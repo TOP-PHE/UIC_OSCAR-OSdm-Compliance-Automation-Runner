@@ -177,7 +177,24 @@ function checkOffersForTrip(body, tripId) {
   return checks;
 }
 
+// What a trip search answered when it gave no trip (#729): its problems,
+// else the members it has, so the run log says why. A real provider answered
+// HTTP 200 with neither an id nor a trip, and the log showed nothing of it.
+function describeTripsAnswer(body) {
+  if (body === null || body === undefined) return ['the answer has no JSON body'];
+  if (Array.isArray(body)) return ['the answer is not an object (a list)'];
+  if (typeof body !== 'object') return [`the answer is not an object (${typeof body})`];
+  const lines = listOf(body.problems).slice(0, 10).map((p, i) => {
+    const code = isText(p?.code) ? p.code : '(no code)';
+    const title = [p?.title, p?.detail].find(isText) || '(no title)';
+    return `problem ${i + 1}: ${code} — ${title}`.slice(0, 300);
+  });
+  const keys = Object.keys(body).slice(0, 20);
+  lines.push(keys.length ? `members of the answer: ${keys.join(', ')}` : 'the answer is an empty object');
+  return lines;
+}
+
 module.exports = {
   UNKNOWN_TRIP_ID, tripsCollectionRequest, vehicleNumbersOf, chooseTrip, checkTripsCollection, offerRequestByTripIds, checkOffersForTrip,
-  coveredTripsOf,
+  coveredTripsOf, describeTripsAnswer,
 };

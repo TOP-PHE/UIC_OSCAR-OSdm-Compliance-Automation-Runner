@@ -2222,6 +2222,9 @@ async function prepareOfferRequestByTripIds() {
   }
   if (!choice.trip) {
     bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, failed: true }));
+    if (status === 200) {
+      for (const line of ti.describeTripsAnswer(body)) validationLogger(`[INFO] POST /trips-collection: ${line}`);
+    }
     validationLogger("[WARNING] Offers by trip id: no trip to ask offers for — the offer request goes out by search criteria, and its answer is not used.");
     return;
   }

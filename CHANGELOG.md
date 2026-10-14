@@ -84,6 +84,37 @@ Checked:
 
 ---
 
+## [server-1.11.279] / [collection-OTST_V2.0.157] — 2026-10-14
+
+Issue #729, release 2026.314. Collection and server tests; no server code.
+
+### Fixed
+- **No empty `productCategory` in a trip specification.** A leg whose Test
+  Data gave no product category was sent with `"productCategory": {}`.
+  OSDM's ProductCategory requires `productCategoryRef`, `name` and
+  `shortName`, and a real provider refused every such offer request as
+  malformed, stopping five scenarios at step 01. The member is now written
+  only when all three are given; when only some are, the run log says why
+  it was left out.
+- **A passenger member the provider says it ignored is a WARNING.** A
+  `PATCH …/passengers/{id}` answered 200 with `PARAMETER_NOT_SUPPORTED`
+  problems ("Parameter 'dateOfBirth' was ignored.") and kept the old value;
+  steps 03 and 04 failed "Date of birth is correct". A member named by such a
+  problem (its `pointers`, else the quoted name in its title) that comes back
+  different is now a WARNING, in 03 and, from what 03 was told, in 04
+  (`__passengerIgnoredFields`). A member the provider did not name still
+  fails.
+- **An empty trip search says what it held.** When `POST /trips-collection`
+  answers 200 with no trip to choose, the run log now lists its problems
+  (code and title, at most ten) and its members.
+
+Checked:
+- Simulator replay, all 89 scenarios, before and after: the same recordings.
+- Unit tests: `bruno-product-category.test.js` (new),
+  `bruno-passenger-update.test.js`, `bruno-trip-ids.test.js`.
+
+---
+
 ## [server-1.11.278] / [collection-OTST_V2.0.156] — 2026-10-14
 
 Issue #727, release 2026.313. Server only; the collection is unchanged.

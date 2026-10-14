@@ -39,7 +39,7 @@ jest.mock('../../../Bruno_Collection/library-bruno/testCapture.js', () => ({
 }));
 
 const sp = require('../../../Bruno_Collection/library-bruno/scenarioParser.js');
-const { patchMultiPassengerResponse } = require('../../../Bruno_Collection/library-bruno/passengers.js');
+const { patchMultiPassengerResponse, ignoredParameters } = require('../../../Bruno_Collection/library-bruno/passengers.js');
 global.validationLogger = () => {};
 
 const SIMULATOR_FILE = path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'data_base', 'simulator_datafile.json');
@@ -131,5 +131,58 @@ describe('patchMultiPassengerResponse: a member not returned', () => {
       'Passenger 0 - First name is correct (expected: Ana, actual: Anna)',
       'Passenger 0 - Date of birth is correct (expected: 1990-01-02, actual: 1990-01-03)',
     ]);
+  });
+});
+
+describe('patchMultiPassengerResponse: a member the provider says it ignored (#729)', () => {
+  const sent = {
+    updateFirstName: 'Ana', updateLastName: 'Example', updateDateOfBirth: '1990-01-16',
+    updateEmail: 'ana@example.org', updatePhoneNumber: '', updateGender: 'X',
+  };
+  const ignoredProblem = (name) => ({
+    code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED', title: `Parameter '${name}' was ignored.`, status: 501,
+  });
+  const kept = { dateOfBirth: '1990-01-15', gender: 'MALE', detail: { firstName: 'Ana', lastName: 'Example', contact: { email: sent.updateEmail } } };
+  const run = (response) => {
+    envStore.offerPassengerNumber = '1';
+    envStore.passengerAdditionalData = JSON.stringify([sent]);
+    withBrunoExpect(() => patchMultiPassengerResponse(response, 0));
+    return mockResults.filter((r) => !r.ok).map((r) => r.name);
+  };
+
+  test('the ignored members are named by the problem\'s pointers, else by its title', () => {
+    expect(ignoredParameters({ problems: [ignoredProblem('dateOfBirth'), ignoredProblem('anonymousPassengerSpecifications.gender')] }))
+      .toEqual(['dateofbirth', 'gender']);
+    expect(ignoredParameters({ problems: [{ code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED', title: 'x', pointers: ['/passenger/dateOfBirth'] }] }))
+      .toEqual(['dateofbirth']);
+    expect(ignoredParameters({ problems: [{ code: 'urn:uic:problem:PROPERTY_SUBSTITUTED', title: "The value of item 'type' has been changed." }] }))
+      .toEqual([]);
+    expect(ignoredParameters({})).toEqual([]);
+    expect(ignoredParameters(null)).toEqual([]);
+  });
+
+  test('step 03: a different value the provider said it ignored is a WARNING, not a failure', () => {
+    const failures = run({ problems: [ignoredProblem('gender'), ignoredProblem('dateOfBirth')], passenger: { id: 'P1', ...kept } });
+    expect(failures).toEqual([]);
+    expect(mockLogs.filter((l) => l.startsWith('[WARNING]'))).toEqual([
+      "[WARNING] Passenger 0 - Date of birth: the provider said it ignored 'dateOfBirth' (sent: 1990-01-16, kept: 1990-01-15).",
+      "[WARNING] Passenger 0 - Gender: the provider said it ignored 'gender' (sent: X, kept: MALE).",
+    ]);
+  });
+
+  test('step 04 (no problem in the answer) grades the members 03 was told were ignored the same way', () => {
+    run({ problems: [ignoredProblem('dateOfBirth')], passenger: { id: 'P1', ...kept, gender: 'X' } });
+    mockResults = []; mockLogs = [];
+    expect(run({ passenger: { id: 'P1', ...kept, gender: 'X' } })).toEqual([]);
+  });
+
+  test('a member the provider did not name stays a failure', () => {
+    const failures = run({ problems: [ignoredProblem('gender')], passenger: { id: 'P1', ...kept, gender: 'X' } });
+    expect(failures).toEqual(['Passenger 0 - Date of birth is correct (expected: 1990-01-16, actual: 1990-01-15)']);
+  });
+
+  test('the ignored members are kept per passenger', () => {
+    run({ problems: [ignoredProblem('dateOfBirth')], passenger: { id: 'P1', ...kept, gender: 'X' } });
+    expect(JSON.parse(envStore.__passengerIgnoredFields)).toEqual({ 0: ['dateofbirth'] });
   });
 });

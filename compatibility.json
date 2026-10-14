@@ -7,11 +7,23 @@
       "release": "2026.315",
       "date": "2026-10-14",
       "server": "1.11.280",
-      "collection": "OTST_V2.0.156",
+      "collection": "OTST_V2.0.157",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Find journeys shows when it searched, with which values, and why it found nothing (#730)."
+
+      ]
+    },
+    {
+      "release": "2026.314",
+      "date": "2026-10-14",
+      "server": "1.11.279",
+      "collection": "OTST_V2.0.157",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "No empty productCategory in trip specifications; passenger members the provider says it ignored are warnings; an empty trip search is explained in the run log (#729)."
       ]
     },
     {
