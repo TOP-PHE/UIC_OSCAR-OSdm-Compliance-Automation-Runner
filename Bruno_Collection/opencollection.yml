@@ -634,6 +634,15 @@ request:
           }
         } catch (_e) { console.log(`[WARNING] H1/H2 check: ${_e && _e.message}`); }
 
+        // ── #736: OSCAR's own request body against the OSDM request schema ──
+        // A body that does not conform is OSCAR's issue, whatever the provider
+        // answered; the check is named "[OSCAR request] …" to say so.
+        try {
+          const { bruTest: _reqBruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+          const { recordRequestConformance } = require(bru.getEnvVar("library_base") + "osdmRequestSchema.js");
+          recordRequestConformance(req, _reqBruTest);
+        } catch (_rcErr) { console.log(`[WARNING] OSCAR request conformance: ${_rcErr && _rcErr.message}`); }
+
         // ── HTML Report: append this request/response ─────────────────────────
         // __rptTests was accumulated via bruTest() across ALL script phases for this request.
         try {

@@ -163,6 +163,19 @@ confirming a refund offer past its `validUntil` (step 13), taking an exchange
 offer past its `preBookableUntil` (step 11). Each refusal must be a 4xx with
 an RFC 9457 Problem body.
 
+### OSCAR's own requests
+
+Every request OSCAR sends with a body (offers, booking, passenger and
+purchaser updates, reservations added later, confirmation, refund and
+exchange) is checked against the OSDM request schema of the version under
+test, once it has gone out: one check per request, named `[OSCAR request]`.
+A failure is OSCAR's issue, not the provider's, whatever the provider
+answered: it lists the paths and members at fault, never their values. The
+negative tests that send a wrong body on purpose (the passenger and purchaser
+sweeps, the empty passenger list) say so and pass. Requests a step's script
+sends itself (the trip search, the Idempotency-Key and after-sale probes) are
+not checked.
+
 ## 4. The ready-made scenarios
 
 ### 4.1 The simulator's data file (89 scenarios)
