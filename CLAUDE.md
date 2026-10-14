@@ -105,7 +105,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the same as "Open a finding". The route file is mounted **before**
     `company-findings.js`, whose `GET /findings/:id` would take
     "suggestions" for an id. Tuned on a real provider's batch (35 failures →
-    18 groups); that data stays in the private repository.
+    18 groups); that data stays in the private repository. **Part 3
+    (1.11.285): a draft's simulator hint** (`simulatorHint()`), from
+    `src/utils/simulator-checks.json`, **generated** by
+    `scripts/generate-simulator-checks.js` from `OSDM_Simulator/replay/after.json`
+    (keys: `hintKey()` = `stepKey|checkText`, the grouping's own; `SIM_WRONG_*`
+    left out). Regenerate it with each replay recording, as `describe` is; a
+    stale table only loses hints, it never gives a wrong category. The step
+    must match exactly after `stepKey()`: "GET Booking after Fulfillments" is
+    not "GET Booking".
 - **Auth-profile dispatcher** (`worker/auth-profiles.js`): pluggable
   token-fetch adapters per vendor quirk — `oauth2_basic`, `oauth2_post`,
   `paxone_json`, `sqills_extension`, `custom` (user JSON template,

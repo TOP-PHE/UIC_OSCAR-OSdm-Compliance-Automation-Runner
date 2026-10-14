@@ -61,6 +61,18 @@ function scopeForTestManager(req, res) {
   return resolveCompanyScope(req, res);
 }
 
+// How each check fared on the simulator (#735, part 3), generated from a
+// replay by scripts/generate-simulator-checks.js. Read once; without it a
+// draft simply carries no hint.
+let simulatorChecks;
+function simulatorTable() {
+  if (simulatorChecks === undefined) {
+    try { simulatorChecks = require('../../utils/simulator-checks.json'); }
+    catch { simulatorChecks = null; }
+  }
+  return simulatorChecks;
+}
+
 const parseJson = (text, fallback) => {
   try { return JSON.parse(text); } catch { return fallback; }
 };
@@ -182,7 +194,7 @@ router.post('/findings/suggestions/analyse', analyseLimiter, (req, res) => {
         scenarios: g.scenarios, runs: g.runs.slice(0, 10), occurrences: g.count });
       continue;
     }
-    tally[upsertDraft(companyId, g, S.draftOf(g, { batchLabel: batchId }), m, batchId)]++;
+    tally[upsertDraft(companyId, g, S.draftOf(g, { batchLabel: batchId, simulatorChecks: simulatorTable() }), m, batchId)]++;
   }
   const finished = batchRuns.filter((r) => FINISHED.has(r.status));
   const notSeen = S.notSeen(findings, matchedIds, finished.map((r) => r.scenario_code).filter(Boolean))

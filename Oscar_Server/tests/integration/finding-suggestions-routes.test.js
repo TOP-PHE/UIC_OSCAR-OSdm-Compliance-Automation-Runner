@@ -128,6 +128,8 @@ describe('#735 analysing a batch', () => {
       title: '02. POST Create Booking answers 400 MISSING_INFORMATION', step: '02. POST Create Booking',
       expectedStatus: 400, category: 'open',
     });
+    // #735 part 3: the same check passes on the simulator (committed table).
+    expect(drafts[0].draft.simulatorHint).toMatchObject({ verdict: 'provider' });
     const stored = get('SELECT draft FROM finding_suggestion WHERE id = ?', [drafts[0].id]).draft;
     expect(stored).not.toContain('MISSING_INFORMATION');
   });

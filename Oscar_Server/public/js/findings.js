@@ -601,6 +601,7 @@
       + '<div style="font-size:11px;color:#90a4ae">' + d.occurrences + ' failure(s) · ' + esc(d.scenarios.join(', ')) + ' · step ' + esc(d.draft.step || '—')
       + (d.draft.expectedStatus ? (' · HTTP ' + esc(d.draft.expectedStatus)) : '') + '</div>'
       + (maybe ? '<div style="font-size:12px;color:#a85b00;margin-top:4px">⚠ May already be recorded as <a href="#" data-action="open-finding" data-id="' + esc(maybe.id) + '">' + esc(maybe.title) + '</a> (same step and scenario).</div>' : '')
+      + renderSimulatorHint(d.draft.simulatorHint)
       + field('title', 'Title') + '<div style="margin-top:8px">' + pills
       + ' <span style="font-size:11px;color:#90a4ae">' + esc(d.draft.reason || '') + '</span></div>'
       + field('observed', 'Observed', 70) + field('interpretation', 'Interpretation (OSCAR\'s reading, spec reference)', 50) + field('evidence', 'Evidence', 50)
@@ -609,6 +610,16 @@
       + '<button class="btn btn-danger btn-sm" data-action="suggest-decide" data-how="reject" data-id="' + esc(d.id) + '" title="Not a finding: it will not be suggested again">Reject</button>'
       + '<button class="btn btn-success btn-sm" data-action="suggest-decide" data-how="accept" data-id="' + esc(d.id) + '">Accept as finding</button>'
       + '</div></div></div>';
+  }
+
+  // #735 part 3: how the same check fared on the simulator. A hint, never a
+  // decision: the category stays the Test Manager's.
+  function renderSimulatorHint(h) {
+    if (!h || !h.text) return '';
+    var look = h.verdict === 'oscar' ? { fg: '#6a1b9a', bg: '#f3e5f5', icon: '🧪' } : { fg: '#1565c0', bg: '#e3f2fd', icon: '🧪' };
+    return '<div style="font-size:12px;margin-top:6px;padding:4px 8px;border-radius:6px;display:inline-block;background:' + look.bg + ';color:' + look.fg + '"'
+      + ' title="The same check on the OSDM simulator, from its last replay. A hint only.">'
+      + look.icon + ' ' + esc(h.text) + '</div>';
   }
 
   function renderDecidedNote(sg) {
