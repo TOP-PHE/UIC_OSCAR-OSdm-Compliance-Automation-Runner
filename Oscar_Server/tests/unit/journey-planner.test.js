@@ -30,6 +30,9 @@ describe('parseTime', () => {
     expect(parseTime('09:10')).toEqual({ local: 550, utc: 550 });
     expect(parseTime('23:59:59Z')).toEqual({ local: 1439, utc: 1439 });
     expect(parseTime('01:00-0130')).toEqual({ local: 60, utc: 150 });
+    expect(parseTime('09:10z')).toEqual({ local: 550, utc: 550 });
+    expect(parseTime('09:10+2')).toBeNull();
+    expect(parseTime('09:10 CET')).toBeNull();
     expect(parseTime('24:00')).toBeNull();
     expect(parseTime('')).toBeNull();
     expect(parseTime('2026-10-14T09:10')).toBeNull();

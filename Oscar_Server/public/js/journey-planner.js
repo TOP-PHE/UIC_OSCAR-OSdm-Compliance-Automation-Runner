@@ -26,12 +26,10 @@
 //
 // Loaded by scenarios.html before scenarios.js (browser global
 // OscarJourneyPlanner) and required by the tests.
-(function (root, factory) {
-  const api = factory(root.OscarTripApply || (typeof require === 'function' ? require('./trip-apply.js') : null));
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.OscarJourneyPlanner = api;
-}(globalThis, function (tripApply) {
+(function (root) {
   'use strict';
+
+  const tripApply = root.OscarTripApply || require('./trip-apply.js');
 
   const DAY = 24 * 60;
   const DEFAULTS = Object.freeze({
@@ -57,18 +55,22 @@
   // minutes since midnight on the clock as written and in UTC (which may be
   // below 0 or above a day). null when not a time.
   function parseTime(time) {
-    const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/i.exec(String(time ?? '').trim());
+    const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(.*)$/.exec(String(time ?? '').trim());
     if (!m) return null;
     const h = Number(m[1]);
     const min = Number(m[2]);
     if (h > 23 || min > 59) return null;
-    let offset = 0;
-    if (m[3] && m[3].toUpperCase() !== 'Z') {
-      const sign = m[3][0] === '-' ? -1 : 1;
-      const digits = m[3].slice(1).replace(':', '');
-      offset = sign * (Number(digits.slice(0, 2)) * 60 + Number(digits.slice(2)));
-    }
+    const offset = offsetOf(m[3]);
+    if (offset === null) return null;
     return { local: h * 60 + min, utc: h * 60 + min - offset };
+  }
+
+  // "", "Z", "+02:00", "+0200" or "-01:30": minutes east of UTC; null otherwise.
+  function offsetOf(text) {
+    if (text === '' || text.toUpperCase() === 'Z') return 0;
+    const m = /^([+-])(\d{2}):?(\d{2})$/.exec(text);
+    if (!m) return null;
+    return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
   }
 
   // Days two calendars share. null stands for "every day"; [] for none.
@@ -211,5 +213,7 @@
     return { journeys: found.slice(0, o.limit), total: found.length, truncated };
   }
 
-  return Object.freeze({ planJourneys, stopKey, parseTime, commonDays, DEFAULTS, SEARCH_BUDGET });
-}));
+  const api = Object.freeze({ planJourneys, stopKey, parseTime, commonDays, DEFAULTS, SEARCH_BUDGET });
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.OscarJourneyPlanner = api;
+}(globalThis));
