@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.318",
+  "current_release": "2026.319",
   "releases": [
+    {
+      "release": "2026.319",
+      "date": "2026-10-14",
+      "server": "1.11.284",
+      "collection": "OTST_V2.0.159",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Findings: drafts suggested from a batch's failures, matched against recorded findings, for the Test Manager to accept, edit or reject (#735)."
+      ]
+    },
     {
       "release": "2026.318",
       "date": "2026-10-14",

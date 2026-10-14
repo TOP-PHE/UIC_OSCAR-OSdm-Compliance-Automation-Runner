@@ -34,15 +34,11 @@ const { requireAuth }   = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
 const { reprojectDatafile }   = require('../../utils/knownDeviationProjection');
+const { CATEGORIES, SEVERITIES, STATUSES, toApiFinding, asStr, asStatus, createFinding } = require('../helpers/findings');
 const log = require('../../utils/logger').child({ module: 'company-findings' });
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
-
-// ── Whitelists (anything else is coerced to a safe default) ───────────────────
-const CATEGORIES = new Set(['open', 'provider_deviation', 'oscar_issue', 'not_supported', 'spec_question']);
-const SEVERITIES = new Set(['major', 'minor', 'not_supported']);
-const STATUSES   = new Set(['open', 'discussing', 'resolved']);
 
 // ── Scope + role guards ───────────────────────────────────────────────────────
 // Findings are vendor test data. Like GET /v1/company/datafile, administrators
@@ -67,36 +63,8 @@ function requireTestManager(req, res) {
 }
 
 // ── Serialisers (snake_case row → camelCase API) ──────────────────────────────
-function toApiFinding(f) {
-  return {
-    id:             f.id,
-    title:          f.title,
-    step:           f.step || null,
-    scenarioCode:   f.scenario_code || null,
-    expectedStatus: (f.expected_status === null || f.expected_status === undefined) ? null : f.expected_status,
-    observed:       f.observed || '',
-    interpretation: f.interpretation || '',
-    category:       f.category,
-    severity:       f.severity || null,
-    status:         f.status,
-    baselineInRun:  !!f.baseline_in_run,
-    raiseToOsdm:    !!f.raise_to_osdm,
-    evidence:       f.evidence || '',
-    createdBy:      f.created_by || null,
-    createdAt:      f.created_at,
-    updatedAt:      f.updated_at
-  };
-}
 function toApiComment(c) {
   return { id: c.id, findingId: c.finding_id, author: c.author, role: c.role || null, body: c.body, createdAt: c.created_at };
-}
-
-function asStr(v) { return (v === null || v === undefined) ? null : String(v); }
-function asStatus(v) {
-  // Accept '', null, a number, or a numeric string. Empty → null (not status-level).
-  if (v === '' || v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 // ── GET /findings — list for the current test-system ──────────────────────────
@@ -141,30 +109,13 @@ router.post('/findings', async (req, res) => {
   const title = String(b.title || '').trim();
   if (!title) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'A finding needs a title.' });
 
-  const id             = crypto.randomUUID();
-  const category       = CATEGORIES.has(b.category) ? b.category : 'open';
-  const severity       = SEVERITIES.has(b.severity) ? b.severity : null;
-  const expectedStatus = asStatus(b.expectedStatus);
-  const step           = b.step ? String(b.step).trim() : null;
-  const scenarioCode   = b.scenarioCode ? String(b.scenarioCode).trim() : null;
-  const baselineInRun  = (b.baselineInRun && expectedStatus !== null && step) ? 1 : 0;
-  const createdBy      = (typeof b.createdBy === 'string' && b.createdBy.trim()) ? b.createdBy.trim() : req.user.email;
+  const f = createFinding(companyId, { ...b, title }, req.user.email);
 
-  run(
-    `INSERT INTO finding
-       (id, company_id, title, step, scenario_code, expected_status, observed, interpretation,
-        category, severity, status, baseline_in_run, raise_to_osdm, evidence, created_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, companyId, title, step, scenarioCode, expectedStatus, asStr(b.observed), asStr(b.interpretation),
-     category, severity, 'open', baselineInRun, b.raiseToOsdm ? 1 : 0, asStr(b.evidence), createdBy]
-  );
-
-  if (baselineInRun) {
+  if (f.baseline_in_run) {
     try { await reprojectDatafile(companyId); }
     catch (err) { log.warn({ err: err.message, companyId }, 'create: reproject failed'); }
   }
 
-  const f = get('SELECT * FROM finding WHERE id = ?', [id]);
   res.status(201).json({ finding: toApiFinding(f) });
 });
 

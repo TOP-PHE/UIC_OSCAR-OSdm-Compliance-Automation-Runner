@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-suggested-findings",
+    "date": "October 14, 2026",
+    "tag": "New",
+    "title": "Test Findings: drafts suggested from a batch's failures",
+    "summary": "Test Managers can ask OSCAR to group a batch's failures into draft findings, see which recorded findings are still seen, and accept, edit or reject each draft.",
+    "content": "On the Test Findings page, \"Suggested from runs\" groups the failed checks of a batch: one draft per problem, with the scenarios that showed it and a proposed category. Findings already recorded are shown as still seen, and those whose scenario ran without the problem as not seen. Each draft can be accepted (after editing it if needed), rejected, or kept as an OSCAR issue. Drafts are visible to Test Managers only, and nothing becomes a finding without your click."
+  },
+  {
     "id": "2026-10-14-oscar-request-check",
     "date": "October 14, 2026",
     "tag": "New",
