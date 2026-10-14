@@ -276,25 +276,28 @@ var TripParameters = class {
   }
 };
 
+// #719: a filter writes only the members it has. OSDM 3.8 makes none of
+// them nullable, and a provider refuses `"lineNumbers": null` or
+// `"carrierFilter": null` as a malformed request.
 var TripDataFilter = class {
   constructor(carrierFilter, vehicleFilter) {
-    this.carrierFilter = carrierFilter;
-    this.vehicleFilter = vehicleFilter;
+    if (carrierFilter) this.carrierFilter = carrierFilter;
+    if (vehicleFilter) this.vehicleFilter = vehicleFilter;
   }
 };
 
 var CarrierFilter = class {
   constructor(carriers, exclude = true) {
     this.carriers = carriers;
-    this.exclude = exclude;
+    if (typeof exclude === 'boolean') this.exclude = exclude;
   }
 };
 
 var VehicleFilter = class {
   constructor(vehicleNumbers, lineNumbers = null, exclude = true) {
-    this.vehicleNumbers = vehicleNumbers;
-    this.lineNumbers = lineNumbers;
-    this.exclude = exclude;
+    if (Array.isArray(vehicleNumbers)) this.vehicleNumbers = vehicleNumbers;
+    if (Array.isArray(lineNumbers)) this.lineNumbers = lineNumbers;
+    if (typeof exclude === 'boolean') this.exclude = exclude;
   }
 };
 

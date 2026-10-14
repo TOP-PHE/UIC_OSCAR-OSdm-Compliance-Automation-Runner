@@ -62,6 +62,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.274] / [collection-OTST_V2.0.154] — 2026-10-14
+
+Issue #719, release 2026.309.
+
+### Fixed
+
+- **The trip search filter no longer sends null members.** A SEARCH trip
+  naming a train or an operator adds `parameters.dataFilter` to `POST
+  /offers`. The `model.js` classes wrote every member, so the request carried
+  `"lineNumbers": null`, and `"carrierFilter": null` or `"vehicleFilter":
+  null` when only one of the two was named. None of them is nullable in OSDM
+  3.8. A real provider answered `400 MALFORMED_REQUEST` to all of them, which
+  stopped 29 of its 32 catalogue copies at step 01. `VehicleFilter`,
+  `CarrierFilter` and `TripDataFilter` now write only the members they have.
+
+### Default decisions (taken without asking)
+
+- `exclude` is still sent as before (`false` for the train and operator the
+  scenario names).
+
+### Not verified
+
+- Not yet run again against the provider.
+
+Checked:
+- Unit tests on the request built (`bruno-search-filter.test.js`): with a
+  train, an operator, both, or neither, there is no null anywhere. Three of
+  these tests fail on the old `model.js`.
+- A replay of 3 simulator scenarios, one of which names a train, gives the
+  same checks as before.
+
+---
+
 ## [server-1.11.273] / [collection-OTST_V2.0.153] — 2026-10-14
 
 Issue #717, release 2026.308.
