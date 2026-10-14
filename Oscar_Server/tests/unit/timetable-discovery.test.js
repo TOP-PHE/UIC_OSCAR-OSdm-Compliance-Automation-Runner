@@ -440,3 +440,88 @@ describe('classifyOfferProbe', () => {
     });
   });
 });
+
+// ── #715: the provider's connections as journeys ─────────────────────────────
+describe('#715 harvestConnections / journeysFromConnections', () => {
+  const td = require('../../src/services/timetable-discovery');
+  const leg = (from, to, dep, arr, veh, names = {}) => ({
+    timedLeg: {
+      start: { stopPlaceRef: from, stopPlaceName: names.from, serviceDeparture: { timetabledTime: `2026-10-19T${dep}+02:00` } },
+      end: { stopPlaceRef: to, stopPlaceName: names.to, serviceArrival: { timetabledTime: `2026-10-19T${arr}+02:00` } },
+      service: { vehicleNumbers: [veh], productCategory: { productCategoryRef: 'R' } },
+    },
+  });
+  const transfer = { transferLeg: { start: {}, end: {} } };
+  const A = 'urn:uic:stn:1000001';
+  const B = 'urn:uic:stn:1000002';
+  const C = 'urn:uic:stn:1000003';
+  const D = 'urn:uic:stn:1000004';
+  const resp = {
+    trips: [
+      { legs: [leg(A, D, '08:00:00', '11:00:00', 'direct')] },
+      { legs: [leg(A, B, '08:00:00', '09:00:00', 'R1', { from: 'Alpha', to: 'Beta' }), transfer, leg(B, D, '09:20:00', '10:30:00', 'R2', { to: 'Delta' })] },
+      { legs: [leg(A, B, '08:00:00', '09:00:00', 'R1'), leg(B, C, '09:10:00', '09:40:00', 'R3'), leg(C, D, '09:50:00', '10:20:00', 'R4')] },
+      { legs: [leg(A, B, '08:00:00', '08:10:00', 'x'), leg(B, C, '08:20:00', '08:30:00', 'y'), leg(C, B, '08:40:00', '08:50:00', 'z'), leg(B, D, '09:00:00', '09:10:00', 'w')] },
+    ],
+  };
+
+  // Store the legs as groupAndMerge would, with ids, the way the route does.
+  function stored(response) {
+    const { toCreate } = td.groupAndMerge(td.harvestTrips(response), [], {});
+    return toCreate.map((c, i) => ({ id: `t${i}`, label: c.label, data: c.data }));
+  }
+
+  test('only trips of 2 or 3 timed legs are connections; transfer legs do not count', () => {
+    const conns = td.harvestConnections(resp);
+    expect(conns.map(c => c.map(l => l.vehicleNumber).join('+'))).toEqual(['R1+R2', 'R1+R3+R4']);
+    expect(td.harvestConnections({})).toEqual([]);
+  });
+
+  test('the searched origin and destination stand at the ends, as for the train sets', () => {
+    const [conn] = td.harvestConnections(resp, { searchedOrigin: 'urn:uic:stn:001000001', searchedDestination: 'urn:uic:stn:1000004' });
+    expect(conn[0].originURN).toBe('urn:uic:stn:001000001');
+    expect(conn[0].destinationURN).toBe(B);
+    expect(conn[1].destinationURN).toBe('urn:uic:stn:1000004');
+  });
+
+  test('each connection becomes a journey over the stored train services', () => {
+    const trains = stored(resp);
+    const { toCreate, skipped } = td.journeysFromConnections(td.harvestConnections(resp), trains, []);
+    expect(skipped).toBe(0);
+    expect(toCreate).toHaveLength(2);
+    const svc = (l) => trains.find(t => t.id === l.trainResourceId).data.services[l.serviceIndex].vehicleNumber;
+    expect(toCreate.map(j => j.data.legs.map(svc).join('+'))).toEqual(['R1+R2', 'R1+R3+R4']);
+    expect(toCreate[0].label).toBe('Alpha → Delta via Beta (08:00)');
+    expect(toCreate[1].label).toBe('1000001 → 1000004 via 1000002, 1000003 (08:00)');
+  });
+
+  test('no duplicate: the same connection on several days, or already stored', () => {
+    const twice = { trips: [...resp.trips, resp.trips[1]] };
+    const trains = stored(twice);
+    const first = td.journeysFromConnections(td.harvestConnections(twice), trains, []);
+    expect(first.toCreate).toHaveLength(2);
+    const again = td.journeysFromConnections(td.harvestConnections(twice), trains, first.toCreate);
+    expect(again.toCreate).toEqual([]);
+  });
+
+  test('a leg with no stored service, or a connection that does not fit one trip date, is skipped', () => {
+    const trains = stored(resp);
+    const withoutR1 = trains.filter(t => !t.data.services.some(x => x.vehicleNumber === 'R1'));
+    const missing = td.journeysFromConnections(td.harvestConnections(resp), withoutR1, []);
+    expect(missing.toCreate).toEqual([]);
+    expect(missing.skipped).toBe(2);
+    const night = { trips: [{ legs: [leg(A, B, '23:00:00', '00:30:00', 'N1'), leg(B, C, '00:45:00', '02:00:00', 'N2')] }] };
+    const r = td.journeysFromConnections(td.harvestConnections(night), stored(night), []);
+    expect(r).toEqual({ toCreate: [], skipped: 1 });
+    const back = { trips: [{ legs: [leg(A, B, '08:00:00', '09:00:00', 'b1'), leg(B, C, '08:30:00', '09:30:00', 'b2')] }] };
+    expect(td.journeysFromConnections(td.harvestConnections(back), stored(back), []).skipped).toBe(1);
+    // A last leg after midnight is fine: nothing follows it.
+    const late = { trips: [{ legs: [leg(A, B, '21:00:00', '22:00:00', 'l1'), leg(B, C, '22:30:00', '00:30:00', 'l2')] }] };
+    expect(td.journeysFromConnections(td.harvestConnections(late), stored(late), []).toCreate).toHaveLength(1);
+  });
+
+  test('a train set running other days is not taken for the leg', () => {
+    const trains = stored(resp).map(t => ({ ...t, data: { ...t.data, daysOfWeek: ['SUN'] } }));
+    expect(td.journeysFromConnections(td.harvestConnections(resp), trains, []).toCreate).toEqual([]);
+  });
+});

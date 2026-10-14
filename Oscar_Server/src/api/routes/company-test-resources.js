@@ -25,21 +25,22 @@ const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = requi
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
-const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
+const { harvestTrips, harvestConnections, journeysFromConnections, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
 // not pin the request handler for minutes.
 const TRIPS_FETCH_TIMEOUT_MS = 20000;
 
-// Discovery harvests from POST /offers only (issue #167). The offer response
-// carries BOTH the timetable (`trips[].legs[].timedLeg`, read by harvestTrips)
-// AND the offered classes/ancillaries (`offers[]`, read by harvestOfferCatalog)
-// — strictly more information than /trips-collection, and it's the path the
-// Bruno run flow always uses, so it works on every sandbox (some, e.g. Chaps,
-// don't implement the optional OJP /trips-collection search at all). The
-// per-endpoint loop is kept generic in case a future vendor needs a fallback.
+// Discovery harvests from POST /offers by default (issue #167). The offer
+// response carries BOTH the timetable (`trips[].legs[].timedLeg`, read by
+// harvestTrips) AND the offered classes/ancillaries (`offers[]`, read by
+// harvestOfferCatalog), and it's the path the Bruno run flow always uses, so
+// it works on every sandbox. #715: the Test Manager may ask for the trip
+// search instead (`searchWith: 'trips-collection'`): timetables only, with
+// /offers as the fallback on a day it fails or gives no trip.
 const DISCOVERY_ENDPOINTS = ['offers'];
+const TRIP_SEARCH_ENDPOINTS = ['trips-collection', 'offers'];
 
 // Normalize a station identifier to an OSDM URN. Accepts a full
 // `urn:uic:stn:8400058` or a bare code `8400058` (convenience).
@@ -217,6 +218,28 @@ router.delete('/test-resources/:id', (req, res) => {
   return res.json({ deleted: true });
 });
 
+// #715: store the provider's connections as JOURNEY resources, once their legs
+// are stored as train services. { created: [{id, label}], skipped }.
+function createConnectionJourneys(companyId, connections) {
+  if (connections.length === 0) return { created: [], skipped: 0 };
+  const decoded = (type) => all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [companyId, type])
+    .map(r => {
+      let data = {};
+      try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
+      return { id: r.id, label: r.label, data };
+    });
+  const { toCreate, skipped } = journeysFromConnections(connections, decoded('TRAIN'), decoded('JOURNEY'));
+  const created = toCreate.map(j => {
+    const id = uuidv4();
+    run(
+      `INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'JOURNEY', ?, ?)`,
+      [id, companyId, j.label, colEncrypt(JSON.stringify(j.data))]
+    );
+    return { id, label: j.label };
+  });
+  return { created, skipped };
+}
+
 // ── POST /v1/company/test-resources/discover-timetable (issue #157,#159,#167) ─
 // "Train Timetable Discovery" — reverse-engineer train-set test data from the
 // offers a sandbox actually returns. For an O&D across the next N days (1..14,
@@ -238,6 +261,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   let days = Number.parseInt(req.body?.days, 10);
   if (!Number.isInteger(days) || days < 1) days = 7;
   if (days > 14) days = 14;
+  const endpoints = req.body?.searchWith === 'trips-collection' ? TRIP_SEARCH_ENDPOINTS : DISCOVERY_ENDPOINTS;
 
   // api_base lives on the company; OSDM credentials live on the tester.
   const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
@@ -271,6 +295,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   // we don't keep probing the unsupported one (issue #159).
   const dates = searchDates(days, new Date());
   const harvested = [];
+  const connections = [];   // #715: trips of 2 or 3 legs, made journeys below
   const dayResults = [];
   // Accumulate the offer "catalog" (travel/service classes + ancillaries the
   // sandbox actually offered) across days, to prefill Service Configuration.
@@ -280,7 +305,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   let preferred = null;   // endpoint that worked on a previous day
 
   for (const date of dates) {
-    const order = preferred ? [preferred] : DISCOVERY_ENDPOINTS;
+    const order = preferred ? [preferred] : endpoints;
     let via = null;
     let lastStatus = 0;
     let lastError = '';
@@ -318,6 +343,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
 
     if (via) {
       harvested.push(...dayRecs);
+      connections.push(...harvestConnections(dayJson, { searchedOrigin: origin, searchedDestination: destination }));
       // Harvest the offered classes/ancillaries (no-op on a trips-collection
       // response, which has no offers[]).
       const oc = harvestOfferCatalog(dayJson);
@@ -397,8 +423,11 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
     updated.push({ id: u.id, label: u.label });
   }
 
-  log.info({ companyId: targetCompanyId, origin, destination, days, ...summary }, 'Timetable discovery completed');
-  return res.json({ summary, created, updated, dayResults, offerProbe });
+  // #715: the provider's connections, as journeys over the services just stored.
+  const journeys = createConnectionJourneys(targetCompanyId, connections);
+
+  log.info({ companyId: targetCompanyId, origin, destination, days, ...summary, journeysCreated: journeys.created.length }, 'Timetable discovery completed');
+  return res.json({ summary, created, updated, dayResults, offerProbe, journeys });
 });
 
 // ── POST /v1/company/test-resources/reprobe-offers (#369) ────────────────────

@@ -5002,6 +5002,13 @@ function openTimetableDiscovery() {
         <label style="font-size:12px;color:#455a64;font-weight:600">Days to scan (1–14)
           <input id="tt-days" class="param-input" type="number" min="1" max="14" value="7" style="margin-top:3px;width:90px">
         </label>
+        <label style="font-size:12px;color:#455a64;font-weight:600">Search with
+          <select id="tt-search-with" class="param-input param-select" style="margin-top:3px;max-width:340px">
+            <option value="offers" selected>Offers (POST /offers) — default</option>
+            <option value="trips-collection">Trip search (POST /trips-collection), then offers if it fails</option>
+          </select>
+        </label>
+        <div style="font-size:11.5px;color:#78909c;line-height:1.5">Trips with 2 or 3 legs are also kept as journeys, so a pair of stations without a direct train gives you its connections.</div>
       </div>
       <div id="tt-discover-status" style="margin-top:14px;font-size:12.5px;color:#546e7a"></div>
       <div id="tt-discover-result" style="margin-top:12px"></div>
@@ -5033,6 +5040,7 @@ async function runTimetableDiscovery() {
 
   const originURN = originEl.value.trim();
   const destinationURN = destEl.value.trim();
+  const searchWith = document.getElementById('tt-search-with')?.value || 'offers';
   let days = Number.parseInt(daysEl?.value, 10);
   if (!Number.isInteger(days) || days < 1) days = 7;
   if (days > 14) days = 14;
@@ -5052,7 +5060,7 @@ async function runTimetableDiscovery() {
     const res = await fetch('/v1/company/test-resources/discover-timetable', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originURN, destinationURN, days })
+      body: JSON.stringify({ originURN, destinationURN, days, searchWith })
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -5063,7 +5071,7 @@ async function runTimetableDiscovery() {
     }
     const s = body.summary || {};
     statusEl.style.color = '#2e7d32';
-    statusEl.textContent = `✅ Found ${s.routesDiscovered || 0} route(s), ${s.servicesDiscovered || 0} service(s). Created ${s.created || 0}, updated ${s.updated || 0} train set(s).`;
+    statusEl.textContent = `✅ Found ${s.routesDiscovered || 0} route(s), ${s.servicesDiscovered || 0} service(s). Created ${s.created || 0}, updated ${s.updated || 0} train set(s)${discoveryJourneysText(body.journeys)}.`;
     renderDiscoveryResult(resultEl, body);
 
     // Reload + re-render ALL sections from the server so the new/updated train
@@ -5079,6 +5087,12 @@ async function runTimetableDiscovery() {
   }
 }
 
+// #715: ", 2 journey(s)" for the status line, '' when Discovery made none.
+function discoveryJourneysText(journeys) {
+  const n = Array.isArray(journeys?.created) ? journeys.created.length : 0;
+  return n > 0 ? `, ${n} journey(s)` : '';
+}
+
 // Render the created/updated lists + per-day breakdown into the modal.
 function renderDiscoveryResult(el, body) {
   if (!el) return;
@@ -5090,7 +5104,8 @@ function renderDiscoveryResult(el, body) {
     return `<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#455a64">${esc(title)} (${arr.length})</div>
         <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#546e7a">${items}</ul></div>`;
   };
-  el.innerHTML = list('Created train sets', created) + list('Updated train sets', updated);
+  el.innerHTML = list('Created train sets', created) + list('Updated train sets', updated)
+    + list('Created journeys (the provider\'s connections)', body.journeys?.created || []);
   renderDiscoveryDays(el, body.dayResults || []);
 }
 

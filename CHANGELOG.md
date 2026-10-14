@@ -62,6 +62,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.272] / [collection-OTST_V2.0.152] — 2026-10-14
+
+Issue #715, release 2026.307. Server only; the collection is unchanged.
+
+*Find journeys* (#711) only chains the trains already in Test Data, and a
+Test Manager who does not know a provider's network has none that connect.
+The provider knows its connections: Discovery now keeps them.
+
+### Added
+
+- **Discover timetable keeps the provider's connections as journeys.**
+  - Each trip of 2 or 3 timed legs in the answer becomes a JOURNEY resource
+    over the train services Discovery stores for its legs
+    (`harvestConnections()` and `journeysFromConnections()` in
+    `services/timetable-discovery.js`).
+  - A journey with the same legs is not created twice, across days or runs.
+  - A connection that does not fit one trip date is left out: a later leg
+    leaving before the previous one arrives, or a leg after midnight that is
+    not the last. Every leg of a journey runs on the trip date.
+  - A pair of stations with no direct train therefore gives its
+    connections, ready to apply to a scenario.
+- **Discover timetable → Search with:** *Offers* (`POST /offers`, the
+  default as before) or *Trip search* (`POST /trips-collection`, with the
+  same trip search body the collection sends since #602). On a day the trip
+  search fails or gives no trip, Discovery asks `/offers`; it then stays on
+  the endpoint that worked. The answer and the page list the journeys
+  created.
+
+### Default decisions (taken without asking)
+
+- Trips of 2 or 3 legs only, as in Find journeys; transfer legs between
+  trains do not count as legs.
+- The journey's label is the stop-place names (codes when the provider
+  gives none), the change stations and the departure time.
+
+### Not verified
+
+- Not run against a real provider.
+- The simulator's trip search gives direct trips only, so it cannot show a
+  connection. The behaviour is covered by unit tests on trip answers with 2
+  and 3 legs, and by route tests with a stubbed provider.
+
+Checked:
+- Each rule shown to fail its test when removed.
+- The Discover window in a browser, with a stubbed answer: the option is
+  sent, and the journeys are listed.
+
+---
+
 ## [server-1.11.271] / [collection-OTST_V2.0.152] — 2026-10-14
 
 Issue #713, release 2026.306.

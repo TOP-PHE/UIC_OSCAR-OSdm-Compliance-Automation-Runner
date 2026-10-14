@@ -28,7 +28,7 @@ const jwt     = require('jsonwebtoken');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
-const { run, get, encrypt } = require('../../src/db/db');
+const { run, get, all, encrypt } = require('../../src/db/db');
 
 const app = buildAppWithRoute('/v1/company', '../../src/api/routes/company-test-resources');
 
@@ -235,6 +235,92 @@ describe('test-resources — discover-timetable', () => {
       global.fetch = origFetch;
       run(`UPDATE companies SET extra_headers = NULL WHERE id = ?`, [companyId]);
     }
+  });
+});
+
+// ── #715: connections as journeys, and the trip search ─────────────────────────
+describe('test-resources — discover-timetable keeps connections (#715)', () => {
+  const { colDecrypt } = require('../../src/db/db');
+  const leg = (from, to, dep, arr, veh) => ({
+    timedLeg: {
+      start: { stopPlaceRef: from, serviceDeparture: { timetabledTime: `2026-10-19T${dep}` } },
+      end: { stopPlaceRef: to, serviceArrival: { timetabledTime: `2026-10-19T${arr}` } },
+      service: { vehicleNumbers: [veh], productCategory: { productCategoryRef: 'R' } },
+    },
+  });
+  const O = 'urn:uic:stn:7100001';
+  const V = 'urn:uic:stn:7100002';
+  const T = 'urn:uic:stn:7100003';
+  const payload = { trips: [{ legs: [leg(O, V, '08:00:00', '08:50:00', 'R 801'), leg(V, T, '09:10:00', '10:45:00', 'EC 171')] }] };
+  const journeys = () => all(`SELECT * FROM test_resources WHERE company_id = ? AND resource_type = 'JOURNEY'`, [companyId])
+    .map(r => ({ label: r.label, data: JSON.parse(colDecrypt(r.data)) }));
+  const discover = (body) => request(app).post('/v1/company/test-resources/discover-timetable')
+    .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+    .send({ originURN: O, destinationURN: T, days: 1, ...body });
+
+  afterEach(() => run(`DELETE FROM test_resources WHERE company_id = ?`, [companyId]));
+
+  test('a trip of two legs becomes a journey over the two train sets, once', async () => {
+    const origFetch = global.fetch;
+    const urls = [];
+    global.fetch = async (url) => { urls.push(String(url)); return { ok: true, status: 200, text: async () => JSON.stringify(payload) }; };
+    try {
+      const res = await discover({});
+      expect(res.status).toBe(200);
+      expect(urls.every(u => u.endsWith('/offers'))).toBe(true);
+      expect(res.body.journeys.created).toHaveLength(1);
+      const [j] = journeys();
+      expect(j.label).toBe('7100001 → 7100003 via 7100002 (08:00)');
+      const trains = all(`SELECT * FROM test_resources WHERE company_id = ? AND resource_type = 'TRAIN'`, [companyId])
+        .map(r => ({ id: r.id, data: JSON.parse(colDecrypt(r.data)) }));
+      const vehicle = (l) => trains.find(t => t.id === l.trainResourceId).data.services[l.serviceIndex].vehicleNumber;
+      expect(j.data.legs.map(vehicle)).toEqual(['R 801', 'EC 171']);
+      // Discovering again finds the same connection: nothing new.
+      const again = await discover({});
+      expect(again.body.journeys.created).toEqual([]);
+      expect(journeys()).toHaveLength(1);
+    } finally { global.fetch = origFetch; }
+  });
+
+  test('the trip search is asked first when chosen, and /offers when it fails', async () => {
+    const origFetch = global.fetch;
+    const urls = [];
+    global.fetch = async (url) => {
+      urls.push(String(url));
+      if (String(url).endsWith('/trips-collection')) return { ok: false, status: 501, text: async () => 'not implemented' };
+      return { ok: true, status: 200, text: async () => JSON.stringify(payload) };
+    };
+    try {
+      const res = await discover({ searchWith: 'trips-collection' });
+      expect(res.status).toBe(200);
+      expect(urls.map(u => u.split('/').pop())).toEqual(['trips-collection', 'offers']);
+      expect(res.body.dayResults[0].via).toBe('offers');
+      expect(res.body.journeys.created).toHaveLength(1);
+    } finally { global.fetch = origFetch; }
+  });
+
+  test('the trip search answer alone is enough', async () => {
+    const origFetch = global.fetch;
+    const urls = [];
+    global.fetch = async (url) => { urls.push(String(url)); return { ok: true, status: 200, text: async () => JSON.stringify(payload) }; };
+    try {
+      const res = await discover({ searchWith: 'trips-collection' });
+      expect(urls.map(u => u.split('/').pop())).toEqual(['trips-collection']);
+      expect(res.body.dayResults[0].via).toBe('trips-collection');
+      expect(res.body.journeys.created).toHaveLength(1);
+    } finally { global.fetch = origFetch; }
+  });
+
+  test('any other value searches with /offers', async () => {
+    const origFetch = global.fetch;
+    const urls = [];
+    global.fetch = async (url) => { urls.push(String(url)); return { ok: true, status: 200, text: async () => JSON.stringify({ trips: [] }) }; };
+    try {
+      const res = await discover({ searchWith: 'something' });
+      expect(res.status).toBe(200);
+      expect(urls.map(u => u.split('/').pop())).toEqual(['offers']);
+      expect(res.body.journeys).toEqual({ created: [], skipped: 0 });
+    } finally { global.fetch = origFetch; }
   });
 });
 
