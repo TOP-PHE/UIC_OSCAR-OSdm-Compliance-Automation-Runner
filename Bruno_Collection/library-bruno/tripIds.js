@@ -186,7 +186,7 @@ function describeTripsAnswer(body) {
   if (typeof body !== 'object') return [`the answer is not an object (${typeof body})`];
   const lines = listOf(body.problems).slice(0, 10).map((p, i) => {
     const code = isText(p?.code) ? p.code : '(no code)';
-    const title = isText(p?.title) ? p.title : (isText(p?.detail) ? p.detail : '(no title)');
+    const title = [p?.title, p?.detail].find(isText) || '(no title)';
     return `problem ${i + 1}: ${code} — ${title}`.slice(0, 300);
   });
   const keys = Object.keys(body).slice(0, 20);
