@@ -15,6 +15,17 @@
       ]
     },
     {
+      "release": "2026.310",
+      "date": "2026-10-14",
+      "server": "1.11.275",
+      "collection": "OTST_V2.0.155",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "The departure date probe reads the refusal's reason: a refusal for another reason no longer passes (#721)."
+      ]
+    },
+    {
       "release": "2026.309",
       "date": "2026-10-14",
       "server": "1.11.274",

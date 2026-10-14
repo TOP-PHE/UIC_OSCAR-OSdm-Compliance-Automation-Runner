@@ -262,7 +262,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `NHF_SALE_TOO_MANY_PASSENGERS` | One passenger more than the provider's maximum: the offer request, or else the booking, must be refused. | the maximum number of passengers | 70 | `SIM_NHF_TOO_MANY_PASSENGERS_38` |
 | `NHF_SALE_NO_PASSENGER` | An offer request with no passenger at all must be refused. | — | 70 | `SIM_NHF_NO_PASSENGER_38` |
 | `NHF_SALE_BEYOND_SALES_HORIZON` | A departure one day beyond the provider's sales horizon: the offer request must be refused, or give no offer. | the sales horizon | 69 | `SIM_NHF_BEYOND_SALES_HORIZON_38` |
-| `NHF_SALE_DEPARTURE_IN_PAST` | A departure yesterday: the offer request must be refused, or give no offer. | — | 70 | `SIM_NHF_DEPARTURE_IN_PAST_38` |
+| `NHF_SALE_DEPARTURE_IN_PAST` | A departure yesterday: the offer request must be refused, or give no offer. | — | 71 | `SIM_NHF_DEPARTURE_IN_PAST_38` |
 | `NHF_CONFIRM_TWICE` | A booking confirmed twice: the second confirmation must give the same tickets, or be refused; never new ones. | — | 231 | `SIM_NHF_CONFIRM_AGAIN_38` |
 | `NHF_REFUND_TWICE` | A ticket refunded in full cannot be refunded again: the second refund offer request must be refused. | REFUND_FULL | 346 | `SIM_NHF_REFUND_AGAIN_38` |
 | `NHF_EXCHANGE_REFUNDED` | A ticket refunded in full cannot be exchanged: the exchange offer request must be refused. | REFUND_FULL, EXCHANGE_FULL | 346 | `SIM_NHF_EXCHANGE_REFUNDED_38` |
