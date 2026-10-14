@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-is-reservation-required",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Fewer false warnings on booked parts",
+    "summary": "The booking step no longer warns about an optional field that neither the offer nor the booking gives.",
+    "content": "The booking step compared the 'reservation required' flag of each part between the offer and the booking, and warned whenever it was missing. That flag is optional, and only exists on admissions, so a provider that never sends it got a warning on every part. OSCAR now warns only when the offer and the booking disagree on whether the flag is there."
+  },
+  {
     "id": "2026-10-14-mandatory-reservation-place-selection",
     "date": "October 14, 2026",
     "tag": "Fix",

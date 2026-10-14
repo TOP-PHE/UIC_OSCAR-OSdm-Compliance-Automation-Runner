@@ -1116,7 +1116,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     which every `testCapture` mock in the tests must also provide); an
     `overallFlexibility` that one of the offer's products has passes (OSDM:
     "best represent this offer"). Read `required` in the 3.8 file before
-    writing an "exists" check.
+    writing an "exists" check. An optional member compared between offer and
+    booking warns only when one side has it (#744,
+    `validatePartEqualityFields()`); `isReservationRequired` is on admissions
+    only.
   - **A step a script routes to must not be one the run filter skips**
     (#652, OTST_V2.0.132). A skipped request runs no script, so its routing
     never happens and Bruno goes on down the folder (a skipped 08 reached

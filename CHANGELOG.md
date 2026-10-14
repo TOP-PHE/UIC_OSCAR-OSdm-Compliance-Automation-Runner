@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.287] / [collection-OTST_V2.0.161] — 2026-10-14
+
+Issue #744, release 2026.322. Collection and server tests; no server code.
+
+### Fixed
+- **No more "'isReservationRequired' missing in offer or booking" warning
+  for a member nobody gave.** A real provider's booking step logged it on
+  the admission and on the reservation, because the provider never sends
+  `isReservationRequired`. In OSDM the member is optional and exists on
+  admissions only. A member compared between the offer and the booking now
+  gives a WARNING only when one side has it ("is in the offer but not in the
+  booking"); absent on both sides it is a DEBUG line. `isReservationRequired`
+  is no longer looked for on reservation and ancillary parts.
+
+Checked:
+- Simulator replay, all scenarios, before and after: same checks.
+- Unit tests in `bruno-bookings-part-pairing.test.js`; three of the four new
+  tests fail on the old code.
+
+---
+
 ## [server-1.11.286] / [collection-OTST_V2.0.160] — 2026-10-14
 
 Issue #742, release 2026.321. Collection and server tests; no server code.
