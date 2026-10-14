@@ -182,7 +182,8 @@ function checkOffersForTrip(body, tripId) {
 // HTTP 200 with neither an id nor a trip, and the log showed nothing of it.
 function describeTripsAnswer(body) {
   if (body === null || body === undefined) return ['the answer has no JSON body'];
-  if (typeof body !== 'object' || Array.isArray(body)) return [`the answer is not an object (${Array.isArray(body) ? 'a list' : typeof body})`];
+  if (Array.isArray(body)) return ['the answer is not an object (a list)'];
+  if (typeof body !== 'object') return [`the answer is not an object (${typeof body})`];
   const lines = listOf(body.problems).slice(0, 10).map((p, i) => {
     const code = isText(p?.code) ? p.code : '(no code)';
     const title = isText(p?.title) ? p.title : (isText(p?.detail) ? p.detail : '(no title)');

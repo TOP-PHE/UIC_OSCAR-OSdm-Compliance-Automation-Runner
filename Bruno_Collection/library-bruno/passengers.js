@@ -21,23 +21,24 @@ module.exports = {
 // name in its title. Only the last segment is kept, lower-cased.
 function ignoredParameters(response) {
   const problems = Array.isArray(response?.problems) ? response.problems : [];
-  const names = [];
-  for (const p of problems) {
-    if (!p || typeof p !== 'object') continue;
-    const code = String(p.code || '');
-    const title = String(p.title || '');
-    if (!code.endsWith('PARAMETER_NOT_SUPPORTED') && !/\bignored\b/i.test(title)) continue;
-    const refs = Array.isArray(p.pointers) && p.pointers.length ? p.pointers.map(String) : [];
-    if (!refs.length) {
-      const m = /'([^']+)'/.exec(title);
-      if (m) refs.push(m[1]);
-    }
-    for (const ref of refs) {
-      const last = ref.split(/[./]/).filter(Boolean).pop();
-      if (last) names.push(last.toLowerCase());
-    }
+  return [...new Set(problems.flatMap(ignoredNamesOf))];
+}
+
+// The members one problem says were ignored, lower-cased; [] for any other problem.
+function ignoredNamesOf(p) {
+  if (!p || typeof p !== 'object') return [];
+  const code = String(p.code || '');
+  const title = String(p.title || '');
+  if (!code.endsWith('PARAMETER_NOT_SUPPORTED') && !/\bignored\b/i.test(title)) return [];
+  let refs = Array.isArray(p.pointers) ? p.pointers.map(String) : [];
+  if (!refs.length) {
+    const m = /'([^']+)'/.exec(title);
+    refs = m ? [m[1]] : [];
   }
-  return [...new Set(names)];
+  return refs
+    .map((ref) => ref.split(/[./]/).findLast(Boolean))
+    .filter(Boolean)
+    .map((name) => name.toLowerCase());
 }
 
 // The ignored members are kept per passenger from 03 so that 04 (a GET, with
@@ -46,7 +47,8 @@ function ignoredFor(response, passengerIndex) {
   let kept = {};
   try {
     const raw = bru.getEnvVar("__passengerIgnoredFields");
-    kept = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : {};
+    if (typeof raw === "string" && raw) kept = JSON.parse(raw);
+    else if (raw && typeof raw === "object") kept = raw;
   } catch { kept = {}; }
   const fromAnswer = ignoredParameters(response);
   if (fromAnswer.length) {
