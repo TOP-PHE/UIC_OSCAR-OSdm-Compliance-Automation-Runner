@@ -132,8 +132,7 @@ function checkAlternatives(value, schema, ctx, path) {
     if (!trial.issues.length) return;
     if (!best || trial.issues.length < best.length) best = trial.issues;
   }
-  ctx.issues.push(`${path || '(body)'}: fits none of the ${schema.anyOf.length} forms OSDM allows; the closest says:`);
-  ctx.issues.push(...best);
+  ctx.issues.push(`${path || '(body)'}: fits none of the ${schema.anyOf.length} forms OSDM allows; the closest says:`, ...best);
 }
 
 // A discriminated type (PlaceRef) stands for the subtype its value names in
@@ -144,7 +143,7 @@ function subtypeNamed(value, schema, ctx) {
   const d = schema.discriminator;
   if (!d || typeOf(value) !== 'object' || typeof value[d.propertyName] !== 'string') return null;
   const named = value[d.propertyName];
-  const target = (d.mapping && d.mapping[named]) || named;
+  const target = d.mapping?.[named] || named;
   if (target === ctx.owner) return null;
   return ctx.schemas[target] ? target : '';
 }
@@ -250,7 +249,7 @@ function recordRequestConformance(req, bruTest) {
     bruTest(check.name, () => { if (!check.ok) throw new Error(check.message); });
     return check;
   } catch (e) {
-    console.log(`[WARNING] OSCAR request conformance check could not run: ${e && e.message}`);
+    console.log(`[WARNING] OSCAR request conformance check could not run: ${e?.message}`);
     return null;
   }
 }
