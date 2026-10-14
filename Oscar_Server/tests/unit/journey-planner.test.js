@@ -190,3 +190,33 @@ describe('stats (#730): what the search had to work with', () => {
     expect(planJourneys([train(1, 'urn:uic:stn:8101003', B, [svc('1', '08:00', '09:00')])], 'urn:uic:stn:8101081', B).stats.fromOrigin).toBe(0);
   });
 });
+
+describe('stop places of Test Data (#733)', () => {
+  const { stopPlacesOf, findStopPlaces } = require('../../public/js/journey-planner.js');
+  const resources = [
+    { ...train(1, 'urn:uic:stn:8101003', 'urn:uic:stn:8001071', [], { originName: 'Wien Hbf', destinationName: 'Berlin Hbf' }), label: 'RJ Wien Hbf→Berlin Hbf' },
+    { ...train(2, 'urn:uic:stn:008101003', 'urn:uic:stn:8100108', []), label: 'RJ Wien→Linz' },
+    { ...train(3, 'urn:uic:stn:8100108', 'urn:uic:stn:8101081', [], { destinationName: 'Wien Meidling' }), id: null, label: 'unsaved' },
+    { id: 4, resource_type: 'JOURNEY', data: '{}' },
+  ];
+
+  test('one entry per place, with the name given and the train sets using it', () => {
+    const places = stopPlacesOf(resources);
+    expect(places.map((p) => p.id)).toEqual(['urn:uic:stn:8101003', 'urn:uic:stn:8001071', 'urn:uic:stn:8100108', 'urn:uic:stn:8101081']);
+    expect(places[0]).toEqual({ id: 'urn:uic:stn:8101003', name: 'Wien Hbf', trainSets: ['RJ Wien Hbf→Berlin Hbf', 'RJ Wien→Linz'] });
+    expect(places[2].name).toBe('');
+  });
+
+  test('matches by name first, then code, then a train set label; accents and case do not matter', () => {
+    expect(findStopPlaces(resources, 'wien').map((p) => p.id)).toEqual([
+      'urn:uic:stn:8101003', 'urn:uic:stn:8101081', 'urn:uic:stn:8001071', 'urn:uic:stn:8100108',
+    ]);
+    expect(findStopPlaces(resources, '8101081').map((p) => p.id)).toEqual(['urn:uic:stn:8101081']);
+    expect(findStopPlaces(resources, 'urn:uic:stn:008101081').map((p) => p.id)).toEqual(['urn:uic:stn:8101081']);
+    // A name match ranks before a train set label that names the place.
+    expect(findStopPlaces(resources, 'BÉRLIN').map((p) => p.id)).toEqual(['urn:uic:stn:8001071', 'urn:uic:stn:8101003']);
+    expect(findStopPlaces(resources, 'w')).toEqual([]);
+    expect(findStopPlaces(undefined, 'wien')).toEqual([]);
+    expect(findStopPlaces(resources, 'wien', 1)).toHaveLength(1);
+  });
+});

@@ -1164,3 +1164,32 @@ describe('#730 Find journeys says when it searched, with what, and why it found 
       .toBe('No journey found: 4 service(s) leave the origin and 2 reach the destination, but none connect within the transfer limits. Add the trains in between, or allow a longer wait.');
   });
 });
+
+describe('#733 the place lookup offers Test Data stop places first', () => {
+  const planner = require('../../public/js/journey-planner.js');
+  const esc = require('../../public/js/esc.js').esc;
+  const merge = loadFunction('js/scenarios.js', 'mergePlaceLookups', { OscarJourneyPlanner: planner });
+  const item = loadFunction('js/scenarios.js', 'placeLookupItemHtml', { esc });
+  const failure = loadFunction('js/scenarios.js', 'placesDownloadFailure');
+
+  test('Test Data places first, cached ones not already listed after, at most the limit', () => {
+    const local = [{ id: 'urn:uic:stn:8101003', name: 'Wien Hbf', trainSets: ['a'], fromTestData: true }];
+    const cached = [{ id: 'urn:uic:stn:008101003', name: 'Wien Hbf' }, { id: 'urn:uic:stn:8101081', name: 'Wien Meidling' }, null];
+    expect(merge(local, cached).map((p) => p.id)).toEqual(['urn:uic:stn:8101003', 'urn:uic:stn:8101081']);
+    expect(merge(local, cached, 1)).toHaveLength(1);
+  });
+
+  test('a Test Data row shows its train sets; a nameless one shows its code; text is escaped', () => {
+    const html = item({ id: 'urn:uic:stn:1', name: '', trainSets: ['A<b>', 'B', 'C'], fromTestData: true }, 0, true);
+    expect(html).toContain('Test Data · A&lt;b&gt;, B +1');
+    expect(html).toContain('<div style="color:#263238">urn:uic:stn:1</div>');
+    expect(html).toContain('background:#e8f4fb');
+    expect(item({ id: 'u', name: 'N' }, 1, false)).not.toContain('Test Data');
+  });
+
+  test('a provider without GET /places is told apart from a failure', () => {
+    expect(failure({ vendor_status: 501, detail: 'x' }, 502)).toBe('The provider does not offer the list of stop places (GET /places answered HTTP 501). The origin/destination lookup offers the stop places of your Test Data instead.');
+    expect(failure({ vendor_status: 500, detail: 'GET /places returned HTTP 500' }, 502)).toBe('Places download failed: GET /places returned HTTP 500');
+    expect(failure({}, 400)).toBe('Places download failed: HTTP 400');
+  });
+});

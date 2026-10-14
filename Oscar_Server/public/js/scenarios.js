@@ -5177,7 +5177,7 @@ async function refreshPlacesStatus() {
     if (!res.ok) { el.textContent = ''; return; }
     const b = await res.json();
     if (!b.place_count) {
-      el.textContent = 'No places cached yet — click Download places to enable the origin/destination lookup.';
+      el.textContent = 'No provider places cached: the origin/destination lookup offers the stop places of your Test Data. Download places adds the provider\'s list, when it has one.';
       el.style.color = '#b0885a';
     } else {
       el.textContent = `${b.place_count} place(s) cached${b.cached_at ? ' · ' + placesAgo(b.cached_at) : ''}`;
@@ -5197,6 +5197,17 @@ function placesAgo(ts) {
   return Math.floor(secs / 86400) + 'd ago';
 }
 
+// What a failed Download places says (#733). A provider without GET /places
+// (501, 404, 405) is not an error of OSCAR's: the lookup then offers the stop
+// places of Test Data.
+function placesDownloadFailure(body, status) {
+  const vs = body?.vendor_status;
+  if ([404, 405, 501].includes(vs)) {
+    return `The provider does not offer the list of stop places (GET /places answered HTTP ${vs}). The origin/destination lookup offers the stop places of your Test Data instead.`;
+  }
+  return `Places download failed: ${body?.detail || body?.title || ('HTTP ' + status)}`;
+}
+
 // POST /places/refresh — bulk-download from the vendor and re-render the status.
 async function downloadPlaces(btn) {
   const original = btn ? btn.textContent : '';
@@ -5205,7 +5216,7 @@ async function downloadPlaces(btn) {
     const res = await fetch('/v1/company/places/refresh', { method: 'POST' });
     const b = await res.json().catch(() => ({}));
     if (!res.ok) {
-      oscarToast(`Places download failed: ${b.detail || b.title || ('HTTP ' + res.status)}`, 'error');
+      oscarToast(placesDownloadFailure(b, res.status), [404, 405, 501].includes(b.vendor_status) ? 'warn' : 'error');
       return;
     }
     oscarToast(`Cached ${b.place_count} stop place(s)${b.truncated ? ' (list truncated — see server log)' : ''}.`, b.place_count ? 'success' : 'warn');
@@ -5226,6 +5237,29 @@ document.body.addEventListener('focusin', function(e) {
     attachPlaceAutocomplete(input);
   }
 });
+
+// Test Data's stop places, then the cached ones not already among them (#733),
+// at most `limit` in all.
+function mergePlaceLookups(local, cached, limit = 20) {
+  const key = (id) => OscarJourneyPlanner.stopKey(id);
+  const seen = new Set(local.map((p) => key(p.id)));
+  return [...local, ...cached.filter((p) => p && !seen.has(key(p.id)))].slice(0, limit);
+}
+
+// One row of the place lookup. A Test Data place shows the train sets that use
+// it, since it may have no name.
+function placeLookupItemHtml(p, i, isActive) {
+  const sets = p.trainSets || [];
+  const more = sets.length > 2 ? ` +${sets.length - 2}` : '';
+  const hint = p.fromTestData
+    ? `<div style="color:#2e7d32;font-size:11px">Test Data · ${esc(sets.slice(0, 2).join(', '))}${esc(more)}</div>`
+    : '';
+  return `
+      <div class="place-lookup-item" data-i="${esc(i)}" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #f0f3f5;${isActive ? 'background:#e8f4fb' : ''}">
+        <div style="color:#263238">${esc(p.name || p.id)}</div>
+        <div class="mono" style="color:#90a4ae;font-size:11px">${esc(p.id)}</div>${hint}
+      </div>`;
+}
 
 function attachPlaceAutocomplete(input) {
   if (!input || input._placeAutocomplete) return;
@@ -5258,11 +5292,7 @@ function attachPlaceAutocomplete(input) {
       box.style.cssText = 'position:absolute;z-index:10000;background:#fff;border:1px solid #cfd8dc;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;font-size:12.5px';
       document.body.appendChild(box);
     }
-    box.innerHTML = items.map((p, i) => `
-      <div class="place-lookup-item" data-i="${i}" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #f0f3f5;${i === active ? 'background:#e8f4fb' : ''}">
-        <div style="color:#263238">${esc(p.name)}</div>
-        <div class="mono" style="color:#90a4ae;font-size:11px">${esc(p.id)}</div>
-      </div>`).join('');
+    box.innerHTML = items.map((p, i) => placeLookupItemHtml(p, i, i === active)).join('');
     positionBox();
     // mousedown (not click) so it fires before the input's blur closes the box.
     box.querySelectorAll('.place-lookup-item').forEach(it => {
@@ -5286,17 +5316,25 @@ function attachPlaceAutocomplete(input) {
     input._placeSuppress = false;
   }
 
+  // Test Data's own stop places come first (#733); the provider's cached
+  // places follow, without the ones already listed. A failed or empty cache
+  // (a provider with no GET /places) still leaves Test Data's.
   async function query(q) {
     const mySeq = ++seq;
+    const local = OscarJourneyPlanner.findStopPlaces(wizData?.resources, q)
+      .map((p) => ({ ...p, fromTestData: true }));
+    let cached = [];
     try {
       const res = await fetch(`/v1/company/places?q=${encodeURIComponent(q)}&limit=20`);
-      if (!res.ok) { removeBox(); return; }
-      const b = await res.json();
-      if (mySeq !== seq) return;         // a newer keystroke superseded this one
-      items = Array.isArray(b.places) ? b.places : [];
-      active = -1;
-      render();
-    } catch { removeBox(); }
+      if (res.ok) {
+        const b = await res.json();
+        cached = Array.isArray(b.places) ? b.places : [];
+      }
+    } catch { cached = []; }
+    if (mySeq !== seq) return;           // a newer keystroke superseded this one
+    items = mergePlaceLookups(local, cached);
+    active = -1;
+    render();
   }
 
   input.addEventListener('input', () => {

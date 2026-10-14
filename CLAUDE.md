@@ -1313,6 +1313,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   are left out. Each search answers with its time and values first, and an
   empty result with its reason, from `planJourneys().stats` (#730): without
   that, a search giving the same answer as the last one looked like no click.
+  **The place lookup offers Test Data's stop places first** (#733,
+  `findStopPlaces()` in the same file, merged with the cache by
+  `mergePlaceLookups()` in `scenarios.js`): a real provider answers
+  `GET /places` with 501, so its cache stays empty. Discover timetable stores
+  `originName` / `destinationName` on a new set (on an existing one only with
+  another change, like every descriptive field). The refresh route's 502
+  carries `vendor_status`; 501/404/405 is told as "no list", not an error.
 - **Discover timetable keeps the provider's connections** (#715, 1.11.272).
   Trips of 2 or 3 timed legs become JOURNEY resources over the services
   `groupAndMerge` stored (`harvestConnections()` / `journeysFromConnections()`,
