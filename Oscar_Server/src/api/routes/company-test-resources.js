@@ -274,6 +274,35 @@ async function _vendorSession(req, res, targetCompanyId) {
   return { company, token, extraHeaders };
 }
 
+// #717: `days` days of POST /offers for a route, one after the other.
+// { harvested: records (harvestTrips), daysAnswered }.
+async function _searchRouteDays({ company, token, extraHeaders }, origin, destination, days) {
+  const harvested = [];
+  let daysAnswered = 0;
+  await searchDates(days, new Date()).reduce((previous, date) => previous.then(async () => {
+    let r;
+    try {
+      r = await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, origin, destination, company.api_base), extraHeaders);
+    } catch { return; }   // a day that fails is a day not answered
+    if (!r.ok) return;
+    daysAnswered++;
+    harvested.push(...harvestTrips(r.json, { searchedOrigin: origin, searchedDestination: destination }));
+  }), Promise.resolve());
+  return { harvested, daysAnswered };
+}
+
+// #717: give train set `t` its days from the harvest, or say why not.
+function _fillCalendar(t, daysAnswered, harvested, companyId, out) {
+  const found = daysAnswered === 0 ? { reason: 'the provider answered no search of its route' } : calendarFromHarvest(t.data, harvested);
+  if (!found.daysOfWeek) {
+    out.unresolved.push({ id: t.id, label: t.label, reason: found.reason });
+    return;
+  }
+  run(`UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
+    [colEncrypt(JSON.stringify({ ...t.data, daysOfWeek: found.daysOfWeek })), t.id, companyId]);
+  out.updated.push({ id: t.id, label: t.label, daysOfWeek: found.daysOfWeek });
+}
+
 // ── POST /v1/company/test-resources/fill-calendars (#717) ─────────────────────
 // Train sets without operating days learn them from the provider: their route
 // is searched over the next 7 days (POST /offers, as Discovery does), and a
@@ -295,7 +324,6 @@ router.post('/test-resources/fill-calendars', async (req, res) => {
 
   const session = await _vendorSession(req, res, targetCompanyId);
   if (!session) return;
-  const { company, token, extraHeaders } = session;
 
   const byRoute = new Map();
   for (const t of targets) {
@@ -303,31 +331,16 @@ router.post('/test-resources/fill-calendars', async (req, res) => {
     if (!byRoute.has(key)) byRoute.set(key, []);
     byRoute.get(key).push(t);
   }
-  const updated = [];
-  const unresolved = [];
-  const routes = [];
-  for (const sets of byRoute.values()) {
+  const out = { updated: [], unresolved: [], routes: [] };
+  // One route after the other, one day after the other: a provider's gateway
+  // may block a burst of searches (#646).
+  await [...byRoute.values()].reduce((previous, sets) => previous.then(async () => {
     const { originURN: origin, destinationURN: destination } = sets[0].data;
-    const harvested = [];
-    let daysAnswered = 0;
-    for (const date of searchDates(7, new Date())) {
-      let r;
-      try {
-        r = await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, origin, destination, company.api_base), extraHeaders);
-      } catch (_err) { continue; }
-      if (!r.ok) continue;
-      daysAnswered++;
-      harvested.push(...harvestTrips(r.json, { searchedOrigin: origin, searchedDestination: destination }));
-    }
-    routes.push({ origin, destination, daysAnswered });
-    for (const t of sets) {
-      const found = daysAnswered === 0 ? { reason: 'the provider answered no search of its route' } : calendarFromHarvest(t.data, harvested);
-      if (!found.daysOfWeek) { unresolved.push({ id: t.id, label: t.label, reason: found.reason }); continue; }
-      run(`UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
-        [colEncrypt(JSON.stringify({ ...t.data, daysOfWeek: found.daysOfWeek })), t.id, targetCompanyId]);
-      updated.push({ id: t.id, label: t.label, daysOfWeek: found.daysOfWeek });
-    }
-  }
+    const { harvested, daysAnswered } = await _searchRouteDays(session, origin, destination, 7);
+    out.routes.push({ origin, destination, daysAnswered });
+    for (const t of sets) _fillCalendar(t, daysAnswered, harvested, targetCompanyId, out);
+  }), Promise.resolve());
+  const { updated, unresolved, routes } = out;
   log.info({ companyId: targetCompanyId, updated: updated.length, unresolved: unresolved.length }, 'Missing train calendars filled');
   return res.json({ updated, unresolved, routes });
 });

@@ -39,6 +39,22 @@ function operatingDaysOf(trip) {
   return trip.__operatingDays.filter((d) => DAY_CODES.includes(d));
 }
 
+// The server's notes, as run log lines.
+function noteLines(trip) {
+  const notes = Array.isArray(trip?.__calendarNotes) ? trip.__calendarNotes : [];
+  return notes.filter((n) => typeof n?.text === 'string')
+    .map((n) => `[${n.level === 'WARNING' ? 'WARNING' : 'INFO'}] 📅 ${n.text}`);
+}
+
+// The first day from `date` on, within a week, that is one of `days`.
+function firstRunningDay(date, days) {
+  for (let shift = 0; shift < 7; shift++) {
+    const candidate = addDays(date, shift);
+    if (days.includes(weekdayCode(candidate))) return { candidate, shift };
+  }
+  return null;
+}
+
 /**
  * The trip date: `date` as the usual rules gave it (`named` when the scenario
  * named the day itself), checked against the trip's calendar.
@@ -46,11 +62,7 @@ function operatingDaysOf(trip) {
  */
 function dateForTrip(date, named, trip) {
   const days = operatingDaysOf(trip);
-  const lines = [];
-  const notes = trip && Array.isArray(trip.__calendarNotes) ? trip.__calendarNotes : [];
-  for (const n of notes) {
-    if (n && typeof n.text === 'string') lines.push(`[${n.level === 'WARNING' ? 'WARNING' : 'INFO'}] 📅 ${n.text}`);
-  }
+  const lines = noteLines(trip);
   if (!days || days.length === 0 || !weekdayCode(date)) return { date, lines };
   const list = days.join(', ');
   if (named) {
@@ -59,16 +71,13 @@ function dateForTrip(date, named, trip) {
     }
     return { date, lines };
   }
-  for (let shift = 0; shift < 7; shift++) {
-    const candidate = addDays(date, shift);
-    if (days.includes(weekdayCode(candidate))) {
-      lines.push(shift === 0
-        ? `[INFO] 📅 Departure ${candidate} (${weekdayCode(candidate)}): the trip's trains run that day (${list}).`
-        : `[INFO] 📅 Departure ${candidate} (${weekdayCode(candidate)}), ${shift} day(s) after ${date}: the first day the trip's trains run (${list}).`);
-      return { date: candidate, lines };
-    }
-  }
-  return { date, lines };
+  const found = firstRunningDay(date, days);
+  if (!found) return { date, lines };
+  const { candidate, shift } = found;
+  lines.push(shift === 0
+    ? `[INFO] 📅 Departure ${candidate} (${weekdayCode(candidate)}): the trip's trains run that day (${list}).`
+    : `[INFO] 📅 Departure ${candidate} (${weekdayCode(candidate)}), ${shift} day(s) after ${date}: the first day the trip's trains run (${list}).`);
+  return { date: candidate, lines };
 }
 
 module.exports = { weekdayCode, operatingDaysOf, dateForTrip };

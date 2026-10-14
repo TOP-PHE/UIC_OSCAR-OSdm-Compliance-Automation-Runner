@@ -59,16 +59,12 @@ function matchLeg(leg, trains) {
   if (!from || !to) return null;
   const number = String(leg.vehicleNumber ?? '').trim();
   const clock = clockOf(leg.startDatetime);
-  let byTime = null;
-  for (const train of trains) {
-    const d = train.data;
-    if (stopKey(d.originURN) !== from || stopKey(d.destinationURN) !== to) continue;
-    for (const service of Array.isArray(d.services) ? d.services : []) {
-      if (number && String(service?.vehicleNumber ?? '').trim() === number) return { train, service, by: 'number' };
-      if (!byTime && clock && clockOf(service?.departureTime) === clock) byTime = { train, service, by: 'time' };
-    }
-  }
-  return byTime;
+  const onRoute = trains.filter((t) => stopKey(t.data.originURN) === from && stopKey(t.data.destinationURN) === to);
+  const pairs = onRoute.flatMap((train) => (Array.isArray(train.data.services) ? train.data.services : []).map((service) => ({ train, service })));
+  const byNumber = number && pairs.find(({ service }) => String(service?.vehicleNumber ?? '').trim() === number);
+  if (byNumber) return { ...byNumber, by: 'number' };
+  const byTime = clock && pairs.find(({ service }) => clockOf(service?.departureTime) === clock);
+  return byTime ? { ...byTime, by: 'time' } : null;
 }
 
 // The legs of a trip requirement, as { origin, destination, vehicleNumber, startDatetime, endDatetime }.

@@ -267,11 +267,11 @@ function scenarioTripDate(scenario, baseIso, departureDay, now = new Date()) {
 // annotation), unless the scenario names the day itself. Logs the trip's
 // calendar notes.
 function tripDateFor(scenario, baseIso, tripRequirement, now = new Date()) {
-  const date = scenarioTripDate(scenario, baseIso, tripRequirement && tripRequirement.departureDay, now);
+  const date = scenarioTripDate(scenario, baseIso, tripRequirement?.departureDay, now);
   const n = scenario ? scenario.departureDaysFromToday : undefined;
   const named = (Number.isInteger(n) && n >= -366 && n <= 1000)
     || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
-      .includes(String((tripRequirement && tripRequirement.departureDay) || '').trim().toUpperCase());
+      .includes(String(tripRequirement?.departureDay || '').trim().toUpperCase());
   const { dateForTrip } = require('./tripCalendar.js');
   const out = dateForTrip(date, named, tripRequirement);
   out.lines.forEach((line) => validationLogger(line));

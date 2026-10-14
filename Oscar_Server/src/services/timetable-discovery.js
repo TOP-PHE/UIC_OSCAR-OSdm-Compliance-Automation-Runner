@@ -548,7 +548,7 @@ function groupAndMerge(harvested, existing, catalog) {
   // 3. Index existing TRAIN resources by route + calendar (first wins).
   const existingByKey = new Map();
   for (const r of (existing || [])) {
-    if (!r || r.resource_type !== 'TRAIN') continue;
+    if (r?.resource_type !== 'TRAIN') continue;
     const d = r.data || {};
     const cal = sortDays(Array.isArray(d.daysOfWeek) ? d.daysOfWeek : []).join(',');
     const k = `${d.originURN || ''}|${d.destinationURN || ''}|${d.productCategoryRef || ''}|${cal}`;
