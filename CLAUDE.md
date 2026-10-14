@@ -481,6 +481,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     upload test sends a schema-valid file: `tests/helpers/valid-datafile.js`.
   - A parser refusal is answered by `parseUpload` (400, or 413 for size); the
     global error handler only ever sees real errors.
+  - **The JSON body parser's refusals are the client's too** (#725): the
+    global handler answers `entity.parse.failed` 400 and `entity.too.large`
+    413, each with its reason. Before, Test Config's Save & Apply with no data
+    file loaded sent `null` and saw only "500: Internal Server Error";
+    `saveDatafile()` now sends nothing when `state` is not an object.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network

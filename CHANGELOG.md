@@ -62,6 +62,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.277] / [collection-OTST_V2.0.156] — 2026-10-14
+
+Issue #725, release 2026.312. Server only; the collection is unchanged.
+
+### Fixed
+- **Save & Apply with no data file loaded** sent `null`, and Test Config
+  showed "Server responded with 500: Internal Server Error". It now sends
+  nothing and says "Nothing to save: no data file is loaded yet. Add or copy
+  a scenario first."
+- **A request body the JSON parser refuses is answered with its reason.** The
+  global error handler turned body-parser's refusals into a bare 500: invalid
+  JSON now answers 400 "The request body is not valid JSON.", a body over
+  5 MB answers 413 "The request body is larger than 5 MB.". Neither is logged
+  as an unhandled error any more.
+
+Checked:
+- Unit tests of both (`server.test.js`, `scenarios-load-guard.test.js`); each
+  fails with its guard removed.
+- Found from the server log of a real Test Config session
+  (`SyntaxError … "null" is not valid JSON`, PUT /v1/company/datafile/json).
+
+---
+
 ## [server-1.11.276] / [collection-OTST_V2.0.156] — 2026-10-14
 
 Issue #722, release 2026.311.

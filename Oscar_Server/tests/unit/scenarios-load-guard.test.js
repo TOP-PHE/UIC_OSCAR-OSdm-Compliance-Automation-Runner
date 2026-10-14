@@ -454,14 +454,14 @@ describe('stale-save guard (the version a save sends back)', () => {
     expect({ ...ctx.datafileSaveHeaders(undefined) }).toEqual({ 'Content-Type': 'application/json' });
   });
 
-  function saving(putAnswer) {
+  function saving(putAnswer, state = { scenarios: [], scenariosToRun: [] }) {
     const sent = [];
     const { fetch, calls } = fakeFetch({
       [`PUT ${DATAFILE}/json`]: (opts) => { sent.push(opts.headers); return putAnswer; },
       [`GET ${DATAFILE}`]: withEtag(200, { scenarios: [], scenariosToRun: [] }, '"v2"'),
     });
     const ctx = page(['saveDatafile', 'datafileSaveHeaders', 'staleSaveMessage'], {
-      fetch, state: { scenarios: [], scenariosToRun: [] }, dirty: true, isTestManager: false,
+      fetch, state, dirty: true, isTestManager: false,
       datafileLoadedVersion: '"v1"', errors: [], confirmed: 0, refreshed: 0,
       setSaveBtnState() {}, hidePanels() {}, logout() {}, incrementVersion: (v) => v,
       showSaveError(m) { ctx.errors.push(m); }, showSaveConfirm() { ctx.confirmed++; },
@@ -487,6 +487,16 @@ describe('stale-save guard (the version a save sends back)', () => {
     expect(t.ctx.errors[0]).toContain('Download unsaved edits');
     expect(t.ctx.dirty).toBe(true);
     expect(t.ctx.refreshed).toBe(0);
+  });
+
+  // #725: with no data file loaded the page sent "null", which the server
+  // refused with a bare 500.
+  test('with no data file loaded, nothing is sent and the page says why', async () => {
+    const t = saving(response(200, { to_run: [] }), null);
+    await t.ctx.saveDatafile();
+    expect(t.calls).toEqual([]);
+    expect(t.ctx.errors).toEqual(['Nothing to save: no data file is loaded yet. Add or copy a scenario first.']);
+    expect(t.ctx.confirmed).toBe(0);
   });
 
   test('every data file save in the page sends a version', () => {

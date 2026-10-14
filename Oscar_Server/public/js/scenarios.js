@@ -3506,6 +3506,12 @@ function showSaveConfirm(data) {
 }
 
 async function saveDatafile() {
+  // #725: with no data file loaded there is nothing to save. The page used to
+  // send "null", which the server refused with a bare 500.
+  if (!state || typeof state !== 'object') {
+    showSaveError('Nothing to save: no data file is loaded yet. Add or copy a scenario first.');
+    return;
+  }
   setSaveBtnState(true, '💾 Saving…');
   hidePanels();
   try {

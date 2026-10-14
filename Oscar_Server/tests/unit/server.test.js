@@ -106,6 +106,25 @@ describe('GET /health', () => {
 // The test env leaves ALLOWED_ORIGINS unset, so the app is built fail-closed.
 // A cross-origin request must NOT get its origin reflected (the old behaviour
 // was origin: true + credentials, which reflected any site).
+// #725: a body the JSON parser refuses was answered 500 with no reason.
+describe('request bodies the JSON parser refuses', () => {
+  test('"null" and broken JSON: 400 with the reason, not 500', async () => {
+    for (const body of ['null', '{"scenarios": [', 'not json']) {
+      const res = await request(app).put('/v1/company/datafile/json')
+        .set('Content-Type', 'application/json').send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toBe('The request body is not valid JSON.');
+    }
+  });
+
+  test('a body over 5 MB: 413 with the reason', async () => {
+    const res = await request(app).put('/v1/company/datafile/json')
+      .set('Content-Type', 'application/json').send(JSON.stringify({ x: 'a'.repeat(5 * 1024 * 1024 + 10) }));
+    expect(res.status).toBe(413);
+    expect(res.body.detail).toBe('The request body is larger than 5 MB.');
+  });
+});
+
 describe('CORS', () => {
   test('an arbitrary Origin is not reflected when no allowlist is configured', async () => {
     const res = await request(app).get('/health').set('Origin', 'https://evil.example');

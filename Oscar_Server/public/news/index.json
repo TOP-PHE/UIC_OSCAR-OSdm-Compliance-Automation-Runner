@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-save-nothing-loaded",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Save & Apply says why when there is nothing to save",
+    "summary": "Saving Test Config with no data file loaded no longer ends in an unexplained \"500 Internal Server Error\".",
+    "content": "When no data file was loaded yet (a new company or provider, or after a delete), Save & Apply sent an empty request and the page showed \"Server responded with 500: Internal Server Error\". It now tells you there is nothing to save yet. The server also answers a malformed or oversized request with the reason instead of a bare 500."
+  },
+  {
     "id": "2026-10-14-minimal-offer-search",
     "date": "October 14, 2026",
     "tag": "Improvement",

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.311",
+  "current_release": "2026.312",
   "releases": [
+    {
+      "release": "2026.312",
+      "date": "2026-10-14",
+      "server": "1.11.277",
+      "collection": "OTST_V2.0.156",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Save & Apply with no data file loaded says so instead of a bare 500; the server answers invalid or oversized JSON bodies 400 / 413 with the reason (#725)."
+      ]
+    },
     {
       "release": "2026.311",
       "date": "2026-10-14",
