@@ -231,7 +231,57 @@
     return { journeys: found.slice(0, o.limit), total: found.length, truncated, stats };
   }
 
-  const api = Object.freeze({ planJourneys, stopKey, parseTime, commonDays, DEFAULTS, SEARCH_BUDGET });
+  // ── Stop places of Test Data (#733) ──────────────────────────────────────
+  // The stop places the saved and unsaved TRAIN sets start or end at, one per
+  // place (stopKey), with the name the provider gave when Discover timetable
+  // stored it, and the labels of the sets that use it. The place lookup offers
+  // them first: a provider may have no GET /places, and Find journeys can only
+  // use these places anyway.
+  function stopPlacesOf(resources) {
+    const byKey = new Map();
+    const add = (urn, name, label) => {
+      const key = stopKey(urn);
+      if (!key) return;
+      let p = byKey.get(key);
+      if (!p) { p = { id: String(urn).trim(), name: '', trainSets: [] }; byKey.set(key, p); }
+      if (!p.name && typeof name === 'string' && name.trim()) p.name = name.trim();
+      if (label && !p.trainSets.includes(label)) p.trainSets.push(label);
+    };
+    for (const r of resources || []) {
+      if (!r || (r.resource_type && r.resource_type !== 'TRAIN')) continue;
+      const d = tripApply.resourceData(r) || {};
+      const label = typeof r.label === 'string' ? r.label.trim() : '';
+      add(d.originURN, d.originName, label);
+      add(d.destinationURN, d.destinationName, label);
+    }
+    return [...byKey.values()];
+  }
+
+  // The stop places of Test Data that match `q` (at least 2 characters):
+  // name first (start, then anywhere), then the code, then a train set's
+  // label. Case and accents do not matter.
+  function findStopPlaces(resources, q, limit = 20) {
+    const fold = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const needle = fold(q).trim();
+    if (needle.length < 2) return [];
+    const code = stopKey(needle).split(':').pop();
+    const rank = (p) => {
+      const name = fold(p.name);
+      if (name.startsWith(needle)) return 0;
+      if (name.includes(needle)) return 1;
+      if (fold(p.id).includes(needle) || (code && stopKey(p.id).split(':').pop().includes(code))) return 2;
+      if (p.trainSets.some((l) => fold(l).includes(needle))) return 3;
+      return -1;
+    };
+    return stopPlacesOf(resources)
+      .map((p) => ({ p, r: rank(p) }))
+      .filter((x) => x.r >= 0)
+      .sort((a, b) => a.r - b.r || (a.p.name || a.p.id).localeCompare(b.p.name || b.p.id))
+      .slice(0, limit)
+      .map((x) => x.p);
+  }
+
+  const api = Object.freeze({ planJourneys, stopKey, parseTime, commonDays, stopPlacesOf, findStopPlaces, DEFAULTS, SEARCH_BUDGET });
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.OscarJourneyPlanner = api;
 }(globalThis));

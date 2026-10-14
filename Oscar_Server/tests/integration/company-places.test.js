@@ -182,6 +182,19 @@ describe('places — refresh', () => {
     }
   });
 
+  test('#733 — a provider without GET /places: 502 naming the vendor status', async () => {
+    const origFetch = global.fetch;
+    global.fetch = async () => ({ ok: false, status: 501, text: async () => JSON.stringify({ title: 'Not implemented', status: 501 }) });
+    try {
+      const res = await request(app).post('/v1/company/places/refresh').set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
+      expect(res.status).toBe(502);
+      expect(res.body.vendor_status).toBe(501);
+      expect(res.body.detail).toMatch(/^GET \/places returned HTTP 501/);
+    } finally {
+      global.fetch = origFetch;
+    }
+  });
+
   // #477: the company's Dedicated Headers (API Config) were previously never
   // applied on this route — only the Bruno run path read them.
   test('#477 — sends the company Dedicated Headers, resolving {{access_token}}', async () => {

@@ -576,6 +576,11 @@ function groupAndMerge(harvested, existing, catalog) {
         data: {
           originURN: g.originURN || '',
           destinationURN: g.destinationURN || '',
+          // The stop place names the provider gave (#733): the place lookup
+          // offers Test Data's stop places by name when the provider has no
+          // GET /places.
+          originName: g.originName || '',
+          destinationName: g.destName || '',
           operatorCode: g.operatorCode || '',
           productCategoryRef: g.productCategoryRef || '',
           productCategoryName: g.productCategoryName || '',
@@ -613,6 +618,8 @@ function groupAndMerge(harvested, existing, catalog) {
     if (!data.operatorCode && g.operatorCode) data.operatorCode = g.operatorCode;
     if (!data.productCategoryName && g.productCategoryName) data.productCategoryName = g.productCategoryName;
     if (!data.productCategoryShortName && g.productCategoryShortName) data.productCategoryShortName = g.productCategoryShortName;
+    if (!data.originName && g.originName) data.originName = g.originName;
+    if (!data.destinationName && g.destName) data.destinationName = g.destName;
 
     // Prefill Service Configuration from the offer catalog, but ONLY into arrays
     // that are currently empty — a set the tester has already configured is

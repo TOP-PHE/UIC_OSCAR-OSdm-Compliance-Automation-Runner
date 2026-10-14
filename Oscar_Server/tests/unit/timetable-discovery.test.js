@@ -202,6 +202,9 @@ describe('groupAndMerge', () => {
     });
     // Catalog arrays initialised empty for the tester to fill in.
     expect(toCreate[0].data.ticketTypes).toEqual([]);
+    // #733: the provider's stop place names are kept for the place lookup.
+    expect(toCreate[0].data.originName).toBe('Basel');
+    expect(toCreate[0].data.destinationName).toBe('Amsterdam');
     expect(summary).toMatchObject({ routesDiscovered: 1, created: 1, updated: 0, servicesAdded: 1 });
   });
 

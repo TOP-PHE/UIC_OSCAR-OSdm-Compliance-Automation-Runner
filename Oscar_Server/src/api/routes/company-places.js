@@ -112,7 +112,9 @@ router.post('/places/refresh', async (req, res) => {
     }
     if (!r.ok) {
       if (page === 0) {
-        return res.status(502).json({ status: 502, title: 'Vendor API Error',
+        // vendor_status lets the page tell "the provider has no GET /places"
+        // (501, 404, 405) from a real failure (#733).
+        return res.status(502).json({ status: 502, title: 'Vendor API Error', vendor_status: r.status,
           detail: `GET /places returned HTTP ${r.status}${r.text ? ': ' + String(r.text).slice(0, 300) : ''}` });
       }
       break; // a later page errored (e.g. page out of range) — we're done
