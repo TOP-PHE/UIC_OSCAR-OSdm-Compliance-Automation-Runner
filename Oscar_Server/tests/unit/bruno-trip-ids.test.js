@@ -212,6 +212,15 @@ describe('step 01', () => {
     expect(mockResults.filter((r) => !r.ok).map((r) => r.name)).toEqual(['Trips collection: a trip to ask offers for — none']);
   });
 
+  test('an answer with no trip: the log says what it held (#729)', async () => {
+    envStore = baseEnv();
+    respond(200, { problems: [{ code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED', title: "Parameter 'x' was ignored." }] });
+    await offers.prepareOfferRequestByTripIds();
+    expect(offers.checkOfferRequestByTripIds(200, {})).toBe(true);
+    expect(mockLogs).toContain("[INFO] POST /trips-collection: problem 1: urn:uic:problem:PARAMETER_NOT_SUPPORTED — Parameter 'x' was ignored.");
+    expect(mockLogs).toContain('[INFO] POST /trips-collection: members of the answer: problems');
+  });
+
   test('a transport error is a failed status, not a thrown step', async () => {
     envStore = baseEnv();
     answer = (cb) => cb(new Error('ECONNREFUSED'));
@@ -230,5 +239,24 @@ describe('step 01', () => {
     mockResults = [];
     expect(offers.checkOfferRequestByTripIds(200, { offers: [] })).toBe(true);
     expect(mockResults.filter((r) => !r.ok).map((r) => r.name)).toEqual(['🧪 Trip id probe: provider rejects with a client error (4xx)']);
+  });
+});
+
+describe('describeTripsAnswer (#729)', () => {
+  test('says what an answer without trips held', () => {
+    expect(ti.describeTripsAnswer(null)).toEqual(['the answer has no JSON body']);
+    expect(ti.describeTripsAnswer([])).toEqual(['the answer is not an object (a list)']);
+    expect(ti.describeTripsAnswer('x')).toEqual(['the answer is not an object (string)']);
+    expect(ti.describeTripsAnswer({})).toEqual(['the answer is an empty object']);
+    expect(ti.describeTripsAnswer({ trips: [], warnings: {} })).toEqual(['members of the answer: trips, warnings']);
+    expect(ti.describeTripsAnswer({ problems: [{ detail: 'd' }, null] })).toEqual([
+      'problem 1: (no code) — d', 'problem 2: (no code) — (no title)', 'members of the answer: problems',
+    ]);
+  });
+
+  test('at most ten problems, each at most 300 characters', () => {
+    const lines = ti.describeTripsAnswer({ problems: Array.from({ length: 12 }, () => ({ code: 'C', title: 'x'.repeat(400) })) });
+    expect(lines).toHaveLength(11);
+    expect(Math.max(...lines.map((l) => l.length))).toBe(300);
   });
 });

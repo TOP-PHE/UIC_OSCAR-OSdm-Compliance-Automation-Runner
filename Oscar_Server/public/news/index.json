@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-real-provider-fixes",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Three fixes from a real provider's run",
+    "summary": "No more empty product category in trip requests, ignored passenger details are warnings, and an empty trip search is explained in the log.",
+    "content": "A leg without a product category in Test Data used to be sent with an empty one, which a provider refused as a malformed request; it is now left out. When a provider answers a passenger update by saying it ignored a detail (for example the date of birth), the unchanged value is now a warning instead of a failure. When a search of trips by id returns no trip, the run log now shows what the provider answered."
+  },
+  {
     "id": "2026-10-14-copy-message-visible",
     "date": "October 14, 2026",
     "tag": "Fix",

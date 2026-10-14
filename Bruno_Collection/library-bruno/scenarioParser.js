@@ -42,7 +42,8 @@ module.exports = {
   featureNotDeclaredWarning,
   applyExternalRefFormat,
   scenarioTripDate,
-  tripDateFor
+  tripDateFor,
+  productCategoryOf
 };
 
 // Which passengers step 03 updates: "MAIN" (the first only) when the scenario
@@ -103,7 +104,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -1597,9 +1598,13 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
     const boardSpec = new BoardSpecification(new StopPlaceRef(legDef.startStopPlaceRef), new ServiceTime(_specStartDateTime));
     const alignSpec = new AlightSpecification(new StopPlaceRef(legDef.endStopPlaceRef), new ServiceTime(_specEndDateTime));
 
-    const productCategory = legDef.productCategoryRef === null
-      ? null
-      : new ProductCategory(legDef.productCategoryRef, legDef.productCategoryName, legDef.productCategoryShortName);
+    // OSDM's ProductCategory requires productCategoryRef, name and shortName
+    // (#729): one with any of them missing is not sent at all. A provider
+    // refused `"productCategory": {}` as a malformed request.
+    const productCategory = productCategoryOf(legDef);
+    if (!productCategory && [legDef.productCategoryRef, legDef.productCategoryName, legDef.productCategoryShortName].some(isText)) {
+      validationLogger(`[INFO] Leg ${n}: product category not sent — OSDM needs its reference, name and short name together.`);
+    }
 
     const datedJourney = new DatedJourney(productCategory, [legDef.vehicleNumber], [new NamedCompany(legDef.carrier)]);
 
@@ -1755,6 +1760,20 @@ function osdmFulfillmentOptions(requestedFulfillmentOptions) {
   if (Array.isArray(requestedFulfillmentOptions) && requestedFulfillmentOptions.length > 0) {
     bru.setEnvVar("offerFulfillmentOptions", JSON.stringify(requestedFulfillmentOptions));
   }
+}
+
+function isText(v) {
+  return typeof v === 'string' && v.trim() !== '';
+}
+
+// The leg's ProductCategory, or null when the Test Data does not give all
+// three members OSDM requires (#729).
+function productCategoryOf(legDef) {
+  const ref = legDef?.productCategoryRef;
+  const name = legDef?.productCategoryName;
+  const shortName = legDef?.productCategoryShortName;
+  if (!isText(ref) || !isText(name) || !isText(shortName)) return null;
+  return new ProductCategory(ref, name, shortName);
 }
 
 // Expose globally for convenience (includes resetScenarioEnvVars)

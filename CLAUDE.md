@@ -1124,6 +1124,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     null `carrierFilter` / `vehicleFilter`, none nullable in OSDM 3.8, and a
     provider refused every such search as malformed. A new `model.js` class
     for a request must not assign unset members.
+  - **A request member OSDM requires in full is sent in full or not at all**
+    (#729): `productCategory` goes out only with its reference, name and short
+    name (`productCategoryOf()` in `scenarioParser.js`); `{}` was refused as
+    malformed. And **a member the provider says it ignored is a WARNING**:
+    a PATCH answer's `PARAMETER_NOT_SUPPORTED` problems name it (`pointers`,
+    else the quoted name in the title, `ignoredParameters()` in
+    `passengers.js`), kept in `__passengerIgnoredFields` so that 04 grades
+    alike. An empty `/trips-collection` answer is described in the log
+    (`describeTripsAnswer()`), since its body is not in the report.
   - **A search goes by place and time; the train is chosen in the answer**
     (#722). The train and operator filters (`parameters.dataFilter`) are
     optional in OSDM, and a provider that refused an operator code stopped
