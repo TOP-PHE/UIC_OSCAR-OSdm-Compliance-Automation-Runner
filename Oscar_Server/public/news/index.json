@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-find-journeys",
+    "date": "October 14, 2026",
+    "tag": "New",
+    "title": "Find journeys with transfers among your trains",
+    "summary": "Test Data can now chain the trains you have defined into journeys of 2 or 3 legs between two stop places, without asking the provider.",
+    "content": "In Test Data → Journeys, click Find journeys, give an origin and a destination (by name, with the stop-place lookup) and OSCAR lists the connections it can build from your train sets, shortest first: each leg starts where the previous one ends, with a minimum transfer time and a maximum wait you can set. Create journey adds one, ready to check and save. It only uses the trains already in Test Data: add the trains that meet at a common station first, by hand or with Discover timetable."
+  },
+  {
     "id": "2026-10-13-provider-run-fixes",
     "date": "October 13, 2026",
     "tag": "Fix",

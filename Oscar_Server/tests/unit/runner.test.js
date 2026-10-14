@@ -734,16 +734,17 @@ describe('executeRun — a silent Bruno is stopped', () => {
     const { companyId, userId } = seedCompanyUser();
     const runId = seedRun(companyId, userId);
     resolveAccessToken.mockResolvedValueOnce('tok-abc');
-    // Output every 30 ms for twice the limit: silent for longer than the limit
-    // only if a step stalls for 270 ms, which a loaded CI runner did with 120.
-    setConfig('RUN_IDLE_TIMEOUT_MS', '300');
+    // Output every 50 ms for longer than the limit: silent for longer than the
+    // limit only if a step stalls for 1.45 s. A loaded CI runner stalled past
+    // 100 ms with a 120 ms limit, and past 270 ms with a 300 ms one (#712).
+    setConfig('RUN_IDLE_TIMEOUT_MS', '1500');
     const fakeProc = makeFakeProc();
     spawn.mockReturnValueOnce(fakeProc);
     const runPromise = executeRun({ runId, companyId, userId });
     await waitForSpawnCalls(1);
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 40; i++) {
       fakeProc.stdout.emit('data', Buffer.from(`request ${i}\n`));
-      await new Promise((r) => setTimeout(r, 30));
+      await new Promise((r) => setTimeout(r, 50));
     }
     const killed = fakeProc.kill.mock.calls.length;
     fakeProc.emit('close', 0);

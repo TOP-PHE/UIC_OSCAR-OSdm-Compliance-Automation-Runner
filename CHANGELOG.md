@@ -62,6 +62,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.270] / [collection-OTST_V2.0.151] — 2026-10-14
+
+Issue #711, release 2026.305. Server only; the collection is unchanged.
+
+### Added
+
+- **Test Data → Journeys → 🔎 Find journeys.** Give an origin and a
+  destination (the stop-place lookup works in both fields): OSCAR chains the
+  train sets already in Test Data into journeys of 2 or 3 legs and lists them,
+  shortest first. *Create journey* adds one as an unsaved journey, opened for
+  review. The provider is not asked: it is a calculation over Test Data
+  (`public/js/journey-planner.js`, browser global and CommonJS, like
+  `trip-apply.js`).
+- The rules: each leg starts where the previous one ends, codes compared
+  without their leading zeros (`005457076` = `5457076`); at least the minimum
+  transfer time (5 min) and at most the maximum wait (3 h) between legs, both
+  settable; times compared in UTC; no stop place twice; the
+  legs' operating days must share a day (none set = every day); a service
+  arriving after midnight can only be the last leg, because every leg of a
+  journey runs on the trip date. The search stops after 200,000 partial
+  chains and says so.
+
+### Default decisions (taken without asking)
+
+- Only journeys with transfers are listed (2 or 3 legs); a direct train is
+  already a train set.
+- The 20 shortest are shown, with the total found.
+- The journey's label is built from the stop-place codes and the departure
+  time; it can be edited before saving.
+- Testers do not see the button, as for the other Test Data actions.
+
+### Not verified
+
+- Not tried on a real company's Test Data; it finds only what Test Data holds.
+
+Checked: 13 unit tests (each rule shown to fail when removed), and the page in
+a browser on a throw-away server: search, create, save, no page error.
+
+---
+
 ## [server-1.11.269] / [collection-OTST_V2.0.151] — 2026-10-13
 
 Issue #709, release 2026.304.

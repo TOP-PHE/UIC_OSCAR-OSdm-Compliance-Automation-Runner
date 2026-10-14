@@ -1,4 +1,4 @@
-/* global OscarScenarioAccess, OscarTripApply, logout, oscarToast, parseServerTs */  // defined in other public/ files (S11b: public/ is now linted)
+/* global OscarScenarioAccess, OscarTripApply, OscarJourneyPlanner, logout, oscarToast, parseServerTs */  // defined in other public/ files (S11b: public/ is now linted)
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -1023,7 +1023,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-download-places"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-download-places"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-find-journeys"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
 
   // #450 — show how many stop places are cached (drives the origin/destination
@@ -4421,6 +4421,7 @@ function renderWizardStep2() {
         : `<div id="journey-list">${journeyItems}</div>`}
       <div style="margin-top:12px">
         <button class="btn btn-secondary btn-sm" data-action="wiz-add-journey">➕ Add Journey</button>
+        <button class="btn btn-secondary btn-sm" data-action="wiz-find-journeys" title="Chain the train sets defined above into journeys of 2 or 3 legs between two stop places — the provider is not asked (#711)">🔎 Find journeys</button>
       </div>
     </div>
   </div>
@@ -5610,6 +5611,142 @@ async function wizDeleteJourney(id) {
     wizData.resources = wizData.resources.filter(r => r !== j);
     await refreshAllSections();
   } catch (e) { oscarToast(`Network error: ${e.message}`, 'error'); }
+}
+
+// ── Find journeys among the defined trains (#711) ─────────────────────────────
+// A small journey planner: chains the train sets already in Test Data into
+// journeys of 2 or 3 legs (js/journey-planner.js). Nothing is asked of the
+// provider. A result becomes an unsaved journey, opened for review.
+let journeyFinderResults = [];
+
+function openJourneyFinder() {
+  if (isTester) return;
+  closeJourneyFinder();
+  journeyFinderResults = [];
+  const d = OscarJourneyPlanner.DEFAULTS;
+  const overlay = document.createElement('div');
+  overlay.id = 'jf-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:680px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:22px 24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0;font-size:17px;color:#263238">🔎 Find journeys</h3>
+        <button class="row-delete-btn" data-action="jf-close" title="Close">✕</button>
+      </div>
+      <p style="color:#607d8b;font-size:12.5px;line-height:1.6;margin:0 0 16px">
+        Chains the train sets of Test Data into journeys with transfers.
+        Only the trains defined here are used; the provider is not asked.
+        Add trains by hand or with <b>Discover timetable</b> first.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label style="font-size:12px;color:#455a64;font-weight:600">Origin
+          <input id="jf-origin" class="param-input" data-place-lookup placeholder="a stop place name, or urn:uic:stn:5457076" style="margin-top:3px" autocomplete="off">
+        </label>
+        <label style="font-size:12px;color:#455a64;font-weight:600">Destination
+          <input id="jf-dest" class="param-input" data-place-lookup placeholder="a stop place name, or urn:uic:stn:5433295" style="margin-top:3px" autocomplete="off">
+        </label>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <label style="font-size:12px;color:#455a64;font-weight:600">Legs
+            <select id="jf-legs" class="param-input param-select" style="margin-top:3px;width:120px">
+              <option value="2">2 only</option>
+              <option value="3" selected>2 or 3</option>
+            </select>
+          </label>
+          <label style="font-size:12px;color:#455a64;font-weight:600">Minimum transfer (min)
+            <input id="jf-min" class="param-input" type="number" min="0" max="1440" value="${esc(d.minTransferMinutes)}" style="margin-top:3px;width:90px">
+          </label>
+          <label style="font-size:12px;color:#455a64;font-weight:600">Maximum wait (min)
+            <input id="jf-max" class="param-input" type="number" min="0" max="1440" value="${esc(d.maxWaitMinutes)}" style="margin-top:3px;width:90px">
+          </label>
+        </div>
+      </div>
+      <div id="jf-status" style="margin-top:14px;font-size:12.5px;color:#546e7a"></div>
+      <div id="jf-result" style="margin-top:12px"></div>
+      <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary btn-sm" data-action="jf-close">Close</button>
+        <button class="btn btn-primary btn-sm" data-action="jf-run">Search</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeJourneyFinder(); });
+  const o = document.getElementById('jf-origin');
+  if (o) o.focus();
+}
+
+function closeJourneyFinder() {
+  const el = document.getElementById('jf-overlay');
+  if (el) el.remove();
+}
+
+// "09:10:00+02:00" → "09:10": the offset is the same on every leg in practice.
+function journeyFinderClock(t) { return String(t || '').slice(0, 5); }
+
+function journeyFinderStepHtml(s) {
+  return `<div style="font-size:12px;color:#37474f;padding:2px 0">
+    🚆 ${esc(journeyFinderClock(s.departureTime))} ${esc(stnShort(s.originURN))} → ${esc(journeyFinderClock(s.arrivalTime))} ${esc(stnShort(s.destinationURN))}
+    <span style="color:#78909c">· ${esc(s.vehicleNumber || '?')} · ${esc(s.label || '')}</span>
+  </div>`;
+}
+
+function journeyFinderResultHtml(j, i) {
+  const waits = j.waits.map((w, k) => `${stnShort(j.via[k])} ${w} min`).join(', ');
+  const days = j.days === null ? 'every day' : j.days.join(' ');
+  return `<div class="sub-card" style="padding:8px 12px;margin-bottom:6px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <b style="font-size:12.5px;color:#263238">${esc(journeyFinderClock(j.departureTime))} → ${esc(journeyFinderClock(j.arrivalTime))}</b>
+      <span style="font-size:11px;color:#78909c">${esc(j.durationMinutes)} min · ${esc(j.legs.length)} legs · transfer ${esc(waits)} · ${esc(days)}</span>
+      <button class="btn btn-secondary btn-sm" data-action="jf-create" data-idx="${esc(i)}" style="margin-left:auto">➕ Create journey</button>
+    </div>
+    ${j.steps.map(journeyFinderStepHtml).join('')}
+  </div>`;
+}
+
+function runJourneyFinder() {
+  const val = (id) => document.getElementById(id)?.value ?? '';
+  const status = document.getElementById('jf-status');
+  const result = document.getElementById('jf-result');
+  if (!status || !result) return;
+  const plan = OscarJourneyPlanner.planJourneys(wizData.resources, val('jf-origin'), val('jf-dest'), {
+    maxLegs: Number(val('jf-legs')),
+    minTransferMinutes: Number(val('jf-min')),
+    maxWaitMinutes: Number(val('jf-max')),
+  });
+  journeyFinderResults = plan.journeys;
+  result.innerHTML = plan.journeys.map(journeyFinderResultHtml).join('');
+  if (plan.error) {
+    status.textContent = plan.error;
+  } else if (plan.journeys.length === 0) {
+    status.textContent = 'No journey found among the defined trains. Add the trains that connect (by hand or with Discover timetable), or allow a longer wait.';
+  } else {
+    const shown = plan.total > plan.journeys.length ? ` (the ${plan.journeys.length} shortest of ${plan.total})` : '';
+    status.textContent = `${plan.total} journey(s) found${shown}.`;
+  }
+  if (plan.truncated) status.textContent += ' The search stopped early: some journeys may be missing.';
+}
+
+function journeyFinderCreate(idx) {
+  const j = journeyFinderResults[idx];
+  if (!j) return;
+  const first = j.steps[0];
+  const last = j.steps.at(-1);
+  const label = `${stnShort(first.originURN)} → ${stnShort(last.destinationURN)} via ${j.via.map(stnShort).join(', ')} (${journeyFinderClock(j.departureTime)})`;
+  closeJourneyFinder();
+  wizData.resources.push({ id: null, _unsaved: true, label, resource_type: 'JOURNEY', data: { legs: structuredClone(j.legs) } });
+  renderWizardStep2InSection();
+  const bodyData = document.getElementById('body-data');
+  const toggleData = document.getElementById('toggle-data');
+  if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  toggleJourneyDetail(journeys.length - 1);
+  const detail = document.getElementById('journey-detail-' + (journeys.length - 1));
+  // The Journeys section is drawn closed: open it, or the new journey is hidden.
+  const section = detail?.closest('.fw-section-body');
+  if (section) {
+    section.classList.add('open');
+    section.previousElementSibling?.classList.add('open');
+  }
+  if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  oscarToast('Journey created — check it and click Save Journey.', 'success');
 }
 
 // ── Wizard navigation (now section-local) ─────────────────────────────────────
@@ -7172,6 +7309,14 @@ document.body.addEventListener('click', function(e) {
       toggleJourneyDetail(Number.parseInt(el.dataset.jidx)); break;
     case 'wiz-add-journey':
       wizAddJourney(); break;
+    case 'wiz-find-journeys':
+      openJourneyFinder(); break;
+    case 'jf-run':
+      runJourneyFinder(); break;
+    case 'jf-close':
+      closeJourneyFinder(); break;
+    case 'jf-create':
+      journeyFinderCreate(Number.parseInt(el.dataset.idx, 10)); break;
     case 'wiz-duplicate-journey':
       e.stopPropagation(); wizDuplicateJourney(Number.parseInt(el.dataset.jidx)); break;
     case 'wiz-delete-journey':
