@@ -62,6 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.281] / [collection-OTST_V2.0.157] — 2026-10-14
+
+Issue #733, release 2026.316. Server only; the collection is unchanged.
+
+### Added
+- **The place lookup offers Test Data's stop places.** Typing in an
+  origin or destination field (and in Find journeys) now lists first the
+  stop places the train sets of Test Data start or end at, matched by name,
+  by code (with or without leading zeros) or by the label of a train set that
+  uses it; the provider's cached places follow, without duplicates. A
+  provider may not offer `GET /places`, and Find journeys can only use these
+  places anyway.
+- **Discover timetable keeps stop place names.** A train set it creates
+  carries `originName` / `destinationName`, the names the provider gave; an
+  existing set gets them when Discover next adds to it.
+
+### Changed
+- **A provider without `GET /places` is not an error.** When Download places
+  is answered 501, 404 or 405, the page says the provider does not offer the
+  list and that the lookup uses Test Data instead (a warning). The refresh
+  route returns `vendor_status` alongside its 502.
+
+Checked:
+- Unit tests: `journey-planner.test.js` (`stopPlacesOf`, `findStopPlaces`),
+  `ui-scripts.test.js` (merge, row, failure text), `timetable-discovery.test.js`
+  (names kept); integration: `company-places.test.js` (`vendor_status`).
+
+---
+
 ## [server-1.11.280] / [collection-OTST_V2.0.157] — 2026-10-14
 
 Issue #730, release 2026.315. Server only; the collection is unchanged.

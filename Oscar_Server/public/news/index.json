@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-test-data-place-lookup",
+    "date": "October 14, 2026",
+    "tag": "Improvement",
+    "title": "Stop place lookup works without the provider's list",
+    "summary": "Origin and destination fields now suggest the stations of your Test Data, even when the provider does not offer its list of stop places.",
+    "content": "Some providers do not offer the list of stop places (GET /places), so Download places could not fill the lookup. Origin and destination fields, including Find journeys, now suggest first the stations your train sets start or end at: type part of a name, a code, or a train set's name. The provider's places follow when they were downloaded. Discover timetable now keeps the station names the provider gives, and Download places explains when the provider has no list instead of showing an error."
+  },
+  {
     "id": "2026-10-14-find-journeys-feedback",
     "date": "October 14, 2026",
     "tag": "Improvement",
