@@ -50,7 +50,7 @@ const analyseLimiter = rateLimit({
 // The most failed checks one analysis reads: a batch of a hundred scenarios
 // failing everywhere stays well under it.
 const MAX_FAILURES = 5000;
-const FINISHED = ['COMPLETED', 'FAILED'];
+const FINISHED = new Set(['COMPLETED', 'FAILED']);
 
 function scopeForTestManager(req, res) {
   if (req.user.role !== 'test_manager') {
@@ -177,14 +177,14 @@ router.post('/findings/suggestions/analyse', analyseLimiter, (req, res) => {
   for (const g of groups) {
     const m = S.matchFinding(g, findings, acceptedByKey);
     if (m) matchedIds.push(m.finding.id);
-    if (m && m.strength === 'same') {
+    if (m?.strength === 'same') {
       stillSeen.push({ findingId: m.finding.id, title: m.finding.title, why: m.why, check: g.check,
         scenarios: g.scenarios, runs: g.runs.slice(0, 10), occurrences: g.count });
       continue;
     }
     tally[upsertDraft(companyId, g, S.draftOf(g, { batchLabel: batchId }), m, batchId)]++;
   }
-  const finished = batchRuns.filter((r) => FINISHED.includes(r.status));
+  const finished = batchRuns.filter((r) => FINISHED.has(r.status));
   const notSeen = S.notSeen(findings, matchedIds, finished.map((r) => r.scenario_code).filter(Boolean))
     .map((f) => ({ findingId: f.id, title: f.title, scenarioCode: f.scenarioCode }));
 

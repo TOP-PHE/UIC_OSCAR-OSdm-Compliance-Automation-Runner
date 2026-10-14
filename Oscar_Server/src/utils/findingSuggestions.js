@@ -32,7 +32,8 @@ const crypto = require('node:crypto');
 // digits that the last rule would otherwise cut.
 const VALUE = [
   [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>'],
-  [/\b\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?\b/g, '<instant>'],
+  [/\b\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?/g, '<instant>'],
+  [/\b\d{4}-\d{2}-\d{2}\b/g, '<instant>'],
   // A long token mixing letters and digits (a provider's id, a scenario code).
   [/\b[A-Za-z0-9_-]{12,}\b/g, (t) => (/\d/.test(t) && /[A-Za-z]/.test(t) ? '<id>' : t)],
   [/"[^"\n]{0,80}"/g, '"…"'],
@@ -43,7 +44,7 @@ const VALUE = [
 /** A check's text with the values one run met replaced. */
 function checkText(name) {
   let out = String(name == null ? '' : name).trim();
-  for (const [pattern, placeholder] of VALUE) out = out.replace(pattern, placeholder);
+  for (const [pattern, placeholder] of VALUE) out = out.replace(pattern, (m) => (typeof placeholder === 'function' ? placeholder(m) : placeholder));
   return out;
 }
 
@@ -100,31 +101,38 @@ function groupKeyOf(record) {
  * and check as first seen, the scenarios and runs that showed it, and the
  * first record as its sample.
  */
+function newGroup(key, r) {
+  const error = isError(r.status);
+  return {
+    key,
+    step: String(r.step || ''),
+    check: checkText(r.check),
+    status: r.status == null ? null : Number(r.status),
+    problemCode: error ? problemCodeOf(r.problemCode) : null,
+    problemTitle: error ? (r.problemTitle || null) : null,
+    warningCode: error ? null : problemCodeOf(r.problemCode),
+    scenarios: [],
+    runs: [],
+    count: 0,
+    sample: r,
+  };
+}
+
+function addToGroup(g, r) {
+  g.count++;
+  if (r.scenarioCode && !g.scenarios.includes(r.scenarioCode)) g.scenarios.push(r.scenarioCode);
+  if (r.runId && !g.runs.some((x) => x.runId === r.runId)) {
+    g.runs.push({ runId: r.runId, at: r.at || null, scenarioCode: r.scenarioCode || null });
+  }
+}
+
 function groupFailures(records) {
   const groups = new Map();
   for (const r of records || []) {
-    if (!r || !r.check) continue;
+    if (!r?.check) continue;
     const key = groupKeyOf(r);
-    let g = groups.get(key);
-    if (!g) {
-      g = {
-        key,
-        step: String(r.step || ''),
-        check: checkText(r.check),
-        status: r.status == null ? null : Number(r.status),
-        problemCode: isError(r.status) ? problemCodeOf(r.problemCode) : null,
-        problemTitle: isError(r.status) ? (r.problemTitle || null) : null,
-        warningCode: isError(r.status) ? null : problemCodeOf(r.problemCode),
-        scenarios: [],
-        runs: [],
-        count: 0,
-        sample: r,
-      };
-      groups.set(key, g);
-    }
-    g.count++;
-    if (r.scenarioCode && !g.scenarios.includes(r.scenarioCode)) g.scenarios.push(r.scenarioCode);
-    if (r.runId && !g.runs.some((x) => x.runId === r.runId)) g.runs.push({ runId: r.runId, at: r.at || null, scenarioCode: r.scenarioCode || null });
+    if (!groups.has(key)) groups.set(key, newGroup(key, r));
+    addToGroup(groups.get(key), r);
   }
   return [...groups.values()];
 }
@@ -143,7 +151,7 @@ function proposeCategory(group) {
   const status = group.status;
   const code = group.problemCode || '';
   const ok2xx = status >= 200 && status < 300;
-  if (/^\[OSCAR request\]/.test(String(group.check))) {
+  if (String(group.check).startsWith('[OSCAR request]')) {
     return { category: 'oscar_issue', reason: 'OSCAR\'s own request did not conform to OSDM (#736).' };
   }
   if (status === 501 || NOT_SUPPORTED_CODES.test(code)) {
@@ -152,7 +160,7 @@ function proposeCategory(group) {
   if (isError(status) && SPEC_QUESTION_CODES.test(code)) {
     return { category: 'spec_question', reason: `The provider's problem ${code} names a parameter, a value or a limit it does not accept.` };
   }
-  const negative = /^NHF_/i.test(String(group.sample && group.sample.scenarioCode || ''));
+  const negative = /^NHF_/i.test(String(group.sample?.scenarioCode || ''));
   if (ok2xx && (EXPECTS_REFUSAL.test(String(group.check)) || negative)) {
     return { category: 'provider_deviation', reason: 'A refusal was expected and the provider answered with success.' };
   }
@@ -178,7 +186,7 @@ function textOfFinding(f) {
  * nothing: many different checks fail on a 200.
  */
 function matchFinding(group, findings, acceptedByKey) {
-  const known = acceptedByKey && acceptedByKey[group.key];
+  const known = acceptedByKey?.[group.key];
   if (known) {
     const f = (findings || []).find((x) => x.id === known);
     if (f) return { finding: f, why: 'accepted from the same failure before', strength: 'same' };
@@ -230,6 +238,13 @@ function titleOf(group) {
   return clip(`${group.step}: ${group.check}`, 160);
 }
 
+// "Run <id> (<scenario>), <when>."
+function runLine(r) {
+  const scenario = r.scenarioCode ? ' (' + r.scenarioCode + ')' : '';
+  const when = r.at ? ', ' + r.at : '';
+  return 'Run ' + r.runId + scenario + when + '.';
+}
+
 /**
  * A draft finding from a group: the fields of POST /findings, filled from the
  * run's report. `expectedStatus` is the error status the provider answered,
@@ -251,7 +266,7 @@ function draftOf(group, { batchLabel } = {}) {
   ].filter(Boolean).join('\n');
   const evidence = [
     batchLabel ? `Batch ${batchLabel}.` : null,
-    ...group.runs.slice(0, 10).map((r) => `Run ${r.runId}${r.scenarioCode ? ` (${r.scenarioCode})` : ''}${r.at ? `, ${r.at}` : ''}.`),
+    ...group.runs.slice(0, 10).map(runLine),
     group.runs.length > 10 ? `And ${group.runs.length - 10} more run(s).` : null,
     s.problemDetail ? `Problem detail: ${clip(s.problemDetail, 300)}` : null,
   ].filter(Boolean).join('\n');
