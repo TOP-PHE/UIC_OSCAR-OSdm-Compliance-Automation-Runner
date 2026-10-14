@@ -5831,19 +5831,25 @@ function journeyFinderSummary(plan, q) {
   if (plan.journeys.length > 0) {
     const shown = plan.total > plan.journeys.length ? ` (the ${plan.journeys.length} shortest of ${plan.total})` : '';
     lines.push(`${plan.total} journey(s) found${shown}.`);
-  } else if (!st.services) {
-    lines.push('No journey found: Test Data has no saved train set with timed services.');
   } else {
-    const among = `among the ${st.services} services of ${st.trainSets} saved train set(s)`;
-    if (!st.fromOrigin) lines.push(`No journey found: no train service leaves ${q.origin} ${among}. A train set from a nearby station has another stop place code.`);
-    if (!st.toDestination) lines.push(`No journey found: no train service reaches ${q.destination} ${among}.`);
-    if (st.fromOrigin && st.toDestination) {
-      lines.push(`No journey found: ${st.fromOrigin} service(s) leave the origin and ${st.toDestination} reach the destination, but none connect within the transfer limits. Add the trains in between, or allow a longer wait.`);
-    }
+    lines.push(...journeyFinderEmptyReasons(st, q));
   }
   if (st.unsavedTrainSets) lines.push(`${st.unsavedTrainSets} train set(s) not saved yet were not used: click Save Train first.`);
   if (plan.truncated) lines.push('The search stopped early: some journeys may be missing.');
   return lines;
+}
+
+// Why a search found no journey (#730), from planJourneys().stats.
+function journeyFinderEmptyReasons(st, q) {
+  if (!st.services) return ['No journey found: Test Data has no saved train set with timed services.'];
+  const among = `among the ${st.services} services of ${st.trainSets} saved train set(s)`;
+  const reasons = [];
+  if (!st.fromOrigin) reasons.push(`No journey found: no train service leaves ${q.origin} ${among}. A train set from a nearby station has another stop place code.`);
+  if (!st.toDestination) reasons.push(`No journey found: no train service reaches ${q.destination} ${among}.`);
+  if (st.fromOrigin && st.toDestination) {
+    reasons.push(`No journey found: ${st.fromOrigin} service(s) leave the origin and ${st.toDestination} reach the destination, but none connect within the transfer limits. Add the trains in between, or allow a longer wait.`);
+  }
+  return reasons;
 }
 
 function runJourneyFinder() {

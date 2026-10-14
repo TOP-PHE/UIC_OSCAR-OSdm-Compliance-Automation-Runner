@@ -1133,7 +1133,9 @@ describe('#709 the passenger update in the Test Framework', () => {
 });
 
 describe('#730 Find journeys says when it searched, with what, and why it found nothing', () => {
-  const summary = loadFunction('js/scenarios.js', 'journeyFinderSummary');
+  const summary = loadFunction('js/scenarios.js', 'journeyFinderSummary', {
+    journeyFinderEmptyReasons: loadFunction('js/scenarios.js', 'journeyFinderEmptyReasons'),
+  });
   const q = { origin: 'urn:uic:stn:8101081', destination: 'urn:uic:stn:8001071', maxLegs: 3, minTransfer: 5, maxWait: 180, at: '14:05:12' };
   const plan = (stats, extra = {}) => ({ journeys: [], total: 0, truncated: false, stats, ...extra });
   const first = 'Searched at 14:05:12: urn:uic:stn:8101081 → urn:uic:stn:8001071, 2 or 3 legs, transfer 5–180 min.';
