@@ -1,4 +1,4 @@
-/* global esc, oscarSelectedProvider, oscarToastAfterNav, dirty, OscarCopyReport */  // defined in esc.js, nav.js, scenarios.js and copy-report.js
+/* global esc, oscarSelectedProvider, oscarToastAfterNav, dirty, state, OscarCopyReport */  // defined in esc.js, nav.js, scenarios.js and copy-report.js
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
