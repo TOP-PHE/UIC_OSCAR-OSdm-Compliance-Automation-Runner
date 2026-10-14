@@ -694,6 +694,17 @@ app.get('/{*splat}', spaShellLimiter, (req, res) => {
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
+  // #725: a body the JSON parser refuses is the client's error. It used to be
+  // answered 500 with no reason (a page saving "null" saw only "Internal
+  // Server Error").
+  if (err.type === 'entity.parse.failed') {
+    log.warn({ path: req.path, method: req.method }, 'request body is not valid JSON');
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The request body is not valid JSON.' });
+  }
+  if (err.type === 'entity.too.large') {
+    log.warn({ path: req.path, method: req.method }, 'request body over the limit');
+    return res.status(413).json({ status: 413, title: 'Payload Too Large', detail: 'The request body is larger than 5 MB.' });
+  }
   log.error({ err, path: req.path, method: req.method }, 'Unhandled error');
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({ status: 413, title: 'File Too Large', detail: 'Maximum upload size is 5 MB.' });
