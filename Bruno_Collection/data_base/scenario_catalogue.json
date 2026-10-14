@@ -449,7 +449,7 @@
       "code": "OTST_SALE_SEARCH_TRAIN_FILTER_1ADT",
       "source": "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38",
       "purpose": "An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only.",
-      "checks": 1,
+      "checks": 231,
       "needs": {
         "trip": "SEARCH",
         "passengers": 1

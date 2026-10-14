@@ -222,7 +222,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT` | An optional seat reservation booked with `placeSelections`. | — | 370 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` |
 | `OTST_SALE_RESERVATION_ADD_LATER_2ADT` | An optional seat reservation added to the pre-booked booking afterwards. | — | 367 | `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` |
 | `OTST_SALE_BY_TRIP_ID_1ADT` | Offers asked by trip id, after a trip search (`POST /trips-collection`). | — | 237 | `SIM_SALE_BY_TRIP_ID_1ADT_38` |
-| `OTST_SALE_SEARCH_TRAIN_FILTER_1ADT` | An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only. | — | 0 | `SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38` |
+| `OTST_SALE_SEARCH_TRAIN_FILTER_1ADT` | An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only. | — | 231 | `SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38` |
 | `OTST_SALE_DOCUMENTS_RETURN_1ADT` | Fulfillment documents of a return, and each fulfillment read with `GET /fulfillments/{id}`. | return model COMBINED, OSDM 3.7+ | 351 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` |
 | `OTST_SALE_IDEMPOTENCY_1ADT` | `Idempotency-Key` on the booking and the confirmation: the same key gives the same answer. | — | 236 | `SIM_SALE_IDEMPOTENCY_1ADT_38` |
 | `OTST_SALE_REQUESTED_INFORMATION_1ADT` | Requested information: what the offers ask for is checked and supplied. | — | 233 | `SIM_RI_AUTOFEED_1ADT_38` |

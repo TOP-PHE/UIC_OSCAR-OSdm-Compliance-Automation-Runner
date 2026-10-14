@@ -62,6 +62,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.276] / [collection-OTST_V2.0.156] — 2026-10-14
+
+Issue #722, release 2026.311.
+
+### Changed
+- **An offer search sends origin, destination and time only.** The train and
+  operator filters (`tripSearchCriteria.parameters.dataFilter`) are optional
+  in OSDM, and a real provider that refused an operator code stopped every
+  scenario at step 01. They are now sent only when the trip's Trip Search
+  Criteria turn **Train filter** on.
+- **The train is chosen in the answer** (`library-bruno/searchTrain.js`,
+  `searchTripOffers()` in `offers.js`): the offers covering the trip of the
+  Test Data train, else of the first trip leaving at the time asked or later.
+  The train not in the answer is a WARNING, never a stop. One-way SEARCH trips
+  only; trip specifications, offers by trip id and returns are unchanged. The
+  price comparisons of 01c (reduction cards) and 01d (group) compare within
+  the same trip.
+
+### Added
+- **The train filter tested on its own:** with Train filter on, the request
+  carries the train and operator as before, and the answer must hold a trip of
+  that train (FAIL otherwise; a trip of another train is a WARNING).
+  Simulator scenario `SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38` and reference
+  scenario `OTST_SALE_SEARCH_TRAIN_FILTER_1ADT` (231 checks).
+
+Checked:
+- Unit tests of the module and of its wiring in `offers.js` (16), and of the
+  parser's default (no `parameters` without the filter); each guard was
+  broken in turn and its test failed.
+- A replay of 5 existing simulator scenarios (sale, sale by trip id with a
+  train, card, group, separate return) gives the same checks as the full
+  recording of #721; the new one gives 231, none failed.
+
+---
+
 ## [server-1.11.274] / [collection-OTST_V2.0.154] — 2026-10-14
 
 Issue #719, release 2026.309.
