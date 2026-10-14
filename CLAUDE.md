@@ -1254,6 +1254,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   adds to a run list; when the copier's list is "ALL" (`runsAllAfterCopy()`,
   the same reading as `POST /v1/runs`) the report warns that scenarios to
   complete would run. It does not rewrite "ALL" into a list, on purpose.
+- **Find journeys is a planner over Test Data, never the provider** (#711,
+  1.11.270). `public/js/journey-planner.js` (pure; browser global and
+  CommonJS, needs `trip-apply.js` first) chains TRAIN services into 2- or
+  3-leg JOURNEY resources. Stop places compare with `stopKey()` (leading
+  zeros dropped), times in UTC from their offset. Every leg of a journey runs
+  on the trip date (`trip-apply.js` gives them all `%TRIP_DATE%`), so a
+  service arriving after midnight counts its arrival on the next day and
+  nothing can follow it: the wait check does that, with no separate rule. The
+  search has a budget (`SEARCH_BUDGET`) and reports `truncated`. A result is
+  pushed as an unsaved journey; the Journeys section is drawn closed, so the
+  page opens it before showing the new journey.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is
@@ -1485,6 +1496,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Oscar_Server/public/providers.html` | Providers page (Test Managers): add/rename, endpoint, tester access, #540 |
 | `Oscar_Server/src/utils/scenarioCopy.js` | rules of copying scenarios between providers, #540 |
 | `Oscar_Server/public/js/trip-apply.js` | the one "Apply test data" implementation (browser + server), #540 |
+| `Oscar_Server/public/js/journey-planner.js` | Find journeys: chains Test Data's train sets into 2- or 3-leg journeys, no provider call, #711 |
 | `Oscar_Server/src/utils/datafileVersion.js` | the data file version (ETag) a Test Config save is checked against, #540 |
 | `Oscar_Server/src/utils/datafileSchema.js` | the upload's data file check: the collection's run-time schema rules, re-stated and pinned to `validators.js` by a test, #549 |
 | `Oscar_Server/src/utils/testerCredentials.js` | a tester's OSDM credentials per (user, company), #540 |
