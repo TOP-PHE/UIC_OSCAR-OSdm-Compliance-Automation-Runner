@@ -694,6 +694,33 @@ const MIGRATIONS = [
         )`);
       } catch (_e) { /* benign if already exists */ }
   }},
+  { version: 31, name: 'finding-suggestions', up: () => {
+      // #735 - candidate findings drawn from a batch's failures, waiting for a
+      // Test Manager's decision. A table of their own, not a status of
+      // `finding`: every reader of `finding` (the page, the known-deviation
+      // projection, the export) would otherwise have to leave drafts out.
+      // group_key identifies the failure across batches, so a rejected one,
+      // or one marked as OSCAR's, is not suggested again.
+      db.exec(`CREATE TABLE IF NOT EXISTS finding_suggestion (
+        id                 TEXT PRIMARY KEY,
+        company_id         TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        group_key          TEXT NOT NULL,
+        state              TEXT NOT NULL DEFAULT 'draft',
+        draft              TEXT NOT NULL,
+        scenarios          TEXT,
+        runs               TEXT,
+        occurrences        INTEGER NOT NULL DEFAULT 0,
+        maybe_finding_id   TEXT,
+        finding_id         TEXT,
+        last_batch_id      TEXT,
+        decided_by         TEXT,
+        decided_at         TEXT,
+        created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (company_id, group_key)
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_finding_suggestion_company ON finding_suggestion(company_id, state)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

@@ -86,6 +86,26 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `[WARNING]`) instead of a hard FAIL. Any *other* status still fails — this
   can't be used to hide a regression. Extended (#447) with `scenario_code`,
   linking a finding to the scenario that revealed it.
+  - **Suggested from runs** (#735, 1.11.284): a batch's failed checks
+    (`run_assertions` + the request's problem) grouped into drafts, rules
+    only, no model. `utils/findingSuggestions.js` (pure): the key is step +
+    check text with the run's values out (`checkText()`) + HTTP status + the
+    problem code **of an error answer only** (a 200 may carry warning
+    problems that have nothing to do with the failed check). Matching:
+    `same` (a past draft's key, or same step and error status / problem
+    code / check text) shows "still seen" and makes no draft; `maybe` (same
+    step and scenario) still makes the draft, naming the finding, because one
+    step of one scenario fails in several ways and a wrong "still seen" hides
+    a new problem. A 2xx status never matches by itself. Drafts live in
+    `finding_suggestion` (migration 31), **not** as a `finding` status, so no
+    reader of `finding` has to leave them out; `draft` is encrypted. Test
+    Manager only, testers and certifiers get 403. Rejected and OSCAR-issue
+    keys are not suggested again; an OSCAR issue never becomes a finding.
+    Accepting goes through `createFinding()` (`api/helpers/findings.js`),
+    the same as "Open a finding". The route file is mounted **before**
+    `company-findings.js`, whose `GET /findings/:id` would take
+    "suggestions" for an id. Tuned on a real provider's batch (35 failures →
+    18 groups); that data stays in the private repository.
 - **Auth-profile dispatcher** (`worker/auth-profiles.js`): pluggable
   token-fetch adapters per vendor quirk — `oauth2_basic`, `oauth2_post`,
   `paxone_json`, `sqills_extension`, `custom` (user JSON template,

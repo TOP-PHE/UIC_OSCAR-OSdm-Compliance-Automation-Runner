@@ -565,6 +565,8 @@ app.use('/v1/company',         require('./api/routes/company'));
 app.use('/v1/company',         require('./api/routes/company-test-framework'));
 app.use('/v1/company',         require('./api/routes/company-test-resources'));
 app.use('/v1/company',         require('./api/routes/company-places'));
+// Before company-findings: its GET /findings/:id would take "suggestions" for an id.
+app.use('/v1/company',         require('./api/routes/company-finding-suggestions'));
 app.use('/v1/company',         require('./api/routes/company-findings'));
 app.use('/v1/company',         require('./api/routes/company-scenario-copy'));
 app.use('/v1/runs',            require('./api/routes/runs'));

@@ -62,6 +62,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.284] / [collection-OTST_V2.0.159] — 2026-10-14
+
+Issue #735 (parts 1 and 2), release 2026.319. Server only; the collection
+stays OTST_V2.0.159.
+
+### Added
+- **Test Findings: "Suggested from runs".** A Test Manager picks a batch and
+  OSCAR groups its failed checks: one draft per problem, with the scenarios
+  and runs that showed it. The key is the step, the check text with the
+  run's values left out, the HTTP status and, for an error answer, the OSDM
+  problem code. Each group is matched against the company's findings:
+  - recorded already (the same failure accepted before, or the same step
+    with the same error status, problem code or check) → shown as **still
+    seen**, nothing written;
+  - same step and scenario only → the draft is made, with "may already be
+    recorded as …";
+  - an open finding whose scenario ran and that nothing matched → shown as
+    **not seen in this batch**.
+- A draft starts with a category from fixed rules: 501 or an "operation not
+  supported" problem → Not supported; a parameter, value or limit the
+  provider does not accept (`PARAMETER_NOT_SUPPORTED`, `…NOT_MODIFIABLE`) →
+  Spec question; a success where a refusal was expected → Provider
+  deviation; a failed `[OSCAR request]` check (#736) → OSCAR issue; else
+  Open point. The rule that applied is shown next to it.
+- Observed and Evidence are filled from what the run report already shows
+  (step, check, status, problem code and title, runs); no request body, no
+  header.
+- For each draft: **Accept** (title, category and texts can be edited first;
+  it becomes an ordinary finding), **Reject** (not suggested again) or
+  **OSCAR issue** (kept on this page, never a finding). Nothing is written
+  to a finding without one of those clicks.
+- Drafts are stored apart (`finding_suggestion`, migration 31, the draft
+  encrypted), seen by Test Managers only: testers, certifiers and the
+  provider never see them.
+
+Not in this release: the simulator hint (part 3 of #735), which tells
+whether the same check passes on the simulator.
+
+Checked:
+- `finding-suggestions.test.js` (rules) and
+  `finding-suggestions-routes.test.js` (a batch seeded as the runner stores
+  it: analyse, still seen / not seen, accept with edits, reject, OSCAR issue,
+  re-analysis, roles, another company).
+- On a real provider's batch of 35 failures: 18 groups, 4 recognised as
+  recorded, 8 "may be recorded", 6 new.
+- In Chromium on a throw-away server: analyse, edit, accept, back to the list.
+
+---
+
 ## [server-1.11.283] / [collection-OTST_V2.0.159] — 2026-10-14
 
 Issue #736, release 2026.318. Collection, a generator script and tests; no

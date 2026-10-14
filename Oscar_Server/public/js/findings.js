@@ -34,6 +34,7 @@
     replyText: '',    // draft reply for the open thread
     importing: false, // JSON-import view open
     importText: '',   // pasted import JSON
+    suggest: null,    // #735 "Suggested from runs" view: { batches, batchId, analysis, drafts, oscarIssues, rejected, edits, busy }
     openCats: {},     // category → expanded?      (accordion level 1, collapsed by default)
     openGroups: {},   // 'category|status' → expanded? (accordion level 2, collapsed by default)
     scenarioCodes: [] // datafile scenario.code list — autocomplete source for "which scenario revealed this" (#447)
@@ -134,11 +135,13 @@
   // ── Render dispatch ──────────────────────────────────────────────────────────
   function render() {
     var ha = document.getElementById('header-actions');
-    ha.innerHTML = (state.isTM && !state.form && !state.importing)
+    ha.innerHTML = (state.isTM && !state.form && !state.importing && !state.suggest)
       ? '<button class="btn btn-success" data-action="compose-new">＋ Open a finding</button>'
+        + ' <button class="btn btn-secondary" data-action="suggest-open" title="Group a batch\'s failures into draft findings for you to accept, edit or reject">🧩 Suggested from runs</button>'
         + ' <button class="btn btn-secondary" data-action="import-open" title="Import findings from a JSON array (e.g. OSCAR\'s analysis for this test-system)">⬆ Import</button>'
       : '';
     var root = document.getElementById('findings-root');
+    if (state.suggest) { root.innerHTML = renderSuggest(state.suggest); return; }
     if (state.importing) { root.innerHTML = renderImport(); return; }
     if (state.form) { root.innerHTML = renderForm(state.form); return; }
     if (state.openId && state.thread) { root.innerHTML = renderThread(state.thread); return; }
@@ -467,6 +470,158 @@
     return h;
   }
 
+
+  // ── Suggested from runs (#735) ───────────────────────────────────────────────
+  // A batch's failures, grouped by the server into draft findings. Nothing is
+  // written to a finding without a click here; testers never see this view.
+  var SUGGEST_BASE = '/v1/company/findings/suggestions';
+
+  async function openSuggest() {
+    state.suggest = { batches: [], batchId: '', analysis: null, drafts: [], oscarIssues: [], rejected: 0, edits: {}, busy: false };
+    state.form = null; state.importing = false; state.openId = null; state.thread = null;
+    render(); window.scrollTo(0, 0);
+    try {
+      var b = await api('GET', SUGGEST_BASE + '/batches');
+      state.suggest.batches = b.batches || [];
+      state.suggest.batchId = state.suggest.batches.length ? state.suggest.batches[0].batchId : '';
+      await loadSuggestions();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function loadSuggestions() {
+    var data = await api('GET', SUGGEST_BASE);
+    var sg = state.suggest; if (!sg) return;
+    sg.drafts = data.drafts || []; sg.oscarIssues = data.oscarIssues || []; sg.rejected = data.rejected || 0;
+    render();
+  }
+
+  async function analyseBatch() {
+    var sg = state.suggest; if (!sg || !sg.batchId) { toast('Choose a batch first.', 'warning'); return; }
+    sg.busy = true; render();
+    try {
+      sg.analysis = await api('POST', SUGGEST_BASE + '/analyse', { batchId: sg.batchId });
+      await loadSuggestions();
+      toast(sg.analysis.created + ' new draft(s), ' + sg.analysis.updated + ' updated, ' + sg.analysis.stillSeen.length + ' still seen.', 'success');
+    } catch (e) { toast(e.message, 'error'); }
+    sg.busy = false; render();
+  }
+
+  function draftFields(d) {
+    var e = state.suggest.edits[d.id] || {};
+    return {
+      title: e.title != null ? e.title : (d.draft.title || ''),
+      category: e.category || d.draft.category || 'open',
+      observed: e.observed != null ? e.observed : (d.draft.observed || ''),
+      interpretation: e.interpretation != null ? e.interpretation : (d.draft.interpretation || ''),
+      evidence: e.evidence != null ? e.evidence : (d.draft.evidence || '')
+    };
+  }
+
+  async function decideSuggestion(id, how) {
+    var sg = state.suggest; if (!sg) return;
+    var d = sg.drafts.find(function (x) { return x.id === id; }); if (!d) return;
+    try {
+      if (how === 'accept') {
+        var r = await api('POST', SUGGEST_BASE + '/' + encodeURIComponent(id) + '/accept', draftFields(d));
+        toast('Finding created: ' + r.finding.title, 'success');
+        await refresh();
+      } else {
+        await api('POST', SUGGEST_BASE + '/' + encodeURIComponent(id) + '/' + how);
+        toast(how === 'reject' ? 'Rejected: it will not be suggested again.' : 'Kept as an OSCAR issue (not shown to the provider).', 'success');
+      }
+      delete sg.edits[id];
+      await loadSuggestions();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function renderSuggest(sg) {
+    var h = '<div style="margin-bottom:12px"><button class="btn btn-secondary btn-sm" data-action="suggest-close">← All findings</button></div>';
+    h += '<div class="card"><div class="card-body" style="padding:14px">'
+      + '<div style="font-size:15px;font-weight:700;color:#37474f;margin-bottom:4px">🧩 Suggested from runs</div>'
+      + '<div style="font-size:12px;color:#78909c;margin-bottom:10px">The failed checks of a batch, grouped: one draft per problem, with the scenarios that showed it. '
+      + 'A draft is yours to accept, edit then accept, reject, or keep as an OSCAR issue. Testers and the provider never see drafts.</div>'
+      + renderBatchPicker(sg) + '</div></div>';
+    if (sg.analysis) h += renderAnalysis(sg.analysis);
+    h += '<div style="font-size:13px;font-weight:700;color:#eceff1;margin:16px 0 8px">Drafts waiting (' + sg.drafts.length + ')</div>';
+    h += sg.drafts.length ? sg.drafts.map(renderDraft).join('')
+      : '<div class="placeholder" style="padding:14px">No draft waiting. Analyse a batch to get some.</div>';
+    h += renderDecidedNote(sg);
+    return h;
+  }
+
+  function renderBatchPicker(sg) {
+    if (!sg.batches.length) return '<div style="font-size:13px;color:#78909c">No batch of runs yet for this test-system.</div>';
+    var opts = sg.batches.map(function (b) {
+      var label = fmtTs(b.started) + ' — ' + b.runs + ' run(s)' + (b.finishedRuns < b.runs ? (', ' + b.finishedRuns + ' finished') : '');
+      return '<option value="' + esc(b.batchId) + '"' + (b.batchId === sg.batchId ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      + '<label for="suggest-batch" style="font-size:12px;color:#455a64">Batch</label>'
+      + '<select id="suggest-batch" class="param-input" data-action="suggest-batch" style="max-width:360px">' + opts + '</select>'
+      + '<button class="btn btn-primary btn-sm" data-action="suggest-analyse"' + (sg.busy ? ' disabled' : '') + '>'
+      + (sg.busy ? '⏳ Analysing…' : 'Analyse') + '</button></div>';
+  }
+
+  function renderAnalysis(a) {
+    var h = '<div class="card" style="margin-top:12px"><div class="card-body" style="padding:12px;font-size:12px;color:#455a64">'
+      + '<div style="margin-bottom:6px"><strong>' + a.batch.failures + '</strong> failed check(s) in ' + a.batch.finishedRuns + ' finished run(s) → '
+      + a.groups + ' problem(s): ' + a.created + ' new draft(s), ' + a.updated + ' updated, ' + a.stillSeen.length + ' already recorded'
+      + (a.suppressed ? (', ' + a.suppressed + ' rejected or OSCAR\'s before') : '') + '.'
+      + (a.batch.truncated ? ' <span style="color:#c62828">Only the first failures were read.</span>' : '') + '</div>';
+    if (a.stillSeen.length) {
+      h += '<div style="margin-top:6px"><strong>Still seen</strong> (shown, nothing written):<ul style="margin:4px 0 0 18px">'
+        + a.stillSeen.map(function (s) {
+          return '<li><a href="#" data-action="open-finding" data-id="' + esc(s.findingId) + '">' + esc(s.title) + '</a> — '
+            + esc(s.why) + ', ' + s.occurrences + '× in ' + esc(s.scenarios.join(', ')) + '</li>';
+        }).join('') + '</ul></div>';
+    }
+    if (a.notSeen.length) {
+      h += '<div style="margin-top:6px"><strong>Not seen in this batch</strong> (its scenario ran, nothing matched):<ul style="margin:4px 0 0 18px">'
+        + a.notSeen.map(function (s) {
+          return '<li><a href="#" data-action="open-finding" data-id="' + esc(s.findingId) + '">' + esc(s.title) + '</a> — ' + esc(s.scenarioCode) + '</li>';
+        }).join('') + '</ul></div>';
+    }
+    return h + '</div></div>';
+  }
+
+  function renderDraft(d) {
+    var x = draftFields(d);
+    var pills = CAT_ORDER.map(function (k) {
+      return '<span class="pill' + (x.category === k ? ' selected' : '') + '" data-action="suggest-pill" data-id="' + esc(d.id) + '" data-value="' + k + '">' + esc(CAT_LABELS[k]) + '</span>';
+    }).join(' ');
+    var maybe = d.maybeFindingId ? liveFinding(d.maybeFindingId) : null;
+    function field(name, label, rows) {
+      var fid = 'sg-' + name + '-' + d.id;
+      var input = rows
+        ? '<textarea id="' + esc(fid) + '" class="param-input" data-action="suggest-field" data-id="' + esc(d.id) + '" data-field="' + name + '" style="min-height:' + rows + 'px;resize:vertical">' + esc(x[name]) + '</textarea>'
+        : '<input id="' + esc(fid) + '" class="param-input" data-action="suggest-field" data-id="' + esc(d.id) + '" data-field="' + name + '" value="' + esc(x[name]) + '">';
+      return '<label for="' + esc(fid) + '" style="font-size:11px;color:#78909c;display:block;margin-top:8px">' + esc(label) + '</label>' + input;
+    }
+    return '<div class="card" style="margin-bottom:10px"><div class="card-body" style="padding:12px">'
+      + '<div style="font-size:11px;color:#90a4ae">' + d.occurrences + ' failure(s) · ' + esc(d.scenarios.join(', ')) + ' · step ' + esc(d.draft.step || '—')
+      + (d.draft.expectedStatus ? (' · HTTP ' + esc(d.draft.expectedStatus)) : '') + '</div>'
+      + (maybe ? '<div style="font-size:12px;color:#a85b00;margin-top:4px">⚠ May already be recorded as <a href="#" data-action="open-finding" data-id="' + esc(maybe.id) + '">' + esc(maybe.title) + '</a> (same step and scenario).</div>' : '')
+      + field('title', 'Title') + '<div style="margin-top:8px">' + pills
+      + ' <span style="font-size:11px;color:#90a4ae">' + esc(d.draft.reason || '') + '</span></div>'
+      + field('observed', 'Observed', 70) + field('interpretation', 'Interpretation (OSCAR\'s reading, spec reference)', 50) + field('evidence', 'Evidence', 50)
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap">'
+      + '<button class="btn btn-secondary btn-sm" data-action="suggest-decide" data-how="oscar-issue" data-id="' + esc(d.id) + '" title="OSCAR\'s own problem: kept here, never shown to the provider">OSCAR issue</button>'
+      + '<button class="btn btn-danger btn-sm" data-action="suggest-decide" data-how="reject" data-id="' + esc(d.id) + '" title="Not a finding: it will not be suggested again">Reject</button>'
+      + '<button class="btn btn-success btn-sm" data-action="suggest-decide" data-how="accept" data-id="' + esc(d.id) + '">Accept as finding</button>'
+      + '</div></div></div>';
+  }
+
+  function renderDecidedNote(sg) {
+    if (!sg.oscarIssues.length && !sg.rejected) return '';
+    var h = '<div style="font-size:12px;color:#cfd8dc;margin-top:12px">';
+    if (sg.oscarIssues.length) {
+      h += '<strong>Kept as OSCAR issues</strong> (' + sg.oscarIssues.length + '):<ul style="margin:4px 0 0 18px">'
+        + sg.oscarIssues.map(function (s) { return '<li>' + esc(s.draft.title) + '</li>'; }).join('') + '</ul>';
+    }
+    if (sg.rejected) h += '<div>' + sg.rejected + ' suggestion(s) rejected; they are not suggested again.</div>';
+    return h + '</div>';
+  }
+
   // ── Actions ──────────────────────────────────────────────────────────────────
   async function openFinding(id) {
     try {
@@ -568,7 +723,16 @@
     var el = closestAction(e.target); if (!el) return;
     var a = el.dataset.action, id = el.dataset.id;
     switch (a) {
-      case 'open-finding':  openFinding(id); break;
+      case 'open-finding':  e.preventDefault(); state.suggest = null; openFinding(id); break;
+      case 'suggest-open':  openSuggest(); break;
+      case 'suggest-close': state.suggest = null; render(); break;
+      case 'suggest-analyse': analyseBatch(); break;
+      case 'suggest-decide': decideSuggestion(id, el.dataset.how); break;
+      case 'suggest-pill': {
+        if (!state.suggest) break;
+        (state.suggest.edits[id] || (state.suggest.edits[id] = {})).category = el.dataset.value;
+        render(); break;
+      }
       case 'toggle-cat':    state.openCats[el.dataset.cat] = !state.openCats[el.dataset.cat]; render(); break;
       case 'toggle-group':  { var gk = el.dataset.cat + '|' + el.dataset.status; state.openGroups[gk] = !state.openGroups[gk]; render(); break; }
       case 'expand-all':    setAllCats(true); render(); break;
@@ -601,10 +765,14 @@
     if (el.dataset.action === 'set-reply-text') state.replyText = el.value;
     else if (el.dataset.action === 'import-text') state.importText = el.value;
     else if (el.dataset.action === 'form-field' && state.form) state.form.fields[el.dataset.field] = el.value;
+    else if (el.dataset.action === 'suggest-field' && state.suggest) {
+      (state.suggest.edits[el.dataset.id] || (state.suggest.edits[el.dataset.id] = {}))[el.dataset.field] = el.value;
+    }
   });
   document.body.addEventListener('change', function (e) {
     var el = closestAction(e.target); if (!el) return;
     if (el.dataset.action === 'form-toggle' && state.form) state.form.fields[el.dataset.field] = el.checked;
+    else if (el.dataset.action === 'suggest-batch' && state.suggest) state.suggest.batchId = el.value;
   });
 
   // ── Init ─────────────────────────────────────────────────────────────────────
