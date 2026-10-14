@@ -301,6 +301,38 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #717: the run's copy says the days its trip's Test Data trains run.
+  test('a run gets its trips\' calendars in its copy; a Test Manager the stored file', async () => {
+    const { companyId, userId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run("INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'Weekend R', ?)", [uuidv4(), companyId,
+      colEncrypt(JSON.stringify({ originURN: 'urn:uic:stn:7100001', destinationURN: 'urn:uic:stn:7100002', daysOfWeek: ['SAT', 'SUN'],
+        services: [{ vehicleNumber: 'R 9', departureTime: '08:00:00', arrivalTime: '09:00:00' }] }))]);
+    run("UPDATE users SET role = 'test_manager' WHERE id = ?", [userId]);
+    const stored = JSON.stringify({ scenarios: [], tripRequirements: [
+      { id: 1, tripType: 'SEARCH', trip: { origin: 'urn:uic:stn:007100001', destination: 'urn:uic:stn:7100002', startDatetime: '%TRIP_DATE%T08:00:00', vehicleNumber: 'R 9' } },
+    ] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.status).toBe(200);
+      expect(forRun.body.tripRequirements[0].__operatingDays).toEqual(['SAT', 'SUN']);
+      const forTm = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-Forwarded-For', '1.2.3.4')
+        .set('Cookie', `oscar_session=${makeToken('test_manager', userId, companyId)}`);
+      expect(forTm.text).toBe(stored);
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   test('a run gets the stored file when the framework cannot be read', async () => {
     const { companyId, slug } = seedCompanyUser();
     run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)', [uuidv4(), companyId, 'not json']);

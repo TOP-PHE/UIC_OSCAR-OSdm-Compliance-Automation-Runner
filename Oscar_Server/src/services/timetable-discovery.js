@@ -464,6 +464,24 @@ function _dayPatternLabel(days) {
  *   summary: object
  * }}
  */
+// #717: an existing set of the group's route and product category, with no
+// operating days, holding one of `services`, not already taken by another
+// pattern of the same route (the first pattern takes it).
+function _uncalendaredTwin(existing, g, services, taken) {
+  const keys = new Set(services.map(serviceKey));
+  return (existing || []).find(r => {
+    if (!r || r.resource_type !== 'TRAIN') return false;
+    const d = r.data || {};
+    if (d.originURN !== g.originURN || d.destinationURN !== g.destinationURN) return false;
+    if ((d.productCategoryRef || '') !== (g.productCategoryRef || '')) return false;
+    if (Array.isArray(d.daysOfWeek) && d.daysOfWeek.length) return false;
+    if (taken.has(r.id)) return false;
+    const hit = (Array.isArray(d.services) ? d.services : []).some(s => keys.has(serviceKey(s)));
+    if (hit) taken.add(r.id);
+    return hit;
+  }) || null;
+}
+
 function groupAndMerge(harvested, existing, catalog) {
   catalog = catalog || {};
   const catTravel  = Array.isArray(catalog.travelClasses)  ? catalog.travelClasses  : [];
@@ -530,7 +548,7 @@ function groupAndMerge(harvested, existing, catalog) {
   // 3. Index existing TRAIN resources by route + calendar (first wins).
   const existingByKey = new Map();
   for (const r of (existing || [])) {
-    if (!r || r.resource_type !== 'TRAIN') continue;
+    if (r?.resource_type !== 'TRAIN') continue;
     const d = r.data || {};
     const cal = sortDays(Array.isArray(d.daysOfWeek) ? d.daysOfWeek : []).join(',');
     const k = `${d.originURN || ''}|${d.destinationURN || ''}|${d.productCategoryRef || ''}|${cal}`;
@@ -538,6 +556,7 @@ function groupAndMerge(harvested, existing, catalog) {
   }
 
   // 4. Reconcile each desired set against the matching existing set.
+  const takenTwins = new Set();   // #717: sets without calendar already given one
   const toCreate = [];
   const toUpdate = [];
   let servicesAdded = 0;
@@ -545,7 +564,9 @@ function groupAndMerge(harvested, existing, catalog) {
   for (const set of desired) {
     const g = set.g;
     const dkey = `${g.originURN || ''}|${g.destinationURN || ''}|${g.productCategoryRef || ''}|${set.daysOfWeek.join(',')}`;
-    const existingRes = existingByKey.get(dkey);
+    // #717: a set of the same route with no calendar yet, sharing a service,
+    // is this one: it gets the calendar instead of a second set appearing.
+    const existingRes = existingByKey.get(dkey) || _uncalendaredTwin(existing, g, set.services, takenTwins);
 
     if (!existingRes) {
       const services = set.services.slice().sort((a, b) => String(a.departureTime).localeCompare(String(b.departureTime)));
@@ -586,7 +607,8 @@ function groupAndMerge(harvested, existing, catalog) {
       addedHere++;
     }
     // Calendar is part of the match key; only set it if the existing set had none.
-    if (!Array.isArray(data.daysOfWeek) || data.daysOfWeek.length === 0) data.daysOfWeek = set.daysOfWeek.slice();
+    const calendarFilled = (!Array.isArray(data.daysOfWeek) || data.daysOfWeek.length === 0) && set.daysOfWeek.length > 0;
+    if (calendarFilled) data.daysOfWeek = set.daysOfWeek.slice();
     // Fill descriptive fields only when currently empty (preserve manual edits).
     if (!data.operatorCode && g.operatorCode) data.operatorCode = g.operatorCode;
     if (!data.productCategoryName && g.productCategoryName) data.productCategoryName = g.productCategoryName;
@@ -606,7 +628,7 @@ function groupAndMerge(harvested, existing, catalog) {
     fillEmpty('serviceClasses', catService);
     fillEmpty('ancillaries', catAnc);
 
-    if (addedHere > 0 || catalogFilled) {
+    if (addedHere > 0 || catalogFilled || calendarFilled) {
       toUpdate.push({ id: existingRes.id, label: existingRes.label, data });
       servicesAdded += addedHere;
     }
@@ -626,6 +648,46 @@ function groupAndMerge(harvested, existing, catalog) {
   };
 }
 
+// ── Filling a missing calendar (#717) ─────────────────────────────────────
+// A train set with no operating days learns them from the provider: the days
+// on which every one of its services was seen over the days searched.
+
+// "09:10" of "09:10:00+02:00" / "2026-10-19T09:10:00"; '' when none.
+function _clock(value) {
+  const m = /(\d{2}):(\d{2})/.exec(String(value || ''));
+  return m ? `${m[1]}:${m[2]}` : '';
+}
+
+// A harvested record is a run of `svc` on the set's route: same train number
+// when both have one, else the same departure time.
+function _sameService(rec, svc) {
+  const a = String(rec.vehicleNumber || '').trim();
+  const b = String(svc.vehicleNumber || '').trim();
+  if (a && b) return a === b;
+  return Boolean(_clock(svc.departureTime)) && _clock(rec.departureTime) === _clock(svc.departureTime);
+}
+
+/**
+ * The operating days of a train set (`data`, its route and services) from the
+ * records of a search of its route. { daysOfWeek } when every service was seen
+ * and they share days; else { reason } in words, nothing guessed.
+ */
+function calendarFromHarvest(data, harvested) {
+  const services = Array.isArray(data?.services) ? data.services.filter(Boolean) : [];
+  if (services.length === 0) return { reason: 'it has no service' };
+  const onRoute = (harvested || []).filter(r => r.originURN === data.originURN && r.destinationURN === data.destinationURN && r.dayOfWeek);
+  const unseen = [];
+  let days = null;
+  for (const svc of services) {
+    const seen = [...new Set(onRoute.filter(r => _sameService(r, svc)).map(r => r.dayOfWeek))];
+    if (seen.length === 0) { unseen.push(svc.vehicleNumber || _clock(svc.departureTime) || '?'); continue; }
+    days = days === null ? seen : days.filter(d => seen.includes(d));
+  }
+  if (unseen.length) return { reason: `the provider did not offer ${unseen.join(', ')} on the days searched` };
+  if (days.length === 0) return { reason: 'its services run on different days: Discover timetable splits them into sets' };
+  return { daysOfWeek: sortDays(days) };
+}
+
 module.exports = {
   classifyOfferProbe,
   summarizeOfferProbe,
@@ -635,6 +697,7 @@ module.exports = {
   harvestTrips,
   harvestConnections,
   journeysFromConnections,
+  calendarFromHarvest,
   harvestOfferCatalog,
   routeKey,
   serviceKey,

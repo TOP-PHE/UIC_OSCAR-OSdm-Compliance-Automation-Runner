@@ -62,6 +62,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.273] / [collection-OTST_V2.0.153] — 2026-10-14
+
+Issue #717, release 2026.308.
+
+A scenario's trip is filled from Test Data trains and journeys, but only
+their stop places, times and numbers reach it, not the days they run. The
+run took today plus the lead time, so a trip whose trains run at weekends
+was asked for on a weekday, and failed for no visible reason.
+
+### Added
+
+- **The run knows the days its trip's trains run, for old scenarios too.**
+  When the server hands the data file to a run, it matches each trip
+  requirement against the company's TRAIN resources: stop places (leading
+  zeros ignored) and train number, else the departure time.
+  - It annotates the run's copy with the days every matched leg runs
+    (`__operatingDays`), and notes for the log (`__calendarNotes`)
+    (`utils/tripCalendar.js`, pure; `withTripCalendars()` in `server.js`).
+  - The stored file is unchanged, and a calendar filled later is used by the
+    next run.
+  - Test Data text in the notes cannot hold `{{`.
+- **The date is a day the trains run** (`library-bruno/tripCalendar.js`,
+  `tripDateFor()` in `scenarioParser.js`).
+  - With no day named by the scenario, today + lead time moves to the first
+    following day in the calendar, and the log says so.
+  - A day the scenario names ("Departure day", or `departureDaysFromToday`
+    for the #704 probes) is kept, with a `[WARNING]` when the trains do not
+    run then.
+- **Time checks, as warnings in the run log:**
+  - a departure time that is not the matched train's;
+  - SPECIFICATION legs that do not connect: the next leg starts elsewhere,
+    or before the previous one arrives;
+  - legs with no day in common.
+  A leg without calendar, or without a Test Data train, is named at INFO.
+- **Test Data → 📅 Fill missing calendars** (Test Manager,
+  `POST /v1/company/test-resources/fill-calendars`).
+  - For each train set without operating days, the provider is asked for
+    its route over the next 7 days (`POST /offers`, as Discovery does), and
+    the set gets the days on which every one of its services was seen
+    (`calendarFromHarvest()`).
+  - What cannot be decided is reported with the reason, never guessed: a
+    service not offered, services running on different days, or no answer.
+- **Discover timetable fills a matching set that has no calendar** (same
+  route, product category and a shared service) instead of creating a second
+  set, and reports it as updated.
+
+### Default decisions (taken without asking)
+
+- The date moves forward only, at most six days.
+- A leg is matched by train number first, the departure time only when the
+  trip names no train.
+- Fill missing calendars searches 7 days and needs every service of a set
+  seen at least once, so a set whose train did not run that week stays
+  without calendar and is reported.
+
+### Not verified
+
+- Not run against a real provider; Fill missing calendars and the date
+  choice were tested with stubbed answers and on the simulator.
+- Test Config does not show the time notes yet; they are in the run log.
+
+Checked:
+- Unit tests of the server match, the collection's date choice, the
+  calendar fill and the Discovery merge; route tests with a stubbed
+  provider; the run branch of `/data/:filename`.
+- On the simulator, a replay of 4 scenarios gives the same checks as
+  before, and a data file annotated as the server would gives the run date
+  on the trains' day (a Sunday).
+
+---
+
 ## [server-1.11.272] / [collection-OTST_V2.0.152] — 2026-10-14
 
 Issue #715, release 2026.307. Server only; the collection is unchanged.

@@ -525,3 +525,39 @@ describe('#715 harvestConnections / journeysFromConnections', () => {
     expect(td.journeysFromConnections(td.harvestConnections(resp), trains, []).toCreate).toEqual([]);
   });
 });
+
+// ── #717: missing calendars ──────────────────────────────────────────────────
+describe('#717 calendarFromHarvest / a set without calendar in Discovery', () => {
+  const td = require('../../src/services/timetable-discovery');
+  const A = 'urn:uic:stn:1000001';
+  const B = 'urn:uic:stn:1000002';
+  const rec = (vehicleNumber, departureTime, dayOfWeek, extra = {}) => ({ originURN: A, destinationURN: B, vehicleNumber, departureTime, arrivalTime: '10:00:00', dayOfWeek, ...extra });
+  const set = (services) => ({ originURN: A, destinationURN: B, services });
+
+  test('the days every service was seen', () => {
+    const harvested = [rec('R1', '08:00:00', 'SAT'), rec('R1', '08:00:00', 'SUN'), rec('R2', '09:00:00', 'SUN'), rec('R2', '09:00:00', 'MON')];
+    expect(td.calendarFromHarvest(set([{ vehicleNumber: 'R1' }]), harvested)).toEqual({ daysOfWeek: ['SAT', 'SUN'] });
+    expect(td.calendarFromHarvest(set([{ vehicleNumber: 'R1' }, { vehicleNumber: 'R2' }]), harvested)).toEqual({ daysOfWeek: ['SUN'] });
+    // No number on one side: the departure time decides.
+    expect(td.calendarFromHarvest(set([{ departureTime: '09:00' }]), harvested)).toEqual({ daysOfWeek: ['MON', 'SUN'] });
+  });
+
+  test('what cannot be decided is said, not guessed', () => {
+    const harvested = [rec('R1', '08:00:00', 'SAT'), rec('R2', '09:00:00', 'MON'), rec('R3', '07:00', 'TUE', { destinationURN: 'urn:uic:stn:9' })];
+    expect(td.calendarFromHarvest(set([{ vehicleNumber: 'R1' }, { vehicleNumber: 'R2' }]), harvested).reason).toMatch(/different days/);
+    expect(td.calendarFromHarvest(set([{ vehicleNumber: 'R1' }, { vehicleNumber: 'R3' }]), harvested)).toEqual({ reason: 'the provider did not offer R3 on the days searched' });
+    expect(td.calendarFromHarvest(set([]), harvested)).toEqual({ reason: 'it has no service' });
+    expect(td.calendarFromHarvest(set([{ vehicleNumber: 'R1' }]), [])).toEqual({ reason: 'the provider did not offer R1 on the days searched' });
+  });
+
+  test('Discovery fills a matching set that has no calendar, instead of making a second one', () => {
+    const existing = [{ id: 'x', resource_type: 'TRAIN', label: 'Mine', data: { originURN: A, destinationURN: B, productCategoryRef: '', daysOfWeek: [], services: [{ vehicleNumber: 'R1', departureTime: '08:00:00', arrivalTime: '10:00:00' }] } }];
+    const harvested = [rec('R1', '08:00:00', 'SAT', { productCategoryRef: '' }), rec('R1', '08:00:00', 'SUN', { productCategoryRef: '' })];
+    const { toCreate, toUpdate } = td.groupAndMerge(harvested, existing, {});
+    expect(toCreate).toEqual([]);
+    expect(toUpdate.map(u => [u.id, u.data.daysOfWeek])).toEqual([['x', ['SAT', 'SUN']]]);
+    // A set with a calendar of its own is left alone: another set is made.
+    const dated = [{ ...existing[0], data: { ...existing[0].data, daysOfWeek: ['MON'] } }];
+    expect(td.groupAndMerge(harvested, dated, {}).toCreate).toHaveLength(1);
+  });
+});

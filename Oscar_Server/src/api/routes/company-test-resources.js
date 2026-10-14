@@ -25,7 +25,7 @@ const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = requi
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
-const { harvestTrips, harvestConnections, journeysFromConnections, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
+const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
@@ -240,6 +240,111 @@ function createConnectionJourneys(companyId, connections) {
   return { created, skipped };
 }
 
+// What a call to the provider needs: the company's endpoint, the person's
+// token and their headers (requestor, subscription key, and the company's
+// Dedicated Headers, #477). Answers the request and returns null when one is
+// missing.
+async function _vendorSession(req, res, targetCompanyId) {
+  // api_base lives on the company; OSDM credentials live on the tester.
+  const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
+  if (!company?.api_base) {
+    res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
+    return null;
+  }
+  const userRow = credentialsFor(req.user.id, targetCompanyId);
+  if (!userRow) {
+    res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User credentials not found.' });
+    return null;
+  }
+  // Resolve a bearer token — reuses the runner's auth profiles + token cache.
+  let token;
+  try {
+    token = await resolveAccessToken(userRow, { info: (m) => log.debug(m), error: (m) => log.warn(m) });
+  } catch (err) {
+    res.status(502).json({ status: 502, title: 'Auth Failed', detail: `Could not obtain an access token: ${err.message}` });
+    return null;
+  }
+  // Optional per-tester headers (mirror the Bruno run path).
+  const extraHeaders = {};
+  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
+  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
+  // #477: company-wide Dedicated Headers (API Config) — previously only the
+  // Bruno run path applied these; Discovery silently ignored them.
+  mergeDedicatedHeaders(extraHeaders, company, token);
+  return { company, token, extraHeaders };
+}
+
+// #717: `days` days of POST /offers for a route, one after the other.
+// { harvested: records (harvestTrips), daysAnswered }.
+async function _searchRouteDays({ company, token, extraHeaders }, origin, destination, days) {
+  const harvested = [];
+  let daysAnswered = 0;
+  await searchDates(days, new Date()).reduce((previous, date) => previous.then(async () => {
+    let r;
+    try {
+      r = await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, origin, destination, company.api_base), extraHeaders);
+    } catch { return; }   // a day that fails is a day not answered
+    if (!r.ok) return;
+    daysAnswered++;
+    harvested.push(...harvestTrips(r.json, { searchedOrigin: origin, searchedDestination: destination }));
+  }), Promise.resolve());
+  return { harvested, daysAnswered };
+}
+
+// #717: give train set `t` its days from the harvest, or say why not.
+function _fillCalendar(t, daysAnswered, harvested, companyId, out) {
+  const found = daysAnswered === 0 ? { reason: 'the provider answered no search of its route' } : calendarFromHarvest(t.data, harvested);
+  if (!found.daysOfWeek) {
+    out.unresolved.push({ id: t.id, label: t.label, reason: found.reason });
+    return;
+  }
+  run(`UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
+    [colEncrypt(JSON.stringify({ ...t.data, daysOfWeek: found.daysOfWeek })), t.id, companyId]);
+  out.updated.push({ id: t.id, label: t.label, daysOfWeek: found.daysOfWeek });
+}
+
+// ── POST /v1/company/test-resources/fill-calendars (#717) ─────────────────────
+// Train sets without operating days learn them from the provider: their route
+// is searched over the next 7 days (POST /offers, as Discovery does), and a
+// set gets the days on which every one of its services was seen. A set that
+// cannot be decided is reported with the reason, never guessed.
+router.post('/test-resources/fill-calendars', async (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+
+  const targets = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN'])
+    .map(r => {
+      let data = {};
+      try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
+      return { id: r.id, label: r.label, data };
+    })
+    .filter(t => !(Array.isArray(t.data.daysOfWeek) && t.data.daysOfWeek.length) && t.data.originURN && t.data.destinationURN);
+  if (targets.length === 0) return res.json({ updated: [], unresolved: [], routes: [] });
+
+  const session = await _vendorSession(req, res, targetCompanyId);
+  if (!session) return;
+
+  const byRoute = new Map();
+  for (const t of targets) {
+    const key = `${t.data.originURN}>${t.data.destinationURN}`;
+    if (!byRoute.has(key)) byRoute.set(key, []);
+    byRoute.get(key).push(t);
+  }
+  const out = { updated: [], unresolved: [], routes: [] };
+  // One route after the other, one day after the other: a provider's gateway
+  // may block a burst of searches (#646).
+  await [...byRoute.values()].reduce((previous, sets) => previous.then(async () => {
+    const { originURN: origin, destinationURN: destination } = sets[0].data;
+    const { harvested, daysAnswered } = await _searchRouteDays(session, origin, destination, 7);
+    out.routes.push({ origin, destination, daysAnswered });
+    for (const t of sets) _fillCalendar(t, daysAnswered, harvested, targetCompanyId, out);
+  }), Promise.resolve());
+  const { updated, unresolved, routes } = out;
+  log.info({ companyId: targetCompanyId, updated: updated.length, unresolved: unresolved.length }, 'Missing train calendars filled');
+  return res.json({ updated, unresolved, routes });
+});
+
 // ── POST /v1/company/test-resources/discover-timetable (issue #157,#159,#167) ─
 // "Train Timetable Discovery" — reverse-engineer train-set test data from the
 // offers a sandbox actually returns. For an O&D across the next N days (1..14,
@@ -263,31 +368,9 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   if (days > 14) days = 14;
   const endpoints = req.body?.searchWith === 'trips-collection' ? TRIP_SEARCH_ENDPOINTS : DISCOVERY_ENDPOINTS;
 
-  // api_base lives on the company; OSDM credentials live on the tester.
-  const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company?.api_base) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
-  }
-  const userRow = credentialsFor(req.user.id, targetCompanyId);
-  if (!userRow) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User credentials not found.' });
-  }
-
-  // Resolve a bearer token — reuses the runner's auth profiles + token cache.
-  let token;
-  try {
-    token = await resolveAccessToken(userRow, { info: (m) => log.debug(m), error: (m) => log.warn(m) });
-  } catch (err) {
-    return res.status(502).json({ status: 502, title: 'Auth Failed', detail: `Could not obtain an access token: ${err.message}` });
-  }
-
-  // Optional per-tester headers (mirror the Bruno run path).
-  const extraHeaders = {};
-  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
-  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
-  // #477: company-wide Dedicated Headers (API Config) — previously only the
-  // Bruno run path applied these; Discovery silently ignored them.
-  mergeDedicatedHeaders(extraHeaders, company, token);
+  const session = await _vendorSession(req, res, targetCompanyId);
+  if (!session) return;
+  const { company, token, extraHeaders } = session;
 
   // Search day-by-day. For each day we try the endpoints in preference order
   // (trips-collection → offers); both responses carry `trips[]`. Once one

@@ -41,7 +41,8 @@ module.exports = {
   buildReturnSearchParameters,
   featureNotDeclaredWarning,
   applyExternalRefFormat,
-  scenarioTripDate
+  scenarioTripDate,
+  tripDateFor
 };
 
 // Which passengers step 03 updates: "MAIN" (the first only) when the scenario
@@ -260,6 +261,21 @@ function scenarioTripDate(scenario, baseIso, departureDay, now = new Date()) {
   const out = d.toISOString().slice(0, 10);
   validationLogger('[INFO] 📅 Departure ' + (n >= 0 ? n + ' day(s) from today' : (-n) + ' day(s) ago') + ' (departureDaysFromToday) → ' + out);
   return out;
+}
+
+// #717: the trip date, on a day the trip's Test Data trains run (OSCAR's
+// annotation), unless the scenario names the day itself. Logs the trip's
+// calendar notes.
+function tripDateFor(scenario, baseIso, tripRequirement, now = new Date()) {
+  const date = scenarioTripDate(scenario, baseIso, tripRequirement?.departureDay, now);
+  const n = scenario ? scenario.departureDaysFromToday : undefined;
+  const named = (Number.isInteger(n) && n >= -366 && n <= 1000)
+    || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
+      .includes(String(tripRequirement?.departureDay || '').trim().toUpperCase());
+  const { dateForTrip } = require('./tripCalendar.js');
+  const out = dateForTrip(date, named, tripRequirement);
+  out.lines.forEach((line) => validationLogger(line));
+  return out.date;
 }
 
 // #363: optional per-trip departure DAY (weekend-only trains). Keeps the
@@ -1005,7 +1021,7 @@ function parseScenarioData(jsonData) {
               validationLogger('[INFO] ⏳ processing a specification');
               const legDefinitions = [];
               // #363: per-trip departure day (Auto when unset).
-              const _specTripDate = scenarioTripDate(scenario, nextWeekdayString, tripRequirement.departureDay);
+              const _specTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
               // #705: the day ages are counted on.
               bru.setEnvVar("__travelDay", _specTripDate);
 
@@ -1046,7 +1062,7 @@ function parseScenarioData(jsonData) {
             case "SEARCH": {
               validationLogger('[INFO] ⏳ processing a search');
               // #363: per-trip departure day (Auto when unset).
-              const _searchTripDate = scenarioTripDate(scenario, nextWeekdayString, tripRequirement.departureDay);
+              const _searchTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
               // #705: the day ages are counted on.
               bru.setEnvVar("__travelDay", _searchTripDate);
               const _searchStart = subTripDate(tripRequirement.trip.startDatetime, _searchTripDate, 'startDatetime', 'tripRequirement (SEARCH)');

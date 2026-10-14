@@ -1081,7 +1081,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-download-places"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-find-journeys"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-fill-calendars"], [data-action="wiz-download-places"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-find-journeys"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
 
   // #450 — show how many stop places are cached (drives the origin/destination
@@ -4467,6 +4467,7 @@ function renderWizardStep2() {
         ${trains.length > 0 ? '<button class="btn btn-secondary btn-sm" data-action="wiz-save-all-trains" title="Save every train you have open/edited in one go">💾 Save all trains</button>' : ''}
         <button class="btn btn-secondary btn-sm" data-action="wiz-reprobe-offers" title="Re-run the anonymous-adult offer probe for every route of the train list and refresh the availability warnings (#369)">&#128260; Re-probe offers</button>
         <button class="btn btn-secondary btn-sm" data-action="wiz-discover-timetable" title="Scan the sandbox timetable for an origin/destination and auto-create the train sets it actually runs">🔍 Discover timetable</button>
+        <button class="btn btn-secondary btn-sm" data-action="wiz-fill-calendars" title="Ask the provider on which days the train sets without operating days run, over the next 7 days (#717)">📅 Fill missing calendars</button>
         <button class="btn btn-secondary btn-sm" data-action="wiz-download-places" title="Bulk-download the vendor's stop places (OSDM GET /places) and cache them for the origin/destination lookups below (#450)">⬇ Download places</button>
         <span id="wiz-places-status" style="font-size:11px;color:#90a4ae;align-self:center"></span>
       </div>
@@ -5085,6 +5086,36 @@ async function runTimetableDiscovery() {
   } finally {
     if (runBtn) { runBtn.disabled = false; runBtn.textContent = 'Discover again'; }
   }
+}
+
+// #717: the train sets without operating days learn them from the provider.
+async function fillMissingCalendars(el) {
+  el.disabled = true;
+  const label = el.textContent;
+  el.textContent = 'Asking the provider…';
+  try {
+    const res = await fetch('/v1/company/test-resources/fill-calendars', { method: 'POST' });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { oscarToast(`Fill missing calendars failed: ${body.detail || body.title || ('HTTP ' + res.status)}`, 'error'); return; }
+    oscarToast(fillCalendarsSummary(body), (body.unresolved || []).length ? 'warn' : 'success');
+    if ((body.updated || []).length) await refreshAllSections();
+  } finally {
+    el.disabled = false;
+    el.textContent = label;
+  }
+}
+
+// #717: the sentence that sums up a calendar fill.
+function fillCalendarsSummary(body) {
+  const updated = Array.isArray(body?.updated) ? body.updated : [];
+  const unresolved = Array.isArray(body?.unresolved) ? body.unresolved : [];
+  if (updated.length === 0 && unresolved.length === 0) return 'Every train set already has its operating days.';
+  const done = updated.map(u => `${u.label}: ${(u.daysOfWeek || []).join(' ')}`);
+  const left = unresolved.map(u => `${u.label}: ${u.reason}`);
+  return [
+    `${updated.length} train set(s) given their days${done.length ? ' (' + done.join('; ') + ')' : ''}.`,
+    left.length ? `${unresolved.length} left as they were (${left.join('; ')}).` : '',
+  ].filter(Boolean).join(' ');
 }
 
 // #715: ", 2 journey(s)" for the status line, '' when Discovery made none.
@@ -7351,6 +7382,8 @@ document.body.addEventListener('click', function(e) {
       openTimetableDiscovery(); break;
     case 'wiz-download-places':
       downloadPlaces(el).catch(reportActionError); break;
+    case 'wiz-fill-calendars':
+      fillMissingCalendars(el).catch(reportActionError); break;
     case 'wiz-reprobe-offers': {
       // #369: manual refresh of the per-route offer-availability findings.
       el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
