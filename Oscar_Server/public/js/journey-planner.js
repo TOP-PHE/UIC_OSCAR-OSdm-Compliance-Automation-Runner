@@ -55,12 +55,14 @@
   // minutes since midnight on the clock as written and in UTC (which may be
   // below 0 or above a day). null when not a time.
   function parseTime(time) {
-    const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(.*)$/.exec(String(time ?? '').trim());
+    const text = String(time ?? '').trim();
+    const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/.exec(text);
     if (!m) return null;
     const h = Number(m[1]);
     const min = Number(m[2]);
     if (h > 23 || min > 59) return null;
-    const offset = offsetOf(m[3]);
+    // What follows the clock is the offset, read on its own.
+    const offset = offsetOf(text.slice(m[0].length));
     if (offset === null) return null;
     return { local: h * 60 + min, utc: h * 60 + min - offset };
   }
