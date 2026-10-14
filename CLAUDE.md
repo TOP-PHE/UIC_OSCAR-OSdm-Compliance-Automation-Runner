@@ -1133,6 +1133,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `passengers.js`), kept in `__passengerIgnoredFields` so that 04 grades
     alike. An empty `/trips-collection` answer is described in the log
     (`describeTripsAnswer()`), since its body is not in the report.
+  - **A reservation's leg is never sent empty, and a booking may rename
+    legs** (#737). `legOfReservation()` (`seatReservations.js`): the part's
+    own coverage, else the one leg of the offer's trip no other reservation
+    part covers, else none. None means no `placeSelections` entry
+    (PLACE_SELECTION books it through `optionalReservationSelections`,
+    ADD_LATER leaves it out: 3.8's `BookedOfferPartRequest` has no other
+    way). `checkBookedReservations()` matches a renamed leg by its place in
+    the trip of the same id, from `__offerTripLegs` (the offer response's
+    trips, kept at step 01).
   - **A search goes by place and time; the train is chosen in the answer**
     (#722). The train and operator filters (`parameters.dataFilter`) are
     optional in OSDM, and a provider that refused an operator code stopped

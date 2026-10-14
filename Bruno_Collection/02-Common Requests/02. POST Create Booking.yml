@@ -212,7 +212,7 @@ runtime:
           const { checkBookedReservations, fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
           const _asked = fromEnv(bru.getEnvVar("__reservationsBooked"), []);
           if (_asked.length > 0) {
-            checkBookedReservations((_body && _body.booking) || _body, fromEnv(bru.getEnvVar("offer"), null), _asked, { places: false }).forEach((c) => {
+            checkBookedReservations((_body && _body.booking) || _body, fromEnv(bru.getEnvVar("offer"), null), _asked, { places: false, offerTrips: fromEnv(bru.getEnvVar("__offerTripLegs"), []) }).forEach((c) => {
               test(c.name, () => { if (!c.ok) throw new Error(c.message); });
             });
           }

@@ -78,21 +78,63 @@ function reservationsToBook(offer, { bookOptional }) {
   let optional = [];
   if (bookOptional) {
     const linked = relations.length > 0;
+    // In each optional group, a part that names its leg first (#737): one
+    // that names none cannot go in a placeSelection.
+    const hasLeg = (id) => listOf(listOf(offer?.reservationOfferParts).find((p) => p?.id === id)?.tripCoverage?.coveredLegIds).length > 0;
+    const firstOf = (refs) => (refs.find(hasLeg) ? [refs.find(hasLeg)] : refs.slice(0, 1));
     const candidates = linked
-      ? relations.filter(({ relation }) => !isMandatory(relation)).flatMap(({ refs }) => refs.slice(0, 1))
+      ? relations.filter(({ relation }) => !isMandatory(relation)).flatMap(({ refs }) => firstOf(refs))
       : [...known];
     optional = ids(candidates).filter((id) => known.has(id) && !mandatory.includes(id));
   }
   return { mandatory, optional };
 }
 
-/** The placeSelections that name reservations, with the trip and leg each covers. */
-function placeSelectionsFor(offer, reservationIds) {
+/**
+ * The trip and leg a reservation part covers (#737): its own tripCoverage,
+ * else, when the offer names the trip, the one leg of it that no other
+ * reservation part of the offer covers. null when that cannot be told: a
+ * provider may offer a reservation without saying on which leg.
+ * @param {object[]} tripLegs the offer response's trips, as { id, legIds }
+ */
+function legOfReservation(offer, reservationId, tripLegs = []) {
   const parts = listOf(offer?.reservationOfferParts);
-  return reservationIds.map((id) => {
-    const coverage = parts.find((p) => p?.id === id)?.tripCoverage || {};
-    return { reservationId: id, tripLegCoverage: { tripId: coverage.coveredTripId, legId: listOf(coverage.coveredLegIds)[0] } };
+  const part = parts.find((p) => p?.id === reservationId);
+  if (!part) return null;
+  const own = part.tripCoverage || {};
+  const ownLeg = listOf(own.coveredLegIds)[0];
+  if (own.coveredTripId && ownLeg) return { tripId: own.coveredTripId, legId: ownLeg };
+  const trips = listOf(tripLegs);
+  const tripId = own.coveredTripId || offer?.tripCoverage?.coveredTripId || (trips.length === 1 ? trips[0]?.id : undefined);
+  const legs = listOf(trips.find((t) => t?.id === tripId)?.legIds);
+  if (!tripId || legs.length === 0) return null;
+  const taken = new Set(parts.filter((p) => p !== part && p?.tripCoverage?.coveredTripId === tripId)
+    .flatMap((p) => listOf(p.tripCoverage.coveredLegIds)));
+  const free = legs.filter((l) => !taken.has(l));
+  return free.length === 1 ? { tripId, legId: free[0] } : null;
+}
+
+/**
+ * The placeSelections that name reservations, with the trip and leg each
+ * covers. A reservation whose leg cannot be told is left out (#737): OSDM's
+ * TripLegCoverage requires both members, and an empty one was refused.
+ * `reservationsWithoutLeg()` names those.
+ */
+function placeSelectionsFor(offer, reservationIds, tripLegs = []) {
+  return reservationIds.flatMap((id) => {
+    const leg = legOfReservation(offer, id, tripLegs);
+    return leg ? [{ reservationId: id, tripLegCoverage: leg }] : [];
   });
+}
+
+/** The reservations of `reservationIds` whose leg cannot be told (#737). */
+function reservationsWithoutLeg(offer, reservationIds, tripLegs = []) {
+  return reservationIds.filter((id) => !legOfReservation(offer, id, tripLegs));
+}
+
+/** The trips of an offer response as { id, legIds }, for the functions above. */
+function tripLegsOf(trips) {
+  return listOf(trips).filter((t) => t?.id).map((t) => ({ id: t.id, legIds: listOf(t.legs).map((l) => l?.id).filter(Boolean) }));
 }
 
 /**
@@ -142,14 +184,29 @@ function checkProviderRules(offer, passengerRefs) {
  * taken. `places: false` leaves out the place check (a pre-booking may not
  * have allocated one yet).
  */
-function checkBookedReservations(booking, offer, reservationIds, { places = true } = {}) {
+function checkBookedReservations(booking, offer, reservationIds, { places = true, offerTrips = [] } = {}) {
   const parts = listOf(offer?.reservationOfferParts).filter((p) => reservationIds.includes(p?.id));
   const booked = listOf(booking?.bookedOffers).flatMap((o) => listOf(o?.reservations));
   const keyOf = (coverage) => `${coverage?.coveredTripId}|${listOf(coverage?.coveredLegIds).join(',')}`;
+  // A booking may give its trip new leg ids (#737). The leg is then the one
+  // at the same place in the trip of the same id: offer response and booking
+  // list the trip's legs in travel order.
+  const bookingTrips = tripLegsOf(booking?.trips);
+  const positionOf = (trips, coverage) => {
+    const legs = listOf(listOf(trips).find((t) => t?.id === coverage?.coveredTripId)?.legIds);
+    const leg = listOf(coverage?.coveredLegIds)[0];
+    return leg && legs.length > 0 ? `${coverage.coveredTripId}#${legs.indexOf(leg)}` : null;
+  };
+  const sameLeg = (r, part) => {
+    if (keyOf(r?.tripCoverage) === keyOf(part.tripCoverage)) return true;
+    const a = positionOf(offerTrips, part.tripCoverage);
+    const b = positionOf(bookingTrips, r?.tripCoverage);
+    return !!a && !a.endsWith('#-1') && a === b;
+  };
   const taken = new Set();
   return parts.flatMap((part) => {
-    const covered = !!part.tripCoverage;
-    const match = booked.find((r) => !taken.has(r) && (!covered || keyOf(r?.tripCoverage) === keyOf(part.tripCoverage)));
+    const covered = listOf(part.tripCoverage?.coveredLegIds).length > 0;
+    const match = booked.find((r) => !taken.has(r) && (!covered || sameLeg(r, part)));
     if (match) taken.add(match);
     const legs = listOf(part.tripCoverage?.coveredLegIds).join(', ');
     const what = legs ? `on leg ${legs}` : `${part.summary || part.id} (the offer gives it no leg)`;
@@ -226,4 +283,4 @@ function splitByReservation(selection, offer) {
   });
 }
 
-module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, placeSelectionsFor, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest, splitByReservation };
+module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, legOfReservation, placeSelectionsFor, reservationsWithoutLeg, tripLegsOf, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest, splitByReservation };
