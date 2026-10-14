@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-suggested-findings-simulator-hint",
+    "date": "October 14, 2026",
+    "tag": "Improvement",
+    "title": "Suggested findings: does the same check pass on the simulator?",
+    "summary": "Each draft suggested from a batch now says whether the same check passes on the OSDM simulator, a hint at whether the problem is the provider's or OSCAR's.",
+    "content": "In \"Suggested from runs\" on the Test Findings page, a draft now shows how the same check fares on the OSDM simulator. If it passes there, the problem more likely sits with the provider; if it fails there too, it more likely sits with OSCAR. It is a hint, not a decision: the category remains yours to set."
+  },
+  {
     "id": "2026-10-14-suggested-findings",
     "date": "October 14, 2026",
     "tag": "New",

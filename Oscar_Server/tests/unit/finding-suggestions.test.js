@@ -208,3 +208,64 @@ describe('#735 from a Bruno report', () => {
     expect(S.failuresFromBruReport(null)).toEqual([]);
   });
 });
+
+describe('#735 part 3: the simulator hint', () => {
+  const { tableOf } = require('../../scripts/generate-simulator-checks');
+  const recording = {
+    SIM_SALE_A: { list: [
+      ['02. POST Create Booking', 'HTTP response status — expected 200, actual: 200', 'pass'],
+      ['07. GET Booking', 'Booking: holds the reservation on leg <id>', 'pass'],
+    ] },
+    SIM_SALE_B: { list: [
+      ['02. POST Create Booking', 'HTTP response status — expected 200, actual: 200', 'pass'],
+      ['07. GET Booking', 'Booking: holds the reservation on leg <id>', 'fail'],
+    ] },
+    SIM_WRONG_PRICE: { list: [['01. POST Get Offer', 'Offer: price is 10', 'fail']] },
+  };
+  const table = { checks: tableOf(recording) };
+  const group = (over) => S.groupFailures([rec(over)])[0];
+
+  test('the table counts passes and failures by step and check text, wrong-on-purpose scenarios left out', () => {
+    expect(table.checks).toEqual({
+      'post create booking|HTTP response status — expected N, actual: N': [2, 0],
+      'get booking|Booking: holds the reservation on leg <id>': [1, 1],
+    });
+  });
+
+  test('a check that passes on the simulator points to the provider', () => {
+    expect(S.simulatorHint(group(), table)).toEqual({ verdict: 'provider', passed: 2, failed: 0,
+      text: 'Passes on the simulator (2 time(s)): this points to the provider.' });
+  });
+
+  test('a check that also fails on the simulator points to OSCAR, whatever the leg id', () => {
+    const g = group({ step: '07. GET Booking after Fulfillments', status: 200, problemCode: null,
+      check: 'Booking: holds the reservation on leg 7b75ec5a-758f-4ddb-9cb1-99b5e312bb96' });
+    // Another step name: "get booking after fulfillments" is not "get booking".
+    expect(S.simulatorHint(g, table)).toBeNull();
+    const same = group({ step: '07. GET Booking', status: 200, problemCode: null,
+      check: 'Booking: holds the reservation on leg 7b75ec5a-758f-4ddb-9cb1-99b5e312bb96' });
+    expect(S.simulatorHint(same, table)).toMatchObject({ verdict: 'oscar', passed: 1, failed: 1 });
+  });
+
+  test('no table, or a check the simulator never ran: no hint', () => {
+    expect(S.simulatorHint(group(), null)).toBeNull();
+    expect(S.simulatorHint(group({ check: 'Something only a real provider shows' }), table)).toBeNull();
+  });
+
+  test('the draft carries the hint', () => {
+    expect(S.draftOf(group(), { simulatorChecks: table }).simulatorHint).toMatchObject({ verdict: 'provider' });
+    expect(S.draftOf(group()).simulatorHint).toBeNull();
+  });
+
+  test('the committed table is well formed', () => {
+    const committed = require('../../src/utils/simulator-checks.json');
+    expect(committed.about.scenarios).toBeGreaterThan(50);
+    const entries = Object.entries(committed.checks);
+    expect(entries.length).toBeGreaterThan(500);
+    for (const [key, counts] of entries) {
+      expect(key).toMatch(/^[^|]+\|.+/);
+      expect(counts).toEqual([expect.any(Number), expect.any(Number)]);
+    }
+    expect(committed.checks['post create booking|HTTP response status — expected N, actual: N']).toBeDefined();
+  });
+});

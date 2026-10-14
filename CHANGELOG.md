@@ -62,6 +62,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.285] / [collection-OTST_V2.0.159] — 2026-10-14
+
+Issue #735 (part 3), release 2026.320. Server only.
+
+### Added
+- **A suggested finding says how the same check fares on the simulator.**
+  Each draft of "Suggested from runs" now carries a hint: "Passes on the
+  simulator: this points to the provider", or "Also fails on the simulator:
+  this points to OSCAR". A hint only; the category stays the Test Manager's,
+  and a check the simulator never runs gets none.
+- The table behind it, `src/utils/simulator-checks.json`, is generated from a
+  simulator replay by `scripts/generate-simulator-checks.js` (each check by
+  step and check text, the run's values left out, as a failure is grouped;
+  the `SIM_WRONG_*` scenarios, which fail on purpose, left out). It is to be
+  regenerated with each replay recording, like `OSCAR - Checks by scenario`.
+
+Checked:
+- `finding-suggestions.test.js`: the table from a recording, the hint both
+  ways, no hint without a table or for a check the simulator never ran.
+- `finding-suggestions-routes.test.js`: a draft of an analysed batch carries
+  the hint from the committed table.
+
+---
+
 ## [server-1.11.284] / [collection-OTST_V2.0.159] — 2026-10-14
 
 Issue #735 (parts 1 and 2), release 2026.319. Server only; the collection

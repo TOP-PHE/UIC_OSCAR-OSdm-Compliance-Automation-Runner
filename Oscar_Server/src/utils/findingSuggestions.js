@@ -251,7 +251,7 @@ function runLine(r) {
  * run's report. `expectedStatus` is the error status the provider answered,
  * so that accepting it can baseline that exact answer; none for a 2xx.
  */
-function draftOf(group, { batchLabel } = {}) {
+function draftOf(group, { batchLabel, simulatorChecks } = {}) {
   const { category, reason } = proposeCategory(group);
   const s = group.sample || {};
   const answer = [
@@ -281,7 +281,38 @@ function draftOf(group, { batchLabel } = {}) {
     evidence,
     category,
     reason,
+    simulatorHint: simulatorHint(group, simulatorChecks),
   };
+}
+
+// ── The simulator hint (#735, part 3) ─────────────────────────────────────────
+
+/** The key of a check in the simulator table: step and check text. */
+function hintKey(step, check) {
+  return `${stepKey(step)}|${checkText(check)}`;
+}
+
+/**
+ * How the same check fared on the simulator, from the table that
+ * scripts/generate-simulator-checks.js writes ({ checks: { key: [passed,
+ * failed] } }). A check that passes there points to the provider; one that
+ * fails there too points to OSCAR. A hint only: null when the simulator never
+ * ran the check.
+ */
+function simulatorHint(group, table) {
+  const counts = table?.checks?.[hintKey(group.step, group.check)];
+  if (!Array.isArray(counts)) return null;
+  const [passed, failed] = counts;
+  const runs = passed + failed;
+  if (failed > 0) {
+    return { verdict: 'oscar', passed, failed,
+      text: `Also fails on the simulator (${failed} of ${runs} time(s)): this points to OSCAR.` };
+  }
+  if (passed > 0) {
+    return { verdict: 'provider', passed, failed,
+      text: `Passes on the simulator (${passed} time(s)): this points to the provider.` };
+  }
+  return null;
 }
 
 // ── From a Bruno report ───────────────────────────────────────────────────────
@@ -329,5 +360,7 @@ module.exports = {
   matchFinding,
   notSeen,
   draftOf,
+  hintKey,
+  simulatorHint,
   failuresFromBruReport,
 };
