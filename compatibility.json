@@ -15,6 +15,17 @@
       ]
     },
     {
+      "release": "2026.309",
+      "date": "2026-10-14",
+      "server": "1.11.274",
+      "collection": "OTST_V2.0.154",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Trip search filters send only the members that are set: no null lineNumbers, carrierFilter or vehicleFilter (#719)."
+      ]
+    },
+    {
       "release": "2026.308",
       "date": "2026-10-14",
       "server": "1.11.273",
