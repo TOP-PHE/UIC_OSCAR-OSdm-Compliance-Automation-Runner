@@ -9,7 +9,7 @@
 
 /**
  * The part of chai's BDD `expect` that the tested validators use (bookings.js,
- * offers.js, exchanges.js, osdmEnums.js),
+ * offers.js, exchanges.js, osdmEnums.js, …),
  * for running a validator's own assertions in a unit test (extend it as other
  * validators need). Bruno supplies chai inside its sandbox; the server has no
  * chai dependency.
@@ -31,7 +31,7 @@ function chaiExpect(actual, message) {
     return api;
   };
   const api = {
-    eql: (v) => check(isDeepStrictEqual(actual, v), `to deeply equal ${JSON.stringify(v)}`),
+    eql: (v, m) => { if (m) message = m; return check(isDeepStrictEqual(actual, v), `to deeply equal ${JSON.stringify(v)}`); },
     include: (v, m) => {
       if (m) message = m;
       return check((Array.isArray(actual) || typeof actual === 'string') && actual.includes(v), `to include ${JSON.stringify(v)}`);
@@ -40,7 +40,6 @@ function chaiExpect(actual, message) {
     above: (n) => check(actual > n, `to be above ${n}`),
     below: (n, m) => { if (m) message = m; return check(actual < n, `to be below ${n}`); },
     members: (arr) => check(Array.isArray(actual) && isDeepStrictEqual(sorted(actual), sorted(arr)), `to have members ${JSON.stringify(arr)}`),
-    lengthOf: (n) => check(actual != null && actual.length === n, `to have length ${n}`),
     equal: (v, m) => { if (m) message = m; return check(actual === v, `to equal ${JSON.stringify(v)}`); },
     oneOf: (list, m) => { if (m) message = m; return check(Array.isArray(list) && list.includes(actual), `to be one of ${JSON.stringify(list)}`); },
     property: (name) => check(actual != null && Object.prototype.hasOwnProperty.call(actual, name), `to have property ${name}`),
@@ -54,6 +53,18 @@ function chaiExpect(actual, message) {
     true: () => check(actual === true, 'to be true'),
     false: () => check(actual === false, 'to be false'),
     not: () => { negate = !negate; return api; },
+  };
+  // `lengthOf(n)`, or a chain on the length: `lengthOf.at.least(n)`.
+  getters.lengthOf = () => {
+    const size = actual == null ? undefined : actual.length;
+    const ofLength = (n) => check(size === n, `to have length ${n}`);
+    const onLength = (ok, text) => (n, m) => { if (m) message = m; return check(ok(n), `to have a length ${text} ${n}`); };
+    ofLength.least = onLength((n) => size >= n, 'of at least');
+    ofLength.most = onLength((n) => size <= n, 'of at most');
+    ofLength.above = onLength((n) => size > n, 'above');
+    ofLength.below = onLength((n) => size < n, 'below');
+    ofLength.at = ofLength;
+    return ofLength;
   };
   ['to', 'be', 'and', 'have', 'with', 'at', 'that', 'is', 'of'].forEach((w) => { getters[w] = () => api; });
   Object.entries(getters).forEach(([name, get]) => Object.defineProperty(api, name, { get }));

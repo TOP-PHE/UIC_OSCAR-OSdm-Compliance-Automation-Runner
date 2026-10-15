@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-exchange-tests",
+    "date": "October 15, 2026",
+    "tag": "Quality",
+    "title": "The exchange checks are tested",
+    "summary": "Automated tests now cover almost all of the collection's exchange checks.",
+    "content": "The checks run during an exchange (offers, operation, amounts, fees and the booking around the exchange) now have automated tests of their own, reaching 99 % of that part of the collection. Nothing changes in how a run behaves."
+  },
+  {
     "id": "2026-10-15-collection-coverage",
     "date": "October 15, 2026",
     "tag": "Quality",
