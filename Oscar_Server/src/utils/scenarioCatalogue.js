@@ -180,11 +180,15 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
-  // #766: a place chosen in a way the framework does not declare.
-  if (!placeSelectionFlowDeclared(fw, requirements.placeSelectionFlow)) {
-    missing.push(`place selection ${PLACE_SELECTION_TEXT[requirements.placeSelectionFlow]} (Seat Selection)`);
-  }
-  return [...missing, ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw)];
+  return [
+    ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
+    ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
+  ];
+}
+
+// #766: a place chosen in a way the framework does not declare, as a sentence.
+function placeSelectionMissing(flow, fw) {
+  return placeSelectionFlowDeclared(fw, flow) ? [] : [`place selection ${PLACE_SELECTION_TEXT[flow]} (Seat Selection)`];
 }
 
 // #748: the offer request form a framework does not take, as a sentence:
