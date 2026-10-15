@@ -89,15 +89,21 @@ function validatePartIntersectionFields(offerParts, bookedParts, partType, field
   });
 }
 
+// #744: a member absent from both the offer and the booking is not a finding
+// (the ones compared here are optional); one side only stays a WARNING.
 function validatePartEqualityFields(part, bookedPart, partType, index, fields) {
   fields.forEach(field => {
-    if (part[field] != null && bookedPart[field] != null) {
+    const inOffer = part[field] != null;
+    const inBooking = bookedPart[field] != null;
+    if (inOffer && inBooking) {
       test(`${partType}[${index}].${field} matches between offer and booking : offer='${part[field]}' booking='${bookedPart[field]}'`, () => {
         expect(bookedPart[field]).to.eql(part[field]);
         validationLogger(`[DEBUG] ${partType}[${index}].${field}: offer='${part[field]}' booking='${bookedPart[field]}'`);
       });
+    } else if (inOffer || inBooking) {
+      validationLogger(`[WARNING] ${partType}[${index}]: '${field}' is in the ${inOffer ? 'offer' : 'booking'} but not in the ${inOffer ? 'booking' : 'offer'}`);
     } else {
-      validationLogger(`[WARNING] ${partType}[${index}]: '${field}' missing in offer or booking`);
+      validationLogger(`[DEBUG] ${partType}[${index}]: '${field}' given in neither the offer nor the booking`);
     }
   });
 }
@@ -583,7 +589,8 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
     ids.push(bookedPart.id);
 
     validatePartIntersectionFields(offerParts, bookedParts, partType, ['exchangeable', 'refundable']);
-    validatePartEqualityFields(part, bookedPart, partType, index, ['isReservationRequired', 'offerMode']);
+    // #744: isReservationRequired exists on admissions only (OSDM 3.8).
+    validatePartEqualityFields(part, bookedPart, partType, index, partType === 'admission' ? ['isReservationRequired', 'offerMode'] : ['offerMode']);
 
     test(`Status is ${expectedBookedOffersStatus} for ${partType}[${index}] - expected: ${expectedBookedOffersStatus}, actual: ${bookedPart.status}`, () => {
       if (Array.isArray(expectedBookedOffersStatus)) {

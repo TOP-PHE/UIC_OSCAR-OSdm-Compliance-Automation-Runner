@@ -286,3 +286,35 @@ describe('#550 — pairOfferParts', () => {
     });
   });
 });
+
+// #744: a real provider gives no isReservationRequired, on any part. OSDM 3.8
+// has it, optional, on admissions only.
+describe('#744 — isReservationRequired', () => {
+  const without = (parts) => parts.map(({ isReservationRequired, ...rest }) => rest);
+  const warnings = (l) => l.filter((line) => line.startsWith('[WARNING]') && line.includes('isReservationRequired'));
+
+  test('absent from both the offer and the booking: no warning, no check', () => {
+    const { results: r, logs: l } = run(without(OFFER), without(BOOKED));
+    expect(warnings(l)).toEqual([]);
+    expect(r.some((x) => x.name.includes('isReservationRequired'))).toBe(false);
+    expect(r.filter((x) => !x.ok)).toEqual([]);
+  });
+
+  test('on one side only: one warning per part, naming the side that has it', () => {
+    const { logs: l } = run(OFFER, without(BOOKED));
+    expect(warnings(l)).toHaveLength(OFFER.length);
+    expect(warnings(l)[0]).toBe("[WARNING] admission[0]: 'isReservationRequired' is in the offer but not in the booking");
+  });
+
+  test('on both sides of an admission: compared', () => {
+    const { results: r } = run(OFFER, BOOKED);
+    expect(r.filter((x) => x.name.startsWith('admission[0].isReservationRequired matches')).map((x) => x.ok)).toEqual([true]);
+  });
+
+  test('never looked for on a reservation part', () => {
+    const { results: r, logs: l } = run(without(OFFER), without(BOOKED), 'reservation');
+    expect(l.some((line) => line.includes('isReservationRequired'))).toBe(false);
+    expect(r.some((x) => x.name.includes('isReservationRequired'))).toBe(false);
+    expect(r.some((x) => x.name.startsWith('reservation[0].offerMode matches'))).toBe(true);
+  });
+});

@@ -373,7 +373,7 @@
       "code": "OTST_SALE_RESERVATION_MANDATORY_2ADT",
       "source": "SIM_SALE_RESERVATION_MANDATORY_2ADT_38",
       "purpose": "A mandatory seat reservation, detected from the admission and booked with it.",
-      "checks": 346,
+      "checks": 343,
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -387,7 +387,7 @@
       "code": "OTST_SALE_RESERVATION_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with optionalReservationSelections.",
-      "checks": 375,
+      "checks": 369,
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -401,7 +401,7 @@
       "code": "OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with placeSelections.",
-      "checks": 375,
+      "checks": 369,
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -415,7 +415,7 @@
       "code": "OTST_SALE_RESERVATION_ADD_LATER_2ADT",
       "source": "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38",
       "purpose": "An optional seat reservation added to the pre-booked booking afterwards.",
-      "checks": 373,
+      "checks": 368,
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
