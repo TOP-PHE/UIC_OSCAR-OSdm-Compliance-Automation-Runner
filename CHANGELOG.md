@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.289] / [collection-OTST_V2.0.163] — 2026-10-15
+
+Issue #748, release 2026.324.
+
+### Added
+- **The Test Framework declares how the provider takes an offer request** (`offerRequestForms`: SEARCH, SPECIFICATION, TRIP_IDS). It is set under Sales Flows › 📨 Offer requests. No list means every form, as before.
+  - **Why:** a real provider answered every request by `tripSearchCriteria` with 500, and sold the same train end to end by `tripSpecifications`. Every scenario had to be switched by hand.
+  - **Scenario catalogue:** a one-way search without the train filter is sent as a trip specification when only SPECIFICATION is declared. When SEARCH and SPECIFICATION are both declared, it is offered twice: under its own code (search) and under `<code>_SPEC` (specification). The specification copy gets a trip of its own, of one leg, filled from the chosen Test Data train. Returns, the train-filter search and the trip-id scenarios cannot be converted: they are refused when their form is not declared.
+  - **Warnings:** a scenario whose form is not declared gets a `[WARNING]` in its run log (`offerRequestBy:<form>` in `__featureNotDeclaredWarnings`). The trip type picker marks an undeclared form. A copy between providers says so too.
+  - **To check after a copy:** a trip specification names the train number and the operator (OSDM's `DatedJourney` requires both), so the chosen Test Data train must have them.
+
+### Fixed
+- **An exchange asked for offers by trip search, even when the sale used a trip specification.** `requestExchangeOffersBody()` sent a null `tripSearchCriteria`. It now sends `tripSpecifications` for a SPECIFICATION trip. A search sends the same body as before.
+
+Checked:
+- Unit tests in `offer-request-forms.test.js`. They fail when the warning or the exchange fix is removed.
+- The 29 catalogue scenarios that can be converted, run on the simulator as trip specifications: 0 failed, the same number of checks as by search.
+- Simulator replay, all scenarios, before and after.
+
+---
+
 ## [server-1.11.288] / [collection-OTST_V2.0.162] — 2026-10-15
 
 Issue #749, release 2026.323.

@@ -162,9 +162,11 @@ function makeDistinct(p, n) {
  * #704: a sales-horizon entry departs on the horizon's last day, or the day after.
  * #705: the age entry gets a passenger list of its own, on the edges of the
  * framework's age ranges. #709: with `passengerUpdate: false` in the framework,
- * no scenario updates its passengers.
+ * no scenario updates its passengers. #748: an entry sent as a trip
+ * specification (`tripAs`) gets a trip of its own, of one leg.
  */
-function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
+function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
+  const datafile = withSpecificationTrips(catalogueFile, entries);
   const byCode = new Map(arr(entries).map((e) => [e.code, e]));
   const fw = frameworkOf(frameworkConfig);
   const notes = {};
@@ -181,6 +183,10 @@ function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
       ids.next += 1;
     };
     applyLimit(entry.limit, scenario, source, fw, { ownList, toCheck });
+    // #748: OSDM's DatedJourney requires the train number and the carrier.
+    if (entry.tripAs === 'SPECIFICATION') {
+      toCheck.push('the chosen train must have its number and operator code in Test Data: a trip specification names both');
+    }
     // #709: a provider without the passenger update gets none.
     if (fw.passengerUpdate === false && isObj(scenario.salesFlowActions)) {
       scenario.salesFlowActions = { ...scenario.salesFlowActions, patchPassengers: false };
@@ -189,6 +195,52 @@ function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
     return scenario;
   });
   return { datafile: { ...datafile, scenarios, passengersList: lists }, notes };
+}
+
+// The fields of a trip that make a leg (as the editor's TRIP_LEG_FIELDS, #749).
+const TRIP_LEG_FIELDS = ['origin', 'destination', 'startDatetime', 'endDatetime', 'vehicleNumber', 'operatorCode',
+  'productCategoryRef', 'productCategoryName', 'productCategoryShortName'];
+
+// #748: a search trip as a trip specification of one leg, under a new id.
+// The copy then fills the leg from the train chosen (scenarioCopy mapToTrain).
+function specificationTrip(entry, id) {
+  const trip = isObj(entry.trip) ? entry.trip : {};
+  const leg = Object.fromEntries(TRIP_LEG_FIELDS.filter((k) => trip[k] !== undefined && trip[k] !== '').map((k) => [k, trip[k]]));
+  return { ...structuredClone(entry), id, tripType: 'SPECIFICATION', legs: [leg] };
+}
+
+/**
+ * #748: the catalogue data file with the entries sent as a trip
+ * specification: each on a specification trip of its own (one per search
+ * trip, however many entries use it), and a twin (`specOf`) added after its
+ * original. The data file given is not changed.
+ */
+function withSpecificationTrips(datafile, entries) {
+  const asSpec = arr(entries).filter((e) => e.tripAs === 'SPECIFICATION');
+  if (!asSpec.length) return datafile;
+  const trips = arr(datafile.tripRequirements).slice();
+  let next = Math.max(0, ...trips.filter(isObj).map((t) => Number(t.id) || 0)) + 1;
+  const specTrip = new Map();
+  const onSpecTrip = (scenario) => {
+    const id = scenario.tripRequirementId;
+    if (!specTrip.has(id)) {
+      const entry = trips.find((t) => isObj(t) && t.id === id);
+      if (!entry) return scenario;
+      trips.push(specificationTrip(entry, next));
+      specTrip.set(id, next);
+      next += 1;
+    }
+    return { ...scenario, tripRequirementId: specTrip.get(id) };
+  };
+  const byCode = new Map(asSpec.map((e) => [e.specOf || e.code, e]));
+  const scenarios = arr(datafile.scenarios).flatMap((sc) => {
+    const entry = isObj(sc) ? byCode.get(sc.code) : null;
+    if (!entry) return [sc];
+    const spec = onSpecTrip(structuredClone(sc));
+    if (!entry.specOf) return [spec];
+    return [sc, { ...spec, code: entry.code, description: entry.purpose }];
+  });
+  return { ...datafile, scenarios, tripRequirements: trips };
 }
 
 // What a limit entry takes from the framework: #699 its passenger count, #704
@@ -268,4 +320,6 @@ function suggestTrip(trip, testData) {
   return `train::${train.id}::${service ? service.index : 0}`;
 }
 
-module.exports = { adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, OVERRULE_CODES };
+module.exports = {
+  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withSpecificationTrips, OVERRULE_CODES,
+};

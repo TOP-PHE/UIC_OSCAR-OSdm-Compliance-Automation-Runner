@@ -33,7 +33,7 @@
  * takes the next free code when its code is already used in the target.
  */
 
-const { scenarioWarnings } = require('./frameworkGating');
+const { scenarioWarnings, offerRequestFormOf, offerRequestFormDeclared, OFFER_REQUEST_TEXT } = require('./frameworkGating');
 const TripApply = require('../../public/js/trip-apply');
 const { idAllocator } = require('./datafileOwnership');
 
@@ -102,6 +102,11 @@ function selectScenarios(source, codes) {
 function warningsFor(sc, source, framework) {
   const out = scenarioWarnings(sc, framework).map(f =>
     `${f} is set, but the target's Test Framework does not declare it.`);
+  // #748: offers asked in a form the target's provider does not take.
+  const form = offerRequestFormOf(sc, source);
+  if (!offerRequestFormDeclared(framework, form)) {
+    out.push(`Offers are asked ${OFFER_REQUEST_TEXT[form]}, which the target's Test Framework does not declare (Offer requests).`);
+  }
   const fulfillment = findById(source.requestedFulfillmentOptionsList, sc.requestedFulfillmentOptionsListId);
   if (fulfillment && declaredOptions(fulfillment, framework).changed) {
     out.push('Fulfillment options are reduced to what the target\'s Test Framework declares.');

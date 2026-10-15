@@ -712,9 +712,14 @@ function requestExchangeOffersBody(overruleCode) {
     }];
   }
 
+  // #748: the trip goes as the sale asked it. A trip specification used to go
+  // as a null tripSearchCriteria, which a provider can only refuse.
+  const trip = bru.getEnvVar("TripType") === "SPECIFICATION"
+    ? { tripSpecifications: parseEnvJson('offerTripSpecifications') }
+    : { tripSearchCriteria: parseEnvJson('offerTripSearchCriteria') };
   const body = {
     fulfillmentIds: parseFulfillmentIds(),
-    tripSearchCriteria: parseEnvJson('offerTripSearchCriteria'),
+    ...trip,
     offerSearchCriteria: parseEnvJson('offerSearchCriteria'),
     anonymousPassengerSpecifications,
     ...(overruleCode != null && { overruleCode })

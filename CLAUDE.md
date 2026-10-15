@@ -71,6 +71,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `partialRefundScopeDeclared()`, and the catalogue's `missingFor()` says
     "partial refund by …". The page's `FW_PARTIAL_REFUND_SCOPES` is pinned to
     the rule table by `ui-scripts.test.js`.
+  - **Offer request forms** (#748, 1.11.289): `offerRequestForms`
+    (`SEARCH` / `SPECIFICATION` / `TRIP_IDS`). Absent = every form. A
+    scenario's form is `offerRequestFormOf()`: trip ids when it arms them, else
+    its trip's type; it needs the datafile, so the warning
+    (`offerRequestBy:<form>`) is added in `annotateDatafile()`, not in
+    `scenarioWarnings()`. The catalogue sends a one-way search without the
+    train filter as a specification (`tripAs`) when only SPECIFICATION is
+    declared, and adds a `<code>_SPEC` twin (`specOf`) when both are:
+    `catalogueFor()` makes the entries, `withSpecificationTrips()`
+    (`catalogueMatch.js`) the scenarios, on a one-leg trip of their own. A
+    specification names the train number and carrier (`DatedJourney` requires
+    both), so a simulator search trip, which has neither, cannot be converted
+    as it is: the copy fills the leg from the Test Data train. To run the
+    converted scenarios on the simulator, give the legs a number (the check
+    used `vehicleNumber: '1001'`). The exchange's offer request
+    (`requestExchangeOffersBody()`) follows `TripType` since then; it sent a
+    null `tripSearchCriteria` for a specification.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
@@ -1212,7 +1229,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     SPECIFICATION trip without legs. The parser moves a leg's arrival to the
     next day when it is not after the departure (`arrivalAfterDeparture()`):
     both get the trip date, and a night train arrived before it left. A
-    provider may support only one form of offer request; declaring it is #748.
+    provider may support only one form of offer request: declared in the Test
+    Framework since #748 (the bullet on offer request forms above).
   - **A negative probe answered 501 is "not supported"** (#751): one
     WARNING from `validateProblemResponse()` (`requestedInformation.js`), no
     FAIL and no error-body checks. Every probe that grades a refusal goes
