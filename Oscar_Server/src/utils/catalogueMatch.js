@@ -163,10 +163,11 @@ function makeDistinct(p, n) {
  * #705: the age entry gets a passenger list of its own, on the edges of the
  * framework's age ranges. #709: with `passengerUpdate: false` in the framework,
  * no scenario updates its passengers. #748: an entry sent as a trip
- * specification (`tripAs`) gets a trip of its own, of one leg.
+ * specification (`tripAs`) gets a trip of its own, of one leg; #759: one
+ * sent by trip id keeps its search trip and asks by `offersByTripIds`.
  */
 function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
-  const datafile = withSpecificationTrips(catalogueFile, entries);
+  const datafile = withOfferRequestForms(catalogueFile, entries);
   const byCode = new Map(arr(entries).map((e) => [e.code, e]));
   const fw = frameworkOf(frameworkConfig);
   const notes = {};
@@ -186,6 +187,10 @@ function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
     // #748: OSDM's DatedJourney requires the train number and the carrier.
     if (entry.tripAs === 'SPECIFICATION') {
       toCheck.push('the chosen train must have its number and operator code in Test Data: a trip specification names both');
+    }
+    // #759: the trip id comes from the provider's own trip search.
+    if (entry.tripAs === 'TRIP_IDS') {
+      toCheck.push('the provider\'s POST /trips-collection must list a trip for the chosen train\'s stations and time');
     }
     // #709: a provider without the passenger update gets none.
     if (fw.passengerUpdate === false && isObj(scenario.salesFlowActions)) {
@@ -210,14 +215,15 @@ function specificationTrip(entry, id) {
 }
 
 /**
- * #748: the catalogue data file with the entries sent as a trip
- * specification: each on a specification trip of its own (one per search
- * trip, however many entries use it), and a twin (`specOf`) added after its
- * original. The data file given is not changed.
+ * #748/#759: the catalogue data file with the entries sent in another form
+ * than a search: a trip specification on a trip of its own (one per search
+ * trip, however many entries use it), a trip id with `offersByTripIds` on.
+ * An entry under the source's own code replaces it; a twin (`variantOf`) is
+ * added after it, in the entries' order. The data file given is not changed.
  */
-function withSpecificationTrips(datafile, entries) {
-  const asSpec = arr(entries).filter((e) => e.tripAs === 'SPECIFICATION');
-  if (!asSpec.length) return datafile;
+function withOfferRequestForms(datafile, entries) {
+  const variants = arr(entries).filter((e) => e.tripAs);
+  if (!variants.length) return datafile;
   const trips = arr(datafile.tripRequirements).slice();
   let next = Math.max(0, ...trips.filter(isObj).map((t) => Number(t.id) || 0)) + 1;
   const specTrip = new Map();
@@ -232,13 +238,20 @@ function withSpecificationTrips(datafile, entries) {
     }
     return { ...scenario, tripRequirementId: specTrip.get(id) };
   };
-  const byCode = new Map(asSpec.map((e) => [e.specOf || e.code, e]));
+  const inForm = (sc, entry) => (entry.tripAs === 'SPECIFICATION'
+    ? onSpecTrip(structuredClone(sc))
+    : { ...structuredClone(sc), offersByTripIds: 'on' });
+  const byOriginal = new Map();
+  for (const e of variants) {
+    const key = e.variantOf || e.code;
+    byOriginal.set(key, [...(byOriginal.get(key) || []), e]);
+  }
   const scenarios = arr(datafile.scenarios).flatMap((sc) => {
-    const entry = isObj(sc) ? byCode.get(sc.code) : null;
-    if (!entry) return [sc];
-    const spec = onSpecTrip(structuredClone(sc));
-    if (!entry.specOf) return [spec];
-    return [sc, { ...spec, code: entry.code, description: entry.purpose }];
+    const list = isObj(sc) ? byOriginal.get(sc.code) : null;
+    if (!list) return [sc];
+    const inPlace = list.find((e) => !e.variantOf);
+    const twins = list.filter((e) => e.variantOf).map((e) => ({ ...inForm(sc, e), code: e.code, description: e.purpose }));
+    return [inPlace ? inForm(sc, inPlace) : sc, ...twins];
   });
   return { ...datafile, scenarios, tripRequirements: trips };
 }
@@ -321,5 +334,5 @@ function suggestTrip(trip, testData) {
 }
 
 module.exports = {
-  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withSpecificationTrips, OVERRULE_CODES,
+  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withOfferRequestForms, OVERRULE_CODES,
 };

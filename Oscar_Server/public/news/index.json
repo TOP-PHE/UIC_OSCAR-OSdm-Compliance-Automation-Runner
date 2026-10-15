@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-reference-scenarios-trip-id",
+    "date": "October 15, 2026",
+    "tag": "Feature",
+    "title": "Reference scenarios by trip id",
+    "summary": "When the Test Framework says a provider takes offer requests by trip id, the reference scenarios are offered that way too.",
+    "content": "Under Sales Flows in the Test Framework, Offer requests lists the forms a provider takes. When trip id is ticked, each reference scenario that searches a one-way trip is also offered by trip id, ending in _TRIPID: the run first asks the provider's trip search, then the offers for the trip found. With trip id only, the scenarios are copied that way directly. The copy report reminds you that the provider's trip search must find the chosen train."
+  },
+  {
     "id": "2026-10-15-exchange-tests",
     "date": "October 15, 2026",
     "tag": "Quality",

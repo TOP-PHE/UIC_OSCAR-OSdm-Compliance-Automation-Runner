@@ -203,7 +203,7 @@ describe('#748: a provider that takes searches and specifications', () => {
   test('lists each convertible search twice, and refuses what needs trip ids', async () => {
     const res = await request(app).get('/v1/company/scenario-catalogue').set(as('TM', 'Q'));
     expect(res.status).toBe(200);
-    expect(entryOf(res.body, 'OTST_SALE_ONE_WAY_1ADT_SPEC')).toMatchObject({ specOf: 'OTST_SALE_ONE_WAY_1ADT', tripAs: 'SPECIFICATION', missing: [] });
+    expect(entryOf(res.body, 'OTST_SALE_ONE_WAY_1ADT_SPEC')).toMatchObject({ variantOf: 'OTST_SALE_ONE_WAY_1ADT', tripAs: 'SPECIFICATION', missing: [] });
     expect(entryOf(res.body, 'OTST_SALE_BY_TRIP_ID_1ADT').missing).toContain('offer requests by trip id');
   });
 
