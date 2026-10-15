@@ -62,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.293] / [collection-OTST_V2.0.165] — 2026-10-15
+
+Issue #758, release 2026.328.
+
+### Security
+- **No code downloaded at run time is executed any more** (Sonar S1523, critical, `validators.js`). If the `ajv` module was missing, `resolveAjvConstructor()` downloaded a script from the `ajvMinified` URL and ran it with `new Function`. That was code from outside the repository, running inside a run. Now AJV is loaded only as an installed module, and `swaggerSchemaValidatorContent()` no longer downloads anything.
+  - **Effect on runs:** none. The only caller of this validation, in `01. POST Get Offer`, was commented out. OSCAR's requests are checked against OSDM by `osdmRequestSchema.js` (#736).
+- **Request ids no longer come from `Math.random`** (Sonar S2245, `scenarioParser.js`). `randomUUID()`, which gives the `externalRef` of the trip and its legs, uses `node:crypto` (Bruno's developer sandbox, as OSCAR runs it). Without it, it uses a time-and-counter value, unique within the run, as the Idempotency-Key test already did.
+- **A test** (`bruno-library-security.test.js`) keeps `new Function(`, `Math.random(` and `eval(` out of `library-bruno`.
+
+Checked:
+- Unit tests, including the fallback without `crypto`; full suite.
+- Simulator replay, all scenarios, before and after.
+
+---
+
 ## [server-1.11.292] / [collection-OTST_V2.0.164] — 2026-10-15
 
 Issue #756, release 2026.327. Tests only; no server or collection code.

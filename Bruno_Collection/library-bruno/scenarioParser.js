@@ -20,16 +20,28 @@ const {
 
 // scenarioParser-bruno.js
 
-// Pure-JS UUID v4 generator — no external package, works in all Bruno sandbox modes
+// A UUID v4 for a request's externalRef. Bruno's sandbox gives scripts
+// `crypto` in developer mode; without it, a time-and-counter value, unique
+// within the run, as the Idempotency-Key test does. Never Math.random (Sonar
+// S2245): an externalRef needs to be unique, not secret, but there is no
+// reason to use a weak generator when a strong one is at hand.
+let uuidCounter = 0;
 function randomUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
+  try {
+    return require('node:crypto').randomUUID();
+  } catch {
+    // Time in the first 6 bytes, the counter in the last 10: never cut, so
+    // two calls of one run never give the same bytes.
+    uuidCounter += 1;
+    const hex = Date.now().toString(16).padStart(12, '0') + uuidCounter.toString(16).padStart(20, '0');
+    const bytes = Array.from({ length: 16 }, (_, i) => Number.parseInt(hex.slice(2 * i, 2 * i + 2), 16));
+    return require('./idempotency.js').uuidFromBytes(bytes);
+  }
 }
 
 module.exports = {
   getScenarioData,
+  randomUUID,
   parseScenarioData,
   resetScenarioEnvVars,
   resolveSalesFlowActions,

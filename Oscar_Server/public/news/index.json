@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-collection-security",
+    "date": "October 15, 2026",
+    "tag": "Security",
+    "title": "Two security findings of the collection closed",
+    "summary": "The collection no longer runs code it could download during a run, and the identifiers it puts in requests come from a secure random source.",
+    "content": "An unused validation path of the collection could download a script and run it during a test run; it is removed. The identifiers OSCAR puts in offer requests now come from the system's secure random generator. Runs behave exactly as before."
+  },
+  {
     "id": "2026-10-15-exchange-tests",
     "date": "October 15, 2026",
     "tag": "Quality",
