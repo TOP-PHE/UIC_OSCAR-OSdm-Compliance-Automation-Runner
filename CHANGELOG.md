@@ -98,7 +98,12 @@ Checked:
   - `place-preferences.test.js`, 21 tests: the pure rules, the wiring of 01/02/07, and a run end to end against the simulator's own functions;
   - simulator `place-preferences.test.js`, 11 tests.
   - Each of seven mutations of the new rules fails a test.
-- Replay before/after: CHECKS_PLACEHOLDER
+- Replay before/after (93 scenarios with `bru` 4.2.1): the 90 existing scenarios give the same checks and warnings. The three new ones fail nothing:
+  - `SIM_SALE_SEAT_PREFERENCE_1ADT_38`: 271 checks, no warning;
+  - `SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38`: 337 checks, the two warnings expected;
+  - `SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38`: 271 checks, the warning at 07.
+  - The booking request with accommodations passes the `[OSCAR request]` check against OSDM 3.8.
+  - *Checks by scenario* and `simulator-checks.json` regenerated.
 
 ---
 
