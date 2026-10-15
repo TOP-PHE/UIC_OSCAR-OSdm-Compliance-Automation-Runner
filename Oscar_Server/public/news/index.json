@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-collection-coverage",
+    "date": "October 15, 2026",
+    "tag": "Quality",
+    "title": "Test coverage of the Bruno collection is measured",
+    "summary": "The quality report now measures how much of the collection's test engine is covered by automated tests, so that it can be raised change after change.",
+    "content": "The collection's checks run inside Bruno, and about forty automated test files already exercise them outside Bruno. Until now the quality report did not count that coverage. It now does: about 81 % of the engine's lines are reached by tests, and every later change to the engine must come with tests of its own."
+  },
+  {
     "id": "2026-10-15-negative-probe-501",
     "date": "October 15, 2026",
     "tag": "Fix",

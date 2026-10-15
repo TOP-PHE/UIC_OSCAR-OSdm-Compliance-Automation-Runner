@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.325",
+  "current_release": "2026.326",
   "releases": [
+    {
+      "release": "2026.326",
+      "date": "2026-10-15",
+      "server": "1.11.291",
+      "collection": "OTST_V2.0.164",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "The coverage of library-bruno is measured: Jest rootDir at the repository root, v8 provider, Sonar exclusion removed (#754)."
+      ]
+    },
     {
       "release": "2026.325",
       "date": "2026-10-15",
