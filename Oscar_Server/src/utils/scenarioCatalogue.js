@@ -178,17 +178,17 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
-  if (!offerRequestTaken(requirements.offerRequest, fw)) missing.push(`offer requests ${OFFER_REQUEST_TEXT[requirements.offerRequest.form]}`);
-  return [...missing, ...limitsMissing(requirements, fw)];
+  return [...missing, ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw)];
 }
 
-// #748: true when the framework takes the scenario's offer request: no list
-// declared, its form listed, or a search that can go as a specification
-// when the framework takes those.
-function offerRequestTaken(request, fw) {
+// #748: the offer request form a framework does not take, as a sentence:
+// none when no list is declared, its form is listed, or it is a search that
+// can go as a specification and the framework takes those.
+function offerRequestMissing(request, fw) {
   const forms = fw.offerRequestForms;
-  if (!request || !Array.isArray(forms) || forms.includes(request.form)) return true;
-  return request.convertible && forms.includes('SPECIFICATION');
+  if (!request || !Array.isArray(forms) || forms.includes(request.form)) return [];
+  if (request.convertible && forms.includes('SPECIFICATION')) return [];
+  return [`offer requests ${OFFER_REQUEST_TEXT[request.form]}`];
 }
 
 // #699 / #704 / #705: the limits a limit entry needs declared, as sentences.
