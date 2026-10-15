@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.328",
+  "current_release": "2026.329",
   "releases": [
+    {
+      "release": "2026.329",
+      "date": "2026-10-15",
+      "server": "1.11.294",
+      "collection": "OTST_V2.0.165",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Reference scenarios by trip id: a _TRIPID twin of every one-way search when the Test Framework declares offer requests by trip id (#759)."
+      ]
+    },
     {
       "release": "2026.328",
       "date": "2026-10-15",

@@ -38,7 +38,7 @@
  */
 
 const {
-  scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT,
+  scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT, OFFER_REQUEST_FORMS,
 } = require('./frameworkGating');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -183,11 +183,11 @@ function missingFor(requirements, framework) {
 
 // #748: the offer request form a framework does not take, as a sentence:
 // none when no list is declared, its form is listed, or it is a search that
-// can go as a specification and the framework takes those.
+// can go in another form the framework takes (#759: by trip id too).
 function offerRequestMissing(request, fw) {
   const forms = fw.offerRequestForms;
   if (!request || !Array.isArray(forms) || forms.includes(request.form)) return [];
-  if (request.convertible && forms.includes('SPECIFICATION')) return [];
+  if (request.convertible && (forms.includes('SPECIFICATION') || forms.includes('TRIP_IDS'))) return [];
   return [`offer requests ${OFFER_REQUEST_TEXT[request.form]}`];
 }
 
@@ -363,29 +363,41 @@ function limitNeedsText(needs, limit) {
 
 /**
  * The catalogue as a company sees it: each entry, what it needs, what is
- * missing. #748: a search that can go as a trip specification is sent as one
- * (`tripAs`) when the framework takes specifications and not searches, and
- * comes twice, the second under `<code>_SPEC` (`specOf`), when it takes both.
+ * missing. #748/#759: a one-way search without the train filter can also be
+ * asked as a trip specification or by trip id. It comes once per form the
+ * framework takes, in the order SEARCH, SPECIFICATION, TRIP_IDS: the first
+ * under its own code (`tripAs` when that form is not the search), the others
+ * as twins under `<code>_SPEC` / `<code>_TRIPID` (`variantOf`).
  */
 function catalogueFor(catalogue, simulator, framework) {
   const fw = isObj(framework?.config) ? framework.config : (framework || {});
   const forms = Array.isArray(fw.offerRequestForms) ? fw.offerRequestForms : null;
   return baseEntries(catalogue, simulator, framework).flatMap((entry) => {
-    if (!forms || !entry.requirements.offerRequest.convertible || !forms.includes('SPECIFICATION')) return [entry];
-    const spec = asSpecification(entry, framework);
-    if (!forms.includes('SEARCH')) return [{ ...spec, code: entry.code }];
-    return [entry, { ...spec, code: `${entry.code}${SPEC_SUFFIX}`, specOf: entry.code, purpose: `${entry.purpose} Offers asked by trip specification.` }];
+    if (!forms || !entry.requirements.offerRequest.convertible) return [entry];
+    const variants = OFFER_REQUEST_FORMS.filter((form) => forms.includes(form))
+      .map((form) => (form === 'SEARCH' ? entry : asForm(entry, form, framework)));
+    if (!variants.length) return [entry];
+    return variants.map((variant, i) => (i === 0 ? variant : {
+      ...variant, code: `${entry.code}${VARIANTS[variant.tripAs].suffix}`, variantOf: entry.code,
+      purpose: `${entry.purpose} ${VARIANTS[variant.tripAs].purpose}`,
+    }));
   });
 }
 
-const SPEC_SUFFIX = '_SPEC';
+// #748/#759: the forms a search can be sent in instead, with the code suffix
+// and the purpose sentence of a twin.
+const VARIANTS = {
+  SPECIFICATION: { suffix: '_SPEC', purpose: 'Offers asked by trip specification.' },
+  TRIP_IDS: { suffix: '_TRIPID', purpose: 'Offers asked by trip id, from POST /trips-collection.' },
+};
 
-// #748: an entry whose search is sent as a trip specification.
-function asSpecification(entry, framework) {
-  const requirements = { ...entry.requirements, offerRequest: { form: 'SPECIFICATION', convertible: false } };
+// An entry whose search is sent in another form. A specification has a trip
+// of its own; by trip id the search trip stays (it finds the trip id).
+function asForm(entry, form, framework) {
+  const requirements = { ...entry.requirements, offerRequest: { form, convertible: false } };
   return {
-    ...entry, tripAs: 'SPECIFICATION', requirements,
-    missing: missingFor(requirements, framework), needs: { ...entry.needs, trip: 'SPECIFICATION' },
+    ...entry, tripAs: form, requirements, missing: missingFor(requirements, framework),
+    needs: form === 'SPECIFICATION' ? { ...entry.needs, trip: 'SPECIFICATION' } : entry.needs,
   };
 }
 

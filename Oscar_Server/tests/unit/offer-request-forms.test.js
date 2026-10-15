@@ -94,7 +94,7 @@ describe('#748 — the catalogue follows the declared forms', () => {
 
   test('no declaration: the catalogue as before', () => {
     expect(plain.map((e) => e.code)).toEqual(catalogue.entries.map((e) => e.code));
-    expect(plain.some((e) => e.tripAs || e.specOf || formMissing(e).length)).toBe(false);
+    expect(plain.some((e) => e.tripAs || e.variantOf || formMissing(e).length)).toBe(false);
   });
 
   test('what can go as a specification: one-way searches without the train filter', () => {
@@ -129,19 +129,87 @@ describe('#748 — the catalogue follows the declared forms', () => {
     expect(entries.find((e) => e.code === 'OTST_SALE_BY_TRIP_ID_1ADT').missing).toEqual([]);
   });
 
-  test('both: each search that can go as a specification comes twice, the twin right after it', () => {
+  test('all three: each search that can change form comes three times, SEARCH, _SPEC, _TRIPID in that order', () => {
     const entries = catalogueFor(catalogue, simulator, withForms(['SEARCH', 'SPECIFICATION', 'TRIP_IDS']));
     const codes = entries.map((e) => e.code);
-    const twins = entries.filter((e) => e.specOf);
-    expect(twins.length).toBe(plain.filter((e) => e.requirements.offerRequest.convertible).length);
-    for (const twin of twins) {
-      expect(twin.code).toBe(`${twin.specOf}_SPEC`);
-      expect(codes.indexOf(twin.code)).toBe(codes.indexOf(twin.specOf) + 1);
-      expect(twin).toMatchObject({ tripAs: 'SPECIFICATION', missing: [] });
-      expect(twin.purpose).toMatch(/Offers asked by trip specification\.$/);
+    const convertible = plain.filter((e) => e.requirements.offerRequest.convertible).map((e) => e.code);
+    const twins = entries.filter((e) => e.variantOf);
+    expect(twins.length).toBe(2 * convertible.length);
+    for (const code of convertible) {
+      const at = codes.indexOf(code);
+      expect(codes.slice(at, at + 3)).toEqual([code, `${code}_SPEC`, `${code}_TRIPID`]);
+      expect(entries[at]).not.toHaveProperty('tripAs');
+      expect(entries[at + 1]).toMatchObject({ variantOf: code, tripAs: 'SPECIFICATION', missing: [] });
+      expect(entries[at + 2]).toMatchObject({ variantOf: code, tripAs: 'TRIP_IDS', missing: [] });
+      expect(entries[at + 1].purpose).toMatch(/Offers asked by trip specification\.$/);
+      expect(entries[at + 2].purpose).toMatch(/Offers asked by trip id, from POST \/trips-collection\.$/);
+      expect(entries[at + 2].needs).toEqual(entries[at].needs);
     }
-    expect(entries.find((e) => e.code === 'OTST_SALE_ONE_WAY_1ADT')).not.toHaveProperty('tripAs');
     expect(codes).not.toContain('OTST_SALE_RETURN_SEPARATE_1ADT_SPEC');
+    expect(codes).not.toContain('OTST_SALE_RETURN_SEPARATE_1ADT_TRIPID');
+    expect(codes).not.toContain('OTST_SALE_BY_TRIP_ID_1ADT_TRIPID');
+  });
+
+  test('two forms: only the declared twin is added', () => {
+    const codes = catalogueFor(catalogue, simulator, withForms(['SEARCH', 'TRIP_IDS'])).map((e) => e.code);
+    expect(codes).toContain('OTST_SALE_ONE_WAY_1ADT_TRIPID');
+    expect(codes.some((c) => c.endsWith('_SPEC'))).toBe(false);
+  });
+
+  test('trip ids only: searches go by trip id in place, the rest is refused', () => {
+    const entries = catalogueFor(catalogue, simulator, withForms(['TRIP_IDS']));
+    expect(entries.map((e) => e.code)).toEqual(catalogue.entries.map((e) => e.code));
+    const one = entries.find((e) => e.code === 'OTST_SALE_ONE_WAY_1ADT');
+    expect(one).toMatchObject({ tripAs: 'TRIP_IDS', missing: [] });
+    expect(one).not.toHaveProperty('variantOf');
+    expect(formMissing(entries.find((e) => e.code === 'OTST_SALE_RETURN_SEPARATE_1ADT'))).toEqual(['offer requests by trip search']);
+    expect(formMissing(entries.find((e) => e.code === 'OTST_SALE_CLASS_PER_LEG_1ADT'))).toEqual(['offer requests by trip specification']);
+  });
+
+  test('specifications and trip ids: the in-place form is the specification, the trip-id one a twin', () => {
+    const entries = catalogueFor(catalogue, simulator, withForms(['SPECIFICATION', 'TRIP_IDS']));
+    const codes = entries.map((e) => e.code);
+    const at = codes.indexOf('OTST_SALE_ONE_WAY_1ADT');
+    expect(entries[at]).toMatchObject({ tripAs: 'SPECIFICATION' });
+    expect(entries[at + 1]).toMatchObject({ code: 'OTST_SALE_ONE_WAY_1ADT_TRIPID', tripAs: 'TRIP_IDS' });
+  });
+});
+
+describe('#759 — the copy of a catalogue search by trip id', () => {
+  const fw = withForms(['SEARCH', 'TRIP_IDS']);
+  const entries = catalogueFor(catalogue, simulator, fw);
+  const { datafile: source, notes } = adaptCatalogueDatafile(catalogueDatafile(catalogue, simulator), entries, fw);
+  const scenario = (code) => source.scenarios.find((s) => s.code === code);
+
+  test('the twin keeps the search trip and arms offersByTripIds; the original does not', () => {
+    const original = scenario('OTST_SALE_ONE_WAY_1ADT');
+    const twin = scenario('OTST_SALE_ONE_WAY_1ADT_TRIPID');
+    expect(twin.offersByTripIds).toBe('on');
+    expect(original.offersByTripIds).not.toBe('on');
+    expect(twin.tripRequirementId).toBe(original.tripRequirementId);
+    const codes = source.scenarios.map((s) => s.code);
+    expect(codes.indexOf(twin.code)).toBe(codes.indexOf(original.code) + 1);
+  });
+
+  test('the twin reads as a trip-id scenario, so the framework gate agrees', () => {
+    const df = catalogueDatafile(catalogue, simulator);
+    df.scenarios = source.scenarios;
+    df.tripRequirements = source.tripRequirements;
+    expect(requirementsOf(scenario('OTST_SALE_ONE_WAY_1ADT_TRIPID'), df).offerRequest.form).toBe('TRIP_IDS');
+  });
+
+  test('trip ids only: the scenario is converted in place', () => {
+    const only = withForms(['TRIP_IDS']);
+    const { datafile } = adaptCatalogueDatafile(catalogueDatafile(catalogue, simulator), catalogueFor(catalogue, simulator, only), only);
+    const sc = datafile.scenarios.find((s) => s.code === 'OTST_SALE_ONE_WAY_1ADT');
+    expect(sc.offersByTripIds).toBe('on');
+    expect(datafile.scenarios.some((s) => s.code.endsWith('_TRIPID'))).toBe(false);
+  });
+
+  test('the person copying is told the trip search must find the train', () => {
+    const line = "the provider's POST /trips-collection must list a trip for the chosen train's stations and time";
+    expect(notes.OTST_SALE_ONE_WAY_1ADT_TRIPID.toCheck).toContain(line);
+    expect(notes.OTST_SALE_ONE_WAY_1ADT.toCheck).not.toContain(line);
   });
 });
 

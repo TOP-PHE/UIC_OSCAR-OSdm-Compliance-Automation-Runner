@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.294] / [collection-OTST_V2.0.165] — 2026-10-15
+
+Issue #759, release 2026.329.
+
+### Added
+- **Reference scenarios by trip id.** When the Test Framework declares offer requests by trip id (`offerRequestForms`), every reference scenario that is a one-way search without the train filter is offered by trip id as well, as a `<code>_TRIPID` twin. With all three forms declared, such a scenario comes three times, in the order SEARCH, `_SPEC`, `_TRIPID` (the twins follow their original). With trip ids only, it is converted in place.
+  - A trip-id copy keeps the search trip and arms `offersByTripIds`: step 01 asks `POST /trips-collection` and then the offers for the trip id chosen (#602).
+  - The copy report says what to check: the provider's `POST /trips-collection` must list a trip for the chosen train's stations and time.
+  - `catalogueFor()` marks a twin with `variantOf` (it was `specOf`); `withOfferRequestForms()` (`catalogueMatch.js`, was `withSpecificationTrips()`) builds the scenarios.
+
+Checked:
+- Unit and route tests: the three forms in every combination, the order of the twins, in-place conversion, the copied scenario, the note; full suite and lint.
+- Simulator: the 29 catalogue sources that can change form, run by trip id on `gamma`: 0 failed (each with the trip search and trip-id checks added).
+- The collection is unchanged: no replay comparison.
+
+---
+
 ## [server-1.11.293] / [collection-OTST_V2.0.165] — 2026-10-15
 
 Issue #758, release 2026.328.

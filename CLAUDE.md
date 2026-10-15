@@ -76,11 +76,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     scenario's form is `offerRequestFormOf()`: trip ids when it arms them, else
     its trip's type; it needs the datafile, so the warning
     (`offerRequestBy:<form>`) is added in `annotateDatafile()`, not in
-    `scenarioWarnings()`. The catalogue sends a one-way search without the
-    train filter as a specification (`tripAs`) when only SPECIFICATION is
-    declared, and adds a `<code>_SPEC` twin (`specOf`) when both are:
-    `catalogueFor()` makes the entries, `withSpecificationTrips()`
-    (`catalogueMatch.js`) the scenarios, on a one-leg trip of their own. A
+    `scenarioWarnings()`. The catalogue gives a one-way search without the
+    train filter one variant per declared form, in the order SEARCH,
+    `<code>_SPEC`, `<code>_TRIPID` (#759, 1.11.294): the first declared form
+    replaces the entry in place (`tripAs`), the others are twins
+    (`variantOf`) right after it. `catalogueFor()` makes the entries,
+    `withOfferRequestForms()` (`catalogueMatch.js`) the scenarios: a
+    specification rides a one-leg trip of its own, a trip-id copy keeps the
+    search trip and arms `offersByTripIds` (#602). All 29 convertible sources
+    pass on the simulator by trip id. A
     specification names the train number and carrier (`DatedJourney` requires
     both), so a simulator search trip, which has neither, cannot be converted
     as it is: the copy fills the leg from the Test Data train. To run the
