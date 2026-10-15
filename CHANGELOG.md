@@ -62,6 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.296] / [collection-OTST_V2.0.167] — 2026-10-15
+
+Issue #764, release 2026.331.
+
+### Fixed
+- **`POST /trips-collection` no longer sends an empty `Requestor` header** (`offers.js`, `sendTripsCollection()`). It sent `Requestor: ""` when no requestor was set; every other request a script sends has left the header out since #692 (`requestorHeader()`). A real provider answered this call with HTTP 200 and a body that was not JSON, and the trip-id scenario stopped at 01; the empty header may be the cause.
+- **A trip search answer that is not JSON is described in the log** (`describeRawAnswer()`, `tripIds.js`): its Content-Type, its length and its first 200 characters with tags and runs of blanks removed, instead of "the answer has no JSON body". The checks do not change.
+
+Checked:
+- Unit tests (`bruno-trip-ids.test.js`): no `Requestor` header when unset or blank; an HTML page, an empty body, bytes, and a JSON text. The new tests fail on the old code.
+- The text is read by a scan, not a regular expression (Sonar S8786): the same output as `replace(/<[^>]*>/g, ' ')` plus blank collapsing on every string of up to 8 characters over `< > a`, space, tab and newline (2,015,539 strings), and linear time (60,000 `<`: under a millisecond, 4.6 s with the regular expression).
+- Replay before/after: no scenario changes.
+
+---
+
 ## [server-1.11.295] / [collection-OTST_V2.0.166] — 2026-10-15
 
 Issue #762, release 2026.330.

@@ -1047,7 +1047,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   be skipped or would see the previous scenario. Its checks are kept in
   `__tripIdsOutcome` and recorded by 01's after-response, ahead of the status
   check, because the negative test (`tripIdsExpectRejection`) expects a 4xx
-  there. One-way SEARCH trips only.
+  there. One-way SEARCH trips only. Its request leaves `Requestor` out when
+  unset (#764, `requestorHeader()`: it sent `""`, and a real provider answered
+  200 with a body that was not JSON), and a non-JSON answer is described in
+  the log (`describeRawAnswer()`: type, length, first 200 characters).
 - **Fulfilment documents are warnings; the refund receipt is awaited, and
   every simulator scenario is catalogued** (#603, 1.11.234 / OTST_V2.0.118).
   `library-bruno/fulfillmentDocuments.js` (pure) reads documents where the

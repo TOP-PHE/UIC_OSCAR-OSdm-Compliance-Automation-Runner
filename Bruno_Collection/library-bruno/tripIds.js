@@ -194,7 +194,46 @@ function describeTripsAnswer(body) {
   return lines;
 }
 
+// What a trip search answered when its body was not JSON (#764): its type,
+// its length and its first characters as text (tags and runs of blanks
+// removed), so the run log shows what the provider sent. A real provider
+// answered HTTP 200 with a body that did not parse, and the log said only
+// "no JSON body".
+const SHOWN_CHARACTERS = 200;
+
+// The text of an answer: tags replaced by a blank, runs of blanks by one. A
+// scan, not a regular expression, so its time stays linear in the length.
+function textOf(raw) {
+  let out = '';
+  let i = 0;
+  while (i < raw.length) {
+    const close = raw[i] === '<' ? raw.indexOf('>', i) : -1;
+    if (raw[i] === '<' && close === -1) {
+      // No '>' after this point: the rest is text (and each later '<' would
+      // scan to the end again).
+      out += raw.slice(i);
+      break;
+    }
+    if (close === -1) {
+      out += raw[i];
+      i += 1;
+    } else {
+      out += ' ';
+      i = close + 1;
+    }
+  }
+  return out.split(/\s/).filter(Boolean).join(' ');
+}
+function describeRawAnswer(text, contentType) {
+  const type = isText(contentType) ? String(contentType) : 'none';
+  const raw = typeof text === 'string' ? text : '';
+  if (raw.trim() === '') return [`the answer is empty (Content-Type ${type})`];
+  const plain = textOf(raw);
+  const shown = plain.length > SHOWN_CHARACTERS ? `${plain.slice(0, SHOWN_CHARACTERS)}…` : plain;
+  return [`the answer is not JSON (Content-Type ${type}, ${raw.length} characters): "${shown}"`];
+}
+
 module.exports = {
   UNKNOWN_TRIP_ID, tripsCollectionRequest, vehicleNumbersOf, chooseTrip, checkTripsCollection, offerRequestByTripIds, checkOffersForTrip,
-  coveredTripsOf, describeTripsAnswer,
+  coveredTripsOf, describeTripsAnswer, describeRawAnswer,
 };
