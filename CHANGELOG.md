@@ -62,6 +62,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.297] / [collection-OTST_V2.0.168] — 2026-10-15
+
+Issue #766 (PR 1 of 5), release 2026.332.
+
+### Added
+- **The Test Framework declares how a place can be chosen** (`placeSelectionFlows`, OSDM's `PlaceSelectionFlow`), in the 🪑 Seat Selection section:
+  - the five flows are: automatic by accommodation and place properties; automatic after asking the available preferences; automatic next to a given place; a named place without fee; a named place with a seat fee;
+  - absent = every flow (frameworks from before this release); `[]` = none.
+- **Each scenario has a flow:**
+  - its own `placeSelectionFlow` (new in the data file schema);
+  - else what its place fields send: a seat from the seat map (`placeSelectionMode`) is a named place; a couchette or berth (`accommodationSelection`), or `reservationBookingForm` `PLACE_SELECTION`, is an automatic selection.
+  - The server (`placeSelectionFlowOf()`, `frameworkGating.js`) and the collection (`flowOfScenario()`, `library-bruno/placeSelection.js`) agree, pinned by a test over every scenario of the simulator.
+- **The golden rule for flows.** A flow the framework does not declare is handled at each stage:
+  - at the run: a `[WARNING]` (`placeSelectionBy:<flow>`);
+  - in the scenario catalogue: the copy is refused ("place selection … (Seat Selection)");
+  - in a copy between companies: it is named.
+- **Step 01 says what the chosen offer offers:**
+  - whether its reservation parts list the scenario's flow (`supportedPlaceSelectionFlows`): listed or not named at all is INFO, another flow or no reservation part is a WARNING;
+  - the preferences it offers (`availablePlacePreferences`).
+  No check fails.
+
+Checked:
+- Unit tests (`place-selection-flows.test.js`): flow of a scenario on both sides, declaration, the run annotation, the catalogue and the copy, what the offer says, the page's pills. The three server rules each fail a test when removed.
+- Replay before/after: checks unchanged; one warning added on `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38`, whose train has no seat reservation (its row in the simulator scenarios page says so).
+
+---
+
 ## [server-1.11.296] / [collection-OTST_V2.0.167] — 2026-10-15
 
 Issue #764, release 2026.331.
