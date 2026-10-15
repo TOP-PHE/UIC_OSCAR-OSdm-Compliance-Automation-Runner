@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.295] / [collection-OTST_V2.0.166] — 2026-10-15
+
+Issue #762, release 2026.330.
+
+### Fixed
+- **A part that names no legs covers the whole trip** (`legClasses.js`). OSDM's TripCoverage: "If neither coveredLegIds nor coveredSections are defined, the complete trip is covered." A real provider gives `coveredTripId` only, and product references without `legIds`; OSCAR read every leg of such an offer as having no class, and reported "classes per leg offered: [none, none]". A part with no trip coverage of its own covers its offer's trip; a part given by `coveredSections` covers no leg (sections are not legs).
+
+### Changed
+- **No offer with the classes asked per leg is a warning, not a stop** (maintainer decision). A provider that cannot sell the combination answers with what it has, and selling that offer or not is the retailer's choice. Step 01 now writes one `[WARNING]` naming the classes offered and saying the class per leg is not tested, and the sale goes on with the offer chosen as usual (01 and 01b no longer stop). The booking is then held to the classes of the offer sold (`__legClassesSold`, check label "Booking (classes of the offer sold)"): a booking that does not give them still fails. When an offer matches, nothing changes.
+- New simulator scenario `SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38`: first class asked on the regional leg, which has none.
+
+Checked:
+- Unit tests (`bruno-leg-classes.test.js`): whole-trip coverage, no trip coverage, sections; the warning path; what the booking is held to. The whole-trip test fails on the old reading.
+- Simulator: the new scenario, 0 failed, one warning.
+- Replay before/after: only the new scenario differs.
+
+---
+
 ## [server-1.11.294] / [collection-OTST_V2.0.165] — 2026-10-15
 
 Issue #759, release 2026.329.

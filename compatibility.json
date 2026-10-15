@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.329",
+  "current_release": "2026.330",
   "releases": [
+    {
+      "release": "2026.330",
+      "date": "2026-10-15",
+      "server": "1.11.295",
+      "collection": "OTST_V2.0.166",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Class per leg: a part naming no legs covers the whole trip; no offer with the classes asked is a warning, and the booking is held to the classes of the offer sold (#762)."
+      ]
+    },
     {
       "release": "2026.329",
       "date": "2026-10-15",

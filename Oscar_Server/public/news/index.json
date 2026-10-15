@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-class-per-leg-warning",
+    "date": "October 15, 2026",
+    "tag": "Improvement",
+    "title": "Class per leg: a warning when the provider does not offer it",
+    "summary": "A scenario asking a different class on each leg no longer stops when the provider offers only one class for the whole trip.",
+    "content": "When no offer gives each leg the class the scenario asks for, the run now says so in a warning and goes on with the offer chosen; the booking is then checked against the classes of that offer. Offers whose parts cover the whole trip without naming its legs are now read correctly, as OSDM defines."
+  },
+  {
     "id": "2026-10-15-reference-scenarios-trip-id",
     "date": "October 15, 2026",
     "tag": "Feature",
