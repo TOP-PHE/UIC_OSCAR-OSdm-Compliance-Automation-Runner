@@ -295,6 +295,14 @@ describe('describeTripsAnswer (#729)', () => {
     expect(ti.describeRawAnswer(null, null)).toEqual(['the answer is empty (Content-Type none)']);
   });
 
+  test('#764: a raw answer is read in linear time (no backtracking regular expression)', () => {
+    const started = Date.now();
+    const [line] = ti.describeRawAnswer('<'.repeat(60000), 'text/plain');
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(line).toContain('60000 characters');
+    expect(ti.describeRawAnswer('a <b>bold</b>  and <unclosed', 'text/html')[0]).toContain('"a bold and <unclosed"');
+  });
+
   test('at most ten problems, each at most 300 characters', () => {
     const lines = ti.describeTripsAnswer({ problems: Array.from({ length: 12 }, () => ({ code: 'C', title: 'x'.repeat(400) })) });
     expect(lines).toHaveLength(11);

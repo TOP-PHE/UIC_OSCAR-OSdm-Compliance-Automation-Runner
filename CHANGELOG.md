@@ -72,6 +72,7 @@ Issue #764, release 2026.331.
 
 Checked:
 - Unit tests (`bruno-trip-ids.test.js`): no `Requestor` header when unset or blank; an HTML page, an empty body, bytes, and a JSON text. The new tests fail on the old code.
+- The text is read by a scan, not a regular expression (Sonar S8786): the same output as `replace(/<[^>]*>/g, ' ')` plus blank collapsing on every string of up to 8 characters over `< > a`, space, tab and newline (2,015,539 strings), and linear time (60,000 `<`: under a millisecond, 4.6 s with the regular expression).
 - Replay before/after: no scenario changes.
 
 ---

@@ -2243,17 +2243,24 @@ async function prepareOfferRequestByTripIds() {
     checks.push({ name: `Trips collection: a trip to ask offers for — ${choice.trip ? choice.how + ", " + choice.trip.id : "none"}`, ok: !!choice.trip, message: choice.reason });
   }
   if (!choice.trip) {
-    bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, failed: true }));
-    if (status === 200) {
-      const lines = body == null && raw ? ti.describeRawAnswer(raw.text, raw.contentType) : ti.describeTripsAnswer(body);
-      for (const line of lines) validationLogger(`[INFO] POST /trips-collection: ${line}`);
-    }
-    validationLogger("[WARNING] Offers by trip id: no trip to ask offers for — the offer request goes out by search criteria, and its answer is not used.");
+    reportNoTrip(status, body, raw, checks);
     return;
   }
   bru.setEnvVar("OfferCollectionRequest", JSON.stringify(ti.offerRequestByTripIds(request, choice.trip.id)));
   bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, tripId: choice.trip.id }));
   validationLogger(`[INFO] 🚆 Offers by trip id — ${body.trips.length} trip(s) answered; asking offers for ${choice.how}: ${choice.trip.id}`);
+}
+
+// No trip to ask offers for: the checks fail the step, and the log says what
+// the trip search answered (#729), or what it was when not JSON (#764).
+function reportNoTrip(status, body, raw, checks) {
+  const ti = require("./tripIds.js");
+  bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, failed: true }));
+  if (status === 200) {
+    const lines = body == null && raw ? ti.describeRawAnswer(raw.text, raw.contentType) : ti.describeTripsAnswer(body);
+    for (const line of lines) validationLogger(`[INFO] POST /trips-collection: ${line}`);
+  }
+  validationLogger("[WARNING] Offers by trip id: no trip to ask offers for — the offer request goes out by search criteria, and its answer is not used.");
 }
 
 // POST /trips-collection (#602), with the headers of the offer request; no
