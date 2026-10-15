@@ -37,7 +37,9 @@
  * train and tariff, and needsText() says them to the person copying.
  */
 
-const { scenarioReturnModel, partialRefundScopeDeclared } = require('./frameworkGating');
+const {
+  scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT,
+} = require('./frameworkGating');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -143,7 +145,21 @@ function requirementsOf(scenario, datafile) {
     returnModel: model,
     minOsdmVersion: model === 'COMBINED' ? '3.7' : null,
     passengerTypes: types,
+    offerRequest: offerRequestOf(scenario, datafile),
   };
+}
+
+/**
+ * #748: the form of a scenario's offer request, and whether a search can be
+ * sent as a trip specification instead: a one-way trip of one leg, asked
+ * without the train filter (which only a search has).
+ */
+function offerRequestOf(scenario, datafile) {
+  const form = offerRequestFormOf(scenario, datafile);
+  if (form !== 'SEARCH') return { form, convertible: false };
+  const trip = arr(datafile.tripRequirements).find((t) => isObj(t) && t.id === scenario.tripRequirementId);
+  const filtered = ARMED.has(trip?.trip?.searchCriteria?.trainFilter);
+  return { form, convertible: Boolean(trip) && !filtered && scenarioReturnModel(scenario) === null };
 }
 
 /** The declarations a framework lacks for these requirements, as sentences. */
@@ -162,7 +178,17 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
+  if (!offerRequestTaken(requirements.offerRequest, fw)) missing.push(`offer requests ${OFFER_REQUEST_TEXT[requirements.offerRequest.form]}`);
   return [...missing, ...limitsMissing(requirements, fw)];
+}
+
+// #748: true when the framework takes the scenario's offer request: no list
+// declared, its form listed, or a search that can go as a specification
+// when the framework takes those.
+function offerRequestTaken(request, fw) {
+  const forms = fw.offerRequestForms;
+  if (!request || !Array.isArray(forms) || forms.includes(request.form)) return true;
+  return request.convertible && forms.includes('SPECIFICATION');
 }
 
 // #699 / #704 / #705: the limits a limit entry needs declared, as sentences.
@@ -335,8 +361,36 @@ function limitNeedsText(needs, limit) {
   return [`${count} the Test Framework declares`, ...text];
 }
 
-/** The catalogue as a company sees it: each entry, what it needs, what is missing. */
+/**
+ * The catalogue as a company sees it: each entry, what it needs, what is
+ * missing. #748: a search that can go as a trip specification is sent as one
+ * (`tripAs`) when the framework takes specifications and not searches, and
+ * comes twice, the second under `<code>_SPEC` (`specOf`), when it takes both.
+ */
 function catalogueFor(catalogue, simulator, framework) {
+  const fw = isObj(framework?.config) ? framework.config : (framework || {});
+  const forms = Array.isArray(fw.offerRequestForms) ? fw.offerRequestForms : null;
+  return baseEntries(catalogue, simulator, framework).flatMap((entry) => {
+    if (!forms || !entry.requirements.offerRequest.convertible || !forms.includes('SPECIFICATION')) return [entry];
+    const spec = asSpecification(entry, framework);
+    if (!forms.includes('SEARCH')) return [{ ...spec, code: entry.code }];
+    return [entry, { ...spec, code: `${entry.code}${SPEC_SUFFIX}`, specOf: entry.code, purpose: `${entry.purpose} Offers asked by trip specification.` }];
+  });
+}
+
+const SPEC_SUFFIX = '_SPEC';
+
+// #748: an entry whose search is sent as a trip specification.
+function asSpecification(entry, framework) {
+  const requirements = { ...entry.requirements, offerRequest: { form: 'SPECIFICATION', convertible: false } };
+  return {
+    ...entry, tripAs: 'SPECIFICATION', requirements,
+    missing: missingFor(requirements, framework), needs: { ...entry.needs, trip: 'SPECIFICATION' },
+  };
+}
+
+// The entries of the catalogue file, against this framework.
+function baseEntries(catalogue, simulator, framework) {
   const datafile = catalogueDatafile(catalogue, simulator);
   return catalogue.entries.map((entry) => {
     const scenario = datafile.scenarios.find((s) => s.code === entry.code);

@@ -302,6 +302,46 @@ function fwTogglePartialScope(el, scope) {
   el.classList.toggle('selected', !on);
 }
 
+// #748: how a provider takes an offer request. Kept in sync with
+// frameworkGating.js (OFFER_REQUEST_FORMS, offerRequestFormDeclared()).
+const FW_OFFER_REQUEST_FORMS = [
+  ['SEARCH', 'By trip search (tripSearchCriteria)'],
+  ['SPECIFICATION', 'By trip specification (tripSpecifications)'],
+  ['TRIP_IDS', 'By trip id (tripIds, after POST /trips-collection)'],
+];
+
+// #748: no list declared means every form (frameworks from before 1.11.289).
+function fwOfferRequestFormDeclared(fw, form) {
+  const declared = fw?.offerRequestForms;
+  return !Array.isArray(declared) || declared.includes(form);
+}
+
+// #748: the framework editor's Offer requests pills.
+function offerRequestPanelHtml(fw) {
+  const pills = FW_OFFER_REQUEST_FORMS.map(([form, label]) =>
+    `<div class="pill${fwOfferRequestFormDeclared(fw, form) ? ' selected' : ''}" data-action="fw-offer-request-form" data-val="${esc(form)}">${esc(label)}</div>`).join('');
+  return `
+      <div class="fw-subsection" style="margin-top:12px">
+        <div class="fw-subsection-label" style="margin-bottom:8px">📨 Offer requests — how the provider takes a request for offers</div>
+        <div style="margin-bottom:6px;font-size:11px;color:#78909c">A scenario asking in another form gets a warning. The scenario catalogue sends a search as a trip specification when only that is ticked, and copies it both ways when both are.</div>
+        <div class="pill-group">${pills}</div>
+      </div>`;
+}
+
+// #748: a form pill. No list means every form, so the first click starts from all three.
+function fwToggleOfferRequestForm(el, form) {
+  const fw = wizData.framework;
+  const list = Array.isArray(fw.offerRequestForms) ? fw.offerRequestForms : FW_OFFER_REQUEST_FORMS.map(([f]) => f);
+  const on = list.includes(form);
+  fw.offerRequestForms = on ? list.filter(x => x !== form) : [...list, form];
+  el.classList.toggle('selected', !on);
+}
+
+// #748: the options of a trip's type picker, an undeclared form marked.
+function tripTypeOptionText(tripType, fw) {
+  return fwOfferRequestFormDeclared(fw, tripType) ? lbl(tripType) : `⚠ ${lbl(tripType)} — not declared in the Test Framework (Offer requests)`;
+}
+
 // A scenario flag counts as armed in any of the spellings datafiles use.
 function isArmed(v) {
   return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1;
@@ -2595,7 +2635,7 @@ function buildTripSection(idx, sc, trip) {
     <span class="param-label">Trip Type <span class="param-hint">How the origin/destination is specified</span></span>
     <select class="param-input param-select"
       data-action="set-trip-field" data-tidx="${esc(tIdx)}" data-field="tripType">
-      ${ENUMS.tripType.map(t => `<option value="${t}" ${trip.tripType===t?'selected':''}>${lbl(t)}</option>`).join('')}
+      ${ENUMS.tripType.map(t => `<option value="${t}" ${trip.tripType===t?'selected':''}>${esc(tripTypeOptionText(t, wizData?.framework || {}))}</option>`).join('')}
     </select>
   </div>`;
 
@@ -4035,6 +4075,7 @@ function renderWizardStep1() {
         </div>
         <div id="fw-return-version-note" style="color:#e65100;font-size:12px;margin-top:6px">${esc(returnModelVersionNote(fw))}</div>
       </div>
+      ${offerRequestPanelHtml(fw)}
     </div>
   </div>
 
@@ -7477,6 +7518,8 @@ document.body.addEventListener('click', function(e) {
       fwTogglePaxType(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-ancillary':
       fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-offer-request-form':
+      fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-return-model':
       fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); break;
     case 'fw-remove-ancillary':

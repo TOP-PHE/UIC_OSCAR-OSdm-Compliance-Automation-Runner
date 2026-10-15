@@ -1684,11 +1684,17 @@ function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
   return { inwardReturnDate };
 }
 
+const OFFER_REQUEST_TEXT = { SEARCH: 'by trip search', SPECIFICATION: 'by trip specification', TRIP_IDS: 'by trip id' };
 const PARTIAL_REFUND_SCOPE_OF = { partialRefundByFulfillment: 'fulfillment', partialRefundByLeg: 'leg', partialRefundByPax: 'passenger' };
 
 // The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
 // scenario arms that the Test Framework does not declare (#218, #619, #713).
 function featureNotDeclaredWarning(scenario, field) {
+  // #748: the offer request's form (offerRequestBy:SEARCH|SPECIFICATION|TRIP_IDS).
+  if (typeof field === 'string' && field.startsWith('offerRequestBy:')) {
+    const form = OFFER_REQUEST_TEXT[field.slice('offerRequestBy:'.length)] || field.slice('offerRequestBy:'.length);
+    return `[WARNING] Scenario "${scenario.code}" asks for offers ${form}, which the Test Framework does not declare (Offer requests). The run will proceed; the provider may refuse the request. Declare the form in the Test Framework, or change the trip type of the scenario's trip.`;
+  }
   if (field === 'returnModel') {
     const model = scenario?.offerSearchCriteria?.returnModel || 'SEPARATE';
     return `[WARNING] Scenario "${scenario.code}" asks for a return in the ${model} model, which the Test Framework does not declare (Return journeys). The run will proceed. Declare the model in the Test Framework, or choose a declared one on the scenario.`;

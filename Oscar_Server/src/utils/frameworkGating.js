@@ -40,6 +40,8 @@
  *   - partialRefundByLeg / partialRefundByPax  ↔  salesFlows: REFUND_PARTIAL
  *     and, when the framework lists them, partialRefundScopes (#713)
  *   - a return's model (offerSearchCriteria.returnModel)  ↔  returnModels (#619)
+ *   - the offer request's form (trip type, trip ids)  ↔  offerRequestForms (#748),
+ *     in annotateDatafile only: it reads the scenario's trip entry
  *   - (future) partialExchangeByLeg / partialExchangeByPax  ↔  EXCHANGE_PARTIAL
  *   - (future) requestedInformationProbe                    ↔  ???
  *
@@ -59,6 +61,15 @@ const RETURN_MODELS = ['SEPARATE', 'COMBINED'];
 // Absent = every scope (frameworks from before 1.11.271); [] = none.
 const PARTIAL_REFUND_SCOPES = ['FULFILLMENT', 'LEG', 'PASSENGER'];
 
+// #748: how a provider takes an offer request (framework.offerRequestForms):
+// by trip search (tripSearchCriteria), by trip specification
+// (tripSpecifications), by trip id (tripIds). Absent = every form
+// (frameworks from before 1.11.289); [] = none.
+const OFFER_REQUEST_FORMS = ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'];
+const OFFER_REQUEST_TEXT = Object.freeze({
+  SEARCH: 'by trip search', SPECIFICATION: 'by trip specification', TRIP_IDS: 'by trip id',
+});
+
 module.exports = {
   gatingRules,
   isScenarioArmedForField,
@@ -66,6 +77,10 @@ module.exports = {
   RETURN_MODELS,
   PARTIAL_REFUND_SCOPES,
   partialRefundScopeDeclared,
+  OFFER_REQUEST_FORMS,
+  OFFER_REQUEST_TEXT,
+  offerRequestFormOf,
+  offerRequestFormDeclared,
   scenarioReturnModel,
   returnModelsUsed,
   needsFrameworkMigration,
@@ -127,6 +142,25 @@ function partialRefundScopeDeclared(framework, scope) {
   if (!scope) return true;
   const declared = framework?.partialRefundScopes;
   return !Array.isArray(declared) || declared.includes(scope);
+}
+
+/**
+ * #748: the form of a scenario's offer request: TRIP_IDS when it asks offers
+ * by trip id (offersByTripIds, or the tripIdsExpectRejection probe), else its
+ * trip's type, SPECIFICATION or SEARCH (the collection's default).
+ */
+function offerRequestFormOf(scenario, datafile) {
+  if (!scenario || typeof scenario !== 'object') return 'SEARCH';
+  if (isArmedValue(scenario.offersByTripIds) || isArmedValue(scenario.tripIdsExpectRejection)) return 'TRIP_IDS';
+  const trips = Array.isArray(datafile?.tripRequirements) ? datafile.tripRequirements : [];
+  const trip = trips.find(t => t && typeof t === 'object' && t.id === scenario.tripRequirementId);
+  return trip?.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH';
+}
+
+/** #748: true when the framework takes this form: no list declared, or listed. */
+function offerRequestFormDeclared(framework, form) {
+  const declared = framework?.offerRequestForms;
+  return !Array.isArray(declared) || declared.includes(form);
 }
 
 /**
@@ -262,7 +296,8 @@ function applyFrameworkMigration(framework, scenarios, nowIso) {
 
 /**
  * Annotate a datafile object in place: each scenario that arms an
- * undeclared feature gets `__featureNotDeclaredWarnings: [field, ...]`.
+ * undeclared feature gets `__featureNotDeclaredWarnings: [field, ...]`, and
+ * one whose offer request form is not declared `offerRequestBy:<form>` (#748).
  * Removes the field when there are no warnings (avoids stale annotations
  * surviving a framework change).
  *
@@ -276,6 +311,10 @@ function annotateDatafile(datafile, framework) {
   for (const sc of datafile.scenarios) {
     if (!sc || typeof sc !== 'object') continue; // a Test Manager's save can store null
     const warnings = scenarioWarnings(sc, framework);
+    // #748: an offer request in a form the framework does not take. Named
+    // with the form, so that the collection can say which.
+    const form = offerRequestFormOf(sc, datafile);
+    if (!offerRequestFormDeclared(framework, form)) warnings.push(`offerRequestBy:${form}`);
     if (warnings.length > 0) {
       sc.__featureNotDeclaredWarnings = warnings;
       count++;

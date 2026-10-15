@@ -36,7 +36,7 @@ app.use(express.json());
 app.use('/v1/company', require('../../src/api/routes/company-scenario-copy'));
 
 const tag = uuidv4().slice(0, 8);
-const ids = { C: uuidv4(), P: uuidv4(), TM: uuidv4(), TS: uuidv4(), CE: uuidv4(), AD: uuidv4() };
+const ids = { C: uuidv4(), P: uuidv4(), Q: uuidv4(), TM: uuidv4(), TS: uuidv4(), CE: uuidv4(), AD: uuidv4() };
 const users = {
   TM: { role: 'test_manager', email: `tm-${tag}@cat.example` },
   TS: { role: 'company_user', email: `ts-${tag}@cat.example` },
@@ -62,6 +62,8 @@ async function readFile(companyId) {
 beforeAll(() => {
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'C', ?)`, [ids.C, `cat-c-${tag}`]);
   run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'P', ?, ?)`, [ids.P, `cat-c-${tag}--p`, ids.C]);
+  // #748: Q takes offer requests by trip search and by trip specification.
+  run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'Q', ?, ?)`, [ids.Q, `cat-c-${tag}--q`, ids.C]);
   for (const [who, u] of Object.entries(users)) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [ids[who], ids.C, u.email, u.role]);
   }
@@ -69,16 +71,18 @@ beforeAll(() => {
   run(`INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)`, [uuidv4(), ids.C, framework({ osdmVersion: '3.6.0', salesFlows: ['SALE'], returnModels: [] })]);
   run(`INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)`,
     [uuidv4(), ids.P, framework({ osdmVersion: '3.8.0', salesFlows: ['SALE', 'REFUND_FULL'], returnModels: ['SEPARATE', 'COMBINED'] })]);
-  for (const c of [ids.C, ids.P]) run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'Train', ?)`, train(c));
+  run(`INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)`,
+    [uuidv4(), ids.Q, framework({ osdmVersion: '3.8.0', salesFlows: ['SALE'], returnModels: [], offerRequestForms: ['SEARCH', 'SPECIFICATION'] })]);
+  for (const c of [ids.C, ids.P, ids.Q]) run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'Train', ?)`, train(c));
 });
 
 afterAll(() => {
-  for (const c of ['C', 'P']) {
+  for (const c of ['C', 'P', 'Q']) {
     const row = get('SELECT datafile_path FROM companies WHERE id = ?', [ids[c]]);
     if (row?.datafile_path) fs.rmSync(row.datafile_path, { force: true });
   }
   run('DELETE FROM auth_events WHERE email LIKE ?', [`%-${tag}@cat.example`]);
-  run('DELETE FROM companies WHERE id IN (?, ?)', [ids.P, ids.C]);
+  run('DELETE FROM companies WHERE id IN (?, ?, ?)', [ids.Q, ids.P, ids.C]);
   run('DELETE FROM users WHERE email LIKE ?', [`%-${tag}@cat.example`]);
 });
 
@@ -192,5 +196,28 @@ describe('copy from the catalogue', () => {
   test('a certifier cannot copy from it', async () => {
     const res = await request(app).post('/v1/company/scenario-copy/preview').set(as('CE')).send({ source_id: 'catalogue' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('#748: a provider that takes searches and specifications', () => {
+  test('lists each convertible search twice, and refuses what needs trip ids', async () => {
+    const res = await request(app).get('/v1/company/scenario-catalogue').set(as('TM', 'Q'));
+    expect(res.status).toBe(200);
+    expect(entryOf(res.body, 'OTST_SALE_ONE_WAY_1ADT_SPEC')).toMatchObject({ specOf: 'OTST_SALE_ONE_WAY_1ADT', tripAs: 'SPECIFICATION', missing: [] });
+    expect(entryOf(res.body, 'OTST_SALE_BY_TRIP_ID_1ADT').missing).toContain('offer requests by trip id');
+  });
+
+  test('copies the twin onto a one-leg specification trip filled from the train', async () => {
+    const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'Q')).send({ source_id: 'catalogue' })).body;
+    const codes = ['OTST_SALE_ONE_WAY_1ADT', 'OTST_SALE_ONE_WAY_1ADT_SPEC'];
+    expect(preview.scenarios.find(s => s.code === codes[1]).toCheck).toEqual([expect.stringMatching(/number and operator code/)]);
+    const tripMap = Object.fromEntries(preview.trips.filter(t => t.usedBy.some(c => codes.includes(c)))
+      .map(t => [t.id, { type: 'train', train_id: train(ids.Q)[0], service_index: 0 }]));
+    const res = await request(app).post('/v1/company/scenario-copy').set(as('TM', 'Q')).send({ source_id: 'catalogue', codes, trip_map: tripMap });
+    expect(res.status).toBe(200);
+    const file = await readFile(ids.Q);
+    const tripOf = (code) => file.tripRequirements.find(t => t.id === file.scenarios.find(s => s.code === code).tripRequirementId);
+    expect(tripOf(codes[0]).tripType).toBe('SEARCH');
+    expect(tripOf(codes[1])).toMatchObject({ tripType: 'SPECIFICATION', legs: [{ origin: 'urn:c:a', destination: 'urn:c:b', vehicleNumber: 'C-7' }] });
   });
 });
