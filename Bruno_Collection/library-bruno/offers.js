@@ -43,6 +43,8 @@ module.exports = {
   checkOfferLegClasses,
   prepareOfferRequestByTripIds,
   checkOfferPlaceSelection,
+  askPlacePreferences,
+  recordPlacePreferenceChecks,
   checkOfferRequestByTripIds,
   routeAfterOfferStep,
   searchTripOffers,
@@ -2165,10 +2167,86 @@ function checkOfferLegClasses(jsonData) {
  * (availablePlacePreferences). A flow it does not list is a warning.
  */
 function checkOfferPlaceSelection() {
+  bru.setEnvVar("__placePreferencesSent", JSON.stringify([]));
   const flow = bru.getEnvVar("placeSelectionFlow");
   if (!flow) return;
-  const { describeOfferedFlow } = require('./placeSelection.js');
-  for (const line of describeOfferedFlow(chosenOffer(), flow)) validationLogger(`[${line.level}] ${line.text}`);
+  const { describeOfferedFlow, choosePreferences } = require('./placeSelection.js');
+  const offer = chosenOffer();
+  for (const line of describeOfferedFlow(offer, flow)) validationLogger(`[${line.level}] ${line.text}`);
+  // #766 PR 2: the seat preferences the booking asks for, among those the
+  // offer lists; one it does not list is a warning.
+  const chosen = choosePreferences(offer, parseEnvJson("placePreferences", []));
+  for (const line of chosen.lines) validationLogger(`[${line.level}] ${line.text}`);
+  bru.setEnvVar("__placePreferencesSent", JSON.stringify(chosen.send));
+}
+
+/**
+ * Before the booking, in the PREFERENCES flow (#766 PR 2): GET
+ * /availabilities/preferences for each reservation the booking places, once
+ * per offer. A preference no longer available is a warning and is not asked.
+ * The checks are kept in __placePreferencesOutcome and recorded by 02's
+ * after-response (a before-request records none).
+ */
+async function askPlacePreferences() {
+  if (bru.getEnvVar("placeSelectionFlow") !== "AUTOMATIC_PLACE_SELECTION_PREFERENCES") return;
+  const send = parseEnvJson("__placePreferencesSent", []);
+  const offerId = bru.getEnvVar("offerId");
+  if (!Array.isArray(send) || send.length === 0 || !offerId || bru.getEnvVar("__placePreferencesAskedFor") === offerId) return;
+  bru.setEnvVar("__placePreferencesAskedFor", offerId);
+  const ps = require('./placeSelection.js');
+  const ids = [...new Set([...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])]
+    .map((p) => p?.reservationId).filter(Boolean))];
+  if (ids.length === 0) {
+    validationLogger("[WARNING] Seat preferences: no reservation is placed in the booking, so GET /availabilities/preferences is not asked.");
+    return;
+  }
+  const answers = await Promise.all(ids.map((id) => sendAvailabilityRequest(ps.preferencesQuery(offerId, id))));
+  const checks = [];
+  let available = send;
+  for (const [i, id] of ids.entries()) {
+    const outcome = ps.checkPreferenceAvailability(answers[i].status, answers[i].body, id, available);
+    checks.push(...outcome.checks);
+    for (const line of outcome.lines) validationLogger(`[${line.level}] ${line.text}`);
+    available = outcome.available;
+  }
+  bru.setEnvVar("__placePreferencesSent", JSON.stringify(available));
+  bru.setEnvVar("__placePreferencesOutcome", JSON.stringify({ checks }));
+}
+
+// A GET of an availability resource (#766), with the headers of the offer
+// request; { status, body }, status 0 when it could not be sent.
+async function sendAvailabilityRequest(path) {
+  const { requestorHeader } = require("./requestHeaders.js");
+  try {
+    const res = await new Promise((resolve, reject) => {
+      bru.sendRequest({
+        url: `${bru.getEnvVar("api_base")}${path}`,
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${bru.getEnvVar("access_token")}`,
+          ...requestorHeader(bru.getEnvVar("requestor")),
+        },
+      }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
+    });
+    let body = res?.data ?? res?.body ?? null;
+    if (body instanceof Uint8Array) body = new TextDecoder().decode(body);
+    if (typeof body === "string") {
+      try { body = JSON.parse(body); } catch { body = null; }
+    }
+    return { status: res?.status || res?.statusCode || 0, body };
+  } catch (err) {
+    validationLogger(`[ERROR] GET ${path.split("?")[0]} could not be sent: ${err?.message || err}`);
+    return { status: 0, body: null };
+  }
+}
+
+/** 02's after-response: records the checks of GET /availabilities/preferences, once. */
+function recordPlacePreferenceChecks() {
+  const outcome = parseEnvJson("__placePreferencesOutcome", null);
+  if (!outcome) return;
+  bru.setEnvVar("__placePreferencesOutcome", null);
+  recordChecks(outcome.checks || []);
 }
 
 // ── Group tariffs (#599) ─────────────────────────────────────────────────────

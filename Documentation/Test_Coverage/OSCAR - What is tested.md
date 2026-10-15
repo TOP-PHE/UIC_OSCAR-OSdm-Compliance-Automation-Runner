@@ -234,6 +234,8 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_RESERVATION_SELECTION_2ADT` | An optional seat reservation booked with `optionalReservationSelections`. | — | 369 | `SIM_SALE_RESERVATION_SELECTION_2ADT_38` |
 | `OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT` | An optional seat reservation booked with `placeSelections`. | — | 369 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` |
 | `OTST_SALE_RESERVATION_ADD_LATER_2ADT` | An optional seat reservation added to the pre-booked booking afterwards. | — | 368 | `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` |
+| `OTST_SALE_SEAT_PREFERENCE_1ADT` | A seat preference (window) asked in the booking with the reservation; the place booked must give it. | — | 271 | `SIM_SALE_SEAT_PREFERENCE_1ADT_38` |
+| `OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT` | Seat preferences in the PREFERENCES flow: `GET /availabilities/preferences` before the booking; one not offered and one no longer available are warnings, the rest is asked and given. | place selection by the available preferences | 337 | `SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38` |
 | `OTST_SALE_BY_TRIP_ID_1ADT` | Offers asked by trip id, after a trip search (`POST /trips-collection`). | — | 241 | `SIM_SALE_BY_TRIP_ID_1ADT_38` |
 | `OTST_SALE_SEARCH_TRAIN_FILTER_1ADT` | An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only. | — | 235 | `SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38` |
 | `OTST_SALE_DOCUMENTS_RETURN_1ADT` | Fulfillment documents of a return, and each fulfillment read with `GET /fulfillments/{id}`. | return model COMBINED, OSDM 3.7+ | 356 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` |

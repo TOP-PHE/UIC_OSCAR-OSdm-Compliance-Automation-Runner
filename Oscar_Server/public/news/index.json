@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-seat-preferences",
+    "date": "October 15, 2026",
+    "tag": "Feature",
+    "title": "Seat preferences: window, aisle, table…",
+    "summary": "A scenario can ask for seat preferences; the run says which ones the offer lists and which ones the booked seat gives.",
+    "content": "In Test Config, Booking Flow Actions, Seat preferences takes OSDM place property codes such as WINDOW or AISLE. The booking asks for those the offer lists; one it does not list is a warning, so the customer can be told it cannot be had. When the Test Framework declares the preferences flow, the availability of the preferences is asked first, and one no longer available is a warning too. At the end, a booked seat without a preference asked is a warning: OSDM honours a preference if it can. Two reference scenarios cover it. This is the second of five steps covering every way to choose a place."
+  },
+  {
     "id": "2026-10-15-place-selection-flows",
     "date": "October 15, 2026",
     "tag": "Feature",

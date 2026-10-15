@@ -19,7 +19,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf } = require('./reductionCards');
-const { reservationsToBook, reservationFrom, linkReservations } = require('./reservations');
+const { reservationsToBook, reservationFrom, linkReservations, propertiesAsked, propertiesGiven } = require('./reservations');
 const { issueDocuments } = require('./documents');
 const variants = require('./variants');
 const persons = require('./persons');
@@ -144,6 +144,8 @@ function createBooking(body, findOffer, provider, nowMs) {
   const bookedOffers = [];
 
   let oneFulfillment = true;
+  // #766: the ignores-place-preferences variant gives no preference asked.
+  const ignorePreferences = variants.variantsOf(specs, provider).has('ignores-place-preferences');
   for (const selection of selections) {
     const { offer, trips: offerTrips, oneFulfillment: single } = bookableOffer(selection, findOffer, nowMs);
     const reserved = reservationsToBook(offer, selection);
@@ -158,7 +160,8 @@ function createBooking(body, findOffer, provider, nowMs) {
       tripCoverage: offer.tripCoverage,
       products: offer.products,
       admissions: offer.admissionOfferParts.map((part) => admissionFrom(part, passengers, createdOn, confirmableUntil)),
-      reservations: reserved.map((part) => reservationFrom(part, (ref) => passengers.get(ref).id, offerTrips, createdOn, confirmableUntil)),
+      reservations: reserved.map((part) => reservationFrom(part, (ref) => passengers.get(ref).id, offerTrips, createdOn, confirmableUntil,
+        propertiesGiven(propertiesAsked(selection, part.id), offerTrips.find((t) => t.id === part.tripCoverage.coveredTripId), provider, { ignore: ignorePreferences }))),
       ancillaries: [],
     };
     linkReservations(bookedOffer);
@@ -264,7 +267,7 @@ function confirmBooking(booking, provider, nowMs) {
  * the booked offer, added while the booking is pre-booked. The request names
  * the offer and, in placeSelections, the reservations.
  */
-function addOfferParts(booking, bookedOfferId, body, findOffer) {
+function addOfferParts(booking, bookedOfferId, body, findOffer, provider) {
   const bookedOffer = booking.bookedOffers.find((o) => o.offerId === bookedOfferId);
   if (!bookedOffer) throw new HttpError(404, 'BOOKED_OFFER_NOT_FOUND', 'Booked offer not found');
   if (booking.fulfillments.length > 0) throw new HttpError(409, 'BOOKING_CONFIRMED', 'Booking confirmed', 'A part can be added to a pre-booked booking only.');
@@ -281,7 +284,9 @@ function addOfferParts(booking, bookedOfferId, body, findOffer) {
   if (added.length === 0) throw new HttpError(409, 'ALREADY_BOOKED', 'Already booked', 'The reservations named are already in the booking.');
   const passengerIdOf = (ref) => booking.passengers.find((p) => p.externalRef === ref)?.id;
   const createdOn = new Date().toISOString();
-  bookedOffer.reservations.push(...added.map((part) => reservationFrom(part, passengerIdOf, found.trips, createdOn, booking.confirmationTimeLimit)));
+  bookedOffer.reservations.push(...added.map((part) => reservationFrom(part, passengerIdOf, found.trips, createdOn, booking.confirmationTimeLimit,
+    propertiesGiven(propertiesAsked(body, part.id), found.trips.find((t) => t.id === part.tripCoverage.coveredTripId), provider,
+      { ignore: variants.has(booking, 'ignores-place-preferences') }))));
   linkReservations(bookedOffer);
   booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), booking.provisionalPrice.currency);
   return { bookedOffers: [bookedOffer] };

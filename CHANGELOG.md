@@ -62,6 +62,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.298] / [collection-OTST_V2.0.169] — 2026-10-15
+
+Issue #766 (PR 2 of 5), release 2026.333. Simulator 0.26.0.
+
+### Added
+- **Seat preferences** (`placePreferences`, OSDM PlaceProperty codes such as `WINDOW`): Test Config → Booking Flow Actions → *Seat preferences*, a list or text ("WINDOW, POWER").
+  - A scenario with preferences uses the automatic flow and, unless it names another form, books its optional reservations by `placeSelections` (`reservationBookingForm` `PLACE_SELECTION`).
+  - Step 01 keeps those the chosen offer lists (its reservation parts' `availablePlacePreferences` and `availablePlaces`). One it does not list is a `[WARNING]` and is not asked: the customer cannot have it. An offer listing none at all says nothing either way, so all are asked.
+  - In the PREFERENCES flow (`placeSelectionFlow` `AUTOMATIC_PLACE_SELECTION_PREFERENCES`), step 02 first asks `GET /availabilities/preferences` for each reservation it places, once per offer. One preference no longer available is a `[WARNING]` and is not asked. The answer is checked: 2xx, `availablePlaces` a list, each place with its accommodation type, sub-type and leg (required in OSDM). 501, 404 and 405 are "not provided", a warning.
+  - The booking sends them in `placeSelections[].accommodations[].placeProperties`, with a SelectedAccommodation for the reservation's passengers (`SEAT` / `ANY_SEAT`, or the part's own seat type).
+  - Step 07: a booked reservation whose places do not name a preference asked is a `[WARNING]`. OSDM honours a preference if it can, and `ReservedPlace.placeProperties` is optional.
+- **Two reference scenarios**: `OTST_SALE_SEAT_PREFERENCE_1ADT` and `OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT`. The second needs the PREFERENCES flow declared. Both list the provider's own `placePreferences` among the values to complete.
+
+### Fixed
+- **`availablePlacePreferences` is a list in OSDM 3.8** (one AvailablePlacePreferences per entry). PR 1 read it as one object, so step 01 never listed the preferences a real offer gave. Both shapes are read now.
+
+### Simulator 0.26.0
+- Profile key `placePreferences` `{ from, groups, soldOut }`.
+  - A reservation on a trip from that stop place lists the preference groups, the same codes in `availablePlaces` (`SEAT` / `ANY_SEAT`), and the flow `AUTOMATIC_PLACE_SELECTION_PREFERENCES` beside `AUTOMATIC_PLACE_SELECTION`.
+  - A booking gives the preferences asked that are offered and not sold out, in `reservedPlaces[].placeProperties`.
+  - `GET /availabilities/preferences` (context OFFER, resource RESERVATION) gives what is left; context BOOKING answers 501.
+  - On `gamma`: station `0000092`; groups `SEAT_POSITION` (`WINDOW`, `AISLE`) and `COACH_AREA` (`TABLE`, `POWER`); `TABLE` sold out.
+- A booking's `accommodations` must name their passengers, type and sub-type (400 otherwise).
+- Variant `ignores-place-preferences`.
+- Scenarios `SIM_SALE_SEAT_PREFERENCE_1ADT_38`, `SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38` and `SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38` (trip requirement 15, passenger list 23).
+
+### Default decisions (taken without asking)
+- **A preference not offered, not available or not given is a warning, never a failure.** The provider sells what it has, and the retailer tells the customer.
+- **The codes are the OSDM specification's examples** (`WINDOW`, `AISLE`, `TABLE`, `POWER`, `UPPER_DECK`). The code lists on osdm.io could not be reached from here.
+- **The simulator offers preferences on one stop place only**, so that no other scenario's answer changes.
+
+Checked:
+- Unit tests:
+  - `place-preferences.test.js`, 21 tests: the pure rules, the wiring of 01/02/07, and a run end to end against the simulator's own functions;
+  - simulator `place-preferences.test.js`, 11 tests.
+  - Each of seven mutations of the new rules fails a test.
+- Replay before/after (93 scenarios with `bru` 4.2.1): the 90 existing scenarios give the same checks and warnings. The three new ones fail nothing:
+  - `SIM_SALE_SEAT_PREFERENCE_1ADT_38`: 271 checks, no warning;
+  - `SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38`: 337 checks, the two warnings expected;
+  - `SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38`: 271 checks, the warning at 07.
+  - The booking request with accommodations passes the `[OSCAR request]` check against OSDM 3.8.
+  - *Checks by scenario* and `simulator-checks.json` regenerated.
+
+---
+
 ## [server-1.11.297] / [collection-OTST_V2.0.168] — 2026-10-15
 
 Issue #766 (PR 1 of 5), release 2026.332.

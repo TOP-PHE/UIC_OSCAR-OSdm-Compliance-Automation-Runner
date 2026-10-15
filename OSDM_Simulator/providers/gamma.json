@@ -43,6 +43,28 @@
       }
     ]
   },
+  "placePreferences": {
+    "from": "urn:uic:stn:0000092",
+    "groups": [
+      {
+        "preferenceGroup": "SEAT_POSITION",
+        "preferences": [
+          "WINDOW",
+          "AISLE"
+        ]
+      },
+      {
+        "preferenceGroup": "COACH_AREA",
+        "preferences": [
+          "TABLE",
+          "POWER"
+        ]
+      }
+    ],
+    "soldOut": [
+      "TABLE"
+    ]
+  },
   "salesHorizon": {
     "from": "urn:uic:stn:0000094",
     "days": 90

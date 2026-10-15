@@ -155,6 +155,17 @@ runtime:
           }
         }
 
+        // #766 PR 2: the booked places give the seat preferences asked
+        // (a warning when not: OSDM honours a preference if possible).
+        require(bru.getEnvVar("library_base") + "placeSelection.js").checkPreferencesGiven(
+          (jsonData && jsonData.booking) || jsonData,
+          require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("__placePreferencesFor"), []),
+          require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("__placePreferencesSent"), [])
+        ).forEach((c) => {
+          if (c.ok) console.log(`[INFO] ${c.name}`);
+          else console.log(`[WARNING] ${c.name} — ${c.message}`);
+        });
+
         // #603: the documents of the confirmed booking (warnings), and the
         // receipts already there before any refund.
         require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").checkConfirmedBookingDocuments((jsonData && jsonData.booking) || null);

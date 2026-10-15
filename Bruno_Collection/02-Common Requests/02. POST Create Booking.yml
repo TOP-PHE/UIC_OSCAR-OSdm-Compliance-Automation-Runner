@@ -58,6 +58,9 @@ runtime:
           }
         }
 
+        // #766 PR 2: in the PREFERENCES flow, the availability of the seat
+        // preferences is asked before the booking.
+        await require(bru.getEnvVar("library_base") + "offers.js").askPlacePreferences();
         buildBookingRequest();
         // #604: a new Idempotency-Key when the scenario tests it.
         require(bru.getEnvVar("library_base") + "idempotencySteps.js").setIdempotencyKey(req, "booking");
@@ -65,6 +68,8 @@ runtime:
       code: |-
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
         const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+        // #766 PR 2: the checks of GET /availabilities/preferences, asked before the booking.
+        require(bru.getEnvVar("library_base") + "offers.js").recordPlacePreferenceChecks();
 
         // #699: one passenger over the provider's maximum, offers given at 01:
         // the booking must be refused. Graded, then the scenario ends.
