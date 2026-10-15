@@ -194,7 +194,22 @@ function describeTripsAnswer(body) {
   return lines;
 }
 
+// What a trip search answered when its body was not JSON (#764): its type,
+// its length and its first characters as text (tags and runs of blanks
+// removed), so the run log shows what the provider sent. A real provider
+// answered HTTP 200 with a body that did not parse, and the log said only
+// "no JSON body".
+const SHOWN_CHARACTERS = 200;
+function describeRawAnswer(text, contentType) {
+  const type = isText(contentType) ? String(contentType) : 'none';
+  const raw = typeof text === 'string' ? text : '';
+  if (raw.trim() === '') return [`the answer is empty (Content-Type ${type})`];
+  const plain = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const shown = plain.length > SHOWN_CHARACTERS ? `${plain.slice(0, SHOWN_CHARACTERS)}…` : plain;
+  return [`the answer is not JSON (Content-Type ${type}, ${raw.length} characters): "${shown}"`];
+}
+
 module.exports = {
   UNKNOWN_TRIP_ID, tripsCollectionRequest, vehicleNumbersOf, chooseTrip, checkTripsCollection, offerRequestByTripIds, checkOffersForTrip,
-  coveredTripsOf, describeTripsAnswer,
+  coveredTripsOf, describeTripsAnswer, describeRawAnswer,
 };

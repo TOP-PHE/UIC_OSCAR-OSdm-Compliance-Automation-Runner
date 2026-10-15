@@ -2236,7 +2236,7 @@ async function prepareOfferRequestByTripIds() {
     return;
   }
   validationLogger(`[INFO] 🚆 Offers by trip id — POST /trips-collection: ${search.origin.stopPlaceRef} → ${search.destination.stopPlaceRef} at ${search.departureTime || search.arrivalTime}`);
-  const { status, body } = await sendTripsCollection(search);
+  const { status, body, raw } = await sendTripsCollection(search);
   const checks = ti.checkTripsCollection(status, body, search);
   const choice = status === 200 ? ti.chooseTrip(body?.trips, { vehicleNumber: bru.getEnvVar("tripVehicleNumber"), departureTime: search.departureTime }) : { trip: null };
   if (status === 200) {
@@ -2245,7 +2245,8 @@ async function prepareOfferRequestByTripIds() {
   if (!choice.trip) {
     bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, failed: true }));
     if (status === 200) {
-      for (const line of ti.describeTripsAnswer(body)) validationLogger(`[INFO] POST /trips-collection: ${line}`);
+      const lines = body == null && raw ? ti.describeRawAnswer(raw.text, raw.contentType) : ti.describeTripsAnswer(body);
+      for (const line of lines) validationLogger(`[INFO] POST /trips-collection: ${line}`);
     }
     validationLogger("[WARNING] Offers by trip id: no trip to ask offers for — the offer request goes out by search criteria, and its answer is not used.");
     return;
@@ -2255,9 +2256,12 @@ async function prepareOfferRequestByTripIds() {
   validationLogger(`[INFO] 🚆 Offers by trip id — ${body.trips.length} trip(s) answered; asking offers for ${choice.how}: ${choice.trip.id}`);
 }
 
-// POST /trips-collection (#602), with the headers of the offer request.
-// { status, body }; status 0 when it could not be sent.
+// POST /trips-collection (#602), with the headers of the offer request; no
+// Requestor header when none is set (#692, #764). { status, body, raw }:
+// status 0 when it could not be sent; raw holds the text and Content-Type of
+// an answer that is not JSON, for the log.
 async function sendTripsCollection(search) {
+  const { requestorHeader } = require("./requestHeaders.js");
   try {
     const res = await new Promise((resolve, reject) => {
       bru.sendRequest({
@@ -2267,16 +2271,20 @@ async function sendTripsCollection(search) {
           "Content-Type": `application/json;version=${bru.getEnvVar("osdmVersion")}`,
           Accept: "application/json",
           Authorization: `Bearer ${bru.getEnvVar("access_token")}`,
-          Requestor: bru.getEnvVar("requestor") || "",
+          ...requestorHeader(bru.getEnvVar("requestor")),
         },
         data: JSON.stringify(search),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });
     let body = res?.data ?? res?.body ?? null;
+    let raw = null;
+    if (body instanceof Uint8Array) body = new TextDecoder().decode(body);
     if (typeof body === "string") {
-      try { body = JSON.parse(body); } catch { body = null; }
+      const headers = res?.headers || {};
+      raw = { text: body, contentType: headers["content-type"] ?? headers["Content-Type"] ?? null };
+      try { body = JSON.parse(body); raw = null; } catch { body = null; }
     }
-    return { status: res?.status || res?.statusCode || 0, body };
+    return { status: res?.status || res?.statusCode || 0, body, raw };
   } catch (err) {
     validationLogger(`[ERROR] POST /trips-collection could not be sent: ${err?.message || err}`);
     return { status: 0, body: null };

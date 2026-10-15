@@ -221,6 +221,41 @@ describe('step 01', () => {
     expect(mockLogs).toContain('[INFO] POST /trips-collection: members of the answer: problems');
   });
 
+  // #764: a real provider was sent `Requestor: ""` and answered HTTP 200 with a body that did not parse.
+  test('no requestor set: no Requestor header at all', async () => {
+    for (const requestor of [undefined, '', '  ']) {
+      envStore = { ...baseEnv(), requestor };
+      sent = [];
+      respond(200, { id: 'C1', trips: departures });
+      await offers.prepareOfferRequestByTripIds();
+      expect(Object.keys(sent[0].headers)).not.toContain('Requestor');
+    }
+  });
+
+  test('an answer that is not JSON: the log gives its type, length and first characters', async () => {
+    envStore = baseEnv();
+    const page = '<html><head><title>Request Rejected</title></head><body>\n  <p>The requested URL was rejected.</p>\n  Your support ID is: 123</body></html>';
+    answer = (cb) => cb(null, { status: 200, data: page, headers: { 'content-type': 'text/html; charset=utf-8' } });
+    await offers.prepareOfferRequestByTripIds();
+    expect(offers.checkOfferRequestByTripIds(200, {})).toBe(true);
+    expect(mockLogs).toContain(`[INFO] POST /trips-collection: the answer is not JSON (Content-Type text/html; charset=utf-8, ${page.length} characters): "Request Rejected The requested URL was rejected. Your support ID is: 123"`);
+    expect(mockLogs.some((l) => l.includes('no JSON body'))).toBe(false);
+  });
+
+  test('an empty answer, or one given as bytes, is described too; a JSON text is read as before', async () => {
+    envStore = baseEnv();
+    answer = (cb) => cb(null, { status: 200, data: '', headers: {} });
+    await offers.prepareOfferRequestByTripIds();
+    expect(mockLogs).toContain('[INFO] POST /trips-collection: the answer is empty (Content-Type none)');
+    mockLogs = [];
+    answer = (cb) => cb(null, { status: 200, data: new TextEncoder().encode('Service Unavailable'), headers: { 'Content-Type': 'text/plain' } });
+    await offers.prepareOfferRequestByTripIds();
+    expect(mockLogs).toContain('[INFO] POST /trips-collection: the answer is not JSON (Content-Type text/plain, 19 characters): "Service Unavailable"');
+    answer = (cb) => cb(null, { status: 200, data: JSON.stringify({ id: 'C1', trips: departures }) });
+    await offers.prepareOfferRequestByTripIds();
+    expect(JSON.parse(envStore.OfferCollectionRequest).tripIds).toEqual(['T2']);
+  });
+
   test('a transport error is a failed status, not a thrown step', async () => {
     envStore = baseEnv();
     answer = (cb) => cb(new Error('ECONNREFUSED'));
@@ -252,6 +287,12 @@ describe('describeTripsAnswer (#729)', () => {
     expect(ti.describeTripsAnswer({ problems: [{ detail: 'd' }, null] })).toEqual([
       'problem 1: (no code) — d', 'problem 2: (no code) — (no title)', 'members of the answer: problems',
     ]);
+  });
+
+  test('#764: a raw answer is cut at 200 characters', () => {
+    const [line] = ti.describeRawAnswer('a'.repeat(500), 'text/plain');
+    expect(line).toBe(`the answer is not JSON (Content-Type text/plain, 500 characters): "${'a'.repeat(200)}…"`);
+    expect(ti.describeRawAnswer(null, null)).toEqual(['the answer is empty (Content-Type none)']);
   });
 
   test('at most ten problems, each at most 300 characters', () => {
