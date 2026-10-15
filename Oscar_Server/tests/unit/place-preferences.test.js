@@ -200,6 +200,7 @@ describe('#766 PR 2 — with the simulator\'s answers', () => {
 });
 
 describe('#766 PR 2 — the collection wiring', () => {
+  afterEach(() => { delete global.bru; delete global.test; delete global.validationLogger; });
   test('parser: the preferences, PLACE_SELECTION by default, the new variables in both reset lists', () => {
     const parser = read('Bruno_Collection', 'library-bruno', 'scenarioParser.js');
     expect(parser).toContain('bru.setEnvVar("placePreferences", JSON.stringify(_placePreferences));');
@@ -229,7 +230,6 @@ describe('#766 PR 2 — the collection wiring', () => {
     });
     return { logs, result };
   }
-  afterEach(() => { delete global.bru; delete global.test; delete global.validationLogger; });
 
   test('the offer step keeps the preferences the offer lists and warns of the others', () => {
     const env = {

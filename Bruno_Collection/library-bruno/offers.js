@@ -2200,11 +2200,11 @@ async function askPlacePreferences() {
     validationLogger("[WARNING] Seat preferences: no reservation is placed in the booking, so GET /availabilities/preferences is not asked.");
     return;
   }
+  const answers = await Promise.all(ids.map((id) => sendAvailabilityRequest(ps.preferencesQuery(offerId, id))));
   const checks = [];
   let available = send;
-  for (const id of ids) {
-    const res = await sendAvailabilityRequest(ps.preferencesQuery(offerId, id));
-    const outcome = ps.checkPreferenceAvailability(res.status, res.body, id, available);
+  for (const [i, id] of ids.entries()) {
+    const outcome = ps.checkPreferenceAvailability(answers[i].status, answers[i].body, id, available);
     checks.push(...outcome.checks);
     for (const line of outcome.lines) validationLogger(`[${line.level}] ${line.text}`);
     available = outcome.available;
