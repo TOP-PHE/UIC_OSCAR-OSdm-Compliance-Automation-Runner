@@ -7,11 +7,22 @@
       "release": "2026.329",
       "date": "2026-10-15",
       "server": "1.11.294",
-      "collection": "OTST_V2.0.164",
+      "collection": "OTST_V2.0.165",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Reference scenarios by trip id: a _TRIPID twin of every one-way search when the Test Framework declares offer requests by trip id (#759)."
+      ]
+    },
+    {
+      "release": "2026.328",
+      "date": "2026-10-15",
+      "server": "1.11.293",
+      "collection": "OTST_V2.0.165",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "library-bruno: no downloaded code is executed (S1523) and request ids no longer come from Math.random (S2245); a test keeps both out (#758)."
       ]
     },
     {

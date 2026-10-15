@@ -8,6 +8,14 @@
     "content": "Under Sales Flows in the Test Framework, Offer requests lists the forms a provider takes. When trip id is ticked, each reference scenario that searches a one-way trip is also offered by trip id, ending in _TRIPID: the run first asks the provider's trip search, then the offers for the trip found. With trip id only, the scenarios are copied that way directly. The copy report reminds you that the provider's trip search must find the chosen train."
   },
   {
+    "id": "2026-10-15-collection-security",
+    "date": "October 15, 2026",
+    "tag": "Security",
+    "title": "Two security findings of the collection closed",
+    "summary": "The collection no longer runs code it could download during a run, and the identifiers it puts in requests come from a secure random source.",
+    "content": "An unused validation path of the collection could download a script and run it during a test run; it is removed. The identifiers OSCAR puts in offer requests now come from the system's secure random generator. Runs behave exactly as before."
+  },
+  {
     "id": "2026-10-15-exchange-tests",
     "date": "October 15, 2026",
     "tag": "Quality",
