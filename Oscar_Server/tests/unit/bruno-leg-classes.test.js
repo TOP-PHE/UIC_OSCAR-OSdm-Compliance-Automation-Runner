@@ -15,6 +15,10 @@
  * the request asks for every class named, the offer chosen gives each leg
  * its class (an admission of its own, or a supplement on the leg), and the
  * booking must give the same.
+ *
+ * #762: a part that names no legs covers the whole trip (OSDM TripCoverage),
+ * and no offer giving the classes asked is a warning: the sale goes on and
+ * the booking is held to the classes of the offer sold.
  */
 
 const fs = require('node:fs');
@@ -40,12 +44,13 @@ jest.mock('../../../Bruno_Collection/library-bruno/testCapture.js', () => ({
   expectTypeOrNull: () => {},
   expectScale: () => {},
 }));
-global.validationLogger = () => {};
+let logs = [];
+global.validationLogger = (line) => { logs.push(line); };
 
 const lc = require('../../../Bruno_Collection/library-bruno/legClasses.js');
 const offers = require('../../../Bruno_Collection/library-bruno/offers.js');
 
-beforeEach(() => { envStore = {}; mockResults = []; });
+beforeEach(() => { envStore = {}; mockResults = []; logs = []; });
 
 const trips = [{ id: 'T1', legs: [{ id: 'L1' }, { id: 'L2' }] }];
 const product = (id, travelClass, type = 'ADMISSION_POINT2POINT') => ({ id, travelClass, type });
@@ -93,6 +98,21 @@ describe('the class of each leg', () => {
     expect(lc.classesByLeg(null, null, [])).toEqual([]);
   });
 
+  // #762: a real provider gives coveredTripId only, and product refs without legIds.
+  test('a part naming no legs covers the whole trip; one with no trip coverage covers its offer\'s trip; sections cover no leg', () => {
+    const whole = [{ id: 'A', tripCoverage: { coveredTripId: 'T1' }, products: [{ productId: 'P1' }] }];
+    expect(lc.classesByLeg(whole, [product('P1', 'FIRST')], ['L1', 'L2']).map((l) => l.travelClass)).toEqual(['FIRST', 'FIRST']);
+    const noCoverage = [{ id: 'A', summaryProductId: 'P2' }];
+    expect(lc.classesByLeg(noCoverage, [product('P2', 'SECOND')], ['L1', 'L2']).map((l) => l.travelClass)).toEqual(['SECOND', 'SECOND']);
+    const sections = [{ id: 'A', summaryProductId: 'P1', tripCoverage: { coveredTripId: 'T1', coveredSections: [{ startPlace: {}, endPlace: {} }] } }];
+    expect(lc.classesByLeg(sections, [product('P1', 'FIRST')], ['L1', 'L2']).map((l) => l.travelClass)).toEqual([null, null]);
+    const wholeTripOffers = [
+      offer('W2', [{ id: 'A', tripCoverage: { coveredTripId: 'T1' }, products: [{ productId: 'P2' }] }], [product('P2', 'SECOND')]),
+      offer('W1', [{ id: 'A', tripCoverage: { coveredTripId: 'T1' }, products: [{ productId: 'P1' }] }], [product('P1', 'FIRST')]),
+    ];
+    expect(lc.offeredCombinations(wholeTripOffers, trips)).toEqual(['[SECOND, SECOND] (1 offer)', '[FIRST, FIRST] (1 offer)']);
+  });
+
   test('the legs are those of the trip the offer covers, in order', () => {
     expect(lc.legIdsOf(upgraded, trips)).toEqual(['L1', 'L2']);
     expect(lc.legIdsOf({ admissions: [{ tripCoverage: { coveredTripId: 'T1' } }] }, trips)).toEqual(['L1', 'L2']);
@@ -136,12 +156,28 @@ describe('the offer step', () => {
     expect(mockResults.map((r) => r.ok)).toEqual([true, true]);
   });
 
-  test('no offer giving them fails, lists what was offered, and the step is told to stop', () => {
+  test('#762: no offer giving them is a warning naming what was offered; the offer is chosen as usual and no check fails', () => {
     envStore.legTravelClasses = JSON.stringify(['FIRST', 'SECOND']);
     select([allSecond, allFirst]);
-    const check = mockResults.find((r) => r.name.startsWith('Offer: an offer gives each leg'));
-    expect(check).toMatchObject({ ok: false, message: 'classes per leg offered: [SECOND, SECOND] (1 offer); [FIRST, FIRST] (1 offer)' });
+    expect(mockResults.some((r) => r.name.startsWith('Offer: an offer gives each leg'))).toBe(false);
+    expect(mockResults.filter((r) => !r.ok)).toEqual([]);
+    expect(logs).toContain('[WARNING] Offer: no offer gives each leg its class [FIRST, SECOND] — classes per leg offered: [SECOND, SECOND] (1 offer); [FIRST, FIRST] (1 offer). The class per leg is not tested; the sale goes on with the offer chosen.');
     expect(envStore.__legClassesNotOffered).toBe('true');
+    expect(envStore.offerId).toBe('S');
+    // The chosen offer is not checked against the classes asked; the booking will be held to its own.
+    mockResults = [];
+    withBrunoExpect(() => offers.checkOfferLegClasses({ trips }));
+    expect(mockResults).toEqual([]);
+    expect(envStore.__legClassesSold).toBe(JSON.stringify(['SECOND', 'SECOND']));
+  });
+
+  test('#762: an offer sold whose legs cannot be read leaves the booking unchecked', () => {
+    envStore.legTravelClasses = JSON.stringify(['FIRST', 'SECOND']);
+    const unreadable = offer('X', [part('A', 'P1', ['L1'])], [product('P1', 'FIRST')]);
+    select([unreadable]);
+    withBrunoExpect(() => offers.checkOfferLegClasses({ trips }));
+    expect(envStore.__legClassesSold).toBe('unknown');
+    expect(logs.some((l) => l.includes('classes per leg [not readable]'))).toBe(true);
   });
 
   test('no class per leg: nothing changes, no check', () => {
@@ -153,19 +189,42 @@ describe('the offer step', () => {
   });
 });
 
+describe('#762: what the booking is held to', () => {
+  test('the scenario\'s classes, or those of the offer sold, or nothing', () => {
+    expect(lc.bookingClassesExpected(JSON.stringify(['FIRST', 'SECOND']), undefined)).toEqual({ expected: ['FIRST', 'SECOND'], label: 'Booking' });
+    expect(lc.bookingClassesExpected(['FIRST', 'SECOND'], JSON.stringify(['SECOND', 'SECOND']))).toEqual({ expected: ['SECOND', 'SECOND'], label: 'Booking (classes of the offer sold)' });
+    expect(lc.bookingClassesExpected(JSON.stringify(['FIRST', 'SECOND']), 'unknown')).toBeNull();
+    expect(lc.bookingClassesExpected(undefined, JSON.stringify(['SECOND']))).toBeNull();
+  });
+
+  test('a booking that does not give the class of the offer sold still fails', () => {
+    const { expected, label } = lc.bookingClassesExpected('["FIRST","SECOND"]', '["SECOND","SECOND"]');
+    expect(lc.checkLegClasses(label, allFirst, trips, expected).map((c) => c.ok)).toEqual([false, false]);
+    expect(lc.checkLegClasses(label, allSecond, trips, expected).every((c) => c.ok)).toBe(true);
+  });
+
+  test('classesOfOffer: every leg\'s class, or null', () => {
+    expect(lc.classesOfOffer(upgraded, trips)).toEqual(['FIRST', 'SECOND']);
+    expect(lc.classesOfOffer(offer('X', [part('A', 'P1', ['L1'])], [product('P1', 'FIRST')]), trips)).toBeNull();
+    expect(lc.classesOfOffer({}, trips)).toBeNull();
+  });
+});
+
 describe('the steps and the parser', () => {
   const root = path.join(__dirname, '..', '..', '..', 'Bruno_Collection');
   const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
 
-  test('01 and 01b stop on __legClassesNotOffered; 01 checks the chosen offer; 07 checks the booking', () => {
-    expect(read('02-Common Requests', '01. POST Get Offer.yml')).toMatch(/__legClassesNotOffered[\s\S]*loopbackOrStop\("POST Get Offer \(class per leg\)"\)[\s\S]*checkOfferLegClasses\(jsonData\)/);
-    expect(read('02-Common Requests', '01b. POST Get Return Offer.yml')).toMatch(/__legClassesNotOffered[\s\S]*loopbackOrStop\("POST Get Return Offer \(class per leg\)"\)/);
-    expect(read('02-Common Requests', '07. GET Booking after Fulfillments.yml')).toMatch(/checkLegClasses\("Booking"/);
+  test('#762: 01 and 01b no longer stop on the classes; 01 checks the chosen offer; 07 checks the booking against what is expected', () => {
+    const step01 = read('02-Common Requests', '01. POST Get Offer.yml');
+    expect(step01).not.toMatch(/class per leg\)"\)/);
+    expect(step01).toMatch(/checkOfferLegClasses\(jsonData\)/);
+    expect(read('02-Common Requests', '01b. POST Get Return Offer.yml')).not.toMatch(/__legClassesNotOffered/);
+    expect(read('02-Common Requests', '07. GET Booking after Fulfillments.yml')).toMatch(/bookingClassesExpected\(bru\.getEnvVar\("legTravelClasses"\), bru\.getEnvVar\("__legClassesSold"\)\)[\s\S]*checkLegClasses\(_classesExpected\.label/);
   });
 
   test('the parser asks for every class named, and both reset lists name the variables', () => {
     const parser = read('library-bruno', 'scenarioParser.js');
     expect(parser).toMatch(/_perLeg \? require\('\.\/legClasses\.js'\)\.requestedClasses\(_perLeg\) : \(criteria\.travelClass \|\| null\)/);
-    for (const text of [parser, read('opencollection.yml')]) expect(text).toMatch(/"legTravelClasses", "__legClassesNotOffered"/);
+    for (const text of [parser, read('opencollection.yml')]) expect(text).toMatch(/"legTravelClasses", "__legClassesNotOffered", "__legClassesSold"/);
   });
 });

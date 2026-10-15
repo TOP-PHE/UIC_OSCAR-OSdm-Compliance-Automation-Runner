@@ -592,17 +592,22 @@ function selectAndSetOffer(jsonData) {
     }
   }
 
-  // #600: the class the scenario expects on each leg. No offer giving them
-  // fails the scenario, which the offer step then stops (__legClassesNotOffered).
+  // #600: the class the scenario expects on each leg. #762: no offer giving
+  // them is a warning, not a failure: a provider answers with what it has,
+  // and selling that offer or not is the retailer's choice. The sale goes on
+  // with the offer chosen as usual (__legClassesNotOffered), and the booking
+  // is then held to the classes of that offer (checkOfferLegClasses).
   const legTravelClasses = parseEnvJson("legTravelClasses", null);
   if (Array.isArray(legTravelClasses)) {
     const { offerMatches, offeredCombinations } = require('./legClasses.js');
     const matching = filteredOffers.filter((o) => offerMatches(o, jsonData.trips, legTravelClasses));
-    test(`Offer: an offer gives each leg its class [${legTravelClasses.join(", ")}] — ${matching.length} offer(s)`, () => {
-      if (matching.length === 0) throw new Error(`classes per leg offered: ${offeredCombinations(jsonData.offers, jsonData.trips).join("; ") || "none"}`);
-    });
-    if (matching.length === 0) bru.setEnvVar("__legClassesNotOffered", "true");
-    else filteredOffers = matching;
+    if (matching.length === 0) {
+      validationLogger(`[WARNING] Offer: no offer gives each leg its class [${legTravelClasses.join(", ")}] — classes per leg offered: ${offeredCombinations(jsonData.offers, jsonData.trips).join("; ") || "none"}. The class per leg is not tested; the sale goes on with the offer chosen.`);
+      bru.setEnvVar("__legClassesNotOffered", "true");
+    } else {
+      test(`Offer: an offer gives each leg its class [${legTravelClasses.join(", ")}] — ${matching.length} offer(s)`, () => {});
+      filteredOffers = matching;
+    }
   }
 
   // Apply flexibility filter if specified. offerSummary is OPTIONAL in OSDM, so
@@ -2137,7 +2142,15 @@ function compareOfferWithoutCards(status, body) {
 function checkOfferLegClasses(jsonData) {
   const expected = parseEnvJson("legTravelClasses", null);
   if (!Array.isArray(expected)) return;
-  const { checkLegClasses } = require('./legClasses.js');
+  const { checkLegClasses, classesOfOffer } = require('./legClasses.js');
+  // #762: none of the offers had the classes asked; the booking is held to
+  // the classes of the offer sold instead ("unknown" when one leg reads none).
+  if (bru.getEnvVar("__legClassesNotOffered") === "true") {
+    const sold = classesOfOffer(chosenOffer(), jsonData?.trips);
+    bru.setEnvVar("__legClassesSold", sold ? JSON.stringify(sold) : "unknown");
+    validationLogger(`[INFO] Offer chosen: classes per leg [${sold ? sold.join(", ") : "not readable"}]; the booking is checked against them.`);
+    return;
+  }
   checkLegClasses("Offer", chosenOffer(), jsonData?.trips, expected).forEach((c) => {
     test(c.name, () => { if (!c.ok) throw new Error(c.message); });
   });

@@ -204,6 +204,7 @@ without a code, it would cost a quarter of its price.
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` | Trip 4: first class on the InterCity leg, second class on the regional leg, which has no first class. The request asks for both classes, the chosen offer gives each leg its class, and so does the booking. | A second-class admission for the whole trip, plus a first-class upgrade part on the InterCity leg. | No failed check. |
+| `SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38` | Trip 4 again, asking first class on the regional leg, which has none (#762). No offer gives each leg its class: the offer step says so in a warning, and the sale goes on with the offer chosen as usual. The booking is held to the classes of that offer. | The same offers as for `SIM_SALE_CLASS_PER_LEG_1ADT_38`: none gives first class on the regional leg. | No failed check; one warning: no offer gives each leg its class. |
 
 ### Seat reservations (#601)
 

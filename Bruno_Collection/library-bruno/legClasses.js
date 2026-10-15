@@ -49,13 +49,24 @@ function legIdsOf(holder, trips) {
   return listOf(trip?.legs).map((leg) => leg?.id).filter(Boolean);
 }
 
+// The legs a part covers. OSDM (TripCoverage): "If neither coveredLegIds nor
+// coveredSections are defined, the complete trip is covered" (#762), and a
+// part with no trip coverage of its own covers its offer's trip. Sections are
+// not legs: a part given by sections covers none here.
+function legsOfPart(part, tripLegIds) {
+  const coverage = part?.tripCoverage;
+  if (listOf(coverage?.coveredLegIds).length > 0) return coverage.coveredLegIds;
+  if (listOf(coverage?.coveredSections).length > 0) return [];
+  return tripLegIds;
+}
+
 // For each product a part names: the product and the legs it covers there.
-function coverageOfPart(part, productById) {
+function coverageOfPart(part, productById, tripLegIds) {
   const refs = listOf(part?.products).filter((r) => r?.productId);
   const named = refs.length > 0 ? refs : [{ productId: part?.summaryProductId }];
   return named.map((r) => ({
     product: productById.get(r.productId),
-    legIds: listOf(r.legIds).length > 0 ? r.legIds : listOf(part?.tripCoverage?.coveredLegIds),
+    legIds: listOf(r.legIds).length > 0 ? r.legIds : legsOfPart(part, tripLegIds),
   }));
 }
 
@@ -69,7 +80,7 @@ function classesByLeg(parts, products, legIds) {
   const productById = new Map(listOf(products).filter((p) => p?.id).map((p) => [p.id, p]));
   const legs = new Map(legIds.map((id) => [id, { legId: id, travelClass: null, partIds: [], span: 0, maxSpan: 0, upgradeType: false }]));
   for (const part of listOf(parts)) {
-    for (const coverage of coverageOfPart(part, productById)) applyCoverage(legs, part.id, coverage);
+    for (const coverage of coverageOfPart(part, productById, legIds)) applyCoverage(legs, part.id, coverage);
   }
   return [...legs.values()].map((leg) => ({
     legId: leg.legId,
@@ -118,6 +129,27 @@ function offeredCombinations(offers, trips) {
   return [...counts].map(([key, n]) => `${key} (${n} offer${n > 1 ? 's' : ''})`);
 }
 
+/** The class of each leg of an offer, in order; null when one leg reads none. */
+function classesOfOffer(offer, trips) {
+  const legs = classesByLeg(offer?.admissionOfferParts, offer?.products, legIdsOf(offer, trips));
+  return legs.length > 0 && legs.every((l) => l.travelClass) ? legs.map((l) => l.travelClass) : null;
+}
+
+/**
+ * What the booking is held to (#762): the classes of the offer sold when no
+ * offer had the classes asked (`sold`, set at the offer step), else the
+ * scenario's. Null when nothing is to be checked: no class named, or the
+ * offer sold could not be read ("unknown").
+ * @returns {{expected: string[], label: string}|null}
+ */
+function bookingClassesExpected(legTravelClasses, sold) {
+  const parse = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+  if (!legTravelClasses) return null;
+  if (sold === 'unknown') return null;
+  if (sold) return { expected: parse(sold), label: 'Booking (classes of the offer sold)' };
+  return { expected: parse(legTravelClasses), label: 'Booking' };
+}
+
 /**
  * The checks that each leg has the expected class, for an offer
  * (`admissionOfferParts`) or a booked offer (`admissions`): one per leg,
@@ -141,4 +173,7 @@ function checkLegClasses(label, holder, trips, expected) {
   });
 }
 
-module.exports = { normaliseLegClasses, requestedClasses, classesByLeg, offerMatches, offeredCombinations, checkLegClasses, legIdsOf };
+module.exports = {
+  normaliseLegClasses, requestedClasses, classesByLeg, offerMatches, offeredCombinations, checkLegClasses, legIdsOf,
+  classesOfOffer, bookingClassesExpected,
+};

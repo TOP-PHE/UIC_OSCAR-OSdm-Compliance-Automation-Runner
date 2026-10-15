@@ -1016,6 +1016,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`travelClasses`, every class named). The simulator read `travelClass` until
   0.10.0, so it answered every request in second class only: a simulator
   field read from a request must be the OSDM name the collection sends.
+  **A part naming no legs covers the whole trip** (#762, OSDM TripCoverage;
+  `legsOfPart()`): a real provider gives `coveredTripId` only, and OSCAR read
+  such legs as "none". **No offer with the classes asked is a WARNING, not a
+  stop** (maintainer decision: the provider sells what it has, the retailer
+  decides): the sale goes on with the offer chosen as usual, and 07 holds the
+  booking to the classes of that offer (`__legClassesSold`,
+  `bookingClassesExpected()`). `SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38`
+  shows it.
 - **A mandatory reservation is read from the admission's relations and booked
   by itself** (#601, 1.11.232 / OTST_V2.0.116). `library-bruno/seatReservations.js`
   (pure): `minGroupItemsToBeBooked` lives in `admission.reservations[]`
