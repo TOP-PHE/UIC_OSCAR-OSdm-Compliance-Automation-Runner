@@ -2478,6 +2478,8 @@ function buildSalesFlowActionsSection(idx, sc) {
           'Which passengers PATCH passengers updates after the booking. ALL (or empty): every passenger. MAIN: the first passenger only, for providers that let only the main passenger be changed. The others are read back against what the booking sent.')}
         ${buildSelect(idx, 'reservationBookingForm', 'Optional reservations', ENUMS.reservationBookingForm,
           'How the optional seat reservations are booked (#601); mandatory ones always go with the booking. RESERVATION_SELECTION: optionalReservationSelections. PLACE_SELECTION: placeSelections naming the trip and leg. ADD_LATER: added after the booking (09, /offer-parts). Empty: optional reservations are not booked.')}
+        ${buildText(idx, 'placePreferences', 'Seat preferences', 'e.g. WINDOW, POWER',
+          'OSDM place property codes asked in the booking (#766), in placeSelections[].accommodations[].placeProperties. Only those the offer lists are asked; one it does not list is a warning, and so is a booked place without one asked. With the PREFERENCES flow declared, GET /availabilities/preferences is asked first. With preferences and no form above, the optional reservations are booked by PLACE_SELECTION. Empty: no preference.')}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Enabled steps are attempted in order after the booking is created. If the offer
           doesn't support a step (e.g. no ancillaries in the offer, non-reservable train),

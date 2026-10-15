@@ -259,6 +259,8 @@ function dataNeedsOf(scenario, datafile, facts) {
   const providerValues = [
     ...(overrule ? ['overruleCode'] : []),
     ...(scenario.expectedProduct ? ['expectedProduct'] : []),
+    // #766: seat preferences are codes of the provider's own list.
+    ...(placeSelectionFlowOf({ placePreferences: scenario.placePreferences }) ? ['placePreferences'] : []),
   ];
   const needs = {
     trip: trip.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH',

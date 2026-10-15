@@ -94,6 +94,7 @@ function checkProvider(key, raw) {
     ...checkTicketing(raw.ticketing, bad),
     ...checkSalesHorizon(raw.salesHorizon, bad),
     ...checkAgeTariffs(raw.ageTariffs, bad),
+    ...checkPlacePreferences(raw.placePreferences, bad),
   };
 }
 
@@ -233,6 +234,30 @@ function checkSalesHorizon(value, bad) {
     && Number.isInteger(value.days) && value.days >= 1 && value.days <= 1000;
   if (!ok) throw bad('salesHorizon');
   return { salesHorizon: { from: value.from, days: value.days } };
+}
+
+// #766: the place preferences a reservation takes, on trips from one stop
+// place (`from`): groups of PlaceProperty codes, offered in the reservation
+// parts and honoured at booking, except those `soldOut` (offered, but no
+// longer available when asked). Absent: no preference is offered.
+const PLACE_PROPERTY = /^[A-Z][A-Z0-9_]{0,39}$/;
+function checkPlacePreferences(value, bad) {
+  if (value === undefined) return {};
+  const groups = value && typeof value === 'object' && Array.isArray(value.groups) ? value.groups : [];
+  const ok = isText(value?.from, 1, 120) && groups.length > 0 && groups.length <= 10
+    && groups.every((g) => g && PLACE_PROPERTY.test(g.preferenceGroup) && Array.isArray(g.preferences)
+      && g.preferences.length > 0 && g.preferences.length <= 20 && g.preferences.every((p) => PLACE_PROPERTY.test(p)));
+  if (!ok) throw bad('placePreferences');
+  const all = groups.flatMap((g) => g.preferences);
+  const soldOut = value.soldOut === undefined ? [] : value.soldOut;
+  if (new Set(all).size !== all.length || !Array.isArray(soldOut) || !soldOut.every((p) => all.includes(p))) throw bad('placePreferences');
+  return {
+    placePreferences: {
+      from: value.from,
+      groups: groups.map((g) => ({ preferenceGroup: g.preferenceGroup, preferences: [...g.preferences] })),
+      soldOut: [...soldOut],
+    },
+  };
 }
 
 // #697: the stop places whose trips are sold with one ticket per passenger

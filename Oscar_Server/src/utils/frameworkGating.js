@@ -205,6 +205,9 @@ function placeSelectionFlowOf(scenario) {
   const accommodation = String(scenario.accommodationSelection || '').trim().toUpperCase();
   if (accommodation === 'COUCHETTE' || accommodation === 'BERTH') return 'AUTOMATIC_PLACE_SELECTION';
   if (String(scenario.reservationBookingForm || '').trim().toUpperCase() === 'PLACE_SELECTION') return 'AUTOMATIC_PLACE_SELECTION';
+  const raw = scenario.placePreferences;
+  const preferences = typeof raw === 'string' ? raw.split(/[\s,;]+/) : (Array.isArray(raw) ? raw : []);
+  if (preferences.some((p) => typeof p === 'string' && p.trim() !== '')) return 'AUTOMATIC_PLACE_SELECTION';
   return null;
 }
 

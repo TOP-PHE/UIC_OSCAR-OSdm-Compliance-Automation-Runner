@@ -172,8 +172,10 @@ function buildBookingRequest() {
   // again by the #601 list.
   const seatMapSelections = parseEnvJson("placeSelections", []);
   const seatMapIds = new Set(seatMapSelections.map((p) => p?.reservationId).filter(Boolean));
-  const placeSelections = [...seatMapSelections,
-    ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))];
+  // #766 PR 2: the seat preferences go in the accommodations of every
+  // selection naming a reservation part of the offer.
+  const placeSelections = withSeatPreferences([...seatMapSelections,
+    ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))]);
   // #239: OSDM's mechanism for booking a mandatory reservation without
   // stating a specific place/compartment — independent of placeSelections.
   // #652: a reservation the placeSelections already book is not named again
@@ -501,6 +503,24 @@ function resolvePlaceSelectionReservationId(selectedAccommodation) {
     validationLogger(`[DEBUG] placeSelection reservationId re-derived from the selected offer: '${envId || "(unset)"}' → '${newId}' (the env value was not a reservationOfferPart of the booked offer).`);
   }
   return newId || envId;
+}
+
+// #766 PR 2: the placeSelections with the seat preferences chosen at the
+// offer step (and narrowed by GET /availabilities/preferences). Keeps the
+// reservations they were asked for in __placePreferencesFor, for step 07.
+function withSeatPreferences(selections) {
+  const send = parseEnvJson("__placePreferencesSent", []);
+  if (!Array.isArray(send) || send.length === 0) return selections;
+  const { withPreferences } = require("./placeSelection.js");
+  const out = withPreferences(selections, parseEnvJson("offer", null), send, parseEnvJson("bookingPassengerReferences", []) || []);
+  const ids = out.filter((sel) => (sel?.accommodations || []).some((a) => (a?.placeProperties || []).some((p) => send.includes(p)))).map((sel) => sel.reservationId);
+  bru.setEnvVar("__placePreferencesFor", JSON.stringify(ids));
+  if (ids.length === 0) {
+    validationLogger(`[WARNING] Seat preferences ${send.join(", ")}: no reservation of the offer is placed in the booking, so none is asked.`);
+  } else {
+    validationLogger(`[INFO] Seat preferences ${send.join(", ")} asked for reservation(s) ${ids.join(", ")}.`);
+  }
+  return out;
 }
 
 // Function to handle place selections

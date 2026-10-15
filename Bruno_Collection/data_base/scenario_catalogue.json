@@ -426,6 +426,38 @@
       }
     },
     {
+      "code": "OTST_SALE_SEAT_PREFERENCE_1ADT",
+      "source": "SIM_SALE_SEAT_PREFERENCE_1ADT_38",
+      "purpose": "A seat preference (window) asked in the booking with the reservation; the place booked must give it.",
+      "checks": 271,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 1,
+        "providerValues": [
+          "placePreferences"
+        ]
+      }
+    },
+    {
+      "code": "OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT",
+      "source": "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38",
+      "purpose": "Seat preferences in the PREFERENCES flow: GET /availabilities/preferences before the booking; one not offered and one no longer available are warnings, the rest is asked and given.",
+      "checks": 337,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 2,
+        "providerValues": [
+          "placePreferences"
+        ]
+      }
+    },
+    {
       "code": "OTST_SALE_BY_TRIP_ID_1ADT",
       "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
       "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",

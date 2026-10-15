@@ -22,6 +22,12 @@
  * A reservation can also be added to a pre-booked booking with
  * POST .../booked-offers/{bookedOfferId}/offer-parts. A booked reservation
  * carries the coach and seats it was given.
+ *
+ * On a trip from `placePreferences.from` (#766), a reservation part offers
+ * the profile's place preferences (`availablePlacePreferences`, and the same
+ * codes in `availablePlaces`) and takes the PREFERENCES flow too. A booking
+ * that asks for some in `placeSelections[].accommodations[].placeProperties`
+ * gets those it offers and has left (not `soldOut`), shown on its places.
  */
 
 const crypto = require('node:crypto');
@@ -35,6 +41,30 @@ const MAX_SELECTIONS = 12;
 const bad = (detail) => new HttpError(400, 'VALIDATION_ERROR', 'The request is not valid', detail);
 const randomId = () => crypto.randomBytes(8).toString('hex');
 const listOf = (value) => (Array.isArray(value) ? value : []);
+// A SelectedAccommodation member that is text (#766).
+const textOf = (value) => typeof value === 'string' && value.length > 0 && value.length <= 80;
+const SEAT_AVAILABILITY = 40;
+
+/** The place preferences of a trip's reservations, or null when it has none (#766). */
+function preferencesOfTrip(trip, provider) {
+  const prefs = provider.placePreferences;
+  return prefs && trip.origin?.stopPlaceRef === prefs.from ? prefs : null;
+}
+
+/** Every place property a provider's preferences name. */
+const preferenceCodes = (prefs) => prefs.groups.flatMap((g) => g.preferences);
+
+/** The places still available for a reservation part: one SEAT / ANY_SEAT entry. */
+function availablePlacesOf(part, prefs, { asked = false } = {}) {
+  const codes = preferenceCodes(prefs).filter((code) => !asked || !prefs.soldOut.includes(code));
+  return [{
+    accommodationType: 'SEAT',
+    accommodationSubType: 'ANY_SEAT',
+    placeProperties: codes,
+    numericAvailability: SEAT_AVAILABILITY,
+    tripLegCoverage: { tripId: part.tripCoverage.coveredTripId, legId: part.tripCoverage.coveredLegIds[0] },
+  }];
+}
 
 /** The reservation of a leg: MANDATORY, OPTIONAL, or null when its train has none. */
 function reservationKind(leg, provider) {
@@ -84,6 +114,12 @@ function reservationsOfDirection(trip, { passengers, tariff, provider, createdOn
       isReservationRequired: false,
       supportedPlaceSelectionFlows: ['AUTOMATIC_PLACE_SELECTION'],
     };
+    const prefs = preferencesOfTrip(trip, provider);
+    if (prefs) {
+      part.supportedPlaceSelectionFlows.push('AUTOMATIC_PLACE_SELECTION_PREFERENCES');
+      part.availablePlacePreferences = [{ preferenceGroups: prefs.groups.map((g) => ({ preferenceGroup: g.preferenceGroup, preferences: [...g.preferences] })) }];
+      part.availablePlaces = availablePlacesOf(part, prefs);
+    }
     const relation = {
       isIncluded: false,
       minGroupItemsToBeBooked: mandatory ? 1 : 0,
@@ -103,10 +139,72 @@ function namedReservations(selection) {
   const chosen = listOf(selection?.optionalReservationSelections);
   const placed = listOf(selection?.placeSelections);
   if (chosen.length + placed.length > MAX_SELECTIONS) throw bad(`at most ${MAX_SELECTIONS} reservation and place selections per offer`);
+  placed.forEach((s, i) => checkAccommodations(s?.accommodations, `placeSelections[${i}]`));
   return [
     ...chosen.map((s, i) => ({ id: id(s?.reservationId, `optionalReservationSelections[${i}]`) })),
     ...placed.map((s, i) => ({ id: id(s?.reservationId, `placeSelections[${i}]`), coverage: s.tripLegCoverage, where: `placeSelections[${i}]` })),
   ];
+}
+
+// #766: a SelectedAccommodation names its passengers, its accommodation type
+// and sub-type (all three required by OSDM), and place properties as text.
+function checkAccommodations(accommodations, where) {
+  if (accommodations === undefined) return;
+  if (!Array.isArray(accommodations) || accommodations.length > MAX_SELECTIONS) throw bad(`${where}.accommodations must be a list`);
+  accommodations.forEach((a, j) => {
+    const at = `${where}.accommodations[${j}]`;
+    const refs = a?.passengerRefs;
+    if (!Array.isArray(refs) || refs.length === 0 || !refs.every(textOf)) throw bad(`${at}.passengerRefs is missing or not valid`);
+    if (!textOf(a.accommodationType) || !textOf(a.accommodationSubType)) throw bad(`${at} must name accommodationType and accommodationSubType`);
+    const props = a.placeProperties;
+    if (props != null && (!Array.isArray(props) || props.length > 20 || !props.every(textOf))) throw bad(`${at}.placeProperties is not valid`);
+  });
+}
+
+/**
+ * The place properties a booking request asks for a reservation (#766):
+ * those of the accommodations of its placeSelections, each once.
+ */
+function propertiesAsked(selection, reservationId) {
+  const asked = listOf(selection?.placeSelections)
+    .filter((s) => s?.reservationId === reservationId)
+    .flatMap((s) => listOf(s.accommodations))
+    .flatMap((a) => listOf(a?.placeProperties));
+  return [...new Set(asked)];
+}
+
+/**
+ * The place properties a reservation is given (#766): those asked that its
+ * trip's preferences offer and are not sold out; none when `ignore` (the
+ * ignores-place-preferences variant) or the trip has no preferences.
+ */
+function propertiesGiven(asked, trip, provider, { ignore = false } = {}) {
+  const prefs = trip ? preferencesOfTrip(trip, provider) : null;
+  if (!prefs || ignore) return [];
+  const codes = preferenceCodes(prefs);
+  return asked.filter((code) => codes.includes(code) && !prefs.soldOut.includes(code));
+}
+
+/**
+ * GET /availabilities/preferences (#766): the places still available for a
+ * reservation part of a remembered offer. `found` is what was remembered of
+ * the offer (or undefined).
+ */
+function preferenceAvailability(query, found, provider) {
+  const contextId = query.get('contextId');
+  const contextType = query.get('contextType');
+  const resourceId = query.get('resourceId');
+  const resourceType = query.get('resourceType');
+  if (!contextId || !contextType || !resourceId || !resourceType) throw bad('contextId, contextType, resourceId and resourceType are required');
+  if (contextType === 'BOOKING') throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator gives the preferences of an offer only.');
+  if (contextType !== 'OFFER') throw bad('contextType must be OFFER or BOOKING');
+  if (resourceType !== 'RESERVATION') throw bad('resourceType must be RESERVATION');
+  if (!found) throw new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+  const part = listOf(found.offer.reservationOfferParts).find((p) => p.id === resourceId);
+  if (!part) throw new HttpError(404, 'RESERVATION_NOT_FOUND', 'Reservation not found', `"${resourceId}" is not a reservation of offer ${contextId}.`);
+  const trip = listOf(found.trips).find((t) => t.id === part.tripCoverage.coveredTripId);
+  const prefs = trip ? preferencesOfTrip(trip, provider) : null;
+  return { availablePlaces: prefs ? availablePlacesOf(part, prefs, { asked: true }) : [] };
 }
 
 // The reservation ids an offer's admissions make mandatory.
@@ -148,7 +246,7 @@ function placesOf(partId, count) {
 }
 
 /** The booked reservation made from a reservation offer part. */
-function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil) {
+function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, placeProperties = []) {
   const tripId = part.tripCoverage.coveredTripId;
   const legId = part.tripCoverage.coveredLegIds[0];
   const leg = listOf(trips.find((t) => t.id === tripId)?.legs).find((l) => l.id === legId);
@@ -182,6 +280,7 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
         vehicleNumber: leg?.timedLeg.service.vehicleNumbers[0] || '0',
         coachNumber,
         placeNumbers,
+        ...(placeProperties.length > 0 ? { placeProperties: [...placeProperties] } : {}),
       }],
       tripLegCoverage: { tripId, legId },
     },
@@ -200,5 +299,5 @@ function linkReservations(bookedOffer) {
 
 module.exports = {
   reservationKind, reservationProductOf, reservationsOfDirection, reservationsToBook, reservationFrom, linkReservations,
-  PRICE_PER_PASSENGER,
+  propertiesAsked, propertiesGiven, preferenceAvailability, PRICE_PER_PASSENGER,
 };

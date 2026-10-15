@@ -236,7 +236,8 @@ describe('#748 — the copy of a catalogue search as a specification', () => {
       .filter((code) => source.scenarios.some((s) => s.code === code));
     expect(sharing.length).toBeGreaterThan(1);
     for (const code of sharing) expect(tripOf(code).id).toBe(spec.id);
-    expect(catalogueDatafile(catalogue, simulator).tripRequirements.every((t) => t.tripType !== 'SPECIFICATION' || t.legs.length > 1)).toBe(true);
+    // A trip made for the copy, not one the catalogue's data already had.
+    expect(catalogueDatafile(catalogue, simulator).tripRequirements.map((t) => t.id)).not.toContain(spec.id);
   });
 
   test('the person copying is told the train needs its number and operator', () => {

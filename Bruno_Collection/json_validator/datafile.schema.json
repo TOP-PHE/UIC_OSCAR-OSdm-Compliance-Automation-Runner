@@ -463,7 +463,7 @@
           },
           "placeSelectionFlow": {
             "type": ["string", "null"],
-            "description": "The OSDM place selection flow the scenario exercises (#766), as the offer's reservation parts name it in supportedPlaceSelectionFlows. When absent it follows from the place fields: placeSelectionMode is a named place (MANUAL_PLACE_SELECTION_WITHOUT_FEE); accommodationSelection COUCHETTE or BERTH, or reservationBookingForm PLACE_SELECTION, is AUTOMATIC_PLACE_SELECTION. Checked against the Test Framework's placeSelectionFlows.",
+            "description": "The OSDM place selection flow the scenario exercises (#766), as the offer's reservation parts name it in supportedPlaceSelectionFlows. When absent it follows from the place fields: placeSelectionMode is a named place (MANUAL_PLACE_SELECTION_WITHOUT_FEE); accommodationSelection COUCHETTE or BERTH, reservationBookingForm PLACE_SELECTION, or placePreferences, is AUTOMATIC_PLACE_SELECTION. Checked against the Test Framework's placeSelectionFlows.",
             "enum": [
               "AUTOMATIC_PLACE_SELECTION",
               "AUTOMATIC_PLACE_SELECTION_PREFERENCES",
@@ -473,6 +473,12 @@
               "",
               null
             ]
+          },
+          "placePreferences": {
+            "description": "Seat preferences asked in the booking (#766), as OSDM PlaceProperty codes: a list such as [\"WINDOW\"], or the same as text, \"WINDOW, POWER\". Only those the offer lists (availablePlacePreferences or availablePlaces) are sent, in placeSelections[].accommodations[].placeProperties; one it does not list is a warning. In the AUTOMATIC_PLACE_SELECTION_PREFERENCES flow GET /availabilities/preferences is asked first. A booked place without a preference asked is a warning. A scenario with preferences books its optional reservations by placeSelections unless it names another reservationBookingForm.",
+            "type": ["array", "string", "null"],
+            "maxLength": 400,
+            "items": { "type": "string", "minLength": 1, "maxLength": 40 }
           },
           "placeSelectionMode": {
             "type": ["string", "null"],
