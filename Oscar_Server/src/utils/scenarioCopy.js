@@ -33,7 +33,10 @@
  * takes the next free code when its code is already used in the target.
  */
 
-const { scenarioWarnings, offerRequestFormOf, offerRequestFormDeclared, OFFER_REQUEST_TEXT } = require('./frameworkGating');
+const {
+  scenarioWarnings, offerRequestFormOf, offerRequestFormDeclared, OFFER_REQUEST_TEXT,
+  placeSelectionFlowOf, placeSelectionFlowDeclared, PLACE_SELECTION_TEXT,
+} = require('./frameworkGating');
 const TripApply = require('../../public/js/trip-apply');
 const { idAllocator } = require('./datafileOwnership');
 
@@ -106,6 +109,11 @@ function warningsFor(sc, source, framework) {
   const form = offerRequestFormOf(sc, source);
   if (!offerRequestFormDeclared(framework, form)) {
     out.push(`Offers are asked ${OFFER_REQUEST_TEXT[form]}, which the target's Test Framework does not declare (Offer requests).`);
+  }
+  // #766: a place chosen in a way the target's provider does not offer.
+  const flow = placeSelectionFlowOf(sc);
+  if (!placeSelectionFlowDeclared(framework, flow)) {
+    out.push(`A place is chosen ${PLACE_SELECTION_TEXT[flow]}, which the target's Test Framework does not declare (Seat Selection).`);
   }
   const fulfillment = findById(source.requestedFulfillmentOptionsList, sc.requestedFulfillmentOptionsListId);
   if (fulfillment && declaredOptions(fulfillment, framework).changed) {

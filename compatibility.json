@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.331",
+  "current_release": "2026.332",
   "releases": [
+    {
+      "release": "2026.332",
+      "date": "2026-10-15",
+      "server": "1.11.297",
+      "collection": "OTST_V2.0.168",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Place selection flows (OSDM PlaceSelectionFlow) declared in the Test Framework, gated like the offer request forms, and read from the offer at step 01 (#766, PR 1 of 5)."
+      ]
+    },
     {
       "release": "2026.331",
       "date": "2026-10-15",

@@ -42,6 +42,8 @@
  *   - a return's model (offerSearchCriteria.returnModel)  ↔  returnModels (#619)
  *   - the offer request's form (trip type, trip ids)  ↔  offerRequestForms (#748),
  *     in annotateDatafile only: it reads the scenario's trip entry
+ *   - the place selection flow (placeSelectionFlow, or the place fields)  ↔
+ *     placeSelectionFlows (#766)
  *   - (future) partialExchangeByLeg / partialExchangeByPax  ↔  EXCHANGE_PARTIAL
  *   - (future) requestedInformationProbe                    ↔  ???
  *
@@ -70,6 +72,24 @@ const OFFER_REQUEST_TEXT = Object.freeze({
   SEARCH: 'by trip search', SPECIFICATION: 'by trip specification', TRIP_IDS: 'by trip id',
 });
 
+// #766: how a provider lets a place be chosen (framework.placeSelectionFlows),
+// OSDM's PlaceSelectionFlow. Absent = every flow (frameworks from before
+// 1.11.297); [] = none.
+const PLACE_SELECTION_FLOWS = [
+  'AUTOMATIC_PLACE_SELECTION',
+  'AUTOMATIC_PLACE_SELECTION_PREFERENCES',
+  'AUTOMATIC_PLACE_SELECTION_NEARBY',
+  'MANUAL_PLACE_SELECTION_WITHOUT_FEE',
+  'MANUAL_PLACE_SELECTION_WITH_FEE',
+];
+const PLACE_SELECTION_TEXT = Object.freeze({
+  AUTOMATIC_PLACE_SELECTION: 'by accommodation and place properties',
+  AUTOMATIC_PLACE_SELECTION_PREFERENCES: 'by the available preferences',
+  AUTOMATIC_PLACE_SELECTION_NEARBY: 'next to a given place',
+  MANUAL_PLACE_SELECTION_WITHOUT_FEE: 'of a named place, without fee',
+  MANUAL_PLACE_SELECTION_WITH_FEE: 'of a named place, with a fee',
+});
+
 module.exports = {
   gatingRules,
   isScenarioArmedForField,
@@ -81,6 +101,10 @@ module.exports = {
   OFFER_REQUEST_TEXT,
   offerRequestFormOf,
   offerRequestFormDeclared,
+  PLACE_SELECTION_FLOWS,
+  PLACE_SELECTION_TEXT,
+  placeSelectionFlowOf,
+  placeSelectionFlowDeclared,
   scenarioReturnModel,
   returnModelsUsed,
   needsFrameworkMigration,
@@ -161,6 +185,34 @@ function offerRequestFormOf(scenario, datafile) {
 function offerRequestFormDeclared(framework, form) {
   const declared = framework?.offerRequestForms;
   return !Array.isArray(declared) || declared.includes(form);
+}
+
+/**
+ * #766: the place selection flow a scenario exercises, or null when it
+ * chooses no place: its own `placeSelectionFlow` when it names one, else what
+ * its place fields send. A seat taken from the seat map (placeSelectionMode)
+ * is a named place; a couchette or berth (accommodationSelection), or a
+ * reservation booked by placeSelections without a place (reservationBookingForm
+ * PLACE_SELECTION), is an automatic selection. Kept alike with
+ * library-bruno/placeSelection.js (flowOfScenario), pinned by a test.
+ */
+function placeSelectionFlowOf(scenario) {
+  if (!scenario || typeof scenario !== 'object') return null;
+  const own = String(scenario.placeSelectionFlow || '').trim().toUpperCase();
+  if (PLACE_SELECTION_FLOWS.includes(own)) return own;
+  const mode = String(scenario.placeSelectionMode || '').trim().toUpperCase();
+  if (mode === 'SEATMAP_AT_OFFER' || mode === 'ADD_TO_BOOKING') return 'MANUAL_PLACE_SELECTION_WITHOUT_FEE';
+  const accommodation = String(scenario.accommodationSelection || '').trim().toUpperCase();
+  if (accommodation === 'COUCHETTE' || accommodation === 'BERTH') return 'AUTOMATIC_PLACE_SELECTION';
+  if (String(scenario.reservationBookingForm || '').trim().toUpperCase() === 'PLACE_SELECTION') return 'AUTOMATIC_PLACE_SELECTION';
+  return null;
+}
+
+/** #766: true when the framework lets a place be chosen this way: no flow, no list, or listed. */
+function placeSelectionFlowDeclared(framework, flow) {
+  if (!flow) return true;
+  const declared = framework?.placeSelectionFlows;
+  return !Array.isArray(declared) || declared.includes(flow);
 }
 
 /**
@@ -297,7 +349,8 @@ function applyFrameworkMigration(framework, scenarios, nowIso) {
 /**
  * Annotate a datafile object in place: each scenario that arms an
  * undeclared feature gets `__featureNotDeclaredWarnings: [field, ...]`, and
- * one whose offer request form is not declared `offerRequestBy:<form>` (#748).
+ * one whose offer request form is not declared `offerRequestBy:<form>` (#748),
+ * one whose place selection flow is not declared `placeSelectionBy:<flow>` (#766).
  * Removes the field when there are no warnings (avoids stale annotations
  * surviving a framework change).
  *
@@ -315,6 +368,9 @@ function annotateDatafile(datafile, framework) {
     // with the form, so that the collection can say which.
     const form = offerRequestFormOf(sc, datafile);
     if (!offerRequestFormDeclared(framework, form)) warnings.push(`offerRequestBy:${form}`);
+    // #766: a place chosen in a way the framework does not declare.
+    const flow = placeSelectionFlowOf(sc);
+    if (!placeSelectionFlowDeclared(framework, flow)) warnings.push(`placeSelectionBy:${flow}`);
     if (warnings.length > 0) {
       sc.__featureNotDeclaredWarnings = warnings;
       count++;

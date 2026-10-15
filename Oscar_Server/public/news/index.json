@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-place-selection-flows",
+    "date": "October 15, 2026",
+    "tag": "Feature",
+    "title": "Seat selection: declare how a place can be chosen",
+    "summary": "The Test Framework now lists the five ways OSDM lets a place be chosen, from a preference to a named seat.",
+    "content": "Under Seat Selection in the Test Framework, tick how the provider lets a place be chosen: automatically by place properties (window, aisle…), after asking the available preferences, next to a given place, or a named place with or without a seat fee. A scenario choosing a place another way gets a warning, and the reference scenarios that need an undeclared way are not copied. At the offer step, the run log says whether the offer lists the way the scenario uses, and which preferences it offers. This is the first of a series that will cover every case."
+  },
+  {
     "id": "2026-10-15-trips-collection-header",
     "date": "October 15, 2026",
     "tag": "Fix",

@@ -461,6 +461,19 @@
               "deleteAncillary": { "type": "boolean" }
             }
           },
+          "placeSelectionFlow": {
+            "type": ["string", "null"],
+            "description": "The OSDM place selection flow the scenario exercises (#766), as the offer's reservation parts name it in supportedPlaceSelectionFlows. When absent it follows from the place fields: placeSelectionMode is a named place (MANUAL_PLACE_SELECTION_WITHOUT_FEE); accommodationSelection COUCHETTE or BERTH, or reservationBookingForm PLACE_SELECTION, is AUTOMATIC_PLACE_SELECTION. Checked against the Test Framework's placeSelectionFlows.",
+            "enum": [
+              "AUTOMATIC_PLACE_SELECTION",
+              "AUTOMATIC_PLACE_SELECTION_PREFERENCES",
+              "AUTOMATIC_PLACE_SELECTION_NEARBY",
+              "MANUAL_PLACE_SELECTION_WITHOUT_FEE",
+              "MANUAL_PLACE_SELECTION_WITH_FEE",
+              "",
+              null
+            ]
+          },
           "placeSelectionMode": {
             "type": ["string", "null"],
             "description": "How place selection is exercised (issue #107). SEATMAP_AT_OFFER = seat map before booking; ADD_TO_BOOKING = reservation added to an existing booking.",

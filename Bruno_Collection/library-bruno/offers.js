@@ -42,6 +42,7 @@ module.exports = {
   compareGroupOfferIndividual,
   checkOfferLegClasses,
   prepareOfferRequestByTripIds,
+  checkOfferPlaceSelection,
   checkOfferRequestByTripIds,
   routeAfterOfferStep,
   searchTripOffers,
@@ -2154,6 +2155,20 @@ function checkOfferLegClasses(jsonData) {
   checkLegClasses("Offer", chosenOffer(), jsonData?.trips, expected).forEach((c) => {
     test(c.name, () => { if (!c.ok) throw new Error(c.message); });
   });
+}
+
+// ── Place selection flow (#766) ──────────────────────────────────────────────
+
+/**
+ * After the offer step: what the chosen offer says of the scenario's place
+ * selection flow (supportedPlaceSelectionFlows) and the preferences it offers
+ * (availablePlacePreferences). A flow it does not list is a warning.
+ */
+function checkOfferPlaceSelection() {
+  const flow = bru.getEnvVar("placeSelectionFlow");
+  if (!flow) return;
+  const { describeOfferedFlow } = require('./placeSelection.js');
+  for (const line of describeOfferedFlow(chosenOffer(), flow)) validationLogger(`[${line.level}] ${line.text}`);
 }
 
 // ── Group tariffs (#599) ─────────────────────────────────────────────────────

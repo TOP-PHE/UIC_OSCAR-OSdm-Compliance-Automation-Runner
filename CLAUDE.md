@@ -92,6 +92,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     used `vehicleNumber: '1001'`). The exchange's offer request
     (`requestExchangeOffersBody()`) follows `TripType` since then; it sent a
     null `tripSearchCriteria` for a specification.
+  - **Place selection flows** (#766, PR 1 = 1.11.297): `placeSelectionFlows`
+    (OSDM `PlaceSelectionFlow`: `AUTOMATIC_PLACE_SELECTION`, `…_PREFERENCES`,
+    `…_NEARBY`, `MANUAL_PLACE_SELECTION_WITHOUT_FEE`, `…_WITH_FEE`). Absent =
+    every flow. A scenario's flow is its own `placeSelectionFlow`, else its
+    place fields: `placeSelectionMode` = a named place, COUCHETTE/BERTH or
+    `reservationBookingForm` PLACE_SELECTION = automatic, otherwise none.
+    `placeSelectionFlowOf()` (server) and `flowOfScenario()`
+    (`library-bruno/placeSelection.js`) must stay alike: a test runs both
+    over every simulator scenario. Warning `placeSelectionBy:<flow>`;
+    catalogue `missingFor()` "place selection …". Step 01 logs what the offer
+    lists (`supportedPlaceSelectionFlows`, `availablePlacePreferences`), a
+    WARNING only for another flow or no reservation part. PRs 2–5 send the
+    choices (preferences, named seat and compartment with or without fee,
+    nearby, after the booking); the plan and grading are in #766.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
