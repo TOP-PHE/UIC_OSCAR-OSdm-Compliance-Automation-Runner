@@ -44,8 +44,9 @@ describe('randomUUID (scenarioParser.js)', () => {
     jest.isolateModules(() => {
       jest.doMock('node:crypto', () => { throw new Error('crypto is not available here'); });
       const { randomUUID } = require(path.join(LIB, 'scenarioParser.js'));
-      const ids = Array.from({ length: 20 }, () => randomUUID());
-      expect(new Set(ids).size).toBe(20);
+      // 1 and 10, 2 and 20…: the first fallback cut its seed and gave those the same id.
+      const ids = Array.from({ length: 300 }, () => randomUUID());
+      expect(new Set(ids).size).toBe(300);
       for (const id of ids) expect(id).toMatch(V4);
     });
     jest.dontMock('node:crypto');

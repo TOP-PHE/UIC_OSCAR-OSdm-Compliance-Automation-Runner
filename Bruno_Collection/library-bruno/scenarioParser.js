@@ -30,9 +30,12 @@ function randomUUID() {
   try {
     return require('node:crypto').randomUUID();
   } catch {
+    // Time in the first 6 bytes, the counter in the last 10: never cut, so
+    // two calls of one run never give the same bytes.
     uuidCounter += 1;
-    const seed = `${Date.now()}-${uuidCounter}`.padEnd(16, '0');
-    return require('./idempotency.js').uuidFromBytes(Array.from(seed.slice(0, 16), (c) => c.codePointAt(0)));
+    const hex = Date.now().toString(16).padStart(12, '0') + uuidCounter.toString(16).padStart(20, '0');
+    const bytes = Array.from({ length: 16 }, (_, i) => Number.parseInt(hex.slice(2 * i, 2 * i + 2), 16));
+    return require('./idempotency.js').uuidFromBytes(bytes);
   }
 }
 
