@@ -62,6 +62,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.292] / [collection-OTST_V2.0.164] — 2026-10-15
+
+Issue #756, release 2026.327. Tests only; no server or collection code.
+
+### Added
+- **Tests of `library-bruno/exchanges.js`** (`tests/unit/bruno-exchanges.test.js`), the first coverage PR after #754: from 55 % to 99 % of its lines.
+  - **What they cover:** the checks of steps 10 to 17 of the exchange flow. That is the offers and the operation, the required members of an exchange offer, the `amountToBePaid` identity, the applied overrule code, the exchange fee against the declared schedule (#396), and the booking read around the exchange (#649).
+  - **Mutation check:** the tests fail when the fee comparison, the amount identity or the remembering of the exchange's parts is removed.
+- **`tests/helpers/bruno-chai.js`** knows two more of chai's forms that the validators use: `lengthOf.at.least(n)` and `eql(value, message)`. Without them, the check "admissionOfferParts is a non-empty array" was recorded as failed in every unit test that reached it.
+
+---
+
 ## [server-1.11.291] / [collection-OTST_V2.0.164] — 2026-10-15
 
 Issue #754, release 2026.326. Test and coverage set-up only; no server or collection code.

@@ -1738,8 +1738,12 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
   At #754: 44 of its 48 modules reached, ~81% of their lines (v8 counts);
   `Oscar_Server/src` ~95% under v8 (it read ~93% under babel: the two count
   differently). The weakest: `displays` 19%, `afterSalesRules` 42%,
-  `placeProbes` 45%, `validators` 46%, `exchanges` 55%, `offers` 55%,
-  `auth` 58%. No test loads `loopback`, `mergeReport`, `reportGenerator` or
+  `placeProbes` 45%, `validators` 46%, `offers` 55%, `auth` 58%.
+  `exchanges` went from 55% to 99% in #756 (`bruno-exchanges.test.js`),
+  which also taught `tests/helpers/bruno-chai.js` `lengthOf.at.least(n)` and
+  `eql(v, message)`: a chain the stub lacks throws inside the check and is
+  recorded as a failure, so a validator's check can look failed in every
+  unit test for that reason alone. No test loads `loopback`, `mergeReport`, `reportGenerator` or
   `schema`; Sonar counts them as uncovered. A PR touching `library-bruno` is
   now held to the 83% new-code bar.
 - **Issue backlog was swept and cross-checked against the code 2026-07-02**
