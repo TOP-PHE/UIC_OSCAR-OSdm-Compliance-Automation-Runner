@@ -94,7 +94,8 @@ describe('requirements and the golden rule', () => {
   test('a combined return needs its model and OSDM 3.7; passenger types other than PERSON must be declared', () => {
     const df = { passengersList: [{ id: 1, passengers: [{ type: 'PERSON' }, { type: 'YOUTH' }] }] };
     const r = requirementsOf({ scenarioType: 'SALE', passengersListId: 1, offerSearchCriteria: { returnOffsetDays: 2, returnModel: 'COMBINED' } }, df);
-    expect(r).toEqual({ salesFlows: ['SALE'], partialRefundScopes: [], returnModel: 'COMBINED', minOsdmVersion: '3.7', passengerTypes: ['YOUTH'] });
+    expect(r).toEqual({ salesFlows: ['SALE'], partialRefundScopes: [], returnModel: 'COMBINED', minOsdmVersion: '3.7', passengerTypes: ['YOUTH'],
+      offerRequest: { form: 'SEARCH', convertible: false } });
     expect(missingFor(r, { salesFlows: ['SALE'], returnModels: ['SEPARATE'], osdmVersion: '3.6.0', passengerTypes: ['ADULT'] }))
       .toEqual(['return model COMBINED', 'OSDM 3.7 or later', 'passenger type YOUTH']);
     expect(missingFor(r, { config: { salesFlows: ['SALE'], returnModels: ['COMBINED'], osdmVersion: '3.8.0', passengerTypes: ['YOUTH'] } })).toEqual([]);

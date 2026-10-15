@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-offer-request-forms",
+    "date": "October 15, 2026",
+    "tag": "Feature",
+    "title": "Declare how a provider takes offer requests",
+    "summary": "The Test Framework now says whether the provider takes offer requests by trip search, by trip specification or by trip id, and the scenario catalogue follows it.",
+    "content": "Some providers only answer offer requests that name the exact train (a trip specification), not a search. Under Sales Flows in the Test Framework, the new Offer requests setting lists the forms the provider takes. When only trip specifications are ticked, the reference scenarios are copied as trip specifications. When searches and specifications are both ticked, each reference scenario that can go both ways is offered twice, the second ending in _SPEC. A scenario asking in a form that is not ticked gets a warning in its run log. An exchange now asks for its offers the same way as the sale."
+  },
+  {
     "id": "2026-10-15-trip-specification-legs",
     "date": "October 15, 2026",
     "tag": "Fix",
