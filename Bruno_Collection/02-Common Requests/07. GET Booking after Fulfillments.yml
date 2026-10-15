@@ -159,11 +159,13 @@ runtime:
         // receipts already there before any refund.
         require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").checkConfirmedBookingDocuments((jsonData && jsonData.booking) || null);
 
-        // #600: the booking gives each leg the class the scenario names.
-        if (bru.getEnvVar("legTravelClasses")) {
-          const { checkLegClasses } = require(bru.getEnvVar("library_base") + "legClasses.js");
+        // #600: the booking gives each leg the class the scenario names, or
+        // (#762) the classes of the offer sold when no offer had them.
+        const _legClasses = require(bru.getEnvVar("library_base") + "legClasses.js");
+        const _classesExpected = _legClasses.bookingClassesExpected(bru.getEnvVar("legTravelClasses"), bru.getEnvVar("__legClassesSold"));
+        if (_classesExpected) {
           const _booking = (jsonData && jsonData.booking) || jsonData || {};
-          checkLegClasses("Booking", (_booking.bookedOffers || [])[0], _booking.trips, JSON.parse(bru.getEnvVar("legTravelClasses"))).forEach((c) => {
+          _legClasses.checkLegClasses(_classesExpected.label, (_booking.bookedOffers || [])[0], _booking.trips, _classesExpected.expected).forEach((c) => {
             test(c.name, () => { if (!c.ok) throw new Error(c.message); });
           });
         }

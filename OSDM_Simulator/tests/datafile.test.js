@@ -386,7 +386,12 @@ test('every trip of the data file is one the simulator answers, on every provide
 test('the class-per-leg scenario: gamma gives first class on the InterCity leg only, with a supplement (#600)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const perLeg = datafile.scenarios.filter((s) => s.legTravelClasses != null);
-  assert.deepEqual(perLeg.map((s) => [s.code, s.legTravelClasses]), [['SIM_SALE_CLASS_PER_LEG_1ADT_38', ['FIRST', 'SECOND']]]);
+  assert.deepEqual(perLeg.map((s) => [s.code, s.legTravelClasses]), [
+    ['SIM_SALE_CLASS_PER_LEG_1ADT_38', ['FIRST', 'SECOND']],
+    // #762: first class asked on the regional leg, which has none: no offer gives it.
+    ['SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38', ['SECOND', 'FIRST']],
+  ]);
+  assert.equal(perLeg[1].tripRequirementId, perLeg[0].tripRequirementId);
   const requirement = datafile.tripRequirements.find((t) => t.id === perLeg[0].tripRequirementId);
   assert.deepEqual(requirement.legs.map((l) => gamma.secondClassOnlyCategories.includes(l.productCategoryShortName)), [false, true]);
   const { response } = buildOfferCollection({
