@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-negative-probe-501",
+    "date": "October 15, 2026",
+    "tag": "Fix",
+    "title": "A refusal test on an operation the provider does not offer",
+    "summary": "A negative test answered 501 (Not Implemented) is now reported as not supported, with a warning, instead of a failure.",
+    "content": "Some tests send invalid data on purpose and expect the provider to refuse it. When the provider does not offer the operation at all and answers 501 (Not Implemented), the test could not run. It used to count as a failure; it is now one warning saying the operation is not supported."
+  },
+  {
     "id": "2026-10-15-offer-request-forms",
     "date": "October 15, 2026",
     "tag": "Feature",

@@ -1231,6 +1231,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     both get the trip date, and a night train arrived before it left. A
     provider may support only one form of offer request: declared in the Test
     Framework since #748 (the bullet on offer request forms above).
+  - **A negative probe answered 501 is "not supported"** (#751): one
+    WARNING from `validateProblemResponse()` (`requestedInformation.js`), no
+    FAIL and no error-body checks. Every probe that grades a refusal goes
+    through it (requested information, place selection, after-sale
+    refusals, limits). A real provider has no `POST …/purchaser`, and the
+    four purchaser probes used to fail one after the other.
   - **An unset variable in a header template goes out as text** (#692,
     OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
     provider without a requestor got that text on every request. The

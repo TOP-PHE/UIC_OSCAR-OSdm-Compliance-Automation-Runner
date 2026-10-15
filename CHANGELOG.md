@@ -62,6 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.290] / [collection-OTST_V2.0.164] — 2026-10-15
+
+Issue #751, release 2026.325. Collection and server tests; no server code.
+
+### Fixed
+- **A negative probe answered 501 is "not supported", not a failure.** A probe sends a value the provider should refuse with a 4xx. When the provider answers 501 (Not Implemented), it does not offer the operation at all, so the probe could not run. `validateProblemResponse()` (`requestedInformation.js`) now logs one WARNING, "not supported — the provider answers 501 (Not Implemented), so the probe could not be run", with no FAIL and no error-body checks. Every probe that grades a refusal goes through it.
+  - **Seen on a real provider:** `POST /bookings/{id}/purchaser` answers 501, and the four purchaser probes of `NHF_PURCHASER_INVALID` failed one after the other.
+  - **Unchanged:** any other status is graded as before (a 500 or a 200 still fails a required rejection).
+
+Checked:
+- Unit tests in `bruno-requestedinformation.test.js`; the new one fails on the old code.
+- Simulator replay, all scenarios, before and after (the simulator answers no probe with 501, so nothing moves).
+
+---
+
 ## [server-1.11.289] / [collection-OTST_V2.0.163] — 2026-10-15
 
 Issue #748, release 2026.324.
