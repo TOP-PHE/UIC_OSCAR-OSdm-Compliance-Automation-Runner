@@ -818,6 +818,13 @@ function validateProblemResponse(o) {
     else { log('WARNING', `${name}: ${failMsg}${softNote}`); }
   };
 
+  // #751: 501 Not Implemented means the provider does not offer the
+  // operation, so the probe could not run: not supported, never a FAIL.
+  if (status === 501) {
+    log('WARNING', `${pfx}${lbl}: not supported — the provider answers 501 (Not Implemented), so the probe could not be run.`);
+    return;
+  }
+
   const isError = typeof status === 'number' && status >= 400;
   const isClientError = isError && status < 500;
 

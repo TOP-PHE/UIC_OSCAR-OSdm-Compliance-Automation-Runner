@@ -461,6 +461,23 @@ describe('validateProblemResponse', () => {
     expect(m.logs.some((l) => l.lvl === 'WARNING' && /does not clearly identify/.test(l.msg))).toBe(true);
   });
 
+  test('#751: a 501 is "not supported", one WARNING and no FAIL, even for a required rejection', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 501, body: { title: 'Not implemented', code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED' },
+      targets: [{ scenarioField: 'firstName' }], assert: m.assert, log: m.log, label: 'purchaser.firstName',
+    });
+    expect(m.asserts).toEqual([]);
+    expect(m.logs).toEqual([{ lvl: 'WARNING',
+      msg: 'Negative requestedInformation [purchaser.firstName]: not supported — the provider answers 501 (Not Implemented), so the probe could not be run.' }]);
+  });
+
+  test('#751: a 500 is still a failed rejection', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({ status: 500, body: { title: 'Error' }, targets: [], assert: m.assert, log: m.log });
+    expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(false);
+  });
+
   test('N3 accepts a Problem.pointers array as field identification', () => {
     const m = mockSinks();
     ri.validateProblemResponse({
