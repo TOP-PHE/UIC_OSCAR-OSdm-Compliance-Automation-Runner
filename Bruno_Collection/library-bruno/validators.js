@@ -17,25 +17,15 @@ module.exports = {
   validateDataFileJsonWithTemplate
 };
 
+// AJV only as an installed module. It used to fall back to running a script
+// downloaded at run time (the `ajvMinified` URL, kept in `scriptContent`) with
+// `new Function`: code from outside the repository, executed inside every run
+// that reached it (Sonar S1523). Nothing calls this validation today (01's
+// call is commented out); OSCAR's own requests are checked against the OSDM
+// schemas by osdmRequestSchema.js (#736), without AJV.
 function resolveAjvConstructor() {
-  try {
-    const AjvModule = require("ajv");
-    return AjvModule.default || AjvModule;
-  } catch (e) {
-    // Fallback to env-provided AJV script in Bruno sandbox environments.
-  }
-
-  const scriptContent = bru.getEnvVar("scriptContent");
-  if (!scriptContent) {
-    throw new Error("AJV scriptContent not found in env and local 'ajv' dependency is unavailable");
-  }
-
-  const factory = new Function(`${String(scriptContent)}; return typeof Ajv !== 'undefined' ? Ajv : null;`);
-  const AjvFromScript = factory();
-  if (!AjvFromScript) {
-    throw new Error("AJV constructor was not exported by scriptContent");
-  }
-  return AjvFromScript;
+  const AjvModule = require("ajv");
+  return AjvModule.default || AjvModule;
 }
 
 // Function to set the authentication token
@@ -97,54 +87,28 @@ function captureSwaggerSchemaValidator() {
   );
 }
 
+// The Swagger validation of the offer exchange, with the schema captured by
+// captureSwaggerSchemaValidator. It no longer downloads AJV first (see
+// resolveAjvConstructor).
 function swaggerSchemaValidatorContent() {
-  const ajvUrl = bru.getEnvVar("ajvMinified");
-  if (!ajvUrl) {
-    console.error("[ERROR] ❌ Missing env var ajvMinified");
-    return;
-  }
-
-  bru.sendRequest(
-    { url: ajvUrl, method: 'GET', proxy: false },
-    function (err, res) {
-      if (err) {
-        // Same as above — inside `if (err)` so err is truthy.
-        console.log("[ERROR] ❌ Error while loading AJV: " + (err.message || err));
-        return;
-      }
-
-      try {
-        const status = res.status || res.statusCode || 200;
-        const text = res.data || "";
-        if (status >= 200 && status < 300 && String(text).length > 0) {
-          console.log("[INFO] ✅ AJV script successfully loaded");
-          const scriptContent = String(text);
-          bru.setEnvVar("scriptContent", scriptContent);
-
-          const swaggerJsonString = bru.getEnvVar("swaggerJson");
-          if (!swaggerJsonString) {
-            console.error("[ERROR] ❌ swaggerJson env var is missing; run captureSwaggerSchemaValidator first");
-            return;
-          }
-          const swaggerSchema = JSON.parse(swaggerJsonString);
-
-          swaggerSchemaValidator({
-            schema: swaggerSchema,
-            requestHeaders: bru.getEnvVar("requestHeaders"),
-            requestBody: bru.getEnvVar("OfferCollectionRequest"),
-            responseHeaders: bru.getEnvVar("responseHeaders"),
-            responseBody: bru.getEnvVar("responseBody"),
-            method: bru.getEnvVar("method"),
-            url: bru.getEnvVar("url")
-          });
-        } else {
-          console.error(`[ERROR] ❌ Failed to load AJV script. HTTP ${status}`);
-        }
-      } catch (e) {
-        console.error("[ERROR] ❌ Error during AJV script evaluation/usage: " + (e.message || e));
-      }
+  try {
+    const swaggerJsonString = bru.getEnvVar("swaggerJson");
+    if (!swaggerJsonString) {
+      console.error("[ERROR] ❌ swaggerJson env var is missing; run captureSwaggerSchemaValidator first");
+      return;
     }
-  );
+    swaggerSchemaValidator({
+      schema: JSON.parse(swaggerJsonString),
+      requestHeaders: bru.getEnvVar("requestHeaders"),
+      requestBody: bru.getEnvVar("OfferCollectionRequest"),
+      responseHeaders: bru.getEnvVar("responseHeaders"),
+      responseBody: bru.getEnvVar("responseBody"),
+      method: bru.getEnvVar("method"),
+      url: bru.getEnvVar("url")
+    });
+  } catch (e) {
+    console.error("[ERROR] ❌ Error during the Swagger validation: " + (e.message || e));
+  }
 }
 
 function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseHeaders, responseBody, method, url }) {

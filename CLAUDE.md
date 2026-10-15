@@ -1237,6 +1237,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     through it (requested information, place selection, after-sale
     refusals, limits). A real provider has no `POST …/purchaser`, and the
     four purchaser probes used to fail one after the other.
+  - **No downloaded code runs, and no id comes from `Math.random`** (#758):
+    `validators.js` loads AJV only as an installed module (it used to run the
+    `ajvMinified` download with `new Function`, Sonar S1523); `randomUUID()`
+    in `scenarioParser.js` uses `node:crypto`, else a time-and-counter value
+    (S2245). `bruno-library-security.test.js` fails on `new Function(`,
+    `Math.random(` or `eval(` anywhere in the library's code.
   - **An unset variable in a header template goes out as text** (#692,
     OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
     provider without a requestor got that text on every request. The
