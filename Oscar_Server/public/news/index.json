@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-trips-collection-header",
+    "date": "October 15, 2026",
+    "tag": "Fix",
+    "title": "Offers by trip id: the trip search request is cleaner, and its answer is shown",
+    "summary": "The trip search sent before an offer request by trip id no longer carries an empty Requestor header, and an answer that is not JSON is described in the run log.",
+    "content": "When no requestor is set, the POST /trips-collection request now leaves the Requestor header out, as every other request does. If the provider answers with something other than JSON, the run log now shows its type and its first characters, so the cause can be seen."
+  },
+  {
     "id": "2026-10-15-class-per-leg-warning",
     "date": "October 15, 2026",
     "tag": "Improvement",
