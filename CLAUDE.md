@@ -103,9 +103,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     over every simulator scenario. Warning `placeSelectionBy:<flow>`;
     catalogue `missingFor()` "place selection …". Step 01 logs what the offer
     lists (`supportedPlaceSelectionFlows`, `availablePlacePreferences`), a
-    WARNING only for another flow or no reservation part. PRs 2–5 send the
-    choices (preferences, named seat and compartment with or without fee,
-    nearby, after the booking); the plan and grading are in #766.
+    WARNING only for another flow or no reservation part. PRs 3–5 send the
+    other choices (named seat and compartment with or without fee, nearby,
+    after the booking); the plan and grading are in #766.
+    **PR 2 (1.11.298): seat preferences.** `placePreferences` (PlaceProperty
+    codes, a list or "WINDOW, POWER") implies the AUTOMATIC flow and, with no
+    form named, `reservationBookingForm` PLACE_SELECTION. Step 01 keeps those
+    the offer lists (`choosePreferences()`; the others are a WARNING, none
+    listed at all = all sent); in the PREFERENCES flow 02's before-request asks
+    `GET /availabilities/preferences` once per offer (`askPlacePreferences()`,
+    checks recorded by 02's after-response, as #602 does); the builder puts
+    them in `placeSelections[].accommodations[].placeProperties`
+    (`withSeatPreferences()` → `withPreferences()`); 07 warns when a booked
+    place does not name one (`checkPreferencesGiven()`). **OSDM 3.8's
+    `ReservationOfferPart.availablePlacePreferences` is a list** of
+    AvailablePlacePreferences; PR 1 read it as one object, `preferenceSetsOf()`
+    reads both. The simulator offers preferences on trips from `0000092` only
+    (`placePreferences` in the profile, `TABLE` sold out; variant
+    `ignores-place-preferences`), so no other scenario's answer changed. The
+    OSDM code lists (osdm.io) were not reachable: the codes are the spec's
+    examples. A catalogue entry with preferences needs `providerValues`
+    `placePreferences`.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
