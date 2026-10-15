@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.288] / [collection-OTST_V2.0.162] — 2026-10-15
+
+Issue #749, release 2026.323.
+
+### Fixed
+- **A trip switched to SPECIFICATION in Test Config keeps what was typed.**
+  - **What went wrong:** changing the trip type only changed the type. The editor kept drawing the SEARCH fields, so what the user typed went to `trip{}`. The run reads only `legs[]` for a SPECIFICATION trip, and stopped before step 01: "tripType=SPECIFICATION but .legs[] is empty". This showed up when a provider asked for its offers to be requested by `tripSpecifications`.
+  - **Now:** switching to SPECIFICATION gives a trip without legs one leg, copied from its trip fields: stations, times, train number, operator code, product category. Switching back to SEARCH fills an empty trip from the first and last legs.
+  - **Drawing:** a SPECIFICATION trip with no legs shows an empty leg editor, never the SEARCH fields. Drawing still writes nothing; the first edit creates the leg.
+- **A night leg arrives the next day.** A leg's departure and arrival both got the trip date, so a train leaving at 18:36 and arriving at 08:38 was sent arriving before it left. An arrival that is not after the departure is now moved to the next day (`arrivalAfterDeparture()` in `scenarioParser.js`), with an INFO line.
+
+Checked:
+- Unit tests in `trip-specification-legs.test.js`; the suite fails on the old code.
+- Simulator replay, all scenarios, before and after.
+
+---
+
 ## [server-1.11.287] / [collection-OTST_V2.0.161] — 2026-10-14
 
 Issue #744, release 2026.322. Collection and server tests; no server code.

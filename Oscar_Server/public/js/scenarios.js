@@ -2630,10 +2630,13 @@ function buildTripSection(idx, sc, trip) {
   </div>` : '';
 
   let inner = '';
-  if (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs)) {
+  if (trip.tripType === 'SPECIFICATION') {
+    // #749: a SPECIFICATION trip without legs shows one empty leg, never the
+    // SEARCH fields; drawing writes nothing, the first edit creates the leg.
+    const legs = Array.isArray(trip.legs) && trip.legs.length > 0 ? trip.legs : [{}];
     // #366: one departure date covers all legs → trip-level, above the legs.
     inner = `<div class="param-grid" style="margin-bottom:8px">${depDayField}</div>`;
-    inner += trip.legs.map((leg, li) => `
+    inner += legs.map((leg, li) => `
     <div class="sub-card">
       <div class="sub-card-title">Leg ${li+1}</div>
       <div style="padding:0 14px 0">${buildTripTrainPicker(idx, tIdx, 'legs.' + li, trains)}</div>
@@ -3290,6 +3293,36 @@ function setTripField(tIdx, field, value) {
   if (tIdx < 0) return;
   state.tripRequirements[tIdx][field] = value;
   markDirty();
+}
+
+// #749: what a trip leg and a SEARCH trip have in common.
+const TRIP_LEG_FIELDS = ['origin', 'destination', 'startDatetime', 'endDatetime', 'vehicleNumber', 'operatorCode',
+  'productCategoryRef', 'productCategoryName', 'productCategoryShortName'];
+
+// #749: a trip switched to another type keeps what the user typed. The run
+// reads legs[] for SPECIFICATION and trip{} for SEARCH; switching only the
+// type used to leave a SPECIFICATION trip without legs, and the run stopped.
+function convertTripType(trip, tripType) {
+  const filled = (v) => v != null && v !== '';
+  trip.tripType = tripType;
+  if (tripType === 'SPECIFICATION' && !(Array.isArray(trip.legs) && trip.legs.length > 0)) {
+    const src = trip.trip || {};
+    const leg = {};
+    TRIP_LEG_FIELDS.forEach((f) => { if (filled(src[f])) leg[f] = src[f]; });
+    trip.legs = [leg];
+  } else if (tripType === 'SEARCH' && Array.isArray(trip.legs) && trip.legs.length > 0) {
+    const t = trip.trip || {};
+    if (!filled(t.origin) && !filled(t.destination) && !filled(t.startDatetime)) {
+      const first = trip.legs[0] || {};
+      const last = trip.legs[trip.legs.length - 1] || {};
+      const out = { ...t };
+      TRIP_LEG_FIELDS.forEach((f) => { if (filled(first[f])) out[f] = first[f]; });
+      if (filled(last.destination)) out.destination = last.destination;
+      if (filled(last.endDatetime)) out.endDatetime = last.endDatetime;
+      trip.trip = out;
+    }
+  }
+  return trip;
 }
 
 // Save time field: prepends %TRIP_DATE%T to the time-only value
@@ -7702,7 +7735,12 @@ document.body.addEventListener('change', function(e) {
       setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-field': {
       const tIdxF = Number.parseInt(el.dataset.tidx);
-      setTripField(tIdxF, el.dataset.field, el.value);
+      if (el.dataset.field === 'tripType' && tIdxF >= 0) {
+        convertTripType(state.tripRequirements[tIdxF], el.value);
+        markDirty();
+      } else {
+        setTripField(tIdxF, el.dataset.field, el.value);
+      }
       // tripType drives whether we render legs[] (SPECIFICATION) or a single
       // trip{} block (SEARCH). Switching between them leaves a stale UI
       // unless we re-render the scenario details that reference this trip.

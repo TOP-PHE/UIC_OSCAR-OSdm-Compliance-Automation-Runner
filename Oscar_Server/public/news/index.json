@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-15-trip-specification-legs",
+    "date": "October 15, 2026",
+    "tag": "Fix",
+    "title": "Trips by specification and night trains",
+    "summary": "Switching a trip to SPECIFICATION now keeps the stations, times and train you typed, and a night train's arrival is sent on the next day.",
+    "content": "Some providers ask for offers to be requested by trip specification (the exact train and its times) rather than by a search. Switching a trip to SPECIFICATION in Test Config used to leave it without any leg, so the run stopped before asking for offers. The trip's details are now copied into its first leg. A leg that arrives after midnight, such as a night train, is now sent with its arrival on the next day."
+  },
+  {
     "id": "2026-10-14-is-reservation-required",
     "date": "October 14, 2026",
     "tag": "Fix",

@@ -1205,6 +1205,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     SEARCH only (not trip ids, not a return); 01c and 01d compare within the
     same trip. One trip in the answer, or offers naming no trip, are left as
     they are, so the simulator (one trip per search) gives the same checks.
+  - **A SPECIFICATION trip reads `legs[]` only, a SEARCH trip `trip{}` only**
+    (#749). Switching the type in Test Config goes through
+    `convertTripType()` (`scenarios.js`), which copies one into the other;
+    the editor draws an empty leg, never the SEARCH fields, for a
+    SPECIFICATION trip without legs. The parser moves a leg's arrival to the
+    next day when it is not after the departure (`arrivalAfterDeparture()`):
+    both get the trip date, and a night train arrived before it left. A
+    provider may support only one form of offer request; declaring it is #748.
   - **An unset variable in a header template goes out as text** (#692,
     OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
     provider without a requestor got that text on every request. The

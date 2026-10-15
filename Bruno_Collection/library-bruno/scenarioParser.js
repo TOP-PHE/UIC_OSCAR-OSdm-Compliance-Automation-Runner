@@ -43,7 +43,8 @@ module.exports = {
   applyExternalRefFormat,
   scenarioTripDate,
   tripDateFor,
-  productCategoryOf
+  productCategoryOf,
+  arrivalAfterDeparture
 };
 
 // Which passengers step 03 updates: "MAIN" (the first only) when the scenario
@@ -220,6 +221,19 @@ function toOffsetDateTime(raw) {
     v = `${v}+00:00`;
   }
   return v;
+}
+
+// #749: a leg's departure and arrival both get the trip date, so a night leg
+// (18:36 → 08:38) arrived before it left. An arrival that is not after the
+// departure is moved to the next day; anything that cannot be read is left
+// as it is.
+function arrivalAfterDeparture(start, end) {
+  const s = Date.parse(toOffsetDateTime(start));
+  const e = Date.parse(toOffsetDateTime(end));
+  const m = typeof end === 'string' ? /^(\d{4})-(\d{2})-(\d{2})(T.*)$/.exec(end) : null;
+  if (Number.isNaN(s) || Number.isNaN(e) || e > s || !m) return end;
+  const next = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1));
+  return next.toISOString().slice(0, 10) + m[4];
 }
 
 // Normalize to LocalDateTime string (TripSearchCriteria rule for non-Bileto):
@@ -1030,7 +1044,11 @@ function parseScenarioData(jsonData) {
                 const legPrefix = `leg${legIndex + 1}`;
                 const _legCtx = `tripRequirement (SPECIFICATION) leg ${legIndex + 1}`;
                 const startDatetime = subTripDate(leg.startDatetime, _specTripDate, 'startDatetime', _legCtx);
-                const endDatetime = subTripDate(leg.endDatetime, _specTripDate, 'endDatetime', _legCtx);
+                const _sameDayEnd = subTripDate(leg.endDatetime, _specTripDate, 'endDatetime', _legCtx);
+                const endDatetime = arrivalAfterDeparture(startDatetime, _sameDayEnd);
+                if (endDatetime !== _sameDayEnd) {
+                  validationLogger(`[INFO] ${_legCtx}: arrival ${_sameDayEnd} is not after the departure ${startDatetime} — taken as the next day, ${endDatetime}.`);
+                }
 
                 bru.setEnvVar(`${legPrefix}StartStopPlaceRef`, leg.origin);
                 bru.setEnvVar(`${legPrefix}EndStopPlaceRef`, leg.destination);

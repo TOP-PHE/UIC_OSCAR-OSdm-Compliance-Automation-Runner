@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.322",
+  "current_release": "2026.323",
   "releases": [
+    {
+      "release": "2026.323",
+      "date": "2026-10-15",
+      "server": "1.11.288",
+      "collection": "OTST_V2.0.162",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Switching a trip to SPECIFICATION copies its fields into a leg; a night leg's arrival is sent on the next day (#749)."
+      ]
+    },
     {
       "release": "2026.322",
       "date": "2026-10-14",
