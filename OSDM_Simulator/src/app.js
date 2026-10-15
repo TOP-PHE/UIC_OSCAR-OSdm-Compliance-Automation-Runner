@@ -353,8 +353,10 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return response;
   }
 
-  // GET /availabilities/preferences (#766)
-  function preferencesRoute(req, provider, scope) {
+  // GET /availabilities/preferences (#766) on a provider with place
+  // preferences; every other availability resource is not provided.
+  function availabilitiesRoute(req, provider, scope, rest) {
+    if (rest.length !== 1 || rest[0] !== 'preferences' || !provider.placePreferences) throw notProvided();
     requireMethod(req, 'GET');
     const query = new URL(req.url, 'https://simulator.invalid').searchParams;
     return preferenceAvailability(query, store.get('offer', scope, query.get('contextId') || ''), provider);
@@ -381,9 +383,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     // #603: a provider that issues documents answers GET /fulfillments/{id}.
     if (resource === 'fulfillments' && rest.length === 1 && provider.documents) return fulfillmentRoute(req, scope, rest[0]);
     // #766: a provider with place preferences gives their availability.
-    if (resource === 'availabilities' && rest.length === 1 && rest[0] === 'preferences' && provider.placePreferences) {
-      return preferencesRoute(req, provider, scope);
-    }
+    if (resource === 'availabilities') return availabilitiesRoute(req, provider, scope, rest);
     if (NOT_PROVIDED.has(resource)) throw notProvided();
     throw notFound();
   }
