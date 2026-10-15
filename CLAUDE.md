@@ -1611,12 +1611,14 @@ space in it, so plain `npm test` / `npx jest` work locally exactly as in CI.
 (The previous checkout lived under `…/UIC_New_Revenue_Management project/…`;
 the space broke `npx jest`'s default glob resolution — "0 tests found". If a
 checkout ever lands in a path with a space again, the workaround is
-`npx jest --rootDir="$(pwd)" --testMatch="**/*.test.js"`.)
+`npx jest --rootDir="$(cd .. && pwd)" --testMatch="**/tests/**/*.test.js"`.
+Since #754 Jest's `rootDir` is the repository root, not `Oscar_Server/`.)
 
 **Claude Code worktrees (`…/oscar-monorepo/.claude/worktrees/<name>/`)** trip
 over the `.claude` dot-directory twice. First, `npx jest` finds 0 tests, and so
 does a positional path filter: use
-`npx jest --rootDir="$(pwd)" --testMatch="**/tests/**/*.test.js"`, and
+`npx jest --rootDir="$(cd .. && pwd)" --testMatch="**/tests/**/*.test.js"`
+(from `Oscar_Server/`; `rootDir` is the repository root since #754), and
 `--testPathPatterns=<name>` to narrow. Second, `server.test.js` › *SPA fallback
 › an unmatched deep GET…* fails with 500. Express's `send` refuses any absolute
 path containing a dot-segment, so `res.sendFile(public/index.html)` 404s
@@ -1721,15 +1723,25 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
   from that batch.
 - **Coverage initiative (2026-07-02, PRs #461–#466) is substantially
   complete**: ~50% → ~88% line coverage on `Oscar_Server/src`, SonarQube
-  Quality Gate is required + green (§2). Not chased further because the two
-  remaining gaps are both deliberately excluded from the coverage metric
-  (`public/**`, `library-bruno/**` — see `sonar-project.properties`), not
-  because anything is left half-done. If coverage work resumes, that's where
-  it resumes. `library-bruno/` is only partly tested: twelve
-  `tests/unit/bruno-*.test.js` files reach about half of its 28 modules
-  (`requestsBuilder`, `scenarioParser`, `osdmCompliance`, `partialRefund`…);
-  `reportGenerator`, `mergeReport` and `validators` have none; `refunds` and
-  `exchanges` are partly covered since #613 (checked 2026-10-09).
+  Quality Gate is required + green (§2). `public/**` stays excluded from the
+  coverage metric. **`library-bruno/**` is measured since #754** and is raised
+  PR after PR (maintainer decision 2026-10-15). Three things made it work, all
+  in `Oscar_Server/package.json`:
+  - Jest's `rootDir` is the repository root, with `roots` = `Oscar_Server` +
+    `Bruno_Collection/library-bruno`.
+  - The provider is `v8`. The babel provider does not instrument a file
+    outside `Oscar_Server/`, and v8 keeps only files under `rootDir`; with
+    either missing, the report silently has no `library-bruno` line.
+  - lcov paths are written from the repository root (`projectRoot: '..'`),
+    as Sonar's base directory expects.
+
+  At #754: 44 of its 48 modules reached, ~81% of their lines (v8 counts);
+  `Oscar_Server/src` ~95% under v8 (it read ~93% under babel: the two count
+  differently). The weakest: `displays` 19%, `afterSalesRules` 42%,
+  `placeProbes` 45%, `validators` 46%, `exchanges` 55%, `offers` 55%,
+  `auth` 58%. No test loads `loopback`, `mergeReport`, `reportGenerator` or
+  `schema`; Sonar counts them as uncovered. A PR touching `library-bruno` is
+  now held to the 83% new-code bar.
 - **Issue backlog was swept and cross-checked against the code 2026-07-02**
   (the list below is freshly verified, not inherited guesswork — re-check
   with `gh issue list --state open` if much time has passed):

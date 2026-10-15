@@ -148,8 +148,9 @@ describe('how a run is wired', () => {
 
   test('Jest runs the global setup and teardown', () => {
     const { jest: config } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    expect(config.globalSetup).toBe('<rootDir>/tests/global-setup.js');
-    expect(config.globalTeardown).toBe('<rootDir>/tests/global-teardown.js');
+    // #754: Jest's rootDir is the repository root, so that library-bruno is measured.
+    expect(config.globalSetup).toBe('<rootDir>/Oscar_Server/tests/global-setup.js');
+    expect(config.globalTeardown).toBe('<rootDir>/Oscar_Server/tests/global-teardown.js');
   });
 
   test('this test file\'s own database carries the run\'s id, in the shape the teardown removes', () => {

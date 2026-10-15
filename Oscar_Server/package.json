@@ -1,6 +1,6 @@
 {
   "name": "oscar-server",
-  "version": "1.11.290",
+  "version": "1.11.291",
   "description": "OSCAR — OSDM Conformance Automation Runner Server",
   "main": "src/server.js",
   "scripts": {
@@ -14,13 +14,34 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": [
-      "<rootDir>/tests/**/*.test.js"
+    "rootDir": "..",
+    "roots": [
+      "<rootDir>/Oscar_Server",
+      "<rootDir>/Bruno_Collection/library-bruno"
     ],
-    "globalSetup": "<rootDir>/tests/global-setup.js",
-    "globalTeardown": "<rootDir>/tests/global-teardown.js",
+    "testMatch": [
+      "<rootDir>/Oscar_Server/tests/**/*.test.js"
+    ],
+    "globalSetup": "<rootDir>/Oscar_Server/tests/global-setup.js",
+    "globalTeardown": "<rootDir>/Oscar_Server/tests/global-teardown.js",
     "setupFiles": [
-      "<rootDir>/tests/setup.js"
+      "<rootDir>/Oscar_Server/tests/setup.js"
+    ],
+    "coverageProvider": "v8",
+    "coverageDirectory": "<rootDir>/Oscar_Server/coverage",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/Oscar_Server/tests/"
+    ],
+    "coverageReporters": [
+      [
+        "lcov",
+        {
+          "projectRoot": ".."
+        }
+      ],
+      "json-summary",
+      "text-summary"
     ],
     "verbose": true,
     "testTimeout": 10000

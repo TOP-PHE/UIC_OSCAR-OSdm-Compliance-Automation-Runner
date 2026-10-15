@@ -62,6 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.291] / [collection-OTST_V2.0.164] — 2026-10-15
+
+Issue #754, release 2026.326. Test and coverage set-up only; no server or collection code.
+
+### Changed
+- **The coverage of `Bruno_Collection/library-bruno` is measured.** It was in `sonar.coverage.exclusions` since the engine had no tests; about 40 `tests/unit/bruno-*.test.js` files run it now, and a PR changing only the collection reported "0 new lines to cover".
+  - **Jest (`Oscar_Server/package.json`):** `rootDir` is the repository root, `roots` are `Oscar_Server` and `Bruno_Collection/library-bruno`, the coverage provider is `v8`, and lcov paths are written from the repository root. The babel provider does not instrument files outside `Oscar_Server/`.
+  - **Sonar:** `library-bruno/**` removed from `sonar.coverage.exclusions`. A PR that changes it is now held to the new-code coverage bar.
+  - **Figures at this change (v8):** `library-bruno` ~81 % of lines (44 of 48 modules reached), `Oscar_Server/src` ~95 %. Not loaded by any test yet: `loopback`, `mergeReport`, `reportGenerator`, `schema`.
+
+Checked:
+- Full Jest suite with coverage, with CI's threshold: 3,252 tests passed; `lcov.info` lists `Oscar_Server/…` and `Bruno_Collection/library-bruno/…` paths.
+
+---
+
 ## [server-1.11.290] / [collection-OTST_V2.0.164] — 2026-10-15
 
 Issue #751, release 2026.325. Collection and server tests; no server code.
