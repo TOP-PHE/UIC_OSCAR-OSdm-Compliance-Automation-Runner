@@ -39,6 +39,7 @@
 
 const {
   scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT, OFFER_REQUEST_FORMS,
+  placeSelectionFlowOf, placeSelectionFlowDeclared, PLACE_SELECTION_TEXT,
 } = require('./frameworkGating');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -146,6 +147,7 @@ function requirementsOf(scenario, datafile) {
     minOsdmVersion: model === 'COMBINED' ? '3.7' : null,
     passengerTypes: types,
     offerRequest: offerRequestOf(scenario, datafile),
+    placeSelectionFlow: placeSelectionFlowOf(scenario),
   };
 }
 
@@ -178,6 +180,10 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
+  // #766: a place chosen in a way the framework does not declare.
+  if (!placeSelectionFlowDeclared(fw, requirements.placeSelectionFlow)) {
+    missing.push(`place selection ${PLACE_SELECTION_TEXT[requirements.placeSelectionFlow]} (Seat Selection)`);
+  }
   return [...missing, ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw)];
 }
 

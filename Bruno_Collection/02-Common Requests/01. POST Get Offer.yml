@@ -182,6 +182,8 @@ runtime:
         // gave the classes asked (a warning), the sale goes on and the booking
         // is held to the classes of the offer chosen.
         require(bru.getEnvVar("library_base") + "offers.js").checkOfferLegClasses(jsonData);
+        // #766: what the offer says of the scenario's place selection flow.
+        require(bru.getEnvVar("library_base") + "offers.js").checkOfferPlaceSelection();
         // #705: passengers on the edges of the age ranges, priced as expected.
         require(bru.getEnvVar("library_base") + "passengerAges.js").checkOfferAges();
 

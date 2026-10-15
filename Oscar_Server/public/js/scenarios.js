@@ -337,6 +337,44 @@ function fwToggleOfferRequestForm(el, form) {
   el.classList.toggle('selected', !on);
 }
 
+// #766: how the provider lets a place be chosen, OSDM's PlaceSelectionFlow.
+// Kept in sync with frameworkGating.js (PLACE_SELECTION_FLOWS,
+// placeSelectionFlowDeclared()).
+const FW_PLACE_SELECTION_FLOWS = [
+  ['AUTOMATIC_PLACE_SELECTION', 'Automatic, by accommodation and place properties (window, aisle…)'],
+  ['AUTOMATIC_PLACE_SELECTION_PREFERENCES', 'Automatic, after asking the available preferences'],
+  ['AUTOMATIC_PLACE_SELECTION_NEARBY', 'Automatic, next to a given place'],
+  ['MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'A named place from the seat map, without fee'],
+  ['MANUAL_PLACE_SELECTION_WITH_FEE', 'A named place from the seat map, with a seat fee'],
+];
+
+// #766: no list declared means every flow (frameworks from before 1.11.297).
+function fwPlaceSelectionFlowDeclared(fw, flow) {
+  const declared = fw?.placeSelectionFlows;
+  return !Array.isArray(declared) || declared.includes(flow);
+}
+
+// #766: the framework editor's place selection flow pills.
+function placeSelectionFlowsPanelHtml(fw) {
+  const pills = FW_PLACE_SELECTION_FLOWS.map(([flow, label]) =>
+    `<div class="pill${fwPlaceSelectionFlowDeclared(fw, flow) ? ' selected' : ''}" data-action="fw-place-selection-flow" data-val="${esc(flow)}" title="${esc(flow)}">${esc(label)}</div>`).join('');
+  return `
+          <div class="fw-subsection" style="margin-top:12px">
+            <div class="fw-subsection-label" style="margin-bottom:8px">How a place can be chosen (OSDM place selection flows)</div>
+            <div style="margin-bottom:6px;font-size:11px;color:#78909c">A scenario choosing a place another way gets a warning, and the scenario catalogue does not copy it. At the offer step, a flow the offer does not list is a warning.</div>
+            <div class="pill-group">${pills}</div>
+          </div>`;
+}
+
+// #766: a flow pill. No list means every flow, so the first click starts from all five.
+function fwTogglePlaceSelectionFlow(el, flow) {
+  const fw = wizData.framework;
+  const list = Array.isArray(fw.placeSelectionFlows) ? fw.placeSelectionFlows : FW_PLACE_SELECTION_FLOWS.map(([f]) => f);
+  const on = list.includes(flow);
+  fw.placeSelectionFlows = on ? list.filter(x => x !== flow) : [...list, flow];
+  el.classList.toggle('selected', !on);
+}
+
 // #748: the options of a trip's type picker, an undeclared form marked.
 function tripTypeOptionText(tripType, fw) {
   return fwOfferRequestFormDeclared(fw, tripType) ? lbl(tripType) : `⚠ ${lbl(tripType)} — not declared in the Test Framework (Offer requests)`;
@@ -4161,6 +4199,7 @@ function renderWizardStep1() {
             </div>
           </div>
         </div>
+        ${placeSelectionFlowsPanelHtml(fw)}
       </div>
     </div>
   </div>
@@ -7520,6 +7559,8 @@ document.body.addEventListener('click', function(e) {
       fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-offer-request-form':
       fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-place-selection-flow':
+      fwTogglePlaceSelectionFlow(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-return-model':
       fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); break;
     case 'fw-remove-ancillary':

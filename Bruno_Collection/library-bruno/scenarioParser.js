@@ -117,7 +117,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -780,6 +780,8 @@ function parseScenarioData(jsonData) {
       // #600: the travel class expected on each leg, in the order of the legs.
       const _legClasses = require('./legClasses.js').normaliseLegClasses(scenario.legTravelClasses);
       bru.setEnvVar("legTravelClasses", _legClasses ? JSON.stringify(_legClasses) : null);
+      // #766: the place selection flow the scenario exercises (null: none).
+      bru.setEnvVar("placeSelectionFlow", require('./placeSelection.js').flowOfScenario(scenario));
       // #599: the expected product must NOT be offered (a group its rules exclude).
       bru.setEnvVar("expectedProductAbsent", (scenario.expectedProductAbsent === true || ["true", "on", "yes"].includes(String(scenario.expectedProductAbsent).toLowerCase())) ? "true" : "false");
       // #596: negative probe — the provider is expected to refuse this overrule code.
@@ -1702,6 +1704,12 @@ const PARTIAL_REFUND_SCOPE_OF = { partialRefundByFulfillment: 'fulfillment', par
 // The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
 // scenario arms that the Test Framework does not declare (#218, #619, #713).
 function featureNotDeclaredWarning(scenario, field) {
+  // #766: a place chosen in a way the framework does not declare.
+  if (typeof field === 'string' && field.startsWith('placeSelectionBy:')) {
+    const flow = field.slice('placeSelectionBy:'.length);
+    const text = require('./placeSelection.js').FLOW_TEXT[flow] || flow;
+    return `[WARNING] Scenario "${scenario.code}" chooses a place ${text} (${flow}), which the Test Framework does not declare (Seat Selection). The run will proceed; the provider may refuse or ignore the choice. Declare the flow in the Test Framework, or change the scenario's place selection.`;
+  }
   // #748: the offer request's form (offerRequestBy:SEARCH|SPECIFICATION|TRIP_IDS).
   if (typeof field === 'string' && field.startsWith('offerRequestBy:')) {
     const form = OFFER_REQUEST_TEXT[field.slice('offerRequestBy:'.length)] || field.slice('offerRequestBy:'.length);
