@@ -96,5 +96,53 @@
     }).filter(Boolean);
   }
 
-  return Object.freeze({ normalizeTrainData, resourceData, applyTrainService, trainService, journeyToTripLegs });
+  // #787: a trip keeps no link to the train set it was filled from: "Apply
+  // test data" copies the values. A trip block or leg was built from a set's
+  // service when it has the set's route and that service's number, as the set
+  // was before an edit (`before`). [{ target: 'trip' | <leg index>, serviceIndex }].
+  function blocksBuiltFrom(tripReq, before) {
+    const d = normalizeTrainData(structuredClone(before || {}));
+    if (!d.originURN || !d.destinationURN || !tripReq || typeof tripReq !== 'object') return [];
+    const out = [];
+    const consider = (block, target) => {
+      if (!block || typeof block !== 'object') return;
+      if (block.origin !== d.originURN || block.destination !== d.destinationURN) return;
+      const serviceIndex = d.services.findIndex(s => s.vehicleNumber && s.vehicleNumber === block.vehicleNumber);
+      if (serviceIndex >= 0) out.push({ target, serviceIndex });
+    };
+    consider(tripReq.trip, 'trip');
+    (Array.isArray(tripReq.legs) ? tripReq.legs : []).forEach((leg, i) => consider(leg, i));
+    return out;
+  }
+
+  const blockOf = (tripReq, target) => (target === 'trip' ? tripReq.trip : tripReq.legs[target]);
+
+  // #787: the blocks of `tripRequirements` built from the set as it was
+  // (`before`) that the set as saved (`after`) would change, each with its
+  // trip's index. A service the edit removed changes nothing.
+  function tripUpdatesFromTrain(tripRequirements, before, after) {
+    const d = normalizeTrainData(structuredClone(after || {}));
+    const out = [];
+    (Array.isArray(tripRequirements) ? tripRequirements : []).forEach((tripReq, tripIndex) => {
+      for (const b of blocksBuiltFrom(tripReq, before)) {
+        const svc = d.services[b.serviceIndex];
+        if (!svc) continue;
+        const block = blockOf(tripReq, b.target);
+        const applied = applyTrainService(structuredClone(block), d, svc);
+        if (JSON.stringify(applied) !== JSON.stringify(block)) out.push({ tripIndex, ...b });
+      }
+    });
+    return out;
+  }
+
+  // #787: fill one block named by an update from the set as saved.
+  function applyTripUpdate(tripReq, update, after) {
+    const d = normalizeTrainData(structuredClone(after || {}));
+    const block = blockOf(tripReq, update.target);
+    const svc = d.services[update.serviceIndex];
+    if (block && svc) applyTrainService(block, d, svc);
+    return tripReq;
+  }
+
+  return Object.freeze({ normalizeTrainData, resourceData, applyTrainService, trainService, journeyToTripLegs, blocksBuiltFrom, tripUpdatesFromTrain, applyTripUpdate });
 }));

@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.313] / [collection-OTST_V2.0.181] — 2026-10-16
+
+Issue #787 (part 2), release 2026.348. Trips follow a corrected train set.
+
+### Added
+- **Saving a train set offers its values to the trips filled from it.** "Apply test data" copies a set's values into a trip, so a train number corrected in Test Data left every trip built from it on the old one: a real provider's batch kept asking for `OSDM-104` after the set said `OSDM_104`.
+  - A trip block or leg was filled from a set's service when it has the set's route and that service's train number, as the set was before the edit (`blocksBuiltFrom()` in `public/js/trip-apply.js`). Trips made before this release are found the same way.
+  - Only the blocks the edit changes are offered (`tripUpdatesFromTrain()`), and they are filled exactly as "Apply test data" does (`applyTripUpdate()`). After a confirmation, Save & Apply keeps the change (`offerTripUpdateFromTrain()` in `scenarios.js`).
+  - A trip used by a scenario that is read-only for the person is left as it is.
+
+### Default decisions (taken without asking)
+- **A trip keeps no link to its set.** Trips are matched by values, so no new key enters the data file and its schema, and old trips are found too.
+- **A service removed from the set changes nothing**: its trips are not offered.
+
+Checked:
+- Unit tests: `trip-follows-train.test.js` (6), including a read-only scenario's trip left as it is (mutation-checked).
+- Full suite, lint.
+
+Not verified: the confirmation in a real browser. The tests lift the page functions and check them that way.
+
+---
+
 ## [server-1.11.312] / [collection-OTST_V2.0.181] — 2026-10-16
 
 Issue #787 (part 1), release 2026.347. Re-probe offers checks each service of a train set.
