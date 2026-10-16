@@ -62,6 +62,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.311] / [collection-OTST_V2.0.181] — 2026-10-16
+
+Issue #785, release 2026.346. The OSDM version is checked, and follows the Test Framework.
+
+### Fixed
+- **A version that is not one is refused where it is typed.** A real provider's batch failed at every request because the Test Framework's version was typed `3..0.5`, and every copied scenario carried it in its `Content-Type`.
+  - `PUT /v1/company/test-framework` answers 400 for an `osdmVersion` that is not digits and dots (`3.8`, `3.0.5`); `utils/osdmVersion.js`, pure.
+  - Test Config's two version fields, the framework's and a scenario's, store nothing while what is typed is not a version. Leaving one with such text puts the stored value back and says why (`changeOsdmVersion()`, before the change switch, which is at Sonar's 30-case limit). The page's pattern is pinned to the server's by a test.
+  - The framework field's value is escaped (`esc()`), which it was not.
+- **A run whose version is not one is refused** before a token is asked for (`refusedOsdmVersion()` in `runner.js`). It is a FAILED run that says where to correct the version: the scenario, or the Test Framework.
+- **A scenario naming no version runs with the Test Framework's.** The run's copy of the data file gets it (`withFrameworkVersion()`, with the framework warnings in `server.js`); the stored file does not change.
+- **Changing the Test Framework's version offers it to the scenarios still on the old one.** After a confirmation, it changes those the person may change; Save & Apply keeps the change. Before, the Test Manager had to delete every copied scenario and copy it again.
+
+### Default decisions (taken without asking)
+- **Copies keep naming their version.** The data file schema requires `osdmVersion` on a scenario, so a copy still gets the framework's; the offer to change them is what keeps them in step.
+- **A stored data file holding a wrong version is not refused on save.** The run refuses it, saying where it is, so the file can still be opened and corrected.
+
+Checked:
+- Unit tests: `osdm-version.test.js` (8), the route (400 and 200), the run's copy (`server.test.js`) and the runner's refusal (`runner.test.js`).
+- Full suite, lint.
+
+Not verified: the confirmation and the toasts in a real browser. The tests lift the page functions and check them that way.
+
+---
+
 ## [server-1.11.310] / [collection-OTST_V2.0.181] — 2026-10-16
 
 Issue #781, release 2026.345. Simulator 0.32.0. Currencies are declared, then tested through the sale and after-sales.

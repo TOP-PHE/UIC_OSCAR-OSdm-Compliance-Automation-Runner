@@ -127,6 +127,18 @@ describe('test-framework — PUT create/update + GET', () => {
     expect(res.body.updated_at).toBeTruthy();
   });
 
+  // #785: a version typed "3..0.5" went into every request of every run.
+  test('400 for an OSDM version that is not one; 3.0.5 and 3.8 pass', async () => {
+    const put = (osdmVersion) => request(app).put('/v1/company/test-framework')
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ config: { profile: 'OTST', salesFlows: ['sale'], _salesFlowsMigratedAt: '2026-01-01T00:00:00.000Z', osdmVersion } });
+    const bad = await put('3..0.5');
+    expect(bad.status).toBe(400);
+    expect(bad.body.detail).toContain('"3..0.5" is not a version');
+    expect((await put('3.0.5')).status).toBe(200);
+    expect((await put('3.8')).status).toBe(200);
+  });
+
   test('200 GET returns the decrypted config for a tester', async () => {
     const res = await request(app).get('/v1/company/test-framework')
       .set('Authorization', `Bearer ${makeToken('company_user', testerId)}`);

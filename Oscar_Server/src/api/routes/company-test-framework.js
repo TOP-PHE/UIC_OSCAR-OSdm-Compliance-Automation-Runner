@@ -26,6 +26,7 @@ const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = requi
 const { decryptFromFileAsync } = require('../../utils/at-rest');
 const { applyFrameworkMigration, needsFrameworkMigration } = require('../../utils/frameworkGating');
 const log = require('../../utils/logger');
+const { isOsdmVersion } = require('../../utils/osdmVersion');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
@@ -118,6 +119,12 @@ router.put('/test-framework', (req, res) => {
   // Accept either { config: {...} } (from wizard) or a bare config object.
   // Phase 2 of issue #60: encrypt the config JSON at rest.
   const configPayload = (body.config && typeof body.config === 'object') ? body.config : body;
+  // #785: the OSDM version goes in every request of every run; "3..0.5" once
+  // failed a whole batch at the provider.
+  const version = configPayload.osdmVersion;
+  if (version != null && version !== '' && !isOsdmVersion(version)) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: `The OSDM version "${String(version).slice(0, 40)}" is not a version: digits and dots, such as 3.8 or 3.0.5.` });
+  }
   const configJson = colEncrypt(JSON.stringify(configPayload));
   const existing = get('SELECT id FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
 
