@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-offer-search-combinations",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Offer search options, combined at random",
+    "summary": "The scenario catalogue can now offer probes that combine several offer search options at once, drawn from a seed you set.",
+    "content": "Under Offer search options in the Test Framework, set how many random combinations you want (up to 20) and a seed, or press New seed. The scenario catalogue then offers that many probes, OTST_OFFER_COMBO_1 and on, each asking for two or more of the values you ticked together, for example first class and non-flexible tariffs. Like the single-option probes, one fails when no offer keeps to an option or when the provider says it ignored it. The same seed always gives the same combinations, so a combination that finds a problem can be copied and run again; a new seed gives new ones. The travel class and the service class are never combined, because a provider may tie them."
+  },
+  {
     "id": "2026-10-16-offer-search-probes",
     "date": "October 16, 2026",
     "tag": "Feature",

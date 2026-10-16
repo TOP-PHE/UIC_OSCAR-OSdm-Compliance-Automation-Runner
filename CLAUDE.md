@@ -200,6 +200,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     to `serviceClassTypes` (HIGH = first, STANDARD = second), flags offer
     parts without ADMISSION as ignored, and ignores the criteria from
     `0000090`.
+    **PR 3 (1.11.308): random combinations.** `offerCombinations: { count,
+    seed }` (1–20, 32-bit); entry `OTST_OFFER_OPTION_COMBINATIONS` becomes
+    `OTST_OFFER_COMBO_<n>` (`optionsOf`), drawn when the catalogue is read
+    by `drawCombinations()` (`utils/offerCombinations.js`, mulberry32): the
+    same seed, the same combinations. Two or more options, one value each,
+    never travel and service class together (`group`). A new seed comes from
+    `crypto.getRandomValues`, never `Math.random`.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

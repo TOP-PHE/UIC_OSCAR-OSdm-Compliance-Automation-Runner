@@ -229,6 +229,7 @@ Each asks for offers with one option of the offer search criteria alone (`offerS
 | `SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38` | `flexibilities` `NON_FLEXIBLE`, the flexibility the scenario chooses too. | Non-flexible offers only. | No failed check. |
 | `SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38` | `requestedOfferParts` `ADMISSION`. | The usual offers: admissions, with their reservation where the train has one. | No failed check. |
 | `SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38` | `offerMode` `INDIVIDUAL`. | Individual offers. | No failed check. |
+| `SIM_OFFER_PROBE_COMBINATION_38` | Three options together (#780 part 3): `travelClasses` `FIRST`, `offerMode` `INDIVIDUAL`, `requestedOfferParts` `ADMISSION`; the source of the catalogue's random combinations. | First-class individual offers. | No failed check. |
 
 ### Seat reservations (#601)
 

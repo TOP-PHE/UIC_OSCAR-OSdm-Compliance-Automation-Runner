@@ -366,7 +366,46 @@ function offerSearchOptionsPanelHtml(fw) {
         <div class="fw-subsection-label" style="margin-bottom:8px">🔎 Offer search options — the offerSearchCriteria values the provider takes</div>
         <div style="margin-bottom:6px;font-size:11px;color:#78909c">A scenario sending a value not ticked gets a warning. Every run checks that the offers keep to the options sent, as warnings: OSDM lets the classes returned differ from those asked.</div>
         ${groups}
+        ${offerCombinationsHtml(fw)}
       </div>`;
+}
+
+// #780 part 3: how many random combinations of the values ticked the
+// catalogue offers, and the seed they are drawn from (empty = none).
+function offerCombinationsHtml(fw) {
+  const c = fw?.offerCombinations || {};
+  const count = Number.isInteger(c.count) ? c.count : '';
+  const seed = Number.isInteger(c.seed) ? c.seed : '';
+  return `
+        <div style="margin:10px 0 2px;font-size:12px;color:#546e7a">Random combinations — the catalogue offers this many scenarios combining two or more of the values ticked, drawn from the seed; the same seed gives the same combinations</div>
+        <label for="fw-offer-combinations-count" style="font-size:12px">Number</label>
+        <input type="number" id="fw-offer-combinations-count" min="1" max="20" value="${esc(count)}" data-action="fw-offer-combinations" data-field="count" style="width:70px">
+        <label for="fw-offer-combinations-seed" style="font-size:12px;margin-left:10px">Seed</label>
+        <input type="number" id="fw-offer-combinations-seed" min="0" max="4294967295" value="${esc(seed)}" data-action="fw-offer-combinations" data-field="seed" style="width:130px">
+        <button type="button" class="btn-secondary" data-action="fw-offer-combinations-new-seed" style="margin-left:6px">New seed</button>`;
+}
+
+// #780 part 3: a typed count (1–20) or seed (0–4294967295); empty removes it.
+// Returns false, with the stored value put back, for anything else.
+function fwSetOfferCombination(field, raw) {
+  const fw = wizData.framework;
+  const text = String(raw ?? '').trim();
+  const max = field === 'count' ? 20 : 4294967295;
+  const min = field === 'count' ? 1 : 0;
+  const n = /^\d{1,10}$/.test(text) ? Number.parseInt(text, 10) : Number.NaN;
+  if (text !== '' && !(n >= min && n <= max)) return false;
+  const c = { ...(fw.offerCombinations || {}) };
+  if (text === '') delete c[field];
+  else c[field] = n;
+  fw.offerCombinations = c;
+  return true;
+}
+
+// #780 part 3: a new seed, from the browser's random source.
+function fwNewOfferCombinationSeed() {
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  wizData.framework.offerCombinations = { ...(wizData.framework.offerCombinations || {}), seed };
+  return seed;
 }
 
 // #780: an option pill. No list means every value, so the first click starts from all of them.
@@ -7616,6 +7655,13 @@ document.body.addEventListener('click', function(e) {
       fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-offer-search-option':
       fwToggleOfferSearchOption(el, el.dataset.key, el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-offer-combinations-new-seed': {
+      const input = document.getElementById('fw-offer-combinations-seed');
+      const seed = fwNewOfferCombinationSeed();
+      if (input) input.value = seed;
+      saveFrameworkDebounced();
+      break;
+    }
     case 'fw-place-selection-flow':
       fwTogglePlaceSelectionFlow(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-return-model':
@@ -8142,6 +8188,10 @@ document.body.addEventListener('change', function(e) {
       fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); break;
     case 'fw-toggle-seatmap':
       fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
+    case 'fw-offer-combinations':
+      if (fwSetOfferCombination(el.dataset.field, el.value)) saveFrameworkDebounced();
+      else el.value = wizData.framework?.offerCombinations?.[el.dataset.field] ?? '';
+      break;
     case 'fw-sales-horizon': {
       // #704: how many days ahead the provider sells; empty = not declared.
       const value = fwSalesHorizonDays(el.value);

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.342",
+  "current_release": "2026.343",
   "releases": [
+    {
+      "release": "2026.343",
+      "date": "2026-10-16",
+      "server": "1.11.308",
+      "collection": "OTST_V2.0.179",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Random combinations of offer search options: the Test Framework sets how many and a seed, and the catalogue offers that many probes combining two or more declared values; the same seed gives the same combinations (#780, part 3)."
+      ]
+    },
     {
       "release": "2026.342",
       "date": "2026-10-16",
