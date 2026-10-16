@@ -704,6 +704,21 @@ function offersOfPairs(pairs, ctx) {
   return { offers, remembered };
 }
 
+// #611: what the offers of a trip from a variant stop place carry.
+function applyStopPlaceVariants(trips, provider, offers, remembered) {
+  // The requested-information stop place asks for each passenger's date of
+  // birth and phone number.
+  if (persons.asksForInformation(trips, provider)) {
+    for (const offer of offers) for (const part of offer.admissionOfferParts) part.requestedInformation = persons.REQUESTED;
+    for (const entry of remembered) entry.asksInfo = true;
+  }
+  // The wrong-offers stop place gives offers one cent off.
+  const wrongFrom = provider.variants?.wrongOffersFrom;
+  if (wrongFrom && trips.some((t) => t.origin?.stopPlaceRef === wrongFrom)) {
+    for (const offer of offers) offer.offerSummary.minimalPrice.amount += 1;
+  }
+}
+
 function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const trips = tripsOf(body, providerAsIs, known);
   // #780: the variant stop place answers as if no criteria were sent.
@@ -728,18 +743,7 @@ function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const { offers, remembered } = offersOfPairs(beyondHorizon ? [] : pairs, {
     classes, flexibilities, collective, passengers, refusals, fulfillmentOptions, provider, nowMs, shortLivedMs,
   });
-  // #611: the offers of a trip from the requested-information stop place ask
-  // for each passenger's date of birth and phone number.
-  const asksInfo = persons.asksForInformation(trips, provider);
-  if (asksInfo) {
-    for (const offer of offers) for (const part of offer.admissionOfferParts) part.requestedInformation = persons.REQUESTED;
-    for (const entry of remembered) entry.asksInfo = true;
-  }
-  // #611: the offers of a trip from the wrong-offers stop place are one cent off.
-  const wrongFrom = provider.variants?.wrongOffersFrom;
-  if (wrongFrom && trips.some((t) => t.origin?.stopPlaceRef === wrongFrom)) {
-    for (const offer of offers) offer.offerSummary.minimalPrice.amount += 1;
-  }
+  applyStopPlaceVariants(trips, provider, offers, remembered);
   const allTrips = [...outboundTrips, ...trips];
   const problems = problemsOf(passengers, offers, collective, refusals);
   const partsIgnored = offerPartsIgnored(criteria);
