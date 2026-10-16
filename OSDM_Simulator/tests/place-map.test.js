@@ -85,7 +85,8 @@ test('map: refusals, and no coach for a trip without a map', () => {
   const status = (body, f = find) => { try { vehiclePlaceMap(body, f, gamma, price); return 200; } catch (e) { return e.status; } };
   const ref = restriction(offer).placeRestrictions[0].reservationRef;
   assert.equal(status({}), 400);
-  assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, contextType: 'BOOKING' } }] }), 501);
+  assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, contextType: 'BOOKING' } }] }, () => null), 404, 'BOOKING context: no such booking');
+  assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, contextType: 'TRIP' } }] }), 400);
   assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, resourceType: 'FARE' } }] }), 400);
   assert.equal(status(restriction(offer), () => undefined), 404);
   assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, resourceId: 'nope' } }] }), 404);
@@ -162,7 +163,8 @@ test('nearby: the free seats around a saloon seat; refusals; no map, nothing', (
   const status = (q, found = find(offer.offerId)) => { try { nearbyAvailability(q, found, gamma); return 200; } catch (e) { return e.status; } };
   assert.equal(status(nearQuery(offer, { placeNumber: '99' })), 404);
   assert.equal(status(nearQuery(offer, { coachNumber: '8' })), 404);
-  assert.equal(status(nearQuery(offer, { contextType: 'BOOKING' })), 501);
+  assert.equal(status(nearQuery(offer, { contextType: 'BOOKING' }), null), 404);
+  assert.equal(status(nearQuery(offer, { contextType: 'TRIP' })), 400);
   assert.equal(status(nearQuery(offer, { resourceType: 'FARE' })), 400);
   assert.equal(status(new URLSearchParams({ contextId: offer.offerId })), 400);
   assert.equal(status(nearQuery(offer), null), 404);

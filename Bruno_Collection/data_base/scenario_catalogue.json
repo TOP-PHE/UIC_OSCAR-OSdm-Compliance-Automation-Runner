@@ -513,6 +513,51 @@
       }
     },
     {
+      "code": "OTST_SALE_NAMED_PLACE_ADD_LATER_2ADT",
+      "source": "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38",
+      "purpose": "An optional reservation added after the booking with two named seats: the place map asked for the booking (POST /availabilities/vehicle-place-map, BOOKING context), the seats named in the offer-parts request and given.",
+      "checks": 335,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "OPTIONAL"
+        ],
+        "passengers": 2
+      }
+    },
+    {
+      "code": "OTST_SALE_NEARBY_PLACE_ADD_LATER_2ADT",
+      "source": "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38",
+      "purpose": "An optional reservation added after the booking near a given place: GET /availabilities/nearby for the booking, the reference place in the offer-parts request, seats given in its coach.",
+      "checks": 335,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "OPTIONAL"
+        ],
+        "passengers": 2,
+        "providerValues": [
+          "referencePlace"
+        ]
+      }
+    },
+    {
+      "code": "OTST_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT",
+      "source": "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38",
+      "purpose": "An optional reservation added after the booking with a seat preference: GET /availabilities/preferences for the booking, the preference in the offer-parts request, and the place given names it.",
+      "checks": 336,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "OPTIONAL"
+        ],
+        "passengers": 2,
+        "providerValues": [
+          "placePreferences"
+        ]
+      }
+    },
+    {
       "code": "OTST_SALE_BY_TRIP_ID_1ADT",
       "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
       "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",

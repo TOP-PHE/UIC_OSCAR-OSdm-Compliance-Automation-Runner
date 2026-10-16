@@ -423,7 +423,11 @@ test('the reservation scenarios: one per form, on a SuperCity (mandatory) then a
     anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }, { externalRef: '00002', type: 'PERSON' }],
   }, gamma, Date.parse('2026-11-02T09:00:00Z'));
   assert.ok(response.offers.every((o) => o.reservationOfferParts.length === 2));
-  for (const scenario of datafile.scenarios.filter((s) => !booked.includes(s))) assert.equal(scenario.reservationBookingForm, undefined, scenario.code);
+  // #766 PR 5: the place choices made after the booking add the reservation later too.
+  const afterBooking = ['SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38', 'SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38', 'SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38'];
+  for (const scenario of datafile.scenarios.filter((s) => !booked.includes(s))) {
+    assert.equal(scenario.reservationBookingForm, afterBooking.includes(scenario.code) ? 'ADD_LATER' : undefined, scenario.code);
+  }
 });
 
 test('the trip id scenarios: the train named is a later departure of POST /trips-collection than the time asked (#602)', () => {
@@ -498,12 +502,11 @@ test('the age scenario: the only one on gamma\'s age-tariff stop place, three pa
   for (const p of list) assert.equal(p.updateDateOfBirth, undefined);
 });
 
-test('the seat preference scenarios: the only ones on gamma\'s preference stop place, on a train with a mandatory reservation (#766)', () => {
+test('the seat preference scenarios: the only ones on gamma\'s preference stop place, on a train with a mandatory reservation, or an optional one added later (#766)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const trips = datafile.tripRequirements.filter((t) => (t.legs || [t.trip]).some((leg) => leg?.origin === gamma.placePreferences.from));
-  assert.deepEqual(trips.map((t) => t.id), [15]);
-  const [leg] = trips[0].legs;
-  assert.equal(gamma.reservations[leg.productCategoryShortName], 'MANDATORY');
+  assert.deepEqual(trips.map((t) => t.id), [15, 18]);
+  assert.deepEqual(trips.map((t) => gamma.reservations[t.legs[0].productCategoryShortName]), ['MANDATORY', 'OPTIONAL']);
   const on = datafile.scenarios.filter((s) => s.tripRequirementId === 15);
   assert.deepEqual(on.map((s) => [s.code, s.placePreferences, s.placeSelectionFlow ?? null]), [
     ['SIM_SALE_SEAT_PREFERENCE_1ADT_38', ['WINDOW'], null],
@@ -515,14 +518,23 @@ test('the seat preference scenarios: the only ones on gamma\'s preference stop p
   assert.ok(offered.includes('WINDOW') && !gamma.placePreferences.soldOut.includes('WINDOW'));
   assert.ok(offered.includes('TABLE') && gamma.placePreferences.soldOut.includes('TABLE'));
   assert.ok(!offered.includes('UPPER_DECK'));
-  assert.deepEqual(datafile.scenarios.filter((s) => s.placePreferences != null).map((s) => s.code), on.map((s) => s.code));
+  // #766 PR 5: the optional reservation added after the booking, with a preference.
+  const later = datafile.scenarios.filter((s) => s.tripRequirementId === 18);
+  assert.deepEqual(later.map((s) => [s.code, s.reservationBookingForm, s.placePreferences, s.placeSelectionFlow]), [
+    ['SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38', 'ADD_LATER', ['WINDOW'], 'AUTOMATIC_PLACE_SELECTION_PREFERENCES'],
+  ]);
+  assert.deepEqual(datafile.scenarios.filter((s) => s.placePreferences != null).map((s) => s.code), [...on, ...later].map((s) => s.code));
 });
 
-test('the named place scenarios: the only ones on gamma\'s place map stop place, on a train with a mandatory reservation (#766)', () => {
+test('the named place scenarios: the only ones on gamma\'s place map stop place, on a train with a mandatory reservation, or an optional one added later (#766)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const trips = datafile.tripRequirements.filter((t) => (t.legs || [t.trip]).some((leg) => leg?.origin === gamma.placeMap.from));
-  assert.deepEqual(trips.map((t) => t.id), [16]);
-  assert.equal(gamma.reservations[trips[0].legs[0].productCategoryShortName], 'MANDATORY');
+  assert.deepEqual(trips.map((t) => t.id), [16, 17]);
+  assert.deepEqual(trips.map((t) => gamma.reservations[t.legs[0].productCategoryShortName]), ['MANDATORY', 'OPTIONAL']);
+  assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === 17).map((s) => [s.code, s.reservationBookingForm, s.placeSelectionFlow]), [
+    ['SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38', 'ADD_LATER', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE'],
+    ['SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38', 'ADD_LATER', 'AUTOMATIC_PLACE_SELECTION_NEARBY'],
+  ]);
   const on = datafile.scenarios.filter((s) => s.tripRequirementId === 16);
   assert.deepEqual(on.map((s) => [s.code, s.placeSelectionFlow, s.namedPlaceKind ?? null]), [
     ['SIM_SALE_NAMED_PLACE_2ADT_38', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', null],

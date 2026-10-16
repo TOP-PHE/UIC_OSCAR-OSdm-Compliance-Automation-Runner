@@ -46,6 +46,8 @@ module.exports = {
   askPlacePreferences,
   askNamedPlaces,
   askNearbyPlace,
+  askPlacesAfterBooking,
+  placeChoiceAfterBooking,
   bookingWithoutPreferences,
   recordPlacePreferenceChecks,
   checkOfferRequestByTripIds,
@@ -2223,20 +2225,19 @@ function bookingWithoutPreferences(status, body) {
  * The checks are kept in __placePreferencesOutcome and recorded by 02's
  * after-response (a before-request records none).
  */
-async function askPlacePreferences() {
+async function askPlacePreferences(afterBooking = false) {
   if (bru.getEnvVar("placeSelectionFlow") !== "AUTOMATIC_PLACE_SELECTION_PREFERENCES") return;
   const send = parseEnvJson("__placePreferencesSent", []);
-  const offerId = bru.getEnvVar("offerId");
-  if (!Array.isArray(send) || send.length === 0 || !offerId || bru.getEnvVar("__placePreferencesAskedFor") === offerId) return;
-  bru.setEnvVar("__placePreferencesAskedFor", offerId);
+  const ctx = placeChoiceContext(afterBooking);
+  if (!Array.isArray(send) || send.length === 0 || !ctx.contextId || bru.getEnvVar("__placePreferencesAskedFor") === ctx.key) return;
+  bru.setEnvVar("__placePreferencesAskedFor", ctx.key);
   const ps = require('./placeSelection.js');
-  const ids = [...new Set([...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])]
-    .map((p) => p?.reservationId).filter(Boolean))];
+  const ids = ctx.ids;
   if (ids.length === 0) {
-    validationLogger("[WARNING] Seat preferences: no reservation is placed in the booking, so GET /availabilities/preferences is not asked.");
+    if (!afterBooking && !placeChoiceAfterBooking()) validationLogger("[WARNING] Seat preferences: no reservation is placed in the booking, so GET /availabilities/preferences is not asked.");
     return;
   }
-  const answers = await Promise.all(ids.map((id) => sendAvailabilityRequest(ps.preferencesQuery(offerId, id))));
+  const answers = await Promise.all(ids.map((id) => sendAvailabilityRequest(ps.preferencesQuery(ctx.contextId, id, ctx.contextType))));
   const checks = [];
   let available = send;
   for (const [i, id] of ids.entries()) {
@@ -2297,19 +2298,18 @@ function recordPlacePreferenceChecks() {
  * scenario's reference place, once per offer. The reference place is then
  * sent in the booking (requestsBuilder).
  */
-async function askNearbyPlace() {
+async function askNearbyPlace(afterBooking = false) {
   const np = require('./namedPlaces.js');
   const ref = parseEnvJson("nearbyReference", null);
-  const offerId = bru.getEnvVar("offerId");
-  if (!ref || bru.getEnvVar("placeSelectionFlow") !== "AUTOMATIC_PLACE_SELECTION_NEARBY" || !offerId || bru.getEnvVar("__nearbyAskedFor") === offerId) return;
-  bru.setEnvVar("__nearbyAskedFor", offerId);
-  const ids = [...new Set([...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])]
-    .map((p) => p?.reservationId).filter(Boolean))];
+  const ctx = placeChoiceContext(afterBooking);
+  if (!ref || bru.getEnvVar("placeSelectionFlow") !== "AUTOMATIC_PLACE_SELECTION_NEARBY" || !ctx.contextId || bru.getEnvVar("__nearbyAskedFor") === ctx.key) return;
+  bru.setEnvVar("__nearbyAskedFor", ctx.key);
+  const ids = ctx.ids;
   if (ids.length === 0) {
-    validationLogger("[WARNING] Nearby place: no reservation is placed in the booking, so no place near the reference is asked.");
+    if (!afterBooking && !placeChoiceAfterBooking()) validationLogger("[WARNING] Nearby place: no reservation is placed in the booking, so no place near the reference is asked.");
     return;
   }
-  const answers = await Promise.all(ids.map((id) => sendAvailabilityRequest(np.nearbyQuery(offerId, id, ref))));
+  const answers = await Promise.all(ids.map((id) => sendAvailabilityRequest(np.nearbyQuery(ctx.contextId, id, ref, ctx.contextType))));
   const checks = [];
   for (const [i, id] of ids.entries()) {
     const outcome = np.checkNearbyAnswer(answers[i].status, answers[i].body, id, ref);
@@ -2325,18 +2325,17 @@ async function askNearbyPlace() {
  * once per offer, and the places (or compartment) to name for each. Nothing
  * to choose is a warning; the booking then names no place.
  */
-async function askNamedPlaces() {
+async function askNamedPlaces(afterBooking = false) {
   const np = require('./namedPlaces.js');
   const kind = bru.getEnvVar("namedPlaceKind");
   const flow = bru.getEnvVar("placeSelectionFlow");
-  const offerId = bru.getEnvVar("offerId");
-  if (!kind || !np.isManual(flow) || !offerId || bru.getEnvVar("__namedPlacesAskedFor") === offerId) return;
-  bru.setEnvVar("__namedPlacesAskedFor", offerId);
+  const ctx = placeChoiceContext(afterBooking);
+  if (!kind || !np.isManual(flow) || !ctx.contextId || bru.getEnvVar("__namedPlacesAskedFor") === ctx.key) return;
+  bru.setEnvVar("__namedPlacesAskedFor", ctx.key);
   const offer = chosenOffer();
-  const ids = [...new Set([...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])]
-    .map((p) => p?.reservationId).filter(Boolean))];
+  const ids = ctx.ids;
   if (ids.length === 0) {
-    validationLogger("[WARNING] Named place: no reservation is placed in the booking, so the place map is not asked.");
+    if (!afterBooking && !placeChoiceAfterBooking()) validationLogger("[WARNING] Named place: no reservation is placed in the booking, so the place map is not asked.");
     return;
   }
   const bookingRefs = parseEnvJson("bookingPassengerReferences", []) || [];
@@ -2345,7 +2344,7 @@ async function askNamedPlaces() {
     const refs = Array.isArray(part?.passengerRefs) && part.passengerRefs.length > 0 ? part.passengerRefs : bookingRefs;
     return { id, passengerRefs: refs };
   });
-  const res = await sendAvailabilityRequest('/availabilities/vehicle-place-map', np.placeMapRequest(offerId, ids));
+  const res = await sendAvailabilityRequest('/availabilities/vehicle-place-map', np.placeMapRequest(ctx.contextId, ids, ctx.contextType));
   const answer = np.checkPlaceMapAnswer(res.status, res.body);
   for (const line of answer.lines) validationLogger(`[${line.level}] ${line.text}`);
   bru.setEnvVar("__namedPlacesOutcome", JSON.stringify({ checks: answer.checks }));
@@ -2356,8 +2355,42 @@ async function askNamedPlaces() {
     const fee = chosen.fees[id] ? ` (selection fee ${chosen.fees[id]})` : '';
     validationLogger(`[INFO] Named place for reservation ${id}: ${np.describeChoice(choice)}${fee}.`);
   }
-  bru.setEnvVar("__namedPlaceChoices", JSON.stringify(chosen.choices));
-  bru.setEnvVar("__namedPlaceFees", JSON.stringify(chosen.fees));
+  // After the booking, the choices join those made for the booking (#766 PR 5).
+  const before = (name) => (afterBooking ? parseEnvJson(name, {}) || {} : {});
+  bru.setEnvVar("__namedPlaceChoices", JSON.stringify({ ...before("__namedPlaceChoices"), ...chosen.choices }));
+  bru.setEnvVar("__namedPlaceFees", JSON.stringify({ ...before("__namedPlaceFees"), ...chosen.fees }));
+}
+
+/**
+ * Where the availability requests of a place choice are asked (#766 PR 5):
+ * before the booking, for the offer and the reservations the booking places;
+ * after it, for the booking and the reservations 09 adds (ADD_LATER). `key`
+ * keeps each ask to once per offer, and once per booking.
+ */
+function placeChoiceContext(afterBooking) {
+  const idsOf = (selections) => [...new Set(selections.map((p) => p?.reservationId).filter(Boolean))];
+  if (afterBooking) {
+    const bookingId = bru.getEnvVar("bookingId");
+    return { contextId: bookingId, contextType: "BOOKING", key: `BOOKING:${bookingId}`, ids: idsOf(parseEnvJson("reservationAddLaterSelections", []) || []) };
+  }
+  const offerId = bru.getEnvVar("offerId");
+  return { contextId: offerId, contextType: "OFFER", key: offerId, ids: idsOf([...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])]) };
+}
+
+/** Whether 09 adds reservations after the booking (ADD_LATER), where the place choice is made then. */
+function placeChoiceAfterBooking() {
+  return bru.getEnvVar("reservationBookingForm") === "ADD_LATER" && (parseEnvJson("reservationAddLaterSelections", []) || []).length > 0;
+}
+
+/**
+ * Before 09 adds the optional reservations after the booking (ADD_LATER):
+ * the same availability requests as before a booking, in a BOOKING context
+ * (#766 PR 5). Their checks are recorded by 09's after-response.
+ */
+async function askPlacesAfterBooking() {
+  await askPlacePreferences(true);
+  await askNamedPlaces(true);
+  await askNearbyPlace(true);
 }
 
 // ── Group tariffs (#599) ─────────────────────────────────────────────────────

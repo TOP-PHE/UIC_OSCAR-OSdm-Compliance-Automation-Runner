@@ -199,10 +199,9 @@ function preferenceAvailability(query, found, provider) {
   const resourceId = query.get('resourceId');
   const resourceType = query.get('resourceType');
   if (!contextId || !contextType || !resourceId || !resourceType) throw bad('contextId, contextType, resourceId and resourceType are required');
-  if (contextType === 'BOOKING') throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator gives the preferences of an offer only.');
-  if (contextType !== 'OFFER') throw bad('contextType must be OFFER or BOOKING');
+  if (!placeMap.CONTEXTS.has(contextType)) throw bad('contextType must be OFFER or BOOKING');
   if (resourceType !== 'RESERVATION') throw bad('resourceType must be RESERVATION');
-  if (!found) throw new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+  if (!found) throw placeMap.contextNotFound(contextType);
   const part = listOf(found.offer.reservationOfferParts).find((p) => p.id === resourceId);
   if (!part) throw new HttpError(404, 'RESERVATION_NOT_FOUND', 'Reservation not found', `"${resourceId}" is not a reservation of offer ${contextId}.`);
   const trip = listOf(found.trips).find((t) => t.id === part.tripCoverage.coveredTripId);

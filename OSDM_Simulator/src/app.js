@@ -356,23 +356,33 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
 
   // GET /availabilities/preferences (#766) on a provider with place
   // preferences; every other availability resource is not provided.
+  // #766 PR 5: what an availability is asked for. An OFFER context is the
+  // offer; a BOOKING context is the offer of the booking's booked offer that
+  // holds the reservation (one added after the booking is still an offer part).
+  function offerInContext(scope, contextId, contextType, reservationId) {
+    if (contextType !== 'BOOKING') return store.get('offer', scope, contextId);
+    const booking = store.get('booking', scope, contextId);
+    const entries = (booking ? booking.bookedOffers : []).map((o) => store.get('offer', scope, o.offerId)).filter(Boolean);
+    return entries.find((e) => (e.offer.reservationOfferParts || []).some((p) => p.id === reservationId)) || null;
+  }
+
   async function availabilitiesRoute(req, provider, scope, rest) {
     // #766 PR 3: POST /availabilities/vehicle-place-map on a provider with a place map.
     if (rest.length === 1 && rest[0] === 'vehicle-place-map' && provider.placeMap) {
       requireMethod(req, 'POST');
       const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
-      return vehiclePlaceMap(await bodyOf(req), (offerId) => store.get('offer', scope, offerId), provider, price);
+      return vehiclePlaceMap(await bodyOf(req), (id, type, reservationId) => offerInContext(scope, id, type, reservationId), provider, price);
     }
+    const query = new URL(req.url, 'https://simulator.invalid').searchParams;
+    const found = () => offerInContext(scope, query.get('contextId') || '', query.get('contextType'), query.get('resourceId'));
     // #766 PR 4: GET /availabilities/nearby on a provider with a place map.
     if (rest.length === 1 && rest[0] === 'nearby' && provider.placeMap) {
       requireMethod(req, 'GET');
-      const query = new URL(req.url, 'https://simulator.invalid').searchParams;
-      return nearbyAvailability(query, store.get('offer', scope, query.get('contextId') || ''), provider);
+      return nearbyAvailability(query, found(), provider);
     }
     if (rest.length !== 1 || rest[0] !== 'preferences' || !provider.placePreferences) throw notProvided();
     requireMethod(req, 'GET');
-    const query = new URL(req.url, 'https://simulator.invalid').searchParams;
-    return preferenceAvailability(query, store.get('offer', scope, query.get('contextId') || ''), provider);
+    return preferenceAvailability(query, found(), provider);
   }
 
   async function osdmRoute(req, provider, clientId, segments) {

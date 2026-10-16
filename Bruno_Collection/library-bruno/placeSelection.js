@@ -257,10 +257,10 @@ function withPreferences(selections, offer, send, passengerRefs = []) {
   });
 }
 
-/** The query of GET /availabilities/preferences for a reservation of an offer. */
-function preferencesQuery(offerId, reservationId) {
+/** The query of GET /availabilities/preferences for a reservation of an offer (or of a booking). */
+function preferencesQuery(contextId, reservationId, contextType = 'OFFER') {
   const q = (v) => encodeURIComponent(String(v ?? ''));
-  return `/availabilities/preferences?contextId=${q(offerId)}&contextType=OFFER&resourceId=${q(reservationId)}&resourceType=RESERVATION`;
+  return `/availabilities/preferences?contextId=${q(contextId)}&contextType=${q(contextType)}&resourceId=${q(reservationId)}&resourceType=RESERVATION`;
 }
 
 /**
