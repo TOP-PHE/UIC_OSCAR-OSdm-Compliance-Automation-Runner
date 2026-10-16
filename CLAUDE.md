@@ -124,6 +124,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     OSDM code lists (osdm.io) were not reachable: the codes are the spec's
     examples. A catalogue entry with preferences needs `providerValues`
     `placePreferences`.
+    **PR 3 (1.11.299): a named place or compartment.** A scenario whose own
+    `placeSelectionFlow` is MANUAL_… (and no older `placeSelectionMode`) gets
+    `namedPlaceKind` (PLACE / COMPARTMENT) from the parser; 02's before-request
+    asks `POST /availabilities/vehicle-place-map` once per offer
+    (`askNamedPlaces()`), `library-bruno/namedPlaces.js` (pure) chooses FREE
+    seats (fee seats first in the fee flow) or a selectable compartment, the
+    builder adds them (`withNamedPlaces()`), and 07 fails a place not given or
+    a price that is not the offer's plus the fees (`checkNamedPlacesBooked()`).
+    `validatePartPrices()` accepts offer price + fee for those reservations.
+    `sendAvailabilityRequest()` takes a POST body (named `payload`: a local
+    `body` shadowed it once, and every map request went out as HTTP 0).
+    Simulator: `placeMap` from `0000091`, coach 7. In the same PR, from two
+    real providers' runs: **`console.log` in a request file never reaches the
+    HTML report** (only `validationLogger` does; a test refuses a tagged
+    `console.log` now); an empty booked `appliedPassengerTypes` is a WARNING;
+    a booking refused with seat preferences is sent once more without them
+    (`bookingWithoutPreferences()`), to tell a refused preference (FAIL if the
+    offer listed it, else WARNING) from a refused reservation.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
