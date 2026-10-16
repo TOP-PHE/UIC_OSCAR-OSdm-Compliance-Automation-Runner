@@ -1113,7 +1113,7 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
     // Handled before the change switch (Sonar S1479 caps its cases).
-    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el) || changeOsdmVersion(action, el)) return;");
+    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeOsdmVersion(action, el)) return;");
     const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
     expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
     expect(fn).toContain("const value = paxAgeValue(field, el.value);");

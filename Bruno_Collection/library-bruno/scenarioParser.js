@@ -117,7 +117,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -842,6 +842,10 @@ function parseScenarioData(jsonData) {
       // expects it refused (past, or beyond the sales horizon).
       bru.setEnvVar("departureDaysFromToday", Number.isInteger(scenario.departureDaysFromToday) ? String(scenario.departureDaysFromToday) : null);
       bru.setEnvVar("departureExpectRejection", _flagOn(scenario.departureExpectRejection) ? "true" : "false");
+      // #781: the currency the offers are in when none is asked, and the probe
+      // asking for one the provider does not sell.
+      bru.setEnvVar("expectedCurrency", typeof scenario.expectedCurrency === "string" && /^[A-Z]{3}$/.test(scenario.expectedCurrency) ? scenario.expectedCurrency : null);
+      bru.setEnvVar("currencyExpectRejection", _flagOn(scenario.currencyExpectRejection) ? "true" : "false");
       // #700: after-sale requests that must be refused.
       bru.setEnvVar("refundAgainProbe", _flagOn(scenario.refundAgainProbe) ? "true" : "false");
       bru.setEnvVar("exchangeRefundedProbe", _flagOn(scenario.exchangeRefundedProbe) ? "true" : "false");
@@ -1749,6 +1753,11 @@ function featureNotDeclaredWarning(scenario, field) {
     const [key, value] = field.slice('offerOption:'.length).split('=');
     const member = OFFER_OPTION_MEMBER[key] || key;
     return `[WARNING] Scenario "${scenario.code}" asks for offers with offerSearchCriteria.${member} ${value}, which the Test Framework does not declare (Offer search options). The run will proceed; the provider may refuse or ignore it. Declare the value in the Test Framework, or change the scenario's offer search criteria.`;
+  }
+  // #781: a currency the framework does not declare (currency:<code>).
+  if (typeof field === 'string' && field.startsWith('currency:')) {
+    const currency = field.slice('currency:'.length);
+    return `[WARNING] Scenario "${scenario.code}" asks for offers in ${currency}, which the Test Framework does not declare (Currencies). The run will proceed; the provider may refuse the currency or answer in another one. Declare the currency in the Test Framework, or change the scenario's offer search criteria.`;
   }
   // #748: the offer request's form (offerRequestBy:SEARCH|SPECIFICATION|TRIP_IDS).
   if (typeof field === 'string' && field.startsWith('offerRequestBy:')) {

@@ -231,6 +231,17 @@ Each asks for offers with one option of the offer search criteria alone (`offerS
 | `SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38` | `offerMode` `INDIVIDUAL`. | Individual offers. | No failed check. |
 | `SIM_OFFER_PROBE_COMBINATION_38` | Three options together (#780 part 3): `travelClasses` `FIRST`, `offerMode` `INDIVIDUAL`, `requestedOfferParts` `ADMISSION`; the source of the catalogue's random combinations. | First-class individual offers. | No failed check. |
 
+### Currencies (#781)
+
+Gamma sells in its own currency, CZK, and in EUR (profile `otherCurrencies`, at a 24th of the CZK price). Without a currency asked, it answers in CZK. A sale keeps its currency through the booking, the refund and the exchange. A currency it does not sell is refused with `400 CURRENCY_NOT_SUPPORTED`. Alpha and beta name no other currency and answer in their own whatever is asked.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38` | A return asked in EUR, booked, confirmed and refunded in full. | Offers, booking and refund offers in EUR. | No failed check. |
+| `SIM_CURRENCY_EUR_EXCHANGE_1ADT_38` | A one-way ticket asked in EUR and exchanged; the exchange request carries the sale's criteria, EUR included. | Offers, booking and exchange offers in EUR. | No failed check. |
+| `SIM_CURRENCY_DEFAULT_1ADT_38` | No currency asked; the scenario expects the default, CZK (`expectedCurrency`). | Offers in CZK. | No failed check. |
+| `SIM_NHF_CURRENCY_NOT_SOLD_38` | Negative test: offers asked in USD (`currencyExpectRejection`). | `400 CURRENCY_NOT_SUPPORTED`, a Problem. | No failed check; the scenario ends after the offer. |
+
 ### Seat reservations (#601)
 
 On trip 5, the SuperCity reservation is mandatory and the EuroCity one is
@@ -316,6 +327,7 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 | `SIM_WRONG_NAMED_PLACE_38` | Variant `gives-other-place` (passenger list 24) on trip 16, a free seat named (#766). Deliberately wrong. | The booking gives the next seat instead of the one named. | One failed check at 07: the booked reservation does not give the place named. |
 | `SIM_WRONG_OFFER_PROBE_IGNORED_38` | Offer search probe (#780), first class asked from station `0000090` (`variants.ignoresOfferOptionsFrom`, trip 19). | The offer search criteria are ignored: second class only. | One failed check at 01: no offer keeps to the travel class asked. |
 | `SIM_WRONG_OFFER_PROBE_RESERVATION_ONLY_38` | Offer search probe (#780), reservations only asked (`requestedOfferParts` `RESERVATION`). | Gamma sells nothing without an admission: the usual offers, and a `PARAMETER_NOT_SUPPORTED` problem naming `offerSearchCriteria.requestedOfferParts`. | One failed check at 01: the provider says it ignored the option. |
+| `SIM_WRONG_CURRENCY_DEFAULT_38` | No currency asked; the scenario expects EUR as the default (`expectedCurrency`). Deliberately wrong. | Offers in gamma's default, CZK. | One failed check at 01: the offers are not in the currency expected. |
 
 ### Requested information and purchaser (#611)
 

@@ -36,6 +36,8 @@ function postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus) {
   // Validate each exchange offer
   jsonData.exchangeOffers.forEach((exchangeOffer, index) => {
     validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillmentStatus);
+    // #781: the exchange is in the sale's currency.
+    require('./currencies.js').checkAfterSale(`Exchange offer[${index}]`, exchangeOffer);
   });
 
   // Store first offer ID

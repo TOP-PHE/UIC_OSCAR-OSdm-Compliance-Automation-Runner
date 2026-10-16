@@ -6,6 +6,9 @@
   },
   "currency": "CZK",
   "priceFactor": 24,
+  "otherCurrencies": {
+    "EUR": { "priceFactor": 1 }
+  },
   "osdmVersion": "3.8.0",
   "idPrefix": "GAMMA",
   "utcOffset": "+02:00",

@@ -31,6 +31,7 @@ const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { buildOfferCollection } = require('./offers');
 const variants = require('./variants');
+const { currencyOf } = require('./bookings');
 
 const MAX_FULFILLMENT_IDS = 20;
 const SEMI_FLEXIBLE_FEE_SHARE = 0.25;
@@ -114,12 +115,14 @@ function exchangeOfferFrom(booking, entry, given, overruleCode, provider) {
     offerSummary: offer.offerSummary,
     admissionOfferParts: offer.admissionOfferParts,
     ...(offer.reservationOfferParts ? { reservationOfferParts: offer.reservationOfferParts } : {}),
-    exchangePrice: price(exchangePrice, provider.currency),
-    exchangeFee: price(exchangeFee, provider.currency),
+    // #781: the new journey's price in the currency it was offered in; the
+    // fee and the balance in the booking's.
+    exchangePrice: price(exchangePrice, offer.offerSummary.minimalPrice.currency),
+    exchangeFee: price(exchangeFee, currencyOf(booking, provider)),
     // What is left to pay, or what comes back when the new journey costs less.
     ...(balance >= 0
-      ? { amountToBePaid: price(balance, provider.currency) }
-      : { refundableAmount: price(-balance, provider.currency) }),
+      ? { amountToBePaid: price(balance, currencyOf(booking, provider)) }
+      : { refundableAmount: price(-balance, currencyOf(booking, provider)) }),
     fulfillments: given.fulfillments.map((f) => fulfillmentRef(booking, f)),
     ...(overruleCode ? { appliedOverruleCode: overruleCode } : {}),
   };
@@ -238,7 +241,7 @@ function confirmExchange(booking, pending, provider, nowMs, bookOffer) {
   const offer = operation.exchangeOffers[0];
   const kept0 = booking.confirmedPrice ? booking.confirmedPrice.amount : 0;
   const givenAmount = givenParts.reduce((total, p) => total + p.price.amount, 0);
-  booking.confirmedPrice = price(kept0 - givenAmount + offer.exchangePrice.amount + offer.exchangeFee.amount, provider.currency);
+  booking.confirmedPrice = price(kept0 - givenAmount + offer.exchangePrice.amount + offer.exchangeFee.amount, currencyOf(booking, provider));
   operation.status = 'CONFIRMED';
   operation.confirmedOn = confirmedOn;
   return booking.fulfillments;

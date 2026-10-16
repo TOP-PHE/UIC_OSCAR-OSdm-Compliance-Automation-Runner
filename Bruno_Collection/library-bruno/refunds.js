@@ -516,6 +516,8 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   // GET/PATCH re-reads would only duplicate it).
   if (((typeof req !== "undefined" && req && req.getName && req.getName()) || "") === "10. POST Refund Offers") {
     validateRefundPermissibility(refundOffer, index);
+    // #781: the refund is in the sale's currency.
+    require('./currencies.js').checkAfterSale(`Refund offer[${index}]`, { refundableAmount: refundOffer.refundableAmount, refundFee: refundOffer.refundFee });
   }
 
   // Validate dates.

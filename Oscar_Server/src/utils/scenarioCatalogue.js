@@ -75,7 +75,10 @@ const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES'];
 // ANY_CLASS ask for nothing to check), the code part and the OSDM member.
 // #780 part 3: an entry (`probe` "OFFER_COMBINATIONS") that comes as random
 // combinations of those values, drawn from the framework's count and seed.
-const PROBES = ['OFFER_OPTIONS', 'OFFER_COMBINATIONS'];
+// #781: entries that come once per declared currency (CURRENCIES), in the
+// default one with none asked (DEFAULT_CURRENCY), and in one not declared
+// (CURRENCY_NOT_SOLD).
+const PROBES = ['OFFER_OPTIONS', 'OFFER_COMBINATIONS', 'CURRENCIES', 'DEFAULT_CURRENCY', 'CURRENCY_NOT_SOLD'];
 const OFFER_OPTION_PROBES = [
   { key: 'offerModes', field: 'offerMode', values: ['INDIVIDUAL'], code: 'OFFER_MODE', member: 'offerMode' },
   { key: 'requestedOfferParts', field: 'requestedOfferParts', values: ['ADMISSION', 'RESERVATION', 'ANCILLARY'], code: 'OFFER_PARTS', member: 'requestedOfferParts' },
@@ -407,6 +410,7 @@ function catalogueFor(catalogue, simulator, framework) {
   return baseEntries(catalogue, simulator, framework).flatMap((entry) => {
     if (entry.probe === 'OFFER_OPTIONS') return offerOptionProbes(entry, fw);
     if (entry.probe === 'OFFER_COMBINATIONS') return offerCombinationProbes(entry, fw);
+    if (CURRENCY_PROBES.has(entry.probe)) return currencyProbes(entry, fw);
     if (!forms || !entry.requirements.offerRequest.convertible) return [entry];
     const variants = OFFER_REQUEST_FORMS.filter((form) => forms.includes(form))
       .map((form) => (form === 'SEARCH' ? entry : asForm(entry, form, framework)));
@@ -476,6 +480,37 @@ function offerCombinationProbes(entry, fw) {
       purpose: `Offer search combination ${i + 1} of seed ${settings.seed}: offers asked with ${text} together; an option no offer keeps to, or that the provider ignores, fails. The scenario ends after the offer.`,
     };
   });
+}
+
+const CURRENCY_PROBES = new Set(['CURRENCIES', 'DEFAULT_CURRENCY', 'CURRENCY_NOT_SOLD']);
+const NO_CURRENCY = 'the currencies sold (Currencies)';
+
+/**
+ * #781: a currency entry against the framework's currencies. CURRENCIES: one
+ * twin per currency sold (`currencyOf`), coded `<code>_<currency>`.
+ * DEFAULT_CURRENCY: the entry asking none and expecting the default
+ * (`expectedCurrencyOf`). CURRENCY_NOT_SOLD: the entry asking for a common
+ * currency not declared (`currencyOf`, `notSold`). Not copiable when the
+ * framework declares nothing to use.
+ */
+function currencyProbes(entry, fw) {
+  const { currenciesOf, currencyNotSold } = require('./currencies');
+  const { sold, default: def } = currenciesOf(fw);
+  const missing = (what) => [{ ...entry, missing: [...entry.missing, what] }];
+  if (entry.probe === 'DEFAULT_CURRENCY') {
+    if (!def) return missing('the default currency (Currencies)');
+    return [{ ...entry, expectedCurrencyOf: def, purpose: `${entry.purpose} Default currency: ${def}.` }];
+  }
+  if (entry.probe === 'CURRENCY_NOT_SOLD') {
+    const other = currencyNotSold(fw);
+    if (!other) return missing(NO_CURRENCY);
+    return [{ ...entry, currencyOf: other, notSold: true, purpose: `${entry.purpose} Currency asked: ${other}.` }];
+  }
+  if (!sold.length) return missing(NO_CURRENCY);
+  return sold.map((currency) => ({
+    ...entry, code: `${entry.code}_${currency}`, variantOf: entry.code, currencyOf: currency,
+    purpose: `${entry.purpose} Currency: ${currency}.`,
+  }));
 }
 
 // #748/#759: the forms a search can be sent in instead, with the code suffix

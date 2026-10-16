@@ -367,7 +367,55 @@ function offerSearchOptionsPanelHtml(fw) {
         <div style="margin-bottom:6px;font-size:11px;color:#78909c">A scenario sending a value not ticked gets a warning. Every run checks that the offers keep to the options sent, as warnings: OSDM lets the classes returned differ from those asked.</div>
         ${groups}
         ${offerCombinationsHtml(fw)}
+        ${currenciesHtml(fw)}
       </div>`;
+}
+
+// #781: the currencies the provider sells in, and the one it answers in when
+// none is asked. Empty = not declared: every currency accepted, none tested.
+function currenciesHtml(fw) {
+  const c = fw?.currencies || {};
+  const sold = Array.isArray(c.sold) ? c.sold.join(', ') : '';
+  const def = typeof c.default === 'string' ? c.default : '';
+  return `
+        <div style="margin:10px 0 2px;font-size:12px;color:#546e7a">💱 Currencies — ISO 4217 codes the provider sells in (offerSearchCriteria.currency), and its default when none is asked; the catalogue offers a sale and an exchange per currency, a sale in the default and a probe with a currency not listed</div>
+        <label for="fw-currencies-sold" style="font-size:12px">Sold in</label>
+        <input type="text" id="fw-currencies-sold" value="${esc(sold)}" placeholder="EUR, CHF" data-action="fw-currencies" data-field="sold" style="width:160px">
+        <label for="fw-currencies-default" style="font-size:12px;margin-left:10px">Default</label>
+        <input type="text" id="fw-currencies-default" value="${esc(def)}" placeholder="EUR" maxlength="3" data-action="fw-currencies" data-field="default" style="width:60px">`;
+}
+
+// #781: a typed list of currencies ("EUR, chf") or a default; empty removes
+// it. The default is always one of those sold. Returns false, leaving the
+// framework as it was, when a word is not a three-letter code.
+function fwSetCurrencies(field, raw) {
+  const words = String(raw ?? '').split(/[\s,;]+/).map((w) => w.trim().toUpperCase()).filter(Boolean);
+  if (words.some((w) => !/^[A-Z]{3}$/.test(w)) || (field === 'default' && words.length > 1)) return false;
+  const c = { ...wizData.framework.currencies };
+  if (field === 'default') {
+    if (words.length) c.default = words[0];
+    else delete c.default;
+  } else if (words.length) {
+    c.sold = [...new Set(words)];
+  } else {
+    delete c.sold;
+  }
+  if (c.default && !(c.sold || []).includes(c.default)) c.sold = [c.default, ...(c.sold || [])];
+  if (Object.keys(c).length) wizData.framework.currencies = c;
+  else delete wizData.framework.currencies;
+  return true;
+}
+
+// #781: handled before the change switch, which is at Sonar's 30-case limit (S1479).
+function changeCurrencies(action, el) {
+  if (action !== 'fw-currencies') return false;
+  if (fwSetCurrencies(el.dataset.field, el.value)) saveFrameworkDebounced();
+  const c = wizData.framework?.currencies || {};
+  const sold = document.getElementById('fw-currencies-sold');
+  if (sold) sold.value = Array.isArray(c.sold) ? c.sold.join(', ') : '';
+  const def = document.getElementById('fw-currencies-default');
+  if (def) def.value = c.default || '';
+  return true;
 }
 
 // #780 part 3: how many random combinations of the values ticked the
@@ -7845,7 +7893,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el) || changeOsdmVersion(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeOsdmVersion(action, el)) return;
 
   switch (action) {
     case 'file-upload':

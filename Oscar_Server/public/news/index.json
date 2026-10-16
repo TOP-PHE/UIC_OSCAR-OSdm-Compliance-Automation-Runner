@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-16-osdm-version",
+    "date": "October 16, 2026",
+    "tag": "Fix",
+    "title": "The OSDM version is checked, and follows the Test Framework",
+    "summary": "A version such as 3..0.5 is refused where it is typed, and changing the Test Framework's version offers to change the scenarios too.",
+    "content": "The OSDM version goes in every request a run sends. A version typed 3..0.5 once made a whole batch fail at the provider, and correcting the Test Framework changed nothing, because each copied scenario kept its own copy. Now the Test Framework and the scenario editor refuse a version that is not digits and dots (3.8, 3.0.5), and a run whose version is not one is refused at once, with where to correct it. When you change the Test Framework's version, Test Config offers to change every scenario still on the old one; Save & Apply keeps it. A scenario that names no version runs with the Test Framework's."
+  },
+  {
+    "id": "2026-10-16-currencies",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Currencies: declared, then tested through the sale and after-sales",
+    "summary": "Declare the currencies a provider sells in; the runs check that a sale keeps its currency, and the catalogue tests each one.",
+    "content": "Under Offer search options in the Test Framework, list the currencies the provider sells in (for example EUR, CHF) and the one it answers in when none is asked. A scenario asking for a currency not listed gets a warning. Every run now checks that the offers are in the currency asked, or in the default when none is asked, and that the booking, the refund offers and the exchange offers stay in the currency of the sale. The scenario catalogue offers a sale with a full refund and an exchange in each currency listed, a sale with no currency asked, and a negative test asking for a common currency the provider does not sell: a refusal or no offer passes, offers in that currency fail."
+  },
+  {
     "id": "2026-10-16-real-provider-false-failures",
     "date": "October 16, 2026",
     "tag": "Fix",

@@ -207,6 +207,25 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     same seed, the same combinations. Two or more options, one value each,
     never travel and service class together (`group`). A new seed comes from
     `crypto.getRandomValues`, never `Math.random`.
+  - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
+    framework (`utils/currencies.js`; the default is always among those sold;
+    nothing declared = every currency, none tested). Warning `currency:<C>`
+    from `annotateDatafile()`, not for the not-sold probe. The collection
+    (`library-bruno/currencies.js`): after 01 the offers are in the currency
+    asked, else the scenario's `expectedCurrency` (none in it = FAIL, some =
+    WARNING); `__saleCurrency` is the chosen offer's, and refund offers (at 10)
+    and exchange offers are held to it. The exchange request already sends the
+    sale's `offerSearchCriteria`, currency included. `currencyExpectRejection`
+    is the not-sold probe at 01 (refusal / no offer pass, offers in it FAIL,
+    in another WARNING), ending the scenario. Catalogue probes `CURRENCIES`
+    (`<code>_<C>` per currency, `currencyOf`), `DEFAULT_CURRENCY`
+    (`expectedCurrencyOf`), `CURRENCY_NOT_SOLD` (first of
+    `NOT_SOLD_CANDIDATES` not declared), copied by `withCurrencies()`.
+    Simulator 0.32.0: gamma sells CZK and EUR (`otherCurrencies`, its own price
+    factor), refuses others with `400 CURRENCY_NOT_SUPPORTED`; a booking,
+    refund and exchange take the booking's currency (`currencyOf()`); an
+    exchange asked without currency is offered in CZK, so a lost currency
+    shows. No simulator scenario asked a currency before, so none moved.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
@@ -679,6 +698,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `scenarios.js` and runs them in a `vm` context with a fake `fetch` and
     `document`. It only works for top-level functions laid out with `}` at
     column 0, which is how the file is written.
+- **The OSDM version is checked and follows the Test Framework** (#785,
+  1.11.311). It goes in every request's `Content-Type`, and `3..0.5` once
+  failed a whole batch. `utils/osdmVersion.js` (pure): digits and dots; the
+  framework route answers 400, the runner refuses the run
+  (`refusedOsdmVersion()`), the run's copy gives the framework's version to a
+  scenario naming none (`withFrameworkVersion()`). Copies still name it (the
+  schema requires it), so changing the framework's version offers the
+  scenarios on the old one the new one (`offerScenarioVersionUpdate()` in
+  `scenarios.js`, own scenarios only). The page's `OSDM_VERSION_PATTERN` is
+  pinned to the server's by `osdm-version.test.js`.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already

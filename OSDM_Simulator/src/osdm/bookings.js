@@ -103,6 +103,8 @@ const SHORT_LIVED = Symbol('short lived');
 const lifetimeOf = (booking, defaultMs) => booking[SHORT_LIVED] || defaultMs;
 
 const sumOf = (prices, currency) => ({ amount: prices.reduce((total, p) => total + p.amount, 0), currency, scale: 2 });
+// #781: a booking is in the currency its offers were sold in.
+const currencyOf = (booking, provider) => partsOf(booking).find((p) => p.price?.currency)?.price.currency || provider.currency;
 // Every part of a booking: its admissions and, since #601, its reservations.
 const partsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...bookedOffer.reservations]);
 
@@ -207,7 +209,7 @@ function createBooking(body, findOffer, provider, nowMs) {
   if (body.purchaser !== undefined) booking.purchaser = { detail: personDetail(body.purchaser?.detail) };
   const externalRef = text(body.externalRef);
   if (externalRef) booking.externalRef = externalRef;
-  booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), provider.currency);
+  booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), currencyOf(booking, provider));
   Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
   Object.defineProperty(booking, SHORT_LIVED, { value: shortLivedMs });
   // #611: a booking of offers that asked for information keeps asking while it is missing.
@@ -264,8 +266,8 @@ function confirmBooking(booking, provider, nowMs) {
     admission.confirmedOn = confirmedOn;
     delete admission.confirmableUntil;
   }
-  booking.confirmedPrice = sumOf(admissions.map((a) => a.price), provider.currency);
-  booking.provisionalPrice = { amount: 0, currency: provider.currency, scale: 2 };
+  booking.confirmedPrice = sumOf(admissions.map((a) => a.price), currencyOf(booking, provider));
+  booking.provisionalPrice = { amount: 0, currency: currencyOf(booking, provider), scale: 2 };
   delete booking.confirmationTimeLimit;
   let groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
   if (variants.has(booking, 'per-passenger')) groups = variants.groupsByPassenger(admissions);
@@ -366,4 +368,4 @@ function exchangedBookedOffer(booking, entry, nowMs) {
   return bookedOffer;
 }
 
-module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf };
+module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf, currencyOf };
