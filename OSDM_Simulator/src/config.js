@@ -95,6 +95,7 @@ function checkProvider(key, raw) {
     ...checkSalesHorizon(raw.salesHorizon, bad),
     ...checkAgeTariffs(raw.ageTariffs, bad),
     ...checkPlacePreferences(raw.placePreferences, bad),
+    ...checkPlaceMap(raw.placeMap, bad),
   };
 }
 
@@ -258,6 +259,17 @@ function checkPlacePreferences(value, bad) {
       soldOut: [...soldOut],
     },
   };
+}
+
+// #766 PR 3: the trips from one stop place (`from`) whose reservations can be
+// placed on a place map, and the selection fee of a fee seat, in hundredths
+// before the price factor. Absent: no place map.
+function checkPlaceMap(value, bad) {
+  if (value === undefined) return {};
+  const ok = value && typeof value === 'object' && isText(value.from, 1, 120)
+    && Number.isInteger(value.fee) && value.fee >= 1 && value.fee <= 10000;
+  if (!ok) throw bad('placeMap');
+  return { placeMap: { from: value.from, fee: value.fee } };
 }
 
 // #697: the stop places whose trips are sold with one ticket per passenger

@@ -474,6 +474,11 @@
               null
             ]
           },
+          "namedPlaceKind": {
+            "description": "In a manual place selection flow named by the scenario (placeSelectionFlow MANUAL_PLACE_SELECTION_WITHOUT_FEE or _WITH_FEE), what is named on the place map (#766): PLACE (default), a free seat per passenger, in placeSelections[].places; COMPARTMENT, a free compartment booked as a whole, in placeSelections[].compartments. POST /availabilities/vehicle-place-map is asked before the booking; the booking must give the places named, at the offer's price plus their selection fees.",
+            "type": ["string", "null"],
+            "enum": ["PLACE", "COMPARTMENT", "", null]
+          },
           "placePreferences": {
             "description": "Seat preferences asked in the booking (#766), as OSDM PlaceProperty codes: a list such as [\"WINDOW\"], or the same as text, \"WINDOW, POWER\". Only those the offer lists (availablePlacePreferences or availablePlaces) are sent, in placeSelections[].accommodations[].placeProperties; one it does not list is a warning. In the AUTOMATIC_PLACE_SELECTION_PREFERENCES flow GET /availabilities/preferences is asked first. A booked place without a preference asked is a warning. A scenario with preferences books its optional reservations by placeSelections unless it names another reservationBookingForm.",
             "type": ["array", "string", "null"],

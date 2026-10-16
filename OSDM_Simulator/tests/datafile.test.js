@@ -62,7 +62,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697), the passenger limits (#699), the accented names (#703), the sales horizon (#704), the age bands (#705), the train filter (#722), the seat preferences (#766) and,
+  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697), the passenger limits (#699), the accented names (#703), the sales horizon (#704), the age bands (#705), the train filter (#722), the seat preferences and named places (#766) and,
   // with the rest of #592 and #611, the later functions are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE', 'SIM_SALE_NAMED_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -218,6 +218,7 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_FULFILLMENT_STATUS_38: ['wrong-fulfillment-status'],
     SIM_WRONG_REFUND_AMOUNT_38: ['wrong-refund-amount'],
     SIM_WRONG_EXCHANGE_AMOUNT_38: ['wrong-exchange-amount'],
+    SIM_WRONG_NAMED_PLACE_38: ['gives-other-place'],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -514,4 +515,18 @@ test('the seat preference scenarios: the only ones on gamma\'s preference stop p
   assert.ok(offered.includes('TABLE') && gamma.placePreferences.soldOut.includes('TABLE'));
   assert.ok(!offered.includes('UPPER_DECK'));
   assert.deepEqual(datafile.scenarios.filter((s) => s.placePreferences != null).map((s) => s.code), on.map((s) => s.code));
+});
+
+test('the named place scenarios: the only ones on gamma\'s place map stop place, on a train with a mandatory reservation (#766)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const trips = datafile.tripRequirements.filter((t) => (t.legs || [t.trip]).some((leg) => leg?.origin === gamma.placeMap.from));
+  assert.deepEqual(trips.map((t) => t.id), [16]);
+  assert.equal(gamma.reservations[trips[0].legs[0].productCategoryShortName], 'MANDATORY');
+  const on = datafile.scenarios.filter((s) => s.tripRequirementId === 16);
+  assert.deepEqual(on.map((s) => [s.code, s.placeSelectionFlow, s.namedPlaceKind ?? null]), [
+    ['SIM_SALE_NAMED_PLACE_2ADT_38', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', null],
+    ['SIM_SALE_NAMED_PLACE_FEE_1ADT_38', 'MANUAL_PLACE_SELECTION_WITH_FEE', null],
+    ['SIM_SALE_NAMED_COMPARTMENT_2ADT_38', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'COMPARTMENT'],
+    ['SIM_WRONG_NAMED_PLACE_38', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', null],
+  ]);
 });

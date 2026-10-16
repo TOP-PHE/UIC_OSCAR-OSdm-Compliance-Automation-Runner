@@ -110,7 +110,7 @@ runtime:
           passengerRefs: _passengerRefs,
         }).forEach((c) => {
           if (c.level === "warn") {
-            if (!c.ok) console.log("[WARNING] " + c.name + " — " + c.message);
+            if (!c.ok) require(bru.getEnvVar("library_base") + "displays.js").validationLogger("[WARNING] " + c.name + " — " + c.message);
             return;
           }
           bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });

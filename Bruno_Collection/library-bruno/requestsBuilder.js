@@ -174,8 +174,9 @@ function buildBookingRequest() {
   const seatMapIds = new Set(seatMapSelections.map((p) => p?.reservationId).filter(Boolean));
   // #766 PR 2: the seat preferences go in the accommodations of every
   // selection naming a reservation part of the offer.
-  const placeSelections = withSeatPreferences([...seatMapSelections,
-    ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))]);
+  // #766 PR 3: and the places named on the place map, in a manual flow.
+  const placeSelections = require("./namedPlaces.js").withNamedPlaces(withSeatPreferences([...seatMapSelections,
+    ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))]), parseEnvJson("__namedPlaceChoices", null));
   // #239: OSDM's mechanism for booking a mandatory reservation without
   // stating a specific place/compartment — independent of placeSelections.
   // #652: a reservation the placeSelections already book is not named again

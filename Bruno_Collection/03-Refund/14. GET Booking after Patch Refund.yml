@@ -80,7 +80,7 @@ runtime:
         const { nextRefundOfferToConfirm, checkFullRefundDone } = require(bru.getEnvVar("library_base") + "refunds.js");
         const _nextRefundOffer = nextRefundOfferToConfirm();
         if (_nextRefundOffer) {
-          console.log(`[INFO] 🔁 Refund offer ${_nextRefundOffer.position}/${_nextRefundOffer.total} (${_nextRefundOffer.id}): confirming it.`);
+          require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[INFO] 🔁 Refund offer ${_nextRefundOffer.position}/${_nextRefundOffer.total} (${_nextRefundOffer.id}): confirming it.`);
           bru.runner.setNextRequest("13. PATCH Refund Offer");
           return;
         }

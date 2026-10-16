@@ -28,6 +28,7 @@ const { createBooking, confirmBooking, releaseIfExpired, addOfferParts, findPass
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
 const { preferenceAvailability } = require('./osdm/reservations');
+const { vehiclePlaceMap } = require('./osdm/placeMap');
 const { buildTripCollection } = require('./osdm/trips');
 const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
 const exchanges = require('./osdm/exchanges');
@@ -355,7 +356,13 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
 
   // GET /availabilities/preferences (#766) on a provider with place
   // preferences; every other availability resource is not provided.
-  function availabilitiesRoute(req, provider, scope, rest) {
+  async function availabilitiesRoute(req, provider, scope, rest) {
+    // #766 PR 3: POST /availabilities/vehicle-place-map on a provider with a place map.
+    if (rest.length === 1 && rest[0] === 'vehicle-place-map' && provider.placeMap) {
+      requireMethod(req, 'POST');
+      const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
+      return vehiclePlaceMap(await bodyOf(req), (offerId) => store.get('offer', scope, offerId), provider, price);
+    }
     if (rest.length !== 1 || rest[0] !== 'preferences' || !provider.placePreferences) throw notProvided();
     requireMethod(req, 'GET');
     const query = new URL(req.url, 'https://simulator.invalid').searchParams;

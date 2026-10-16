@@ -36,11 +36,11 @@ runtime:
           if (candidates.length > 0) {
             const randomCoachId = candidates[Math.floor(Math.random() * candidates.length)];
             bru.setEnvVar('coachId', String(randomCoachId));
-            console.log(`[INFO] coachId was null; picked random id from GET Coach response: ${randomCoachId}`);
+            require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[INFO] coachId was null; picked random id from GET Coach response: ${randomCoachId}`);
           } else {
             // No id to ask for: calling …/null only reports the provider's answer
             // to a request OSCAR should not have sent.
-            console.log(`[INFO] ⏭️  Skipping [02. GET Coach By Id] — no coachId configured and GET Coach gave none.`);
+            require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[INFO] ⏭️  Skipping [02. GET Coach By Id] — no coachId configured and GET Coach gave none.`);
             // skipRequest() must be the last bru call: it clears the bru context.
             if (bru.runner && typeof bru.runner.skipRequest === 'function') bru.runner.skipRequest();
           }

@@ -318,3 +318,23 @@ describe('#744 — isReservationRequired', () => {
     expect(r.some((x) => x.name.startsWith('reservation[0].offerMode matches'))).toBe(true);
   });
 });
+
+describe('#766 — appliedPassengerTypes is optional in a booked part', () => {
+  test('a booked part with none, or an empty list, is a warning, not a failure', () => {
+    const offer = [offerPart(PASSENGERS[0], 0)];
+    for (const given of [[], undefined]) {
+      envStore = {};
+      const { results, logs } = run(offer, [{ ...bookedPart(PASSENGERS[0], 0), appliedPassengerTypes: given }], 'reservation');
+      expect(results.filter((x) => /appliedPassengerTypes/.test(x.name))).toEqual([]);
+      expect(results.filter((x) => !x.ok)).toEqual([]);
+      expect(logs).toContain('[WARNING] reservation[0] appliedPassengerTypes: the offer gives ADULT, the booking gives none (optional in OSDM), so they cannot be compared.');
+    }
+  });
+
+  test('a booked part with another type still fails', () => {
+    envStore = {};
+    const booked = { ...bookedPart(PASSENGERS[0], 0), appliedPassengerTypes: [{ passengerRef: 'prov-PAX1', type: 'SENIOR' }] };
+    const { results } = run([offerPart(PASSENGERS[0], 0)], [booked], 'reservation');
+    expect(results.filter((x) => !x.ok).map((x) => x.name)).toContain('reservation[0] appliedPassengerTypes[0] - type=ADULT exists in booking');
+  });
+});

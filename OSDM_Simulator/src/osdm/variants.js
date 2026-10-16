@@ -24,6 +24,7 @@
  *   main-names-only         only the first passenger's names are kept: no
  *                           date of birth, no contact, nothing for the others
  *   ignores-place-preferences the place properties asked are not given (#766)
+ *   gives-other-place       a named place is moved to the next free seat (#766)
  *   wrong-booking-price     provisionalPrice one cent off the sum of its parts
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
@@ -36,7 +37,7 @@
 
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
-  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences',
+  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount',
 ]);
 

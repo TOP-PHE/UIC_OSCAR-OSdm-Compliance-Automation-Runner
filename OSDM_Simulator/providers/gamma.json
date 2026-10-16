@@ -65,6 +65,10 @@
       "TABLE"
     ]
   },
+  "placeMap": {
+    "from": "urn:uic:stn:0000091",
+    "fee": 10
+  },
   "salesHorizon": {
     "from": "urn:uic:stn:0000094",
     "days": 90

@@ -207,6 +207,9 @@ without a code, it would cost a quarter of its price.
 | `SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38` | Trip 4 again, asking first class on the regional leg, which has none (#762). No offer gives each leg its class: the offer step says so in a warning, and the sale goes on with the offer chosen as usual. The booking is held to the classes of that offer. | The same offers as for `SIM_SALE_CLASS_PER_LEG_1ADT_38`: none gives first class on the regional leg. | No failed check; one warning: no offer gives each leg its class. |
 | `SIM_SALE_SEAT_PREFERENCE_1ADT_38` | Trip 15: a SuperCity from station 0000092, where gamma's reservations offer seat preferences (#766). The booking asks for a window seat (`placePreferences` `WINDOW`, flow AUTOMATIC_PLACE_SELECTION) in `placeSelections[].accommodations[].placeProperties`. | The reservation part lists the two flows, the preferences (`availablePlacePreferences`) and the same codes in `availablePlaces`; the booked place names `WINDOW`. | No failed check, no warning. |
 | `SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38` | Trip 15, flow AUTOMATIC_PLACE_SELECTION_PREFERENCES, asking `WINDOW`, `TABLE` and `UPPER_DECK` (#766). GET /availabilities/preferences is asked before the booking. | `UPPER_DECK` is not among the preferences offered; `TABLE` is offered but sold out, so the availability leaves it out; the booked place names `WINDOW`. | No failed check; two warnings: `UPPER_DECK` not listed by the offer, `TABLE` no longer available. Neither is asked. |
+| `SIM_SALE_NAMED_PLACE_2ADT_38` | Trip 16: a SuperCity from station 0000091, whose coach gamma shows on the place map (#766). Flow MANUAL_PLACE_SELECTION_WITHOUT_FEE: `POST /availabilities/vehicle-place-map` before the booking, two free seats without fee named in `placeSelections[].places`. | Coach 7: seats 11–30 (11 and 12 taken, 21–24 with a selection fee), compartment C1 (61–64) booked as a whole. The booking gives the seats named, at the offer's price. | No failed check, no warning. |
+| `SIM_SALE_NAMED_PLACE_FEE_1ADT_38` | Trip 16, flow MANUAL_PLACE_SELECTION_WITH_FEE: a seat with a selection fee is named. | The booked reservation costs the offer's price plus the fee. | No failed check, no warning. |
+| `SIM_SALE_NAMED_COMPARTMENT_2ADT_38` | Trip 16, flow MANUAL_PLACE_SELECTION_WITHOUT_FEE, `namedPlaceKind` `COMPARTMENT`: compartment C1 named in `placeSelections[].compartments`. | The booking gives compartment C1, seats 61–64. | No failed check, no warning. |
 
 ### Seat reservations (#601)
 
@@ -289,6 +292,7 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 | `SIM_WRONG_FULFILLMENT_STATUS_38` | Fulfillments. | The fulfillments issued say `AVAILABLE`. | Fails: "Fulfillment[0] status comparison", at 06 and 07 (2 failed checks). |
 | `SIM_WRONG_REFUND_AMOUNT_38` | Refund. | `refundableAmount` one cent above its breakdown. | Fails: "Refund response bounds", at 10 and 11 (2 failed checks). |
 | `SIM_WRONG_EXCHANGE_AMOUNT_38` | Exchange. | `amountToBePaid` one cent off `exchangePrice + exchangeFee − price given up`. | Fails: "amountToBePaid = exchangePrice + exchangeFee - confirmedPrice", for both exchange offers at 10 and for the chosen one at 11 and 12 (4 failed checks). |
+| `SIM_WRONG_NAMED_PLACE_38` | Variant `gives-other-place` (passenger list 24) on trip 16, a free seat named (#766). Deliberately wrong. | The booking gives the next seat instead of the one named. | One failed check at 07: the booked reservation does not give the place named. |
 
 ### Requested information and purchaser (#611)
 

@@ -68,7 +68,7 @@ describe('#766 PR 2 — what the offer lists', () => {
     expect([silent.send, silent.lines.map((l) => l.level)]).toEqual([['WINDOW'], ['INFO']]);
     const none = ps.choosePreferences({ reservationOfferParts: [] }, ['WINDOW']);
     expect([none.send, none.lines.map((l) => l.level)]).toEqual([[], ['WARNING']]);
-    expect(ps.choosePreferences(offer, [])).toEqual({ send: [], notOffered: [], lines: [] });
+    expect(ps.choosePreferences(offer, [])).toEqual({ send: [], notOffered: [], listed: false, lines: [] });
   });
 });
 
@@ -204,8 +204,8 @@ describe('#766 PR 2 — the collection wiring', () => {
   test('parser: the preferences, PLACE_SELECTION by default, the new variables in both reset lists', () => {
     const parser = read('Bruno_Collection', 'library-bruno', 'scenarioParser.js');
     expect(parser).toContain('bru.setEnvVar("placePreferences", JSON.stringify(_placePreferences));');
-    expect(parser).toContain('|| (_placePreferences.length > 0 ? "PLACE_SELECTION" : null));');
-    const vars = '"placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "reservationBookingForm"';
+    expect(parser).toContain('|| (_placePreferences.length > 0 || _namedPlace ? "PLACE_SELECTION" : null));');
+    const vars = '"placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind"';
     for (const text of [parser, read('Bruno_Collection', 'opencollection.yml')]) expect(text).toContain(vars);
   });
 
@@ -215,7 +215,7 @@ describe('#766 PR 2 — the collection wiring', () => {
     expect(step02.indexOf('offers.js").askPlacePreferences();')).toBeLessThan(step02.indexOf('        buildBookingRequest();'));
     expect(step02).toContain('offers.js").recordPlacePreferenceChecks();');
     expect(read('Bruno_Collection', '02-Common Requests', '07. GET Booking after Fulfillments.yml')).toContain('placeSelection.js").checkPreferencesGiven(');
-    expect(read('Bruno_Collection', 'library-bruno', 'requestsBuilder.js')).toContain('const placeSelections = withSeatPreferences([...seatMapSelections,');
+    expect(read('Bruno_Collection', 'library-bruno', 'requestsBuilder.js')).toContain('withSeatPreferences([...seatMapSelections,');
   });
 
   function withBru(env, run, sendRequest) {
@@ -286,5 +286,83 @@ describe('#766 PR 2 — the collection wiring', () => {
       await withBru(env, (offers) => offers.askPlacePreferences(), send).result;
     }
     expect(calls).toEqual([]);
+  });
+});
+
+describe('#766 PR 3 — a booking refused with seat preferences is sent once more without them', () => {
+  test('retried on an error answer but 401 and 403, once, and only when preferences were sent', () => {
+    for (const status of [400, 409, 422, 500, 503]) expect(ps.retryWithoutPreferences(status, ['WINDOW'], false)).toBe(true);
+    for (const status of [200, 201, 401, 403]) expect(ps.retryWithoutPreferences(status, ['WINDOW'], false)).toBe(false);
+    expect(ps.retryWithoutPreferences(422, ['WINDOW'], true)).toBe(false);
+    expect(ps.retryWithoutPreferences(422, [], false)).toBe(false);
+    expect(ps.retryWithoutPreferences(undefined, ['WINDOW'], false)).toBe(false);
+  });
+
+  test('accepted without them: a failure when the offer listed them, else a warning; refused again: the reservation', () => {
+    const refused = { status: 422, code: 'X:INCONSISTENT', preferences: ['WINDOW'], listed: true };
+    expect(ps.afterRetryWithoutPreferences(200, refused)).toEqual({ level: 'FAIL', fail: true, text: 'Seat preferences WINDOW: the booking asking for them was refused (HTTP 422, X:INCONSISTENT), and accepted without them, though the offer lists them.' });
+    expect(ps.afterRetryWithoutPreferences(200, { ...refused, listed: false })).toMatchObject({ level: 'WARNING', fail: false });
+    expect(ps.afterRetryWithoutPreferences(422, { ...refused, code: '' })).toEqual({ level: 'INFO', fail: false, text: 'Seat preferences WINDOW: the booking was refused with them (HTTP 422) and without them (HTTP 422): the reservation itself is refused, not the preference.' });
+  });
+
+  test('the offer step says whether the offer listed them', () => {
+    const offer = { reservationOfferParts: [part({ availablePlacePreferences: groups(['POSITION', ['WINDOW']]) })] };
+    expect(ps.choosePreferences(offer, ['WINDOW']).listed).toBe(true);
+    expect(ps.choosePreferences({ reservationOfferParts: [part()] }, ['WINDOW']).listed).toBe(false);
+    expect(ps.choosePreferences({ reservationOfferParts: [] }, ['WINDOW']).listed).toBe(false);
+  });
+
+  function run(env, fn) {
+    const logs = [];
+    global.bru = { getEnvVar: (k) => env[k], setEnvVar: (k, v) => { env[k] = v; } };
+    global.validationLogger = (l) => logs.push(l);
+    global.test = (name, f) => { try { f(); logs.push(`PASS ${name}`); } catch (e) { logs.push(`FAIL ${name}: ${e.message}`); } };
+    let out;
+    jest.isolateModules(() => {
+      jest.doMock(path.join(LIB, 'displays.js'), () => ({ validationLogger: (l) => logs.push(l), logStepStart: () => {} }));
+      out = fn(require(path.join(LIB, 'offers.js')));
+    });
+    delete global.bru; delete global.validationLogger; delete global.test;
+    return { out, logs };
+  }
+
+  test('02: refused → sent again with nothing asked; accepted → a failure for listed preferences; once only', () => {
+    const env = { __placePreferencesSent: '["WINDOW"]', __placePreferencesListed: 'true', __placePreferencesRetried: 'false' };
+    let r = run(env, (o) => o.bookingWithoutPreferences(422, { code: 'urn:x:problem:INCONSISTENT_SEAT_SELECTION' }));
+    expect(r.out).toBe(true);
+    expect(env.__placePreferencesSent).toBe('[]');
+    expect(JSON.parse(env.__placePreferencesRefused)).toEqual({ status: 422, code: 'urn:x:problem:INCONSISTENT_SEAT_SELECTION', preferences: ['WINDOW'], listed: true });
+    expect(r.logs[0]).toMatch(/^\[WARNING\] Seat preferences WINDOW: the booking asking for them was refused \(HTTP 422, urn:x:problem:INCONSISTENT_SEAT_SELECTION\)/);
+    r = run(env, (o) => o.bookingWithoutPreferences(200, {}));
+    expect(r.out).toBe(false);
+    expect(r.logs.filter((l) => l.startsWith('FAIL') || l.startsWith('PASS'))).toEqual(['FAIL Booking: takes the seat preferences the offer lists (WINDOW): Seat preferences WINDOW: the booking asking for them was refused (HTTP 422, urn:x:problem:INCONSISTENT_SEAT_SELECTION), and accepted without them, though the offer lists them.']);
+    expect(env.__placePreferencesRefused).toBeNull();
+    expect(run(env, (o) => o.bookingWithoutPreferences(422, {})).out).toBe(false);
+  });
+
+  test('02: a 500 with preferences the offer did not list, refused again without them: the reservation is refused', () => {
+    const env = { __placePreferencesSent: '["WINDOW","TABLE"]', __placePreferencesListed: 'false', __placePreferencesRetried: 'false' };
+    expect(run(env, (o) => o.bookingWithoutPreferences(500, null)).out).toBe(true);
+    const r = run(env, (o) => o.bookingWithoutPreferences(500, null));
+    expect(r.out).toBe(false);
+    expect(r.logs).toEqual(['[INFO] Seat preferences WINDOW, TABLE: the booking was refused with them (HTTP 500) and without them (HTTP 500): the reservation itself is refused, not the preference.']);
+  });
+
+  test('02 asks before its status check and loops on itself', () => {
+    const step02 = read('Bruno_Collection', '02-Common Requests', '02. POST Create Booking.yml');
+    const at = step02.indexOf('offers.js").bookingWithoutPreferences(_status, _body)');
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(step02.indexOf('HTTP response status — expected 200'));
+    expect(step02.slice(at, at + 200)).toContain('bru.runner.setNextRequest("02. POST Create Booking");');
+  });
+});
+
+describe('#766 PR 3 — what a request file logs reaches the report', () => {
+  test('no request file prints a tagged line with console.log (only validationLogger feeds the HTML report)', () => {
+    const glob = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? glob(path.join(dir, e.name)) : [path.join(dir, e.name)]));
+    const files = glob(path.join(ROOT, 'Bruno_Collection')).filter((f) => f.endsWith('.yml') && !f.endsWith('opencollection.yml') && !f.includes('node_modules'));
+    const offending = files.flatMap((f) => fs.readFileSync(f, 'utf8').split('\n').map((l, i) => [f, i + 1, l]))
+      .filter(([, , l]) => /console\.log\(\s*[`"']\[(WARNING|WARN)\]/.test(l) || /console\.log\(`\[(INFO|WARNING)\] \$\{c\.name\}/.test(l));
+    expect(offending.map(([f, n]) => `${path.relative(ROOT, f)}:${n}`)).toEqual([]);
   });
 });

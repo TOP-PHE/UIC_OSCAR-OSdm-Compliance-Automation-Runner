@@ -136,11 +136,14 @@ describe('#766 — the catalogue and the copy', () => {
     expect(catalogueFor(catalogue, simulator, FRAMEWORK).some((e) => placeMissing(e).length)).toBe(false);
     const entries = catalogueFor(catalogue, simulator, withFlows([]));
     const refused = entries.filter((e) => placeMissing(e).length).map((e) => e.code);
-    expect(refused).toEqual(['OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT', 'OTST_SALE_SEAT_PREFERENCE_1ADT', 'OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT']);
+    const named = ['OTST_SALE_NAMED_PLACE_2ADT', 'OTST_SALE_NAMED_PLACE_FEE_1ADT', 'OTST_SALE_NAMED_COMPARTMENT_2ADT'];
+    expect(refused).toEqual(['OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT', 'OTST_SALE_SEAT_PREFERENCE_1ADT', 'OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT', ...named]);
     const automatic = catalogueFor(catalogue, simulator, withFlows(['AUTOMATIC_PLACE_SELECTION']));
-    expect(automatic.filter((e) => placeMissing(e).length).map((e) => e.code)).toEqual(['OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT']);
-    const both = catalogueFor(catalogue, simulator, withFlows(['AUTOMATIC_PLACE_SELECTION', 'AUTOMATIC_PLACE_SELECTION_PREFERENCES']));
-    expect(both.some((e) => placeMissing(e).length)).toBe(false);
+    expect(automatic.filter((e) => placeMissing(e).length).map((e) => e.code)).toEqual(['OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT', ...named]);
+    const withoutFee = catalogueFor(catalogue, simulator, withFlows(['MANUAL_PLACE_SELECTION_WITHOUT_FEE']));
+    expect(withoutFee.filter((e) => /NAMED/.test(e.code) && placeMissing(e).length).map((e) => e.code)).toEqual(['OTST_SALE_NAMED_PLACE_FEE_1ADT']);
+    const every = catalogueFor(catalogue, simulator, withFlows(['AUTOMATIC_PLACE_SELECTION', 'AUTOMATIC_PLACE_SELECTION_PREFERENCES', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE']));
+    expect(every.some((e) => placeMissing(e).length)).toBe(false);
   });
 
   test('a copy names a flow the target does not declare', () => {

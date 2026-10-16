@@ -149,7 +149,7 @@ runtime:
           if (_booked.length > 0) {
             const _offer = fromEnv(bru.getEnvVar("offer"), null);
             checkBookedReservations((jsonData && jsonData.booking) || jsonData, _offer, _booked, { offerTrips: fromEnv(bru.getEnvVar("__offerTripLegs"), []) }).forEach((c) => {
-              if (c.level === "warn") { if (!c.ok) console.log(`[WARNING] ${c.name} — ${c.message}`); return; }
+              if (c.level === "warn") { if (!c.ok) require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[WARNING] ${c.name} — ${c.message}`); return; }
               test(c.name, () => { if (!c.ok) throw new Error(c.message); });
             });
           }
@@ -162,9 +162,19 @@ runtime:
           require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("__placePreferencesFor"), []),
           require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("__placePreferencesSent"), [])
         ).forEach((c) => {
-          if (c.ok) console.log(`[INFO] ${c.name}`);
-          else console.log(`[WARNING] ${c.name} — ${c.message}`);
+          if (c.ok) require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[INFO] ${c.name}`);
+          else require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[WARNING] ${c.name} — ${c.message}`);
         });
+
+        // #766 PR 3: the places named on the place map are the places booked,
+        // at the offer's price plus their selection fees.
+        {
+          const { fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
+          require(bru.getEnvVar("library_base") + "namedPlaces.js").checkNamedPlacesBooked(
+            (jsonData && jsonData.booking) || jsonData, fromEnv(bru.getEnvVar("offer"), null),
+            fromEnv(bru.getEnvVar("__namedPlaceChoices"), {}), fromEnv(bru.getEnvVar("__namedPlaceFees"), {})
+          ).forEach((c) => test(c.name, () => { if (!c.ok) throw new Error(c.message); }));
+        }
 
         // #603: the documents of the confirmed booking (warnings), and the
         // receipts already there before any refund.

@@ -32,6 +32,7 @@
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
+const placeMap = require('./placeMap');
 
 // The price of a reservation per passenger, in hundredths, before the
 // provider's price factor.
@@ -114,6 +115,8 @@ function reservationsOfDirection(trip, { passengers, tariff, provider, createdOn
       isReservationRequired: false,
       supportedPlaceSelectionFlows: ['AUTOMATIC_PLACE_SELECTION'],
     };
+    // #766 PR 3: a reservation on a trip with a place map takes the manual flows.
+    if (placeMap.placeMapOfTrip(trip, provider)) part.supportedPlaceSelectionFlows.push('MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE');
     const prefs = preferencesOfTrip(trip, provider);
     if (prefs) {
       part.supportedPlaceSelectionFlows.push('AUTOMATIC_PLACE_SELECTION_PREFERENCES');
@@ -246,12 +249,17 @@ function placesOf(partId, count) {
 }
 
 /** The booked reservation made from a reservation offer part. */
-function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, placeProperties = []) {
+function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, { placeProperties = [], named = null, fee = 0, otherPlace = false } = {}) {
   const tripId = part.tripCoverage.coveredTripId;
   const legId = part.tripCoverage.coveredLegIds[0];
   const leg = listOf(trips.find((t) => t.id === tripId)?.legs).find((l) => l.id === legId);
   const passengerIds = part.passengerRefs.map(passengerIdOf);
-  const { coachNumber, placeNumbers } = placesOf(part.id, passengerIds.length);
+  // #766 PR 3: the places a booking named on the place map, else any.
+  const given = named
+    ? { coachNumber: placeMap.COACH, placeNumbers: named.places.map((n) => (otherPlace ? placeMap.otherPlace(n) : n)) }
+    : placesOf(part.id, passengerIds.length);
+  const { coachNumber, placeNumbers } = given;
+  const charged = named ? { ...part.price, amount: part.price.amount + named.fees * fee } : part.price;
   return {
     objectType: 'Reservation',
     id: part.id,
@@ -260,7 +268,7 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
     confirmableUntil,
     validFrom: part.validFrom,
     validUntil: part.validUntil,
-    price: part.price,
+    price: charged,
     tripCoverage: part.tripCoverage,
     summaryProductId: part.summaryProductId,
     products: part.products,
@@ -273,12 +281,13 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
     isReservationRequired: false,
     placeAllocation: {
       accommodationType: 'SEAT',
-      accommodationSubType: 'ANY_SEAT',
+      accommodationSubType: named?.compartment ? 'COMPARTMENT' : 'ANY_SEAT',
       reservedPlaces: [{
         id: `${part.id}-PLACES`,
         passengerIds,
         vehicleNumber: leg?.timedLeg.service.vehicleNumbers[0] || '0',
         coachNumber,
+        ...(named?.compartment ? { compartmentNumber: named.compartment } : {}),
         placeNumbers,
         ...(placeProperties.length > 0 ? { placeProperties: [...placeProperties] } : {}),
       }],

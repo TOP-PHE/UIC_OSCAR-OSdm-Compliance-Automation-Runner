@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-named-place",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Named seat or compartment, with or without a seat fee",
+    "summary": "A scenario can choose a precise seat or a whole compartment on the provider's place map, and OSCAR checks the booking gives it at the right price.",
+    "content": "In Test Config, Booking Flow Actions, choose the place selection flow 'MANUAL_PLACE_SELECTION_WITHOUT_FEE' or '..._WITH_FEE', and under Named place a seat (default) or a compartment. Before the booking, OSCAR asks the place map (POST /availabilities/vehicle-place-map), takes free seats (with a fee in the fee flow) or a free compartment, and names them in the booking. The booking must give exactly those places, at the offer's price plus the seat fees. Three reference scenarios cover it. Also in this release: every warning now shows in the HTML report (some were only in the run log), an empty passenger type list in a booking is a warning, and a booking refused with seat preferences is tried once more without them, so the report says whether the preference or the reservation was refused."
+  },
+  {
     "id": "2026-10-15-seat-preferences",
     "date": "October 15, 2026",
     "tag": "Feature",
