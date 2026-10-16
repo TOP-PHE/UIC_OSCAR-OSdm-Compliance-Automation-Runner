@@ -113,6 +113,6 @@ describe('#749 — a night leg arrives the next day', () => {
 
   test('the SPECIFICATION branch of the parser uses it for every leg', () => {
     const parser = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno', 'scenarioParser.js'), 'utf8');
-    expect(parser).toMatch(/const endDatetime = arrivalAfterDeparture\(startDatetime, _sameDayEnd\);/);
+    expect(parser).toMatch(/const _storedEnd = arrivalAfterDeparture\(_storedStart, _sameDayEnd\);/);
   });
 });

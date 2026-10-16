@@ -123,8 +123,17 @@ describe('the checks', () => {
     expect(warned(checks)).toEqual([]);
   });
 
+  test('404, 405, 501: not provided, a warning and no failure (#772)', () => {
+    for (const status of [404, 405, 501]) {
+      const checks = ti.checkTripsCollection(status, null, search);
+      expect(failed(checks)).toEqual([]);
+      expect(warned(checks)).toEqual([`Trips collection: POST /trips-collection is provided — answered ${status}`]);
+    }
+  });
+
   test('a status other than 200, no id, no trip, a trip without id or legs, an id twice: failures', () => {
-    expect(failed(ti.checkTripsCollection(404, null, search))).toEqual(['Trips collection: HTTP status 200 — actual 404']);
+    expect(failed(ti.checkTripsCollection(500, null, search))).toEqual(['Trips collection: HTTP status 200 — actual 500']);
+    expect(failed(ti.checkTripsCollection(400, null, search))).toEqual(['Trips collection: HTTP status 200 — actual 400']);
     expect(failed(ti.checkTripsCollection(200, { trips: departures }, search))).toEqual(['Trips collection: has an id (TripCollectionResponse.id is required)']);
     expect(failed(ti.checkTripsCollection(200, { id: 'C', trips: [] }, search))).toEqual(['Trips collection: holds trips — 0']);
     const broken = [departures[0], { ...departures[1], id: undefined }, { ...departures[2], legs: [] }];
@@ -197,11 +206,20 @@ describe('step 01', () => {
   test('a refused trip search fails and ends the scenario; the offer request is left by search', async () => {
     envStore = baseEnv();
     const before = envStore.OfferCollectionRequest;
-    answer = (cb) => cb({ response: { status: 501, data: { code: 'NOT_IMPLEMENTED' } } });
+    answer = (cb) => cb({ response: { status: 500, data: { code: 'INTERNAL_ERROR' } } });
     await offers.prepareOfferRequestByTripIds();
     expect(envStore.OfferCollectionRequest).toBe(before);
     expect(offers.checkOfferRequestByTripIds(200, { offers: [] })).toBe(true);
-    expect(mockResults).toEqual([{ name: 'Trips collection: HTTP status 200 — actual 501', ok: false, message: 'HTTP 501' }]);
+    expect(mockResults).toEqual([{ name: 'Trips collection: HTTP status 200 — actual 500', ok: false, message: 'HTTP 500' }]);
+  });
+
+  test('a trip search not provided (501) ends the scenario with a warning, no failure (#772)', async () => {
+    envStore = baseEnv();
+    answer = (cb) => cb({ response: { status: 501, data: { code: 'NOT_IMPLEMENTED' } } });
+    await offers.prepareOfferRequestByTripIds();
+    expect(offers.checkOfferRequestByTripIds(200, { offers: [] })).toBe(true);
+    expect(mockResults).toEqual([]);
+    expect(mockLogs).toContain('[WARNING] Trips collection: POST /trips-collection is provided — answered 501 — the provider does not give a trip search, so offers by trip id cannot be asked');
   });
 
   test('no trip of the train named fails and ends the scenario', async () => {
@@ -272,8 +290,13 @@ describe('step 01', () => {
     expect(offers.checkOfferRequestByTripIds(400, { code: 'VALIDATION_ERROR', title: 'x', detail: 'tripIds[0] is unknown' })).toBe(true);
     expect(mockResults.filter((r) => !r.ok)).toEqual([]);
     mockResults = [];
+    // #772: no offer for the unknown trip is a right answer.
     expect(offers.checkOfferRequestByTripIds(200, { offers: [] })).toBe(true);
+    expect(mockResults.map((r) => [r.name, r.ok])).toEqual([['🧪 Trip id probe: no offer for a trip the provider never gave', true]]);
+    mockResults = [];
+    expect(offers.checkOfferRequestByTripIds(200, { offers: [{ offerId: 'O1' }] })).toBe(true);
     expect(mockResults.filter((r) => !r.ok).map((r) => r.name)).toEqual(['🧪 Trip id probe: provider rejects with a client error (4xx)']);
+    expect(mockLogs.some((l) => l.includes('answered offers for a trip it never gave'))).toBe(true);
   });
 });
 
