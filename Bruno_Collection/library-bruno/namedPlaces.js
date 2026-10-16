@@ -272,10 +272,12 @@ function checkNearbyAnswer(status, body, reservationId, ref) {
   if (list.length > 0) checks.push({ name: `${label}: each available place names its accommodation type, sub-type and leg`, ok: incomplete.length === 0, message: `${incomplete.length} incomplete` });
   const free = list.reduce((sum, p) => sum + (Number.isFinite(p?.numericAvailability) ? p.numericAvailability : 0), 0);
   const counted = list.some((p) => Number.isFinite(p?.numericAvailability));
-  const lines = counted && free === 0
-    ? [{ level: 'WARNING', text: `${label}: no free place near it; the reference place is sent, and the provider decides.` }]
-    : [{ level: 'INFO', text: `${label}: ${counted ? `${free} free place(s) near it` : `${list.length} available place entr${list.length === 1 ? 'y' : 'ies'}`}.` }];
-  return { checks, lines };
+  if (counted && free === 0) {
+    return { checks, lines: [{ level: 'WARNING', text: `${label}: no free place near it; the reference place is sent, and the provider decides.` }] };
+  }
+  let found = list.length === 1 ? '1 available place entry' : list.length + ' available place entries';
+  if (counted) found = free + ' free place(s) near it';
+  return { checks, lines: [{ level: 'INFO', text: `${label}: ${found}.` }] };
 }
 
 /** The placeSelections with the reference place, for each selection that names no place or compartment. */
