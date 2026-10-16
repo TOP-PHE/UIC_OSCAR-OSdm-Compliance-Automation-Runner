@@ -210,6 +210,7 @@ without a code, it would cost a quarter of its price.
 | `SIM_SALE_NAMED_PLACE_2ADT_38` | Trip 16: a SuperCity from station 0000091, whose coach gamma shows on the place map (#766). Flow MANUAL_PLACE_SELECTION_WITHOUT_FEE: `POST /availabilities/vehicle-place-map` before the booking, two free seats without fee named in `placeSelections[].places`. | Coach 7: seats 11–30 (11 and 12 taken, 21–24 with a selection fee), compartment C1 (61–64) booked as a whole. The booking gives the seats named, at the offer's price. | No failed check, no warning. |
 | `SIM_SALE_NAMED_PLACE_FEE_1ADT_38` | Trip 16, flow MANUAL_PLACE_SELECTION_WITH_FEE: a seat with a selection fee is named. | The booked reservation costs the offer's price plus the fee. | No failed check, no warning. |
 | `SIM_SALE_NAMED_COMPARTMENT_2ADT_38` | Trip 16, flow MANUAL_PLACE_SELECTION_WITHOUT_FEE, `namedPlaceKind` `COMPARTMENT`: compartment C1 named in `placeSelections[].compartments`. | The booking gives compartment C1, seats 61–64. | No failed check, no warning. |
+| `SIM_SALE_NEARBY_PLACE_2ADT_38` | Trip 16, flow AUTOMATIC_PLACE_SELECTION_NEARBY, `referencePlace` `7/15` (#766): `GET /availabilities/nearby` for place 15 of coach 7 before the booking, which sends it in `placeSelections[].referencePlace`. | The free seats near place 15 are counted; the booking gives the next free seats after it, in coach 7. | No failed check, no warning. |
 
 ### Seat reservations (#601)
 
@@ -280,6 +281,7 @@ A variant is chosen by a passenger's last name at booking time: `Simvariant-<nam
 | `SIM_VARIANT_MINIMAL_2ADT_38` | Variant `minimal`: optional members left out. | No `bookingCode`, no `summary` on the booked offers and parts. | No failed check. |
 | `SIM_VARIANT_MAIN_PASSENGER_2ADT_38` | Variants `main-passenger-only` and `main-names-only` (passenger list 18), as with some providers: the scenario updates the main passenger only (`passengerUpdateScope` `MAIN`) and reads both back. | A PATCH of another passenger than the first is `400 BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE`; only the main passenger's names are kept, no date of birth and no contact. | No failed check; eleven warnings "… not returned by the provider": date of birth, phone and email of the main passenger (each at 03 and at 04), and first name, last name, date of birth, phone and email of the other. Without `passengerUpdateScope` `MAIN`, the PATCH of the second passenger fails, as it would on such a provider. |
 | `SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38` | Variant `ignores-place-preferences` (passenger list 23) on trip 15, asking a window seat (#766). | The booking gives the seat without the preference asked. | No failed check; one warning at 07: the reservation does not give the seat preference asked. |
+| `SIM_VARIANT_IGNORES_REFERENCE_1ADT_38` | Variant `ignores-reference-place` (passenger list 25) on trip 16, near place `7/15` (#766). | The booking gives the seat in coach 8, not near the reference place. | No failed check; one warning at 07: the reservation is not in the reference place's coach. |
 
 ### Deliberately wrong answers (#611)
 

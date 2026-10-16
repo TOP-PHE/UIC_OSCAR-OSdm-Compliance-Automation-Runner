@@ -233,7 +233,82 @@ function checkNamedPlacesBooked(booking, offer, choices, fees) {
   });
 }
 
+// ── #766 PR 4: a place near a reference place (AUTOMATIC_PLACE_SELECTION_NEARBY) ──
+
+/** The scenario's reference place, `{ coachNumber, placeNumber }`, from text "7/15" (coach / place), or null. */
+function referenceOfScenario(scenario) {
+  const value = scenario?.referencePlace;
+  if (!isText(value)) return null;
+  const at = value.indexOf('/');
+  const coachNumber = at > 0 ? value.slice(0, at).trim() : '';
+  const placeNumber = at > 0 ? value.slice(at + 1).trim() : '';
+  return coachNumber && placeNumber && !placeNumber.includes('/') ? { coachNumber, placeNumber } : null;
+}
+
+/** The query of GET /availabilities/nearby for a reservation of an offer and a reference place. */
+function nearbyQuery(offerId, reservationId, ref) {
+  const q = (v) => encodeURIComponent(String(v ?? ''));
+  return `/availabilities/nearby?contextId=${q(offerId)}&contextType=OFFER&resourceId=${q(reservationId)}&resourceType=RESERVATION`
+    + `&coachNumber=${q(ref?.coachNumber)}&placeNumber=${q(ref?.placeNumber)}`;
+}
+
+/**
+ * The checks of GET /availabilities/nearby: `{ checks, lines }`. 501, 404 and
+ * 405 are "not provided", a warning; the reference place is sent anyway. No
+ * free place near it is a warning too: the provider decides at the booking.
+ */
+function checkNearbyAnswer(status, body, reservationId, ref) {
+  const label = `GET /availabilities/nearby (reservation ${reservationId}, near ${ref.coachNumber}/${ref.placeNumber})`;
+  if ([404, 405, 501].includes(status)) {
+    return { checks: [], lines: [{ level: 'WARNING', text: `${label}: answered ${status}, the provider does not give the places near a place; the reference place is sent as it is.` }] };
+  }
+  const ok2xx = typeof status === 'number' && status >= 200 && status < 300;
+  const checks = [{ name: `${label} is answered with 2xx`, ok: ok2xx, message: `HTTP ${status}` }];
+  if (!ok2xx) return { checks, lines: [] };
+  const places = body?.availablePlaces;
+  checks.push({ name: `${label}: availablePlaces is a list`, ok: Array.isArray(places), message: `availablePlaces is ${places === undefined ? 'absent' : typeof places}` });
+  const list = listOf(places);
+  const incomplete = list.filter((p) => !isText(p?.accommodationType) || !isText(p?.accommodationSubType) || !isText(p?.tripLegCoverage?.tripId) || !isText(p?.tripLegCoverage?.legId));
+  if (list.length > 0) checks.push({ name: `${label}: each available place names its accommodation type, sub-type and leg`, ok: incomplete.length === 0, message: `${incomplete.length} incomplete` });
+  const free = list.reduce((sum, p) => sum + (Number.isFinite(p?.numericAvailability) ? p.numericAvailability : 0), 0);
+  const counted = list.some((p) => Number.isFinite(p?.numericAvailability));
+  if (counted && free === 0) {
+    return { checks, lines: [{ level: 'WARNING', text: `${label}: no free place near it; the reference place is sent, and the provider decides.` }] };
+  }
+  let found = list.length === 1 ? '1 available place entry' : list.length + ' available place entries';
+  if (counted) found = free + ' free place(s) near it';
+  return { checks, lines: [{ level: 'INFO', text: `${label}: ${found}.` }] };
+}
+
+/** The placeSelections with the reference place, for each selection that names no place or compartment. */
+function withReferencePlace(selections, ref) {
+  if (!ref) return listOf(selections);
+  return listOf(selections).map((s) => (listOf(s?.places).length > 0 || listOf(s?.compartments).length > 0 ? s : { ...s, referencePlace: { ...ref } }));
+}
+
+/**
+ * Whether the booked reservations are near the reference place: in its
+ * coach. A warning (level 'warn') otherwise: OSDM places them near it if it
+ * can. The reference place itself given to a passenger is a failure: it is
+ * another traveller's seat, not one near it.
+ */
+function checkNearPlaceGiven(booking, ref, reservationIds) {
+  if (!ref) return [];
+  const all = listOf(booking?.bookedOffers).flatMap((o) => listOf(o?.reservations));
+  const own = all.filter((r) => listOf(reservationIds).includes(r?.id));
+  return (own.length > 0 ? own : all).flatMap((r) => {
+    const reserved = listOf(r?.placeAllocation?.reservedPlaces);
+    const coaches = [...new Set(reserved.map((p) => p?.coachNumber).filter(isText))];
+    const given = reserved.flatMap((p) => listOf(p?.placeNumbers).map((n) => p?.coachNumber + '/' + n));
+    return [
+      { name: `Booking: reservation ${r?.id} is near the reference place ${ref.coachNumber}/${ref.placeNumber} (same coach)`, ok: coaches.includes(ref.coachNumber), level: 'warn', message: `given: ${given.join(', ') || 'no place'}` },
+      { name: `Booking: reservation ${r?.id} does not give the reference place ${ref.coachNumber}/${ref.placeNumber} itself`, ok: !given.includes(ref.coachNumber + '/' + ref.placeNumber), message: `given: ${given.join(', ')}` },
+    ];
+  });
+}
+
 module.exports = {
   MANUAL, KINDS, isManual, kindOfScenario, placeMapRequest, readMap, checkPlaceMapAnswer, chooseNamedPlaces,
   withNamedPlaces, describeChoice, checkNamedPlacesBooked,
+  referenceOfScenario, nearbyQuery, checkNearbyAnswer, withReferencePlace, checkNearPlaceGiven,
 };

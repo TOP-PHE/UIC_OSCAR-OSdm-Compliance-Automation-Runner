@@ -175,8 +175,11 @@ function buildBookingRequest() {
   // #766 PR 2: the seat preferences go in the accommodations of every
   // selection naming a reservation part of the offer.
   // #766 PR 3: and the places named on the place map, in a manual flow.
-  const placeSelections = require("./namedPlaces.js").withNamedPlaces(withSeatPreferences([...seatMapSelections,
-    ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))]), parseEnvJson("__namedPlaceChoices", null));
+  // #766 PR 4: and the reference place, in the NEARBY flow.
+  const _np = require("./namedPlaces.js");
+  const _nearby = bru.getEnvVar("placeSelectionFlow") === "AUTOMATIC_PLACE_SELECTION_NEARBY" ? parseEnvJson("nearbyReference", null) : null;
+  const placeSelections = _np.withReferencePlace(_np.withNamedPlaces(withSeatPreferences([...seatMapSelections,
+    ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))]), parseEnvJson("__namedPlaceChoices", null)), _nearby);
   // #239: OSDM's mechanism for booking a mandatory reservation without
   // stating a specific place/compartment — independent of placeSelections.
   // #652: a reservation the placeSelections already book is not named again

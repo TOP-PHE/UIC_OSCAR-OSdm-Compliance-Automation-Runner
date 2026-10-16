@@ -261,6 +261,8 @@ function dataNeedsOf(scenario, datafile, facts) {
     ...(scenario.expectedProduct ? ['expectedProduct'] : []),
     // #766: seat preferences are codes of the provider's own list.
     ...(placeSelectionFlowOf({ placePreferences: scenario.placePreferences }) ? ['placePreferences'] : []),
+    // #766 PR 4: a reference place is a coach and place of the provider's train.
+    ...(typeof scenario.referencePlace === 'string' && scenario.referencePlace.trim() ? ['referencePlace'] : []),
   ];
   const needs = {
     trip: trip.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH',

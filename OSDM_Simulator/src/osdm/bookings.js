@@ -33,11 +33,14 @@ function reservationOptions(part, selection, trips, provider, chosen) {
   if (named && !named.compartment && named.places.length !== part.passengerRefs.length) {
     throw new HttpError(400, 'VALIDATION_ERROR', 'The request is not valid', `reservation "${part.id}" holds ${part.passengerRefs.length} passenger(s) and names ${named.places.length} place(s)`);
   }
+  const near = placeMap.placeMapOfTrip(trip, provider) ? placeMap.referenceOf(selection, part.id) : null;
   return {
     placeProperties: propertiesGiven(propertiesAsked(selection, part.id), trip, provider, { ignore: chosen.has('ignores-place-preferences') }),
     named,
     fee: named ? placeMap.feeOf(provider) : 0,
     otherPlace: chosen.has('gives-other-place'),
+    near,
+    ignoreReference: chosen.has('ignores-reference-place'),
   };
 }
 const { issueDocuments } = require('./documents');
@@ -304,7 +307,7 @@ function addOfferParts(booking, bookedOfferId, body, findOffer, provider) {
   if (added.length === 0) throw new HttpError(409, 'ALREADY_BOOKED', 'Already booked', 'The reservations named are already in the booking.');
   const passengerIdOf = (ref) => booking.passengers.find((p) => p.externalRef === ref)?.id;
   const createdOn = new Date().toISOString();
-  const kept = new Set(['ignores-place-preferences', 'gives-other-place'].filter((name) => variants.has(booking, name)));
+  const kept = new Set(['ignores-place-preferences', 'gives-other-place', 'ignores-reference-place'].filter((name) => variants.has(booking, name)));
   bookedOffer.reservations.push(...added.map((part) => reservationFrom(part, passengerIdOf, found.trips, createdOn, booking.confirmationTimeLimit,
     reservationOptions(part, body, found.trips, provider, kept))));
   linkReservations(bookedOffer);

@@ -62,6 +62,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.300] / [collection-OTST_V2.0.171] — 2026-10-16
+
+Issue #766 (PR 4 of 5), release 2026.335. Simulator 0.28.0.
+
+### Added
+- **A place near a given place**: Test Config → Booking Flow Actions → *Place selection flow* `AUTOMATIC_PLACE_SELECTION_NEARBY`, and *Near the place* as coach / place (`referencePlace`, e.g. `7/15`).
+  - Before the booking, step 02 asks `GET /availabilities/nearby` for each reservation it places, near that place, once per offer. The answer is checked: 2xx, `availablePlaces` a list, each with its accommodation type, sub-type and leg. 501, 404 and 405 are "not provided", a warning; no free place near it is a warning too. The reference place is sent either way: the provider decides.
+  - The booking sends it in `placeSelections[].referencePlace`, for each reservation naming no place or compartment.
+  - Step 07: a place given outside the reference place's coach is a **warning** (OSDM places near it if it can). The reference place itself given to a passenger is a **failure**: it is another traveller's seat.
+  - A scenario with a reference place books its optional reservations by `placeSelections`, unless it names another form.
+- **Reference scenario** `OTST_SALE_NEARBY_PLACE_2ADT`. It needs the flow declared in the Test Framework; its reference place is the simulator's, so the copy report lists it to complete with a coach and place of the provider's train.
+
+### Simulator 0.28.0
+- On a trip with a place map (`placeMap.from`), a reservation also takes the flow `AUTOMATIC_PLACE_SELECTION_NEARBY`.
+- `GET /availabilities/nearby` (offer context only; 501 for a booking): the number of free saloon seats around the place. An unknown place is 404.
+- A booking naming a `referencePlace` gets the next free seats after it, in its coach. One not on the saloon is refused with 409 `PLACE_NOT_AVAILABLE`, a malformed one with 400.
+- Variant `ignores-reference-place`: the seats are given in the next coach.
+- Scenarios `SIM_SALE_NEARBY_PLACE_2ADT_38` and `SIM_VARIANT_IGNORES_REFERENCE_1ADT_38` (trip requirement 16, passenger list 25).
+
+### Default decisions (taken without asking)
+- **"Near" is read as "in the same coach".** OSDM gives no distance; the coach is what a booked place states in every answer.
+- **Another coach is a warning, the place itself a failure.** The first is the provider doing what it could; the second gives a passenger a seat the reference says is someone else's.
+- **The reference place is sent even when `/availabilities/nearby` is not provided or finds nothing**, so the booking itself is tested.
+- **A reference scenario's place is to complete, not removed.** Without it the scenario would test nothing new.
+
+Checked:
+- Unit tests: `nearby-place.test.js`, 14 tests, including an end-to-end sale against the simulator's own functions, normal and with the variant; `catalogue-match.test.js`, one more; simulator `place-map.test.js`, the nearby answers and the booking near a place. Each of seven mutations of the new rules fails a test.
+- Replay before/after (99 scenarios with `bru` 4.2.1): the 97 existing scenarios give the same checks and warnings. The two new ones:
+  - `SIM_SALE_NEARBY_PLACE_2ADT_38`: 336 checks, 0 failed, no warning (seats after 7/15, in coach 7);
+  - `SIM_VARIANT_IGNORES_REFERENCE_1ADT_38`: 273 checks, 0 failed, one warning (seat 8/52, another coach).
+  - *Checks by scenario* and `simulator-checks.json` regenerated; `replay.js catalogue` agrees (56 entries).
+
+---
+
 ## [server-1.11.299] / [collection-OTST_V2.0.170] — 2026-10-16
 
 Issue #766 (PR 3 of 5), release 2026.334. Simulator 0.27.0.

@@ -204,13 +204,13 @@ describe('#766 PR 3 — the collection wiring', () => {
   test('parser, reset lists, 02, the builder, 07 and the price comparison', () => {
     const parser = read('Bruno_Collection', 'library-bruno', 'scenarioParser.js');
     expect(parser).toContain('bru.setEnvVar("namedPlaceKind", _namedPlace ? _np.kindOfScenario(scenario) : null);');
-    expect(parser).toContain('|| (_placePreferences.length > 0 || _namedPlace ? "PLACE_SELECTION" : null));');
+    expect(parser).toContain('|| (_placePreferences.length > 0 || _namedPlace || _nearby ? "PLACE_SELECTION" : null));');
     const vars = '"namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome"';
     for (const text of [parser, read('Bruno_Collection', 'opencollection.yml')]) expect(text).toContain(vars);
     const step02 = read('Bruno_Collection', '02-Common Requests', '02. POST Create Booking.yml');
     expect(step02.indexOf('offers.js").askNamedPlaces();')).toBeGreaterThan(step02.indexOf('offers.js").askPlacePreferences();'));
     expect(step02.indexOf('offers.js").askNamedPlaces();')).toBeLessThan(step02.indexOf('        buildBookingRequest();'));
-    expect(read('Bruno_Collection', 'library-bruno', 'requestsBuilder.js')).toContain('require("./namedPlaces.js").withNamedPlaces(withSeatPreferences([');
+    expect(read('Bruno_Collection', 'library-bruno', 'requestsBuilder.js')).toContain('_np.withNamedPlaces(withSeatPreferences([');
     expect(read('Bruno_Collection', '02-Common Requests', '07. GET Booking after Fulfillments.yml')).toContain('namedPlaces.js").checkNamedPlacesBooked(');
   });
 
