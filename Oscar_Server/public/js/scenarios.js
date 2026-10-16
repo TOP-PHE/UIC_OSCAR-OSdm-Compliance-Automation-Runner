@@ -3455,6 +3455,58 @@ function buildFulfillmentSection(idx, sc, fulfGroup) {
 
 // ── State mutation helpers ────────────────────────────────────────────────────
 
+// #785: an OSDM version is digits and dots: "3.8" or "3.0.5". Pinned to the
+// server's (utils/osdmVersion.js) by osdm-version.test.js.
+const OSDM_VERSION_PATTERN = /^\d{1,2}\.\d{1,2}(?:\.\d{1,3})?$/;
+function isOsdmVersionText(v) {
+  return OSDM_VERSION_PATTERN.test(String(v ?? '').trim());
+}
+
+// #785: the scenarios this person may change that name `version`, by index.
+function scenariosOnVersion(scenarios, version) {
+  const out = [];
+  (Array.isArray(scenarios) ? scenarios : []).forEach((sc, idx) => {
+    if (sc && String(sc.osdmVersion ?? '').trim() === version && !isReadOnlyForMe(sc)) out.push(idx);
+  });
+  return out;
+}
+
+// #785: once the framework's version is changed, the scenarios still naming
+// the old one are offered the new one, after a confirmation. They keep their
+// own version otherwise; a scenario naming none follows the framework anyway.
+function offerScenarioVersionUpdate(before, after) {
+  if (!before || before === after || !state || typeof state !== 'object') return;
+  const idxs = scenariosOnVersion(state.scenarios, before);
+  if (!idxs.length) return;
+  if (!confirm(`${idxs.length} scenario(s) of this data file have OSDM version ${before}. Change them to ${after}? Save & Apply keeps the change.`)) return;
+  for (const idx of idxs) setScenarioField(idx, 'osdmVersion', after);
+  oscarToast(`${idxs.length} scenario(s) now on OSDM version ${after}: Save & Apply to keep it.`, 'info');
+}
+
+// #785: the version fields, once left. One that is not a version is put back
+// and said; a new framework version offers the scenarios on the old one the
+// new one. Handled before the change switch, which is at Sonar's 30-case limit.
+function changeOsdmVersion(action, el) {
+  const scenarioField = action === 'set-scenario-text' && el.dataset.field === 'osdmVersion';
+  if (action !== 'wiz-osdm-version' && !scenarioField) return false;
+  const v = el.value.trim();
+  if (scenarioField) {
+    if (v && !isOsdmVersionText(v)) {
+      oscarToast(`"${v}" is not an OSDM version (digits and dots, such as 3.8 or 3.0.5).`, 'error');
+      el.value = state?.scenarios?.[Number.parseInt(el.dataset.idx)]?.osdmVersion || '';
+    }
+    return true;
+  }
+  if (!isOsdmVersionText(v)) {
+    oscarToast(`"${v}" is not an OSDM version (digits and dots, such as 3.8 or 3.0.5).`, 'error');
+    el.value = wizData.framework?.osdmVersion || '';
+    return true;
+  }
+  offerScenarioVersionUpdate(String(el.defaultValue || '').trim(), v);
+  el.defaultValue = v;
+  return true;
+}
+
 function setScenarioField(idx, field, value) {
   state.scenarios[idx][field] = value === '' ? null : value;
   markDirty();
@@ -4175,7 +4227,7 @@ function renderWizardStep1() {
     <div class="fw-section-body open">
       <div class="param-field" style="max-width:220px">
         <label class="param-label">OSDM Specification version <span class="param-hint">e.g. 3.4</span></label>
-        <input class="param-input" value="${fw.osdmVersion||'3.4'}" placeholder="3.4"
+        <input class="param-input" value="${esc(fw.osdmVersion||'3.4')}" placeholder="3.4"
           data-action="wiz-osdm-version" style="max-width:120px">
       </div>
     </div>
@@ -7793,7 +7845,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el) || changeOsdmVersion(action, el)) return;
 
   switch (action) {
     case 'file-upload':
@@ -8268,6 +8320,8 @@ document.body.addEventListener('input', function(e) {
 
   switch (action) {
     case 'set-scenario-text':
+      // #785: a version mid-typing ("3.") is not stored; the field is checked when left.
+      if (el.dataset.field === 'osdmVersion' && el.value.trim() && !isOsdmVersionText(el.value)) break;
       setScenarioField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value); break;
     case 'set-scenario-max-wait-minutes': {
       // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
@@ -8438,7 +8492,7 @@ document.body.addEventListener('input', function(e) {
       // as a falsy osdmVersion and replaced with the default, losing the user
       // previous value without intent. The next re-render (any other action)
       // will snap the displayed value back to the stored one.
-      if (!v) break;
+      if (!v || !isOsdmVersionText(v)) break;
       wizData.framework.osdmVersion = v;
       refreshReturnVersionNote();
       saveFrameworkDebounced();

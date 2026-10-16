@@ -318,8 +318,12 @@ function withFrameworkWarnings(plaintext, companyId) {
     const fwRow = dbGet('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
     if (!fwRow?.config) return plaintext;
     const { annotateDatafile } = require('./utils/frameworkGating');
+    const { withFrameworkVersion } = require('./utils/osdmVersion');
     const datafile = JSON.parse(plaintext.toString('utf8'));
-    if (annotateDatafile(datafile, JSON.parse(colDecrypt(fwRow.config))).annotatedCount === 0) return plaintext;
+    const framework = JSON.parse(colDecrypt(fwRow.config));
+    // #785: a scenario naming no OSDM version runs with the framework's.
+    const versioned = withFrameworkVersion(datafile, framework.osdmVersion);
+    if (annotateDatafile(datafile, framework).annotatedCount === 0 && versioned === 0) return plaintext;
     return Buffer.from(JSON.stringify(datafile), 'utf8');
   } catch (err) {
     log.warn({ errMsg: err.message, companyId }, 'run datafile: framework warnings not added');
