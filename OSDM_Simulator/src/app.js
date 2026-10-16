@@ -325,13 +325,16 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return { booking };
   }
 
+  // /bookings/{id} itself: GET reads it, DELETE deletes it (#776).
+  function bookingMethod(req) {
+    requireMethod(req, 'GET', 'DELETE');
+    return { GET: bookingItself, DELETE: (provider, scope, bookingId) => deleteBooking(scope, bookingId) }[req.method];
+  }
+
   async function bookingRoute(req, provider, scope, rest) {
     const [bookingId, part, partId, ...more] = rest;
     if (bookingId === undefined) return newBooking(req, provider, scope);
-    if (part === undefined) {
-      requireMethod(req, 'GET', 'DELETE');
-      return req.method === 'DELETE' ? deleteBooking(scope, bookingId) : bookingItself(provider, scope, bookingId);
-    }
+    if (part === undefined) return bookingMethod(req)(provider, scope, bookingId);
     if (provider.exchange && (part === 'exchange-offers' || part === 'exchange-operations') && more.length === 0) {
       return exchangeRoute(req, provider, scope, bookingId, part, partId);
     }
