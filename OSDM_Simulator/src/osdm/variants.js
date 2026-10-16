@@ -26,6 +26,9 @@
  *   ignores-place-preferences the place properties asked are not given (#766)
  *   gives-other-place       a named place is moved to the next free seat (#766)
  *   ignores-reference-place the seats near a reference place are in another coach (#766)
+ *   refuses-bare-place-selection a placeSelection asking nothing (no places,
+ *                           compartments, reference place or accommodations)
+ *                           is refused with 400 (#793): send none instead
  *   wrong-booking-price     provisionalPrice one cent off the sum of its parts
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
@@ -38,7 +41,7 @@
 
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
-  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place',
+  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount',
 ]);
 

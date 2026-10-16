@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-mandatory-reservation",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Mandatory seat reservations: a placeSelection or nothing",
+    "summary": "The Test Framework now says how a mandatory reservation is booked when no seat is chosen, and a chosen seat takes its seat-map ancillary along.",
+    "content": "Providers disagree on how a mandatory seat reservation is booked when the customer chooses no seat. One requires a placeSelection naming the trip and leg; another refuses such a placeSelection, because it asks nothing, and books the reservation with the booking. OSDM settles neither. In the Test Framework, under the place selection flows, choose 'In placeSelections' (as before) or 'Not named'. A reservation with a seat choice (preferences, a named place, a reference place) always gets its placeSelection. And when a scenario names a place on the seat map, OSCAR now books the offer's optional seat-map ancillary along with it, which one provider requires."
+  },
+  {
     "id": "2026-10-16-trips-follow-train",
     "date": "October 16, 2026",
     "tag": "Feature",

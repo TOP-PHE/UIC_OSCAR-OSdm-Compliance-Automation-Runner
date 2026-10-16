@@ -226,6 +226,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     refund and exchange take the booking's currency (`currencyOf()`); an
     exchange asked without currency is offered in CZK, so a lost currency
     shows. No simulator scenario asked a currency before, so none moved.
+  - **A mandatory reservation without a seat choice** (#793, 1.11.314):
+    `mandatoryReservationForm` in the framework, `PLACE_SELECTION` (default,
+    the #742 behaviour, which one provider requires) or `NONE` (named nowhere;
+    another provider refuses a placeSelection that asks nothing). The run's
+    copy gives it to scenarios naming none (`utils/mandatoryReservation.js`);
+    the builder drops the bare mandatory selections after the choices are
+    applied (`withoutBareMandatory()`, `seatReservations.js`), so a choice
+    always keeps its selection. A named place also books the offer's optional
+    seat-map ancillary (`seatMapAncillarySelections()`, `namedPlaces.js`, type
+    containing `SEAT_MAP`). Simulator 0.33.0: variant
+    `refuses-bare-place-selection`; its offers have no ancillary parts.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

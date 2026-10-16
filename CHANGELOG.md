@@ -62,6 +62,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.314] / [collection-OTST_V2.0.182] — 2026-10-16
+
+Issue #793, release 2026.349. Simulator 0.33.0. A mandatory reservation without a seat choice, and a named place that needs a seat-map ancillary.
+
+### Added
+- **The Test Framework says how a mandatory reservation booked without a seat choice is sent** (place selection flows panel, `mandatoryReservationForm`).
+  - `PLACE_SELECTION`, the default, is the behaviour since #742: a `placeSelection` naming its trip and leg. One real provider requires it ("Mandatory reservation(s) not covered by any placeSelection").
+  - `NONE`: the reservation is named nowhere in the booking request. Another real provider refuses a `placeSelection` that asks nothing, and books the reservation with the booking.
+  - OSDM 3.8 settles neither: `PlaceSelection` requires only `reservationId` and `tripLegCoverage`, and `optionalReservationSelections` says "Mandatory reservations are booked when the booking is being booked".
+  - A reservation with a seat choice (preferences, a named place, a reference place) always gets its `placeSelection`.
+  - The run's copy of the data file gives the framework's value to each scenario naming none (`utils/mandatoryReservation.js`, with the framework warnings in `server.js`). The data file schema takes `mandatoryReservationForm` on a scenario.
+  - The collection builds the selections as before, then drops the mandatory ones that ask nothing (`withoutBareMandatory()`, `seatReservations.js`). Under `NONE`, a mandatory reservation whose leg cannot be told is not named in `optionalReservationSelections` either.
+- **A named place takes the offer's optional seat-map ancillary along** (`seatMapAncillarySelections()`, `namedPlaces.js`). One real provider takes a named place only with its `SEAT_MAP_SELECTION` ancillary, and answers 422 `SEAT_MAP_ANCILLARY_MISSING` otherwise.
+  - When the booking names places or compartments, every ancillary offer part whose type contains `SEAT_MAP` and that no admission makes mandatory goes in `optionalAncillarySelections`.
+  - It is booked for the passengers placed, or for all of the ancillary's passengers when the places name none.
+
+### Simulator 0.33.0
+- Variant `refuses-bare-place-selection` (last name `Simvariant-Refuses-Bare-Place-Selection`): a `placeSelection` naming no place, compartment, reference place or accommodation is refused with 400.
+- Scenario `SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38` (passenger list 26, trip 5): the SuperCity's mandatory reservation booked under `NONE`.
+
+### Default decisions (taken without asking)
+- **The default stays `PLACE_SELECTION`**, so no existing run changes.
+- **The seat-map ancillary is recognised by its type** (`SEAT_MAP` in it). OSDM does not tie an ancillary to a named place, and selecting it is harmless for a provider that does not need it.
+- **The simulator shows the first part only.** Its offers have no ancillary parts; the second part is covered by unit tests.
+
+Checked:
+- Unit tests:
+  - `mandatory-reservation.test.js` (6): the server rule, the run's copy, the page's field and handler;
+  - `bruno-seat-reservations.test.js` (+6) and `bruno-requestsbuilder.test.js` (+1): the collection, down to the booking request sent, mutation-checked;
+  - the run's copy in `server.test.js`.
+- Simulator unit test of the variant.
+- Replay with the real collection:
+  - `SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38`: 278 checks, 0 failed. The same scenario under `PLACE_SELECTION` fails 2 checks, refused at the booking.
+  - `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` and `SIM_SALE_NAMED_PLACE_2ADT_38`: recordings identical to before.
+- Full suite, lint.
+
+Not verified:
+- Against a real provider.
+- Test Config's new field in a real browser.
+
+---
+
 ## [server-1.11.313] / [collection-OTST_V2.0.181] — 2026-10-16
 
 Issue #787 (part 2), release 2026.348. Trips follow a corrected train set.

@@ -1976,8 +1976,13 @@ function handleOptionalReservationSelections(selectedOffer, trips) {
   // #742: a mandatory reservation whose leg is known goes in placeSelections
   // whatever the form; one whose leg cannot be told goes in
   // optionalReservationSelections instead (#737): a placeSelection needs it.
-  const sel = sr.bookingSelections(selectedOffer, { atBooking, mandatory, form }, tripLegs);
-  sel.noLeg.forEach((id) => validationLogger(`[WARNING] Reservation ${id}: the offer gives no leg for it — booked through optionalReservationSelections instead of placeSelections.`));
+  // #793: the Test Framework says how a mandatory one without a seat choice
+  // is sent (a placeSelection, or nothing); the booking builder drops it then.
+  const mandatoryForm = sr.normaliseMandatoryForm(bru.getEnvVar("mandatoryReservationForm"));
+  bru.setEnvVar("__mandatoryReservationIds", JSON.stringify(mandatory));
+  const sel = sr.bookingSelections(selectedOffer, { atBooking, mandatory, form, mandatoryForm }, tripLegs);
+  sel.noLeg.filter((id) => !(mandatoryForm === "NONE" && mandatory.includes(id))).forEach((id) => validationLogger(`[WARNING] Reservation ${id}: the offer gives no leg for it — booked through optionalReservationSelections instead of placeSelections.`));
+  if (mandatoryForm === "NONE" && mandatory.length > 0) validationLogger(`[INFO] Mandatory reservation(s) ${mandatory.join(", ")}: not named in the booking request unless a seat is chosen for them (Test Framework: mandatory reservation without a seat choice = nothing).`);
   bru.setEnvVar("reservationPlaceSelections", JSON.stringify(sel.placeSelections));
   bru.setEnvVar("optionalReservationSelections", JSON.stringify(sel.optionalReservationSelections));
   // Adding a reservation later takes placeSelections only (OSDM 3.8

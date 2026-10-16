@@ -245,7 +245,7 @@ describe('#766 — the Test Framework page', () => {
     expect(wizData.framework.placeSelectionFlows).toEqual([...PLACE_SELECTION_FLOWS.slice(1), 'AUTOMATIC_PLACE_SELECTION']);
     expect(el.on).toBe(true);
     const declared = lift('fwPlaceSelectionFlowDeclared', {});
-    const panel = lift('placeSelectionFlowsPanelHtml', { FW_PLACE_SELECTION_FLOWS, fwPlaceSelectionFlowDeclared: declared, esc: (v) => v });
+    const panel = lift('placeSelectionFlowsPanelHtml', { FW_PLACE_SELECTION_FLOWS, fwPlaceSelectionFlowDeclared: declared, esc: (v) => v, mandatoryReservationFormHtml: () => '' });
     const html = panel({ placeSelectionFlows: ['MANUAL_PLACE_SELECTION_WITH_FEE'] });
     expect((html.match(/class="pill selected"/g) || []).length).toBe(1);
     expect(html).toContain('data-action="fw-place-selection-flow" data-val="MANUAL_PLACE_SELECTION_WITH_FEE"');

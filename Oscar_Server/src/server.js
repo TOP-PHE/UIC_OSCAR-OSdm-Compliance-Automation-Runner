@@ -323,7 +323,9 @@ function withFrameworkWarnings(plaintext, companyId) {
     const framework = JSON.parse(colDecrypt(fwRow.config));
     // #785: a scenario naming no OSDM version runs with the framework's.
     const versioned = withFrameworkVersion(datafile, framework.osdmVersion);
-    if (annotateDatafile(datafile, framework).annotatedCount === 0 && versioned === 0) return plaintext;
+    // #793: and the framework's form for a mandatory reservation without a seat choice.
+    const formed = require('./utils/mandatoryReservation').withMandatoryReservationForm(datafile, framework);
+    if (annotateDatafile(datafile, framework).annotatedCount === 0 && versioned === 0 && formed === 0) return plaintext;
     return Buffer.from(JSON.stringify(datafile), 'utf8');
   } catch (err) {
     log.warn({ errMsg: err.message, companyId }, 'run datafile: framework warnings not added');

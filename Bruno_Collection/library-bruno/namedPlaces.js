@@ -307,7 +307,45 @@ function checkNearPlaceGiven(booking, ref, reservationIds) {
   });
 }
 
+// ── A seat-map ancillary for a named place (#793) ─────────────────────────
+// A provider takes a named place only with its seat-map ancillary: booked
+// anyway where an admission's relation makes it mandatory, else it must be in
+// optionalAncillarySelections (422 SEAT_MAP_ANCILLARY_MISSING otherwise).
+// OSDM does not tie an ancillary to a named place; selecting it is harmless
+// for a provider that does not.
+
+const SEAT_MAP_ANCILLARY = /SEAT_MAP/;
+
+/** The ids of the offer's ancillaries an admission's relation makes mandatory. */
+function mandatoryAncillaryIds(offer) {
+  return new Set(listOf(offer?.admissionOfferParts).flatMap((a) => listOf(a?.ancillaries))
+    .filter((rel) => Number(rel?.minGroupItemsToBeBooked) > 0)
+    .flatMap((rel) => listOf(rel?.ancillaryGroup?.ancillaryRefs).map((ref) => ref?.id)).filter(isText));
+}
+
+/**
+ * The optionalAncillarySelections of a booking naming places: the offer's
+ * optional seat-map ancillaries, for the passengers named in the places (all
+ * of the ancillary's when the places name none). [] when no place or
+ * compartment is named.
+ */
+function seatMapAncillarySelections(offer, placeSelections) {
+  const named = listOf(placeSelections).filter((sel) => listOf(sel?.places).length > 0 || listOf(sel?.compartments).length > 0);
+  if (named.length === 0) return [];
+  const placedRefs = new Set(named.flatMap((sel) => [...listOf(sel.places), ...listOf(sel.compartments)]).flatMap((p) => [p?.passengerRef, ...listOf(p?.passengerRefs)]).filter(isText));
+  const mandatory = mandatoryAncillaryIds(offer);
+  return listOf(offer?.ancillaryOfferParts)
+    .filter((part) => isText(part?.id) && SEAT_MAP_ANCILLARY.test(upper(part?.type)) && !mandatory.has(part.id))
+    .map((part) => {
+      const own = listOf(part.passengerRefs).filter(isText);
+      const refs = placedRefs.size > 0 ? own.filter((r) => placedRefs.has(r)) : own;
+      return { ancillaryId: part.id, passengerRefs: refs };
+    })
+    .filter((sel) => sel.passengerRefs.length > 0);
+}
+
 module.exports = {
+  seatMapAncillarySelections, mandatoryAncillaryIds,
   MANUAL, KINDS, isManual, kindOfScenario, placeMapRequest, readMap, checkPlaceMapAnswer, chooseNamedPlaces,
   withNamedPlaces, describeChoice, checkNamedPlacesBooked,
   referenceOfScenario, nearbyQuery, checkNearbyAnswer, withReferencePlace, checkNearPlaceGiven,
