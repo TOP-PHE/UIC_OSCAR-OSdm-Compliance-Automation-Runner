@@ -5274,7 +5274,7 @@ function offerTripUpdateFromTrain(before, saved) {
   const tripIds = new Set(tripIdxs.map(i => state.tripRequirements[i].id));
   document.querySelectorAll('.scenario-detail').forEach(det => {
     if (!det.dataset.rendered) return;
-    const scIdx = Number.parseInt(det.id.replace('detail-', ''));
+    const scIdx = Number.parseInt(det.id.replace('detail-', ''), 10);
     if (tripIds.has(state.scenarios[scIdx]?.tripRequirementId)) reRenderScenarioDetail(scIdx);
   });
   oscarToast(`${tripIdxs.length} trip(s) updated from "${saved.label}": Save & Apply to keep it.`, 'info');

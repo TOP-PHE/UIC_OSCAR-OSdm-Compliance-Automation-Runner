@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.347",
+  "current_release": "2026.348",
   "releases": [
+    {
+      "release": "2026.348",
+      "date": "2026-10-16",
+      "server": "1.11.313",
+      "collection": "OTST_V2.0.181",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Saving a train set in Test Data offers its new values to the trips filled from it (same route and train number as before the edit), after a confirmation (#787)."
+      ]
+    },
     {
       "release": "2026.347",
       "date": "2026-10-16",

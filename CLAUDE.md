@@ -1625,6 +1625,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   punctuation or case), another train at that time, a time, day, product
   category or operator that differs; at most 8, then "… and N more".
   `classifyOfferProbe` reads OSDM's WarningCollection `{ warnings: [...] }`.
+  **Trips follow a corrected set** (#787 PR 2, 1.11.313): a trip keeps no
+  link to its set ("Apply test data" copies values), so saving an edited set
+  (`wizSaveTrain`) calls `offerTripUpdateFromTrain()`: blocks with the set's
+  route and a service's number *as before the edit* (`blocksBuiltFrom()`,
+  `trip-apply.js`) that the edit would change (`tripUpdatesFromTrain()`) are
+  refilled after a confirmation, except trips of a read-only scenario.
 - **A run goes on a day its trip's trains run** (#717, 1.11.273 /
   OTST_V2.0.153). Trips keep no calendar, so the server matches each trip
   requirement against the TRAIN resources when it serves the run's copy

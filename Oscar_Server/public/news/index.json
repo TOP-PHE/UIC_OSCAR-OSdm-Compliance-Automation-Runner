@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-trips-follow-train",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Trips follow a corrected train set",
+    "summary": "When you save a train set, Test Config offers to update the trips that were filled from it.",
+    "content": "Apply test data copies a train set's values into a trip, so correcting a train number in Test Data used to leave every trip on the old one. Now, when you save a train set you changed, Test Config finds the trips filled from it (same route and same train number as before your edit) and asks whether to update them. The new train number, times, operator and product category go into those trips; Save & Apply keeps the change. Trips of scenarios you cannot change are left as they are."
+  },
+  {
     "id": "2026-10-16-probe-services",
     "date": "October 16, 2026",
     "tag": "Feature",
