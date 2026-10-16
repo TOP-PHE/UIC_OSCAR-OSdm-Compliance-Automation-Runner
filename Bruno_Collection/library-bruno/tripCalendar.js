@@ -114,7 +114,7 @@ function dateWithReturn(date, named, outDays, back, lines) {
     }
     return { date, lines };
   }
-  const found = firstDayWithReturn(date, outDays && outDays.length ? outDays : null, backDays, offset);
+  const found = firstDayWithReturn(date, outDays?.length ? outDays : null, backDays, offset);
   if (!found) {
     lines.push(`[WARNING] 📅 No day suits both the outbound trains and the trains going back ${offset} day(s) later after ${at} (${backList}) in Test Data.`);
     return { date, lines };
@@ -138,8 +138,8 @@ function dateForTrip(date, named, trip, ret = null) {
   const lines = noteLines(trip);
   const back = returnDays(trip, ret);
   lines.push(...back.lines);
-  if (back.days && back.days.length && weekdayCode(date)) {
-    if (named && days && days.length && !days.includes(weekdayCode(date))) lines.push(namedDayWarning(date, days));
+  if (back.days?.length && weekdayCode(date)) {
+    if (named && days?.length && !days.includes(weekdayCode(date))) lines.push(namedDayWarning(date, days));
     return dateWithReturn(date, named, days, back, lines);
   }
   if (!days || days.length === 0 || !weekdayCode(date)) return { date, lines };

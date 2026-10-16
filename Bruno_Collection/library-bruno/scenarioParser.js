@@ -302,9 +302,8 @@ function tripDateFor(scenario, baseIso, tripRequirement, now = new Date()) {
   const { dateForTrip } = require('./tripCalendar.js');
   // #778: a return is dated on a day a train goes back after its time.
   const _ret = returnOptsFromScenario(scenario);
-  const _firstLeg = tripRequirement?.tripType === 'SPECIFICATION'
-    ? (Array.isArray(tripRequirement.legs) ? tripRequirement.legs[0] : null)
-    : tripRequirement?.trip;
+  let _firstLeg = tripRequirement?.trip;
+  if (tripRequirement?.tripType === 'SPECIFICATION') _firstLeg = Array.isArray(tripRequirement.legs) ? tripRequirement.legs[0] : null;
   const out = dateForTrip(date, named, tripRequirement,
     { offsetDays: _ret.offsetDays, time: _ret.time, outboundClock: _firstLeg?.startDatetime });
   out.lines.forEach((line) => validationLogger(line));

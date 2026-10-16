@@ -152,19 +152,22 @@ function returnServices(trip, resources) {
   const from = stopKey(legs.at(-1).destination);
   const to = stopKey(legs[0].origin);
   if (!from || !to) return [];
-  const out = [];
-  for (const train of trainsOf(resources)) {
-    if (stopKey(train.data.originURN) !== from || stopKey(train.data.destinationURN) !== to) continue;
-    const days = Array.isArray(train.data.daysOfWeek) ? train.data.daysOfWeek.filter((x) => DAY_ORDER.includes(x)) : [];
-    for (const service of Array.isArray(train.data.services) ? train.data.services : []) {
-      const departure = clockOf(service?.departureTime);
-      if (!departure) continue;
-      const entry = { departure, number: safe(String(service?.vehicleNumber ?? '').trim()) };
-      if (days.length) entry.days = days.slice().sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
-      out.push(entry);
-    }
-  }
-  return out.sort((a, b) => a.departure.localeCompare(b.departure));
+  return trainsOf(resources)
+    .filter((train) => stopKey(train.data.originURN) === from && stopKey(train.data.destinationURN) === to)
+    .flatMap(servicesOf)
+    .sort((a, b) => a.departure.localeCompare(b.departure));
+}
+
+// The timed services of one train, each { departure, number, days? }.
+function servicesOf(train) {
+  const days = Array.isArray(train.data.daysOfWeek) ? train.data.daysOfWeek.filter((x) => DAY_ORDER.includes(x)) : [];
+  days.sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+  const services = Array.isArray(train.data.services) ? train.data.services : [];
+  return services.filter((service) => clockOf(service?.departureTime)).map((service) => {
+    const entry = { departure: clockOf(service.departureTime), number: safe(String(service.vehicleNumber ?? '').trim()) };
+    if (days.length) entry.days = days.slice();
+    return entry;
+  });
 }
 
 /**
