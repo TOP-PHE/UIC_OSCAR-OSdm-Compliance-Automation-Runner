@@ -480,7 +480,7 @@
             "enum": ["PLACE", "COMPARTMENT", "", null]
           },
           "referencePlace": {
-            "description": "In the AUTOMATIC_PLACE_SELECTION_NEARBY flow (#766), the place the passengers want to sit near, as coach / place: \"7/15\". GET /availabilities/nearby is asked for it before the booking, and the booking sends it in placeSelections[].referencePlace. A place given outside its coach is a warning; the reference place itself given to a passenger is a failure.",
+            "description": "In the AUTOMATIC_PLACE_SELECTION_NEARBY flow (#766), the place the passengers want to sit near, as coach / place: \"7/15\". GET /availabilities/nearby is asked for it before the booking, and the booking sends it in placeSelections[].referencePlace. A place given outside its coach is a warning; the reference place itself given to a passenger is a failure. Empty or \"AUTO\" (#776): the run books the trip first for the first passenger alone, takes the place given as the reference, and deletes that booking once the scenario's booking is answered.",
             "type": ["string", "null"],
             "maxLength": 40
           },

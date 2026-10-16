@@ -50,6 +50,7 @@ module.exports = {
   placeChoiceAfterBooking,
   bookingWithoutPreferences,
   recordPlacePreferenceChecks,
+  releaseReferenceBooking,
   checkOfferRequestByTripIds,
   routeAfterOfferStep,
   searchTripOffers,
@@ -2254,13 +2255,19 @@ async function askPlacePreferences(afterBooking = false) {
 // offer request: a GET, or a POST of `body`; { status, body }, status 0 when
 // it could not be sent.
 async function sendAvailabilityRequest(path, payload) {
+  return sendOsdmRequest(payload === undefined ? "GET" : "POST", path, payload);
+}
+
+// A request to the provider sent from a step's script: GET, POST (with a
+// body) or DELETE. { status, body }; status 0 when it could not be sent.
+async function sendOsdmRequest(method, path, payload) {
   const { requestorHeader } = require("./requestHeaders.js");
   const post = payload !== undefined;
   try {
     const res = await new Promise((resolve, reject) => {
       bru.sendRequest({
         url: `${bru.getEnvVar("api_base")}${path}`,
-        method: post ? "POST" : "GET",
+        method,
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${bru.getEnvVar("access_token")}`,
@@ -2277,7 +2284,7 @@ async function sendAvailabilityRequest(path, payload) {
     }
     return { status: res?.status || res?.statusCode || 0, body };
   } catch (err) {
-    validationLogger(`[ERROR] ${post ? "POST" : "GET"} ${path.split("?")[0]} could not be sent: ${err?.message || err}`);
+    validationLogger(`[ERROR] ${method} ${path.split("?")[0]} could not be sent: ${err?.message || err}`);
     return { status: 0, body: null };
   }
 }
@@ -2300,8 +2307,11 @@ function recordPlacePreferenceChecks() {
  */
 async function askNearbyPlace(afterBooking = false) {
   const np = require('./namedPlaces.js');
-  const ref = parseEnvJson("nearbyReference", null);
   const ctx = placeChoiceContext(afterBooking);
+  // #776: the reference place taken from a first booking, made here: before
+  // the booking, or before 09 when the reservation is added after it.
+  if (afterBooking || !placeChoiceAfterBooking()) await makeReferenceBooking(ctx.ids);
+  const ref = parseEnvJson("nearbyReference", null);
   if (!ref || bru.getEnvVar("placeSelectionFlow") !== "AUTOMATIC_PLACE_SELECTION_NEARBY" || !ctx.contextId || bru.getEnvVar("__nearbyAskedFor") === ctx.key) return;
   bru.setEnvVar("__nearbyAskedFor", ctx.key);
   const ids = ctx.ids;
@@ -2317,6 +2327,70 @@ async function askNearbyPlace(afterBooking = false) {
     for (const line of outcome.lines) validationLogger(`[${line.level}] ${line.text}`);
   }
   bru.setEnvVar("__nearbyOutcome", JSON.stringify({ checks }));
+}
+
+/**
+ * #776: the reference place of the NEARBY flow from a first booking. Step
+ * 01's offer request is sent again for the first passenger alone (A), the
+ * offer standing for the chosen one is booked with its reservations, and the
+ * place A is given becomes `nearbyReference`. Once per sale; nothing when the
+ * scenario names its own reference place, or when no reservation is placed.
+ * A failure is a warning: the scenario then goes on without a reference place.
+ */
+async function makeReferenceBooking(reservationIds) {
+  if (String(bru.getEnvVar("nearbyReferenceAuto")) !== "true" || String(bru.getEnvVar("__referenceBookingTried")) === "true") return;
+  if (bru.getEnvVar("placeSelectionFlow") !== "AUTOMATIC_PLACE_SELECTION_NEARBY" || reservationIds.length === 0) return;
+  bru.setEnvVar("__referenceBookingTried", "true");
+  const rb = require("./referenceBooking.js");
+  const skip = (why) => validationLogger(`[WARNING] Nearby place: no reference place, ${why}; the place near another passenger is not tested.`);
+  const request = rb.referenceOfferRequest(parseEnvJson("OfferCollectionRequest", null));
+  if (!request) {
+    skip("the offer request names no passenger to book first");
+    return;
+  }
+  const offers = await sendOsdmRequest("POST", "/offers", request.body);
+  const pick = offers.status >= 200 && offers.status < 300 ? rb.referenceOffer(chosenOffer(), offers.body?.offers) : null;
+  if (!pick) {
+    skip(`the offers asked for passenger ${request.passengerRef} alone (HTTP ${offers.status}) hold no reservation`);
+    return;
+  }
+  const passenger = (parseEnvJson("bookingPassengerSpecifications", []) || []).find((p) => p?.externalRef === request.passengerRef)
+    || (parseEnvJson("bookingPassengerSpecifications", []) || [])[0];
+  const body = rb.referenceBookingRequest({ offer: pick.offer, trips: offers.body?.trips, passenger, purchaser: parseEnvJson("bookingPurchaserSpecifications", null), passengerRef: request.passengerRef });
+  if (!body) {
+    skip("passenger A's booking could not be built");
+    return;
+  }
+  const booked = await sendOsdmRequest("POST", "/bookings", body);
+  const place = booked.status >= 200 && booked.status < 300 ? rb.placeOfReferenceBooking(booked.body) : null;
+  if (place?.bookingId) bru.setEnvVar("__referenceBookingId", place.bookingId);
+  if (!place) {
+    skip(`passenger ${request.passengerRef}'s booking on offer ${pick.offer.offerId} was refused (HTTP ${booked.status}${booked.body?.code ? ", " + booked.body.code : ""})`);
+    return;
+  }
+  if (place.missing) {
+    skip(`passenger ${request.passengerRef}'s booking ${place.bookingId}: ${place.missing}`);
+    return;
+  }
+  bru.setEnvVar("nearbyReference", JSON.stringify({ coachNumber: place.coachNumber, placeNumber: place.placeNumber }));
+  validationLogger(`[INFO] Nearby place: the reference place is ${place.coachNumber}/${place.placeNumber}, given to passenger ${request.passengerRef} alone in booking ${place.bookingId} (offer ${pick.offer.offerId}, ${pick.how}); the scenario's booking asks for places near it.`);
+}
+
+/**
+ * #776: passenger A's booking is deleted once the scenario's booking (02, or
+ * 09 for a reservation added later) has been answered. A booking not deleted
+ * is a warning naming it: it expires on its own if it was only pre-booked.
+ */
+async function releaseReferenceBooking() {
+  const id = bru.getEnvVar("__referenceBookingId");
+  if (!id) return;
+  bru.setEnvVar("__referenceBookingId", null);
+  const res = await sendOsdmRequest("DELETE", `/bookings/${encodeURIComponent(id)}`);
+  if (res.status >= 200 && res.status < 300) {
+    validationLogger(`[INFO] Nearby place: passenger A's booking ${id} (the reference place) is deleted (HTTP ${res.status}).`);
+  } else {
+    validationLogger(`[WARNING] Nearby place: passenger A's booking ${id} (the reference place) could not be deleted (HTTP ${res.status}${res.body?.code ? ", " + res.body.code : ""}); it stays pre-booked until it expires.`);
+  }
 }
 
 /**

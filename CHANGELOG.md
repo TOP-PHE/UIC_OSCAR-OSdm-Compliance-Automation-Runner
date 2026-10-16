@@ -62,6 +62,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.304] / [collection-OTST_V2.0.175] — 2026-10-16
+
+Issue #776, release 2026.339. Simulator 0.30.0.
+
+### Added
+- **A nearby place near the place of another passenger, taken from a first booking.** A reference place is a coach and place of one train of one provider: it cannot be written into a scenario, and the catalogue copies carried the simulator's `7/15`. With `referencePlace` empty or `AUTO`, before the booking (or before 09 for a reservation added later) the run:
+  - asks step 01's offers again for the first passenger alone;
+  - books, for that passenger, the offer standing for the chosen one, with its reservations;
+  - takes the place given as the reference place.
+  The scenario's own booking then asks for places near it, while that place is taken. The first booking is deleted (`DELETE /bookings/{id}`) once the scenario's booking is answered. It is sent from the step's script, like the after-sale probes (#700), so the run filter cannot skip it. `library-bruno/referenceBooking.js` holds the pure part; `makeReferenceBooking()` and `releaseReferenceBooking()` (`offers.js`) the requests.
+  - No offer with a reservation, the first booking refused, or no place given: a WARNING, and the sale goes on without a reference place.
+  - The first booking's place given to a passenger of the scenario: a FAIL (the rule of #766 PR 4); another coach: a WARNING.
+  - The first booking not deleted: a WARNING naming it.
+- **Reference scenario `OTST_SALE_NEARBY_PLACE_1ADT`**, for a provider that books one passenger's reservation only. `OTST_SALE_NEARBY_PLACE_2ADT` and `OTST_SALE_NEARBY_PLACE_ADD_LATER_2ADT` now come from the `AUTO` scenarios: a copy has no reference place left to complete.
+- Test Config's *Near the place* field and the data file schema say what empty and `AUTO` do. A place written as `coach/place` works as before.
+
+### Simulator 0.30.0
+- `DELETE /bookings/{id}`: a booking not confirmed is deleted (204); a confirmed one is refused (409 `BOOKING_CONFIRMED`).
+- On a train with a place map, a place the simulator chooses is a free saloon seat of the map's coach, so that it can be named as a reference place. It was a coach and seat drawn from the reservation's id, outside the map.
+- Scenarios `SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38`, `SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38`, `SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38`.
+
+### Default decisions (taken without asking)
+- **Empty means AUTO.** Before, an empty `referencePlace` in the NEARBY flow sent no reference place at all; no scenario relied on it.
+- **The first booking is deleted once the scenario's booking is answered**, not at the end of the scenario: its place is taken while the provider places the others, and nothing is left behind if the scenario stops later.
+- **Passenger A is the first passenger of the scenario**, booked under the same name.
+
+Checked:
+- Unit tests: `nearby-reference-booking.test.js` (16), with the simulator's own functions end to end; two pinned patterns updated in `nearby-place.test.js`. Simulator: `reference-booking.test.js` (2); the data-file tests pin the new scenarios.
+- Replay before (main and simulator 0.29.0) and after (this branch and simulator 0.30.0) of the eleven scenarios on the place-map trains and four others: the same checks. The three new scenarios: 336, 273 and 335 checks, no failure; the simulator log shows the first booking, then its `DELETE` answered 204.
+- Full suite, lint, simulator tests.
+
+Not verified: a run against a real provider.
+
+---
+
 ## [server-1.11.303] / [collection-OTST_V2.0.174] — 2026-10-16
 
 Issue #774, release 2026.338. Two gradings a real provider's seat reservation batch showed wrong.

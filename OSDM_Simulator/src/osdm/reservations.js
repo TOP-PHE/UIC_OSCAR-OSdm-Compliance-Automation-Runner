@@ -248,7 +248,7 @@ function placesOf(partId, count) {
 }
 
 /** The booked reservation made from a reservation offer part. */
-function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, { placeProperties = [], named = null, fee = 0, otherPlace = false, near = null, ignoreReference = false } = {}) {
+function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, { placeProperties = [], named = null, fee = 0, otherPlace = false, near = null, ignoreReference = false, onMap = false } = {}) {
   const tripId = part.tripCoverage.coveredTripId;
   const legId = part.tripCoverage.coveredLegIds[0];
   const leg = listOf(trips.find((t) => t.id === tripId)?.legs).find((l) => l.id === legId);
@@ -260,6 +260,9 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
   if (named) given = { coachNumber: placeMap.COACH, placeNumbers: named.places.map((n) => (otherPlace ? placeMap.otherPlace(n) : n)) };
   else if (near && !ignoreReference) given = { coachNumber: near.coachNumber, placeNumbers: placeMap.seatsNear(near.placeNumber, passengerIds.length) };
   else if (near) given = { coachNumber: String(Number(near.coachNumber) + 1), placeNumbers: placeMap.seatsNear(near.placeNumber, passengerIds.length) };
+  // #776: on a train with a place map, a place chosen by the simulator is one
+  // of the map's free saloon seats, so that it can be a reference place.
+  else if (onMap) given = { coachNumber: placeMap.COACH, placeNumbers: placeMap.seatsNear('', passengerIds.length) };
   else given = placesOf(part.id, passengerIds.length);
   const { coachNumber, placeNumbers } = given;
   const charged = named ? { ...part.price, amount: part.price.amount + named.fees * fee } : part.price;

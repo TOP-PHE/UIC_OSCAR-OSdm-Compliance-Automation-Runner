@@ -312,8 +312,14 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     const [bookingId, part, partId, ...more] = rest;
     if (bookingId === undefined) return newBooking(req, provider, scope);
     if (part === undefined) {
-      requireMethod(req, 'GET');
+      requireMethod(req, 'GET', 'DELETE');
       const booking = bookingOf(scope, bookingId);
+      // #776: a booking not confirmed may be deleted; a confirmed one is refunded instead.
+      if (req.method === 'DELETE') {
+        if (booking.fulfillments.length > 0) throw new HttpError(409, 'BOOKING_CONFIRMED', 'Booking confirmed', 'A confirmed booking cannot be deleted; it is refunded.');
+        store.remove('booking', scope, bookingId);
+        return NO_CONTENT;
+      }
       releaseIfExpired(booking, now());
       persons.showRequestedInformation(booking);
       showRefundReceipt(booking, provider, now());

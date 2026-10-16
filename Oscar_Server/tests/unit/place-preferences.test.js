@@ -204,7 +204,7 @@ describe('#766 PR 2 — the collection wiring', () => {
   test('parser: the preferences, PLACE_SELECTION by default, the new variables in both reset lists', () => {
     const parser = read('Bruno_Collection', 'library-bruno', 'scenarioParser.js');
     expect(parser).toContain('bru.setEnvVar("placePreferences", JSON.stringify(_placePreferences));');
-    expect(parser).toContain('|| (_placePreferences.length > 0 || _namedPlace || _nearby ? "PLACE_SELECTION" : null));');
+    expect(parser).toContain('|| (_placePreferences.length > 0 || _namedPlace || _nearby || _nearbyAuto ? "PLACE_SELECTION" : null));');
     const vars = '"placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind"';
     for (const text of [parser, read('Bruno_Collection', 'opencollection.yml')]) expect(text).toContain(vars);
   });

@@ -262,7 +262,8 @@ function dataNeedsOf(scenario, datafile, facts) {
     // #766: seat preferences are codes of the provider's own list.
     ...(placeSelectionFlowOf({ placePreferences: scenario.placePreferences }) ? ['placePreferences'] : []),
     // #766 PR 4: a reference place is a coach and place of the provider's train.
-    ...(typeof scenario.referencePlace === 'string' && scenario.referencePlace.trim() ? ['referencePlace'] : []),
+    // #776: "AUTO" takes it from a first booking, so the provider gives it.
+    ...(typeof scenario.referencePlace === 'string' && !['', 'AUTO'].includes(scenario.referencePlace.trim().toUpperCase()) ? ['referencePlace'] : []),
   ];
   const needs = {
     trip: trip.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH',

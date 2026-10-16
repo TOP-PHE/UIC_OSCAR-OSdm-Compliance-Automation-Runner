@@ -164,6 +164,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     simulator resolves a BOOKING context to the offer that holds the
     reservation (`offerInContext()` in `app.js`); trips 17/18 are EuroCity
     (optional reservation) from the map and preference stop places.
+    **The reference place from a first booking (#776, 1.11.304).** A coach
+    and place belong to one train: `referencePlace` empty or `AUTO`
+    (`isAutoReference()`, env `nearbyReferenceAuto`) makes
+    `askNearbyPlace()` call `makeReferenceBooking()` first. It re-sends 01's
+    offer request for the first passenger alone, books the offer standing
+    for the chosen one (`referenceOffer()` = `matchingOffer()` among offers
+    holding a reservation), and sets `nearbyReference` from the place given.
+    It runs once per sale (`__referenceBookingTried`), before 02, or before
+    09 with ADD_LATER. `releaseReferenceBooking()` sends `DELETE
+    /bookings/{id}` at the top of 02's and 09's after-response, so A's place
+    is taken while the provider places the others. Failures are WARNINGs and
+    the sale goes on without a reference. The catalogue's needs leave out
+    `referencePlace` for `AUTO`. Simulator 0.30.0: DELETE of an unconfirmed
+    booking; on a map train, an automatic place is a free saloon seat of
+    coach 7 (a reference place must be on the map there).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

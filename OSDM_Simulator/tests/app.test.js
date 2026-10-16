@@ -219,7 +219,7 @@ test('a path that is no OSDM resource is a 404, a wrong method a 405', async () 
     assert.equal((await call(sim.base, token, 'GET', url)).status, 404, url);
   }
   const wrong = [['POST', '/alpha/versions', ['GET']], ['GET', '/alpha/offers', ['POST']], ['GET', '/alpha/bookings', ['POST']],
-    ['DELETE', '/alpha/bookings/x', ['GET']], ['GET', '/alpha/bookings/x/fulfillments', ['POST']]];
+    ['PATCH', '/alpha/bookings/x', ['GET', 'DELETE']], ['GET', '/alpha/bookings/x/fulfillments', ['POST']]];
   for (const [method, url, allowed] of wrong) {
     const res = await call(sim.base, token, method, url, method === 'POST' ? {} : undefined);
     assert.equal(res.status, 405, `${method} ${url}`);

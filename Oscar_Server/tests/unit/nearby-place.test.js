@@ -140,8 +140,8 @@ describe('#766 PR 4 — the collection wiring', () => {
   test('parser, reset lists, 02, the builder and 07', () => {
     const parser = read('Bruno_Collection', 'library-bruno', 'scenarioParser.js');
     expect(parser).toContain('bru.setEnvVar("nearbyReference", _nearby ? JSON.stringify(_nearby) : null);');
-    expect(parser).toContain('|| (_placePreferences.length > 0 || _namedPlace || _nearby ? "PLACE_SELECTION" : null));');
-    const vars = '"__namedPlacesOutcome", "nearbyReference", "__nearbyAskedFor", "__nearbyOutcome"';
+    expect(parser).toContain('|| (_placePreferences.length > 0 || _namedPlace || _nearby || _nearbyAuto ? "PLACE_SELECTION" : null));');
+    const vars = '"__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome"';
     for (const text of [parser, read('Bruno_Collection', 'opencollection.yml')]) expect(text).toContain(vars);
     const step02 = read('Bruno_Collection', '02-Common Requests', '02. POST Create Booking.yml');
     expect(step02.indexOf('offers.js").askNearbyPlace();')).toBeGreaterThan(step02.indexOf('offers.js").askNamedPlaces();'));
