@@ -161,7 +161,7 @@ describe('the steps and the parser', () => {
     expect(step('01b. POST Get Return Offer.yml')).toMatch(/__productNotOffered[\s\S]*loopbackOrStop\("POST Get Return Offer \(expected product check\)"\)/);
     expect(step('07. GET Booking after Fulfillments.yml')).toMatch(/checkBookingProduct\(/);
     for (const file of [path.join(root, 'library-bruno', 'scenarioParser.js'), path.join(root, 'opencollection.yml')]) {
-      expect(fs.readFileSync(file, 'utf8')).toMatch(/"expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual"/);
+      expect(fs.readFileSync(file, 'utf8')).toMatch(/"expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual"/);
     }
   });
 });

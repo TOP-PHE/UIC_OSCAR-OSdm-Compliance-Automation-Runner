@@ -62,6 +62,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.307] / [collection-OTST_V2.0.178] — 2026-10-16
+
+Issue #780 part 2, release 2026.342. Simulator 0.31.0.
+
+### Added
+- **Offer search probes.** A scenario with `offerSearchProbe` on tests the options of its offer search criteria. After `01. POST Get Offer`, each option it sends is a test, failed when no offer keeps to it or when the provider says it ignored it (`PARAMETER_NOT_SUPPORTED`). Some offers not keeping to it is an INFO line. The scenario ends after the offer. Test Config has the field (Offer search probe); the data file schema too.
+- **One reference scenario per declared option value.** The catalogue entry `OTST_OFFER_OPTION_PROBE` (`"probe": "OFFER_OPTIONS"`) comes, for a company, once per value its Test Framework declares, as `OTST_OFFER_<OPTION>_<VALUE>`:
+  - `OFFER_MODE_INDIVIDUAL`;
+  - `OFFER_PARTS_ADMISSION`, `_RESERVATION`, `_ANCILLARY`;
+  - `TRAVEL_CLASS_FIRST`, `_SECOND`;
+  - `SERVICE_CLASS_BEST`, `_HIGH`, `_STANDARD`, `_BASIC`;
+  - `FLEXIBILITY_FULL_FLEXIBLE`, `_SEMI_FLEXIBLE`, `_NON_FLEXIBLE` (from the Tariff Flexibility list).
+
+  The values come from the declared lists of Offer search options. An option left at "every value" declares nothing to probe. `COLLECTIVE` needs a group (the group entries test it), and `ALL`, `FARE_*` and `ANY_CLASS` ask for nothing to check. With no value declared, the entry is listed but cannot be copied. A copy asks for the value alone (`withOfferOptions()`, `catalogueMatch.js`); a flexibility probe also chooses that flexibility. The probes keep their search: no `_SPEC` / `_TRIPID` twins.
+
+### Simulator 0.31.0
+- `gamma` keeps to `serviceClassTypes`: `HIGH` is first class, `STANDARD` second; `BEST` and `BASIC` are not sold (no offer).
+- An offer request asking for offer parts without `ADMISSION` (or `ALL`) gets the usual offers and a `PARAMETER_NOT_SUPPORTED` problem naming `offerSearchCriteria.requestedOfferParts`: it sells nothing without an admission.
+- Station `0000090` (`variants.ignoresOfferOptionsFrom`, optional in a profile): its offers ignore the offer search criteria.
+- Scenarios `SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38` (source of the catalogue entry), `SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38`, `SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38`, `SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38`, `SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38`; and two that fail on purpose, `SIM_WRONG_OFFER_PROBE_IGNORED_38` (from station `0000090`) and `SIM_WRONG_OFFER_PROBE_RESERVATION_ONLY_38`.
+
+### Default decisions (taken without asking)
+- **Only explicitly declared values are probed.** "Every value" (no list) accepts every value, so it raises no warning, but it does not claim that every value is sold. Probing all of them would fail on most providers.
+- **A probe is graded harder than the general check of part 1.** It exists only because the provider declared the value, so no offer keeping to it is a failure there, not a warning.
+- **The probe ends after the offer**, as the expected-product-absent test does: the booking would test nothing more about the option.
+
+Checked:
+- Unit tests: `offer-search-options.test.js` (6 more) for the catalogue, the copy (schema-valid) and the grading. Simulator: `offer-options.test.js` (4); the data-file tests pin the new scenarios and the station.
+- Simulator replay of the seven new scenarios: the five probes pass (118, 118, 106, 118 and 118 checks). The two wrong ones fail one check each, the one meant to fail. A first version of the flexibility probe failed on its own scenario's flexibility, so the copy now sets it.
+- Full simulator replay, compared with the previous full recording.
+- Full suite, lint, simulator tests.
+
+Not verified: a run against a real provider. Next in #780: random combinations with a seed.
+
+---
+
 ## [server-1.11.306] / [collection-OTST_V2.0.177] — 2026-10-16
 
 Issue #780 part 1, release 2026.341. The offer search options are declared and their answer checked.

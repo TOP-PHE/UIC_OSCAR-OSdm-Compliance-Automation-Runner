@@ -235,3 +235,99 @@ describe('the Test Framework page', () => {
     expect(page).toContain("case 'fw-offer-search-option':");
   });
 });
+
+// ── #780 part 2: the offer search probes ────────────────────────────────────
+
+const { catalogueFor, catalogueDatafile, declaredOptionValues } = require('../../src/utils/scenarioCatalogue');
+const { adaptCatalogueDatafile, withOfferOptions } = require('../../src/utils/catalogueMatch');
+const { schemaProblems } = require('../../src/utils/datafileSchema');
+
+describe('#780 part 2: the catalogue makes one probe per declared value', () => {
+  const DATA = path.join(LIB, '..', 'data_base');
+  const catalogue = JSON.parse(fs.readFileSync(path.join(DATA, 'scenario_catalogue.json'), 'utf8'));
+  const simulator = JSON.parse(fs.readFileSync(path.join(DATA, 'simulator_datafile.json'), 'utf8'));
+  const FW = { salesFlows: ['SALE'], passengerTypes: ['ADULT'] };
+  const probes = (fw) => catalogueFor(catalogue, simulator, fw).filter((e) => e.code.startsWith('OTST_OFFER_'));
+
+  test('the values worth a probe: declared lists only, without ALL, FARE_*, ANY_CLASS or COLLECTIVE', () => {
+    expect(declaredOptionValues({}).map((o) => o.value)).toEqual([]);
+    expect(declaredOptionValues({
+      offerSearchOptions: { offerModes: ['INDIVIDUAL', 'COLLECTIVE'], requestedOfferParts: ['ALL', 'FARE_ADMISSION', 'ADMISSION'], travelClasses: ['ANY_CLASS', 'FIRST'], serviceClassTypes: ['HIGH'] },
+      offerCriteria: { flexibilities: ['SEMI_FLEXIBLE'] },
+    }).map((o) => `${o.key}=${o.value}`)).toEqual([
+      'offerModes=INDIVIDUAL', 'requestedOfferParts=ADMISSION', 'travelClasses=FIRST', 'serviceClassTypes=HIGH', 'flexibilities=SEMI_FLEXIBLE',
+    ]);
+  });
+
+  test('nothing declared: the probe entry is listed once and cannot be copied', () => {
+    const [entry] = probes(FW);
+    expect(entry.code).toBe('OTST_OFFER_OPTION_PROBE');
+    expect(entry.missing).toEqual(['an offer search option value to probe (Offer search options, Tariff Flexibility)']);
+    expect(entry.requirements.offerRequest.convertible).toBe(false);
+  });
+
+  test('declared values: one twin each, in the order of the options, and no form variant of them', () => {
+    const fw = { ...FW, offerRequestForms: ['SEARCH', 'SPECIFICATION'], offerSearchOptions: { travelClasses: ['FIRST', 'SECOND'] }, offerCriteria: { flexibilities: ['NON_FLEXIBLE'] } };
+    const list = probes(fw);
+    expect(list.map((e) => e.code)).toEqual(['OTST_OFFER_TRAVEL_CLASS_FIRST', 'OTST_OFFER_TRAVEL_CLASS_SECOND', 'OTST_OFFER_FLEXIBILITY_NON_FLEXIBLE']);
+    expect(list.every((e) => e.variantOf === 'OTST_OFFER_OPTION_PROBE' && e.missing.length === 0)).toBe(true);
+    expect(list[0].optionOf).toEqual({ key: 'travelClasses', field: 'travelClass', value: 'FIRST' });
+    expect(list[0].purpose).toBe('Offer search probe: offers asked with offerSearchCriteria.travelClasses FIRST alone; no offer keeping to it, or the provider ignoring it, fails. The scenario ends after the offer.');
+  });
+
+  test('the copy: each twin asks for its value alone, probe on; the probe entry gives way; the file stays valid', () => {
+    const fw = { ...FW, offerSearchOptions: { offerModes: ['INDIVIDUAL'], serviceClassTypes: ['HIGH'] }, offerCriteria: { flexibilities: ['SEMI_FLEXIBLE'] } };
+    const entries = catalogueFor(catalogue, simulator, fw);
+    const file = catalogueDatafile(catalogue, simulator);
+    const { datafile } = adaptCatalogueDatafile(file, entries, fw);
+    const byCode = Object.fromEntries(datafile.scenarios.map((s) => [s.code, s]));
+    expect(byCode.OTST_OFFER_OPTION_PROBE).toBeUndefined();
+    expect(byCode.OTST_OFFER_OFFER_MODE_INDIVIDUAL.offerSearchCriteria).toEqual({ serviceClass: [], travelClass: [], flexibilities: [], offerMode: 'INDIVIDUAL', requestedOfferParts: [] });
+    expect(byCode.OTST_OFFER_SERVICE_CLASS_HIGH.offerSearchCriteria.serviceClass).toEqual(['HIGH']);
+    expect(byCode.OTST_OFFER_FLEXIBILITY_SEMI_FLEXIBLE.offerSearchCriteria.flexibilities).toEqual(['SEMI_FLEXIBLE']);
+    expect(byCode.OTST_OFFER_FLEXIBILITY_SEMI_FLEXIBLE.desiredFlexibility).toBe('SEMI_FLEXIBLE');
+    for (const code of ['OTST_OFFER_OFFER_MODE_INDIVIDUAL', 'OTST_OFFER_SERVICE_CLASS_HIGH', 'OTST_OFFER_FLEXIBILITY_SEMI_FLEXIBLE']) {
+      expect(byCode[code].offerSearchProbe).toBe('on');
+      expect(byCode[code].description).toMatch(/^Offer search probe: /);
+    }
+    const schema = JSON.parse(fs.readFileSync(path.join(LIB, '..', 'json_validator', 'datafile.schema.json'), 'utf8'));
+    expect(schemaProblems(datafile, schema).problems).toEqual([]);
+    // The file given is not changed, and without probes nothing happens.
+    expect(file.scenarios.some((s) => s.code === 'OTST_OFFER_OPTION_PROBE')).toBe(true);
+    expect(withOfferOptions(file, [])).toBe(file);
+  });
+});
+
+describe('#780 part 2: an offer search probe grades the options', () => {
+  function run(criteria, response) {
+    const results = [];
+    global.bru = { getEnvVar: (k) => ({ offerSearchCriteria: JSON.stringify(criteria), offerSearchProbe: 'true' })[k], setEnvVar: () => {} };
+    global.test = (name, fn) => { try { fn(); results.push([name, 'pass']); } catch (e) { results.push([name, 'fail', e.message]); } };
+    logs.length = 0;
+    try {
+      const offers = require(path.join(LIB, 'offers.js'));
+      global.validationLogger = (line) => { logs.push(line); };
+      offers.checkOfferSearchCriteria(response);
+    } finally { delete global.bru; delete global.test; }
+    return results;
+  }
+
+  test('kept: a passing test; none kept or ignored: a failed one; some not kept: a pass and an INFO line', () => {
+    expect(run({ travelClasses: ['FIRST'] }, { offers: [offer('a', { travelClass: 'FIRST' })] })).toEqual([['Offer request: the offers keep to the travel classes asked (FIRST)', 'pass']]);
+    expect(run({ travelClasses: ['FIRST'] }, { offers: [offer('a')] })).toEqual([['Offer request: the offers keep to the travel classes asked (FIRST)', 'fail', '1 of 1 offer(s) do not (offer a: SECOND)']]);
+    expect(run({ travelClasses: ['FIRST'] }, { offers: [offer('a')], problems: [{ code: 'PARAMETER_NOT_SUPPORTED', pointers: ['offerSearchCriteria.travelClasses'] }] })[0][1]).toBe('fail');
+    expect(run({ travelClasses: ['FIRST'] }, { offers: [offer('a'), offer('b', { travelClass: 'FIRST' })] })).toEqual([['Offer request: the offers keep to the travel classes asked (FIRST)', 'pass']]);
+    expect(logs).toEqual(['[INFO] Offer request: the offers keep to the travel classes asked (FIRST) — 1 of 2 offer(s) do not (offer a: SECOND)']);
+  });
+
+  test('01 ends a probe after its checks, and the parser arms it', () => {
+    const step = fs.readFileSync(path.join(LIB, '..', '02-Common Requests', '01. POST Get Offer.yml'), 'utf8');
+    expect(step).toContain('if (bru.getEnvVar("offerSearchProbe") === "true") {');
+    expect(step.indexOf('checkOfferSearchCriteria(jsonData);')).toBeLessThan(step.indexOf('loopbackOrStop("POST Get Offer (offer search probe)")'));
+    const parser = fs.readFileSync(path.join(LIB, 'scenarioParser.js'), 'utf8');
+    expect(parser).toContain('bru.setEnvVar("offerSearchProbe",');
+    for (const file of [path.join(LIB, 'scenarioParser.js'), path.join(LIB, '..', 'opencollection.yml')]) {
+      expect(fs.readFileSync(file, 'utf8')).toContain('"expectedProductAbsent", "offerSearchProbe",');
+    }
+  });
+});

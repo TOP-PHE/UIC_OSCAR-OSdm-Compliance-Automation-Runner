@@ -17,7 +17,8 @@
     "requestedInformationFrom": "urn:uic:stn:0000097"
   },
   "variants": {
-    "wrongOffersFrom": "urn:uic:stn:0000098"
+    "wrongOffersFrom": "urn:uic:stn:0000098",
+    "ignoresOfferOptionsFrom": "urn:uic:stn:0000090"
   },
   "ticketing": {
     "perPassengerFrom": "urn:uic:stn:0000096",

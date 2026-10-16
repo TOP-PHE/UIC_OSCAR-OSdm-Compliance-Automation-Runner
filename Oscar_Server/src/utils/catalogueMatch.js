@@ -171,7 +171,7 @@ function makeDistinct(p, n) {
  * sent by trip id keeps its search trip and asks by `offersByTripIds`.
  */
 function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
-  const datafile = withOfferRequestForms(catalogueFile, entries);
+  const datafile = withOfferOptions(withOfferRequestForms(catalogueFile, entries), entries);
   const byCode = new Map(arr(entries).map((e) => [e.code, e]));
   const fw = frameworkOf(frameworkConfig);
   const notes = {};
@@ -260,6 +260,31 @@ function withOfferRequestForms(datafile, entries) {
   return { ...datafile, scenarios, tripRequirements: trips };
 }
 
+/**
+ * #780: the catalogue data file with the offer search probes: each twin
+ * (`optionOf`) is its source asking for that one option value, with
+ * `offerSearchProbe` on; a flexibility probe also chooses that flexibility.
+ * The probe entry itself gives way to its twins. The data file given is not
+ * changed.
+ */
+function withOfferOptions(datafile, entries) {
+  const probes = arr(entries).filter((e) => e.optionOf);
+  if (!probes.length) return datafile;
+  const scenarios = arr(datafile.scenarios).flatMap((sc) => {
+    const twins = isObj(sc) ? probes.filter((e) => e.variantOf === sc.code) : [];
+    if (!twins.length) return [sc];
+    return twins.map((e) => {
+      const { field, value } = e.optionOf;
+      const criteria = { serviceClass: [], travelClass: [], flexibilities: [], offerMode: null, requestedOfferParts: [] };
+      criteria[field] = field === 'offerMode' ? value : [value];
+      const twin = { ...structuredClone(sc), code: e.code, description: e.purpose, offerSearchCriteria: criteria, offerSearchProbe: 'on' };
+      if (field === 'flexibilities') twin.desiredFlexibility = value;
+      return twin;
+    });
+  });
+  return { ...datafile, scenarios };
+}
+
 // What a limit entry takes from the framework: #699 its passenger count, #704
 // its departure day, #705 its passengers' ages. Nothing when the framework
 // does not declare it (the entry then cannot be copied).
@@ -338,5 +363,5 @@ function suggestTrip(trip, testData) {
 }
 
 module.exports = {
-  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withOfferRequestForms, OVERRULE_CODES,
+  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withOfferRequestForms, withOfferOptions, OVERRULE_CODES,
 };

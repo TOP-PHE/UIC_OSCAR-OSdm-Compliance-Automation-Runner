@@ -67,6 +67,20 @@ const HORIZON_LIMITS = new Set(['SALES_HORIZON', 'OVER_SALES_HORIZON']);
 // #705: one whose passengers stand on the edges of the age ranges the Test
 // Framework declares for CHILD and ADULT (AGE_RANGES).
 const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES'];
+// #780: an entry that stands for the offer search probes (`probe`
+// "OFFER_OPTIONS"): it comes once per option value the Test Framework
+// declares, each asking for that value alone. Per option: the framework key,
+// the scenario's offerSearchCriteria field, the values worth a probe (a
+// COLLECTIVE request needs a group, as the group entries have; ALL, FARE_*,
+// ANY_CLASS ask for nothing to check), the code part and the OSDM member.
+const PROBES = ['OFFER_OPTIONS'];
+const OFFER_OPTION_PROBES = [
+  { key: 'offerModes', field: 'offerMode', values: ['INDIVIDUAL'], code: 'OFFER_MODE', member: 'offerMode' },
+  { key: 'requestedOfferParts', field: 'requestedOfferParts', values: ['ADMISSION', 'RESERVATION', 'ANCILLARY'], code: 'OFFER_PARTS', member: 'requestedOfferParts' },
+  { key: 'travelClasses', field: 'travelClass', values: ['FIRST', 'SECOND'], code: 'TRAVEL_CLASS', member: 'travelClasses' },
+  { key: 'serviceClassTypes', field: 'serviceClass', values: ['BEST', 'HIGH', 'STANDARD', 'BASIC'], code: 'SERVICE_CLASS', member: 'serviceClassTypes' },
+  { key: 'flexibilities', field: 'flexibilities', values: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'], code: 'FLEXIBILITY', member: 'flexibilities' },
+];
 // The keys of `needs` (#681), in the order dataNeedsOf() writes them.
 const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
   'reductionCards', 'providerValues', 'requestedInformation', 'expiry'];
@@ -83,6 +97,7 @@ function entryProblems(e, at, scenarios, codes) {
   for (const key of Object.keys(e.set || {})) if (!SETTABLE.test(key)) problems.push(`${at}.set.${key} is not a field the catalogue may change`);
   if (String(e.source).startsWith('SIM_WRONG_')) problems.push(`${at}.source is a deliberately wrong scenario`);
   if (e.limit !== undefined && !LIMITS.includes(e.limit)) problems.push(`${at}.limit "${e.limit}" is not one of ${LIMITS.join(', ')}`);
+  if (e.probe !== undefined && !PROBES.includes(e.probe)) problems.push(`${at}.probe "${e.probe}" is not one of ${PROBES.join(', ')}`);
   problems.push(...needsProblems(e.needs, at));
   return problems;
 }
@@ -388,6 +403,7 @@ function catalogueFor(catalogue, simulator, framework) {
   const fw = isObj(framework?.config) ? framework.config : (framework || {});
   const forms = Array.isArray(fw.offerRequestForms) ? fw.offerRequestForms : null;
   return baseEntries(catalogue, simulator, framework).flatMap((entry) => {
+    if (entry.probe === 'OFFER_OPTIONS') return offerOptionProbes(entry, fw);
     if (!forms || !entry.requirements.offerRequest.convertible) return [entry];
     const variants = OFFER_REQUEST_FORMS.filter((form) => forms.includes(form))
       .map((form) => (form === 'SEARCH' ? entry : asForm(entry, form, framework)));
@@ -397,6 +413,33 @@ function catalogueFor(catalogue, simulator, framework) {
       purpose: `${entry.purpose} ${VARIANTS[variant.tripAs].purpose}`,
     }));
   });
+}
+
+/**
+ * #780: the values of each offer search option a framework declares that are
+ * worth a probe: its offerSearchOptions lists (a key absent declares nothing
+ * to probe, though every value is accepted) and its tariff flexibilities.
+ */
+function declaredOptionValues(fw) {
+  const options = isObj(fw.offerSearchOptions) ? fw.offerSearchOptions : {};
+  return OFFER_OPTION_PROBES.flatMap((probe) => {
+    const declared = probe.key === 'flexibilities' ? fw.offerCriteria?.flexibilities : options[probe.key];
+    return probe.values.filter((v) => arr(declared).includes(v)).map((value) => ({ ...probe, value }));
+  });
+}
+
+// #780: the probe entry as one twin per declared value (`optionOf`), or as
+// itself, not copiable, when the framework declares none.
+function offerOptionProbes(entry, fw) {
+  const values = declaredOptionValues(fw);
+  if (!values.length) return [{ ...entry, missing: [...entry.missing, 'an offer search option value to probe (Offer search options, Tariff Flexibility)'] }];
+  return values.map((o) => ({
+    ...entry,
+    code: `OTST_OFFER_${o.code}_${o.value}`,
+    variantOf: entry.code,
+    optionOf: { key: o.key, field: o.field, value: o.value },
+    purpose: `Offer search probe: offers asked with offerSearchCriteria.${o.member} ${o.value} alone; no offer keeping to it, or the provider ignoring it, fails. The scenario ends after the offer.`,
+  }));
 }
 
 // #748/#759: the forms a search can be sent in instead, with the code suffix
@@ -425,6 +468,8 @@ function baseEntries(catalogue, simulator, framework) {
     if (PASSENGER_LIMITS.has(entry.limit)) requirements.maxPassengers = true;
     if (HORIZON_LIMITS.has(entry.limit)) requirements.salesHorizon = true;
     if (entry.limit === 'AGE_RANGES') requirements.ageRanges = true;
+    // #780: the offer search probes keep their search: they test the options, not the form.
+    if (entry.probe) requirements.offerRequest = { ...requirements.offerRequest, convertible: false };
     return {
       code: entry.code,
       kind: kindOf(entry.code),
@@ -436,6 +481,7 @@ function baseEntries(catalogue, simulator, framework) {
       needs: entry.needs,
       needsText: entry.limit ? limitNeedsText(entry.needs, entry.limit) : needsText(entry.needs),
       ...(entry.limit ? { limit: entry.limit } : {}),
+      ...(entry.probe ? { probe: entry.probe } : {}),
     };
   });
 }
@@ -443,4 +489,5 @@ function baseEntries(catalogue, simulator, framework) {
 module.exports = {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
   dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, ageRangesOf, NEEDS_KEYS, LIMITS,
+  OFFER_OPTION_PROBES, declaredOptionValues,
 };

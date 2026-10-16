@@ -2147,7 +2147,9 @@ function compareOfferWithoutCards(status, body) {
 /**
  * After 01: do the offers keep to the offerSearchCriteria the request sent?
  * A warning per option no offer keeps to, or that the provider says it
- * ignored; an INFO line otherwise.
+ * ignored; an INFO line otherwise. In an offer search probe (#780 part 2,
+ * `offerSearchProbe`), each option is a test, failed in those two cases: the
+ * probe exists because the Test Framework declares the value.
  */
 function checkOfferSearchCriteria(jsonData) {
   const raw = bru.getEnvVar("offerSearchCriteria");
@@ -2157,9 +2159,16 @@ function checkOfferSearchCriteria(jsonData) {
   }
   const { ignoredParameters } = require('./ignoredParameters.js');
   const { checkOfferCriteria } = require('./offerCriteria.js');
+  const probe = String(bru.getEnvVar("offerSearchProbe")) === "true";
   checkOfferCriteria(criteria, jsonData, ignoredParameters(jsonData)).forEach((c) => {
-    if (c.ok) validationLogger(`[INFO] ✔ ${c.name}`);
-    else validationLogger(`[${c.level === 'warn' ? 'WARNING' : 'INFO'}] ${c.name} — ${c.message}`);
+    if (probe) {
+      if (!c.ok && c.level !== 'warn') validationLogger(`[INFO] ${c.name} — ${c.message}`);
+      test(c.name, () => { if (!c.ok && c.level === 'warn') throw new Error(c.message); });
+    } else if (c.ok) {
+      validationLogger(`[INFO] ✔ ${c.name}`);
+    } else {
+      validationLogger(`[${c.level === 'warn' ? 'WARNING' : 'INFO'}] ${c.name} — ${c.message}`);
+    }
   });
 }
 

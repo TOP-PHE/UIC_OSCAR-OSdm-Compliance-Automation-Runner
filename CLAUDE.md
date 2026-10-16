@@ -191,6 +191,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     keep to each option sent: never a failure (OSDM: classes may differ),
     WARNING when no offer does, INFO when some do not. The page's
     `FW_OFFER_SEARCH_OPTIONS` is pinned to `OFFER_SEARCH_OPTIONS`.
+    **PR 2 (1.11.307): probes.** `offerSearchProbe` on: those checks are tests
+    (failed when no offer keeps to the option or it is ignored) and the
+    scenario ends after 01. Catalogue entry `OTST_OFFER_OPTION_PROBE`
+    (`probe: OFFER_OPTIONS`) becomes `OTST_OFFER_<OPTION>_<VALUE>` per value
+    *explicitly* listed (`declaredOptionValues()`; "every value" probes
+    nothing), copied by `withOfferOptions()`. Simulator 0.31.0: gamma keeps
+    to `serviceClassTypes` (HIGH = first, STANDARD = second), flags offer
+    parts without ADMISSION as ignored, and ignores the criteria from
+    `0000090`.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
