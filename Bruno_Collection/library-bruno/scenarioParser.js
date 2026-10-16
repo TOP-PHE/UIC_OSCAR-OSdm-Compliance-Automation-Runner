@@ -1729,6 +1729,8 @@ function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
 }
 
 const OFFER_REQUEST_TEXT = { SEARCH: 'by trip search', SPECIFICATION: 'by trip specification', TRIP_IDS: 'by trip id' };
+// #780: the framework key of an offer search option → the OSDM member.
+const OFFER_OPTION_MEMBER = { offerModes: 'offerMode', requestedOfferParts: 'requestedOfferParts', travelClasses: 'travelClasses', serviceClassTypes: 'serviceClassTypes' };
 const PARTIAL_REFUND_SCOPE_OF = { partialRefundByFulfillment: 'fulfillment', partialRefundByLeg: 'leg', partialRefundByPax: 'passenger' };
 
 // The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
@@ -1739,6 +1741,12 @@ function featureNotDeclaredWarning(scenario, field) {
     const flow = field.slice('placeSelectionBy:'.length);
     const text = require('./placeSelection.js').FLOW_TEXT[flow] || flow;
     return `[WARNING] Scenario "${scenario.code}" chooses a place ${text} (${flow}), which the Test Framework does not declare (Seat Selection). The run will proceed; the provider may refuse or ignore the choice. Declare the flow in the Test Framework, or change the scenario's place selection.`;
+  }
+  // #780: an offer search option value (offerOption:<framework key>=<value>).
+  if (typeof field === 'string' && field.startsWith('offerOption:')) {
+    const [key, value] = field.slice('offerOption:'.length).split('=');
+    const member = OFFER_OPTION_MEMBER[key] || key;
+    return `[WARNING] Scenario "${scenario.code}" asks for offers with offerSearchCriteria.${member} ${value}, which the Test Framework does not declare (Offer search options). The run will proceed; the provider may refuse or ignore it. Declare the value in the Test Framework, or change the scenario's offer search criteria.`;
   }
   // #748: the offer request's form (offerRequestBy:SEARCH|SPECIFICATION|TRIP_IDS).
   if (typeof field === 'string' && field.startsWith('offerRequestBy:')) {

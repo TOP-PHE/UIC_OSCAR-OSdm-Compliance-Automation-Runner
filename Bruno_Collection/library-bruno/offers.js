@@ -43,6 +43,7 @@ module.exports = {
   checkOfferLegClasses,
   prepareOfferRequestByTripIds,
   checkOfferPlaceSelection,
+  checkOfferSearchCriteria,
   askPlacePreferences,
   askNamedPlaces,
   askNearbyPlace,
@@ -2138,6 +2139,27 @@ function compareOfferWithoutCards(status, body) {
       return;
     }
     test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+  });
+}
+
+// ── Offer request options (#780) ─────────────────────────────────────────────
+
+/**
+ * After 01: do the offers keep to the offerSearchCriteria the request sent?
+ * A warning per option no offer keeps to, or that the provider says it
+ * ignored; an INFO line otherwise.
+ */
+function checkOfferSearchCriteria(jsonData) {
+  const raw = bru.getEnvVar("offerSearchCriteria");
+  let criteria = raw;
+  if (typeof raw === "string") {
+    try { criteria = JSON.parse(raw); } catch { criteria = null; }
+  }
+  const { ignoredParameters } = require('./ignoredParameters.js');
+  const { checkOfferCriteria } = require('./offerCriteria.js');
+  checkOfferCriteria(criteria, jsonData, ignoredParameters(jsonData)).forEach((c) => {
+    if (c.ok) validationLogger(`[INFO] ✔ ${c.name}`);
+    else validationLogger(`[${c.level === 'warn' ? 'WARNING' : 'INFO'}] ${c.name} — ${c.message}`);
   });
 }
 

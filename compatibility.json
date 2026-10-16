@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.340",
+  "current_release": "2026.341",
   "releases": [
+    {
+      "release": "2026.341",
+      "date": "2026-10-16",
+      "server": "1.11.306",
+      "collection": "OTST_V2.0.177",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Offer search options: the Test Framework declares the offerSearchCriteria values a provider takes, a scenario sending another warns, and every run says whether the offers keep to the options sent (#780, part 1)."
+      ]
+    },
     {
       "release": "2026.340",
       "date": "2026-10-16",

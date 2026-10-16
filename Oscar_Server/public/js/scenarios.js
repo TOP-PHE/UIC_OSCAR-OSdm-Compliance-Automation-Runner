@@ -339,6 +339,47 @@ function fwToggleOfferRequestForm(el, form) {
   el.classList.toggle('selected', !on);
 }
 
+// #780: the offer search options a provider takes, per OfferSearchCriteria
+// member. Kept in sync with frameworkGating.js (OFFER_SEARCH_OPTIONS).
+const FW_OFFER_SEARCH_OPTIONS = [
+  ['offerModes', 'Offer mode (offerMode)', ['INDIVIDUAL', 'COLLECTIVE']],
+  ['requestedOfferParts', 'Offer parts (requestedOfferParts)', ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL']],
+  ['travelClasses', 'Travel classes (travelClasses)', ['FIRST', 'SECOND', 'ANY_CLASS']],
+  ['serviceClassTypes', 'Service classes (serviceClassTypes)', ['BEST', 'HIGH', 'STANDARD', 'BASIC', 'ANY_CLASS']],
+];
+
+// #780: no list declared for an option means every value.
+function fwOfferSearchOptionDeclared(fw, key, value) {
+  const declared = fw?.offerSearchOptions?.[key];
+  return !Array.isArray(declared) || declared.includes(value);
+}
+
+// #780: the framework editor's Offer search options pills.
+function offerSearchOptionsPanelHtml(fw) {
+  const groups = FW_OFFER_SEARCH_OPTIONS.map(([key, label, values]) => {
+    const pills = values.map((v) => `<div class="pill${fwOfferSearchOptionDeclared(fw, key, v) ? ' selected' : ''}" data-action="fw-offer-search-option" data-key="${esc(key)}" data-val="${esc(v)}">${esc(v.replaceAll('_', ' '))}</div>`).join('');
+    return `<div style="margin:6px 0 2px;font-size:12px;color:#546e7a">${esc(label)}</div><div class="pill-group">${pills}</div>`;
+  }).join('');
+  return `
+      <div class="fw-subsection" style="margin-top:12px">
+        <div class="fw-subsection-label" style="margin-bottom:8px">🔎 Offer search options — the offerSearchCriteria values the provider takes</div>
+        <div style="margin-bottom:6px;font-size:11px;color:#78909c">A scenario sending a value not ticked gets a warning. Every run checks that the offers keep to the options sent, as warnings: OSDM lets the classes returned differ from those asked.</div>
+        ${groups}
+      </div>`;
+}
+
+// #780: an option pill. No list means every value, so the first click starts from all of them.
+function fwToggleOfferSearchOption(el, key, value) {
+  const option = FW_OFFER_SEARCH_OPTIONS.find(([k]) => k === key);
+  if (!option) return;
+  const fw = wizData.framework;
+  if (!fw.offerSearchOptions || typeof fw.offerSearchOptions !== 'object') fw.offerSearchOptions = {};
+  const list = Array.isArray(fw.offerSearchOptions[key]) ? fw.offerSearchOptions[key] : [...option[2]];
+  const on = list.includes(value);
+  fw.offerSearchOptions[key] = on ? list.filter((x) => x !== value) : [...list, value];
+  el.classList.toggle('selected', !on);
+}
+
 // #766: how the provider lets a place be chosen, OSDM's PlaceSelectionFlow.
 // Kept in sync with frameworkGating.js (PLACE_SELECTION_FLOWS,
 // placeSelectionFlowDeclared()).
@@ -4124,6 +4165,7 @@ function renderWizardStep1() {
         <div id="fw-return-version-note" style="color:#e65100;font-size:12px;margin-top:6px">${esc(returnModelVersionNote(fw))}</div>
       </div>
       ${offerRequestPanelHtml(fw)}
+      ${offerSearchOptionsPanelHtml(fw)}
     </div>
   </div>
 
@@ -7569,6 +7611,8 @@ document.body.addEventListener('click', function(e) {
       fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-offer-request-form':
       fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-offer-search-option':
+      fwToggleOfferSearchOption(el, el.dataset.key, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-place-selection-flow':
       fwTogglePlaceSelectionFlow(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-return-model':

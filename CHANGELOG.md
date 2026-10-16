@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.306] / [collection-OTST_V2.0.177] — 2026-10-16
+
+Issue #780 part 1, release 2026.341. The offer search options are declared and their answer checked.
+
+### Added
+- **The Test Framework declares the offer search options a provider takes** (Offer search options, under Offer requests): per OSDM `OfferSearchCriteria` member, the values it supports: `offerMode`, `requestedOfferParts`, `travelClasses`, `serviceClassTypes`. Stored as `offerSearchOptions`; a member absent means every value, `[]` none. A scenario sending a value not declared gets a WARNING at the run (`offerOption:<key>=<value>`, `frameworkGating.js`), its criteria read as the collection reads them (its own, else the first of its `offerSearchCriteriaList` entry). The older `offerCriteria` members other than `flexibilities` were never shown on the page and keep their defaults: they are not read as declarations.
+- **After 01, the run says whether the offers keep to each option sent** (`library-bruno/offerCriteria.js`, pure; `checkOfferSearchCriteria()` in `offers.js`): offer mode (on the admissions), offer parts, flexibilities, travel and service classes (on the admissions' products: a reservation sold with a flexible admission is itself non-flexible), product tags (a product carrying the tag, or of that type). None of it fails: OSDM says the classes returned may differ from those asked, and requires no filtering. No offer keeping to an option is a WARNING; some offers not keeping to it is INFO; an option the provider says it ignored (`PARAMETER_NOT_SUPPORTED`) is a WARNING saying so. A reservation or ancillary sold with an admission counts as part of it when admissions are asked. `ALL`, `FARE_*` and `ANY_CLASS` ask for nothing to check.
+
+Checked:
+- Unit tests: `offer-search-options.test.js` (19), with the page's option lists pinned to the server's.
+- Replay of 12 simulator scenarios (sale, return in both models, card, product, groups, class per leg, mandatory reservation, OSDM 3.6/3.7/3.8): the same checks and warnings as the recording of OTST_V2.0.175. A first version warned on the group scenarios, whose answers hold individual offers too; that is now INFO.
+- Full suite, lint.
+
+Not verified: a run against a real provider. Coming in the next parts of #780: one catalogue entry per declared value, the simulator honouring each option (with variants that break one), random combinations with a seed.
+
+---
+
 ## [server-1.11.305] / [collection-OTST_V2.0.176] — 2026-10-16
 
 Issue #778, release 2026.340. A return is dated on a day its train goes back.
