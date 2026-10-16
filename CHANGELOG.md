@@ -105,7 +105,12 @@ Checked:
   - `bruno-bookings-part-pairing.test.js`, 2 more;
   - simulator `place-map.test.js`, 11 tests.
   - Each of eight mutations of the new rules fails a test.
-- Replay before/after: CHECKS_PLACEHOLDER
+- Replay before/after (97 scenarios with `bru` 4.2.1): the 93 existing scenarios give the same checks and warnings. The four new ones:
+  - `SIM_SALE_NAMED_PLACE_2ADT_38`: 336 checks, 0 failed (seats 7/13, 7/14);
+  - `SIM_SALE_NAMED_PLACE_FEE_1ADT_38`: 273 checks, 0 failed (seat 7/21, offer price + fee);
+  - `SIM_SALE_NAMED_COMPARTMENT_2ADT_38`: 336 checks, 0 failed (compartment C1);
+  - `SIM_WRONG_NAMED_PLACE_38`: 273 checks, the one failure intended.
+  - *Checks by scenario* and `simulator-checks.json` regenerated; `replay.js catalogue` agrees.
 
 ---
 
