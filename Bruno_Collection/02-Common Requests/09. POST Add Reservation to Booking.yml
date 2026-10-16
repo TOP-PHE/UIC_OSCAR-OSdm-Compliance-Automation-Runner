@@ -202,12 +202,15 @@ runtime:
 
         // #601: the reservations added are in the answer, on their legs, and
         // count as booked for the checks of 07.
-        const { checkBookedReservations, fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
+        const { checkBookedReservations, reservationsIgnored, fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
         const _addedLater = fromEnv(bru.getEnvVar("reservationAddLaterSelections"), []);
         if (bru.getEnvVar("reservationBookingForm") === "ADD_LATER" && _addedLater.length > 0) {
           const _ids = _addedLater.map((s) => s.reservationId);
           const _offer = fromEnv(bru.getEnvVar("offer"), null);
-          checkBookedReservations(body, _offer, _ids, { offerTrips: fromEnv(bru.getEnvVar("__offerTripLegs"), []) }).forEach((c) => {
+          // #774: placeSelections the provider says it ignored: "not supported".
+          const _ignored = { ...fromEnv(bru.getEnvVar("__reservationsIgnored"), {}), ...reservationsIgnored(body, { placeSelections: _ids }) };
+          bru.setEnvVar("__reservationsIgnored", JSON.stringify(_ignored));
+          checkBookedReservations(body, _offer, _ids, { offerTrips: fromEnv(bru.getEnvVar("__offerTripLegs"), []), ignored: _ignored }).forEach((c) => {
             if (c.level === "warn") { if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`); return; }
             bruTest(c.name.replace(/^Booking:/, "Added reservation:"), () => { if (!c.ok) throw new Error(c.message); });
           });

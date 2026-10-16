@@ -64,6 +64,25 @@ function isDateTime(value) {
 // Rules are AGGREGATED (one result per rule, not per array entry) so a long
 // version list does not flood the report; offending indices are named in the
 // failure message instead.
+/**
+ * #774: whether a version the API advertises is the one the data file names.
+ * The data file usually names major.minor ("3.8") and the API the full
+ * version ("3.8.0"): numbers are compared part by part, as far as the data
+ * file goes, so "3.8" matches "3.8.0" and "3.8.2", "3.8.1" only "3.8.1", and
+ * "3.8" not "3.80". A leading "v" is allowed on either side.
+ */
+function sameOsdmVersion(expected, advertised) {
+  const parts = (v) => String(v ?? '').trim().replace(/^v/i, '').split('.');
+  const want = parts(expected);
+  const have = parts(advertised);
+  if (want.length < 2 || want.some((p) => !/^\d+$/.test(p))) return String(expected ?? '').trim() === String(advertised ?? '').trim();
+  // A part the API leaves out reads as 0: "3.8.0" matches "3.8".
+  return want.every((p, i) => {
+    const h = i >= 2 && have[i] === undefined ? '0' : have[i];
+    return /^\d+$/.test(h || '') && Number(h) === Number(p);
+  });
+}
+
 function validateApiVersions(body) {
   const checks = [];
 
@@ -772,6 +791,7 @@ function handleSystemInfoStatus(statusCode, endpoint, ctx) {
 
 module.exports = {
   isType,
+  sameOsdmVersion,
   isDateTime,
   validateApiVersions,
   validateOsdmCollection,

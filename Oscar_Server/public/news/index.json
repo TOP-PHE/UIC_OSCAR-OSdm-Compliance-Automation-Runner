@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-version-and-ignored-reservations",
+    "date": "October 16, 2026",
+    "tag": "Fix",
+    "title": "OSDM 3.8 and 3.8.0 are the same version; a reservation the provider ignores is a warning",
+    "summary": "Two corrections from a real provider's seat reservation run.",
+    "content": "A data file at OSDM 3.8 no longer reads as a mismatch with a provider that announces 3.8.0: the version numbers are compared as far as the data file goes. When a provider answers that it ignored the way OSCAR asked for a reservation (PARAMETER_NOT_SUPPORTED on optionalReservationSelections or placeSelections), the missing reservation is now a warning saying it is not supported, instead of a failure. A reservation missing without such an answer still fails."
+  },
+  {
     "id": "2026-10-16-provider-run-fixes",
     "date": "October 16, 2026",
     "tag": "Fix",
