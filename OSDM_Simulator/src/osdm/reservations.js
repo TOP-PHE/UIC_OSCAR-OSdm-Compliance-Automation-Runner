@@ -116,7 +116,7 @@ function reservationsOfDirection(trip, { passengers, tariff, provider, createdOn
       supportedPlaceSelectionFlows: ['AUTOMATIC_PLACE_SELECTION'],
     };
     // #766 PR 3: a reservation on a trip with a place map takes the manual flows.
-    if (placeMap.placeMapOfTrip(trip, provider)) part.supportedPlaceSelectionFlows.push('MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE');
+    if (placeMap.placeMapOfTrip(trip, provider)) part.supportedPlaceSelectionFlows.push('AUTOMATIC_PLACE_SELECTION_NEARBY', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE');
     const prefs = preferencesOfTrip(trip, provider);
     if (prefs) {
       part.supportedPlaceSelectionFlows.push('AUTOMATIC_PLACE_SELECTION_PREFERENCES');
@@ -249,15 +249,19 @@ function placesOf(partId, count) {
 }
 
 /** The booked reservation made from a reservation offer part. */
-function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, { placeProperties = [], named = null, fee = 0, otherPlace = false } = {}) {
+function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, { placeProperties = [], named = null, fee = 0, otherPlace = false, near = null, ignoreReference = false } = {}) {
   const tripId = part.tripCoverage.coveredTripId;
   const legId = part.tripCoverage.coveredLegIds[0];
   const leg = listOf(trips.find((t) => t.id === tripId)?.legs).find((l) => l.id === legId);
   const passengerIds = part.passengerRefs.map(passengerIdOf);
   // #766 PR 3: the places a booking named on the place map, else any.
-  const given = named
-    ? { coachNumber: placeMap.COACH, placeNumbers: named.places.map((n) => (otherPlace ? placeMap.otherPlace(n) : n)) }
-    : placesOf(part.id, passengerIds.length);
+  // #766 PR 4: the seats after a reference place, in its coach (another
+  // coach for the ignores-reference-place variant).
+  let given;
+  if (named) given = { coachNumber: placeMap.COACH, placeNumbers: named.places.map((n) => (otherPlace ? placeMap.otherPlace(n) : n)) };
+  else if (near && !ignoreReference) given = { coachNumber: near.coachNumber, placeNumbers: placeMap.seatsNear(near.placeNumber, passengerIds.length) };
+  else if (near) given = { coachNumber: String(Number(near.coachNumber) + 1), placeNumbers: placesOf(part.id, passengerIds.length).placeNumbers };
+  else given = placesOf(part.id, passengerIds.length);
   const { coachNumber, placeNumbers } = given;
   const charged = named ? { ...part.price, amount: part.price.amount + named.fees * fee } : part.price;
   return {

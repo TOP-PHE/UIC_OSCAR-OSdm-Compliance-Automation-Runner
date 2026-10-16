@@ -116,6 +116,10 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
     delete out.expectedProduct;
     toComplete.push('the provider\'s product (expectedProduct)');
   }
+  // #766 PR 4: the simulator's coach and place mean nothing on another train.
+  if (arr(n.providerValues).includes('referencePlace')) {
+    toComplete.push(`a coach and place of the provider's train to sit near (referencePlace, now the simulator's ${out.referencePlace})`);
+  }
   const toCheck = needsToCheck(n);
   // An after-sale needs a tariff that allows it, among those the provider
   // sells: the Test Framework's flexibilities (#687).

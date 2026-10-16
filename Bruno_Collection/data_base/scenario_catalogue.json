@@ -497,6 +497,22 @@
       }
     },
     {
+      "code": "OTST_SALE_NEARBY_PLACE_2ADT",
+      "source": "SIM_SALE_NEARBY_PLACE_2ADT_38",
+      "purpose": "Two seats near a given place (AUTOMATIC_PLACE_SELECTION_NEARBY): GET /availabilities/nearby, then the booking names the place in placeSelections[].referencePlace and gives seats in its coach, never the place itself.",
+      "checks": 336,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 2,
+        "providerValues": [
+          "referencePlace"
+        ]
+      }
+    },
+    {
       "code": "OTST_SALE_BY_TRIP_ID_1ADT",
       "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
       "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",

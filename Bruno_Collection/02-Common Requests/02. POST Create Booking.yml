@@ -63,6 +63,8 @@ runtime:
         await require(bru.getEnvVar("library_base") + "offers.js").askPlacePreferences();
         // #766 PR 3: in a manual flow, the place map is asked and places are named.
         await require(bru.getEnvVar("library_base") + "offers.js").askNamedPlaces();
+        // #766 PR 4: in the NEARBY flow, the places near the reference place are asked.
+        await require(bru.getEnvVar("library_base") + "offers.js").askNearbyPlace();
         buildBookingRequest();
         // #604: a new Idempotency-Key when the scenario tests it.
         require(bru.getEnvVar("library_base") + "idempotencySteps.js").setIdempotencyKey(req, "booking");

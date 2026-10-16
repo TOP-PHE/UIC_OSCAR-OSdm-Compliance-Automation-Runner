@@ -45,6 +45,7 @@ module.exports = {
   checkOfferPlaceSelection,
   askPlacePreferences,
   askNamedPlaces,
+  askNearbyPlace,
   bookingWithoutPreferences,
   recordPlacePreferenceChecks,
   checkOfferRequestByTripIds,
@@ -2282,12 +2283,40 @@ async function sendAvailabilityRequest(path, payload) {
 
 /** 02's after-response: records the checks of the availability requests asked before it, once. */
 function recordPlacePreferenceChecks() {
-  for (const name of ["__placePreferencesOutcome", "__namedPlacesOutcome"]) {
+  for (const name of ["__placePreferencesOutcome", "__namedPlacesOutcome", "__nearbyOutcome"]) {
     const outcome = parseEnvJson(name, null);
     if (!outcome) continue;
     bru.setEnvVar(name, null);
     recordChecks(outcome.checks || []);
   }
+}
+
+/**
+ * Before the booking, in the NEARBY flow (#766 PR 4): GET
+ * /availabilities/nearby for each reservation the booking places, near the
+ * scenario's reference place, once per offer. The reference place is then
+ * sent in the booking (requestsBuilder).
+ */
+async function askNearbyPlace() {
+  const np = require('./namedPlaces.js');
+  const ref = parseEnvJson("nearbyReference", null);
+  const offerId = bru.getEnvVar("offerId");
+  if (!ref || bru.getEnvVar("placeSelectionFlow") !== "AUTOMATIC_PLACE_SELECTION_NEARBY" || !offerId || bru.getEnvVar("__nearbyAskedFor") === offerId) return;
+  bru.setEnvVar("__nearbyAskedFor", offerId);
+  const ids = [...new Set([...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])]
+    .map((p) => p?.reservationId).filter(Boolean))];
+  if (ids.length === 0) {
+    validationLogger("[WARNING] Nearby place: no reservation is placed in the booking, so no place near the reference is asked.");
+    return;
+  }
+  const answers = await Promise.all(ids.map((id) => sendAvailabilityRequest(np.nearbyQuery(offerId, id, ref))));
+  const checks = [];
+  for (const [i, id] of ids.entries()) {
+    const outcome = np.checkNearbyAnswer(answers[i].status, answers[i].body, id, ref);
+    checks.push(...outcome.checks);
+    for (const line of outcome.lines) validationLogger(`[${line.level}] ${line.text}`);
+  }
+  bru.setEnvVar("__nearbyOutcome", JSON.stringify({ checks }));
 }
 
 /**

@@ -53,6 +53,13 @@ describe('adaptReferenceScenario', () => {
     expect(r.toComplete).toEqual([expect.stringMatching(/product/)]);
   });
 
+  test('a reference place is the simulator\'s coach: kept, and said to complete (#766)', () => {
+    const r = adaptReferenceScenario({ code: 'X', referencePlace: '7/15' }, { providerValues: ['referencePlace'] }, {});
+    expect(r.scenario.referencePlace).toBe('7/15');
+    expect(r.toComplete).toEqual(["a coach and place of the provider's train to sit near (referencePlace, now the simulator's 7/15)"]);
+    expect(adaptReferenceScenario({ code: 'X', referencePlace: '7/15' }, {}, {}).toComplete).toEqual([]);
+  });
+
   test('an after-sale never keeps the non-flexible tariff; a sale keeps what it asks', () => {
     expect(adaptReferenceScenario({ desiredFlexibility: 'NON_FLEXIBLE' }, { tariff: 'REFUNDABLE' }, {}).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
     expect(adaptReferenceScenario({}, { tariff: 'EXCHANGEABLE' }, {}).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');

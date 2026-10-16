@@ -167,7 +167,7 @@ test('route: GET /availabilities/preferences answers on gamma, 501 elsewhere, an
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.availablePlaces[0].placeProperties, ['WINDOW', 'AISLE', 'POWER']);
   assert.equal((await call(sim.base, token, 'POST', url, {})).status, 405);
-  assert.equal((await call(sim.base, token, 'GET', '/gamma/availabilities/nearby')).status, 501);
+  assert.equal((await call(sim.base, token, 'GET', '/gamma/availabilities/on-demand-services')).status, 501);
   const alphaToken = await tokenFor(sim.base, 'alpha', SECRETS.alpha[0]);
   assert.equal((await call(sim.base, alphaToken, 'GET', '/alpha/availabilities/preferences?contextId=x')).status, 501);
 });

@@ -479,6 +479,11 @@
             "type": ["string", "null"],
             "enum": ["PLACE", "COMPARTMENT", "", null]
           },
+          "referencePlace": {
+            "description": "In the AUTOMATIC_PLACE_SELECTION_NEARBY flow (#766), the place the passengers want to sit near, as coach / place: \"7/15\". GET /availabilities/nearby is asked for it before the booking, and the booking sends it in placeSelections[].referencePlace. A place given outside its coach is a warning; the reference place itself given to a passenger is a failure.",
+            "type": ["string", "null"],
+            "maxLength": 40
+          },
           "placePreferences": {
             "description": "Seat preferences asked in the booking (#766), as OSDM PlaceProperty codes: a list such as [\"WINDOW\"], or the same as text, \"WINDOW, POWER\". Only those the offer lists (availablePlacePreferences or availablePlaces) are sent, in placeSelections[].accommodations[].placeProperties; one it does not list is a warning. In the AUTOMATIC_PLACE_SELECTION_PREFERENCES flow GET /availabilities/preferences is asked first. A booked place without a preference asked is a warning. A scenario with preferences books its optional reservations by placeSelections unless it names another reservationBookingForm.",
             "type": ["array", "string", "null"],

@@ -61,9 +61,9 @@ test('profile: gamma has a place map from one stop place; a wrong one is refused
   }
 });
 
-test('offer: a reservation from that stop place takes the two manual flows; elsewhere as before', () => {
+test('offer: a reservation from that stop place takes the nearby and the two manual flows; elsewhere as before', () => {
   assert.deepEqual(offered().offer.reservationOfferParts[0].supportedPlaceSelectionFlows,
-    ['AUTOMATIC_PLACE_SELECTION', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE']);
+    ['AUTOMATIC_PLACE_SELECTION', 'AUTOMATIC_PLACE_SELECTION_NEARBY', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE']);
   assert.deepEqual(offered('urn:uic:stn:0000001').offer.reservationOfferParts[0].supportedPlaceSelectionFlows, ['AUTOMATIC_PLACE_SELECTION']);
 });
 
@@ -148,4 +148,54 @@ test('route: POST /availabilities/vehicle-place-map on gamma, 501 elsewhere, POS
   assert.equal((await call(sim.base, token, 'GET', '/gamma/availabilities/vehicle-place-map')).status, 405);
   const alphaToken = await tokenFor(sim.base, 'alpha', SECRETS.alpha[0]);
   assert.equal((await call(sim.base, alphaToken, 'POST', '/alpha/availabilities/vehicle-place-map', restriction(offers[0]))).status, 501);
+});
+
+// ── #766 PR 4: a place near a reference place ───────────────────────────────
+
+const { nearbyAvailability, seatsNear } = require('../src/osdm/placeMap');
+const nearQuery = (offer, o = {}) => new URLSearchParams({ contextId: offer.offerId, contextType: 'OFFER', resourceId: offer.reservationOfferParts[0].id, resourceType: 'RESERVATION', coachNumber: '7', placeNumber: '15', ...o });
+
+test('nearby: the free seats around a saloon seat; refusals; no map, nothing', () => {
+  const { offer, find } = offered();
+  const answer = nearbyAvailability(nearQuery(offer), find(offer.offerId), gamma);
+  assert.deepEqual(answer.availablePlaces.map((p) => [p.accommodationType, p.accommodationSubType, p.numericAvailability]), [['SEAT', 'ANY_SEAT', 17]]);
+  const status = (q, found = find(offer.offerId)) => { try { nearbyAvailability(q, found, gamma); return 200; } catch (e) { return e.status; } };
+  assert.equal(status(nearQuery(offer, { placeNumber: '99' })), 404);
+  assert.equal(status(nearQuery(offer, { coachNumber: '8' })), 404);
+  assert.equal(status(nearQuery(offer, { contextType: 'BOOKING' })), 501);
+  assert.equal(status(nearQuery(offer, { resourceType: 'FARE' })), 400);
+  assert.equal(status(new URLSearchParams({ contextId: offer.offerId })), 400);
+  assert.equal(status(nearQuery(offer), null), 404);
+  const other = offered('urn:uic:stn:0000001');
+  assert.deepEqual(nearbyAvailability(nearQuery(other.offer), other.find(other.offer.offerId), gamma).availablePlaces, []);
+});
+
+test('nearby: seats after the reference, taken ones skipped, going round at the end', () => {
+  assert.deepEqual(seatsNear('15', 2), ['16', '17']);
+  assert.deepEqual(seatsNear('11', 2), ['13', '14'], 'from a taken seat too');
+  assert.deepEqual(seatsNear('29', 3), ['30', '13', '14']);
+});
+
+test('booking: a reference place gives the seats after it, in its coach; the variant another coach', () => {
+  const { offer, trip, find } = offered();
+  const ref = { referencePlace: { coachNumber: '7', placeNumber: '15' } };
+  const near = reserved(booking(offer, trip, find, ref)).placeAllocation.reservedPlaces[0];
+  assert.deepEqual([near.coachNumber, near.placeNumbers], ['7', ['16', '17']]);
+  const other = reserved(booking(offer, trip, find, ref, 'Simvariant-Ignores-Reference-Place')).placeAllocation.reservedPlaces[0];
+  assert.equal(other.coachNumber, '8');
+  const status = (choice) => { try { booking(offer, trip, find, choice); return 200; } catch (e) { return e.status; } };
+  assert.equal(status({ referencePlace: { coachNumber: '7', placeNumber: '61' } }), 409);
+  assert.equal(status({ referencePlace: { coachNumber: '7' } }), 400);
+});
+
+test('route: GET /availabilities/nearby on gamma, GET only', async (t) => {
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
+  const { offers } = (await call(sim.base, token, 'POST', '/gamma/offers', tripFrom(FROM))).body;
+  const url = `/gamma/availabilities/nearby?${nearQuery(offers[0])}`;
+  const res = await call(sim.base, token, 'GET', url);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.availablePlaces[0].numericAvailability, 17);
+  assert.equal((await call(sim.base, token, 'POST', url, {})).status, 405);
 });

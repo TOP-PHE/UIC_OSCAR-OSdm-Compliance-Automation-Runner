@@ -23,6 +23,11 @@
  * or named twice is refused (409 PLACE_NOT_AVAILABLE). The booked reservation
  * gives the places named, and its price carries the selection fee of each
  * fee seat. The `gives-other-place` variant gives the next seat instead.
+ *
+ * Nearby (PR 4): GET /availabilities/nearby gives how many seats are free
+ * around a reference place of coach 7, and a booking naming `referencePlace`
+ * gets the free seats that follow it in the saloon. The
+ * `ignores-reference-place` variant gives seats in another coach.
  */
 
 const { HttpError } = require('../http');
@@ -126,6 +131,57 @@ function namedPlacesOf(selection, reservationId) {
   return { places: numbers, compartment: null, fees: numbers.filter((n) => FEE_SEATS.has(n)).length };
 }
 
+// The free saloon seats after a reference seat, as many as asked, going
+// round from the start of the saloon when the end is reached.
+function seatsNear(reference, count) {
+  const at = SALOON.indexOf(reference);
+  const order = [...SALOON.slice(at + 1), ...SALOON.slice(0, Math.max(at, 0))];
+  return order.filter((n) => !TAKEN.has(n)).slice(0, count);
+}
+
+/** Whether a reference place is one of the map's saloon seats. */
+const isSaloonSeat = (coach, place) => coach === COACH && SALOON.includes(place);
+
+/**
+ * GET /availabilities/nearby: the free seats around a reference place, as one
+ * SEAT / ANY_SEAT AvailablePlace. `found` is what was remembered of the offer.
+ */
+function nearbyAvailability(query, found, provider) {
+  const get = (k) => query.get(k);
+  for (const k of ['contextId', 'contextType', 'resourceId', 'resourceType', 'coachNumber', 'placeNumber']) {
+    if (!get(k)) throw bad(`${k} is required`);
+  }
+  if (get('contextType') === 'BOOKING') throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator gives the places near a place of an offer only.');
+  if (get('contextType') !== 'OFFER' || get('resourceType') !== 'RESERVATION') throw bad('contextType must be OFFER and resourceType RESERVATION');
+  if (!found) throw new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+  const part = listOf(found.offer.reservationOfferParts).find((p) => p.id === get('resourceId'));
+  if (!part) throw new HttpError(404, 'RESERVATION_NOT_FOUND', 'Reservation not found', `"${get('resourceId')}" is not a reservation of offer ${get('contextId')}.`);
+  const trip = listOf(found.trips).find((t) => t.id === part.tripCoverage.coveredTripId);
+  if (!placeMapOfTrip(trip, provider)) return { availablePlaces: [] };
+  if (!isSaloonSeat(get('coachNumber'), get('placeNumber'))) throw new HttpError(404, 'PLACE_NOT_FOUND', 'Place not found', `place ${get('coachNumber')}/${get('placeNumber')} is not on the map`);
+  return {
+    availablePlaces: [{
+      accommodationType: 'SEAT',
+      accommodationSubType: 'ANY_SEAT',
+      numericAvailability: seatsNear(get('placeNumber'), SALOON.length).length,
+      tripLegCoverage: { tripId: part.tripCoverage.coveredTripId, legId: part.tripCoverage.coveredLegIds[0] },
+    }],
+  };
+}
+
+/**
+ * The reference place a booking request names for a reservation, or null:
+ * `{ coachNumber, placeNumber }`. One not on the saloon is refused (409).
+ */
+function referenceOf(selection, reservationId) {
+  const refs = listOf(selection?.placeSelections).filter((s) => s?.reservationId === reservationId && s.referencePlace).map((s) => s.referencePlace);
+  if (refs.length === 0) return null;
+  const ref = refs[0];
+  if (!text(ref?.coachNumber) || !text(ref?.placeNumber)) throw bad('referencePlace must name coachNumber and placeNumber');
+  if (!isSaloonSeat(ref.coachNumber, ref.placeNumber)) throw notAvailable(`reference place ${ref.coachNumber}/${ref.placeNumber} is not on the map`);
+  return { coachNumber: ref.coachNumber, placeNumber: ref.placeNumber };
+}
+
 /** The place a variant gives instead of a named seat: the next free one. */
 function otherPlace(number) {
   let n = Number(number) + 1;
@@ -133,4 +189,7 @@ function otherPlace(number) {
   return String(n);
 }
 
-module.exports = { placeMapOfTrip, vehiclePlaceMap, namedPlacesOf, feeOf, otherPlace, COACH, FEE_SEATS, TAKEN, COMPARTMENT };
+module.exports = {
+  placeMapOfTrip, vehiclePlaceMap, namedPlacesOf, feeOf, otherPlace, nearbyAvailability, referenceOf, seatsNear,
+  COACH, FEE_SEATS, TAKEN, COMPARTMENT,
+};
