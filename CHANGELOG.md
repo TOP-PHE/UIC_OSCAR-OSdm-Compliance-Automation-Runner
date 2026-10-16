@@ -62,6 +62,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.310] / [collection-OTST_V2.0.181] — 2026-10-16
+
+Issue #781, release 2026.345. Simulator 0.32.0. Currencies are declared, then tested through the sale and after-sales.
+
+### Added
+- **The Test Framework declares the currencies a provider sells in** (Offer search options › 💱 Currencies): the ISO 4217 codes sold, and the default, the one it answers in when none is asked. Stored as `currencies: { sold, default }` (`utils/currencies.js`); the default is always among those sold. Nothing declared accepts every currency and tests none. A scenario asking for a currency not declared gets a WARNING at the run (`currency:<code>`, `frameworkGating.js`).
+- **A run checks the sale's currency** (`library-bruno/currencies.js`):
+  - after `01. POST Get Offer`, the offers are in the currency asked, or else in the scenario's `expectedCurrency`: no offer in it fails, some offers in another one is a WARNING;
+  - the chosen offer's currency is kept as the sale's (`__saleCurrency`);
+  - at `10. POST Refund Offers` the refund offers, and the exchange offers, are held to it (one check each, failed when a price is in another currency).
+
+  The booking was already checked against the offer's currency. The exchange request already carried the sale's offer search criteria, currency included, so nothing changes there.
+- **Negative test `currencyExpectRejection`** (data file schema): the offer request asks for a currency the provider does not sell. A refusal or no offer passes. Offers in that currency fail: the provider sells it, so the Test Framework should declare it. Offers in another currency pass with a WARNING. The scenario ends after the offer. OSDM says nothing of what a provider must do with such a currency, hence the grading.
+- **Catalogue entries:**
+  - `OTST_SALE_CURRENCY` (`probe: CURRENCIES`): a return sold and refunded in full, once per declared currency as `OTST_SALE_CURRENCY_<code>`;
+  - `OTST_EXCHANGE_CURRENCY` (`probe: CURRENCIES`): a ticket sold and exchanged, likewise;
+  - `OTST_SALE_DEFAULT_CURRENCY` (`DEFAULT_CURRENCY`): no currency asked, the default expected;
+  - `NHF_CURRENCY_NOT_SOLD` (`CURRENCY_NOT_SOLD`): the first of USD, JPY, GBP… not declared.
+
+  Without the currencies declared, they are listed but cannot be copied. A copy keeps the source's other criteria (`withCurrencies()`, `catalogueMatch.js`).
+
+### Simulator 0.32.0
+- `gamma` sells in CZK and EUR (profile `otherCurrencies`, each with its own price factor: EUR at a 24th of the CZK price). It answers in the currency asked, in CZK when none is asked, and refuses any other with `400 CURRENCY_NOT_SUPPORTED`. `alpha` and `beta` name no other currency and answer in their own whatever is asked, as before.
+- A booking, its confirmation, its refund offers and its exchange fees and balance are in the booking's currency (`currencyOf()` in `bookings.js`). An exchange asked without a currency gets its new journey priced in CZK, so a lost currency shows in `exchangePrice`.
+- Scenarios:
+  - `SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38` and `SIM_CURRENCY_EUR_EXCHANGE_1ADT_38`, the sources of the per-currency entries;
+  - `SIM_CURRENCY_DEFAULT_1ADT_38`, which expects CZK;
+  - `SIM_NHF_CURRENCY_NOT_SOLD_38`, which asks for USD;
+  - `SIM_WRONG_CURRENCY_DEFAULT_38`, which fails on purpose: it expects EUR with none asked.
+
+  No simulator scenario asked for a currency before (their own criteria name none), so none of them moves.
+
+### Default decisions (taken without asking)
+- **A scenario's own `currency` stays as it is** (the question the issue left open): it is checked against the declared list as a WARNING, like the other undeclared capabilities, and never changed.
+- **Offers in another currency than the one asked fail only when no offer is in it.** Some offers in another currency is a WARNING, as for the other offer search options.
+- **The not-sold currency is a common one**, the first of a fixed list that the framework does not declare, so the rest of the request stays sound.
+
+Left out: Test Config shows no field for `expectedCurrency` or `currencyExpectRejection`. The catalogue sets them, and the data file schema takes them. The set-up checklist v2 question is to be added with the checklist itself.
+
+Checked:
+- Unit tests: `currencies.test.js` (16): the declaration, the warning, the catalogue entries and copies, the page's fields, and the collection's checks with a stand-in Bruno. Simulator: `currencies.test.js` (3). The data-file tests pin the new scenarios.
+- Simulator replay of the five new scenarios: 527, 389, 234 and 71 checks with no failure; the wrong one fails one check, the one meant to fail.
+- Full simulator replay (118 scenarios), compared with the one of 1.11.309. 30 scenarios have more checks, each a new currency check that passes: offers, refund offers or exchange offers in the sale's currency. None newly fails, and the two `SIM_WRONG_*` scenarios that are part of it keep their failures (4 and 2). Every simulator scenario stays in CZK, gamma's default. I updated the check counts of 19 catalogue entries, added the 4 new ones, and reran `describe` and `generate-simulator-checks.js`; `replay.js catalogue` agrees on all 66 entries.
+- Full suite, lint, simulator tests.
+
+Not verified: a run against a real provider in a second currency. The Test Framework's currency fields were checked by lifting the page functions in the tests, not in a browser.
+
+---
+
 ## [server-1.11.309] / [collection-OTST_V2.0.180] — 2026-10-16
 
 Issue #786, release 2026.344. Four checks failed a real provider's (OSDM 3.0.5) correct answers.

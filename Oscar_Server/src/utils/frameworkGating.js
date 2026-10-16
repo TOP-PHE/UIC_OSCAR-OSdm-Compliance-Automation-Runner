@@ -412,6 +412,11 @@ function datafileScenarioWarnings(sc, framework, datafile) {
   for (const [key, values] of Object.entries(offerSearchOptionsOf(sc, datafile))) {
     for (const value of values) if (!offerSearchOptionDeclared(framework, key, value)) warnings.push(`offerOption:${key}=${value}`);
   }
+  // #781: a currency the framework does not declare, unless that is the
+  // point of the scenario (the not-sold probe).
+  const currency = scenarioOfferCriteria(sc, datafile)?.currency;
+  if (typeof currency === 'string' && currency && !isArmedValue(sc.currencyExpectRejection)
+      && !require('./currencies').currencyDeclared(framework, currency)) warnings.push(`currency:${currency}`);
   return warnings;
 }
 

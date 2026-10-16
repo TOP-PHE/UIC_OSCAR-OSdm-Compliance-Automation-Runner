@@ -668,29 +668,30 @@ function shortLivedMsOf(trips, provider) {
   return short.seconds * 1000;
 }
 
-function buildOfferCollection(body, provider, nowMs, known = {}) {
-  const trips = tripsOf(body, provider, known);
-  const shortLivedMs = shortLivedMsOf(trips, provider);
-  const passengers = passengersOf(body, provider);
-  const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
-  // #704: a departure in the past is refused; one beyond the horizon gets no offer.
-  const beyondHorizon = horizonProblem([...outboundTrips, ...trips], provider, nowMs);
-  // #780: the variant stop place answers as if no criteria were sent.
-  const ignoresOptions = trips.some((t) => t.origin?.stopPlaceRef === provider.variants?.ignoresOfferOptionsFrom);
-  const criteria = ignoresOptions ? undefined : body.offerSearchCriteria;
-  const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
-  const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
-  const classes = classesAsked(criteria);
-  const fulfillmentOptions = fulfillmentOptionsOf(body);
-  const collective = criteria?.offerMode === 'COLLECTIVE';
-  const refusals = new Set();
+// #781: the provider as it sells in the currency asked. Its own currency, or
+// none asked: as it is. Another one it sells in: that currency and its price
+// factor. One it does not sell, from a provider that names the others it
+// sells: refused. A provider that names none answers in its own, as before.
+function inCurrency(provider, criteria) {
+  const asked = criteria?.currency;
+  if (asked == null || asked === '' || asked === provider.currency) return provider;
+  if (typeof asked !== 'string' || !/^[A-Z]{3}$/.test(asked)) throw bad('offerSearchCriteria.currency is not an ISO 4217 code');
+  if (!provider.otherCurrencies) return provider;
+  const other = provider.otherCurrencies[asked];
+  if (!other) {
+    const sold = [provider.currency, ...Object.keys(provider.otherCurrencies)].join(', ');
+    throw new HttpError(400, 'CURRENCY_NOT_SUPPORTED', 'Currency not supported', `No offer is sold in ${asked}. Sold in: ${sold}.`);
+  }
+  return { ...provider, currency: asked, priceFactor: other.priceFactor };
+}
+
+// The offers of each trip (or pair of trips), class and tariff, and what the
+// simulator remembers of each.
+function offersOfPairs(pairs, ctx) {
+  const { classes, flexibilities, collective, passengers, refusals, fulfillmentOptions, provider, nowMs, shortLivedMs } = ctx;
   const offers = [];
   const remembered = [];
-  // Both directions: one offer covers an outbound trip and an inbound one.
-  const pairs = outboundTrips.length > 0
-    ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
-    : trips.map((trip) => ({ trip }));
-  for (const { trip, inboundTrip } of beyondHorizon ? [] : pairs) {
+  for (const { trip, inboundTrip } of pairs) {
     const covered = inboundTrip ? [trip, inboundTrip] : [trip];
     for (const travelClass of classes) {
       for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals, provider }))) {
@@ -700,18 +701,49 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
       }
     }
   }
-  // #611: the offers of a trip from the requested-information stop place ask
-  // for each passenger's date of birth and phone number.
-  const asksInfo = persons.asksForInformation(trips, provider);
-  if (asksInfo) {
+  return { offers, remembered };
+}
+
+// #611: what the offers of a trip from a variant stop place carry.
+function applyStopPlaceVariants(trips, provider, offers, remembered) {
+  // The requested-information stop place asks for each passenger's date of
+  // birth and phone number.
+  if (persons.asksForInformation(trips, provider)) {
     for (const offer of offers) for (const part of offer.admissionOfferParts) part.requestedInformation = persons.REQUESTED;
     for (const entry of remembered) entry.asksInfo = true;
   }
-  // #611: the offers of a trip from the wrong-offers stop place are one cent off.
+  // The wrong-offers stop place gives offers one cent off.
   const wrongFrom = provider.variants?.wrongOffersFrom;
   if (wrongFrom && trips.some((t) => t.origin?.stopPlaceRef === wrongFrom)) {
     for (const offer of offers) offer.offerSummary.minimalPrice.amount += 1;
   }
+}
+
+function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
+  const trips = tripsOf(body, providerAsIs, known);
+  // #780: the variant stop place answers as if no criteria were sent.
+  const ignoresOptions = trips.some((t) => t.origin?.stopPlaceRef === providerAsIs.variants?.ignoresOfferOptionsFrom);
+  const criteria = ignoresOptions ? undefined : body.offerSearchCriteria;
+  const provider = inCurrency(providerAsIs, criteria);
+  const shortLivedMs = shortLivedMsOf(trips, provider);
+  const passengers = passengersOf(body, provider);
+  const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
+  // #704: a departure in the past is refused; one beyond the horizon gets no offer.
+  const beyondHorizon = horizonProblem([...outboundTrips, ...trips], provider, nowMs);
+  const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
+  const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
+  const classes = classesAsked(criteria);
+  const fulfillmentOptions = fulfillmentOptionsOf(body);
+  const collective = criteria?.offerMode === 'COLLECTIVE';
+  const refusals = new Set();
+  // Both directions: one offer covers an outbound trip and an inbound one.
+  const pairs = outboundTrips.length > 0
+    ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
+    : trips.map((trip) => ({ trip }));
+  const { offers, remembered } = offersOfPairs(beyondHorizon ? [] : pairs, {
+    classes, flexibilities, collective, passengers, refusals, fulfillmentOptions, provider, nowMs, shortLivedMs,
+  });
+  applyStopPlaceVariants(trips, provider, offers, remembered);
   const allTrips = [...outboundTrips, ...trips];
   const problems = problemsOf(passengers, offers, collective, refusals);
   const partsIgnored = offerPartsIgnored(criteria);

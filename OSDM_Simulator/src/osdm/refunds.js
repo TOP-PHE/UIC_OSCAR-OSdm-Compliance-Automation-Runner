@@ -26,7 +26,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { noteRefund } = require('./documents');
-const { lifetimeOf } = require('./bookings');
+const { lifetimeOf, currencyOf } = require('./bookings');
 const variants = require('./variants');
 const ticketing = require('./ticketing');
 
@@ -100,12 +100,12 @@ function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs, s
     validUntil: new Date(nowMs + lifetimeOf(booking, REFUND_OFFER_LIFETIME_MS)).toISOString(),
     status: 'PROPOSED',
     fulfillments: [{ id: fulfillment.id, status: fulfillment.status, bookingRef: booking.id, bookingParts: fulfillment.bookingParts }],
-    refundFee: price(sum('fee'), provider.currency),
+    refundFee: price(sum('fee'), currencyOf(booking, provider)),
     // #611: one cent off its breakdown in the wrong-refund-amount variant.
-    refundableAmount: price(sum('refundable') + (variants.has(booking, 'wrong-refund-amount') ? 1 : 0), provider.currency),
+    refundableAmount: price(sum('refundable') + (variants.has(booking, 'wrong-refund-amount') ? 1 : 0), currencyOf(booking, provider)),
     refundOfferBreakdown: items.map((item) => ({
-      refundFee: price(item.fee, provider.currency),
-      refundableAmount: price(item.refundable, provider.currency),
+      refundFee: price(item.fee, currencyOf(booking, provider)),
+      refundableAmount: price(item.refundable, currencyOf(booking, provider)),
       bookingParts: [{ id: item.part.id, summary: item.part.summary }],
     })),
     ...(overruleCode ? { appliedOverruleCode: overruleCode } : {}),
@@ -185,7 +185,7 @@ function confirmRefundOffer(booking, refundOfferId, body, provider, nowMs) {
   // #603: the refund receipt appears in the booking some time later.
   noteRefund(booking, provider, nowMs);
   if (booking.confirmedPrice) {
-    booking.confirmedPrice = price(booking.confirmedPrice.amount - offer.refundableAmount.amount, provider.currency);
+    booking.confirmedPrice = price(booking.confirmedPrice.amount - offer.refundableAmount.amount, currencyOf(booking, provider));
   }
   return offer;
 }

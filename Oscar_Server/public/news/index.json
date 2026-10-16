@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-currencies",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Currencies: declared, then tested through the sale and after-sales",
+    "summary": "Declare the currencies a provider sells in; the runs check that a sale keeps its currency, and the catalogue tests each one.",
+    "content": "Under Offer search options in the Test Framework, list the currencies the provider sells in (for example EUR, CHF) and the one it answers in when none is asked. A scenario asking for a currency not listed gets a warning. Every run now checks that the offers are in the currency asked, or in the default when none is asked, and that the booking, the refund offers and the exchange offers stay in the currency of the sale. The scenario catalogue offers a sale with a full refund and an exchange in each currency listed, a sale with no currency asked, and a negative test asking for a common currency the provider does not sell: a refusal or no offer passes, offers in that currency fail."
+  },
+  {
     "id": "2026-10-16-real-provider-false-failures",
     "date": "October 16, 2026",
     "tag": "Fix",
