@@ -698,6 +698,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `scenarios.js` and runs them in a `vm` context with a fake `fetch` and
     `document`. It only works for top-level functions laid out with `}` at
     column 0, which is how the file is written.
+- **The OSDM version is checked and follows the Test Framework** (#785,
+  1.11.311). It goes in every request's `Content-Type`, and `3..0.5` once
+  failed a whole batch. `utils/osdmVersion.js` (pure): digits and dots; the
+  framework route answers 400, the runner refuses the run
+  (`refusedOsdmVersion()`), the run's copy gives the framework's version to a
+  scenario naming none (`withFrameworkVersion()`). Copies still name it (the
+  schema requires it), so changing the framework's version offers the
+  scenarios on the old one the new one (`offerScenarioVersionUpdate()` in
+  `scenarios.js`, own scenarios only). The page's `OSDM_VERSION_PATTERN` is
+  pinned to the server's by `osdm-version.test.js`.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already

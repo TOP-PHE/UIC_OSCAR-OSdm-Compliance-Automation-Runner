@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.345",
+  "current_release": "2026.346",
   "releases": [
+    {
+      "release": "2026.346",
+      "date": "2026-10-16",
+      "server": "1.11.311",
+      "collection": "OTST_V2.0.181",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "The OSDM version is checked: the Test Framework refuses one that is not digits and dots, a run with one is refused before anything is sent, a scenario naming none runs with the framework's, and changing the framework's version offers it to the scenarios on the old one (#785)."
+      ]
+    },
     {
       "release": "2026.345",
       "date": "2026-10-16",

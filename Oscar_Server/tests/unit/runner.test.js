@@ -1261,6 +1261,18 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       expectStarted(await attempt(datafileFor(CODE)));
     });
 
+    // #785: the version goes in every request's Content-Type.
+    test('an OSDM version that is not one: refused before any token, saying where to correct it', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[0].osdmVersion = '3..0.5';
+      const out = await attempt(df);
+      expect(out.result.error).toContain('The OSDM version "3..0.5" is not a version');
+      expect(out.result.error).toContain('Correct it in the scenario');
+      expect([out.row.status, out.started, out.tokenAsked]).toEqual(['FAILED', 0, 0]);
+      df.scenarios[0].osdmVersion = '3.0.5';
+      expectStarted(await attempt(df));
+    });
+
     test('in the scenario being run', async () => {
       const df = datafileFor(CODE);
       df.scenarios[0].label = `Paris ${TOKEN}`;

@@ -36,6 +36,7 @@ const { safeJoinUuid } = require('../utils/paths');
 const { templatesForRunner, runRefusal } = require('../utils/datafileTemplates');
 const runSecrets = require('../utils/runSecrets');
 const { usableUrlRefusal } = require('../utils/urlPolicy');
+const { versionRefusal } = require('../utils/osdmVersion');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
 // analyzer (jssecurity:S6549) requires the regex to live in the same
@@ -597,6 +598,23 @@ async function refusedDatafileText(datafilePath, runner) {
   }
 }
 
+// #785: the OSDM version the scenario runs with (its own, else the Test
+// Framework's) goes in every request's Content-Type; a run with one that is
+// not a version is refused before anything is sent. A data file that cannot
+// be read was already refused above; a missing one is left as it is.
+async function refusedOsdmVersion(datafilePath, scenarioCode, companyId) {
+  if (!datafilePath || !scenarioCode || !(await fsExists(datafilePath))) return null;
+  try {
+    const datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+    const fwRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
+    let framework = {};
+    try { framework = fwRow?.config ? JSON.parse(colDecrypt(fwRow.config)) : {}; } catch { framework = {}; }
+    return versionRefusal(datafile, scenarioCode, framework.osdmVersion);
+  } catch {
+    return 'The data file could not be read, so its OSDM version could not be checked and the run was not started. Try again; if it happens again, ask your Test Manager to check the data file.';
+  }
+}
+
 // S5: a run sends every OSDM request to the company api_base. Refuse to start
 // one aimed at a non-public target (loopback, the private network, a Docker
 // service name) before a token is resolved — with DNS, so a name that resolves
@@ -767,7 +785,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const refusal = refusedRunScope(runRow, companyId, effectiveUserId)
     || refusedScenarioCode(scenarioOverride)
     || await refusedApiBase(companyRow.api_base)
-    || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email });
+    || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email })
+    || await refusedOsdmVersion(companyRow.datafile_path, scenarioOverride, companyId);
   if (refusal) {
     dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);
     logEvent(runId, 'error', `[runner] ${refusal}`);
