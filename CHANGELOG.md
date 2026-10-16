@@ -91,7 +91,7 @@ Issue #780 part 2, release 2026.342. Simulator 0.31.0.
 Checked:
 - Unit tests: `offer-search-options.test.js` (6 more) for the catalogue, the copy (schema-valid) and the grading. Simulator: `offer-options.test.js` (4); the data-file tests pin the new scenarios and the station.
 - Simulator replay of the seven new scenarios: the five probes pass (118, 118, 106, 118 and 118 checks). The two wrong ones fail one check each, the one meant to fail. A first version of the flexibility probe failed on its own scenario's flexibility, so the copy now sets it.
-- Full simulator replay, compared with the previous full recording.
+- Full simulator replay (112 scenarios), compared with the previous full recording: the 101 scenarios recorded before give the same checks; the one other difference, a seat number in a warning of `SIM_VARIANT_IGNORES_REFERENCE_1ADT_38`, comes from #776. `OSCAR - Checks by scenario.md` and `simulator-checks.json` regenerated; `replay.js catalogue` agrees (61 entries).
 - Full suite, lint, simulator tests.
 
 Not verified: a run against a real provider. Next in #780: random combinations with a seed.
