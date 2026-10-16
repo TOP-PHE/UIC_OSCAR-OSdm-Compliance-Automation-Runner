@@ -228,7 +228,7 @@ describe('the Test Framework page', () => {
     expect(Object.keys(wizData.framework.offerSearchOptions)).toEqual(['travelClasses']);
     const declared = lift('fwOfferSearchOptionDeclared', {});
     const esc = (v) => String(v);
-    const html = lift('offerSearchOptionsPanelHtml', { FW_OFFER_SEARCH_OPTIONS, fwOfferSearchOptionDeclared: declared, esc })({ offerSearchOptions: { offerModes: ['INDIVIDUAL'] } });
+    const html = lift('offerSearchOptionsPanelHtml', { FW_OFFER_SEARCH_OPTIONS, fwOfferSearchOptionDeclared: declared, esc, offerCombinationsHtml: () => '' })({ offerSearchOptions: { offerModes: ['INDIVIDUAL'] } });
     expect(html).toContain('data-key="offerModes" data-val="INDIVIDUAL"');
     expect((html.match(/class="pill selected"/g) || []).length).toBe(1 + 8 + 3 + 5);
     expect(page).toContain('${offerSearchOptionsPanelHtml(fw)}');
@@ -247,7 +247,7 @@ describe('#780 part 2: the catalogue makes one probe per declared value', () => 
   const catalogue = JSON.parse(fs.readFileSync(path.join(DATA, 'scenario_catalogue.json'), 'utf8'));
   const simulator = JSON.parse(fs.readFileSync(path.join(DATA, 'simulator_datafile.json'), 'utf8'));
   const FW = { salesFlows: ['SALE'], passengerTypes: ['ADULT'] };
-  const probes = (fw) => catalogueFor(catalogue, simulator, fw).filter((e) => e.code.startsWith('OTST_OFFER_'));
+  const probes = (fw) => catalogueFor(catalogue, simulator, fw).filter((e) => e.code.startsWith('OTST_OFFER_') && !e.code.startsWith('OTST_OFFER_COMBO') && e.code !== 'OTST_OFFER_OPTION_COMBINATIONS');
 
   test('the values worth a probe: declared lists only, without ALL, FARE_*, ANY_CLASS or COLLECTIVE', () => {
     expect(declaredOptionValues({}).map((o) => o.value)).toEqual([]);
@@ -329,5 +329,137 @@ describe('#780 part 2: an offer search probe grades the options', () => {
     for (const file of [path.join(LIB, 'scenarioParser.js'), path.join(LIB, '..', 'opencollection.yml')]) {
       expect(fs.readFileSync(file, 'utf8')).toContain('"expectedProductAbsent", "offerSearchProbe",');
     }
+  });
+});
+
+// ── #780 part 3: random combinations ────────────────────────────────────────
+
+const { combinationSettings, drawCombinations, MAX_COUNT } = require('../../src/utils/offerCombinations');
+
+describe('#780 part 3: combinations drawn from a seed', () => {
+  const OPTIONS = [
+    { key: 'offerModes', values: ['INDIVIDUAL'] },
+    { key: 'requestedOfferParts', values: ['ADMISSION', 'RESERVATION'] },
+    { key: 'travelClasses', values: ['FIRST', 'SECOND'], group: 'class' },
+    { key: 'serviceClassTypes', values: ['HIGH', 'STANDARD'], group: 'class' },
+    { key: 'flexibilities', values: ['FULL_FLEXIBLE', 'NON_FLEXIBLE'] },
+  ];
+  const text = (list) => list.map((c) => c.map((o) => `${o.key}=${o.value}`).join('&'));
+
+  test('the settings: a count of 1 to 20 and a 32-bit seed, both whole numbers', () => {
+    expect(combinationSettings({ offerCombinations: { count: 5, seed: 0 } })).toEqual({ count: 5, seed: 0 });
+    expect(combinationSettings({ offerCombinations: { count: MAX_COUNT, seed: 4294967295 } })).toEqual({ count: 20, seed: 4294967295 });
+    for (const c of [{ count: 0, seed: 1 }, { count: 21, seed: 1 }, { count: 2.5, seed: 1 }, { count: 2 }, { count: 2, seed: -1 }, { count: 2, seed: 4294967296 }, { count: '2', seed: 1 }]) {
+      expect(combinationSettings({ offerCombinations: c })).toBeNull();
+    }
+    expect(combinationSettings({})).toBeNull();
+    expect(combinationSettings(null)).toBeNull();
+  });
+
+  test('the same seed gives the same combinations; another seed, others', () => {
+    expect(text(drawCombinations(OPTIONS, 5, 42))).toEqual(text(drawCombinations(OPTIONS, 5, 42)));
+    expect(text(drawCombinations(OPTIONS, 5, 42))).not.toEqual(text(drawCombinations(OPTIONS, 5, 43)));
+  });
+
+  test('each has two or more options, one value each, declared, in order; no two alike; never both classes', () => {
+    const order = OPTIONS.map((o) => o.key);
+    for (let seed = 0; seed < 500; seed++) {
+      const list = drawCombinations(OPTIONS, 8, seed);
+      expect(new Set(text(list)).size).toBe(list.length);
+      for (const combination of list) {
+        const keys = combination.map((c) => c.key);
+        expect(keys.length).toBeGreaterThanOrEqual(2);
+        expect(new Set(keys).size).toBe(keys.length);
+        expect([...keys].sort((a, b) => order.indexOf(a) - order.indexOf(b))).toEqual(keys);
+        expect(keys.includes('travelClasses') && keys.includes('serviceClassTypes')).toBe(false);
+        for (const c of combination) expect(OPTIONS.find((o) => o.key === c.key).values).toContain(c.value);
+      }
+    }
+  });
+
+  test('fewer when there are not that many; none from fewer than two usable options', () => {
+    expect(drawCombinations([{ key: 'a', values: ['1'] }, { key: 'b', values: ['2'] }], 10, 1)).toEqual([[{ key: 'a', value: '1' }, { key: 'b', value: '2' }]]);
+    expect(drawCombinations([{ key: 'a', values: ['1'] }, { key: 'b', values: [] }], 3, 1)).toEqual([]);
+    expect(drawCombinations([{ key: 't', values: ['F'], group: 'c' }, { key: 's', values: ['H'], group: 'c' }], 3, 1)).toEqual([]);
+    expect(drawCombinations(null, 3, 1)).toEqual([]);
+  });
+});
+
+describe('#780 part 3: the catalogue offers the combinations', () => {
+  const DATA = path.join(LIB, '..', 'data_base');
+  const catalogue = JSON.parse(fs.readFileSync(path.join(DATA, 'scenario_catalogue.json'), 'utf8'));
+  const simulator = JSON.parse(fs.readFileSync(path.join(DATA, 'simulator_datafile.json'), 'utf8'));
+  const FW = { salesFlows: ['SALE'], passengerTypes: ['ADULT'], offerSearchOptions: { travelClasses: ['FIRST'], requestedOfferParts: ['ADMISSION'] }, offerCriteria: { flexibilities: ['NON_FLEXIBLE', 'FULL_FLEXIBLE'] } };
+  const combos = (fw) => catalogueFor(catalogue, simulator, fw).filter((e) => e.code.startsWith('OTST_OFFER_COMBO') || e.code === 'OTST_OFFER_OPTION_COMBINATIONS');
+
+  test('no count or seed, or nothing to combine: listed once, not copiable', () => {
+    expect(combos(FW).map((e) => [e.code, e.missing])).toEqual([['OTST_OFFER_OPTION_COMBINATIONS', ['the number of random combinations and their seed (Offer search options)']]]);
+    const lonely = { ...FW, offerSearchOptions: {}, offerCriteria: { flexibilities: ['NON_FLEXIBLE'] }, offerCombinations: { count: 3, seed: 7 } };
+    expect(combos(lonely).map((e) => e.missing)).toEqual([['two offer search options with a value to combine (Offer search options, Tariff Flexibility)']]);
+  });
+
+  test('a count and a seed: that many combinations, each copied with all its values and the probe on', () => {
+    const fw = { ...FW, offerCombinations: { count: 3, seed: 12345 } };
+    const entries = combos(fw);
+    expect(entries.map((e) => e.code)).toEqual(['OTST_OFFER_COMBO_1', 'OTST_OFFER_COMBO_2', 'OTST_OFFER_COMBO_3']);
+    expect(entries.every((e) => e.variantOf === 'OTST_OFFER_OPTION_COMBINATIONS' && e.missing.length === 0 && e.optionsOf.length >= 2)).toBe(true);
+    expect(entries[0].purpose).toMatch(/^Offer search combination 1 of seed 12345: offers asked with .+ together; /);
+    // The same framework draws the same combinations.
+    expect(combos(fw).map((e) => e.optionsOf)).toEqual(entries.map((e) => e.optionsOf));
+    const { datafile } = adaptCatalogueDatafile(catalogueDatafile(catalogue, simulator), catalogueFor(catalogue, simulator, fw), fw);
+    for (const entry of entries) {
+      const scenario = datafile.scenarios.find((s) => s.code === entry.code);
+      expect(scenario.offerSearchProbe).toBe('on');
+      for (const { field, value } of entry.optionsOf) {
+        expect(field === 'offerMode' ? scenario.offerSearchCriteria[field] : scenario.offerSearchCriteria[field]).toEqual(field === 'offerMode' ? value : [value]);
+        if (field === 'flexibilities') expect(scenario.desiredFlexibility).toBe(value);
+      }
+    }
+    expect(datafile.scenarios.some((s) => s.code === 'OTST_OFFER_OPTION_COMBINATIONS')).toBe(false);
+    const schema = JSON.parse(fs.readFileSync(path.join(LIB, '..', 'json_validator', 'datafile.schema.json'), 'utf8'));
+    expect(schemaProblems(datafile, schema).problems).toEqual([]);
+  });
+});
+
+describe('#780 part 3: the Test Framework page', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 'scenarios.js'), 'utf8').replaceAll('\r\n', '\n');
+  const lines = page.split('\n');
+  const lift = (name, context) => {
+    const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
+    const end = lines.findIndex((l, i) => i > start && l === '}');
+    return vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n')})`, context);
+  };
+
+  test('a typed count or seed is kept when in range, refused otherwise; empty removes it', () => {
+    const wizData = { framework: {} };
+    const set = lift('fwSetOfferCombination', { wizData });
+    expect(set('count', '5')).toBe(true);
+    expect(set('seed', '4294967295')).toBe(true);
+    expect(wizData.framework.offerCombinations).toEqual({ count: 5, seed: 4294967295 });
+    for (const [field, raw] of [['count', '0'], ['count', '21'], ['count', '2.5'], ['seed', '4294967296'], ['seed', '-1'], ['seed', 'abc']]) {
+      expect(set(field, raw)).toBe(false);
+    }
+    expect(wizData.framework.offerCombinations).toEqual({ count: 5, seed: 4294967295 });
+    expect(set('count', ' ')).toBe(true);
+    expect(wizData.framework.offerCombinations).toEqual({ seed: 4294967295 });
+  });
+
+  test('a new seed comes from the browser\'s random source and is kept', () => {
+    const wizData = { framework: { offerCombinations: { count: 2 } } };
+    const crypto = { getRandomValues: (a) => { a[0] = 987654321; return a; } };
+    expect(lift('fwNewOfferCombinationSeed', { wizData, crypto, Uint32Array })()).toBe(987654321);
+    expect(wizData.framework.offerCombinations).toEqual({ count: 2, seed: 987654321 });
+  });
+
+  test('the fields are drawn with their values, labelled, and wired', () => {
+    const html = lift('offerCombinationsHtml', { esc: (v) => String(v) })({ offerCombinations: { count: 4, seed: 99 } });
+    expect(html).toContain('id="fw-offer-combinations-count" min="1" max="20" value="4"');
+    expect(html).toContain('id="fw-offer-combinations-seed" min="0" max="4294967295" value="99"');
+    expect(html).toContain('<label for="fw-offer-combinations-count"');
+    expect(html).toContain('<label for="fw-offer-combinations-seed"');
+    expect(page).toContain('${offerCombinationsHtml(fw)}');
+    expect(page).toContain("if (action !== 'fw-offer-combinations') return false;");
+    expect(page).toContain('|| changeOfferCombination(action, el)) return;');
+    expect(page).toContain("case 'fw-offer-combinations-new-seed': {");
   });
 });

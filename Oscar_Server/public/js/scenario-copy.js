@@ -148,6 +148,34 @@
       + `<strong>${esc(lines[0])}</strong>${details}</div>`;
   }
 
+  // One box ticks or unticks every scenario that can be copied; the greyed-out
+  // ones (not declared in the Test Framework) stay unticked.
+  function selectAllRow(scenarios) {
+    const copyable = scenarios.filter(sc => !(Array.isArray(sc.missing) && sc.missing.length)).length;
+    if (copyable < 2) return '';
+    return `<label style="display:flex;gap:8px;align-items:center;padding:4px 0 8px;margin-bottom:4px;font-size:13px;font-weight:700;border-bottom:1px solid #eceff1;cursor:pointer">
+        <input type="checkbox" id="sc-copy-all" data-copy-action="toggle-all" style="width:auto">
+        Tick all that can be copied (${copyable})</label>`;
+  }
+
+  function codeBoxes() {
+    return Array.from(document.querySelectorAll('#sc-copy-scenarios input[data-copy-action="toggle-code"]:not(:disabled)'));
+  }
+
+  function tickAll(checked) {
+    for (const box of codeBoxes()) box.checked = checked;
+  }
+
+  // The "all" box follows the scenario boxes: ticked when all are, half when some are.
+  function syncSelectAll() {
+    const all = document.getElementById('sc-copy-all');
+    if (!all) return;
+    const boxes = codeBoxes();
+    const ticked = boxes.filter(b => b.checked).length;
+    all.checked = boxes.length > 0 && ticked === boxes.length;
+    all.indeterminate = ticked > 0 && ticked < boxes.length;
+  }
+
   function renderPreview() {
     const list = document.getElementById('sc-copy-scenarios');
     if (!preview.scenarios.length) {
@@ -155,7 +183,7 @@
       document.getElementById('sc-copy-trips').innerHTML = '';
       return;
     }
-    list.innerHTML = preview.scenarios.map(scenarioRow).join('');
+    list.innerHTML = selectAllRow(preview.scenarios) + preview.scenarios.map(scenarioRow).join('');
     renderTrips();
     renderReport();
   }
@@ -243,7 +271,8 @@
     const el = e.target.closest('[data-copy-action]');
     if (!el) return;
     if (el.dataset.copyAction === 'source') loadPreview().catch(reportError);
-    else if (el.dataset.copyAction === 'toggle-code' && preview) { renderTrips(); renderReport(); }
+    else if (el.dataset.copyAction === 'toggle-all' && preview) { tickAll(el.checked); renderTrips(); renderReport(); }
+    else if (el.dataset.copyAction === 'toggle-code' && preview) { syncSelectAll(); renderTrips(); renderReport(); }
   });
 
   // The button: the catalogue is always a source.

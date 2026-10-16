@@ -73,7 +73,9 @@ const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES'];
 // the scenario's offerSearchCriteria field, the values worth a probe (a
 // COLLECTIVE request needs a group, as the group entries have; ALL, FARE_*,
 // ANY_CLASS ask for nothing to check), the code part and the OSDM member.
-const PROBES = ['OFFER_OPTIONS'];
+// #780 part 3: an entry (`probe` "OFFER_COMBINATIONS") that comes as random
+// combinations of those values, drawn from the framework's count and seed.
+const PROBES = ['OFFER_OPTIONS', 'OFFER_COMBINATIONS'];
 const OFFER_OPTION_PROBES = [
   { key: 'offerModes', field: 'offerMode', values: ['INDIVIDUAL'], code: 'OFFER_MODE', member: 'offerMode' },
   { key: 'requestedOfferParts', field: 'requestedOfferParts', values: ['ADMISSION', 'RESERVATION', 'ANCILLARY'], code: 'OFFER_PARTS', member: 'requestedOfferParts' },
@@ -404,6 +406,7 @@ function catalogueFor(catalogue, simulator, framework) {
   const forms = Array.isArray(fw.offerRequestForms) ? fw.offerRequestForms : null;
   return baseEntries(catalogue, simulator, framework).flatMap((entry) => {
     if (entry.probe === 'OFFER_OPTIONS') return offerOptionProbes(entry, fw);
+    if (entry.probe === 'OFFER_COMBINATIONS') return offerCombinationProbes(entry, fw);
     if (!forms || !entry.requirements.offerRequest.convertible) return [entry];
     const variants = OFFER_REQUEST_FORMS.filter((form) => forms.includes(form))
       .map((form) => (form === 'SEARCH' ? entry : asForm(entry, form, framework)));
@@ -440,6 +443,39 @@ function offerOptionProbes(entry, fw) {
     optionOf: { key: o.key, field: o.field, value: o.value },
     purpose: `Offer search probe: offers asked with offerSearchCriteria.${o.member} ${o.value} alone; no offer keeping to it, or the provider ignoring it, fails. The scenario ends after the offer.`,
   }));
+}
+
+/**
+ * #780 part 3: the combination entry as `count` twins (`optionsOf`), each
+ * asking for two or more declared option values together, drawn from the
+ * framework's seed. Not copiable, listed once, without a count and seed, or
+ * with fewer than two options having a declared value.
+ */
+function offerCombinationProbes(entry, fw) {
+  const { combinationSettings, drawCombinations } = require('./offerCombinations');
+  const settings = combinationSettings(fw);
+  if (!settings) return [{ ...entry, missing: [...entry.missing, 'the number of random combinations and their seed (Offer search options)'] }];
+  const values = declaredOptionValues(fw);
+  const options = OFFER_OPTION_PROBES.map((p) => ({
+    key: p.key, values: values.filter((v) => v.key === p.key).map((v) => v.value),
+    ...(p.key === 'travelClasses' || p.key === 'serviceClassTypes' ? { group: 'class' } : {}),
+  }));
+  const combinations = drawCombinations(options, settings.count, settings.seed);
+  if (!combinations.length) return [{ ...entry, missing: [...entry.missing, 'two offer search options with a value to combine (Offer search options, Tariff Flexibility)'] }];
+  return combinations.map((combination, i) => {
+    const optionsOf = combination.map(({ key, value }) => {
+      const probe = OFFER_OPTION_PROBES.find((p) => p.key === key);
+      return { key, field: probe.field, value, member: probe.member };
+    });
+    const text = optionsOf.map((o) => `${o.member} ${o.value}`).join(', ');
+    return {
+      ...entry,
+      code: `OTST_OFFER_COMBO_${i + 1}`,
+      variantOf: entry.code,
+      optionsOf: optionsOf.map(({ key, field, value }) => ({ key, field, value })),
+      purpose: `Offer search combination ${i + 1} of seed ${settings.seed}: offers asked with ${text} together; an option no offer keeps to, or that the provider ignores, fails. The scenario ends after the offer.`,
+    };
+  });
 }
 
 // #748/#759: the forms a search can be sent in instead, with the code suffix

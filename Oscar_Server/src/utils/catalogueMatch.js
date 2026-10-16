@@ -262,23 +262,25 @@ function withOfferRequestForms(datafile, entries) {
 
 /**
  * #780: the catalogue data file with the offer search probes: each twin
- * (`optionOf`) is its source asking for that one option value, with
+ * (`optionOf`, or `optionsOf` for a combination) is its source asking for
+ * those option values alone, with
  * `offerSearchProbe` on; a flexibility probe also chooses that flexibility.
  * The probe entry itself gives way to its twins. The data file given is not
  * changed.
  */
 function withOfferOptions(datafile, entries) {
-  const probes = arr(entries).filter((e) => e.optionOf);
+  const probes = arr(entries).filter((e) => e.optionOf || e.optionsOf);
   if (!probes.length) return datafile;
   const scenarios = arr(datafile.scenarios).flatMap((sc) => {
     const twins = isObj(sc) ? probes.filter((e) => e.variantOf === sc.code) : [];
     if (!twins.length) return [sc];
     return twins.map((e) => {
-      const { field, value } = e.optionOf;
       const criteria = { serviceClass: [], travelClass: [], flexibilities: [], offerMode: null, requestedOfferParts: [] };
-      criteria[field] = field === 'offerMode' ? value : [value];
       const twin = { ...structuredClone(sc), code: e.code, description: e.purpose, offerSearchCriteria: criteria, offerSearchProbe: 'on' };
-      if (field === 'flexibilities') twin.desiredFlexibility = value;
+      for (const { field, value } of e.optionsOf || [e.optionOf]) {
+        criteria[field] = field === 'offerMode' ? value : [value];
+        if (field === 'flexibilities') twin.desiredFlexibility = value;
+      }
       return twin;
     });
   });

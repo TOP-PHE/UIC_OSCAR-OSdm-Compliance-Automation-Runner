@@ -72,3 +72,63 @@ describe('showMsg', () => {
     expect(run('').scrolled).toBeNull();
   });
 });
+
+// Copy scenarios: one box ticks every scenario that can be copied, and
+// follows the scenario boxes. The greyed-out ones stay unticked.
+describe('Copy scenarios: tick all', () => {
+  const SELECT_ALL = lift('function selectAllRow(', '\n  }');
+  const CODE_BOXES = lift('function codeBoxes(', '\n  }');
+  const TICK_ALL = lift('function tickAll(', '\n  }');
+  const SYNC = lift('function syncSelectAll(', '\n  }');
+
+  function page(boxes) {
+    const all = { checked: false, indeterminate: false };
+    const document = {
+      querySelectorAll: (sel) => {
+        expect(sel).toBe('#sc-copy-scenarios input[data-copy-action="toggle-code"]:not(:disabled)');
+        return boxes.filter(b => !b.disabled);
+      },
+      getElementById: (id) => (id === 'sc-copy-all' ? all : null),
+    };
+    const ctx = vm.createContext({ document, Array });
+    vm.runInContext(`${CODE_BOXES}\n${TICK_ALL}\n${SYNC}\nthis.tickAll = tickAll; this.syncSelectAll = syncSelectAll;`, ctx);
+    return { ctx, all };
+  }
+
+  test('the box is drawn only when two or more scenarios can be copied, and counts them', () => {
+    const ctx = vm.createContext({ Array });
+    vm.runInContext(`${SELECT_ALL}\nthis.selectAllRow = selectAllRow;`, ctx);
+    const html = ctx.selectAllRow([{ missing: [] }, {}, { missing: ['x'] }]);
+    expect(html).toContain('data-copy-action="toggle-all"');
+    expect(html).toContain('Tick all that can be copied (2)');
+    expect(ctx.selectAllRow([{}, { missing: ['x'] }])).toBe('');
+  });
+
+  test('ticking all leaves the greyed-out scenarios unticked; unticking clears the others', () => {
+    const boxes = [{ checked: false }, { checked: false, disabled: true }, { checked: false }];
+    const { ctx } = page(boxes);
+    ctx.tickAll(true);
+    expect(boxes.map(b => b.checked)).toEqual([true, false, true]);
+    ctx.tickAll(false);
+    expect(boxes.map(b => b.checked)).toEqual([false, false, false]);
+  });
+
+  test('the box follows the scenario boxes: all, some, none', () => {
+    const boxes = [{ checked: true }, { checked: false, disabled: true }, { checked: true }];
+    const { ctx, all } = page(boxes);
+    ctx.syncSelectAll();
+    expect([all.checked, all.indeterminate]).toEqual([true, false]);
+    boxes[2].checked = false;
+    ctx.syncSelectAll();
+    expect([all.checked, all.indeterminate]).toEqual([false, true]);
+    boxes[0].checked = false;
+    ctx.syncSelectAll();
+    expect([all.checked, all.indeterminate]).toEqual([false, false]);
+  });
+
+  test('the page wires both boxes', () => {
+    expect(SOURCE).toContain("el.dataset.copyAction === 'toggle-all' && preview) { tickAll(el.checked); renderTrips(); renderReport(); }");
+    expect(SOURCE).toContain("el.dataset.copyAction === 'toggle-code' && preview) { syncSelectAll(); renderTrips(); renderReport(); }");
+    expect(SOURCE).toContain('selectAllRow(preview.scenarios) + preview.scenarios.map(scenarioRow)');
+  });
+});

@@ -62,6 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.308] / [collection-OTST_V2.0.179] — 2026-10-16
+
+Issue #780 part 3, release 2026.343. Random combinations of offer search options.
+
+### Added
+- **The Test Framework sets a number of random combinations and their seed** (Offer search options: Number 1–20, Seed 0–4294967295, a New seed button drawing from the browser's random source). Stored as `offerCombinations: { count, seed }`.
+- **The catalogue entry `OTST_OFFER_OPTION_COMBINATIONS`** (`"probe": "OFFER_COMBINATIONS"`) comes as `OTST_OFFER_COMBO_1` … `_<count>`. Each is an offer search probe (part 2) asking for two or more declared option values together, one value per option. The values are those part 2 probes one by one. The draw (`utils/offerCombinations.js`, pure, a seeded 32-bit generator) gives the same combinations for the same seed, so a combination that finds a gap can be copied again and rerun. A new seed gives new ones. No two combinations are alike. The purpose of each names its seed and its values. Without a count and seed, or with fewer than two options to combine, the entry is listed but cannot be copied.
+- Source scenario `SIM_OFFER_PROBE_COMBINATION_38`: first class, individual offers and admissions asked together.
+- **Copy scenarios has a "Tick all that can be copied (N)" box** above the list (maintainer request). It ticks or unticks every scenario that can be copied. The greyed-out ones, which need what the Test Framework does not declare, stay unticked. The box follows the scenario boxes: ticked when all are, half-ticked when some are (`selectAllRow()`, `tickAll()`, `syncSelectAll()` in `scenario-copy.js`, tested in `scenario-copy-page.test.js`).
+
+### Default decisions (taken without asking)
+- **The combinations are drawn when the catalogue is read, from the framework's seed, not at run time.** A run then knows exactly what it sends, the copy report shows it, and a failing combination keeps its code and content until the seed changes.
+- **The travel class and the service class are never combined.** They ask for the same comfort in two ways, and a provider may tie them (first class = HIGH), so together they would mostly find no offer, a failure that says nothing about the provider. OSDM does not forbid it; the issue's "a combination OSDM forbids is never sent" holds trivially.
+- At most 20 combinations per copy.
+
+Checked:
+- Unit tests: `offer-search-options.test.js` (+9):
+  - the draw on 500 seeds: two or more options, one declared value each, in order, no duplicates, never both classes;
+  - the settings range;
+  - the catalogue and the copy, schema-valid;
+  - the page's fields and handlers.
+- The new simulator scenario passes (see the replay below).
+- Full simulator replay, compared with the previous one.
+- Full suite, lint, simulator tests.
+
+Not verified: a run against a real provider.
+
+---
+
 ## [server-1.11.307] / [collection-OTST_V2.0.178] — 2026-10-16
 
 Issue #780 part 2, release 2026.342. Simulator 0.31.0.
