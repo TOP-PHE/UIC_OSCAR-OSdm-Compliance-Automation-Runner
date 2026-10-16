@@ -1616,6 +1616,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   asks the trip search first, `/offers` on a failed or empty day. The
   simulator's search gives direct trips only, so only the tests show a
   connection.
+  **The offer re-probe checks each service** (#787 PR 1, 1.11.312): it
+  keeps the direct trains each `/offers` answer shows (`harvestTrips`) and
+  the days answered, searches once more at the time of a service no answer
+  showed (`askUnseenServices()`, at most 6 per route), then adds per set
+  `serviceFindings()` (pure, `timetable-discovery.js`): a number the
+  provider writes otherwise (`OSDM-104` / `OSDM_104`, compared without
+  punctuation or case), another train at that time, a time, day, product
+  category or operator that differs; at most 8, then "… and N more".
+  `classifyOfferProbe` reads OSDM's WarningCollection `{ warnings: [...] }`.
 - **A run goes on a day its trip's trains run** (#717, 1.11.273 /
   OTST_V2.0.153). Trips keep no calendar, so the server matches each trip
   requirement against the TRAIN resources when it serves the run's copy

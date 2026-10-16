@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-probe-services",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Re-probe offers checks each train of a train set",
+    "summary": "The probe now says when the provider writes a train number otherwise, runs another train at that time, or gives another time or day.",
+    "content": "Re-probe offers used to search each route and say whether it sells: it could not see a train number typed wrong. A scenario naming OSDM-104 got no offer from a provider writing OSDM_104, and the probe said all was well. Now each train of a train set is looked for in the provider's answers, by its number (punctuation and case aside). A train that is not found is searched once more at its own time. The probe then says, per train set, a number the provider writes otherwise, the provider's train at that time, a departure or arrival time that differs, a day the set says it runs without an offer (or the other way round), and a product category or operator named otherwise."
+  },
+  {
     "id": "2026-10-16-osdm-version",
     "date": "October 16, 2026",
     "tag": "Fix",

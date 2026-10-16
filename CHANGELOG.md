@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.312] / [collection-OTST_V2.0.181] — 2026-10-16
+
+Issue #787 (part 1), release 2026.347. Re-probe offers checks each service of a train set.
+
+### Added
+- **Each service of a train set is looked for in the provider's answers.** The offer re-probe searched a route and said whether it sells; a train number typed wrong went unseen. A real provider writes `OSDM_104` where the train set said `OSDM-104`, so every scenario on that train got no offer while the probe said the route sells.
+  - The re-probe keeps the direct trains each `/offers` answer shows and the days answered. A service no answer showed is searched once more at its own time (`askUnseenServices()`, at most 6 per route).
+  - `serviceFindings()` (pure, `services/timetable-discovery.js`) adds to each set's findings: a number the provider writes otherwise (compared without punctuation or case), the provider's train at that time, a departure or arrival time that differs, a day the set lists without an offer or an offer on a day it does not list, a product category or operator named otherwise. At most 8, then "… and N more".
+- `classifyOfferProbe` reads OSDM's WarningCollection (`{ warnings: [...] }`) when there is no offer.
+
+### Default decisions (taken without asking)
+- **Nothing is changed in the train set.** The findings say what differs; the Test Manager corrects the set (part 2 of #787 carries a correction to the trips built from it).
+- **A connection's legs are not checked.** Only direct trains of the set's own route are compared.
+
+Checked:
+- Unit tests: `service-probe.test.js` (8); the route, with a provider naming the train otherwise (`company-test-resources-routes.test.js`).
+- Full suite, lint.
+
+Not verified: against a real provider. The findings were written from the batch that showed the number.
+
+---
+
 ## [server-1.11.311] / [collection-OTST_V2.0.181] — 2026-10-16
 
 Issue #785, release 2026.346. The OSDM version is checked, and follows the Test Framework.
