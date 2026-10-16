@@ -406,7 +406,8 @@ function classifyOfferProbe(resp) {
   const trips = Array.isArray(resp.trips) ? resp.trips.length : 0;
   if (resp.offers.length === 0) {
     // #787: OSDM 3.5+ gives warnings as a WarningCollection { warnings: [...] }.
-    const warnings = Array.isArray(resp.warnings) ? resp.warnings : (Array.isArray(resp.warnings?.warnings) ? resp.warnings.warnings : []);
+    let warnings = Array.isArray(resp.warnings?.warnings) ? resp.warnings.warnings : [];
+    if (Array.isArray(resp.warnings)) warnings = resp.warnings;
     const echo = []
       .concat(warnings, Array.isArray(resp.problems) ? resp.problems : [])
       .map(w => w && (w.code || w.title)).filter(Boolean).slice(0, 3);
@@ -726,6 +727,9 @@ function _unseenFinding(svc, onRoute, probedDays) {
   return `${name}: not found in the provider's answers on ${probedDays.map((d) => d.date).join(', ')}`;
 }
 
+// Probed days in words: "Sun 2026-10-18, Mon 2026-10-19".
+const _dayList = (days) => days.map((d) => `${DAY_NAMES[d.dayOfWeek] || d.dayOfWeek} ${d.date}`).join(', ');
+
 // The times and days of one service the answers show by its number.
 function _seenFindings(svc, seen, data, probedDays) {
   const out = [];
@@ -738,9 +742,9 @@ function _seenFindings(svc, seen, data, probedDays) {
   if (!runs) return out;
   const seenDays = new Set(seen.map((r) => r.dayOfWeek));
   const missing = probedDays.filter((d) => runs.includes(d.dayOfWeek) && !seenDays.has(d.dayOfWeek));
-  if (missing.length) out.push(`${name}: not offered on ${missing.map((d) => `${DAY_NAMES[d.dayOfWeek] || d.dayOfWeek} ${d.date}`).join(', ')}, a day the set says it runs`);
+  if (missing.length) out.push(`${name}: not offered on ${_dayList(missing)}, a day the set says it runs`);
   const extra = probedDays.filter((d) => !runs.includes(d.dayOfWeek) && seenDays.has(d.dayOfWeek));
-  if (extra.length) out.push(`${name}: offered on ${extra.map((d) => `${DAY_NAMES[d.dayOfWeek] || d.dayOfWeek} ${d.date}`).join(', ')}, a day the set does not list`);
+  if (extra.length) out.push(`${name}: offered on ${_dayList(extra)}, a day the set does not list`);
   return out;
 }
 

@@ -518,15 +518,21 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
 // no answer showed is asked for once more at its own time, on the first day
 // answered (at most MAX_SERVICE_SEARCHES per route, each time once).
 const MAX_SERVICE_SEARCHES = 6;
+
+// One provider call after the other, never several at once.
+function inSequence(items, fn) {
+  return items.reduce((done, item) => done.then(() => fn(item)), Promise.resolve());
+}
+
 async function askUnseenServices(od, harvest, ask, keep) {
   const date = harvest.days[0]?.date;
   if (!date) return;
   const times = [...new Set(od.trains.flatMap((t) => servicesUnseen(t.data, harvest.records))
     .map((svc) => /(\d{2}:\d{2})/.exec(String(svc.departureTime))?.[1]).filter(Boolean))].slice(0, MAX_SERVICE_SEARCHES);
-  for (const time of times) {
+  await inSequence(times, async (time) => {
     const r = await ask(date, od, `${time}:00`);
     if (r?.ok && classifyOfferProbe(r.json)) keep(r.json, date);
-  }
+  });
 }
 
 // ── POST /v1/company/test-resources/reprobe-offers (#369) ────────────────────
@@ -582,17 +588,17 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
       return await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, od.origin, od.destination, company.api_base, atTime), extraHeaders);
     } catch (_err) { return null; }
   };
-  for (const od of byOd.values()) {
+  await inSequence([...byOd.values()], async (od) => {
     const probe = { daysProbed: 0, daysWithOffers: 0, classes: new Set(), flex: new Set(), noOffer: [] };
     // #787: the direct trains each answer shows, and the days answered.
     const harvest = { records: [], days: [] };
     const keep = (json, date) => harvest.records.push(...harvestTrips(json, { searchedOrigin: od.origin, searchedDestination: od.destination })
       .map((r) => ({ ...r, dayOfWeek: r.dayOfWeek || dayOfWeekCode(`${date}T12:00:00`) })));
-    for (const date of searchDates(3, new Date())) {
+    await inSequence(searchDates(3, new Date()), async (date) => {
       const r2 = await ask(date, od);
-      if (!r2?.ok) continue;
+      if (!r2?.ok) return;
       const pc = classifyOfferProbe(r2.json);
-      if (!pc) continue;
+      if (!pc) return;
       keep(r2.json, date);
       harvest.days.push({ date, dayOfWeek: dayOfWeekCode(`${date}T12:00:00`) });
       probe.daysProbed++;
@@ -603,7 +609,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
       } else {
         probe.noOffer.push({ date, finding: pc.finding });
       }
-    }
+    });
     const offerProbe = summarizeOfferProbe(probe);
     if (offerProbe) {
       await askUnseenServices(od, harvest, ask, keep);
@@ -619,7 +625,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
       origin: od.origin, destination: od.destination, trains: od.trains.length,
       probed: !!offerProbe, findings: offerProbe ? offerProbe.findings : ['probe got no usable offers response']
     });
-  }
+  });
 
   log.info({ companyId: targetCompanyId, routes: routes.length, updatedCount }, 'Offer re-probe completed');
   return res.json({ routes, updated: updatedCount });
