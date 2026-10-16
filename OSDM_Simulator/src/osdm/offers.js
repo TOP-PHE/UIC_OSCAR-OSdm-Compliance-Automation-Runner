@@ -685,6 +685,25 @@ function inCurrency(provider, criteria) {
   return { ...provider, currency: asked, priceFactor: other.priceFactor };
 }
 
+// The offers of each trip (or pair of trips), class and tariff, and what the
+// simulator remembers of each.
+function offersOfPairs(pairs, ctx) {
+  const { classes, flexibilities, collective, passengers, refusals, fulfillmentOptions, provider, nowMs, shortLivedMs } = ctx;
+  const offers = [];
+  const remembered = [];
+  for (const { trip, inboundTrip } of pairs) {
+    const covered = inboundTrip ? [trip, inboundTrip] : [trip];
+    for (const travelClass of classes) {
+      for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals, provider }))) {
+        const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS });
+        offers.push(offer);
+        remembered.push({ offer, trips: covered, passengers, oneFulfillment: flexibility.group?.oneFulfillment === true, shortLivedMs });
+      }
+    }
+  }
+  return { offers, remembered };
+}
+
 function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const trips = tripsOf(body, providerAsIs, known);
   // #780: the variant stop place answers as if no criteria were sent.
@@ -702,22 +721,13 @@ function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const fulfillmentOptions = fulfillmentOptionsOf(body);
   const collective = criteria?.offerMode === 'COLLECTIVE';
   const refusals = new Set();
-  const offers = [];
-  const remembered = [];
   // Both directions: one offer covers an outbound trip and an inbound one.
   const pairs = outboundTrips.length > 0
     ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
     : trips.map((trip) => ({ trip }));
-  for (const { trip, inboundTrip } of beyondHorizon ? [] : pairs) {
-    const covered = inboundTrip ? [trip, inboundTrip] : [trip];
-    for (const travelClass of classes) {
-      for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals, provider }))) {
-        const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS });
-        offers.push(offer);
-        remembered.push({ offer, trips: covered, passengers, oneFulfillment: flexibility.group?.oneFulfillment === true, shortLivedMs });
-      }
-    }
-  }
+  const { offers, remembered } = offersOfPairs(beyondHorizon ? [] : pairs, {
+    classes, flexibilities, collective, passengers, refusals, fulfillmentOptions, provider, nowMs, shortLivedMs,
+  });
   // #611: the offers of a trip from the requested-information stop place ask
   // for each passenger's date of birth and phone number.
   const asksInfo = persons.asksForInformation(trips, provider);
