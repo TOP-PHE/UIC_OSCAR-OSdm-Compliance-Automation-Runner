@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Random combinations of offer search options: the Test Framework sets how many and a seed, and the catalogue offers that many probes combining two or more declared values; the same seed gives the same combinations (#780, part 3)."
+        "Random combinations of offer search options: the Test Framework sets how many and a seed, and the catalogue offers that many probes combining two or more declared values; the same seed gives the same combinations (#780, part 3).",
+        "Copy scenarios: a box ticks every scenario that can be copied at once."
       ]
     },
     {
