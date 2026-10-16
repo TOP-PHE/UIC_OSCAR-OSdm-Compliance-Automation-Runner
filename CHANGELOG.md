@@ -62,6 +62,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.299] / [collection-OTST_V2.0.170] — 2026-10-16
+
+Issue #766 (PR 3 of 5), release 2026.334. Simulator 0.27.0.
+
+### Added
+- **A named place or compartment, chosen on the place map**: Test Config → Booking Flow Actions → *Place selection flow* `MANUAL_PLACE_SELECTION_WITHOUT_FEE` or `…_WITH_FEE`, and *Named place* `PLACE` (default) or `COMPARTMENT`.
+  - Before the booking, step 02 asks `POST /availabilities/vehicle-place-map` for the reservations it places, once per offer. The answer is checked: 2xx, and each place with its status and reservations. 501, 404 and 405 are "not provided", a warning, and the booking names no place.
+  - Choosing: free seats only, never taken ones, never the seats of a compartment booked as a whole. Without fee, seats without a selection fee; with fee, fee seats first (none on the map is a warning). For a compartment, a free one large enough for the passengers. Nothing to choose is a warning.
+  - The booking names them in `placeSelections[].places` (one `SelectedPlace` per passenger) or `placeSelections[].compartments`.
+  - Step 07 **fails** when the booked reservation does not give the places named, or does not cost the offer's price plus the fees of the seats named. They were free, and the retailer sold them to the customer.
+  - A scenario naming a manual flow books its optional reservations by `placeSelections`, unless it names another form. The older seat map mode (`placeSelectionMode`) is unchanged.
+- **Three reference scenarios**: `OTST_SALE_NAMED_PLACE_2ADT`, `OTST_SALE_NAMED_PLACE_FEE_1ADT`, `OTST_SALE_NAMED_COMPARTMENT_2ADT`. Each needs its flow declared in the Test Framework.
+- **Test Config** shows the *Place selection flow* of a scenario (OSDM's five flows), and the *Named place*.
+
+### Fixed
+- **Every warning of a request file reaches the HTML report.** Some steps printed theirs with `console.log`, which only goes to the run log. These included 07's "the place booked does not give the seat preference" and "the reservation gives no place", 02's "multiple offers not supported" and 08's seat map gaps. They go through the report's logger now, and a test refuses a new one. A real provider's run showed the step 07 warning was missing from the report.
+- **`appliedPassengerTypes` empty or absent on a booked part is a warning.** It is optional in OSDM; a real provider returns `[]` on a booked reservation, and three checks failed for it.
+- **A booking refused while it asked for seat preferences is sent once more without them.** Two real providers refused it (422, and 500 for one).
+  - Accepted the second time: the preference was refused. That is a failure when the offer listed the preference, else a warning.
+  - Refused again: the reservation itself is refused, and the status check fails as before.
+
+### Simulator 0.27.0
+- Profile key `placeMap` `{ from, fee }`. On a trip from that stop place:
+  - a reservation takes the two manual flows;
+  - `POST /availabilities/vehicle-place-map` gives coach 7. Its open saloon has seats 11–30: 11 and 12 taken, 21–24 with a selection fee. Its compartment C1 (seats 61–64) is booked as a whole only;
+  - a booking naming places or the compartment gets them, its reservation priced with the fees. A taken, unknown, repeated or compartment seat is refused with 409 `PLACE_NOT_AVAILABLE`.
+- On `gamma`: station `0000091`; fee 10 before the price factor (2.40 CZK).
+- Variant `gives-other-place`.
+- Scenarios `SIM_SALE_NAMED_PLACE_2ADT_38`, `SIM_SALE_NAMED_PLACE_FEE_1ADT_38` and `SIM_SALE_NAMED_COMPARTMENT_2ADT_38`, and `SIM_WRONG_NAMED_PLACE_38`, which fails on purpose (trip requirement 16, passenger list 24).
+
+### Default decisions (taken without asking)
+- **A place named but not given, or a wrong price, is a failure; not being able to choose is a warning.** The first is the provider breaking what it offered; the second says only what the map held.
+- **In the fee flow, fee seats are taken first**, so that the fee is tested; free seats complete when there are too few.
+- **The place map is asked from 02's own script**, like the seat preferences: no new request file the run filter could skip (#652).
+- **The retry without preferences happens once, on any error but 401 and 403.**
+
+Checked:
+- Unit tests:
+  - `named-places.test.js`, 20 tests, including an end-to-end sale against the simulator's own functions for each flow;
+  - `place-preferences.test.js`, 7 more for the retry;
+  - `bruno-bookings-part-pairing.test.js`, 2 more;
+  - simulator `place-map.test.js`, 11 tests.
+  - Each of eight mutations of the new rules fails a test.
+- Replay before/after: CHECKS_PLACEHOLDER
+
+---
+
 ## [server-1.11.298] / [collection-OTST_V2.0.169] — 2026-10-15
 
 Issue #766 (PR 2 of 5), release 2026.333. Simulator 0.26.0.

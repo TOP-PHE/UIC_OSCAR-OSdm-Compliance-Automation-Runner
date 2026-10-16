@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.333",
+  "current_release": "2026.334",
   "releases": [
+    {
+      "release": "2026.334",
+      "date": "2026-10-16",
+      "server": "1.11.299",
+      "collection": "OTST_V2.0.170",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Named place and compartment, with or without a selection fee: the place map is asked (POST /availabilities/vehicle-place-map), free places are named, and the booking must give them at the offer's price plus the fees (#766, PR 3 of 5).",
+        "Every warning of a request file reaches the HTML report; an empty appliedPassengerTypes in a booking is a warning; a booking refused with seat preferences is sent once more without them."
+      ]
+    },
     {
       "release": "2026.333",
       "date": "2026-10-15",
