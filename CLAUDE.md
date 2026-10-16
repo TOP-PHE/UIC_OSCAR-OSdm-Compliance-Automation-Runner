@@ -142,6 +142,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     a booking refused with seat preferences is sent once more without them
     (`bookingWithoutPreferences()`), to tell a refused preference (FAIL if the
     offer listed it, else WARNING) from a refused reservation.
+    **PR 4 (1.11.300): near a given place.** Flow NEARBY plus
+    `referencePlace` "coach/place" → env `nearbyReference`; 02 asks
+    `GET /availabilities/nearby` per reservation (`askNearbyPlace()`, checks
+    recorded with the others by `recordPlacePreferenceChecks()`), the builder
+    adds `referencePlace` to every selection naming no place
+    (`withReferencePlace()`), 07 runs `checkNearPlaceGiven()`: another coach a
+    WARNING (`level: 'warn'`, logged), the reference itself a FAIL. "Near" =
+    same coach, OSDM gives no distance. The catalogue's needs carry
+    `providerValues` `referencePlace`, and the copy lists it to complete
+    (the simulator's `7/15` means nothing elsewhere).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
