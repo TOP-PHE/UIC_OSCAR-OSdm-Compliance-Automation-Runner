@@ -255,25 +255,25 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
-| `OTST_REFUND_RETURN_FULL_1ADT` | Full refund of a return: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model SEPARATE | 529 | `SIM_REFUND_RETURN_1ADT_38` |
-| `OTST_REFUND_RETURN_INBOUND_1ADT` | Partial refund of a return by fulfillment: the inbound ticket alone. | REFUND_PARTIAL, return model SEPARATE | 455 | `SIM_REFUND_INBOUND_1ADT_38` |
-| `OTST_REFUND_PARTIAL_PASSENGER_2ADT` | Partial refund by passenger: two adults, the last one refunded alone; the other passenger's ticket stays. | REFUND_PARTIAL | 476 | `SIM_REFUND_PAX_2ADT_38` |
-| `OTST_REFUND_PARTIAL_LEG_1ADT` | Partial refund by leg: a two-leg journey, the last leg refunded alone; the first leg stays. | REFUND_PARTIAL | 453 | `SIM_REFUND_LEG_1ADT_38` |
-| `OTST_REFUND_PARTIAL_PASSENGERS_THIRD` | Partial refund of a third of the passengers, at the provider's maximum number of passengers: only theirs are refunded, the others' tickets stay. | REFUND_PARTIAL, the maximum number of passengers | 5237 | `SIM_REFUND_PAX_THIRD_19PAX_38` |
-| `OTST_REFUND_TECHNICAL_CANCELLATION_1ADT` | Technical cancellation: refund with an overrule code, everything back and no fee. | REFUND_FULL, return model SEPARATE | 533 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` |
+| `OTST_REFUND_RETURN_FULL_1ADT` | Full refund of a return: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model SEPARATE | 525 | `SIM_REFUND_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_INBOUND_1ADT` | Partial refund of a return by fulfillment: the inbound ticket alone. | REFUND_PARTIAL, return model SEPARATE | 454 | `SIM_REFUND_INBOUND_1ADT_38` |
+| `OTST_REFUND_PARTIAL_PASSENGER_2ADT` | Partial refund by passenger: two adults, the last one refunded alone; the other passenger's ticket stays. | REFUND_PARTIAL | 475 | `SIM_REFUND_PAX_2ADT_38` |
+| `OTST_REFUND_PARTIAL_LEG_1ADT` | Partial refund by leg: a two-leg journey, the last leg refunded alone; the first leg stays. | REFUND_PARTIAL | 452 | `SIM_REFUND_LEG_1ADT_38` |
+| `OTST_REFUND_PARTIAL_PASSENGERS_THIRD` | Partial refund of a third of the passengers, at the provider's maximum number of passengers: only theirs are refunded, the others' tickets stay. | REFUND_PARTIAL, the maximum number of passengers | 5230 | `SIM_REFUND_PAX_THIRD_19PAX_38` |
+| `OTST_REFUND_TECHNICAL_CANCELLATION_1ADT` | Technical cancellation: refund with an overrule code, everything back and no fee. | REFUND_FULL, return model SEPARATE | 529 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` |
 | `OTST_REFUND_WITHDRAWN_1ADT` | Refund offer asked for, then withdrawn instead of confirmed: the ticket stays. | REFUND_FULL | 332 | `SIM_REFUND_DELETE_1ADT_38` |
 | `OTST_REFUND_OFFER_ONLY_1ADT` | Refund offer asked for and read, neither confirmed nor withdrawn. | REFUND_FULL | 299 | `SIM_REFUND_ONLY_OFFER_1ADT_38` |
-| `OTST_REFUND_RECEIPT_RETURN_1ADT` | Full refund of a return, then the refund receipt waited for in the booking. | REFUND_FULL, return model SEPARATE | 532 | `SIM_REFUND_RECEIPT_RETURN_1ADT_38` |
-| `OTST_REFUND_RETURN_COMBINED_FULL_1ADT` | Full refund of a return sold as one offer: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 599 | `SIM_REFUND_COMBINED_RETURN_1ADT_38` |
-| `OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT` | Partial refund by fulfillment of a return sold as one offer: the inbound ticket alone. | REFUND_PARTIAL, return model COMBINED, OSDM 3.7+ | 516 | `SIM_REFUND_COMBINED_INBOUND_1ADT_38` |
-| `OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT` | Technical cancellation of a return sold as one offer: overrule code, everything back and no fee. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 603 | `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38` |
-| `OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT` | Full refund of a return sold as one offer, then the refund receipt waited for in the booking. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 602 | `SIM_REFUND_COMBINED_RECEIPT_1ADT_38` |
+| `OTST_REFUND_RECEIPT_RETURN_1ADT` | Full refund of a return, then the refund receipt waited for in the booking. | REFUND_FULL, return model SEPARATE | 528 | `SIM_REFUND_RECEIPT_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_COMBINED_FULL_1ADT` | Full refund of a return sold as one offer: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 593 | `SIM_REFUND_COMBINED_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT` | Partial refund by fulfillment of a return sold as one offer: the inbound ticket alone. | REFUND_PARTIAL, return model COMBINED, OSDM 3.7+ | 515 | `SIM_REFUND_COMBINED_INBOUND_1ADT_38` |
+| `OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT` | Technical cancellation of a return sold as one offer: overrule code, everything back and no fee. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 597 | `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38` |
+| `OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT` | Full refund of a return sold as one offer, then the refund receipt waited for in the booking. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 596 | `SIM_REFUND_COMBINED_RECEIPT_1ADT_38` |
 
 #### Exchange
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
-| `OTST_EXCHANGE_1ADT` | Exchange of a one-way ticket: exchange offers, one taken, confirmed. | EXCHANGE_FULL | 387 | `SIM_EXCHANGE_1ADT_38` |
+| `OTST_EXCHANGE_1ADT` | Exchange of a one-way ticket: exchange offers, one taken, confirmed. | EXCHANGE_FULL | 385 | `SIM_EXCHANGE_1ADT_38` |
 | `OTST_EXCHANGE_WITHDRAWN_1ADT` | Exchange pre-booked, then withdrawn before its confirmation: the ticket stays. | EXCHANGE_FULL | 357 | `SIM_EXCHANGE_DELETE_1ADT_38` |
 
 #### Negative tests (NHF: the provider must refuse)
@@ -287,8 +287,8 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `NHF_SALE_BEYOND_SALES_HORIZON` | A departure one day beyond the provider's sales horizon: the offer request must be refused, or give no offer. | the sales horizon | 70 | `SIM_NHF_BEYOND_SALES_HORIZON_38` |
 | `NHF_SALE_DEPARTURE_IN_PAST` | A departure yesterday: the offer request must be refused, or give no offer. | — | 72 | `SIM_NHF_DEPARTURE_IN_PAST_38` |
 | `NHF_CONFIRM_TWICE` | A booking confirmed twice: the second confirmation must give the same tickets, or be refused; never new ones. | — | 235 | `SIM_NHF_CONFIRM_AGAIN_38` |
-| `NHF_REFUND_TWICE` | A ticket refunded in full cannot be refunded again: the second refund offer request must be refused. | REFUND_FULL | 352 | `SIM_NHF_REFUND_AGAIN_38` |
-| `NHF_EXCHANGE_REFUNDED` | A ticket refunded in full cannot be exchanged: the exchange offer request must be refused. | REFUND_FULL, EXCHANGE_FULL | 352 | `SIM_NHF_EXCHANGE_REFUNDED_38` |
+| `NHF_REFUND_TWICE` | A ticket refunded in full cannot be refunded again: the second refund offer request must be refused. | REFUND_FULL | 349 | `SIM_NHF_REFUND_AGAIN_38` |
+| `NHF_EXCHANGE_REFUNDED` | A ticket refunded in full cannot be exchanged: the exchange offer request must be refused. | REFUND_FULL, EXCHANGE_FULL | 349 | `SIM_NHF_EXCHANGE_REFUNDED_38` |
 | `NHF_EXPIRED_OFFER` | Booking an offer after its `preBookableUntil` must be refused. Waits up to 40 minutes. | — | 121 | `SIM_NHF_EXPIRED_OFFER_38` |
 | `NHF_EXPIRED_BOOKING` | Confirming a booking after its confirmation time limit must be refused. Waits up to 40 minutes. | — | 191 | `SIM_NHF_EXPIRED_BOOKING_38` |
 | `NHF_EXPIRED_REFUND_OFFER` | Confirming a refund offer after its `validUntil` must be refused. Waits up to 40 minutes. | REFUND_FULL | 303 | `SIM_NHF_EXPIRED_REFUND_OFFER_38` |

@@ -1399,6 +1399,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     parsed in one place, `ignoredParameters.js` (last segment, so
     `…placeSelections.accommodations` is not the reservation). The version
     check compares with `sameOsdmVersion()`: data file `3.8` = API `3.8.0`.
+  - **Times to the second, deadlines by state, flags of refunded parts**
+    (#786, 1.11.309, a 3.0.5 provider). A booking may be created in the same
+    second as its offer (`checkBookingAfterOffer()`: at or after). A refund
+    offer's `validUntil` is checked while PROPOSED only, like
+    `confirmableUntil`. `refundable` / `exchangeable` of a REFUNDED or
+    EXCHANGED part are not compared with the offer (`AFTER_SALE_DONE`). An
+    answer without `offers` fails as "no offer" and quotes the provider
+    (`providerReasons()`); the WarningCollection `{ warnings: [...] }` is
+    OSDM's own shape, read by `envelopeWarnings()`.
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id

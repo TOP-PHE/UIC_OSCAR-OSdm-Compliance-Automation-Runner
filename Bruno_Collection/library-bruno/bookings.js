@@ -19,6 +19,7 @@ module.exports = {
   alignPassengerIdsToSubmittedOrder,
   isPostConfirmationStage,
   pairOfferParts,
+  checkBookingAfterOffer,
   // Not under its own name: offers.js exposes a different validateOfferParts
   // on globalThis.
   validateBookedOfferParts: validateOfferParts,
@@ -69,12 +70,36 @@ function alignPassengerIdsToSubmittedOrder(bookingPassengers, submittedRefs) {
   return { ids, aligned: true, reordered };
 }
 
+// Check booking.createdOn >= offer.createdOn. #786: at or after, not after:
+// a provider giving times to the second books in the same second it priced.
+function checkBookingAfterOffer(booking, selectedOffer) {
+  const bookingDate = new Date(booking.createdOn);
+  const offerDate   = new Date(selectedOffer.createdOn);
+  if (!isNaN(bookingDate.getTime()) && !isNaN(offerDate.getTime())) {
+    test(`booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`, () => {
+      validationLogger(`[DEBUG] booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`);
+      expect(bookingDate.getTime(), 'the booking is created before the offer it books').to.be.at.least(offerDate.getTime());
+    });
+  } else {
+    validationLogger(`[WARNING] Invalid date - bookingDate: ${booking.createdOn}, offerDate: ${selectedOffer.createdOn}`);
+  }
+}
+
 // ─── Field-level helpers ─────────────────────────────────────────────────────
 
+// #786: a refunded or exchanged part can no longer be refunded or exchanged,
+// so its flags say NO whatever the offer said: those parts are not compared.
+const AFTER_SALE_DONE = new Set(['REFUNDED', 'EXCHANGED']);
+
 function validatePartIntersectionFields(offerParts, bookedParts, partType, fields) {
+  const liveParts = bookedParts.filter(p => !AFTER_SALE_DONE.has(p?.status));
+  if (liveParts.length < bookedParts.length) {
+    validationLogger(`[INFO] ${partType}: ${fields.join(' / ')} not compared for ${bookedParts.length - liveParts.length} part(s) already refunded or exchanged.`);
+  }
   fields.forEach(field => {
     const offerValues   = offerParts.map(p => p[field]).filter(v => v != null);
-    const bookingValues = bookedParts.map(p => p[field]).filter(v => v != null);
+    const bookingValues = liveParts.map(p => p[field]).filter(v => v != null);
+    if (liveParts.length === 0) return;
     if (offerValues.length > 0 && bookingValues.length > 0) {
       test(`${partType} ${field} values have at least one member in common between offer and booking offer=[${offerValues}] booking=[${bookingValues}]`, () => {
         const intersection = offerValues.filter(v => bookingValues.includes(v));
@@ -867,17 +892,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validationLogger(`[FULL] Passenger IDs: [${passengerIdList}]`);
   bru.setEnvVar("passengerIdList", passengerIdList);
 
-  // Check booking.createdOn > offer.createdOn
-  const bookingDate = new Date(booking.createdOn);
-  const offerDate   = new Date(selectedOffer.createdOn);
-  if (!isNaN(bookingDate.getTime()) && !isNaN(offerDate.getTime())) {
-    test(`booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`, () => {
-      validationLogger(`[DEBUG] booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`);
-      expect(bookingDate.getTime()).to.be.above(offerDate.getTime());
-    });
-  } else {
-    validationLogger(`[WARNING] Invalid date - bookingDate: ${booking.createdOn}, offerDate: ${selectedOffer.createdOn}`);
-  }
+  checkBookingAfterOffer(booking, selectedOffer);
 
   // B2 / #204: booking-level confirmation deadline must be a valid future datetime
   // when present (OSDM).

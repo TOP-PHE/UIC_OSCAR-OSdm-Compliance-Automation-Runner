@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-real-provider-false-failures",
+    "date": "October 16, 2026",
+    "tag": "Fix",
+    "title": "Four false failures removed",
+    "summary": "Four checks failed correct answers from a provider; they now pass, and a search without offers says what the provider said.",
+    "content": "A booking made in the same second as its offer now passes (some providers give times to the second). A refund offer's deadline is checked only before its confirmation: once confirmed, a provider may set it to the confirmation time. The refundable and exchangeable flags of a part already refunded or exchanged are no longer compared with the offer: such a part cannot be refunded again. And when a search returns no offer at all, the failure now says so and quotes the provider's warnings, instead of calling the answer malformed."
+  },
+  {
     "id": "2026-10-16-offer-search-combinations",
     "date": "October 16, 2026",
     "tag": "Feature",

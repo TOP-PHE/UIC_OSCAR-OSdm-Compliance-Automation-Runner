@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.309] / [collection-OTST_V2.0.180] — 2026-10-16
+
+Issue #786, release 2026.344. Four checks failed a real provider's (OSDM 3.0.5) correct answers.
+
+### Fixed
+- **A booking made in the same second as its offer passes** (`checkBookingAfterOffer()` in `bookings.js`, steps 02/05/07). The provider gives times to the second, and the check wanted the booking strictly after the offer. It is now "at or after"; a booking before its offer still fails.
+- **A refund offer's `validUntil` is checked while the offer is PROPOSED only** (`refunds.js`). It is the deadline to confirm: once CONFIRMED, the provider set it to the confirmation time, and the PATCH answer failed "not in the future". A confirmed offer's deadline is now said at INFO; its presence is still required. The same rule #644 gave `confirmableUntil`.
+- **The `refundable` / `exchangeable` flags of a REFUNDED or EXCHANGED part are not compared with the offer** (`validatePartIntersectionFields()`). A refunded part can no longer be refunded or exchanged, so step 14 read `NO` against the offer's `YES` and failed twice. Parts not yet refunded are compared as before.
+- **An answer without `offers` says "no offer" and what the provider said** (`providerReasons()` in `offers.js`). It read "malformed OfferCollectionResponse envelope" while the provider had answered no offer with a warning (`2103: Could not validate (part of) the routes`). It is still a failure. Both messages now quote the first three warnings and problems, or say the provider gives none.
+
+Not changed: a refund offer confirmed with `refundableAmount` 0 after being proposed at another amount still fails. That is the provider's to explain.
+
+Checked:
+- Unit tests: `bruno-real-provider-786.test.js` (7). With the first three fixes undone, three of them fail.
+- Full simulator replay, compared with the one of 1.11.308: 24 scenarios have fewer checks (the deadline of a confirmed refund offer, and the flags of parts already refunded or exchanged, are no longer checked), none newly failing. The catalogue's check counts of 14 entries and the generated pages follow.
+
+---
+
 ## [server-1.11.308] / [collection-OTST_V2.0.179] — 2026-10-16
 
 Issue #780 part 3, release 2026.343. Random combinations of offer search options.
