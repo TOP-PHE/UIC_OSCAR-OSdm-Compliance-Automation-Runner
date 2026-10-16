@@ -18,6 +18,7 @@ const { processRequestedInformation } = require('./requestedInformation.js');
 module.exports = {
   checkWarningsAndProblems,
   envelopeWarnings,
+  providerReasons,
   postOfferResponsePreRequest,
   ensureAuthorizationOr403,
   postOfferResponse,
@@ -74,6 +75,18 @@ function envelopeWarnings(jsonData, log) {
     return w;
   }
   return [];
+}
+
+// #786: what the provider says about an answer, for a failure message: the
+// first three warnings and problems as "code: detail", or that it says nothing.
+function providerReasons(jsonData) {
+  const problems = Array.isArray(jsonData?.problems) ? jsonData.problems : [];
+  const said = [...envelopeWarnings(jsonData), ...problems]
+    .filter((w) => w && typeof w === "object")
+    .map((w) => [w.code, w.detail || w.title].filter((v) => v != null && v !== "").join(": "))
+    .filter(Boolean);
+  if (!said.length) return "The provider gives no warning or problem saying why.";
+  return `The provider says: ${said.slice(0, 3).join("; ")}${said.length > 3 ? "; …" : ""}.`;
 }
 
 // Check the OSDM response ENVELOPE for warnings[] / problems[] — both can
@@ -316,8 +329,13 @@ function postOfferResponse(jsonData) {
     // #355: no standalone validationLogger before the throw — the caller
     // re-throws inside bruTest("Offers found in response", …) whose failure
     // echo prints this exact message, so logging here showed it TWICE.
+    // #786: a provider may leave offers[] out when it has none, with a
+    // warning saying why: say "no offer" and quote the provider first.
+    if (jsonData.offers === undefined) {
+      throw new Error(`POST /offers returned no offer: the response has no 'offers' property. ${providerReasons(jsonData)}`);
+    }
     if (!Array.isArray(jsonData.offers)) {
-      throw new Error(`POST /offers response has no offers[] array (got ${jsonData.offers === undefined ? "no 'offers' property" : typeof jsonData.offers}) — malformed OfferCollectionResponse envelope.`);
+      throw new Error(`POST /offers response has no offers[] array (got ${typeof jsonData.offers}) — malformed OfferCollectionResponse envelope. ${providerReasons(jsonData)}`);
     }
     throw new Error(`POST /offers returned 200 with 0 offers — the response carries ${_trips} trip(s) and ${_paxTxt}, but no offer, and ` +
       ((_wrn + _prb) > 0

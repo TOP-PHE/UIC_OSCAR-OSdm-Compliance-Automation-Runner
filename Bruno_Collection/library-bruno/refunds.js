@@ -599,8 +599,14 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     });
   }
 
-  // Validate validUntil (approx 15 minutes in future with 2 minutes tolerance)
-  if (_checkDatePresent('validUntil', refundOffer.validUntil, validUntil)) {
+  // Validate validUntil (approx 15 minutes in future with 2 minutes tolerance).
+  // #786: it is the deadline to confirm, so it is in the future only while the
+  // offer is PROPOSED; a provider may set it to the confirmation time.
+  const _untilPresent = _checkDatePresent('validUntil', refundOffer.validUntil, validUntil);
+  const _pastProposal = refundOffer.status != null && refundOffer.status !== 'PROPOSED';
+  if (_untilPresent && _pastProposal) {
+    validationLogger(`[INFO] Refund offer[${index}] is ${refundOffer.status}: validUntil (${_withLocal(refundOffer.validUntil, validUntil)}) is not checked, the deadline to confirm applies to a PROPOSED offer.`);
+  } else if (_untilPresent) {
     const _label = _withLocal(refundOffer.validUntil, validUntil);
     test(`Refund offer[${index}] validUntil is valid and in the future: ${_label}`, () => {
       expect(validUntil.getTime(),

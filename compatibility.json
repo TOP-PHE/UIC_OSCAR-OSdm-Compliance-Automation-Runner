@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.343",
+  "current_release": "2026.344",
   "releases": [
+    {
+      "release": "2026.344",
+      "date": "2026-10-16",
+      "server": "1.11.309",
+      "collection": "OTST_V2.0.180",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Four false failures seen on a real provider removed: a booking made in the same second as its offer, a refund offer's deadline checked after its confirmation, the after-sale flags of refunded parts compared with the offer, and an answer without offers read as malformed (#786)."
+      ]
+    },
     {
       "release": "2026.343",
       "date": "2026-10-16",
