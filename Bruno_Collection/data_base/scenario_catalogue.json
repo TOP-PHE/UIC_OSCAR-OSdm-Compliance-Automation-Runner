@@ -91,7 +91,7 @@
       "code": "OTST_REFUND_RETURN_FULL_1ADT",
       "source": "SIM_REFUND_RETURN_1ADT_38",
       "purpose": "Full refund of a return: every refund offer confirmed, every fulfillment refunded.",
-      "checks": 525,
+      "checks": 527,
       "needs": {
         "trip": "SEARCH",
         "return": "SEPARATE",
@@ -103,7 +103,7 @@
       "code": "OTST_REFUND_RETURN_INBOUND_1ADT",
       "source": "SIM_REFUND_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return by fulfillment: the inbound ticket alone.",
-      "checks": 454,
+      "checks": 455,
       "needs": {
         "trip": "SEARCH",
         "return": "SEPARATE",
@@ -115,7 +115,7 @@
       "code": "OTST_REFUND_PARTIAL_PASSENGER_2ADT",
       "source": "SIM_REFUND_PAX_2ADT_38",
       "purpose": "Partial refund by passenger: two adults, the last one refunded alone; the other passenger's ticket stays.",
-      "checks": 475,
+      "checks": 476,
       "needs": {
         "trip": "SEARCH",
         "tariff": "REFUNDABLE",
@@ -126,7 +126,7 @@
       "code": "OTST_REFUND_PARTIAL_LEG_1ADT",
       "source": "SIM_REFUND_LEG_1ADT_38",
       "purpose": "Partial refund by leg: a two-leg journey, the last leg refunded alone; the first leg stays.",
-      "checks": 452,
+      "checks": 453,
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -138,7 +138,7 @@
       "code": "OTST_REFUND_PARTIAL_PASSENGERS_THIRD",
       "source": "SIM_REFUND_PAX_THIRD_19PAX_38",
       "purpose": "Partial refund of a third of the passengers, at the provider's maximum number of passengers: only theirs are refunded, the others' tickets stay.",
-      "checks": 5230,
+      "checks": 5237,
       "limit": "MAX_PASSENGERS",
       "needs": {
         "trip": "SEARCH",
@@ -150,7 +150,7 @@
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
       "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",
-      "checks": 529,
+      "checks": 531,
       "needs": {
         "trip": "SEARCH",
         "return": "SEPARATE",
@@ -174,7 +174,7 @@
       "code": "NHF_REFUND_TWICE",
       "source": "SIM_NHF_REFUND_AGAIN_38",
       "purpose": "A ticket refunded in full cannot be refunded again: the second refund offer request must be refused.",
-      "checks": 349,
+      "checks": 350,
       "needs": {
         "trip": "SEARCH",
         "tariff": "REFUNDABLE",
@@ -185,7 +185,7 @@
       "code": "NHF_EXCHANGE_REFUNDED",
       "source": "SIM_NHF_EXCHANGE_REFUNDED_38",
       "purpose": "A ticket refunded in full cannot be exchanged: the exchange offer request must be refused.",
-      "checks": 349,
+      "checks": 350,
       "needs": {
         "trip": "SEARCH",
         "tariff": "REFUNDABLE",
@@ -252,7 +252,7 @@
       "code": "OTST_REFUND_WITHDRAWN_1ADT",
       "source": "SIM_REFUND_DELETE_1ADT_38",
       "purpose": "Refund offer asked for, then withdrawn instead of confirmed: the ticket stays.",
-      "checks": 332,
+      "checks": 333,
       "needs": {
         "trip": "SEARCH",
         "tariff": "REFUNDABLE",
@@ -263,7 +263,7 @@
       "code": "OTST_REFUND_OFFER_ONLY_1ADT",
       "source": "SIM_REFUND_ONLY_OFFER_1ADT_38",
       "purpose": "Refund offer asked for and read, neither confirmed nor withdrawn.",
-      "checks": 299,
+      "checks": 300,
       "needs": {
         "trip": "SEARCH",
         "tariff": "REFUNDABLE",
@@ -274,7 +274,7 @@
       "code": "OTST_REFUND_RECEIPT_RETURN_1ADT",
       "source": "SIM_REFUND_RECEIPT_RETURN_1ADT_38",
       "purpose": "Full refund of a return, then the refund receipt waited for in the booking.",
-      "checks": 528,
+      "checks": 530,
       "needs": {
         "trip": "SEARCH",
         "return": "SEPARATE",
@@ -286,7 +286,7 @@
       "code": "OTST_REFUND_RETURN_COMBINED_FULL_1ADT",
       "source": "SIM_REFUND_COMBINED_RETURN_1ADT_38",
       "purpose": "Full refund of a return sold as one offer covering both directions: every refund offer confirmed, every fulfillment refunded.",
-      "checks": 593,
+      "checks": 595,
       "needs": {
         "trip": "SEARCH",
         "return": "COMBINED",
@@ -298,7 +298,7 @@
       "code": "OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT",
       "source": "SIM_REFUND_COMBINED_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return sold as one offer, by fulfillment: the inbound ticket alone.",
-      "checks": 515,
+      "checks": 516,
       "needs": {
         "trip": "SEARCH",
         "return": "COMBINED",
@@ -310,7 +310,7 @@
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation of a return sold as one offer: refund with an overrule code, everything back and no fee.",
-      "checks": 597,
+      "checks": 599,
       "needs": {
         "trip": "SEARCH",
         "return": "COMBINED",
@@ -324,7 +324,7 @@
       "code": "OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_RECEIPT_1ADT_38",
       "purpose": "Full refund of a return sold as one offer, then the refund receipt waited for in the booking.",
-      "checks": 596,
+      "checks": 598,
       "needs": {
         "trip": "SEARCH",
         "return": "COMBINED",
@@ -336,7 +336,7 @@
       "code": "OTST_EXCHANGE_1ADT",
       "source": "SIM_EXCHANGE_1ADT_38",
       "purpose": "Exchange of a one-way ticket: exchange offers, one taken, confirmed.",
-      "checks": 385,
+      "checks": 389,
       "needs": {
         "trip": "SEARCH",
         "tariff": "EXCHANGEABLE",
@@ -347,7 +347,7 @@
       "code": "OTST_EXCHANGE_WITHDRAWN_1ADT",
       "source": "SIM_EXCHANGE_DELETE_1ADT_38",
       "purpose": "Exchange pre-booked, then withdrawn before its confirmation: the ticket stays.",
-      "checks": 357,
+      "checks": 361,
       "needs": {
         "trip": "SEARCH",
         "tariff": "EXCHANGEABLE",
@@ -651,7 +651,7 @@
       "code": "NHF_EXPIRED_REFUND_OFFER",
       "source": "SIM_NHF_EXPIRED_REFUND_OFFER_38",
       "purpose": "Confirming a refund offer after its validUntil must be refused.",
-      "checks": 303,
+      "checks": 304,
       "set": {
         "expiredRefundOfferMaxWaitMinutes": 40
       },
@@ -668,7 +668,7 @@
       "code": "NHF_EXPIRED_EXCHANGE_OFFER",
       "source": "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38",
       "purpose": "Taking an exchange offer after its preBookableUntil must be refused.",
-      "checks": 269,
+      "checks": 273,
       "set": {
         "expiredExchangeOfferMaxWaitMinutes": 40
       },

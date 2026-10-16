@@ -104,7 +104,10 @@ Left out: Test Config shows no field for `expectedCurrency` or `currencyExpectRe
 Checked:
 - Unit tests: `currencies.test.js` (16): the declaration, the warning, the catalogue entries and copies, the page's fields, and the collection's checks with a stand-in Bruno. Simulator: `currencies.test.js` (3). The data-file tests pin the new scenarios.
 - Simulator replay of the five new scenarios: 527, 389, 234 and 71 checks with no failure; the wrong one fails one check, the one meant to fail.
-- CHECKS_PLACEHOLDER
+- Full simulator replay (118 scenarios), compared with the one of 1.11.309. 30 scenarios have more checks, each a new currency check that passes: offers, refund offers or exchange offers in the sale's currency. None newly fails, and the two `SIM_WRONG_*` scenarios that are part of it keep their failures (4 and 2). Every simulator scenario stays in CZK, gamma's default. I updated the check counts of 19 catalogue entries, added the 4 new ones, and reran `describe` and `generate-simulator-checks.js`; `replay.js catalogue` agrees on all 66 entries.
+- Full suite, lint, simulator tests.
+
+Not verified: a run against a real provider in a second currency. The Test Framework's currency fields were checked by lifting the page functions in the tests, not in a browser.
 
 ---
 
