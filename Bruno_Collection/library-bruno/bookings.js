@@ -297,6 +297,14 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
     }
     return;
   }
+  // #766: appliedPassengerTypes is optional in OSDM (AbstractBookingPart). A
+  // booked part that gives none, or an empty list, says nothing either way: a
+  // WARNING, as for any optional member only one side has (#744). A real
+  // provider returned [] on a booked reservation.
+  if (!Array.isArray(bookedPart.appliedPassengerTypes) || bookedPart.appliedPassengerTypes.length === 0) {
+    validationLogger(`[WARNING] ${partType}[${index}] appliedPassengerTypes: the offer gives ${part.appliedPassengerTypes.map((pt) => pt?.type).join(', ')}, the booking gives none (optional in OSDM), so they cannot be compared.`);
+    return;
+  }
   test(`${partType}[${index}] appliedPassengerTypes exist in both offer and booking`, () => {
     expect(bookedPart.appliedPassengerTypes, `appliedPassengerTypes missing in booking`).to.exist;
     expect(bookedPart.appliedPassengerTypes).to.be.an('array');

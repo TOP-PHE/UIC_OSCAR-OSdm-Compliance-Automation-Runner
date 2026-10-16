@@ -139,6 +139,13 @@ runtime:
         let _body = null;
         try { _body = res.getBody(); } catch (_e) { _body = null; }
 
+        // #766 PR 3: a booking refused while it asked for seat preferences is
+        // sent once more without them; the second answer says which was refused.
+        if (require(bru.getEnvVar("library_base") + "offers.js").bookingWithoutPreferences(_status, _body)) {
+            bru.runner.setNextRequest("02. POST Create Booking");
+            return;
+        }
+
         // ── Two-step return booking (#178/#180), adaptive ─────────────────────
         // Return scenarios first attempt a COMBINED booking (both offers). OSDM
         // permits this, but some vendors don't (Bileto: "Only one offer can be
@@ -167,7 +174,7 @@ runtime:
             test("[OSDM] Vendor supports booking multiple offers (round trip) in one booking", () => {
               expect(false, `Vendor rejected the combined round-trip booking — ${(_body && _body.title) || ""}: ${(_body && _body.detail) || ""}. OSDM allows multiple offers; falling back to two separate bookings.`).to.be.true;
             });
-            console.log("[WARNING] ⚠️ [VENDOR GAP] Provider does not support multiple offers in one booking request — falling back to two separate bookings (outbound, then inbound).");
+            require(bru.getEnvVar("library_base") + "displays.js").validationLogger("[WARNING] ⚠️ [VENDOR GAP] Provider does not support multiple offers in one booking request — falling back to two separate bookings (outbound, then inbound).");
             bru.setEnvVar("__returnBookMode", "sep-out");
             bru.runner.setNextRequest("02. POST Create Booking");
             return;
@@ -266,7 +273,7 @@ runtime:
             && bru.getEnvVar("__addReservationDone") !== "true"
             && !_alreadyAsked;
         if (_alreadyAsked && bru.getEnvVar("__placeMapAtOfferFailed") === "true") {
-            console.log(`[INFO] The reservation ${bru.getEnvVar("reservationId")} was asked for with the booking: it is not added again after it.`);
+            require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[INFO] The reservation ${bru.getEnvVar("reservationId")} was asked for with the booking: it is not added again after it.`);
         }
         const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
             && bru.getEnvVar("__addAncillaryDone") !== "true";

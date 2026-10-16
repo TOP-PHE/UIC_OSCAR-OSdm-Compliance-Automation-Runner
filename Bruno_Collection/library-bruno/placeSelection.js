@@ -162,14 +162,14 @@ function propertiesOfPart(part) {
  */
 function choosePreferences(offer, wanted) {
   const asked = unique(listOf(wanted).filter(isText).map(upper));
-  if (asked.length === 0) return { send: [], notOffered: [], lines: [] };
+  if (asked.length === 0) return { send: [], notOffered: [], listed: false, lines: [] };
   const parts = listOf(offer?.reservationOfferParts);
   if (parts.length === 0) {
-    return { send: [], notOffered: [], lines: [{ level: 'WARNING', text: `Seat preferences ${asked.join(', ')}: the offer chosen has no reservation part, so none is asked.` }] };
+    return { send: [], notOffered: [], listed: false, lines: [{ level: 'WARNING', text: `Seat preferences ${asked.join(', ')}: the offer chosen has no reservation part, so none is asked.` }] };
   }
   const offered = unique(parts.flatMap(propertiesOfPart));
   if (offered.length === 0) {
-    return { send: asked, notOffered: [], lines: [{ level: 'INFO', text: `Seat preferences ${asked.join(', ')}: the offer lists no place preference (availablePlacePreferences and availablePlaces are optional); all are asked, and the booking shows what is given.` }] };
+    return { send: asked, notOffered: [], listed: false, lines: [{ level: 'INFO', text: `Seat preferences ${asked.join(', ')}: the offer lists no place preference (availablePlacePreferences and availablePlaces are optional); all are asked, and the booking shows what is given.` }] };
   }
   const send = asked.filter((code) => offered.includes(code));
   const notOffered = asked.filter((code) => !offered.includes(code));
@@ -178,7 +178,37 @@ function choosePreferences(offer, wanted) {
   for (const code of notOffered) {
     lines.push({ level: 'WARNING', text: `Seat preference ${code}: the offer does not list it (it lists ${offered.join(', ')}); it is not asked, and the customer cannot have it.` });
   }
-  return { send, notOffered, lines };
+  return { send, notOffered, listed: true, lines };
+}
+
+/**
+ * Whether a refused booking that asked for seat preferences is sent once
+ * more without them (#766 PR 3): any error answer but 401 and 403 (the
+ * token, not the request), the first time only. The second answer tells a
+ * refused preference from a refused reservation.
+ */
+function retryWithoutPreferences(status, sent, alreadyRetried) {
+  if (alreadyRetried || listOf(sent).length === 0) return false;
+  return typeof status === 'number' && status >= 400 && status !== 401 && status !== 403;
+}
+
+/**
+ * What the answer to the booking sent again without preferences says:
+ * `{ level, text, fail }`. Accepted: the preferences were what the provider
+ * refused, a failure when the offer listed them, else a warning. Refused
+ * again: the reservation itself is refused, which the status check fails.
+ * @param {number} status   the second answer's status
+ * @param {object} refused  { status, code, preferences, listed } of the first
+ */
+function afterRetryWithoutPreferences(status, refused) {
+  const what = `Seat preferences ${listOf(refused?.preferences).join(', ')}`;
+  const first = `HTTP ${refused?.status}${refused?.code ? `, ${refused.code}` : ''}`;
+  if (typeof status === 'number' && status >= 200 && status < 300) {
+    return refused?.listed
+      ? { level: 'FAIL', fail: true, text: `${what}: the booking asking for them was refused (${first}), and accepted without them, though the offer lists them.` }
+      : { level: 'WARNING', fail: false, text: `${what}: the booking asking for them was refused (${first}), and accepted without them; the offer did not list them, so the provider may not take them.` };
+  }
+  return { level: 'INFO', fail: false, text: `${what}: the booking was refused with them (${first}) and without them (HTTP ${status}): the reservation itself is refused, not the preference.` };
 }
 
 /** The accommodation a seat preference is sent with: the part's first seat entry, else its first, else SEAT / ANY_SEAT. */
@@ -297,5 +327,5 @@ function checkPreferencesGiven(booking, reservationIds, sent) {
 module.exports = {
   FLOWS, FLOW_TEXT, flowOfScenario, flowsOffered, preferencesOffered, describeOfferedFlow,
   preferencesOfScenario, propertiesOfPart, choosePreferences, withPreferences, preferencesQuery,
-  checkPreferenceAvailability, checkPreferencesGiven,
+  checkPreferenceAvailability, checkPreferencesGiven, retryWithoutPreferences, afterRetryWithoutPreferences,
 };

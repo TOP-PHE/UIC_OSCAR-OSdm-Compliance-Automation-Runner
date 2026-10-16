@@ -44,6 +44,7 @@ module.exports = {
   prepareOfferRequestByTripIds,
   checkOfferPlaceSelection,
   askPlacePreferences,
+  bookingWithoutPreferences,
   recordPlacePreferenceChecks,
   checkOfferRequestByTripIds,
   routeAfterOfferStep,
@@ -2168,6 +2169,9 @@ function checkOfferLegClasses(jsonData) {
  */
 function checkOfferPlaceSelection() {
   bru.setEnvVar("__placePreferencesSent", JSON.stringify([]));
+  bru.setEnvVar("__placePreferencesListed", "false");
+  bru.setEnvVar("__placePreferencesRetried", "false");
+  bru.setEnvVar("__placePreferencesRefused", null);
   const flow = bru.getEnvVar("placeSelectionFlow");
   if (!flow) return;
   const { describeOfferedFlow, choosePreferences } = require('./placeSelection.js');
@@ -2178,6 +2182,33 @@ function checkOfferPlaceSelection() {
   const chosen = choosePreferences(offer, parseEnvJson("placePreferences", []));
   for (const line of chosen.lines) validationLogger(`[${line.level}] ${line.text}`);
   bru.setEnvVar("__placePreferencesSent", JSON.stringify(chosen.send));
+  bru.setEnvVar("__placePreferencesListed", chosen.listed ? "true" : "false");
+}
+
+/**
+ * 02's after-response, before its status check (#766 PR 3). A booking refused
+ * while it asked for seat preferences is sent once more without them: true
+ * when 02 is to be sent again. On the second answer, says whether it was the
+ * preference or the reservation that was refused.
+ */
+function bookingWithoutPreferences(status, body) {
+  const ps = require('./placeSelection.js');
+  const refused = parseEnvJson("__placePreferencesRefused", null);
+  if (refused && typeof refused === "object") {
+    bru.setEnvVar("__placePreferencesRefused", null);
+    const outcome = ps.afterRetryWithoutPreferences(status, refused);
+    if (outcome.fail) test(`Booking: takes the seat preferences the offer lists (${refused.preferences.join(', ')})`, () => { throw new Error(outcome.text); });
+    else validationLogger(`[${outcome.level}] ${outcome.text}`);
+    return false;
+  }
+  const sent = parseEnvJson("__placePreferencesSent", []);
+  if (!ps.retryWithoutPreferences(status, sent, bru.getEnvVar("__placePreferencesRetried") === "true")) return false;
+  const code = body && typeof body === "object" ? (body.code || body.title || "") : "";
+  bru.setEnvVar("__placePreferencesRetried", "true");
+  bru.setEnvVar("__placePreferencesRefused", JSON.stringify({ status, code, preferences: sent, listed: bru.getEnvVar("__placePreferencesListed") === "true" }));
+  bru.setEnvVar("__placePreferencesSent", JSON.stringify([]));
+  validationLogger(`[WARNING] Seat preferences ${sent.join(', ')}: the booking asking for them was refused (HTTP ${status}${code ? `, ${code}` : ''}); it is sent once more without them, to tell a refused preference from a refused reservation.`);
+  return true;
 }
 
 /**

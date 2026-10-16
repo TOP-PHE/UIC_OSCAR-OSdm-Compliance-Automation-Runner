@@ -56,7 +56,7 @@ runtime:
             expect(_postSeatMapOk, `No post-booking seat map (status ${statusCode}${_va ? "" : ", no vehicleAvailability"}). Proceeding to add-reservation; the system will assign a place.`).to.be.true;
           });
           validationLogger(`[WARNING] GET ${endpoint} → ${statusCode}${_va ? "" : " (no vehicleAvailability)"} — proceeding without explicit place picks.`);
-          console.log("[WARNING] ⚠️ [VENDOR GAP] No post-booking (BOOKING-context) seat map — letting the system assign the place at add-reservation.");
+          require(bru.getEnvVar("library_base") + "displays.js").validationLogger("[WARNING] ⚠️ [VENDOR GAP] No post-booking (BOOKING-context) seat map — letting the system assign the place at add-reservation.");
         }
 
         // ── OSDM compliance (Layer 1): PlaceAvailabilityResponse ──────────
@@ -76,7 +76,7 @@ runtime:
           bru.setEnvVar("preselectedCoach", _picked[0].coachNumber);
           bru.setEnvVar("preselectedPlace", _picked[0].placeNumber);
           if (_picked[0].layoutId != null) bru.setEnvVar("layoutId", _picked[0].layoutId);
-          console.log("[INFO] ✅ [PLACES] Post-booking: selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
+          require(bru.getEnvVar("library_base") + "displays.js").validationLogger("[INFO] ✅ [PLACES] Post-booking: selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
           if (_picked.length < _paxCount) {
             validationLogger("[WARNING] Only " + _picked.length + " available place(s) for " + _paxCount + " passenger(s) — surplus passengers reuse the last place.");
           }

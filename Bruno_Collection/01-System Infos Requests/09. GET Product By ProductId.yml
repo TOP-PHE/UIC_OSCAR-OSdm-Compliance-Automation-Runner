@@ -29,11 +29,11 @@ runtime:
           if (candidates.length > 0) {
             const randomProductId = candidates[Math.floor(Math.random() * candidates.length)];
             bru.setEnvVar('productId', String(randomProductId));
-            console.log(`[INFO] productId was null; picked random id from GET Products response: ${randomProductId}`);
+            require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[INFO] productId was null; picked random id from GET Products response: ${randomProductId}`);
           } else {
             // No id to ask for: calling …/null only reports the provider's answer
             // to a request OSCAR should not have sent.
-            console.log(`[INFO] ⏭️  Skipping [09. GET Product By ProductId] — no productId configured and GET Products gave none.`);
+            require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[INFO] ⏭️  Skipping [09. GET Product By ProductId] — no productId configured and GET Products gave none.`);
             // skipRequest() must be the last bru call: it clears the bru context.
             if (bru.runner && typeof bru.runner.skipRequest === 'function') bru.runner.skipRequest();
           }

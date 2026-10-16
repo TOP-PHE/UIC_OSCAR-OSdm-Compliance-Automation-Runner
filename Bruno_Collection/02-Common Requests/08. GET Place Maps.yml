@@ -77,7 +77,7 @@ runtime:
           bruTest("[OSDM] Vendor serves a pre-booking (OFFER-context) seat map", () => {
             expect(_offerSeatMapOk, `No offer-time seat map (status ${statusCode}${_va ? "" : ", no vehicleAvailability"}). Falling back to post-booking place selection (add-reservation).`).to.be.true;
           });
-          console.log("[WARNING] ⚠️ [VENDOR GAP] No offer-time (OFFER-context) seat map — selecting the place AFTER pre-booking (post-booking add-reservation).");
+          require(bru.getEnvVar("library_base") + "displays.js").validationLogger("[WARNING] ⚠️ [VENDOR GAP] No offer-time (OFFER-context) seat map — selecting the place AFTER pre-booking (post-booking add-reservation).");
         }
 
         // ── Place pre-selection extraction → feeds Create Booking ─────────
@@ -99,7 +99,7 @@ runtime:
           bru.setEnvVar("preselectedCoach", _picked[0].coachNumber);
           bru.setEnvVar("preselectedPlace", _picked[0].placeNumber);
           if (_picked[0].layoutId != null) bru.setEnvVar("layoutId", _picked[0].layoutId);
-          console.log("[INFO] ✅ [PLACES] Selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
+          require(bru.getEnvVar("library_base") + "displays.js").validationLogger("[INFO] ✅ [PLACES] Selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
           if (_picked.length < _paxCount) {
             validationLogger("[WARNING] Only " + _picked.length + " available place(s) for " + _paxCount + " passenger(s) — surplus passengers reuse the last place.");
           }
