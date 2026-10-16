@@ -394,7 +394,7 @@ function fwSetOfferCombination(field, raw) {
   const min = field === 'count' ? 1 : 0;
   const n = /^\d{1,10}$/.test(text) ? Number.parseInt(text, 10) : Number.NaN;
   if (text !== '' && !(n >= min && n <= max)) return false;
-  const c = { ...(fw.offerCombinations || {}) };
+  const c = { ...fw.offerCombinations };
   if (text === '') delete c[field];
   else c[field] = n;
   fw.offerCombinations = c;
@@ -404,7 +404,7 @@ function fwSetOfferCombination(field, raw) {
 // #780 part 3: a new seed, from the browser's random source.
 function fwNewOfferCombinationSeed() {
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  wizData.framework.offerCombinations = { ...(wizData.framework.offerCombinations || {}), seed };
+  wizData.framework.offerCombinations = { ...wizData.framework.offerCombinations, seed };
   return seed;
 }
 
@@ -3554,6 +3554,15 @@ function changePaxAge(action, el) {
 
 // #709: whether the provider lets a booked passenger be updated, outside the
 // change switch. Absent means yes, as before. True when the action was it.
+// #780 part 3: the count or seed of the random combinations. Handled before
+// the change switch, which is at Sonar's 30-case limit (S1479).
+function changeOfferCombination(action, el) {
+  if (action !== 'fw-offer-combinations') return false;
+  if (fwSetOfferCombination(el.dataset.field, el.value)) saveFrameworkDebounced();
+  else el.value = wizData.framework?.offerCombinations?.[el.dataset.field] ?? '';
+  return true;
+}
+
 function changePassengerUpdate(action, el) {
   if (action !== 'fw-passenger-update') return false;
   if (el.checked) delete wizData.framework.passengerUpdate;
@@ -7784,7 +7793,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el)) return;
 
   switch (action) {
     case 'file-upload':
@@ -8188,10 +8197,6 @@ document.body.addEventListener('change', function(e) {
       fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); break;
     case 'fw-toggle-seatmap':
       fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
-    case 'fw-offer-combinations':
-      if (fwSetOfferCombination(el.dataset.field, el.value)) saveFrameworkDebounced();
-      else el.value = wizData.framework?.offerCombinations?.[el.dataset.field] ?? '';
-      break;
     case 'fw-sales-horizon': {
       // #704: how many days ahead the provider sells; empty = not declared.
       const value = fwSalesHorizonDays(el.value);

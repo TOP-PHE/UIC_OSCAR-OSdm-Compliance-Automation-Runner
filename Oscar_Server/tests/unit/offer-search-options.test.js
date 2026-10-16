@@ -458,7 +458,8 @@ describe('#780 part 3: the Test Framework page', () => {
     expect(html).toContain('<label for="fw-offer-combinations-count"');
     expect(html).toContain('<label for="fw-offer-combinations-seed"');
     expect(page).toContain('${offerCombinationsHtml(fw)}');
-    expect(page).toContain("case 'fw-offer-combinations':");
+    expect(page).toContain("if (action !== 'fw-offer-combinations') return false;");
+    expect(page).toContain('|| changeOfferCombination(action, el)) return;');
     expect(page).toContain("case 'fw-offer-combinations-new-seed': {");
   });
 });
