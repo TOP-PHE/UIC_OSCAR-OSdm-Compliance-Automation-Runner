@@ -45,6 +45,7 @@ module.exports = {
   prepareOfferRequestByTripIds,
   checkOfferPlaceSelection,
   checkOfferSearchCriteria,
+  checkOfferCurrency,
   askPlacePreferences,
   askNamedPlaces,
   askNearbyPlace,
@@ -2188,6 +2189,11 @@ function checkOfferSearchCriteria(jsonData) {
       validationLogger(`[${c.level === 'warn' ? 'WARNING' : 'INFO'}] ${c.name} — ${c.message}`);
     }
   });
+}
+
+/** #781: after 01, the offers are in the currency expected, and the sale's is kept. */
+function checkOfferCurrency(jsonData) {
+  require('./currencies.js').checkSaleCurrency(jsonData, chosenOffer());
 }
 
 // ── Travel class per leg (#600) ──────────────────────────────────────────────

@@ -228,7 +228,7 @@ describe('the Test Framework page', () => {
     expect(Object.keys(wizData.framework.offerSearchOptions)).toEqual(['travelClasses']);
     const declared = lift('fwOfferSearchOptionDeclared', {});
     const esc = (v) => String(v);
-    const html = lift('offerSearchOptionsPanelHtml', { FW_OFFER_SEARCH_OPTIONS, fwOfferSearchOptionDeclared: declared, esc, offerCombinationsHtml: () => '' })({ offerSearchOptions: { offerModes: ['INDIVIDUAL'] } });
+    const html = lift('offerSearchOptionsPanelHtml', { FW_OFFER_SEARCH_OPTIONS, fwOfferSearchOptionDeclared: declared, esc, offerCombinationsHtml: () => '', currenciesHtml: () => '' })({ offerSearchOptions: { offerModes: ['INDIVIDUAL'] } });
     expect(html).toContain('data-key="offerModes" data-val="INDIVIDUAL"');
     expect((html.match(/class="pill selected"/g) || []).length).toBe(1 + 8 + 3 + 5);
     expect(page).toContain('${offerSearchOptionsPanelHtml(fw)}');
@@ -459,7 +459,7 @@ describe('#780 part 3: the Test Framework page', () => {
     expect(html).toContain('<label for="fw-offer-combinations-seed"');
     expect(page).toContain('${offerCombinationsHtml(fw)}');
     expect(page).toContain("if (action !== 'fw-offer-combinations') return false;");
-    expect(page).toContain('|| changeOfferCombination(action, el)) return;');
+    expect(page).toContain('|| changeOfferCombination(action, el) || changeCurrencies(action, el)) return;');
     expect(page).toContain("case 'fw-offer-combinations-new-seed': {");
   });
 });

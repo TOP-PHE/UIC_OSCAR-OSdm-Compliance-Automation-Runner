@@ -96,7 +96,25 @@ function checkProvider(key, raw) {
     ...checkAgeTariffs(raw.ageTariffs, bad),
     ...checkPlacePreferences(raw.placePreferences, bad),
     ...checkPlaceMap(raw.placeMap, bad),
+    ...checkOtherCurrencies(raw.otherCurrencies, raw.currency, bad),
   };
+}
+
+// #781: the other currencies a provider sells in, each with its own price
+// factor: { "EUR": { "priceFactor": 1 } }. Absent: the provider answers in its
+// own currency whatever is asked, as before.
+function checkOtherCurrencies(other, own, bad) {
+  if (other === undefined) return {};
+  if (!other || typeof other !== 'object' || Array.isArray(other)) throw bad('otherCurrencies');
+  const out = {};
+  for (const [code, rule] of Object.entries(other)) {
+    const ok = /^[A-Z]{3}$/.test(code) && code !== own && rule && typeof rule === 'object'
+      && Number.isFinite(rule.priceFactor) && rule.priceFactor > 0 && rule.priceFactor <= 100;
+    if (!ok) throw bad('otherCurrencies');
+    out[code] = { priceFactor: rule.priceFactor };
+  }
+  if (Object.keys(out).length === 0) throw bad('otherCurrencies');
+  return { otherCurrencies: out };
 }
 
 // The named products a provider sells (#598): a code, a name, a flexibility,

@@ -309,6 +309,15 @@
             "description": "The scenario's own departure date (#704), in days from the day of the run: 0 today, -1 yesterday, 90 in ninety days. It replaces the run's lead time and the trip's weekday. Used for the sales-horizon and past-departure tests. Between -366 and 1000; any other value is ignored.",
             "type": ["integer", "null"]
           },
+          "expectedCurrency": {
+            "description": "The currency (ISO 4217) the offers must be in when the request asks for none: the provider's default currency (#781). The booking, the refund and the exchange are then checked against the currency of the sale.",
+            "type": ["string", "null"]
+          },
+          "currencyExpectRejection": {
+            "description": "Negative test (#781). When on, the offer search criteria ask for a currency the Test Framework does not declare: POST /offers must refuse it or give no offer; offers in that currency fail, offers in another currency pass with a warning. The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "departureExpectRejection": {
             "description": "Negative test (#704). When on, the departure date (departureDaysFromToday) is one the provider must not sell, in the past or beyond its sales horizon: POST /offers must refuse it with a 4xx RFC-9457 Problem, or give no offer. The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

@@ -668,16 +668,34 @@ function shortLivedMsOf(trips, provider) {
   return short.seconds * 1000;
 }
 
-function buildOfferCollection(body, provider, nowMs, known = {}) {
-  const trips = tripsOf(body, provider, known);
+// #781: the provider as it sells in the currency asked. Its own currency, or
+// none asked: as it is. Another one it sells in: that currency and its price
+// factor. One it does not sell, from a provider that names the others it
+// sells: refused. A provider that names none answers in its own, as before.
+function inCurrency(provider, criteria) {
+  const asked = criteria?.currency;
+  if (asked == null || asked === '' || asked === provider.currency) return provider;
+  if (typeof asked !== 'string' || !/^[A-Z]{3}$/.test(asked)) throw bad('offerSearchCriteria.currency is not an ISO 4217 code');
+  if (!provider.otherCurrencies) return provider;
+  const other = provider.otherCurrencies[asked];
+  if (!other) {
+    const sold = [provider.currency, ...Object.keys(provider.otherCurrencies)].join(', ');
+    throw new HttpError(400, 'CURRENCY_NOT_SUPPORTED', 'Currency not supported', `No offer is sold in ${asked}. Sold in: ${sold}.`);
+  }
+  return { ...provider, currency: asked, priceFactor: other.priceFactor };
+}
+
+function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
+  const trips = tripsOf(body, providerAsIs, known);
+  // #780: the variant stop place answers as if no criteria were sent.
+  const ignoresOptions = trips.some((t) => t.origin?.stopPlaceRef === providerAsIs.variants?.ignoresOfferOptionsFrom);
+  const criteria = ignoresOptions ? undefined : body.offerSearchCriteria;
+  const provider = inCurrency(providerAsIs, criteria);
   const shortLivedMs = shortLivedMsOf(trips, provider);
   const passengers = passengersOf(body, provider);
   const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
   // #704: a departure in the past is refused; one beyond the horizon gets no offer.
   const beyondHorizon = horizonProblem([...outboundTrips, ...trips], provider, nowMs);
-  // #780: the variant stop place answers as if no criteria were sent.
-  const ignoresOptions = trips.some((t) => t.origin?.stopPlaceRef === provider.variants?.ignoresOfferOptionsFrom);
-  const criteria = ignoresOptions ? undefined : body.offerSearchCriteria;
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
   const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
   const classes = classesAsked(criteria);

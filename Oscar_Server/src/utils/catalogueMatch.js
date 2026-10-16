@@ -171,7 +171,7 @@ function makeDistinct(p, n) {
  * sent by trip id keeps its search trip and asks by `offersByTripIds`.
  */
 function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
-  const datafile = withOfferOptions(withOfferRequestForms(catalogueFile, entries), entries);
+  const datafile = withCurrencies(withOfferOptions(withOfferRequestForms(catalogueFile, entries), entries), entries);
   const byCode = new Map(arr(entries).map((e) => [e.code, e]));
   const fw = frameworkOf(frameworkConfig);
   const notes = {};
@@ -287,6 +287,38 @@ function withOfferOptions(datafile, entries) {
   return { ...datafile, scenarios };
 }
 
+/**
+ * #781: the catalogue data file with the currency entries: a twin per
+ * currency sold asks for it; the default-currency entry asks none and expects
+ * the default; the not-sold entry asks for its currency with the probe on.
+ * The other criteria of the source stay. The data file given is not changed.
+ */
+function withCurrencies(datafile, entries) {
+  const currencyEntries = arr(entries).filter((e) => e.currencyOf || e.expectedCurrencyOf);
+  if (!currencyEntries.length) return datafile;
+  const scenarios = arr(datafile.scenarios).flatMap((sc) => {
+    if (!isObj(sc)) return [sc];
+    const twins = currencyEntries.filter((e) => e.variantOf === sc.code);
+    const own = currencyEntries.find((e) => !e.variantOf && e.code === sc.code);
+    if (!twins.length && !own) return [sc];
+    return (twins.length ? twins : [own]).map((e) => {
+      const twin = { ...structuredClone(sc), code: e.code };
+      if (e.variantOf) twin.description = e.purpose;
+      const criteria = isObj(twin.offerSearchCriteria) ? twin.offerSearchCriteria : {};
+      if (e.expectedCurrencyOf) {
+        delete criteria.currency;
+        twin.expectedCurrency = e.expectedCurrencyOf;
+      } else {
+        criteria.currency = e.currencyOf;
+      }
+      twin.offerSearchCriteria = criteria;
+      if (e.notSold) twin.currencyExpectRejection = 'on';
+      return twin;
+    });
+  });
+  return { ...datafile, scenarios };
+}
+
 // What a limit entry takes from the framework: #699 its passenger count, #704
 // its departure day, #705 its passengers' ages. Nothing when the framework
 // does not declare it (the entry then cannot be copied).
@@ -365,5 +397,5 @@ function suggestTrip(trip, testData) {
 }
 
 module.exports = {
-  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withOfferRequestForms, withOfferOptions, OVERRULE_CODES,
+  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withOfferRequestForms, withOfferOptions, withCurrencies, OVERRULE_CODES,
 };

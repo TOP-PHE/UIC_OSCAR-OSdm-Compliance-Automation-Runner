@@ -755,6 +755,53 @@
         "trip": "SEARCH",
         "passengers": 1
       }
+    },
+    {
+      "code": "OTST_SALE_CURRENCY",
+      "source": "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38",
+      "purpose": "Sale in each currency the Test Framework declares, then a full refund: offers, booking and refund offers all in the currency asked.",
+      "checks": 527,
+      "probe": "CURRENCIES",
+      "needs": {
+        "trip": "SEARCH",
+        "return": "SEPARATE",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_EXCHANGE_CURRENCY",
+      "source": "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38",
+      "purpose": "Exchange in each currency the Test Framework declares: the exchange request carries the sale’s currency, and the exchange offers are in it.",
+      "checks": 389,
+      "probe": "CURRENCIES",
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "EXCHANGEABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_SALE_DEFAULT_CURRENCY",
+      "source": "SIM_CURRENCY_DEFAULT_1ADT_38",
+      "purpose": "Sale with no currency asked: the offers are in the default currency the Test Framework declares, and the booking keeps it.",
+      "checks": 234,
+      "probe": "DEFAULT_CURRENCY",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_CURRENCY_NOT_SOLD",
+      "source": "SIM_NHF_CURRENCY_NOT_SOLD_38",
+      "purpose": "Negative test: offers asked in a common currency the Test Framework does not declare; a refusal or no offer passes, offers in that currency fail. The scenario ends after the offer.",
+      "checks": 71,
+      "probe": "CURRENCY_NOT_SOLD",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     }
   ]
 }
