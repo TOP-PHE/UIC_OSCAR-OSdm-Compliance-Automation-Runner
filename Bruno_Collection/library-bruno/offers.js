@@ -335,7 +335,7 @@ function postOfferResponse(jsonData) {
       throw new Error(`POST /offers returned no offer: the response has no 'offers' property. ${providerReasons(jsonData)}`);
     }
     if (!Array.isArray(jsonData.offers)) {
-      throw new Error(`POST /offers response has no offers[] array (got ${typeof jsonData.offers}) — malformed OfferCollectionResponse envelope. ${providerReasons(jsonData)}`);
+      throw new TypeError(`POST /offers response has no offers[] array (got ${typeof jsonData.offers}) — malformed OfferCollectionResponse envelope. ${providerReasons(jsonData)}`);
     }
     throw new Error(`POST /offers returned 200 with 0 offers — the response carries ${_trips} trip(s) and ${_paxTxt}, but no offer, and ` +
       ((_wrn + _prb) > 0
