@@ -749,7 +749,7 @@
       "code": "OTST_OFFER_OPTION_COMBINATIONS",
       "source": "SIM_OFFER_PROBE_COMBINATION_38",
       "purpose": "Offer search combinations: offers asked with two or more declared option values together, drawn at random from the Test Framework's seed (the same seed, the same combinations); an option no offer keeps to, or that the provider ignores, fails.",
-      "checks": 108,
+      "checks": 120,
       "probe": "OFFER_COMBINATIONS",
       "needs": {
         "trip": "SEARCH",
