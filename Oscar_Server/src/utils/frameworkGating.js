@@ -398,6 +398,23 @@ function applyFrameworkMigration(framework, scenarios, nowIso) {
   return { migrated, additions };
 }
 
+// One scenario's warnings, including those that need the data file.
+function datafileScenarioWarnings(sc, framework, datafile) {
+  const warnings = scenarioWarnings(sc, framework);
+  // #748: an offer request in a form the framework does not take. Named
+  // with the form, so that the collection can say which.
+  const form = offerRequestFormOf(sc, datafile);
+  if (!offerRequestFormDeclared(framework, form)) warnings.push(`offerRequestBy:${form}`);
+  // #766: a place chosen in a way the framework does not declare.
+  const flow = placeSelectionFlowOf(sc);
+  if (!placeSelectionFlowDeclared(framework, flow)) warnings.push(`placeSelectionBy:${flow}`);
+  // #780: an offer search option value the framework does not declare.
+  for (const [key, values] of Object.entries(offerSearchOptionsOf(sc, datafile))) {
+    for (const value of values) if (!offerSearchOptionDeclared(framework, key, value)) warnings.push(`offerOption:${key}=${value}`);
+  }
+  return warnings;
+}
+
 /**
  * Annotate a datafile object in place: each scenario that arms an
  * undeclared feature gets `__featureNotDeclaredWarnings: [field, ...]`, and
@@ -416,18 +433,7 @@ function annotateDatafile(datafile, framework) {
   let count = 0;
   for (const sc of datafile.scenarios) {
     if (!sc || typeof sc !== 'object') continue; // a Test Manager's save can store null
-    const warnings = scenarioWarnings(sc, framework);
-    // #748: an offer request in a form the framework does not take. Named
-    // with the form, so that the collection can say which.
-    const form = offerRequestFormOf(sc, datafile);
-    if (!offerRequestFormDeclared(framework, form)) warnings.push(`offerRequestBy:${form}`);
-    // #766: a place chosen in a way the framework does not declare.
-    const flow = placeSelectionFlowOf(sc);
-    if (!placeSelectionFlowDeclared(framework, flow)) warnings.push(`placeSelectionBy:${flow}`);
-    // #780: an offer search option value the framework does not declare.
-    for (const [key, values] of Object.entries(offerSearchOptionsOf(sc, datafile))) {
-      for (const value of values) if (!offerSearchOptionDeclared(framework, key, value)) warnings.push(`offerOption:${key}=${value}`);
-    }
+    const warnings = datafileScenarioWarnings(sc, framework, datafile);
     if (warnings.length > 0) {
       sc.__featureNotDeclaredWarnings = warnings;
       count++;
