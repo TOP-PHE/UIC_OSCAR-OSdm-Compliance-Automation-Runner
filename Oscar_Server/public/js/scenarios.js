@@ -494,7 +494,34 @@ function placeSelectionFlowsPanelHtml(fw) {
             <div class="fw-subsection-label" style="margin-bottom:8px">How a place can be chosen (OSDM place selection flows)</div>
             <div style="margin-bottom:6px;font-size:11px;color:#78909c">A scenario choosing a place another way gets a warning, and the scenario catalogue does not copy it. At the offer step, a flow the offer does not list is a warning.</div>
             <div class="pill-group">${pills}</div>
+            ${mandatoryReservationFormHtml(fw)}
           </div>`;
+}
+
+// #793: how a mandatory reservation booked without a seat choice is sent.
+// Providers differ (one requires a placeSelection, another refuses one that
+// asks nothing) and OSDM settles neither. No value = a placeSelection.
+const FW_MANDATORY_RESERVATION_FORMS = [
+  ['PLACE_SELECTION', 'In placeSelections (trip and leg only)'],
+  ['NONE', 'Not named: the provider books it with the booking'],
+];
+function mandatoryReservationFormHtml(fw) {
+  const current = fw?.mandatoryReservationForm === 'NONE' ? 'NONE' : 'PLACE_SELECTION';
+  const options = FW_MANDATORY_RESERVATION_FORMS.map(([v, label]) => `<option value="${esc(v)}"${v === current ? ' selected' : ''}>${esc(label)}</option>`).join('');
+  return `
+            <div style="margin-top:10px;font-size:12px">
+              <label for="fw-mandatory-reservation-form">A mandatory reservation booked without a seat choice</label>
+              <select id="fw-mandatory-reservation-form" data-action="fw-mandatory-reservation-form" style="margin-left:6px">${options}</select>
+            </div>`;
+}
+
+// #793: handled before the change switch, which is at Sonar's 30-case limit (S1479).
+function changeMandatoryReservationForm(action, el) {
+  if (action !== 'fw-mandatory-reservation-form') return false;
+  if (el.value === 'NONE') wizData.framework.mandatoryReservationForm = 'NONE';
+  else delete wizData.framework.mandatoryReservationForm;
+  saveFrameworkDebounced();
+  return true;
 }
 
 // #766: a flow pill. No list means every flow, so the first click starts from all five.
@@ -7924,7 +7951,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeOsdmVersion(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
 
   switch (action) {
     case 'file-upload':

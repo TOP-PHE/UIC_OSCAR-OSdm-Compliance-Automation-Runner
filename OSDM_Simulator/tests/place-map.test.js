@@ -202,3 +202,21 @@ test('route: GET /availabilities/nearby on gamma, GET only', async (t) => {
   assert.equal(res.body.availablePlaces[0].numericAvailability, 17);
   assert.equal((await call(sim.base, token, 'POST', url, {})).status, 405);
 });
+
+test('variant refuses-bare-place-selection: a placeSelection asking nothing is a 400, a choice or none passes (#793)', () => {
+  const variant = 'Simvariant-Refuses-Bare-Place-Selection';
+  // A fresh offer each time: a booking takes its seats.
+  const status = (choice, lastName) => {
+    const { offer, trip, find } = offered();
+    try { booking(offer, trip, find, choice, lastName); return 200; } catch (e) { return e.status; }
+  };
+  assert.equal(status({}, variant), 400);
+  assert.equal(status({}), 200, 'without the variant a bare placeSelection passes');
+  assert.equal(status(seats('15', '16'), variant), 200);
+  assert.equal(status({ referencePlace: { coachNumber: '7', placeNumber: '15' } }, variant), 200);
+  // No placeSelection at all passes.
+  const { offer, find } = offered();
+  const request = bookingRequest(offer);
+  request.passengerSpecifications[0].detail.lastName = variant;
+  assert.ok(createBooking(request, find, gamma, NOW).id);
+});

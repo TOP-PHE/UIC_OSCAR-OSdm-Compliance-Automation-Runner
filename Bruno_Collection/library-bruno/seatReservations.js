@@ -50,6 +50,37 @@ function normaliseForm(value) {
   return FORMS.includes(form) ? form : null;
 }
 
+/**
+ * How a mandatory reservation booked without a seat choice is sent (#793):
+ * PLACE_SELECTION (default, #742) a placeSelection naming its trip and leg;
+ * NONE nothing, the provider books it with the booking ("Mandatory
+ * reservations are booked when the booking is being booked"). Providers
+ * differ, OSDM settles neither, so the Test Framework declares it.
+ */
+const MANDATORY_FORMS = Object.freeze(['PLACE_SELECTION', 'NONE']);
+function normaliseMandatoryForm(value) {
+  const form = String(value ?? '').trim().toUpperCase();
+  return MANDATORY_FORMS.includes(form) ? form : 'PLACE_SELECTION';
+}
+
+const nonEmpty = (v) => Array.isArray(v) ? v.length > 0 : v != null && typeof v === 'object';
+
+/** True when a placeSelection asks something: places, compartments, a reference place or accommodations. */
+function hasPlaceChoice(selection) {
+  return ['places', 'compartments', 'accommodations'].some((k) => Array.isArray(selection?.[k]) && selection[k].length > 0)
+    || nonEmpty(selection?.referencePlace);
+}
+
+/**
+ * #793: the placeSelections without those of mandatory reservations that ask
+ * nothing, when the form is NONE. Any other selection is kept as it is.
+ */
+function withoutBareMandatory(selections, mandatoryIds, mandatoryForm) {
+  if (normaliseMandatoryForm(mandatoryForm) !== 'NONE') return listOf(selections);
+  const mandatory = new Set(listOf(mandatoryIds));
+  return listOf(selections).filter((sel) => !mandatory.has(sel?.reservationId) || hasPlaceChoice(sel));
+}
+
 /** Every relation of the offer's admissions, with the ids of its group. */
 function relationsOf(offer) {
   return listOf(offer?.admissionOfferParts).flatMap((admission) => listOf(admission?.reservations).map((relation, i) => ({
@@ -149,10 +180,13 @@ function reservationsWithoutLeg(offer, reservationIds, tripLegs = []) {
  * @param {string[]} mandatory the mandatory ones among them
  * @returns {{ placeSelections: object[], optionalReservationSelections: object[], noLeg: string[] }}
  */
-function bookingSelections(offer, { atBooking, mandatory, form }, tripLegs = []) {
+function bookingSelections(offer, { atBooking, mandatory, form, mandatoryForm }, tripLegs = []) {
   const placeable = form === 'PLACE_SELECTION' ? atBooking : atBooking.filter((id) => mandatory.includes(id));
   const noLeg = reservationsWithoutLeg(offer, placeable, tripLegs);
-  const named = atBooking.filter((id) => !placeable.includes(id) || noLeg.includes(id));
+  // #793: under NONE a mandatory reservation is named in no list; its
+  // placeSelection is kept only for a choice (withoutBareMandatory()).
+  const none = normaliseMandatoryForm(mandatoryForm) === 'NONE';
+  const named = atBooking.filter((id) => (!placeable.includes(id) || noLeg.includes(id)) && !(none && mandatory.includes(id)));
   return {
     placeSelections: placeSelectionsFor(offer, placeable, tripLegs),
     optionalReservationSelections: named.map((id) => ({ reservationId: id })),
@@ -339,4 +373,4 @@ function splitByReservation(selection, offer) {
   });
 }
 
-module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, legOfReservation, placeSelectionsFor, reservationsWithoutLeg, bookingSelections, tripLegsOf, checkRelations, checkProviderRules, checkBookedReservations, reservationsIgnored, reservationInBookingRequest, splitByReservation };
+module.exports = { FORMS, MANDATORY_FORMS, normaliseMandatoryForm, hasPlaceChoice, withoutBareMandatory, fromEnv, normaliseForm, relationsOf, reservationsToBook, legOfReservation, placeSelectionsFor, reservationsWithoutLeg, bookingSelections, tripLegsOf, checkRelations, checkProviderRules, checkBookedReservations, reservationsIgnored, reservationInBookingRequest, splitByReservation };

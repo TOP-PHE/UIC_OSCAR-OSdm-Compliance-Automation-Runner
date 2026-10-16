@@ -55,6 +55,18 @@ const MAX_TEXT = 200;
 const CONFIRMATION_DELAY_MS = 30 * 60 * 1000;
 
 const bad = (detail) => new HttpError(400, 'VALIDATION_ERROR', 'The request is not valid', detail);
+
+const hasItems = (v) => Array.isArray(v) && v.length > 0;
+
+// #793: a placeSelection naming only its reservation and leg asks nothing.
+function refuseBarePlaceSelections(selections) {
+  for (const selection of selections) {
+    const placeSelections = Array.isArray(selection?.placeSelections) ? selection.placeSelections : [];
+    const bare = placeSelections.find((p) => !hasItems(p?.places) && !hasItems(p?.compartments) && !hasItems(p?.accommodations)
+      && !(p?.referencePlace && typeof p.referencePlace === 'object'));
+    if (bare) throw bad(`placeSelections: the selection of reservation "${bare.reservationId}" names no place, compartment, reference place or accommodation; send no placeSelection to have the place given`);
+  }
+}
 const randomId = () => crypto.randomBytes(8).toString('hex');
 const text = (value) => (typeof value === 'string' && value.length <= MAX_TEXT ? value : undefined);
 
@@ -172,6 +184,8 @@ function createBooking(body, findOffer, provider, nowMs) {
   let oneFulfillment = true;
   // #766: the variants that change the places given.
   const chosenVariants = variants.variantsOf(specs, provider);
+  // #793: a provider refusing a placeSelection that asks nothing.
+  if (chosenVariants.has('refuses-bare-place-selection')) refuseBarePlaceSelections(selections);
   for (const selection of selections) {
     const { offer, trips: offerTrips, oneFulfillment: single } = bookableOffer(selection, findOffer, nowMs);
     const reserved = reservationsToBook(offer, selection);

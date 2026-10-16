@@ -179,8 +179,11 @@ function buildBookingRequest() {
   // #766 PR 4: and the reference place, in the NEARBY flow.
   const _np = require("./namedPlaces.js");
   const _nearby = bru.getEnvVar("placeSelectionFlow") === "AUTOMATIC_PLACE_SELECTION_NEARBY" ? parseEnvJson("nearbyReference", null) : null;
-  const placeSelections = _np.withReferencePlace(_np.withNamedPlaces(withSeatPreferences([...seatMapSelections,
+  const _allPlaceSelections = _np.withReferencePlace(_np.withNamedPlaces(withSeatPreferences([...seatMapSelections,
     ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))]), parseEnvJson("__namedPlaceChoices", null)), _nearby);
+  // #793: under the NONE form, a mandatory reservation asking nothing is not named.
+  const _sr = require("./seatReservations.js");
+  const placeSelections = _sr.withoutBareMandatory(_allPlaceSelections, parseEnvJson("__mandatoryReservationIds", []), bru.getEnvVar("mandatoryReservationForm"));
   // #239: OSDM's mechanism for booking a mandatory reservation without
   // stating a specific place/compartment — independent of placeSelections.
   // #652: a reservation the placeSelections already book is not named again
@@ -189,6 +192,11 @@ function buildBookingRequest() {
   const optionalReservationSelections = parseEnvJson("optionalReservationSelections", [])
     .filter((s) => !placedIds.has(s?.reservationId));
   const passengerRefs = parseEnvJson("bookingPassengerReferences");
+  // #793: a named place takes the offer's optional seat-map ancillary along.
+  const ancillarySelections = _np.seatMapAncillarySelections(parseEnvJson("offer", null), placeSelections);
+  if (ancillarySelections.length > 0) {
+    validationLogger(`[INFO] Seat-map ancillary ${ancillarySelections.map((a) => a.ancillaryId).join(", ")} booked with the named place(s), in optionalAncillarySelections.`);
+  }
 
   // Two-step return (#178/#180): when an inbound offer was fetched, book the
   // return. The FIRST attempt books BOTH offers in one booking (OSDM-valid).
@@ -207,6 +215,7 @@ function buildBookingRequest() {
     // #239: manual place/reservation selections apply to the outbound offer
     // only, same simplification already established for placeSelections above.
     if (optionalReservationSelections.length > 0) outboundOffer.optionalReservationSelections = optionalReservationSelections;
+    if (ancillarySelections.length > 0) outboundOffer.optionalAncillarySelections = ancillarySelections;
     if (returnMode === "sep-out") {
       offers.push(outboundOffer);
       validationLogger(`[INFO] 🔁 Return booking (separate) — outbound only (${outboundOfferId}).`);
@@ -222,6 +231,7 @@ function buildBookingRequest() {
     const offer = { offerId: bru.getEnvVar("offerId"), passengerRefs };
     if (placeSelections.length > 0) offer.placeSelections = placeSelections;
     if (optionalReservationSelections.length > 0) offer.optionalReservationSelections = optionalReservationSelections;
+    if (ancillarySelections.length > 0) offer.optionalAncillarySelections = ancillarySelections;
     offers.push(offer);
   }
 
