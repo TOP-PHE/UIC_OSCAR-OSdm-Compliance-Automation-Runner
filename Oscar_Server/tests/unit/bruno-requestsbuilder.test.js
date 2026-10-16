@@ -112,6 +112,40 @@ describe('buildBookingRequest', () => {
     expect(body.externalRef).toBe('00001');
   });
 
+  // #793: under the NONE form a mandatory reservation asking nothing is not named;
+  // a named place takes the offer's optional seat-map ancillary along.
+  test('the mandatory reservation form and the seat-map ancillary', () => {
+    const base = {
+      requiresPlaceSelection: 'false',
+      accommodationSelection: 'NONE',
+      api_base: 'https://x',
+      bookingPassengerSpecifications: '[{"externalRef":"00001","detail":{"firstName":"John","lastName":"Doe"}}]',
+      bookingPassengerReferences: '["00001"]',
+      bookingPurchaserSpecifications: '{"detail":{"firstName":"P"}}',
+      offerId: 'OFFER-1',
+      reservationPlaceSelections: '[{"reservationId":"R1","tripLegCoverage":{"tripId":"T","legId":"L"}},{"reservationId":"R2","tripLegCoverage":{"tripId":"T","legId":"L2"}}]',
+      __mandatoryReservationIds: '["R1"]',
+    };
+    setEnv({ ...base, mandatoryReservationForm: 'NONE' });
+    rb.buildBookingRequest();
+    expect(JSON.parse(store.BookingRequest).offers[0].placeSelections.map((p) => p.reservationId)).toEqual(['R2']);
+    store = {};
+    setEnv({ ...base, mandatoryReservationForm: 'PLACE_SELECTION' });
+    rb.buildBookingRequest();
+    expect(JSON.parse(store.BookingRequest).offers[0].placeSelections.map((p) => p.reservationId)).toEqual(['R1', 'R2']);
+    store = {};
+    setEnv({
+      ...base,
+      mandatoryReservationForm: 'NONE',
+      reservationPlaceSelections: '[{"reservationId":"R1","tripLegCoverage":{"tripId":"T","legId":"L"},"places":[{"coachNumber":"7","placeNumber":"15","passengerRef":"00001"}]},{"reservationId":"R2","tripLegCoverage":{"tripId":"T","legId":"L2"}}]',
+      offer: JSON.stringify({ ancillaryOfferParts: [{ id: 'S1', type: 'SEAT_MAP_SELECTION', passengerRefs: ['00001'] }] }),
+    });
+    rb.buildBookingRequest();
+    const offer = JSON.parse(store.BookingRequest).offers[0];
+    expect(offer.placeSelections.map((p) => p.reservationId)).toEqual(['R1', 'R2']);
+    expect(offer.optionalAncillarySelections).toEqual([{ ancillaryId: 'S1', passengerRefs: ['00001'] }]);
+  });
+
   // #652: one booking request named the same reservation in both lists.
   test('a reservation in placeSelections is not repeated in optionalReservationSelections', () => {
     setEnv({

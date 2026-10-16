@@ -354,3 +354,76 @@ describe('a reservation without a leg, and a booking that renames the legs (#737
     expect(mockLogs.some((l) => l.includes('Reservation RX: the offer gives no leg for it — it cannot be added after the booking'))).toBe(true);
   });
 });
+
+// #793: one provider requires a placeSelection for a mandatory reservation,
+// another refuses one that asks nothing. The Test Framework says which.
+describe('a mandatory reservation without a seat choice (#793)', () => {
+  const np = require('../../../Bruno_Collection/library-bruno/namedPlaces.js');
+  const bare = (id) => ({ reservationId: id, tripLegCoverage: { tripId: 'T1', legId: 'L1' } });
+
+  test('the form: PLACE_SELECTION unless NONE is named', () => {
+    expect(sr.normaliseMandatoryForm('none')).toBe('NONE');
+    expect(sr.normaliseMandatoryForm(' NONE ')).toBe('NONE');
+    for (const other of [undefined, null, '', 'x', 'PLACE_SELECTION']) expect(sr.normaliseMandatoryForm(other)).toBe('PLACE_SELECTION');
+  });
+
+  test('a placeSelection asks something when it names places, compartments, a reference place or accommodations', () => {
+    expect(sr.hasPlaceChoice(bare('R1'))).toBe(false);
+    expect(sr.hasPlaceChoice({ ...bare('R1'), places: [], accommodations: [] })).toBe(false);
+    expect(sr.hasPlaceChoice({ ...bare('R1'), places: [{ coachNumber: '7', placeNumber: '15' }] })).toBe(true);
+    expect(sr.hasPlaceChoice({ ...bare('R1'), compartments: [{ coachNumber: '7', compartmentNumber: '2' }] })).toBe(true);
+    expect(sr.hasPlaceChoice({ ...bare('R1'), accommodations: [{ accommodationType: 'SEAT' }] })).toBe(true);
+    expect(sr.hasPlaceChoice({ ...bare('R1'), referencePlace: { coachNumber: '7', placeNumber: '15' } })).toBe(true);
+  });
+
+  test('under NONE only the mandatory selections asking nothing are dropped', () => {
+    const chosen = { ...bare('R1'), accommodations: [{ accommodationType: 'SEAT', placeProperties: ['FRONT_VIEW'] }] };
+    const list = [bare('R1'), bare('R2'), chosen];
+    expect(sr.withoutBareMandatory(list, ['R1'], 'NONE')).toEqual([bare('R2'), chosen]);
+    expect(sr.withoutBareMandatory(list, ['R1'], 'PLACE_SELECTION')).toEqual(list);
+    expect(sr.withoutBareMandatory(list, ['R1'], undefined)).toEqual(list);
+    expect(sr.withoutBareMandatory(undefined, ['R1'], 'NONE')).toEqual([]);
+  });
+
+  test('under NONE a mandatory reservation without a leg is named nowhere; an optional one still is', () => {
+    const offerNoLeg = { offerId: 'O2', admissionOfferParts: [{ id: 'A', reservations: [relation(1, 'RM'), relation(0, 'RX')] }],
+      reservationOfferParts: [{ id: 'RM', passengerRefs: ['P1'] }, { id: 'RX', passengerRefs: ['P1'] }] };
+    const twoLegs = [{ id: 'T', legIds: ['a', 'b'] }];
+    const placeForm = sr.bookingSelections(offerNoLeg, { atBooking: ['RM', 'RX'], mandatory: ['RM'], form: 'RESERVATION_SELECTION' }, twoLegs);
+    expect(placeForm.optionalReservationSelections.map((s) => s.reservationId).sort()).toEqual(['RM', 'RX']);
+    const none = sr.bookingSelections(offerNoLeg, { atBooking: ['RM', 'RX'], mandatory: ['RM'], form: 'RESERVATION_SELECTION', mandatoryForm: 'NONE' }, twoLegs);
+    expect(none.optionalReservationSelections).toEqual([{ reservationId: 'RX' }]);
+  });
+
+  test('the offer step under NONE keeps the ids of the mandatory ones and says so', () => {
+    envStore.mandatoryReservationForm = 'NONE';
+    withBrunoExpect(() => offers.handleOptionalReservationSelections(offer, []));
+    expect(JSON.parse(envStore.__mandatoryReservationIds)).toEqual(['R1']);
+    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([]);
+    expect(mockLogs.some((l) => l.includes('Mandatory reservation(s) R1: not named in the booking request'))).toBe(true);
+  });
+
+  test('a named place takes the offer\'s optional seat-map ancillary along, for the passengers placed', () => {
+    const offerWithMap = {
+      admissionOfferParts: [
+        { id: 'A1', passengerRefs: ['P1'], ancillaries: [{ minGroupItemsToBeBooked: 0, ancillaryGroup: { ancillaryRefs: [{ id: 'S1' }] } }] },
+        { id: 'A2', passengerRefs: ['P2'], ancillaries: [{ minGroupItemsToBeBooked: 1, ancillaryGroup: { ancillaryRefs: [{ id: 'S2' }] } }] },
+      ],
+      ancillaryOfferParts: [
+        { id: 'S1', type: 'SEAT_MAP_SELECTION', passengerRefs: ['P1'] },
+        { id: 'S2', type: 'SEAT_MAP_SELECTION', passengerRefs: ['P2'] },
+        { id: 'S3', type: 'SEAT_MAP_SELECTION', passengerRefs: ['P3'] },
+        { id: 'W1', type: 'WIFI', passengerRefs: ['P1'] },
+      ],
+    };
+    const placed = [{ ...bare('R1'), places: [{ coachNumber: '7', placeNumber: '15', passengerRef: 'P1' }, { coachNumber: '7', placeNumber: '16', passengerRef: 'P2' }] }];
+    // S2 is mandatory (booked anyway), S3 is for a passenger not placed, W1 is not a seat map.
+    expect(np.seatMapAncillarySelections(offerWithMap, placed)).toEqual([{ ancillaryId: 'S1', passengerRefs: ['P1'] }]);
+    // Places naming no passenger: every passenger of the ancillary.
+    const anonymous = [{ ...bare('R1'), places: [{ coachNumber: '7', placeNumber: '15' }] }];
+    expect(np.seatMapAncillarySelections(offerWithMap, anonymous).map((a) => a.ancillaryId)).toEqual(['S1', 'S3']);
+    // No named place: nothing.
+    expect(np.seatMapAncillarySelections(offerWithMap, [bare('R1')])).toEqual([]);
+    expect(np.seatMapAncillarySelections(null, placed)).toEqual([]);
+  });
+});

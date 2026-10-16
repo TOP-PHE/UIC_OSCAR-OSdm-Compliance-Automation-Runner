@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.348",
+  "current_release": "2026.349",
   "releases": [
+    {
+      "release": "2026.349",
+      "date": "2026-10-16",
+      "server": "1.11.314",
+      "collection": "OTST_V2.0.182",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "The Test Framework says how a mandatory reservation booked without a seat choice is sent: a placeSelection naming its trip and leg (as before), or nothing, the provider booking it with the booking. A named place takes the offer's optional seat-map ancillary along in optionalAncillarySelections (#793)."
+      ]
+    },
     {
       "release": "2026.348",
       "date": "2026-10-16",

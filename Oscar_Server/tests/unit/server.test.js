@@ -344,6 +344,29 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #793: and the framework's form for a mandatory reservation without a seat choice.
+  test('a run\'s copy gives the framework\'s mandatory reservation form to the scenarios naming none', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [uuidv4(), companyId, colEncrypt(JSON.stringify({ mandatoryReservationForm: 'NONE' }))]);
+    const stored = JSON.stringify({ scenarios: [{ code: 'A' }, { code: 'B', mandatoryReservationForm: 'PLACE_SELECTION' }] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.body.scenarios.map((s) => s.mandatoryReservationForm)).toEqual(['NONE', 'PLACE_SELECTION']);
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // #717: the run's copy says the days its trip's Test Data trains run.
   test('a run gets its trips\' calendars in its copy; a Test Manager the stored file', async () => {
     const { companyId, userId, slug } = seedCompanyUser();

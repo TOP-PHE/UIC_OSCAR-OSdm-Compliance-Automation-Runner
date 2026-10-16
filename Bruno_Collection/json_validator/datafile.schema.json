@@ -259,6 +259,11 @@
             "type": ["string", "null"],
             "enum": ["ALL", "MAIN", "", null]
           },
+          "mandatoryReservationForm": {
+            "description": "How a mandatory reservation booked without a seat choice is sent (#793). PLACE_SELECTION (default): a placeSelection naming its trip and leg. NONE: it is named nowhere in the booking request, and the provider books it with the booking. A reservation with a seat choice (preferences, a named place, a reference place) always gets its placeSelection. The run's copy takes the Test Framework's value when the scenario names none.",
+            "type": ["string", "null"],
+            "enum": ["PLACE_SELECTION", "NONE", "", null]
+          },
           "reservationBookingForm": {
             "description": "How the optional seat reservations are booked (#601). A mandatory reservation (a relation of an admission with minGroupItemsToBeBooked above 0) is always booked with the booking. RESERVATION_SELECTION: optionalReservationSelections; PLACE_SELECTION: placeSelections naming the trip and leg; ADD_LATER: added after the booking by POST /bookings/{id}/booked-offers/{id}/offer-parts. Empty or null: optional reservations are not booked.",
             "type": ["string", "null"],
