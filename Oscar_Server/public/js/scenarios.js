@@ -5210,6 +5210,8 @@ async function wizSaveTrain(tidx, opts = {}) {
     fulfillmentMedia: fields.fulfillmentMedia
   };
   const isNew = !t.id || t._unsaved;
+  // #787: the set as it was, to find the trips built from it.
+  const before = isNew ? null : structuredClone(OscarTripApply.resourceData(t));
   try {
     const url    = isNew ? '/v1/company/test-resources' : `/v1/company/test-resources/${t.id}`;
     const method = isNew ? 'POST' : 'PUT';
@@ -5235,6 +5237,7 @@ async function wizSaveTrain(tidx, opts = {}) {
     const targetIdx = wizData.resources.indexOf(t);
     if (targetIdx !== -1) wizData.resources[targetIdx] = saved;
     else wizData.resources.push(saved);
+    if (before) offerTripUpdateFromTrain(before, saved);
     // Save-all reads + persists several panels, then re-renders once itself.
     if (opts.rerender === false) return saved;
     showMsg(`✅ Train "${label}" saved.`, true);
@@ -5247,6 +5250,34 @@ async function wizSaveTrain(tidx, opts = {}) {
     reopenTrainById(saved.id);
     return saved;
   } catch(e) { oscarToast(`Network error: ${e.message}`, 'error'); return null; }
+}
+
+// #787: a trip this person may change: no scenario using it is read-only for them.
+function tripEditableByMe(trip) {
+  return !(state?.scenarios || []).some(sc => sc && trip && sc.tripRequirementId === trip.id && isReadOnlyForMe(sc));
+}
+
+// #787: a trip copies its train set's values ("Apply test data"), so an edited
+// set leaves the trips built from it as they were. Once the set is saved, the
+// trips built from it as it was (same route and train number) are offered the
+// set as saved, after a confirmation; Save & Apply keeps the change.
+function offerTripUpdateFromTrain(before, saved) {
+  if (!state || !Array.isArray(state.tripRequirements)) return;
+  const after = OscarTripApply.resourceData(saved);
+  const updates = OscarTripApply.tripUpdatesFromTrain(state.tripRequirements, before, after)
+    .filter(u => tripEditableByMe(state.tripRequirements[u.tripIndex]));
+  if (!updates.length) return;
+  const tripIdxs = [...new Set(updates.map(u => u.tripIndex))];
+  if (!confirm(`${tripIdxs.length} trip(s) of this data file were filled from train set "${saved.label}" as it was. Update them to the set as saved now? Save & Apply keeps the change.`)) return;
+  for (const u of updates) OscarTripApply.applyTripUpdate(state.tripRequirements[u.tripIndex], u, after);
+  markDirty();
+  const tripIds = new Set(tripIdxs.map(i => state.tripRequirements[i].id));
+  document.querySelectorAll('.scenario-detail').forEach(det => {
+    if (!det.dataset.rendered) return;
+    const scIdx = Number.parseInt(det.id.replace('detail-', ''));
+    if (tripIds.has(state.scenarios[scIdx]?.tripRequirementId)) reRenderScenarioDetail(scIdx);
+  });
+  oscarToast(`${tripIdxs.length} trip(s) updated from "${saved.label}": Save & Apply to keep it.`, 'info');
 }
 
 // Re-open a train's detail panel by resource id after a list re-render.
