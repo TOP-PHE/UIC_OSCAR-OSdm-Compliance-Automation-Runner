@@ -405,8 +405,11 @@ function classifyOfferProbe(resp) {
   if (!resp || typeof resp !== 'object' || !Array.isArray(resp.offers)) return null;
   const trips = Array.isArray(resp.trips) ? resp.trips.length : 0;
   if (resp.offers.length === 0) {
+    // #787: OSDM 3.5+ gives warnings as a WarningCollection { warnings: [...] }.
+    let warnings = Array.isArray(resp.warnings?.warnings) ? resp.warnings.warnings : [];
+    if (Array.isArray(resp.warnings)) warnings = resp.warnings;
     const echo = []
-      .concat(Array.isArray(resp.warnings) ? resp.warnings : [], Array.isArray(resp.problems) ? resp.problems : [])
+      .concat(warnings, Array.isArray(resp.problems) ? resp.problems : [])
       .map(w => w && (w.code || w.title)).filter(Boolean).slice(0, 3);
     const explanation = echo.length
       ? ' (provider says: ' + echo.join('; ') + ')'
@@ -695,7 +698,96 @@ function calendarFromHarvest(data, harvested) {
   return { daysOfWeek: sortDays(days) };
 }
 
+// ── Each service against the provider's answers (#787) ────────────────────
+// The offer probe searches a route, so it shows the route sells; it says
+// nothing of a train number or a time typed wrong. These compare each service
+// of a set with the direct trains of its route the provider answered.
+
+const DAY_NAMES = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
+const MAX_SERVICE_FINDINGS = 8;
+
+// A train number with its punctuation and case taken out: OSDM-104 = osdm_104.
+const _bareNumber = (v) => String(v || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+function _serviceName(svc) {
+  const clock = _clock(svc.departureTime);
+  if (svc.vehicleNumber) return clock ? `Train ${svc.vehicleNumber} (${clock})` : `Train ${svc.vehicleNumber}`;
+  return `The train at ${clock || '?'}`;
+}
+
+// What is wrong with one service the answers do not show by its number.
+function _unseenFinding(svc, onRoute, probedDays) {
+  const name = _serviceName(svc);
+  const bare = _bareNumber(svc.vehicleNumber);
+  const like = bare ? onRoute.find((r) => _bareNumber(r.vehicleNumber) === bare) : null;
+  if (like) return `${name}: the provider names it ${like.vehicleNumber}; a scenario naming ${svc.vehicleNumber} gets no offer`;
+  const clock = _clock(svc.departureTime);
+  const atTime = clock ? onRoute.find((r) => _clock(r.departureTime) === clock && r.vehicleNumber) : null;
+  if (atTime) return `${name}: not found; the provider's train at ${clock} is ${atTime.vehicleNumber}`;
+  return `${name}: not found in the provider's answers on ${probedDays.map((d) => d.date).join(', ')}`;
+}
+
+// Probed days in words: "Sun 2026-10-18, Mon 2026-10-19".
+const _dayList = (days) => days.map((d) => `${DAY_NAMES[d.dayOfWeek] || d.dayOfWeek} ${d.date}`).join(', ');
+
+// The times and days of one service the answers show by its number.
+function _seenFindings(svc, seen, data, probedDays) {
+  const out = [];
+  const name = _serviceName(svc);
+  const dep = _clock(svc.departureTime);
+  const arr = _clock(svc.arrivalTime);
+  if (dep && !seen.some((r) => _clock(r.departureTime) === dep)) out.push(`${name}: leaves at ${_clock(seen[0].departureTime)} at the provider`);
+  if (arr && !seen.some((r) => _clock(r.arrivalTime) === arr)) out.push(`${name}: arrives at ${_clock(seen[0].arrivalTime)} at the provider, ${arr} here`);
+  const runs = Array.isArray(data.daysOfWeek) && data.daysOfWeek.length ? data.daysOfWeek : null;
+  if (!runs) return out;
+  const seenDays = new Set(seen.map((r) => r.dayOfWeek));
+  const missing = probedDays.filter((d) => runs.includes(d.dayOfWeek) && !seenDays.has(d.dayOfWeek));
+  if (missing.length) out.push(`${name}: not offered on ${_dayList(missing)}, a day the set says it runs`);
+  const extra = probedDays.filter((d) => !runs.includes(d.dayOfWeek) && seenDays.has(d.dayOfWeek));
+  if (extra.length) out.push(`${name}: offered on ${_dayList(extra)}, a day the set does not list`);
+  return out;
+}
+
+/**
+ * #787: each service of a train set (`data`) against the records the probe
+ * harvested on its route (`harvestTrips`) and the days that got an answer
+ * (`probedDays`: [{ date, dayOfWeek }]). Findings in words: a train number the
+ * provider does not know (and the one it uses), a time or a day that differs,
+ * a product category or operator the provider names otherwise. [] when every
+ * service is found as stored, or nothing was probed.
+ */
+function serviceFindings(data, records, probedDays) {
+  const services = Array.isArray(data?.services) ? data.services.filter(Boolean) : [];
+  const days = Array.isArray(probedDays) ? probedDays : [];
+  if (!services.length || !days.length) return [];
+  const onRoute = (records || []).filter((r) => r.originURN === data.originURN && r.destinationURN === data.destinationURN);
+  const out = [];
+  const seenAll = [];
+  for (const svc of services) {
+    const seen = onRoute.filter((r) => _sameService(r, svc));
+    if (!seen.length) { out.push(_unseenFinding(svc, onRoute, days)); continue; }
+    seenAll.push(...seen);
+    out.push(..._seenFindings(svc, seen, data, days));
+  }
+  const otherOf = (key, own) => (own ? [...new Set(seenAll.map((r) => r[key]).filter((v) => v && v !== own))] : []);
+  const categories = otherOf('productCategoryRef', data.productCategoryRef);
+  if (categories.length) out.push(`Product category: the provider names ${categories.join(', ')}, the set ${data.productCategoryRef}`);
+  const operators = otherOf('operatorCode', data.operatorCode);
+  if (operators.length) out.push(`Operator: the provider names ${operators.join(', ')}, the set ${data.operatorCode}`);
+  if (out.length <= MAX_SERVICE_FINDINGS) return out;
+  return [...out.slice(0, MAX_SERVICE_FINDINGS), `… and ${out.length - MAX_SERVICE_FINDINGS} more`];
+}
+
+/** #787: the services of a set no answer showed by its number, for a search at their own time. */
+function servicesUnseen(data, records) {
+  const services = Array.isArray(data?.services) ? data.services.filter(Boolean) : [];
+  const onRoute = (records || []).filter((r) => r.originURN === data.originURN && r.destinationURN === data.destinationURN);
+  return services.filter((svc) => _clock(svc.departureTime) && !onRoute.some((r) => _sameService(r, svc)));
+}
+
 module.exports = {
+  serviceFindings,
+  servicesUnseen,
   classifyOfferProbe,
   summarizeOfferProbe,
   dayOfWeekCode,

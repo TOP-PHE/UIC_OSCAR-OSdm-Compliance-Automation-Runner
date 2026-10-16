@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.346",
+  "current_release": "2026.347",
   "releases": [
+    {
+      "release": "2026.347",
+      "date": "2026-10-16",
+      "server": "1.11.312",
+      "collection": "OTST_V2.0.181",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Re-probe offers checks each service of a train set against the provider's answers: a train number the provider writes otherwise, another train at that time, a time, a day, a product category or an operator that differs (#787)."
+      ]
+    },
     {
       "release": "2026.346",
       "date": "2026-10-16",
