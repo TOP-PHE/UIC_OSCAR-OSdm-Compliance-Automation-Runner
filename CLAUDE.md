@@ -152,6 +152,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     same coach, OSDM gives no distance. The catalogue's needs carry
     `providerValues` `referencePlace`, and the copy lists it to complete
     (the simulator's `7/15` means nothing elsewhere).
+    **PR 5 (1.11.301): the same choices after the booking.** With
+    `reservationBookingForm` ADD_LATER, 09's before-request calls
+    `askPlacesAfterBooking()`: the three asks of 02 with
+    `placeChoiceContext(true)` (contextType BOOKING, contextId the booking,
+    ids = `reservationAddLaterSelections`, guard key `BOOKING:<id>`), then
+    `laterPlaceSelections()` (`requestsBuilder.js`) applies preferences, named
+    places and reference place; named choices are merged with the booking's.
+    09's after-response records their checks first. `placeChoiceAfterBooking()`
+    silences 02's "nothing placed" warnings when the choice comes later. The
+    simulator resolves a BOOKING context to the offer that holds the
+    reservation (`offerInContext()` in `app.js`); trips 17/18 are EuroCity
+    (optional reservation) from the map and preference stop places.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
