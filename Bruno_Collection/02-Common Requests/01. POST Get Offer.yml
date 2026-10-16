@@ -184,8 +184,14 @@ runtime:
         require(bru.getEnvVar("library_base") + "offers.js").checkOfferLegClasses(jsonData);
         // #766: what the offer says of the scenario's place selection flow.
         require(bru.getEnvVar("library_base") + "offers.js").checkOfferPlaceSelection();
-        // #780: the offers keep to the offer search criteria sent (warnings).
+        // #780: the offers keep to the offer search criteria sent (warnings;
+        // tests in an offer search probe, which ends here).
         require(bru.getEnvVar("library_base") + "offers.js").checkOfferSearchCriteria(jsonData);
+        if (bru.getEnvVar("offerSearchProbe") === "true") {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (offer search probe)");
+          return;
+        }
         // #705: passengers on the edges of the age ranges, priced as expected.
         require(bru.getEnvVar("library_base") + "passengerAges.js").checkOfferAges();
 

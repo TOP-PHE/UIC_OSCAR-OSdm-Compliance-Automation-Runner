@@ -305,6 +305,34 @@ function wanted(criteria, field, known) {
   return asked.length > 0 ? asked : null;
 }
 
+// #780: the service class of each travel class (productOf gives them).
+const SERVICE_CLASS_OF = { FIRST: 'HIGH', SECOND: 'STANDARD' };
+const SERVICE_CLASSES = ['BEST', 'HIGH', 'STANDARD', 'BASIC'];
+
+// The travel classes offered: those asked, else second class only; with
+// service classes asked, only the travel classes that have one of them (any
+// travel class when none is asked). BEST and BASIC are not sold: no offer.
+function classesAsked(criteria) {
+  const travel = wanted(criteria, 'travelClasses', Object.keys(TRAVEL_CLASSES));
+  const service = wanted(criteria, 'serviceClassTypes', SERVICE_CLASSES);
+  if (!service) return travel || ['SECOND'];
+  return (travel || Object.keys(TRAVEL_CLASSES)).filter((c) => service.includes(SERVICE_CLASS_OF[c]));
+}
+
+// #780: the simulator sells nothing without an admission. Asked for offer
+// parts without ADMISSION (or ALL), it answers as usual and says the member
+// was ignored.
+function offerPartsIgnored(criteria) {
+  const parts = wanted(criteria, 'requestedOfferParts', ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL']);
+  if (!parts || parts.includes('ADMISSION') || parts.includes('ALL')) return null;
+  return {
+    code: 'PARAMETER_NOT_SUPPORTED',
+    title: "Parameter 'offerSearchCriteria.requestedOfferParts' was ignored.",
+    detail: `No offer without an admission is sold (asked: ${parts.join(', ')}); offers with admissions are given.`,
+    pointers: ['offerSearchCriteria.requestedOfferParts'],
+  };
+}
+
 function fulfillmentOptionsOf(body) {
   const asked = Array.isArray(body.requestedFulfillmentOptions) ? body.requestedFulfillmentOptions : [];
   const options = asked
@@ -647,10 +675,12 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
   // #704: a departure in the past is refused; one beyond the horizon gets no offer.
   const beyondHorizon = horizonProblem([...outboundTrips, ...trips], provider, nowMs);
-  const criteria = body.offerSearchCriteria;
+  // #780: the variant stop place answers as if no criteria were sent.
+  const ignoresOptions = trips.some((t) => t.origin?.stopPlaceRef === provider.variants?.ignoresOfferOptionsFrom);
+  const criteria = ignoresOptions ? undefined : body.offerSearchCriteria;
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
   const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
-  const classes = wanted(criteria, 'travelClasses', Object.keys(TRAVEL_CLASSES)) || ['SECOND'];
+  const classes = classesAsked(criteria);
   const fulfillmentOptions = fulfillmentOptionsOf(body);
   const collective = criteria?.offerMode === 'COLLECTIVE';
   const refusals = new Set();
@@ -684,6 +714,8 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   }
   const allTrips = [...outboundTrips, ...trips];
   const problems = problemsOf(passengers, offers, collective, refusals);
+  const partsIgnored = offerPartsIgnored(criteria);
+  if (partsIgnored) problems.push(partsIgnored);
   if (beyondHorizon) problems.push(beyondHorizon);
   const response = { anonymousPassengerSpecifications: passengers, trips: allTrips, offers };
   if (problems.length > 0) response.problems = problems;

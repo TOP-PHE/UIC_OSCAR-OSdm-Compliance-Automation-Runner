@@ -296,6 +296,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `NHF_REQUESTED_INFORMATION_OMITTED` | A passenger update without a demanded field must be refused. | — | 147 | `SIM_NHF_RI_OMIT_1ADT_38` |
 | `NHF_PASSENGER_DATA_INVALID` | A passenger update with an invalid field, one field per pass, must be refused. | — | 163 | `SIM_NHF_RI_INVALID_1ADT_38` |
 | `NHF_PURCHASER_INVALID` | A purchaser with a missing or invalid field, one per pass, must be refused. | — | 250 | `SIM_NHF_PURCHASER_INVALID_1ADT_38` |
+| `OTST_OFFER_OPTION_PROBE` | Offer search probes (#780): one per option value the Test Framework declares (`OTST_OFFER_TRAVEL_CLASS_FIRST`, `OTST_OFFER_SERVICE_CLASS_HIGH`, `OTST_OFFER_FLEXIBILITY_NON_FLEXIBLE`…), offers asked with that value alone; no offer keeping to it, or the provider ignoring it, fails, and the scenario ends after the offer. | — | 118 | `SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38` |
 
 The expiry probes wait 40 minutes on a real provider (the catalogue sets
 their `…MaxWaitMinutes`); on the simulator their deadlines are one minute.

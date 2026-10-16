@@ -64,6 +64,7 @@ const ENUMS = {
   passengerUpdateScope:              [null, 'ALL', 'MAIN'],
   // #599: negative test, the expected product must not be offered.
   expectedProductAbsent:             ['off', 'on'],
+  offerSearchProbe:                  ['off', 'on'],
   // #602: offers asked by trip id, after POST /trips-collection; and its negative test.
   offersByTripIds:                   ['off', 'on'],
   // #604: booking and confirmation sent again with the same Idempotency-Key.
@@ -1802,6 +1803,8 @@ function buildDetailHTML(idx) {
           'The class expected on each leg, in the order of the legs (#600): for a train with a first class and one without. The request asks for every class named; the offer chosen must give each leg its class, by an admission of its own or by a supplement on that leg, and so must the booking. Empty: the travel class criterion applies.')}
         ${buildSelect(idx, 'expectedProductAbsent', 'Expected product absent', ENUMS.expectedProductAbsent,
           'Negative test (#599). On: no offer may hold the expected product above, for example a group its rules exclude (too many passengers, too many adults, a weekday). Passes when none does, fails when one does; the scenario ends after the offer either way.')}
+        ${buildSelect(idx, 'offerSearchProbe', 'Offer search probe', ENUMS.offerSearchProbe,
+          'Offer search probe (#780). On: the scenario tests the options of its offer search criteria. After the offer step, an option no offer keeps to, or that the provider says it ignored, fails; the scenario ends after the offer either way. The catalogue makes one per option value the Test Framework declares.')}
         ${String(state.scenarios[idx]?.scenarioType || '').includes('REFUND') ? `
         <div class="param-field">
           <span class="param-label">Refund receipt wait (min) <span class="param-hint">${esc('Refund receipt (#603). After the refund, the booking is read again every 15 seconds until a receipt (a document of type INFORMATION) appears, for up to this many minutes (1 to 60); none by then fails the scenario. Some providers add it some minutes after the refund. Empty: not awaited.')}</span></span>

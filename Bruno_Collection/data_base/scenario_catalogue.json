@@ -733,6 +733,17 @@
         "trip": "SEARCH",
         "passengers": 1
       }
+    },
+    {
+      "code": "OTST_OFFER_OPTION_PROBE",
+      "source": "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38",
+      "purpose": "Offer search probes: offers asked with one option of the offer search criteria alone, one probe per value the Test Framework declares; no offer keeping to it, or the provider ignoring it, fails.",
+      "checks": 118,
+      "probe": "OFFER_OPTIONS",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     }
   ]
 }

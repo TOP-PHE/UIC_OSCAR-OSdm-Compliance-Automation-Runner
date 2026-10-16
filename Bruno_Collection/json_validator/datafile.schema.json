@@ -324,6 +324,11 @@
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },
+          "offerSearchProbe": {
+            "description": "Offer search probe (#780). When on, the scenario tests its offer search criteria: after 01. POST Get Offer, an option it sends that no offer keeps to, or that the provider says it ignored, fails; the scenario ends there. The catalogue makes one such scenario per option value the Test Framework declares. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "overruleCodeExpectRejection": {
             "description": "Negative test (#596). When on, the provider is expected to refuse overruleCode: 10. POST Refund Offers must answer 4xx with an RFC-9457 Problem, and the scenario ends there. Without an overruleCode the flag is ignored with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

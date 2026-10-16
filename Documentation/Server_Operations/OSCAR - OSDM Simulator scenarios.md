@@ -218,6 +218,18 @@ without a code, it would cost a quarter of its price.
 | `SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38` | The same for one passenger (#776): the first booking and the scenario's booking are for the same passenger. | As above, one seat. | No failed check, no warning. |
 | `SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38` | Trip 17, `ADD_LATER`, `referencePlace` `AUTO` (#776): the first booking is made before step 09, for the reservation added after the booking, and deleted once 09 is answered. | As for `SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38`, near the first booking's seat. | No failed check; one warning at 02, as for `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38`: the optional reservation is not in the booking yet. |
 
+### Offer search probes (#780)
+
+Each asks for offers with one option of the offer search criteria alone (`offerSearchProbe` on) and ends after the offer: no offer keeping to the option, or the provider saying it ignored it, fails. Gamma keeps to the travel classes, flexibilities and offer mode asked, gives service class `HIGH` in first class and `STANDARD` in second (`BEST` and `BASIC` are not sold), and sells nothing without an admission. The catalogue makes one such scenario per option value a Test Framework declares, from the first one.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38` | `travelClasses` `FIRST`. | First-class offers only. | No failed check. |
+| `SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38` | `serviceClassTypes` `HIGH`. | First-class offers, whose service class is `HIGH`. | No failed check. |
+| `SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38` | `flexibilities` `NON_FLEXIBLE`, the flexibility the scenario chooses too. | Non-flexible offers only. | No failed check. |
+| `SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38` | `requestedOfferParts` `ADMISSION`. | The usual offers: admissions, with their reservation where the train has one. | No failed check. |
+| `SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38` | `offerMode` `INDIVIDUAL`. | Individual offers. | No failed check. |
+
 ### Seat reservations (#601)
 
 On trip 5, the SuperCity reservation is mandatory and the EuroCity one is
@@ -301,6 +313,8 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 | `SIM_WRONG_REFUND_AMOUNT_38` | Refund. | `refundableAmount` one cent above its breakdown. | Fails: "Refund response bounds", at 10 and 11 (2 failed checks). |
 | `SIM_WRONG_EXCHANGE_AMOUNT_38` | Exchange. | `amountToBePaid` one cent off `exchangePrice + exchangeFee − price given up`. | Fails: "amountToBePaid = exchangePrice + exchangeFee - confirmedPrice", for both exchange offers at 10 and for the chosen one at 11 and 12 (4 failed checks). |
 | `SIM_WRONG_NAMED_PLACE_38` | Variant `gives-other-place` (passenger list 24) on trip 16, a free seat named (#766). Deliberately wrong. | The booking gives the next seat instead of the one named. | One failed check at 07: the booked reservation does not give the place named. |
+| `SIM_WRONG_OFFER_PROBE_IGNORED_38` | Offer search probe (#780), first class asked from station `0000090` (`variants.ignoresOfferOptionsFrom`, trip 19). | The offer search criteria are ignored: second class only. | One failed check at 01: no offer keeps to the travel class asked. |
+| `SIM_WRONG_OFFER_PROBE_RESERVATION_ONLY_38` | Offer search probe (#780), reservations only asked (`requestedOfferParts` `RESERVATION`). | Gamma sells nothing without an admission: the usual offers, and a `PARAMETER_NOT_SUPPORTED` problem naming `offerSearchCriteria.requestedOfferParts`. | One failed check at 01: the provider says it ignored the option. |
 
 ### Requested information and purchaser (#611)
 

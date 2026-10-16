@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-offer-search-probes",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Offer search probes: one test per option the provider says it takes",
+    "summary": "The scenario catalogue now offers one reference scenario per offer search option value declared in the Test Framework, each asking for that value alone.",
+    "content": "Tick, in the Test Framework's Offer search options and Tariff Flexibility, the values a provider takes: an offer mode, offer parts, travel classes, service classes, flexibilities. The scenario catalogue then offers one probe per value ticked, for example OTST_OFFER_TRAVEL_CLASS_FIRST. A probe asks for offers with that value alone, and fails when no offer keeps to it or when the provider says it ignored it. It ends after the offer. An option left at every value is not probed, because that does not say every value is sold. Any scenario can be made a probe in Test Config (Offer search probe)."
+  },
+  {
     "id": "2026-10-16-offer-search-options",
     "date": "October 16, 2026",
     "tag": "Feature",

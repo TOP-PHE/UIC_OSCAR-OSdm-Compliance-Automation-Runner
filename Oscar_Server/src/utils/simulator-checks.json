@@ -1,9 +1,9 @@
 {
  "about": {
-  "collection": "OTST_V2.0.175",
-  "simulator": "0.30.0",
+  "collection": "OTST_V2.0.178",
+  "simulator": "0.31.0",
   "day": "2026-10-16",
-  "scenarios": 99
+  "scenarios": 104
  },
  "checks": {
   "del exchange offer|Status code is N, offer is deleted": [
@@ -1523,7 +1523,7 @@
    0
   ],
   "get coach|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "get exchange offer|'…' exists in response": [
@@ -1595,7 +1595,7 @@
    0
   ],
   "get passenger categories|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "get passenger|HTTP response status — expected N, actual: N": [
@@ -2039,143 +2039,143 @@
    0
   ],
   "get product by productid|GET /products/{productId} response body is present": [
-   88,
+   93,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is array": [
-   88,
+   93,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is boolean": [
-   176,
+   186,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is object": [
-   88,
+   93,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is string": [
-   440,
+   465,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" is a Product object": [
-   88,
+   93,
    0
   ],
   "get product by productid|GET /products/{productId} → N OK": [
-   88,
+   93,
    0
   ],
   "get product by productid|GET /products/{productId} → Product has required \"…\" (string)": [
-   352,
+   372,
    0
   ],
   "get product by productid|GET /products/{productId} → conforms to OSDM N.N Product schema (deep)": [
-   88,
+   93,
    0
   ],
   "get product by productid|GET /products/{productId} → response is a resource object": [
-   88,
+   93,
    0
   ],
   "get product by productid|[OSDM] Content-Type is JSON": [
-   88,
+   93,
    0
   ],
   "get product tags|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "get products|GET /products response body is present and not empty": [
-   88,
+   93,
    0
   ],
   "get products|GET /products response contains at least one product id": [
-   88,
+   93,
    0
   ],
   "get products|GET /products → \"…\" (when present) is array": [
-   88,
+   93,
    0
   ],
   "get products|GET /products → \"…\" (when present) is boolean": [
-   176,
+   186,
    0
   ],
   "get products|GET /products → \"…\" (when present) is object": [
-   88,
+   93,
    0
   ],
   "get products|GET /products → \"…\" (when present) is string": [
-   440,
+   465,
    0
   ],
   "get products|GET /products → \"…\" is an array<Product>": [
-   88,
+   93,
    0
   ],
   "get products|GET /products → N OK": [
-   88,
+   93,
    0
   ],
   "get products|GET /products → conforms to OSDM N.N Product schema (deep)": [
-   88,
+   93,
    0
   ],
   "get products|GET /products → every Product has required \"…\" (string)": [
-   352,
+   372,
    0
   ],
   "get products|GET /products → response is a collection object": [
-   88,
+   93,
    0
   ],
   "get products|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "get promotion codes|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "get reduction cards|GET /reduction-cards response body is present and not empty": [
-   88,
+   93,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is boolean": [
-   88,
+   93,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is string": [
-   88,
+   93,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" is an array<ReductionCardType>": [
-   88,
+   93,
    0
   ],
   "get reduction cards|GET /reduction-cards → N OK": [
-   88,
+   93,
    0
   ],
   "get reduction cards|GET /reduction-cards → conforms to OSDM N.N ReductionCardType schema (deep)": [
-   88,
+   93,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (object)": [
-   88,
+   93,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (string)": [
-   176,
+   186,
    0
   ],
   "get reduction cards|GET /reduction-cards → response is a collection object": [
-   88,
+   93,
    0
   ],
   "get reduction cards|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "get refund offer|'…' array exists with N refund offer(s)": [
@@ -2295,39 +2295,39 @@
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an ISO-N date-time": [
-   99,
+   104,
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an object": [
-   99,
+   104,
    0
   ],
   "get system version check|GET /versions → N OK": [
-   99,
+   104,
    0
   ],
   "get system version check|GET /versions → at least one ApiVersion entry": [
-   99,
+   104,
    0
   ],
   "get system version check|GET /versions → conforms to OSDM N.N ApiVersion schema (deep)": [
-   99,
+   104,
    0
   ],
   "get system version check|GET /versions → every entry has required \"…\" (non-empty string)": [
-   99,
+   104,
    0
   ],
   "get system version check|GET /versions → response is an array<ApiVersion>": [
-   99,
+   104,
    0
   ],
   "get system version check|OSDM version check (soft): data file \"…\" vs API [N.N] — match": [
-   99,
+   104,
    0
   ],
   "get system version check|Trip Search Criteria has at least one leg": [
-   78,
+   83,
    0
   ],
   "get system version check|Trip Specification has at least one leg": [
@@ -2335,11 +2335,11 @@
    0
   ],
   "get system version check|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "get zones|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ],
   "patch multi passenger|HTTP response status — expected N, actual: N": [
@@ -3519,7 +3519,7 @@
    0
   ],
   "post get offer|'…' array exists with N offer(s)": [
-   95,
+   100,
    0
   ],
   "post get offer|Admission <id> reservation relation N: minGroupItemsToBeBooked N is a whole number no larger than the group (N), and no larger than maxGroupItemsToBeBooked N": [
@@ -3563,7 +3563,7 @@
    0
   ],
   "post get offer|AdmissionOfferPart N isReusable is a boolean or null - isReusable: false": [
-   166,
+   171,
    0
   ],
   "post get offer|AdmissionOfferPart N offerMode is a known value - offerMode: COLLECTIVE": [
@@ -3571,11 +3571,11 @@
    0
   ],
   "post get offer|AdmissionOfferPart N offerMode is a known value - offerMode: INDIVIDUAL": [
-   163,
+   168,
    0
   ],
   "post get offer|AdmissionOfferPart N passengerRefs has at least one entry": [
-   166,
+   171,
    0
   ],
   "post get offer|AdmissionOfferPart N price structure is valid - amount: N, currency: CHF": [
@@ -3583,7 +3583,7 @@
    0
   ],
   "post get offer|AdmissionOfferPart N price structure is valid - amount: N, currency: CZK": [
-   153,
+   158,
    0
   ],
   "post get offer|AdmissionOfferPart N price structure is valid - amount: N, currency: EUR": [
@@ -3591,15 +3591,15 @@
    0
   ],
   "post get offer|AdmissionOfferPart N validFrom is a valid date - validFrom: <instant>": [
-   166,
+   171,
    0
   ],
   "post get offer|AdmissionOfferPart N validUntil is in the future - validUntil: <instant>": [
-   166,
+   171,
    0
   ],
   "post get offer|At least one matching product has the expected flexibility - count : N": [
-   95,
+   100,
    0
   ],
   "post get offer|Group offer: admission <id> names the passenger type of each passenger — N: ADULT, N: ADULT, N: ADULT, N: ADULT, N: ADULT, N: ADULT": [
@@ -3619,19 +3619,19 @@
    0
   ],
   "post get offer|HTTP response status — expected N, actual: N": [
-   95,
+   100,
    0
   ],
   "post get offer|Offer minimalPrice >= sum of admission parts price - minimalPrice: N, admissions: N": [
-   95,
+   100,
    0
   ],
   "post get offer|Offer overallFlexibility consistency - overallFlex: FULL_FLEXIBLE, derived (most restrictive): FULL_FLEXIBLE": [
-   79,
+   83,
    0
   ],
   "post get offer|Offer overallFlexibility consistency - overallFlex: NON_FLEXIBLE, derived (most restrictive): NON_FLEXIBLE": [
-   8,
+   9,
    0
   ],
   "post get offer|Offer overallFlexibility consistency - overallFlex: SEMI_FLEXIBLE, derived (most restrictive): SEMI_FLEXIBLE": [
@@ -3639,19 +3639,39 @@
    0
   ],
   "post get offer|Offer preBookableUntil is a valid date in the future - preBookableUntil: <instant>": [
-   95,
+   100,
+   0
+  ],
+  "post get offer|Offer request: the offers keep to the flexibilities asked (NON_FLEXIBLE)": [
+   1,
+   0
+  ],
+  "post get offer|Offer request: the offers keep to the offer mode asked (INDIVIDUAL)": [
+   1,
+   0
+  ],
+  "post get offer|Offer request: the offers keep to the offer parts asked (ADMISSION)": [
+   1,
+   0
+  ],
+  "post get offer|Offer request: the offers keep to the service classes asked (HIGH)": [
+   1,
+   0
+  ],
+  "post get offer|Offer request: the offers keep to the travel classes asked (FIRST)": [
+   1,
    0
   ],
   "post get offer|Offer summary - minimalPrice structure exists, is a number >= N : N": [
-   95,
+   100,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is a valid OSDM value: FULL_FLEXIBLE": [
-   79,
+   83,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is a valid OSDM value: NON_FLEXIBLE": [
-   8,
+   9,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is a valid OSDM value: SEMI_FLEXIBLE": [
@@ -3659,31 +3679,39 @@
    0
   ],
   "post get offer|Offer summary - overallFlexibility is defined - overallFlexibility: FULL_FLEXIBLE": [
-   79,
+   83,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is defined - overallFlexibility: NON_FLEXIBLE": [
-   8,
+   9,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is defined - overallFlexibility: SEMI_FLEXIBLE": [
    8,
    0
   ],
+  "post get offer|Offer summary - overallServiceClass is defined - overallServiceClass: First": [
+   2,
+   0
+  ],
   "post get offer|Offer summary - overallServiceClass is defined - overallServiceClass: Standard": [
-   94,
+   97,
+   0
+  ],
+  "post get offer|Offer summary - overallTravelClass is defined - overallTravelClass: FIRST": [
+   2,
    0
   ],
   "post get offer|Offer summary - overallTravelClass is defined - overallTravelClass: SECOND": [
-   94,
+   97,
    0
   ],
   "post get offer|Offer tripCoverage.coveredLegIds are non-empty strings - count: N": [
-   95,
+   100,
    0
   ],
   "post get offer|Offer tripCoverage.coveredTripId is present (OSDM: TripCoverage.coveredTripId required)": [
-   95,
+   100,
    0
   ],
   "post get offer|Offer: an offer gives each leg its class [FIRST, SECOND] — N offer(s)": [
@@ -3735,15 +3763,15 @@
    0
   ],
   "post get offer|Passenger N dateOfBirth is a valid date in the past - dateOfBirth: <instant>": [
-   174,
+   179,
    0
   ],
   "post get offer|Passenger N externalRef is defined - externalRef: N": [
-   174,
+   179,
    0
   ],
   "post get offer|Passenger N type is a non-empty PassengerType code - value: PERSON": [
-   172,
+   177,
    0
   ],
   "post get offer|Passenger N type is a non-empty PassengerType code - value: YOUTH": [
@@ -3751,11 +3779,11 @@
    0
   ],
   "post get offer|Passengers are defined - length: N": [
-   95,
+   100,
    0
   ],
   "post get offer|Price fields exist (currency) in minimalPrice": [
-   95,
+   100,
    0
   ],
   "post get offer|Reservation linkage in admission with id <id>, reservationsRef ids should match reservationOfferParts ids": [
@@ -3791,11 +3819,11 @@
    0
   ],
   "post get offer|Selected offer has expected flexibility - expected: FULL_FLEXIBLE, actual: FULL_FLEXIBLE": [
-   79,
+   83,
    0
   ],
   "post get offer|Selected offer has expected flexibility - expected: NON_FLEXIBLE, actual: NON_FLEXIBLE": [
-   8,
+   9,
    0
   ],
   "post get offer|Selected offer has expected flexibility - expected: SEMI_FLEXIBLE, actual: SEMI_FLEXIBLE": [
@@ -3803,23 +3831,23 @@
    0
   ],
   "post get offer|Trip N Leg N has TrainID, Origin & Destination - TrainID: N, Origin: Station N, Destination: Station N": [
-   102,
+   107,
    0
   ],
   "post get offer|Trip N direction is a known value - direction: OUT_BOUND": [
-   95,
+   100,
    0
   ],
   "post get offer|Trip N has legs - length: N": [
-   95,
+   100,
    0
   ],
   "post get offer|Trip N startTime is before endTime (OSDM: temporal order)": [
-   95,
+   100,
    0
   ],
   "post get offer|Trips are defined - length: N": [
-   95,
+   100,
    0
   ],
   "post get offer|Trips collection: HTTP status N — actual N": [
@@ -3851,7 +3879,7 @@
    0
   ],
   "post get offer|[OSCAR request] POST /offers conforms to OSDM N.N OfferCollectionRequest": [
-   99,
+   104,
    0
   ],
   "post get offer|[OSCAR request] POST /offers does not conform to OSDM N.N OfferCollectionRequest, on purpose (negative test: empty passenger list)": [
@@ -3859,7 +3887,7 @@
    0
   ],
   "post get offer|[OSDM] Content-Type is JSON": [
-   100,
+   105,
    0
   ],
   "post get offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: CHF, actual: CHF)": [
@@ -3867,7 +3895,7 @@
    0
   ],
   "post get offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: CZK, actual: CZK)": [
-   153,
+   158,
    0
   ],
   "post get offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: EUR, actual: EUR)": [
@@ -3887,19 +3915,19 @@
    0
   ],
   "post get offer|offers[N].createdOn is a valid ISO datetime (OSDM: Offer.createdOn required)": [
-   384,
+   401,
    0
   ],
   "post get offer|offers[N].offerId is a non-empty string (OSDM: Offer.offerId required)": [
-   384,
+   401,
    0
   ],
   "post get offer|offers[N].passengerRefs count matches requested passengers (expected: N, actual: N)": [
-   384,
+   401,
    0
   ],
   "post get offer|offers[N].passengerRefs is a non-empty array (OSDM: Offer.passengerRefs minItems:N)": [
-   384,
+   401,
    0
   ],
   "post get offer|reservationOfferParts[N].price.currency matches offerSummary currency (expected: CZK, actual: CZK)": [
@@ -3907,7 +3935,7 @@
    0
   ],
   "post get offer|selectedOffer.tripCoverage.coveredTripId (<id>) is part of Trip ids": [
-   95,
+   100,
    0
   ],
   "post get offer|🔎 Train filter: the answer holds a trip of train N — N of N trip(s)": [
@@ -4499,11 +4527,11 @@
    0
   ],
   "simulator access token|Authentication: access token acquired for Simulator": [
-   99,
+   104,
    0
   ],
   "simulator access token|[OSDM] Content-Type is JSON": [
-   99,
+   104,
    0
   ]
  }

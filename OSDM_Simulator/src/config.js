@@ -191,11 +191,15 @@ function checkShortDeadlines(value, bad) {
 
 // #611: answers that differ from the happy path, chosen per booking by the
 // passengers' last names; `wrongOffersFrom` is a stop place whose offers are
-// deliberately wrong. Absent: no variant.
+// deliberately wrong; #780: `ignoresOfferOptionsFrom` (optional) one whose
+// offers ignore the offer search criteria. Absent: no variant.
 function checkVariants(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || !isText(value.wrongOffersFrom, 1, 120)) throw bad('variants');
-  return { variants: { wrongOffersFrom: value.wrongOffersFrom } };
+  if (value.ignoresOfferOptionsFrom !== undefined && !isText(value.ignoresOfferOptionsFrom, 1, 120)) throw bad('variants');
+  const variants = { wrongOffersFrom: value.wrongOffersFrom };
+  if (value.ignoresOfferOptionsFrom) variants.ignoresOfferOptionsFrom = value.ignoresOfferOptionsFrom;
+  return { variants };
 }
 
 // #611: passenger and purchaser data checked on update, and a stop place
