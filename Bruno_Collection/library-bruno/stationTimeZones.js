@@ -42,7 +42,9 @@ function offsetAt(zone, ms) {
       .formatToParts(new Date(ms)).find((p) => p.type === 'timeZoneName');
     if (part?.value === 'GMT') return 0;
     const m = /^GMT([+-])(\d{2}):(\d{2})$/.exec(part?.value || '');
-    return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : null;
+    if (!m) return null;
+    const sign = m[1] === '-' ? -1 : 1;
+    return sign * (Number(m[2]) * 60 + Number(m[3]));
   } catch {
     return null;
   }

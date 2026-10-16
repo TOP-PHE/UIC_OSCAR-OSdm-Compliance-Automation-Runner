@@ -2545,7 +2545,7 @@ function checkOfferRequestByTripIds(status, body) {
   if (outcome.probe) {
     // #772: "no offer" for a trip the provider never gave is a right answer,
     // as for a departure out of range (#704).
-    const offers = body && Array.isArray(body.offers) ? body.offers : null;
+    const offers = Array.isArray(body?.offers) ? body.offers : null;
     if (typeof status === "number" && status >= 200 && status < 300 && offers && offers.length === 0) {
       test("🧪 Trip id probe: no offer for a trip the provider never gave", () => {});
       return true;

@@ -101,7 +101,7 @@ function endsOf(trip) {
   };
 }
 
-const NOT_PROVIDED = [404, 405, 501];
+const NOT_PROVIDED = new Set([404, 405, 501]);
 
 /**
  * The checks of a TripCollectionResponse: an id, trips with ids and legs, no
@@ -112,7 +112,7 @@ const NOT_PROVIDED = [404, 405, 501];
 function checkTripsCollection(status, body, request) {
   // #772: 404, 405 and 501 say the provider does not give a trip search (the
   // #488 rule): a warning, and the scenario cannot go on by trip id.
-  if (NOT_PROVIDED.includes(status)) {
+  if (NOT_PROVIDED.has(status)) {
     return [{ name: `Trips collection: POST /trips-collection is provided — answered ${status}`, ok: false, level: 'warn', message: 'the provider does not give a trip search, so offers by trip id cannot be asked' }];
   }
   const checks = [{ name: `Trips collection: HTTP status 200 — actual ${status}`, ok: status === 200, message: `HTTP ${status}` }];
