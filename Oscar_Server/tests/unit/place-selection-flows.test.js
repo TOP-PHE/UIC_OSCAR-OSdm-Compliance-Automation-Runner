@@ -138,7 +138,7 @@ describe('#766 — the catalogue and the copy', () => {
     const refused = entries.filter((e) => placeMissing(e).length).map((e) => e.code);
     // #766 PR 5: the same choices made after the booking (ADD_LATER) are gated alike.
     const later = ['OTST_SALE_NAMED_PLACE_ADD_LATER_2ADT', 'OTST_SALE_NEARBY_PLACE_ADD_LATER_2ADT', 'OTST_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT'];
-    const named = ['OTST_SALE_NAMED_PLACE_2ADT', 'OTST_SALE_NAMED_PLACE_FEE_1ADT', 'OTST_SALE_NAMED_COMPARTMENT_2ADT', 'OTST_SALE_NEARBY_PLACE_2ADT', ...later];
+    const named = ['OTST_SALE_NAMED_PLACE_2ADT', 'OTST_SALE_NAMED_PLACE_FEE_1ADT', 'OTST_SALE_NAMED_COMPARTMENT_2ADT', 'OTST_SALE_NEARBY_PLACE_2ADT', 'OTST_SALE_NEARBY_PLACE_1ADT', ...later];
     expect(refused).toEqual(['OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT', 'OTST_SALE_SEAT_PREFERENCE_1ADT', 'OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT', ...named]);
     const automatic = catalogueFor(catalogue, simulator, withFlows(['AUTOMATIC_PLACE_SELECTION']));
     expect(automatic.filter((e) => placeMissing(e).length).map((e) => e.code)).toEqual(['OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT', ...named]);

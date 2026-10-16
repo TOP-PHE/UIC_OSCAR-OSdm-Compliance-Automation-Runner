@@ -132,6 +132,8 @@ runtime:
         const { validateBookedOfferPartResponse } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
         // #766 PR 5: the checks of the availability requests asked before 09.
         require(bru.getEnvVar("library_base") + "offers.js").recordPlacePreferenceChecks();
+        // #776: passenger A's booking, made for the reference place, is deleted now that this booking is answered.
+        await require(bru.getEnvVar("library_base") + "offers.js").releaseReferenceBooking();
 
         // #expired-add-reservation-offer: when armed, the POST MUST be rejected
         // — adding an expired offer-part to the booking must not succeed. Grade

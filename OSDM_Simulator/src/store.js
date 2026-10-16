@@ -53,13 +53,18 @@ function createStore({ limits, ttlMs, now = Date.now }) {
     return entry.value;
   }
 
+  // #776: a booking deleted before its confirmation.
+  function remove(kind, scope, id) {
+    bucket(kind, scope, false)?.delete(id);
+  }
+
   function count(kind) {
     let n = 0;
     for (const entries of kinds.get(kind).values()) n += entries.size;
     return n;
   }
 
-  return { put, get, count };
+  return { put, get, remove, count };
 }
 
 module.exports = { createStore };

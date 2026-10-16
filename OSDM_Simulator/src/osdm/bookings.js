@@ -35,6 +35,7 @@ function reservationOptions(part, selection, trips, provider, chosen) {
   }
   const near = placeMap.placeMapOfTrip(trip, provider) ? placeMap.referenceOf(selection, part.id) : null;
   return {
+    onMap: !!placeMap.placeMapOfTrip(trip, provider),
     placeProperties: propertiesGiven(propertiesAsked(selection, part.id), trip, provider, { ignore: chosen.has('ignores-place-preferences') }),
     named,
     fee: named ? placeMap.feeOf(provider) : 0,

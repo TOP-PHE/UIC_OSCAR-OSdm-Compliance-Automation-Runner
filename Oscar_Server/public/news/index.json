@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-nearby-reference-booking",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Sit near another passenger: the reference place comes from a first booking",
+    "summary": "A nearby-place scenario no longer needs a coach and place typed in: the run books the first passenger alone and sits the others near that place.",
+    "content": "A coach and place number belong to one train of one provider, so they cannot be written into a scenario. With 'Near the place' empty or AUTO, the run first books the trip for the first passenger alone, takes the place given as the reference place, and then asks for the scenario's places near it, while that place is taken. The first booking is deleted once the scenario's booking is answered. If the first booking cannot be made, the scenario goes on without a reference place and says so as a warning. The reference scenarios near a place now work this way, and a one-passenger version is added: OTST_SALE_NEARBY_PLACE_1ADT."
+  },
+  {
     "id": "2026-10-16-version-and-ignored-reservations",
     "date": "October 16, 2026",
     "tag": "Fix",

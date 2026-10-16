@@ -498,18 +498,28 @@
     },
     {
       "code": "OTST_SALE_NEARBY_PLACE_2ADT",
-      "source": "SIM_SALE_NEARBY_PLACE_2ADT_38",
-      "purpose": "Two seats near a given place (AUTOMATIC_PLACE_SELECTION_NEARBY): GET /availabilities/nearby, then the booking names the place in placeSelections[].referencePlace and gives seats in its coach, never the place itself.",
+      "source": "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38",
+      "purpose": "Two seats near the place of another passenger (AUTOMATIC_PLACE_SELECTION_NEARBY): the trip is booked first for the first passenger alone, the place given is the reference place; GET /availabilities/nearby, then the booking names it in placeSelections[].referencePlace and gives seats in its coach, never that place itself. The first booking is deleted.",
       "checks": 336,
       "needs": {
         "trip": "SPECIFICATION",
         "reservations": [
           "MANDATORY"
         ],
-        "passengers": 2,
-        "providerValues": [
-          "referencePlace"
-        ]
+        "passengers": 2
+      }
+    },
+    {
+      "code": "OTST_SALE_NEARBY_PLACE_1ADT",
+      "source": "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38",
+      "purpose": "One seat near the place of a first booking (AUTOMATIC_PLACE_SELECTION_NEARBY), for one passenger: the same as OTST_SALE_NEARBY_PLACE_2ADT for a provider that books one passenger's reservation only.",
+      "checks": 273,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 1
       }
     },
     {
@@ -527,18 +537,15 @@
     },
     {
       "code": "OTST_SALE_NEARBY_PLACE_ADD_LATER_2ADT",
-      "source": "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38",
-      "purpose": "An optional reservation added after the booking near a given place: GET /availabilities/nearby for the booking, the reference place in the offer-parts request, seats given in its coach.",
+      "source": "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38",
+      "purpose": "An optional reservation added after the booking near the place of another passenger: a first booking for the first passenger alone gives the reference place; GET /availabilities/nearby for the booking, the reference place in the offer-parts request, seats given in its coach. The first booking is deleted.",
       "checks": 335,
       "needs": {
         "trip": "SPECIFICATION",
         "reservations": [
           "OPTIONAL"
         ],
-        "passengers": 2,
-        "providerValues": [
-          "referencePlace"
-        ]
+        "passengers": 2
       }
     },
     {

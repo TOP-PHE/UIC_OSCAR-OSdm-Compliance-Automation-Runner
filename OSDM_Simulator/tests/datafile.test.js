@@ -424,7 +424,8 @@ test('the reservation scenarios: one per form, on a SuperCity (mandatory) then a
   }, gamma, Date.parse('2026-11-02T09:00:00Z'));
   assert.ok(response.offers.every((o) => o.reservationOfferParts.length === 2));
   // #766 PR 5: the place choices made after the booking add the reservation later too.
-  const afterBooking = ['SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38', 'SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38', 'SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38'];
+  const afterBooking = ['SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38', 'SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38', 'SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38',
+    'SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38'];
   for (const scenario of datafile.scenarios.filter((s) => !booked.includes(s))) {
     assert.equal(scenario.reservationBookingForm, afterBooking.includes(scenario.code) ? 'ADD_LATER' : undefined, scenario.code);
   }
@@ -534,6 +535,7 @@ test('the named place scenarios: the only ones on gamma\'s place map stop place,
   assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === 17).map((s) => [s.code, s.reservationBookingForm, s.placeSelectionFlow]), [
     ['SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38', 'ADD_LATER', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE'],
     ['SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38', 'ADD_LATER', 'AUTOMATIC_PLACE_SELECTION_NEARBY'],
+    ['SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38', 'ADD_LATER', 'AUTOMATIC_PLACE_SELECTION_NEARBY'],
   ]);
   const on = datafile.scenarios.filter((s) => s.tripRequirementId === 16);
   assert.deepEqual(on.map((s) => [s.code, s.placeSelectionFlow, s.namedPlaceKind ?? null]), [
@@ -543,5 +545,10 @@ test('the named place scenarios: the only ones on gamma\'s place map stop place,
     ['SIM_WRONG_NAMED_PLACE_38', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', null],
     ['SIM_SALE_NEARBY_PLACE_2ADT_38', 'AUTOMATIC_PLACE_SELECTION_NEARBY', null],
     ['SIM_VARIANT_IGNORES_REFERENCE_1ADT_38', 'AUTOMATIC_PLACE_SELECTION_NEARBY', null],
+    ['SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38', 'AUTOMATIC_PLACE_SELECTION_NEARBY', null],
+    ['SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38', 'AUTOMATIC_PLACE_SELECTION_NEARBY', null],
   ]);
+  // #776: the reference place of the AUTO scenarios comes from a first booking.
+  assert.deepEqual(datafile.scenarios.filter((s) => s.referencePlace === 'AUTO').map((s) => s.code),
+    ['SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38', 'SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38', 'SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38']);
 });

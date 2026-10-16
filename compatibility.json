@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.338",
+  "current_release": "2026.339",
   "releases": [
+    {
+      "release": "2026.339",
+      "date": "2026-10-16",
+      "server": "1.11.304",
+      "collection": "OTST_V2.0.175",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "A nearby-place scenario with referencePlace empty or AUTO takes its reference place from a first booking of the first passenger alone, deleted afterwards; reference scenario OTST_SALE_NEARBY_PLACE_1ADT (#776)."
+      ]
+    },
     {
       "release": "2026.338",
       "date": "2026-10-16",
