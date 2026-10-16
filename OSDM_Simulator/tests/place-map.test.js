@@ -184,7 +184,8 @@ test('booking: a reference place gives the seats after it, in its coach; the var
   const near = reserved(booking(offer, trip, find, ref)).placeAllocation.reservedPlaces[0];
   assert.deepEqual([near.coachNumber, near.placeNumbers], ['7', ['16', '17']]);
   const other = reserved(booking(offer, trip, find, ref, 'Simvariant-Ignores-Reference-Place')).placeAllocation.reservedPlaces[0];
-  assert.equal(other.coachNumber, '8');
+  // The same seats in the next coach, so the warning a replay records names the same place every run.
+  assert.deepEqual([other.coachNumber, other.placeNumbers], ['8', ['16', '17']]);
   const status = (choice) => { try { booking(offer, trip, find, choice); return 200; } catch (e) { return e.status; } };
   assert.equal(status({ referencePlace: { coachNumber: '7', placeNumber: '61' } }), 409);
   assert.equal(status({ referencePlace: { coachNumber: '7' } }), 400);

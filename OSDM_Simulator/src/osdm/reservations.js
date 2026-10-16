@@ -259,7 +259,7 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
   let given;
   if (named) given = { coachNumber: placeMap.COACH, placeNumbers: named.places.map((n) => (otherPlace ? placeMap.otherPlace(n) : n)) };
   else if (near && !ignoreReference) given = { coachNumber: near.coachNumber, placeNumbers: placeMap.seatsNear(near.placeNumber, passengerIds.length) };
-  else if (near) given = { coachNumber: String(Number(near.coachNumber) + 1), placeNumbers: placesOf(part.id, passengerIds.length).placeNumbers };
+  else if (near) given = { coachNumber: String(Number(near.coachNumber) + 1), placeNumbers: placeMap.seatsNear(near.placeNumber, passengerIds.length) };
   else given = placesOf(part.id, passengerIds.length);
   const { coachNumber, placeNumbers } = given;
   const charged = named ? { ...part.price, amount: part.price.amount + named.fees * fee } : part.price;
