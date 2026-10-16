@@ -76,7 +76,7 @@ Not changed: a refund offer confirmed with `refundableAmount` 0 after being prop
 
 Checked:
 - Unit tests: `bruno-real-provider-786.test.js` (7). With the first three fixes undone, three of them fail.
-- Full simulator replay, compared with the one of 1.11.308.
+- Full simulator replay, compared with the one of 1.11.308: 24 scenarios have fewer checks (the deadline of a confirmed refund offer, and the flags of parts already refunded or exchanged, are no longer checked), none newly failing. The catalogue's check counts of 14 entries and the generated pages follow.
 
 ---
 
