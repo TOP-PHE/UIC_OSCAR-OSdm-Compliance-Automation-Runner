@@ -46,11 +46,11 @@ function kindOfScenario(scenario) {
   return KINDS.includes(kind) ? kind : 'PLACE';
 }
 
-/** The body of POST /availabilities/vehicle-place-map for reservations of an offer. */
-function placeMapRequest(offerId, reservationIds) {
+/** The body of POST /availabilities/vehicle-place-map for reservations of an offer (or, after it, of a booking). */
+function placeMapRequest(contextId, reservationIds, contextType = 'OFFER') {
   return {
     placeRestrictions: listOf(reservationIds).map((id) => ({
-      reservationRef: { contextId: offerId, contextType: 'OFFER', resourceId: id, resourceType: 'RESERVATION' },
+      reservationRef: { contextId, contextType, resourceId: id, resourceType: 'RESERVATION' },
     })),
   };
 }
@@ -245,10 +245,10 @@ function referenceOfScenario(scenario) {
   return coachNumber && placeNumber && !placeNumber.includes('/') ? { coachNumber, placeNumber } : null;
 }
 
-/** The query of GET /availabilities/nearby for a reservation of an offer and a reference place. */
-function nearbyQuery(offerId, reservationId, ref) {
+/** The query of GET /availabilities/nearby for a reservation of an offer (or of a booking) and a reference place. */
+function nearbyQuery(contextId, reservationId, ref, contextType = 'OFFER') {
   const q = (v) => encodeURIComponent(String(v ?? ''));
-  return `/availabilities/nearby?contextId=${q(offerId)}&contextType=OFFER&resourceId=${q(reservationId)}&resourceType=RESERVATION`
+  return `/availabilities/nearby?contextId=${q(contextId)}&contextType=${q(contextType)}&resourceId=${q(reservationId)}&resourceType=RESERVATION`
     + `&coachNumber=${q(ref?.coachNumber)}&placeNumber=${q(ref?.placeNumber)}`;
 }
 

@@ -178,7 +178,7 @@ runtime:
           if (bru.getEnvVar("placeSelectionFlow") === "AUTOMATIC_PLACE_SELECTION_NEARBY") {
             require(bru.getEnvVar("library_base") + "namedPlaces.js").checkNearPlaceGiven(
               (jsonData && jsonData.booking) || jsonData, fromEnv(bru.getEnvVar("nearbyReference"), null),
-              fromEnv(bru.getEnvVar("__reservationsBooked"), [])
+              [...fromEnv(bru.getEnvVar("__reservationsBooked"), []), ...fromEnv(bru.getEnvVar("__reservationsAddedLater"), [])]
             ).forEach((c) => {
               if (c.level === "warn") { require(bru.getEnvVar("library_base") + "displays.js").validationLogger(c.ok ? `[INFO] ${c.name}` : `[WARNING] ${c.name} — ${c.message}`); return; }
               test(c.name, () => { if (!c.ok) throw new Error(c.message); });

@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -3500,6 +3500,115 @@
         "offerMode": null,
         "requestedOfferParts": []
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38",
+      "description": "Simulated provider: a EuroCity from station 0000091 (optional reservation, place map), the reservation added after the booking (#766): POST /availabilities/vehicle-place-map in the BOOKING context, two free seats named in the offer-parts request, and the booking gives them. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "reservationBookingForm": "ADD_LATER",
+      "placeSelectionFlow": "MANUAL_PLACE_SELECTION_WITHOUT_FEE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 17,
+      "passengersListId": 2,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38",
+      "description": "Simulated provider: the same EuroCity, the reservation added after the booking near place 7/15 (#766): GET /availabilities/nearby in the BOOKING context, the reference place in the offer-parts request, and the seats given in coach 7. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "reservationBookingForm": "ADD_LATER",
+      "placeSelectionFlow": "AUTOMATIC_PLACE_SELECTION_NEARBY",
+      "referencePlace": "7/15",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 17,
+      "passengersListId": 2,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38",
+      "description": "Simulated provider: a EuroCity from station 0000092 (optional reservation, seat preferences), the reservation added after the booking with a window seat (#766): GET /availabilities/preferences in the BOOKING context, the preference in the offer-parts request, and the place given names it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "reservationBookingForm": "ADD_LATER",
+      "placeSelectionFlow": "AUTOMATIC_PLACE_SELECTION_PREFERENCES",
+      "placePreferences": [
+        "WINDOW"
+      ],
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 18,
+      "passengersListId": 2,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -3835,6 +3944,42 @@
         }
       ],
       "description": "Simulated trip, a SuperCity (seat reservation mandatory) from station 0000091, whose coach gamma shows on the place map, to station 0000002"
+    },
+    {
+      "id": 17,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000091",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "vehicleNumber": "171",
+          "operatorCode": "",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
+          "productCategoryName": "EuroCity",
+          "productCategoryShortName": "EC"
+        }
+      ],
+      "description": "Simulated trip, a EuroCity (seat reservation optional) from station 0000091, whose coach gamma shows on the place map, to station 0000002"
+    },
+    {
+      "id": 18,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000092",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "vehicleNumber": "173",
+          "operatorCode": "",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
+          "productCategoryName": "EuroCity",
+          "productCategoryShortName": "EC"
+        }
+      ],
+      "description": "Simulated trip, a EuroCity (seat reservation optional) from station 0000092, where gamma offers seat preferences, to station 0000002"
     }
   ],
   "purchaserList": [

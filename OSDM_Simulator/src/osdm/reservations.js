@@ -199,10 +199,9 @@ function preferenceAvailability(query, found, provider) {
   const resourceId = query.get('resourceId');
   const resourceType = query.get('resourceType');
   if (!contextId || !contextType || !resourceId || !resourceType) throw bad('contextId, contextType, resourceId and resourceType are required');
-  if (contextType === 'BOOKING') throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator gives the preferences of an offer only.');
-  if (contextType !== 'OFFER') throw bad('contextType must be OFFER or BOOKING');
+  if (!placeMap.CONTEXTS.has(contextType)) throw bad('contextType must be OFFER or BOOKING');
   if (resourceType !== 'RESERVATION') throw bad('resourceType must be RESERVATION');
-  if (!found) throw new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+  if (!found) throw placeMap.contextNotFound(contextType);
   const part = listOf(found.offer.reservationOfferParts).find((p) => p.id === resourceId);
   if (!part) throw new HttpError(404, 'RESERVATION_NOT_FOUND', 'Reservation not found', `"${resourceId}" is not a reservation of offer ${contextId}.`);
   const trip = listOf(found.trips).find((t) => t.id === part.tripCoverage.coveredTripId);
@@ -260,7 +259,7 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
   let given;
   if (named) given = { coachNumber: placeMap.COACH, placeNumbers: named.places.map((n) => (otherPlace ? placeMap.otherPlace(n) : n)) };
   else if (near && !ignoreReference) given = { coachNumber: near.coachNumber, placeNumbers: placeMap.seatsNear(near.placeNumber, passengerIds.length) };
-  else if (near) given = { coachNumber: String(Number(near.coachNumber) + 1), placeNumbers: placesOf(part.id, passengerIds.length).placeNumbers };
+  else if (near) given = { coachNumber: String(Number(near.coachNumber) + 1), placeNumbers: placeMap.seatsNear(near.placeNumber, passengerIds.length) };
   else given = placesOf(part.id, passengerIds.length);
   const { coachNumber, placeNumbers } = given;
   const charged = named ? { ...part.price, amount: part.price.amount + named.fees * fee } : part.price;

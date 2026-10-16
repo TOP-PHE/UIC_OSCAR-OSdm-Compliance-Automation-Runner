@@ -145,7 +145,7 @@ test('availability: GET /availabilities/preferences leaves out what is sold out'
   assert.deepEqual(answer.availablePlaces.map((p) => p.placeProperties), [['WINDOW', 'AISLE', 'POWER']]);
   assert.equal(answer.availablePlaces[0].numericAvailability, 40);
   const status = (q, found = find(offer.offerId)) => { try { preferenceAvailability(q, found, gamma); return 200; } catch (e) { return e.status; } };
-  assert.equal(status(query({ contextType: 'BOOKING' })), 501);
+  assert.equal(status(query({ contextType: 'BOOKING' }), null), 404);
   assert.equal(status(query({ contextType: 'TRIP' })), 400);
   assert.equal(status(query({ resourceType: 'FARE' })), 400);
   assert.equal(status(new URLSearchParams({ contextId: offer.offerId })), 400);

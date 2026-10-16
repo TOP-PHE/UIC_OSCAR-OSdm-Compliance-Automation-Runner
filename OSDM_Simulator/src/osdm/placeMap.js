@@ -54,6 +54,15 @@ function placeMapOfTrip(trip, provider) {
 /** The selection fee of one seat, in hundredths, before nothing else. */
 const feeOf = (provider) => Math.round(provider.placeMap.fee * provider.priceFactor);
 
+// #766 PR 5: an availability is asked for an offer, or for a booking (a
+// reservation added after it). Unknown, expired or another client's: 404.
+const CONTEXTS = new Set(['OFFER', 'BOOKING']);
+function contextNotFound(contextType) {
+  return contextType === 'BOOKING'
+    ? new HttpError(404, 'BOOKING_NOT_FOUND', 'Booking not found', 'The booking does not exist, or the reservation is not one of its offers.')
+    : new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+}
+
 /**
  * POST /availabilities/vehicle-place-map: the coach, for the reservations
  * the restrictions name (offers of this client only). `findOffer(id)` gives
@@ -65,14 +74,14 @@ function vehiclePlaceMap(body, findOffer, provider, price) {
   const refs = restrictions.map((r, i) => {
     const ref = r?.reservationRef;
     if (!ref || !text(ref.contextId) || !text(ref.resourceId)) throw bad(`placeRestrictions[${i}].reservationRef is missing or not valid`);
-    if (ref.contextType === 'BOOKING') throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator gives the place map of an offer only.');
-    if (ref.contextType !== 'OFFER' || ref.resourceType !== 'RESERVATION') throw bad(`placeRestrictions[${i}].reservationRef must be an OFFER and a RESERVATION`);
-    const found = findOffer(ref.contextId);
-    if (!found) throw new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+    if (!CONTEXTS.has(ref.contextType) || ref.resourceType !== 'RESERVATION') throw bad(`placeRestrictions[${i}].reservationRef must be an OFFER or BOOKING and a RESERVATION`);
+    // #766 PR 5: in a BOOKING context, the offer of the booking that holds the reservation.
+    const found = findOffer(ref.contextId, ref.contextType, ref.resourceId);
+    if (!found) throw contextNotFound(ref.contextType);
     const part = listOf(found.offer.reservationOfferParts).find((p) => p.id === ref.resourceId);
     if (!part) throw new HttpError(404, 'RESERVATION_NOT_FOUND', 'Reservation not found', `"${ref.resourceId}" is not a reservation of offer ${ref.contextId}.`);
     const trip = listOf(found.trips).find((t) => t.id === part.tripCoverage.coveredTripId);
-    return placeMapOfTrip(trip, provider) ? { contextId: ref.contextId, contextType: 'OFFER', resourceId: ref.resourceId, resourceType: 'RESERVATION' } : null;
+    return placeMapOfTrip(trip, provider) ? { contextId: ref.contextId, contextType: ref.contextType, resourceId: ref.resourceId, resourceType: 'RESERVATION' } : null;
   }).filter(Boolean);
   if (refs.length === 0) return { vehicle: { coaches: [] } };
   const fee = { price: price(feeOf(provider)) };
@@ -151,9 +160,8 @@ function nearbyAvailability(query, found, provider) {
   for (const k of ['contextId', 'contextType', 'resourceId', 'resourceType', 'coachNumber', 'placeNumber']) {
     if (!get(k)) throw bad(`${k} is required`);
   }
-  if (get('contextType') === 'BOOKING') throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator gives the places near a place of an offer only.');
-  if (get('contextType') !== 'OFFER' || get('resourceType') !== 'RESERVATION') throw bad('contextType must be OFFER and resourceType RESERVATION');
-  if (!found) throw new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+  if (!CONTEXTS.has(get('contextType')) || get('resourceType') !== 'RESERVATION') throw bad('contextType must be OFFER or BOOKING and resourceType RESERVATION');
+  if (!found) throw contextNotFound(get('contextType'));
   const part = listOf(found.offer.reservationOfferParts).find((p) => p.id === get('resourceId'));
   if (!part) throw new HttpError(404, 'RESERVATION_NOT_FOUND', 'Reservation not found', `"${get('resourceId')}" is not a reservation of offer ${get('contextId')}.`);
   const trip = listOf(found.trips).find((t) => t.id === part.tripCoverage.coveredTripId);
@@ -190,6 +198,6 @@ function otherPlace(number) {
 }
 
 module.exports = {
-  placeMapOfTrip, vehiclePlaceMap, namedPlacesOf, feeOf, otherPlace, nearbyAvailability, referenceOf, seatsNear,
+  CONTEXTS, contextNotFound, placeMapOfTrip, vehiclePlaceMap, namedPlacesOf, feeOf, otherPlace, nearbyAvailability, referenceOf, seatsNear,
   COACH, FEE_SEATS, TAKEN, COMPARTMENT,
 };

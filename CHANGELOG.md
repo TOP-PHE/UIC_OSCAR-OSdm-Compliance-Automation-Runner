@@ -62,6 +62,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.301] / [collection-OTST_V2.0.172] — 2026-10-16
+
+Issue #766 (PR 5 of 5), release 2026.336. Simulator 0.29.0.
+
+### Added
+- **The place choices made after the booking.** A scenario that adds its optional reservations after the booking (Test Config → *Optional reservations* `ADD_LATER`) and names a *Place selection flow* now makes the same choice as a booking would:
+  - Step 09 asks the provider in the **BOOKING context** (`contextId` = the booking, `resourceId` = the reservation to add): `POST /availabilities/vehicle-place-map` in a manual flow, `GET /availabilities/nearby` in the NEARBY flow, `GET /availabilities/preferences` in the PREFERENCES flow. Each once per booking, checked as before the booking.
+  - The offer-parts request names the choice: places or compartment, seat preferences, or the reference place, in `placeSelections`.
+  - Step 07 grades the reservations added like those booked: places named given at the offer's price plus fees, preferences given (warning), near the reference place (warning; the place itself a failure).
+  - Step 02 no longer warns that "no reservation is placed in the booking" when the choice is made after it.
+- **Three reference scenarios**: `OTST_SALE_NAMED_PLACE_ADD_LATER_2ADT`, `OTST_SALE_NEARBY_PLACE_ADD_LATER_2ADT`, `OTST_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT`. Each needs its flow declared, and an optional reservation.
+
+### Simulator 0.29.0
+- `POST /availabilities/vehicle-place-map`, `GET /availabilities/nearby` and `GET /availabilities/preferences` answer in a BOOKING context too: the offer of the booked offer that holds the reservation. An unknown booking, or a reservation that is not one of its offers, is 404 `BOOKING_NOT_FOUND` (it was 501).
+- Trip requirements 17 (EuroCity from `0000091`, place map) and 18 (EuroCity from `0000092`, seat preferences), both with an optional reservation.
+- Scenarios `SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38`, `SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38`, `SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38`.
+- The `ignores-reference-place` variant (#766 PR 4) gives the seats after the reference place in the next coach. It took them from the reservation's random id, so the warning a replay records named another seat on every run.
+
+### Default decisions (taken without asking)
+- **After the booking, the availability is asked for the booking, not for the offer.** OSDM's `contextType` BOOKING exists for this; the reservation added is still named by its offer part id, as the existing step 08b does.
+- **A refused add-later is not retried without the preference.** The retry of #766 PR 3 stays on the booking only; a refusal at 09 fails its status check as before.
+- **The mandatory reservations keep their choice at the booking**; only the reservations 09 adds are asked again.
+
+Checked:
+- Unit tests: `place-after-booking.test.js`, 7 tests, including an end-to-end add-later against the simulator's own functions (BOOKING place map, seats named, booking graded); simulator `after-booking.test.js`, 3 route tests (map, nearby, preferences in the BOOKING context, and the choice given to the reservation added). Each of nine mutations of the new rules fails a test.
+- Replay before (main) / after (branch), 102 scenarios with `bru` 4.2.1: the 99 existing scenarios give the same checks and warnings, but for the variant's seat number above (recorded twice after the fix: the same). The three new ones: `SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38` 335 checks, `SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38` 335, `SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38` 336, each 0 failed, with the one warning at 02 that `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` already has.
+- *Checks by scenario* and `simulator-checks.json` regenerated; `replay.js catalogue` agrees (59 entries).
+
+---
+
 ## [server-1.11.300] / [collection-OTST_V2.0.171] — 2026-10-16
 
 Issue #766 (PR 4 of 5), release 2026.335. Simulator 0.28.0.

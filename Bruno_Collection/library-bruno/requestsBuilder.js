@@ -29,7 +29,8 @@ module.exports = {
   requestRefundOffersBody,
   requestExchangeOffersBody,
   requestExchangeOperationsBody,
-  withPaxoneOfferSearchCriteriaDefaults
+  withPaxoneOfferSearchCriteriaDefaults,
+  laterPlaceSelections
 };
 
 // PAXONE mandates offerSearchCriteria.currency + .offerMode on the offer request:
@@ -512,19 +513,35 @@ function resolvePlaceSelectionReservationId(selectedAccommodation) {
 // #766 PR 2: the placeSelections with the seat preferences chosen at the
 // offer step (and narrowed by GET /availabilities/preferences). Keeps the
 // reservations they were asked for in __placePreferencesFor, for step 07.
-function withSeatPreferences(selections) {
+function withSeatPreferences(selections, { keep = [], afterBooking = false } = {}) {
   const send = parseEnvJson("__placePreferencesSent", []);
   if (!Array.isArray(send) || send.length === 0) return selections;
   const { withPreferences } = require("./placeSelection.js");
   const out = withPreferences(selections, parseEnvJson("offer", null), send, parseEnvJson("bookingPassengerReferences", []) || []);
   const ids = out.filter((sel) => (sel?.accommodations || []).some((a) => (a?.placeProperties || []).some((p) => send.includes(p)))).map((sel) => sel.reservationId);
-  bru.setEnvVar("__placePreferencesFor", JSON.stringify(ids));
+  bru.setEnvVar("__placePreferencesFor", JSON.stringify([...new Set([...keep, ...ids])]));
   if (ids.length === 0) {
-    validationLogger(`[WARNING] Seat preferences ${send.join(", ")}: no reservation of the offer is placed in the booking, so none is asked.`);
+    // #766 PR 5: with reservations added after the booking, they are asked then.
+    if (afterBooking || !require("./offers.js").placeChoiceAfterBooking()) {
+      validationLogger(`[WARNING] Seat preferences ${send.join(", ")}: no reservation of the offer is placed in the booking, so none is asked.`);
+    }
   } else {
     validationLogger(`[INFO] Seat preferences ${send.join(", ")} asked for reservation(s) ${ids.join(", ")}.`);
   }
   return out;
+}
+
+/**
+ * The placeSelections of the reservations 09 adds after the booking
+ * (ADD_LATER, #766 PR 5): with the seat preferences, the places named on the
+ * BOOKING place map and the reference place, as the booking's own get them.
+ * The reservations already asked with preferences stay asked.
+ */
+function laterPlaceSelections(selections) {
+  const np = require("./namedPlaces.js");
+  const keep = parseEnvJson("__placePreferencesFor", []) || [];
+  const nearby = bru.getEnvVar("placeSelectionFlow") === "AUTOMATIC_PLACE_SELECTION_NEARBY" ? parseEnvJson("nearbyReference", null) : null;
+  return np.withReferencePlace(np.withNamedPlaces(withSeatPreferences(selections, { keep, afterBooking: true }), parseEnvJson("__namedPlaceChoices", null)), nearby);
 }
 
 // Function to handle place selections

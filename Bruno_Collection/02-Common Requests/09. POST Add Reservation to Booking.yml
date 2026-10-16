@@ -76,9 +76,13 @@ runtime:
 
         // #601: reservationBookingForm ADD_LATER names the optional
         // reservations chosen at offer time, each with its trip and leg.
-        const _later = require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("reservationAddLaterSelections"), []);
+        let _later = require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("reservationAddLaterSelections"), []);
         const _addLaterForm = bru.getEnvVar("reservationBookingForm") === "ADD_LATER" && _later.length > 0;
         if (_addLaterForm) {
+          // #766 PR 5: the place choice of the scenario, made after the booking:
+          // availability asked for the booking, then the same choices as at it.
+          await require(bru.getEnvVar("library_base") + "offers.js").askPlacesAfterBooking();
+          _later = require(bru.getEnvVar("library_base") + "requestsBuilder.js").laterPlaceSelections(_later);
           placeSelections.length = 0;
           placeSelections.push(..._later);
         }
@@ -126,6 +130,8 @@ runtime:
         const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
         const { validateBookedOfferPartResponse } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        // #766 PR 5: the checks of the availability requests asked before 09.
+        require(bru.getEnvVar("library_base") + "offers.js").recordPlacePreferenceChecks();
 
         // #expired-add-reservation-offer: when armed, the POST MUST be rejected
         // — adding an expired offer-part to the booking must not succeed. Grade

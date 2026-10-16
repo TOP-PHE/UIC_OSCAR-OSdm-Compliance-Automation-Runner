@@ -85,7 +85,8 @@ test('map: refusals, and no coach for a trip without a map', () => {
   const status = (body, f = find) => { try { vehiclePlaceMap(body, f, gamma, price); return 200; } catch (e) { return e.status; } };
   const ref = restriction(offer).placeRestrictions[0].reservationRef;
   assert.equal(status({}), 400);
-  assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, contextType: 'BOOKING' } }] }), 501);
+  assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, contextType: 'BOOKING' } }] }, () => null), 404, 'BOOKING context: no such booking');
+  assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, contextType: 'TRIP' } }] }), 400);
   assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, resourceType: 'FARE' } }] }), 400);
   assert.equal(status(restriction(offer), () => undefined), 404);
   assert.equal(status({ placeRestrictions: [{ reservationRef: { ...ref, resourceId: 'nope' } }] }), 404);
@@ -162,7 +163,8 @@ test('nearby: the free seats around a saloon seat; refusals; no map, nothing', (
   const status = (q, found = find(offer.offerId)) => { try { nearbyAvailability(q, found, gamma); return 200; } catch (e) { return e.status; } };
   assert.equal(status(nearQuery(offer, { placeNumber: '99' })), 404);
   assert.equal(status(nearQuery(offer, { coachNumber: '8' })), 404);
-  assert.equal(status(nearQuery(offer, { contextType: 'BOOKING' })), 501);
+  assert.equal(status(nearQuery(offer, { contextType: 'BOOKING' }), null), 404);
+  assert.equal(status(nearQuery(offer, { contextType: 'TRIP' })), 400);
   assert.equal(status(nearQuery(offer, { resourceType: 'FARE' })), 400);
   assert.equal(status(new URLSearchParams({ contextId: offer.offerId })), 400);
   assert.equal(status(nearQuery(offer), null), 404);
@@ -182,7 +184,8 @@ test('booking: a reference place gives the seats after it, in its coach; the var
   const near = reserved(booking(offer, trip, find, ref)).placeAllocation.reservedPlaces[0];
   assert.deepEqual([near.coachNumber, near.placeNumbers], ['7', ['16', '17']]);
   const other = reserved(booking(offer, trip, find, ref, 'Simvariant-Ignores-Reference-Place')).placeAllocation.reservedPlaces[0];
-  assert.equal(other.coachNumber, '8');
+  // The same seats in the next coach, so the warning a replay records names the same place every run.
+  assert.deepEqual([other.coachNumber, other.placeNumbers], ['8', ['16', '17']]);
   const status = (choice) => { try { booking(offer, trip, find, choice); return 200; } catch (e) { return e.status; } };
   assert.equal(status({ referencePlace: { coachNumber: '7', placeNumber: '61' } }), 409);
   assert.equal(status({ referencePlace: { coachNumber: '7' } }), 400);
