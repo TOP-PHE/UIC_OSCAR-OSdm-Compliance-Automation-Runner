@@ -2210,7 +2210,8 @@ function bookingWithoutPreferences(status, body) {
   bru.setEnvVar("__placePreferencesRetried", "true");
   bru.setEnvVar("__placePreferencesRefused", JSON.stringify({ status, code, preferences: sent, listed: bru.getEnvVar("__placePreferencesListed") === "true" }));
   bru.setEnvVar("__placePreferencesSent", JSON.stringify([]));
-  validationLogger(`[WARNING] Seat preferences ${sent.join(', ')}: the booking asking for them was refused (HTTP ${status}${code ? `, ${code}` : ''}); it is sent once more without them, to tell a refused preference from a refused reservation.`);
+  const answer = code ? `HTTP ${status}, ${code}` : `HTTP ${status}`;
+  validationLogger(`[WARNING] Seat preferences ${sent.join(', ')}: the booking asking for them was refused (${answer}); it is sent once more without them, to tell a refused preference from a refused reservation.`);
   return true;
 }
 
@@ -2323,7 +2324,8 @@ async function askNamedPlaces() {
   const chosen = np.chooseNamedPlaces(answer.map, { flow, kind, reservations });
   for (const line of chosen.lines) validationLogger(`[${line.level}] ${line.text}`);
   for (const [id, choice] of Object.entries(chosen.choices)) {
-    validationLogger(`[INFO] Named place for reservation ${id}: ${np.describeChoice(choice)}${chosen.fees[id] ? ` (selection fee ${chosen.fees[id]})` : ''}.`);
+    const fee = chosen.fees[id] ? ` (selection fee ${chosen.fees[id]})` : '';
+    validationLogger(`[INFO] Named place for reservation ${id}: ${np.describeChoice(choice)}${fee}.`);
   }
   bru.setEnvVar("__namedPlaceChoices", JSON.stringify(chosen.choices));
   bru.setEnvVar("__namedPlaceFees", JSON.stringify(chosen.fees));

@@ -202,7 +202,7 @@ function retryWithoutPreferences(status, sent, alreadyRetried) {
  */
 function afterRetryWithoutPreferences(status, refused) {
   const what = `Seat preferences ${listOf(refused?.preferences).join(', ')}`;
-  const first = `HTTP ${refused?.status}${refused?.code ? `, ${refused.code}` : ''}`;
+  const first = refused?.code ? `HTTP ${refused?.status}, ${refused.code}` : `HTTP ${refused?.status}`;
   if (typeof status === 'number' && status >= 200 && status < 300) {
     return refused?.listed
       ? { level: 'FAIL', fail: true, text: `${what}: the booking asking for them was refused (${first}), and accepted without them, though the offer lists them.` }

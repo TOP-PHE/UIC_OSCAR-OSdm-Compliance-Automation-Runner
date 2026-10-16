@@ -200,6 +200,7 @@ describe('#766 PR 3 — with the simulator\'s answers', () => {
 });
 
 describe('#766 PR 3 — the collection wiring', () => {
+  afterEach(() => { delete global.bru; delete global.validationLogger; });
   test('parser, reset lists, 02, the builder, 07 and the price comparison', () => {
     const parser = read('Bruno_Collection', 'library-bruno', 'scenarioParser.js');
     expect(parser).toContain('bru.setEnvVar("namedPlaceKind", _namedPlace ? _np.kindOfScenario(scenario) : null);');
@@ -224,7 +225,6 @@ describe('#766 PR 3 — the collection wiring', () => {
     });
     return { logs, result };
   }
-  afterEach(() => { delete global.bru; delete global.validationLogger; });
 
   test('askNamedPlaces posts the map request once per offer and keeps the choices and fees', async () => {
     const env = {

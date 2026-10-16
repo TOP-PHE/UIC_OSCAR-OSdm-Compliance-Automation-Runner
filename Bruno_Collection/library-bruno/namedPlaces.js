@@ -103,7 +103,8 @@ function checkPlaceMapAnswer(status, body) {
   if (!ok2xx) return { checks, map: null, lines: [] };
   const map = readMap(body?.vehicle);
   const missing = map.places.filter((p) => !['FREE', 'ALLOCATED', 'RESTRICTED'].includes(p.status) || p.reservationIds.length === 0);
-  checks.push({ name: `${label}: each place gives its status and the reservations it can be booked with`, ok: missing.length === 0, message: `${missing.length} place(s) without a known status or reservationRefs, e.g. ${missing.slice(0, 3).map((p) => `${p.coach}/${p.number}`).join(', ')}` });
+  const examples = missing.slice(0, 3).map((p) => p.coach + '/' + p.number).join(', ');
+  checks.push({ name: `${label}: each place gives its status and the reservations it can be booked with`, ok: missing.length === 0, message: `${missing.length} place(s) without a known status or reservationRefs, e.g. ${examples}` });
   if (map.places.length === 0) {
     return { checks, map: null, lines: [{ level: 'WARNING', text: `${label}: the answer holds no place (no coach, or no compartment); no place is named in the booking.` }] };
   }
@@ -122,47 +123,63 @@ function checkPlaceMapAnswer(status, body) {
  * @param {object[]} reservations   [{ id, passengerRefs }]
  */
 function chooseNamedPlaces(map, { flow, kind, reservations }) {
-  const choices = {};
-  const fees = {};
-  const lines = [];
+  const out = { choices: {}, fees: {}, lines: [] };
   const used = new Set();
   const withFee = upper(flow) === 'MANUAL_PLACE_SELECTION_WITH_FEE';
   for (const { id, passengerRefs } of listOf(reservations)) {
     const refs = listOf(passengerRefs).filter(isText);
     if (refs.length === 0) continue;
-    const forMe = (x) => x.reservationIds.length === 0 || x.reservationIds.includes(id);
-    if (kind === 'COMPARTMENT') {
-      const c = listOf(map?.compartments).find((x) => x.status === 'FREE' && forMe(x) && !used.has(`${x.coach}#${x.number}`)
-        && x.places.length >= refs.length && (withFee || x.fee == null));
-      if (!c) { lines.push({ level: 'WARNING', text: `Reservation ${id}: the place map has no free compartment booked as a whole${withFee ? '' : ' without fee'} for ${refs.length} passenger(s); no compartment is named.` }); continue; }
-      used.add(`${c.coach}#${c.number}`);
-      choices[id] = { compartments: [{ coachNumber: c.coach, compartmentNumber: c.number, passengerRefs: refs }] };
-      fees[id] = c.fee || 0;
-      continue;
-    }
-    const free = listOf(map?.places).filter((p) => p.status === 'FREE' && !p.selectable && forMe(p) && !used.has(`${p.coach}/${p.number}`));
-    const pool = withFee
-      ? [...free.filter((p) => p.fee != null), ...free.filter((p) => p.fee == null)]
-      : free.filter((p) => p.fee == null);
-    if (withFee && !free.some((p) => p.fee != null)) {
-      lines.push({ level: 'WARNING', text: `Reservation ${id}: the place map gives no seat with a selection fee; the fee is not tested.` });
-    }
-    if (pool.length < refs.length) {
-      lines.push({ level: 'WARNING', text: `Reservation ${id}: the place map has ${pool.length} free seat(s)${withFee ? '' : ' without fee'} for ${refs.length} passenger(s); no place is named.` });
-      continue;
-    }
-    const picked = pool.slice(0, refs.length);
-    picked.forEach((p) => used.add(`${p.coach}/${p.number}`));
-    choices[id] = { places: picked.map((p, i) => ({ coachNumber: p.coach, placeNumber: p.number, passengerRef: refs[i] })) };
-    fees[id] = picked.reduce((sum, p) => sum + (p.fee || 0), 0);
+    const choose = kind === 'COMPARTMENT' ? chooseCompartment : chooseSeats;
+    choose(map, { id, refs, withFee, used }, out);
   }
-  return { choices, fees, lines };
+  return out;
+}
+
+// Whether a place or compartment of the map may go to the reservation `id`.
+const forReservation = (x, id) => x.reservationIds.length === 0 || x.reservationIds.includes(id);
+const feeWords = (withFee) => (withFee ? '' : ' without fee');
+
+// One free compartment booked as a whole, large enough, for a reservation.
+function chooseCompartment(map, { id, refs, withFee, used }, out) {
+  const c = listOf(map?.compartments).find((x) => x.status === 'FREE' && forReservation(x, id) && !used.has(x.coach + '#' + x.number)
+    && x.places.length >= refs.length && (withFee || x.fee == null));
+  if (!c) {
+    out.lines.push({ level: 'WARNING', text: `Reservation ${id}: the place map has no free compartment booked as a whole${feeWords(withFee)} for ${refs.length} passenger(s); no compartment is named.` });
+    return;
+  }
+  used.add(c.coach + '#' + c.number);
+  out.choices[id] = { compartments: [{ coachNumber: c.coach, compartmentNumber: c.number, passengerRefs: refs }] };
+  out.fees[id] = c.fee || 0;
+}
+
+// One free seat per passenger for a reservation: without a fee, or fee seats first.
+function chooseSeats(map, { id, refs, withFee, used }, out) {
+  const free = listOf(map?.places).filter((p) => p.status === 'FREE' && !p.selectable && forReservation(p, id) && !used.has(p.coach + '/' + p.number));
+  const withAFee = free.filter((p) => p.fee != null);
+  const pool = withFee ? [...withAFee, ...free.filter((p) => p.fee == null)] : free.filter((p) => p.fee == null);
+  if (withFee && withAFee.length === 0) {
+    out.lines.push({ level: 'WARNING', text: `Reservation ${id}: the place map gives no seat with a selection fee; the fee is not tested.` });
+  }
+  if (pool.length < refs.length) {
+    out.lines.push({ level: 'WARNING', text: `Reservation ${id}: the place map has ${pool.length} free seat(s)${feeWords(withFee)} for ${refs.length} passenger(s); no place is named.` });
+    return;
+  }
+  const picked = pool.slice(0, refs.length);
+  picked.forEach((p) => used.add(p.coach + '/' + p.number));
+  out.choices[id] = { places: picked.map((p, i) => ({ coachNumber: p.coach, placeNumber: p.number, passengerRef: refs[i] })) };
+  out.fees[id] = picked.reduce((sum, p) => sum + (p.fee || 0), 0);
 }
 
 /** The placeSelections with the places chosen added to the selection of their reservation. */
 function withNamedPlaces(selections, choices) {
   const named = choices && typeof choices === 'object' ? choices : {};
   return listOf(selections).map((s) => (named[s?.reservationId] ? { ...s, ...named[s.reservationId] } : s));
+}
+
+// The compartments a booked reservation names, for a message.
+function compartmentsText(reserved) {
+  const numbers = reserved.map((p) => p?.compartmentNumber).filter(Boolean);
+  return numbers.length > 0 ? ', compartment ' + numbers.join(', ') : '';
 }
 
 /** Short text of a choice, for the log. */
@@ -199,7 +216,7 @@ function checkNamedPlacesBooked(booking, offer, choices, fees) {
     const checks = [{
       name: `Booking: reservation ${r.id} gives the places named (${what})`,
       ok,
-      message: `given: ${given.join(', ') || 'no place'}${reserved.some((p) => p?.compartmentNumber) ? `, compartment ${reserved.map((p) => p.compartmentNumber).filter(Boolean).join(', ')}` : ''}`,
+      message: 'given: ' + (given.join(', ') || 'no place') + compartmentsText(reserved),
     }];
     const part = listOf(offer?.reservationOfferParts).find((p) => p?.id === id);
     const offered = amountOf(part?.price);
@@ -207,7 +224,7 @@ function checkNamedPlacesBooked(booking, offer, choices, fees) {
     if (offered != null && paid != null) {
       const fee = fees?.[id] || 0;
       checks.push({
-        name: `Booking: reservation ${r.id} costs the offer's price${fee ? ` plus the selection fee (${offered} + ${fee})` : ` (${offered}), no selection fee`}`,
+        name: `Booking: reservation ${r.id} costs the offer's price` + (fee ? ` plus the selection fee (${offered} + ${fee})` : ` (${offered}), no selection fee`),
         ok: paid === offered + fee,
         message: `booked at ${paid}${paid > offered + fee ? ' (more than asked)' : ''}`,
       });
