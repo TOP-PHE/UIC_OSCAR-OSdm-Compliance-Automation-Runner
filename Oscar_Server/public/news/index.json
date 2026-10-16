@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-return-calendar",
+    "date": "October 16, 2026",
+    "tag": "Fix",
+    "title": "A return is dated on a day its train goes back",
+    "summary": "The date of a return scenario now suits both the outbound train and the train back, and a return time later than every train back is pointed out.",
+    "content": "The run already moved the outbound date to a day its Test Data trains run. The return was simply that date plus the days of the scenario, at the return time. Now the run also looks at the Test Data trains going back: it chooses the first day on which the outbound train runs and a train back runs on the return day, at or after the return time. When no train goes back after the return time, the run says so as a warning, with their times, so that the scenario's return time can be set before the last one. Nothing changes when Test Data has no direct train back."
+  },
+  {
     "id": "2026-10-16-nearby-reference-booking",
     "date": "October 16, 2026",
     "tag": "Feature",

@@ -1560,6 +1560,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   The collection's `tripDateFor()` (`library-bruno/tripCalendar.js`) moves an
   unnamed date forward to the first such day; a day the scenario names
   (`departureDay`, `departureDaysFromToday`) is kept and warned about.
+  **A return goes on a day a train goes back** (#778, 1.11.305): the server
+  also writes `__returnServices` (Test Data services from the trip's last stop
+  place to its first: departure, number, days), and `dateForTrip()` takes the
+  first day the outbound runs with one of those, leaving at or after the
+  return time (`returnTime`, else the outbound time), `returnOffsetDays`
+  later. None after that time is a WARNING with their times; no direct train
+  back, or one without calendar, checks nothing.
   `POST /test-resources/fill-calendars` fills sets without days from 7 days
   of `/offers`, only when every service was seen (`calendarFromHarvest()`);
   Discovery's merge fills a calendarless twin instead of adding a set

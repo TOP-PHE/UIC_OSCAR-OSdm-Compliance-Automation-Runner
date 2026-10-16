@@ -19,6 +19,10 @@
  *   - `__calendarNotes`: [{ level, text }] for the run log — a leg with no
  *     calendar or no train, a departure time that is not the train's, legs
  *     that do not connect.
+ *   - `__returnServices` (#778): the Test Data services of the way back (the
+ *     trip's last stop place to its first), each `{ departure: 'HH:MM',
+ *     number, days }`, `days` absent when its train has no calendar. The
+ *     collection dates a return scenario on a day one of them runs.
  * Matching at run time, not when the trip is filled, means old scenarios get
  * it too, and a calendar filled later is used by the next run.
  */
@@ -138,6 +142,35 @@ function tripCalendar(trip, resources) {
 }
 
 /**
+ * The Test Data services going back from the trip's last stop place to its
+ * first (#778), in departure order, each { departure, number, days? }.
+ * [] when no train makes that journey directly.
+ */
+function returnServices(trip, resources) {
+  const legs = legsOf(trip);
+  if (legs.length === 0) return [];
+  const from = stopKey(legs.at(-1).destination);
+  const to = stopKey(legs[0].origin);
+  if (!from || !to) return [];
+  return trainsOf(resources)
+    .filter((train) => stopKey(train.data.originURN) === from && stopKey(train.data.destinationURN) === to)
+    .flatMap(servicesOf)
+    .sort((a, b) => a.departure.localeCompare(b.departure));
+}
+
+// The timed services of one train, each { departure, number, days? }.
+function servicesOf(train) {
+  const days = Array.isArray(train.data.daysOfWeek) ? train.data.daysOfWeek.filter((x) => DAY_ORDER.includes(x)) : [];
+  days.sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+  const services = Array.isArray(train.data.services) ? train.data.services : [];
+  return services.filter((service) => clockOf(service?.departureTime)).map((service) => {
+    const entry = { departure: clockOf(service.departureTime), number: safe(String(service.vehicleNumber ?? '').trim()) };
+    if (days.length) entry.days = days.slice();
+    return entry;
+  });
+}
+
+/**
  * Annotate every trip requirement of `datafile` (changed in place).
  * @returns {number} how many trip requirements got an annotation.
  */
@@ -146,12 +179,14 @@ function annotateTripCalendars(datafile, resources) {
   for (const trip of Array.isArray(datafile?.tripRequirements) ? datafile.tripRequirements : []) {
     if (!trip || typeof trip !== 'object') continue;
     const { operatingDays, notes } = tripCalendar(trip, resources);
-    if (operatingDays === null && notes.length === 0) continue;
+    const back = returnServices(trip, resources);
+    if (operatingDays === null && notes.length === 0 && back.length === 0) continue;
     if (operatingDays !== null) trip.__operatingDays = operatingDays;
     if (notes.length) trip.__calendarNotes = notes;
+    if (back.length) trip.__returnServices = back;
     annotated++;
   }
   return annotated;
 }
 
-module.exports = { DAY_ORDER, clockOf, matchLeg, tripCalendar, annotateTripCalendars };
+module.exports = { DAY_ORDER, clockOf, matchLeg, tripCalendar, returnServices, annotateTripCalendars };

@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.305] / [collection-OTST_V2.0.176] — 2026-10-16
+
+Issue #778, release 2026.340. A return is dated on a day its train goes back.
+
+### Fixed
+- **A return scenario is dated on a day a train goes back after its return time.** Since #717 the outbound date moves to a day its Test Data trains run; the return was the outbound date + `returnOffsetDays` and nothing looked at the way back. A real provider's six return scenarios stopped at `01b` with `TRIP_NO_SEARCH_RESULT`: they asked for 17:00 and the one train back leaves at 14:05, and it does not run on Thursdays, so an outbound on a Tuesday would have found nothing back either.
+  - The server annotates each trip of the run's data file with `__returnServices` (`returnServices()`, `utils/tripCalendar.js`): the Test Data services from the trip's last stop place to its first, with their departure time and the days their train runs.
+  - The collection (`returnDays()` and `dateForTrip()`, `library-bruno/tripCalendar.js`) keeps the services leaving at or after the return time (`returnTime`, else the outbound time, as the request does) and moves the date to the first day on which the outbound trains run and one of those runs `returnOffsetDays` later. A day the scenario names is kept, with a warning when no train goes back on its return day.
+  - No train back after the return time: a WARNING naming their times ("set the scenario's return time before the last one"), and the outbound rule only.
+  - Unchanged when nothing is known: no direct Test Data train back (a return through a change), or a train back with no calendar.
+
+Checked:
+- Unit tests: `return-calendar.test.js` (17), with the real provider's case; the #717 tests unchanged.
+- The simulator's replay does not seed Test Data trains, so no simulator scenario can change.
+- Full suite, lint.
+
+Not verified: a run against the real provider.
+
+---
+
 ## [server-1.11.304] / [collection-OTST_V2.0.175] — 2026-10-16
 
 Issue #776, release 2026.339. Simulator 0.30.0.
