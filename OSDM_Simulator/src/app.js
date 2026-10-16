@@ -308,16 +308,17 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return addOfferParts(booking, bookedOfferId, await bodyOf(req), (offerId) => store.get('offer', scope, offerId), provider);
   }
 
-  // GET, DELETE /bookings/{id}
-  function bookingItself(req, provider, scope, bookingId) {
-    requireMethod(req, 'GET', 'DELETE');
+  // DELETE /bookings/{id} (#776): a booking not confirmed may be deleted; a confirmed one is refunded instead.
+  function deleteBooking(scope, bookingId) {
     const booking = bookingOf(scope, bookingId);
-    // #776: a booking not confirmed may be deleted; a confirmed one is refunded instead.
-    if (req.method === 'DELETE') {
-      if (booking.fulfillments.length > 0) throw new HttpError(409, 'BOOKING_CONFIRMED', 'Booking confirmed', 'A confirmed booking cannot be deleted; it is refunded.');
-      store.remove('booking', scope, bookingId);
-      return NO_CONTENT;
-    }
+    if (booking.fulfillments.length > 0) throw new HttpError(409, 'BOOKING_CONFIRMED', 'Booking confirmed', 'A confirmed booking cannot be deleted; it is refunded.');
+    store.remove('booking', scope, bookingId);
+    return NO_CONTENT;
+  }
+
+  // GET /bookings/{id}
+  function bookingItself(provider, scope, bookingId) {
+    const booking = bookingOf(scope, bookingId);
     releaseIfExpired(booking, now());
     persons.showRequestedInformation(booking);
     showRefundReceipt(booking, provider, now());
@@ -327,7 +328,10 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
   async function bookingRoute(req, provider, scope, rest) {
     const [bookingId, part, partId, ...more] = rest;
     if (bookingId === undefined) return newBooking(req, provider, scope);
-    if (part === undefined) return bookingItself(req, provider, scope, bookingId);
+    if (part === undefined) {
+      requireMethod(req, 'GET', 'DELETE');
+      return req.method === 'DELETE' ? deleteBooking(scope, bookingId) : bookingItself(provider, scope, bookingId);
+    }
     if (provider.exchange && (part === 'exchange-offers' || part === 'exchange-operations') && more.length === 0) {
       return exchangeRoute(req, provider, scope, bookingId, part, partId);
     }
