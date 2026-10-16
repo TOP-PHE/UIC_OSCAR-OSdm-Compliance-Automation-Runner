@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-nearby-place",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "A seat next to a given place",
+    "summary": "A scenario can ask for seats near a place of the train, as a traveller joining a friend would.",
+    "content": "In Test Config, Booking Flow Actions, choose the place selection flow 'AUTOMATIC_PLACE_SELECTION_NEARBY' and fill Near the place with a coach and a place, such as 7/15. Before the booking, OSCAR asks the provider which places are free near it (GET /availabilities/nearby), then names the place in the booking. A seat given in another coach is a warning; the place itself given to a passenger is a failure, since it is someone else's seat. One reference scenario covers it: give it a coach and place of the provider's train when you copy it. This is the fourth of five steps covering every way to choose a place."
+  },
+  {
     "id": "2026-10-16-named-place",
     "date": "October 16, 2026",
     "tag": "Feature",

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.334",
+  "current_release": "2026.335",
   "releases": [
+    {
+      "release": "2026.335",
+      "date": "2026-10-16",
+      "server": "1.11.300",
+      "collection": "OTST_V2.0.171",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "A place near a given place (AUTOMATIC_PLACE_SELECTION_NEARBY): GET /availabilities/nearby is asked, the booking sends the reference place, and a place outside its coach is a warning; the reference place itself given is a failure (#766, PR 4 of 5)."
+      ]
+    },
     {
       "release": "2026.334",
       "date": "2026-10-16",
