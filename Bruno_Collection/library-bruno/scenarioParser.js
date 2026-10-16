@@ -300,7 +300,13 @@ function tripDateFor(scenario, baseIso, tripRequirement, now = new Date()) {
     || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
       .includes(String(tripRequirement?.departureDay || '').trim().toUpperCase());
   const { dateForTrip } = require('./tripCalendar.js');
-  const out = dateForTrip(date, named, tripRequirement);
+  // #778: a return is dated on a day a train goes back after its time.
+  const _ret = returnOptsFromScenario(scenario);
+  const _firstLeg = tripRequirement?.tripType === 'SPECIFICATION'
+    ? (Array.isArray(tripRequirement.legs) ? tripRequirement.legs[0] : null)
+    : tripRequirement?.trip;
+  const out = dateForTrip(date, named, tripRequirement,
+    { offsetDays: _ret.offsetDays, time: _ret.time, outboundClock: _firstLeg?.startDatetime });
   out.lines.forEach((line) => validationLogger(line));
   return out.date;
 }
