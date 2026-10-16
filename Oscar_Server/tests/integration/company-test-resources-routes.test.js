@@ -436,6 +436,42 @@ describe('test-resources — reprobe-offers', () => {
     }
   });
 
+  // #787: each service is looked for in the answers; one not seen is asked
+  // for once more at its own time, and a number typed otherwise is named.
+  test('a train number the provider writes otherwise is named on the set', async () => {
+    const trainId = uuidv4();
+    const { colEncrypt, colDecrypt } = require('../../src/db/db');
+    const A = 'urn:uic:stn:8727100';
+    const B = 'urn:uic:stn:8400058';
+    run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'Paris-Amsterdam', ?)`,
+      [trainId, companyId, colEncrypt(JSON.stringify({ originURN: A, destinationURN: B, services: [{ vehicleNumber: 'OSDM-104', departureTime: '11:10:00+02:00', arrivalTime: '14:30:00+02:00' }] }))]);
+    const leg = (date) => ({ timedLeg: {
+      start: { stopPlaceRef: { stopPlaceRef: A }, serviceDeparture: { timetabledTime: `${date}T11:10:00+01:00` } },
+      end: { stopPlaceRef: { stopPlaceRef: B }, serviceArrival: { timetabledTime: `${date}T14:30:00+01:00` } },
+      service: { vehicleNumbers: ['OSDM_104'] },
+    } });
+    const asked = [];
+    const origFetch = global.fetch;
+    global.fetch = async (_url, init) => {
+      const body = JSON.parse(init.body);
+      asked.push(body.tripSearchCriteria?.departureTime);
+      const date = String(body.tripSearchCriteria?.departureTime).slice(0, 10);
+      const answer = { trips: [{ id: 't1', legs: [leg(date)] }], offers: [{ offerId: 'o1', offerSummary: { overallTravelClass: 'SECOND' } }] };
+      return { ok: true, status: 200, text: async () => JSON.stringify(answer) };
+    };
+    try {
+      const res = await request(app).post('/v1/company/test-resources/reprobe-offers')
+        .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
+      expect(res.status).toBe(200);
+      const stored = JSON.parse(colDecrypt(get('SELECT data FROM test_resources WHERE id = ?', [trainId]).data));
+      expect(stored.offerProbe.findings).toContain('Train OSDM-104 (11:10): the provider names it OSDM_104; a scenario naming OSDM-104 gets no offer');
+      expect(asked.some((t) => String(t).endsWith('T11:10:00'))).toBe(true);
+    } finally {
+      global.fetch = origFetch;
+      run('DELETE FROM test_resources WHERE id = ?', [trainId]);
+    }
+  });
+
   // #477: same gap as discover-timetable — Re-probe never applied the
   // company's Dedicated Headers.
   test('#477 — sends the company Dedicated Headers', async () => {

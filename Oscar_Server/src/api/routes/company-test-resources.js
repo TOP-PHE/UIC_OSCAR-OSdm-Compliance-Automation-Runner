@@ -25,7 +25,7 @@ const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = requi
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
-const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
+const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe, serviceFindings, servicesUnseen, dayOfWeekCode } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
@@ -54,7 +54,7 @@ function _stnUrn(s) {
 // LocalDateTime (no offset), EXCEPT Bileto, which requires an OffsetDateTime —
 // its deserializer 400s ("Failed to read request") on a bare local time. This
 // mirrors the Bileto exception in the Bruno run flow (scenarioParser.js).
-function _tripSearch(date, origin, destination, apiBase) {
+function _tripSearch(date, origin, destination, apiBase, atTime) {
   const isBileto = /bileto/i.test(String(apiBase || ''));
   const isPaxone = /paxone/i.test(String(apiBase || ''));
   // Most sandboxes return the whole day's offers for a midnight departureTime,
@@ -63,7 +63,8 @@ function _tripSearch(date, origin, destination, apiBase) {
   // "0 trips" even on routes that clearly run (the SALE scenario gets offers at
   // T06:00). Query PAXONE at a daytime hour so the running service is in range;
   // every other sandbox keeps midnight (whole-day), unchanged.
-  const time = isPaxone ? '08:00:00' : '00:00:00';
+  // #787: the re-probe also asks for a service at its own time.
+  const time = atTime || (isPaxone ? '08:00:00' : '00:00:00');
   return {
     departureTime: isBileto ? `${date}T${time}+00:00` : `${date}T${time}`,
     origin: { objectType: 'StopPlaceRef', stopPlaceRef: origin },
@@ -83,8 +84,8 @@ function _tripSearch(date, origin, destination, apiBase) {
 // timetable discovery fail on every searched day. For PAXONE we send the minimal
 // required pair (EUR / INDIVIDUAL — neither filters the timetable we harvest);
 // every other sandbox keeps the empty criteria, unchanged.
-function _discoveryBody(endpoint, date, origin, destination, apiBase) {
-  const trip = _tripSearch(date, origin, destination, apiBase);
+function _discoveryBody(endpoint, date, origin, destination, apiBase, atTime) {
+  const trip = _tripSearch(date, origin, destination, apiBase, atTime);
   if (endpoint === 'offers') {
     const isPaxone = /paxone/i.test(String(apiBase || ''));
     return {
@@ -513,6 +514,21 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   return res.json({ summary, created, updated, dayResults, offerProbe, journeys });
 });
 
+// #787: a search at midnight may not list every train of the day: a service
+// no answer showed is asked for once more at its own time, on the first day
+// answered (at most MAX_SERVICE_SEARCHES per route, each time once).
+const MAX_SERVICE_SEARCHES = 6;
+async function askUnseenServices(od, harvest, ask, keep) {
+  const date = harvest.days[0]?.date;
+  if (!date) return;
+  const times = [...new Set(od.trains.flatMap((t) => servicesUnseen(t.data, harvest.records))
+    .map((svc) => /(\d{2}:\d{2})/.exec(String(svc.departureTime))?.[1]).filter(Boolean))].slice(0, MAX_SERVICE_SEARCHES);
+  for (const time of times) {
+    const r = await ask(date, od, `${time}:00`);
+    if (r?.ok && classifyOfferProbe(r.json)) keep(r.json, date);
+  }
+}
+
 // ── POST /v1/company/test-resources/reprobe-offers (#369) ────────────────────
 // Manual refresh of the offer-availability findings: for every DISTINCT O&D
 // across the existing TRAIN resources, re-run the anonymous-adult offer probe
@@ -561,16 +577,24 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
 
   const routes = [];
   let updatedCount = 0;
+  const ask = async (date, od, atTime) => {
+    try {
+      return await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, od.origin, od.destination, company.api_base, atTime), extraHeaders);
+    } catch (_err) { return null; }
+  };
   for (const od of byOd.values()) {
     const probe = { daysProbed: 0, daysWithOffers: 0, classes: new Set(), flex: new Set(), noOffer: [] };
+    // #787: the direct trains each answer shows, and the days answered.
+    const harvest = { records: [], days: [] };
+    const keep = (json, date) => harvest.records.push(...harvestTrips(json, { searchedOrigin: od.origin, searchedDestination: od.destination })
+      .map((r) => ({ ...r, dayOfWeek: r.dayOfWeek || dayOfWeekCode(`${date}T12:00:00`) })));
     for (const date of searchDates(3, new Date())) {
-      let r2;
-      try {
-        r2 = await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, od.origin, od.destination, company.api_base), extraHeaders);
-      } catch (_err) { continue; }
-      if (!r2.ok) continue;
+      const r2 = await ask(date, od);
+      if (!r2?.ok) continue;
       const pc = classifyOfferProbe(r2.json);
       if (!pc) continue;
+      keep(r2.json, date);
+      harvest.days.push({ date, dayOfWeek: dayOfWeekCode(`${date}T12:00:00`) });
       probe.daysProbed++;
       if (pc.offers > 0) {
         probe.daysWithOffers++;
@@ -582,8 +606,10 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
     }
     const offerProbe = summarizeOfferProbe(probe);
     if (offerProbe) {
+      await askUnseenServices(od, harvest, ask, keep);
       for (const t of od.trains) {
-        t.data.offerProbe = offerProbe;
+        const own = serviceFindings(t.data, harvest.records, harvest.days);
+        t.data.offerProbe = { ...offerProbe, findings: [...offerProbe.findings, ...own] };
         run(`UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
           [colEncrypt(JSON.stringify(t.data)), t.id, targetCompanyId]);
         updatedCount++;
