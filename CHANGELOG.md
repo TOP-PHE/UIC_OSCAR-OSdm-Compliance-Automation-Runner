@@ -88,7 +88,11 @@ Issue #766 (PR 4 of 5), release 2026.335. Simulator 0.28.0.
 - **A reference scenario's place is to complete, not removed.** Without it the scenario would test nothing new.
 
 Checked:
-CHECKED_PLACEHOLDER
+- Unit tests: `nearby-place.test.js`, 14 tests, including an end-to-end sale against the simulator's own functions, normal and with the variant; `catalogue-match.test.js`, one more; simulator `place-map.test.js`, the nearby answers and the booking near a place. Each of seven mutations of the new rules fails a test.
+- Replay before/after (99 scenarios with `bru` 4.2.1): the 97 existing scenarios give the same checks and warnings. The two new ones:
+  - `SIM_SALE_NEARBY_PLACE_2ADT_38`: 336 checks, 0 failed, no warning (seats after 7/15, in coach 7);
+  - `SIM_VARIANT_IGNORES_REFERENCE_1ADT_38`: 273 checks, 0 failed, one warning (seat 8/52, another coach).
+  - *Checks by scenario* and `simulator-checks.json` regenerated; `replay.js catalogue` agrees (56 entries).
 
 ---
 
