@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-provider-run-fixes",
+    "date": "October 16, 2026",
+    "tag": "Fix",
+    "title": "Trips after the clock change, and contact details below OSDM 3.4",
+    "summary": "Four corrections from a real provider's run: trips given by specification found again after the end of summer time, and passenger updates that reach providers on older OSDM versions.",
+    "content": "Test Data keeps the times seen at discovery with that day's offset, so a run after the end of summer time asked for trains an hour too early and the provider answered 'trip not found'. The times now take the offset of the trip date, from the time zone of the stop place's country. The passenger update and the purchaser body put email and phone number flat in the person's details below OSDM 3.4, as the booking already did: a provider on 3.0.5 ignored them before. A trip search the provider does not give is now a warning, and a provider answering an unknown trip id with no offer passes."
+  },
+  {
     "id": "2026-10-16-place-after-booking",
     "date": "October 16, 2026",
     "tag": "Feature",

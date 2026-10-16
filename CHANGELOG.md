@@ -62,6 +62,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.302] / [collection-OTST_V2.0.173] — 2026-10-16
+
+Issue #772, release 2026.337. Four defects of OSCAR's own, seen on a real provider's run.
+
+### Fixed
+- **A specification trip keeps the summer offset after the clock change.** Test Data stores a service's times with the offset of the day it was seen (`08:00:00+02:00`). A run dated after the end of summer time sent `08:00+02:00`, 07:00 local, and the provider answered `OFFER_TRIP_NOT_FOUND`: every specification trip stopped at step 01. Each leg's times now take the offset of the trip date, in the time zone of the stop place's country (`library-bruno/stationTimeZones.js`: the first two digits of a 7-digit `urn:uic:stn:` code). The step logs the change at INFO. A stored offset that is not one of the zone's two is left alone, and so is an unknown country (the simulator's `00…` stations) or a sandbox without time zones.
+- **Email and phone go where the OSDM version takes them.** The booking puts them flat in `detail` below 3.4 and in `detail.contact` from 3.4. The passenger update (step 03) and the purchaser body always used `detail.contact`, which a 3.0.5 provider ignored: the update failed "phone number is correct" and "email is correct", and the invalid email/phone probes tested nothing. Both follow the booking's rule now (`library-bruno/personContact.js`).
+- **An unknown trip id answered with no offer passes** (`NHF_SALE_BY_TRIP_ID_UNKNOWN`), as a departure out of range does (#704). Offers for it still fail.
+- **A trip search not provided (404, 405, 501) is a warning**, not a failure (the #488 rule); the scenario still cannot go on by trip id.
+
+### Default decisions (taken without asking)
+- **The time zone comes from the station code's country**, not from the date the time was seen: Test Data does not keep that date. One time zone per country covers every country an OSDM provider sells today; a country with several (none in the list) would need more.
+- **The ambiguous and missing hours of a clock change keep the stored offset.**
+- **Below 3.4 means the booking's boundary**, kept the same for the three bodies, although the comment in `passengers.js` dates ContactDetail from 3.1.
+
+Checked:
+- Unit tests: `provider-run-772.test.js` (9), `bruno-trip-ids.test.js` (3 more, one changed). Each of eight mutations of the new rules fails a test but two: the second offset look, removed as it changed no answer, and the value a `catch` returns when the sandbox has no time zones, which the guard makes equivalent.
+- Replay of ten simulator scenarios (by specification, by trip id, the unknown trip probe, passenger and purchaser updates and probes): the same checks as before. The simulator's stations and versions are outside both fixes.
+- Full suite 3400 tests, lint, simulator 246 tests.
+
+Not verified: a run against the real provider.
+
+---
+
 ## [server-1.11.301] / [collection-OTST_V2.0.172] — 2026-10-16
 
 Issue #766 (PR 5 of 5), release 2026.336. Simulator 0.29.0.

@@ -1336,6 +1336,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     collection's before-request removes the header then
     (`requestHeaders.js`); a request a script sends uses `requestorHeader()`.
     A new optional header template needs the same treatment.
+  - **A timetable time takes the offset of the trip date** (#772,
+    1.11.302): Test Data keeps the offset of the day a service was seen, so
+    a run after a clock change asked for a train an hour off
+    (`OFFER_TRIP_NOT_FOUND`). The parser passes each SPECIFICATION leg time
+    through `onTheDay()` (`stationTimeZones.js`): the zone from the UIC
+    country (first two digits of a 7-digit station code), changed only when
+    the stored offset is one of the zone's two. A SEARCH sends no offset, so
+    it never had the problem. **Email and phone follow the booking's version
+    rule** (`personContact.js` `withContactShape()`: flat below 3.4,
+    `detail.contact` from 3.4) in the passenger PATCH and the purchaser body;
+    a 3.0.5 provider ignored `contact`.
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id
