@@ -460,7 +460,7 @@ const SUBRUN_SALE_STATE = [
   // booking
   'bookingId', 'bookedOfferId', 'BookingRequest', 'admissionReservationAncillaryBookingPartsIds',
   'provisionalPrice', 'provisionalPriceAmount', 'confirmedPriceAmount', 'bookingConfirmedPrice',
-  '__addReservationDone', '__addAncillaryDone', '__reservationsBooked', '__reservationsAddedLater',
+  '__addReservationDone', '__addAncillaryDone', '__reservationsBooked', '__reservationsAddedLater', '__reservationsIgnored',
   '__purchaserStepDone',
   // places
   'placeSelections', 'layoutId', 'preselectedCoach', 'preselectedPlace', 'preselectedPlaces',

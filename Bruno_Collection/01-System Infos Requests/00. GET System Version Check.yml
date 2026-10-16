@@ -82,12 +82,14 @@ runtime:
 
         validationLogger(`[INFO] 📋 Expected OSDM version (from data file): "${expectedVersion}"`);
 
-        // Find matching version in response
+        // Find matching version in response. #774: "3.8" in the data file
+        // matches "3.8.0" from the API (part by part, as far as the data file goes).
+        const { sameOsdmVersion } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
         let foundMatch = false;
         if (Array.isArray(versionsData)) {
           foundMatch = versionsData.some(v => {
             const versionString = v.version || (v.major + "." + v.minor + "." + (v.patch || "0"));
-            return versionString === expectedVersion;
+            return sameOsdmVersion(expectedVersion, versionString);
           });
         }
 

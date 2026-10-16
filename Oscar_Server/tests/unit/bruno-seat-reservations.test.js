@@ -201,7 +201,7 @@ describe('the steps, the builder and the parser', () => {
   });
 
   test('#644: step 02 checks the reservations asked for, without the place check', () => {
-    expect(read('02-Common Requests', '02. POST Create Booking.yml')).toMatch(/__reservationsBooked"\), \[\]\);\n\s+if \(_asked\.length > 0\) \{\n\s+checkBookedReservations\([^\n]*_asked, \{ places: false, offerTrips: fromEnv\(bru\.getEnvVar\("__offerTripLegs"\), \[\]\) \}\)/);
+    expect(read('02-Common Requests', '02. POST Create Booking.yml')).toMatch(/__reservationsBooked"\), \[\]\);\n\s+if \(_asked\.length > 0\) \{\n(?:\s+(?:\/\/|const|bru\.setEnvVar)[^\n]*\n)*\s+checkBookedReservations\([^\n]*_asked, \{ places: false, offerTrips: fromEnv\(bru\.getEnvVar\("__offerTripLegs"\), \[\]\), ignored: _ignored \}\)/);
   });
 
   test('the booking request carries the reservation place selections; the misplaced admission checks are gone', () => {

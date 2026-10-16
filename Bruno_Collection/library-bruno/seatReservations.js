@@ -6,6 +6,8 @@ http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
 
+const { ignoredParameters } = require('./ignoredParameters.js');
+
 /**
  * seatReservations.js — mandatory and optional seat reservations (#601).
  *
@@ -208,9 +210,11 @@ function checkProviderRules(offer, passengerRefs) {
  * warning: OSDM does not require it. A reservation part the offer gives
  * without a trip coverage is matched by any booked reservation not already
  * taken. `places: false` leaves out the place check (a pre-booking may not
- * have allocated one yet).
+ * have allocated one yet). `ignored` maps a reservation id to the request
+ * member the provider said it ignored (`reservationsIgnored()`): that
+ * reservation missing is a warning, not a failure (#774).
  */
-function checkBookedReservations(booking, offer, reservationIds, { places = true, offerTrips = [] } = {}) {
+function checkBookedReservations(booking, offer, reservationIds, { places = true, offerTrips = [], ignored = {} } = {}) {
   const parts = listOf(offer?.reservationOfferParts).filter((p) => reservationIds.includes(p?.id));
   const booked = listOf(booking?.bookedOffers).flatMap((o) => listOf(o?.reservations));
   const keyOf = (coverage) => `${coverage?.coveredTripId}|${listOf(coverage?.coveredLegIds).join(',')}`;
@@ -236,7 +240,13 @@ function checkBookedReservations(booking, offer, reservationIds, { places = true
     if (match) taken.add(match);
     const legs = listOf(part.tripCoverage?.coveredLegIds).join(', ');
     const what = legs ? `on leg ${legs}` : `${part.summary || part.id} (the offer gives it no leg)`;
-    const checks = [{
+    const member = match ? null : ignored[part.id];
+    const checks = [member ? {
+      name: `Booking: holds the reservation ${what}`,
+      ok: false,
+      level: 'warn',
+      message: `not supported: the provider says it ignored offers.${member} (PARAMETER_NOT_SUPPORTED), and the booking holds no reservation for ${part.id}`,
+    } : {
       name: `Booking: holds the reservation ${what}`,
       ok: !!match,
       message: match ? undefined : `the booking holds ${booked.length} reservation(s), none for the reservation ${part.id} ${what}`,
@@ -248,6 +258,26 @@ function checkBookedReservations(booking, offer, reservationIds, { places = true
     }
     return checks;
   });
+}
+
+/**
+ * #774: the reservations asked through a member the provider says it ignored.
+ * `asked` names the reservation ids sent in each member; the answer's
+ * PARAMETER_NOT_SUPPORTED problems say which members were ignored. Returns
+ * { reservationId: member }, the member as OSDM spells it.
+ *
+ * @param {object} response the booking (or offer-parts) answer
+ * @param {{placeSelections?: string[], optionalReservationSelections?: string[]}} asked
+ * @returns {Object<string, string>}
+ */
+function reservationsIgnored(response, asked = {}) {
+  const names = new Set(ignoredParameters(response));
+  const out = {};
+  for (const member of ['placeSelections', 'optionalReservationSelections']) {
+    if (!names.has(member.toLowerCase())) continue;
+    listOf(asked[member]).forEach((id) => { if (id && !out[id]) out[id] = member; });
+  }
+  return out;
 }
 
 /**
@@ -309,4 +339,4 @@ function splitByReservation(selection, offer) {
   });
 }
 
-module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, legOfReservation, placeSelectionsFor, reservationsWithoutLeg, bookingSelections, tripLegsOf, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest, splitByReservation };
+module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, legOfReservation, placeSelectionsFor, reservationsWithoutLeg, bookingSelections, tripLegsOf, checkRelations, checkProviderRules, checkBookedReservations, reservationsIgnored, reservationInBookingRequest, splitByReservation };

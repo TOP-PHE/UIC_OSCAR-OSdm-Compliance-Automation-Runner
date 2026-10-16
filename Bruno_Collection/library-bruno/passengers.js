@@ -8,38 +8,15 @@
 const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES, checkExtensibleCode } = require('./osdmEnums.js');
+// The members a provider says it ignored (#729): a PATCH answer may carry
+// PARAMETER_NOT_SUPPORTED "Parameter 'dateOfBirth' was ignored." next to
+// HTTP 200, and the passenger then keeps the value it had.
+const { ignoredParameters } = require('./ignoredParameters.js');
 
 module.exports = {
   patchMultiPassengerResponse,
   ignoredParameters
 };
-
-// The members a provider says it ignored (#729). A PATCH answer may carry
-// problems such as PARAMETER_NOT_SUPPORTED "Parameter 'dateOfBirth' was
-// ignored." next to HTTP 200: the passenger then keeps the value it had. The
-// member is named by the problem's `pointers` (OSDM 3.x), else by the quoted
-// name in its title. Only the last segment is kept, lower-cased.
-function ignoredParameters(response) {
-  const problems = Array.isArray(response?.problems) ? response.problems : [];
-  return [...new Set(problems.flatMap(ignoredNamesOf))];
-}
-
-// The members one problem says were ignored, lower-cased; [] for any other problem.
-function ignoredNamesOf(p) {
-  if (!p || typeof p !== 'object') return [];
-  const code = String(p.code || '');
-  const title = String(p.title || '');
-  if (!code.endsWith('PARAMETER_NOT_SUPPORTED') && !/\bignored\b/i.test(title)) return [];
-  let refs = Array.isArray(p.pointers) ? p.pointers.map(String) : [];
-  if (!refs.length) {
-    const m = /'([^']+)'/.exec(title);
-    refs = m ? [m[1]] : [];
-  }
-  return refs
-    .map((ref) => ref.split(/[./]/).findLast(Boolean))
-    .filter(Boolean)
-    .map((name) => name.toLowerCase());
-}
 
 // The ignored members are kept per passenger from 03 so that 04 (a GET, with
 // no problem to read) grades the same members the same way.

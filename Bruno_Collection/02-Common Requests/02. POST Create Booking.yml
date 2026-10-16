@@ -225,10 +225,16 @@ runtime:
         // provider that takes the request and leaves one out is seen here, not
         // only after the confirmation (07).
         {
-          const { checkBookedReservations, fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
+          const { checkBookedReservations, reservationsIgnored, fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
           const _asked = fromEnv(bru.getEnvVar("__reservationsBooked"), []);
           if (_asked.length > 0) {
-            checkBookedReservations((_body && _body.booking) || _body, fromEnv(bru.getEnvVar("offer"), null), _asked, { places: false, offerTrips: fromEnv(bru.getEnvVar("__offerTripLegs"), []) }).forEach((c) => {
+            // #774: a reservation asked through a member the provider says it
+            // ignored is "not supported", a warning here and at 07.
+            const _idsOf = (name) => fromEnv(bru.getEnvVar(name), []).map((x) => x && x.reservationId);
+            const _ignored = reservationsIgnored(_body, { placeSelections: _idsOf("reservationPlaceSelections"), optionalReservationSelections: _idsOf("optionalReservationSelections") });
+            bru.setEnvVar("__reservationsIgnored", JSON.stringify(_ignored));
+            checkBookedReservations((_body && _body.booking) || _body, fromEnv(bru.getEnvVar("offer"), null), _asked, { places: false, offerTrips: fromEnv(bru.getEnvVar("__offerTripLegs"), []), ignored: _ignored }).forEach((c) => {
+              if (c.level === "warn") { if (!c.ok) require(bru.getEnvVar("library_base") + "displays.js").validationLogger(`[WARNING] ${c.name} — ${c.message}`); return; }
               test(c.name, () => { if (!c.ok) throw new Error(c.message); });
             });
           }

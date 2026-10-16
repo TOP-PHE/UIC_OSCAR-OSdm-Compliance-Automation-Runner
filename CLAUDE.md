@@ -1347,6 +1347,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     rule** (`personContact.js` `withContactShape()`: flat below 3.4,
     `detail.contact` from 3.4) in the passenger PATCH and the purchaser body;
     a 3.0.5 provider ignored `contact`.
+  - **A reservation the provider says it ignored is "not supported"**
+    (#774, 1.11.303): `reservationsIgnored()` (`seatReservations.js`) reads
+    the booking's (or 09's) PARAMETER_NOT_SUPPORTED problems for
+    `placeSelections` / `optionalReservationSelections`, kept per sale in
+    `__reservationsIgnored`, and `checkBookedReservations()` makes that
+    reservation missing a WARNING at 02, 07 and 09. Ignored members are
+    parsed in one place, `ignoredParameters.js` (last segment, so
+    `…placeSelections.accommodations` is not the reservation). The version
+    check compares with `sameOsdmVersion()`: data file `3.8` = API `3.8.0`.
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id

@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.303] / [collection-OTST_V2.0.174] — 2026-10-16
+
+Issue #774, release 2026.338. Two gradings a real provider's seat reservation batch showed wrong.
+
+### Fixed
+- **A data file at OSDM `3.8` matches an API at `3.8.0`.** `00. GET System Version Check` compared the two as text, so every run against a provider giving the full version logged "OSDM version mismatch". `sameOsdmVersion()` (`osdmCompliance.js`) compares the numbers part by part, as far as the data file goes: `3.8` matches `3.8.0` and `3.8.2`, `3.8.1` only `3.8.1`, `3.8` not `3.80`. A patch the API leaves out reads as 0.
+- **A reservation the provider says it ignored is a warning, not a failure.** The booking answer said `PARAMETER_NOT_SUPPORTED` "Parameter 'offers.optionalReservationSelections' was ignored." and held no reservation; step 02 failed "Booking: holds the reservation …". The provider said clearly that it does not take a reservation that way: the check is now a WARNING "not supported" at 02, 07 and 09 (`reservationsIgnored()`, `seatReservations.js`), for `optionalReservationSelections` and `placeSelections`, as #729 does for a passenger member. A reservation missing with no such problem still fails; preferences ignored inside a placeSelection (`…placeSelections.accommodations`) do not count. The parsing of ignored members moved from `passengers.js` to `library-bruno/ignoredParameters.js`, shared by both.
+
+Checked:
+- Unit tests: `provider-run-774.test.js` (10); `bruno-seat-reservations.test.js` (one pinned pattern updated). Turning off either new rule fails a test.
+- The simulator never answers an ignored parameter, and its data file names full versions that it advertises: no simulator scenario can change, so no replay was recorded.
+- Full suite 3410 tests, lint.
+
+Not verified: a run against the real provider.
+
+---
+
 ## [server-1.11.302] / [collection-OTST_V2.0.173] — 2026-10-16
 
 Issue #772, release 2026.337. Four defects of OSCAR's own, seen on a real provider's run.
