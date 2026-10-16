@@ -58,6 +58,8 @@ const ENUMS = {
   overruleCodeExpectRejection:       ['off', 'on'],
   // #601: how the optional seat reservations are booked; mandatory ones always are.
   reservationBookingForm:            [null, 'RESERVATION_SELECTION', 'PLACE_SELECTION', 'ADD_LATER'],
+  placeSelectionFlow:                [null, 'AUTOMATIC_PLACE_SELECTION', 'AUTOMATIC_PLACE_SELECTION_PREFERENCES', 'AUTOMATIC_PLACE_SELECTION_NEARBY', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE'],
+  namedPlaceKind:                    [null, 'PLACE', 'COMPARTMENT'],
   // Which passengers step 03 updates.
   passengerUpdateScope:              [null, 'ALL', 'MAIN'],
   // #599: negative test, the expected product must not be offered.
@@ -2478,6 +2480,10 @@ function buildSalesFlowActionsSection(idx, sc) {
           'Which passengers PATCH passengers updates after the booking. ALL (or empty): every passenger. MAIN: the first passenger only, for providers that let only the main passenger be changed. The others are read back against what the booking sent.')}
         ${buildSelect(idx, 'reservationBookingForm', 'Optional reservations', ENUMS.reservationBookingForm,
           'How the optional seat reservations are booked (#601); mandatory ones always go with the booking. RESERVATION_SELECTION: optionalReservationSelections. PLACE_SELECTION: placeSelections naming the trip and leg. ADD_LATER: added after the booking (09, /offer-parts). Empty: optional reservations are not booked.')}
+        ${buildSelect(idx, 'placeSelectionFlow', 'Place selection flow', ENUMS.placeSelectionFlow,
+          'How the place is chosen (#766), as OSDM names it. Empty: from the fields above and below. MANUAL_… asks the place map (POST /availabilities/vehicle-place-map) before the booking and names free places; WITHOUT_FEE takes seats without a selection fee, WITH_FEE a seat with one, whose fee the booking must add. …_PREFERENCES asks GET /availabilities/preferences first.')}
+        ${buildSelect(idx, 'namedPlaceKind', 'Named place', ENUMS.namedPlaceKind,
+          'In a MANUAL_… flow: PLACE (default), one free seat per passenger; COMPARTMENT, a free compartment booked as a whole. The booking must give the places named.')}
         ${buildText(idx, 'placePreferences', 'Seat preferences', 'e.g. WINDOW, POWER',
           'OSDM place property codes asked in the booking (#766), in placeSelections[].accommodations[].placeProperties. Only those the offer lists are asked; one it does not list is a warning, and so is a booked place without one asked. With the PREFERENCES flow declared, GET /availabilities/preferences is asked first. With preferences and no form above, the optional reservations are booked by PLACE_SELECTION. Empty: no preference.')}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">

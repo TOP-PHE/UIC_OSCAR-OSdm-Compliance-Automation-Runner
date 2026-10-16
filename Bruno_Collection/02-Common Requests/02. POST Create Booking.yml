@@ -61,6 +61,8 @@ runtime:
         // #766 PR 2: in the PREFERENCES flow, the availability of the seat
         // preferences is asked before the booking.
         await require(bru.getEnvVar("library_base") + "offers.js").askPlacePreferences();
+        // #766 PR 3: in a manual flow, the place map is asked and places are named.
+        await require(bru.getEnvVar("library_base") + "offers.js").askNamedPlaces();
         buildBookingRequest();
         // #604: a new Idempotency-Key when the scenario tests it.
         require(bru.getEnvVar("library_base") + "idempotencySteps.js").setIdempotencyKey(req, "booking");

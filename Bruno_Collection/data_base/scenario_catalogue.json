@@ -458,6 +458,45 @@
       }
     },
     {
+      "code": "OTST_SALE_NAMED_PLACE_2ADT",
+      "source": "SIM_SALE_NAMED_PLACE_2ADT_38",
+      "purpose": "Two named seats without a selection fee, chosen on the place map (POST /availabilities/vehicle-place-map); the booking gives them at the offer's price.",
+      "checks": 336,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 2
+      }
+    },
+    {
+      "code": "OTST_SALE_NAMED_PLACE_FEE_1ADT",
+      "source": "SIM_SALE_NAMED_PLACE_FEE_1ADT_38",
+      "purpose": "A named seat with a selection fee, chosen on the place map; the booking gives it at the offer's price plus the fee.",
+      "checks": 273,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_SALE_NAMED_COMPARTMENT_2ADT",
+      "source": "SIM_SALE_NAMED_COMPARTMENT_2ADT_38",
+      "purpose": "A compartment booked as a whole, chosen on the place map; the booking gives it.",
+      "checks": 336,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 2
+      }
+    },
+    {
       "code": "OTST_SALE_BY_TRIP_ID_1ADT",
       "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
       "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",

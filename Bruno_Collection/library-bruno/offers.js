@@ -44,6 +44,7 @@ module.exports = {
   prepareOfferRequestByTripIds,
   checkOfferPlaceSelection,
   askPlacePreferences,
+  askNamedPlaces,
   bookingWithoutPreferences,
   recordPlacePreferenceChecks,
   checkOfferRequestByTripIds,
@@ -2172,6 +2173,8 @@ function checkOfferPlaceSelection() {
   bru.setEnvVar("__placePreferencesListed", "false");
   bru.setEnvVar("__placePreferencesRetried", "false");
   bru.setEnvVar("__placePreferencesRefused", null);
+  bru.setEnvVar("__namedPlaceChoices", null);
+  bru.setEnvVar("__namedPlaceFees", null);
   const flow = bru.getEnvVar("placeSelectionFlow");
   if (!flow) return;
   const { describeOfferedFlow, choosePreferences } = require('./placeSelection.js');
@@ -2244,20 +2247,24 @@ async function askPlacePreferences() {
   bru.setEnvVar("__placePreferencesOutcome", JSON.stringify({ checks }));
 }
 
-// A GET of an availability resource (#766), with the headers of the offer
-// request; { status, body }, status 0 when it could not be sent.
-async function sendAvailabilityRequest(path) {
+// A request to an availability resource (#766), with the headers of the
+// offer request: a GET, or a POST of `body`; { status, body }, status 0 when
+// it could not be sent.
+async function sendAvailabilityRequest(path, payload) {
   const { requestorHeader } = require("./requestHeaders.js");
+  const post = payload !== undefined;
   try {
     const res = await new Promise((resolve, reject) => {
       bru.sendRequest({
         url: `${bru.getEnvVar("api_base")}${path}`,
-        method: "GET",
+        method: post ? "POST" : "GET",
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${bru.getEnvVar("access_token")}`,
+          ...(post ? { "Content-Type": `application/json;version=${bru.getEnvVar("osdmVersion")}` } : {}),
           ...requestorHeader(bru.getEnvVar("requestor")),
         },
+        ...(post ? { data: JSON.stringify(payload) } : {}),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });
     let body = res?.data ?? res?.body ?? null;
@@ -2267,17 +2274,59 @@ async function sendAvailabilityRequest(path) {
     }
     return { status: res?.status || res?.statusCode || 0, body };
   } catch (err) {
-    validationLogger(`[ERROR] GET ${path.split("?")[0]} could not be sent: ${err?.message || err}`);
+    validationLogger(`[ERROR] ${post ? "POST" : "GET"} ${path.split("?")[0]} could not be sent: ${err?.message || err}`);
     return { status: 0, body: null };
   }
 }
 
-/** 02's after-response: records the checks of GET /availabilities/preferences, once. */
+/** 02's after-response: records the checks of the availability requests asked before it, once. */
 function recordPlacePreferenceChecks() {
-  const outcome = parseEnvJson("__placePreferencesOutcome", null);
-  if (!outcome) return;
-  bru.setEnvVar("__placePreferencesOutcome", null);
-  recordChecks(outcome.checks || []);
+  for (const name of ["__placePreferencesOutcome", "__namedPlacesOutcome"]) {
+    const outcome = parseEnvJson(name, null);
+    if (!outcome) continue;
+    bru.setEnvVar(name, null);
+    recordChecks(outcome.checks || []);
+  }
+}
+
+/**
+ * Before the booking, in a manual flow (#766 PR 3): POST
+ * /availabilities/vehicle-place-map for the reservations the booking places,
+ * once per offer, and the places (or compartment) to name for each. Nothing
+ * to choose is a warning; the booking then names no place.
+ */
+async function askNamedPlaces() {
+  const np = require('./namedPlaces.js');
+  const kind = bru.getEnvVar("namedPlaceKind");
+  const flow = bru.getEnvVar("placeSelectionFlow");
+  const offerId = bru.getEnvVar("offerId");
+  if (!kind || !np.isManual(flow) || !offerId || bru.getEnvVar("__namedPlacesAskedFor") === offerId) return;
+  bru.setEnvVar("__namedPlacesAskedFor", offerId);
+  const offer = chosenOffer();
+  const ids = [...new Set([...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])]
+    .map((p) => p?.reservationId).filter(Boolean))];
+  if (ids.length === 0) {
+    validationLogger("[WARNING] Named place: no reservation is placed in the booking, so the place map is not asked.");
+    return;
+  }
+  const bookingRefs = parseEnvJson("bookingPassengerReferences", []) || [];
+  const reservations = ids.map((id) => {
+    const part = (offer?.reservationOfferParts || []).find((p) => p?.id === id);
+    const refs = Array.isArray(part?.passengerRefs) && part.passengerRefs.length > 0 ? part.passengerRefs : bookingRefs;
+    return { id, passengerRefs: refs };
+  });
+  const res = await sendAvailabilityRequest('/availabilities/vehicle-place-map', np.placeMapRequest(offerId, ids));
+  const answer = np.checkPlaceMapAnswer(res.status, res.body);
+  for (const line of answer.lines) validationLogger(`[${line.level}] ${line.text}`);
+  bru.setEnvVar("__namedPlacesOutcome", JSON.stringify({ checks: answer.checks }));
+  if (!answer.map) return;
+  const chosen = np.chooseNamedPlaces(answer.map, { flow, kind, reservations });
+  for (const line of chosen.lines) validationLogger(`[${line.level}] ${line.text}`);
+  for (const [id, choice] of Object.entries(chosen.choices)) {
+    validationLogger(`[INFO] Named place for reservation ${id}: ${np.describeChoice(choice)}${chosen.fees[id] ? ` (selection fee ${chosen.fees[id]})` : ''}.`);
+  }
+  bru.setEnvVar("__namedPlaceChoices", JSON.stringify(chosen.choices));
+  bru.setEnvVar("__namedPlaceFees", JSON.stringify(chosen.fees));
 }
 
 // ── Group tariffs (#599) ─────────────────────────────────────────────────────

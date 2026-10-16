@@ -125,7 +125,8 @@ describe('#644: by-id requests without an id are skipped', () => {
       setVar: () => {},
       runner: { skipRequest: () => { skipped = true; } },
     };
-    const fakeRequire = () => ({ resolveEffectiveVersion: () => '3.8.0', atLeast: () => true });
+    // #766: the scripts log through displays.js, so the report shows the line.
+    const fakeRequire = () => ({ resolveEffectiveVersion: () => '3.8.0', atLeast: () => true, validationLogger: () => {} });
     new Function('bru', 'require', 'console', beforeRequest(file))(bru, fakeRequire, { log: () => {} });
     return { skipped, env };
   };

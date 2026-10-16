@@ -111,6 +111,12 @@ function validatePartEqualityFields(part, bookedPart, partType, index, fields) {
 function validatePartPrices(offerParts, bookedParts, partType) {
   // #650: an absent or null scale is the OSDM default 2.
   const offerPrices   = offerParts.filter(p => p.price).map(p => ({ amount: p.price.amount, currency: p.price.currency, scale: p.price.scale ?? 2 }));
+  // #766 PR 3: a reservation on a seat named with a selection fee costs the
+  // offer's price plus the fee (checked exactly at 07).
+  if (partType === 'reservation') {
+    const fees = require('./seatReservations.js').fromEnv(bru.getEnvVar("__namedPlaceFees"), {}) || {};
+    offerParts.filter(p => p.price && fees[p.id]).forEach(p => offerPrices.push({ amount: p.price.amount + fees[p.id], currency: p.price.currency, scale: p.price.scale ?? 2 }));
+  }
   const bookingPrices = bookedParts.filter(p => p.price).map(p => ({ amount: p.price.amount, currency: p.price.currency, scale: p.price.scale ?? 2 }));
   if (offerPrices.length > 0 && bookingPrices.length > 0) {
     test(`${partType} prices have at least one member in common between offer and booking`, () => {
