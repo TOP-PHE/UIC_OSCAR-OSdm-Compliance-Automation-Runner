@@ -1,0 +1,237 @@
+// Copyright [2026] [International Union of Railways (UIC)]
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+
+'use strict';
+
+/**
+ * #780 (PR 1): the Test Framework declares the offer search options a provider
+ * takes (offerSearchOptions); a scenario sending a value not declared warns at
+ * the run. After 01, the collection says whether the offers keep to each
+ * option sent, as warnings.
+ */
+
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const {
+  OFFER_SEARCH_OPTIONS, scenarioOfferCriteria, offerSearchOptionsOf, offerSearchOptionDeclared, annotateDatafile,
+} = require('../../src/utils/frameworkGating');
+
+const LIB = path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno');
+// offers.js logs through the global validationLogger, which requiring it resets.
+const logs = [];
+const { askedOptions, admissionProducts, checkOfferCriteria } = require(path.join(LIB, 'offerCriteria.js'));
+
+// An offer as OSDM 3.8 gives it: products on the offer, parts naming them.
+function offer(id, { mode = 'INDIVIDUAL', flexibility = 'FULL_FLEXIBLE', travelClass = 'SECOND', service = 'STANDARD', reservation = false, tags = [], type = 'ADMISSION_POINT2POINT' } = {}) {
+  const products = [{ id: `${id}-A`, type, flexibility, travelClass, serviceClass: { type: service }, productTags: tags }];
+  const o = {
+    offerId: id,
+    products,
+    admissionOfferParts: [{ id: `${id}-AP`, offerMode: mode, products: [{ productId: `${id}-A` }] }],
+  };
+  if (reservation) {
+    products.push({ id: `${id}-R`, type: 'RESERVATION', flexibility: 'NON_FLEXIBLE', travelClass: 'FIRST', serviceClass: { type: 'HIGH' } });
+    o.reservationOfferParts = [{ id: `${id}-RP`, offerMode: 'COLLECTIVE', products: [{ productId: `${id}-R` }] }];
+  }
+  return o;
+}
+const byName = (checks) => Object.fromEntries(checks.map((c) => [c.name.replace(/^Offer request: the offers keep to the /, '').replace(/ asked.*$/, ''), c]));
+
+describe('collection: askedOptions', () => {
+  test('only what the request carried; ALL, FARE_* and ANY_CLASS ask for nothing to check', () => {
+    expect(askedOptions({ offerMode: ' COLLECTIVE ', requestedOfferParts: ['ADMISSION', 'ALL', 'FARE_ADMISSION'], travelClasses: ['ANY_CLASS'], serviceClassTypes: ['HIGH', 'ANY_CLASS'], flexibilities: [], productTags: ['RESERVATION', ''] })).toEqual({
+      offerMode: ['COLLECTIVE'], requestedOfferParts: ['ADMISSION'], flexibilities: [], travelClasses: [], serviceClassTypes: ['HIGH'], productTags: ['RESERVATION'],
+    });
+    expect(askedOptions(null)).toEqual({ offerMode: [], requestedOfferParts: [], flexibilities: [], travelClasses: [], serviceClassTypes: [], productTags: [] });
+  });
+});
+
+describe('collection: checkOfferCriteria', () => {
+  test('offers that keep to every option: one passing check per option sent', () => {
+    const checks = checkOfferCriteria(
+      { offerMode: 'INDIVIDUAL', requestedOfferParts: ['ADMISSION', 'RESERVATION'], flexibilities: ['FULL_FLEXIBLE'], travelClasses: ['SECOND'], serviceClassTypes: ['STANDARD'], productTags: ['ADMISSION_POINT2POINT'] },
+      { offers: [offer('o1', { reservation: true }), offer('o2')] },
+    );
+    expect(checks.map((c) => [c.name, c.ok, c.level])).toEqual([
+      ['Offer request: the offers keep to the offer mode asked (INDIVIDUAL)', true, 'info'],
+      ['Offer request: the offers keep to the offer parts asked (ADMISSION, RESERVATION)', true, 'info'],
+      ['Offer request: the offers keep to the flexibilities asked (FULL_FLEXIBLE)', true, 'info'],
+      ['Offer request: the offers keep to the travel classes asked (SECOND)', true, 'info'],
+      ['Offer request: the offers keep to the service classes asked (STANDARD)', true, 'info'],
+      ['Offer request: the offers keep to the product tags asked (ADMISSION_POINT2POINT)', true, 'info'],
+    ]);
+  });
+
+  test('a reservation sold with the admission says nothing of the tariff, class or mode asked', () => {
+    // The reservation is NON_FLEXIBLE, FIRST, HIGH and COLLECTIVE: none of it counts.
+    const checks = checkOfferCriteria({ offerMode: 'INDIVIDUAL', flexibilities: ['FULL_FLEXIBLE'], travelClasses: ['SECOND'], serviceClassTypes: ['STANDARD'] }, { offers: [offer('o1', { reservation: true })] });
+    expect(checks.every((c) => c.ok)).toBe(true);
+  });
+
+  test('offers that do not keep to an option: named, a warning when none does, INFO when some do', () => {
+    const response = { offers: [offer('o1', { mode: 'COLLECTIVE', flexibility: 'NON_FLEXIBLE', travelClass: 'FIRST', service: 'HIGH', reservation: true }), offer('o2')] };
+    const c = byName(checkOfferCriteria({ offerMode: 'INDIVIDUAL', requestedOfferParts: ['ADMISSION'], flexibilities: ['FULL_FLEXIBLE'], travelClasses: ['SECOND'], serviceClassTypes: ['STANDARD'], productTags: ['UPGRADE_POINT2POINT'] }, response));
+    expect(c['offer mode'].message).toBe('1 of 2 offer(s) do not (offer o1: COLLECTIVE)');
+    expect(c['offer parts'].ok).toBe(true);
+    expect(c.flexibilities.message).toBe('1 of 2 offer(s) do not (offer o1: NON_FLEXIBLE)');
+    expect(c['travel classes'].message).toBe('1 of 2 offer(s) do not (offer o1: FIRST)');
+    expect(c['service classes'].message).toBe('1 of 2 offer(s) do not (offer o1: HIGH)');
+    expect(c['product tags'].message).toBe('2 of 2 offer(s) do not (offer o1: no product tagged so; offer o2: no product tagged so)');
+    expect(Object.entries(c).filter(([k]) => k !== 'offer parts').map(([k, x]) => [k, x.ok, x.level])).toEqual([
+      ['offer mode', false, 'info'], ['flexibilities', false, 'info'], ['travel classes', false, 'info'], ['service classes', false, 'info'], ['product tags', false, 'warn'],
+    ]);
+  });
+
+  test('offer parts: a reservation sold with an admission is part of it; otherwise every part kind must be asked', () => {
+    const reservationOnly = { offerId: 'r', reservationOfferParts: [{ id: 'rp' }] };
+    const withReservation = offer('o1', { reservation: true });
+    expect(checkOfferCriteria({ requestedOfferParts: ['ADMISSION'] }, { offers: [withReservation] })[0].ok).toBe(true);
+    expect(checkOfferCriteria({ requestedOfferParts: ['ADMISSION'] }, { offers: [reservationOnly] })[0].message).toBe('1 of 1 offer(s) do not (offer r: RESERVATION)');
+    expect(checkOfferCriteria({ requestedOfferParts: ['RESERVATION'] }, { offers: [withReservation, reservationOnly] })[0].message).toBe('1 of 2 offer(s) do not (offer o1: ADMISSION, RESERVATION)');
+  });
+
+  test('a product tag or a product type asked: one product carrying it is enough', () => {
+    const response = { offers: [offer('o1', { tags: ['SPLIT_RESERVATION'] }), offer('o2', { type: 'UPGRADE_POINT2POINT' })] };
+    expect(checkOfferCriteria({ productTags: ['SPLIT_RESERVATION', 'UPGRADE_POINT2POINT'] }, response)[0].ok).toBe(true);
+  });
+
+  test('more than three offers off: three named, then an ellipsis', () => {
+    const offers = ['a', 'b', 'c', 'd'].map((id) => offer(id, { travelClass: 'FIRST' }));
+    expect(checkOfferCriteria({ travelClasses: ['SECOND'] }, { offers })[0].message).toBe('4 of 4 offer(s) do not (offer a: FIRST; offer b: FIRST; offer c: FIRST; …)');
+  });
+
+  test('an option the provider says it ignored is a warning saying so', () => {
+    const [c] = checkOfferCriteria({ serviceClassTypes: ['HIGH'] }, { offers: [offer('o1')] }, ['serviceclasstypes']);
+    expect(c).toEqual({ name: 'Offer request: the offers keep to the service classes asked (HIGH)', ok: false, level: 'warn', message: 'the provider says it ignored offerSearchCriteria.serviceClassTypes (PARAMETER_NOT_SUPPORTED): not supported' });
+  });
+
+  test('nothing asked, no offer, or an offer that says nothing: no warning', () => {
+    expect(checkOfferCriteria({}, { offers: [offer('o1')] })).toEqual([]);
+    expect(checkOfferCriteria({ travelClasses: ['SECOND'] }, { offers: [] })).toEqual([]);
+    expect(checkOfferCriteria({ travelClasses: ['SECOND'] }, null)).toEqual([]);
+    expect(checkOfferCriteria({ travelClasses: ['SECOND'], offerMode: 'INDIVIDUAL' }, { offers: [{ offerId: 'x' }] }).every((c) => c.ok)).toBe(true);
+  });
+
+  test('admission products: by productId, by summaryProductId, else every product', () => {
+    expect(admissionProducts(offer('o1', { reservation: true })).map((p) => p.id)).toEqual(['o1-A']);
+    expect(admissionProducts({ products: [{ id: 'p1' }, { id: 'p2' }], admissionOfferParts: [{ summaryProductId: 'p2' }] }).map((p) => p.id)).toEqual(['p2']);
+    expect(admissionProducts({ products: [{ id: 'p1' }], admissionOfferParts: [{}] }).map((p) => p.id)).toEqual(['p1']);
+    expect(admissionProducts({})).toEqual([]);
+  });
+});
+
+describe('collection: after 01', () => {
+  test('checkOfferSearchCriteria reads the request sent and logs a line per option', () => {
+    global.bru = { getEnvVar: (k) => (k === 'offerSearchCriteria' ? JSON.stringify({ travelClasses: ['SECOND'], offerMode: 'INDIVIDUAL', serviceClassTypes: ['STANDARD'], flexibilities: ['FULL_FLEXIBLE'] }) : undefined), setEnvVar: () => {} };
+    logs.length = 0;
+    try {
+      const offers = require(path.join(LIB, 'offers.js'));
+      global.validationLogger = (line) => { logs.push(line); };
+      offers.checkOfferSearchCriteria({
+        offers: [offer('o1', { travelClass: 'FIRST' }), offer('o2', { travelClass: 'FIRST', service: 'HIGH' })],
+        problems: [{ code: 'PARAMETER_NOT_SUPPORTED', title: "Parameter 'offerSearchCriteria.offerMode' was ignored." }],
+      });
+    } finally { delete global.bru; }
+    expect(logs).toEqual([
+      '[WARNING] Offer request: the offers keep to the offer mode asked (INDIVIDUAL) — the provider says it ignored offerSearchCriteria.offerMode (PARAMETER_NOT_SUPPORTED): not supported',
+      '[INFO] ✔ Offer request: the offers keep to the flexibilities asked (FULL_FLEXIBLE)',
+      '[WARNING] Offer request: the offers keep to the travel classes asked (SECOND) — 2 of 2 offer(s) do not (offer o1: FIRST; offer o2: FIRST)',
+      '[INFO] Offer request: the offers keep to the service classes asked (STANDARD) — 1 of 2 offer(s) do not (offer o2: HIGH)',
+    ]);
+  });
+
+  test('01 calls it, and the scenario parser words the framework warning', () => {
+    const step = fs.readFileSync(path.join(LIB, '..', '02-Common Requests', '01. POST Get Offer.yml'), 'utf8');
+    expect(step).toContain('offers.js").checkOfferSearchCriteria(jsonData);');
+    global.bru = { getEnvVar: () => undefined, setEnvVar: () => {} };
+    let sp;
+    try { sp = require(path.join(LIB, 'scenarioParser.js')); } finally { delete global.bru; }
+    expect(sp.featureNotDeclaredWarning({ code: 'S1' }, 'offerOption:serviceClassTypes=HIGH')).toBe(
+      '[WARNING] Scenario "S1" asks for offers with offerSearchCriteria.serviceClassTypes HIGH, which the Test Framework does not declare (Offer search options). The run will proceed; the provider may refuse or ignore it. Declare the value in the Test Framework, or change the scenario\'s offer search criteria.');
+  });
+});
+
+describe('server: the framework declares the options', () => {
+  test('a scenario\'s criteria: its own, else the first of its list entry', () => {
+    const df = { offerSearchCriteriaList: [{ id: 3, offerSearchCriteria: [{ offerMode: 'COLLECTIVE' }] }] };
+    expect(scenarioOfferCriteria({ offerSearchCriteria: { offerMode: 'INDIVIDUAL' }, offerSearchCriteriaListId: 3 }, df)).toEqual({ offerMode: 'INDIVIDUAL' });
+    expect(scenarioOfferCriteria({ offerSearchCriteriaListId: 3 }, df)).toEqual({ offerMode: 'COLLECTIVE' });
+    expect(scenarioOfferCriteria({ offerSearchCriteriaListId: 9 }, df)).toBeNull();
+    expect(scenarioOfferCriteria({}, df)).toBeNull();
+    expect(scenarioOfferCriteria(null, df)).toBeNull();
+  });
+
+  test('the values a scenario sends, by framework key', () => {
+    expect(offerSearchOptionsOf({ offerSearchCriteria: { offerMode: 'COLLECTIVE', requestedOfferParts: ['ADMISSION', 'ADMISSION', ''], travelClass: ['FIRST'], serviceClass: null } }, {})).toEqual({
+      offerModes: ['COLLECTIVE'], requestedOfferParts: ['ADMISSION'], travelClasses: ['FIRST'], serviceClassTypes: [],
+    });
+  });
+
+  test('absent = every value, [] = none', () => {
+    expect(offerSearchOptionDeclared({}, 'travelClasses', 'FIRST')).toBe(true);
+    expect(offerSearchOptionDeclared({ offerSearchOptions: { travelClasses: [] } }, 'travelClasses', 'FIRST')).toBe(false);
+    expect(offerSearchOptionDeclared({ offerSearchOptions: { travelClasses: ['FIRST'] } }, 'travelClasses', 'FIRST')).toBe(true);
+    expect(offerSearchOptionDeclared(null, 'offerModes', 'COLLECTIVE')).toBe(true);
+  });
+
+  test('the run\'s data file names each value not declared', () => {
+    const df = { scenarios: [
+      { code: 'A', offerSearchCriteria: { offerMode: 'COLLECTIVE', travelClass: ['FIRST', 'SECOND'] } },
+      { code: 'B', offerSearchCriteria: { offerMode: 'INDIVIDUAL' } },
+    ] };
+    annotateDatafile(df, { offerSearchOptions: { offerModes: ['INDIVIDUAL'], travelClasses: ['SECOND'] } });
+    expect(df.scenarios[0].__featureNotDeclaredWarnings).toEqual(['offerOption:offerModes=COLLECTIVE', 'offerOption:travelClasses=FIRST']);
+    expect(df.scenarios[1].__featureNotDeclaredWarnings).toBeUndefined();
+  });
+
+  test('no simulator scenario warns against a framework that declares nothing', () => {
+    const sim = JSON.parse(fs.readFileSync(path.join(LIB, '..', 'data_base', 'simulator_datafile.json'), 'utf8'));
+    annotateDatafile(sim, { salesFlows: ['SALE', 'REFUND_FULL', 'REFUND_PARTIAL', 'REFUND_IROPS', 'EXCHANGE_FULL', 'EXCHANGE_PARTIAL', 'EXCHANGE_IROPS'], returnModels: ['SEPARATE', 'COMBINED'] });
+    const options = sim.scenarios.flatMap((s) => (s?.__featureNotDeclaredWarnings || []).filter((w) => w.startsWith('offerOption:')));
+    expect(options).toEqual([]);
+  });
+});
+
+describe('the Test Framework page', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 'scenarios.js'), 'utf8').replaceAll('\r\n', '\n');
+  const lines = page.split('\n');
+  const lift = (name, context) => {
+    const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
+    const end = lines.findIndex((l, i) => i > start && l === '}');
+    return vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n')})`, context);
+  };
+  const start = lines.indexOf('const FW_OFFER_SEARCH_OPTIONS = [');
+  const FW_OFFER_SEARCH_OPTIONS = vm.runInNewContext(lines.slice(start, lines.indexOf('];', start) + 1).join('\n').replace('const FW_OFFER_SEARCH_OPTIONS = ', ''));
+
+  test('the page\'s options and values are the server\'s', () => {
+    expect(Object.fromEntries(FW_OFFER_SEARCH_OPTIONS.map(([k, , v]) => [k, v]))).toEqual(
+      Object.fromEntries(Object.entries(OFFER_SEARCH_OPTIONS).map(([k, o]) => [k, o.values])));
+  });
+
+  test('the first click starts from every value; the pills follow; the panel is drawn and wired', () => {
+    const wizData = { framework: {} };
+    const toggle = lift('fwToggleOfferSearchOption', { wizData, FW_OFFER_SEARCH_OPTIONS });
+    const el = { classList: { toggle: (_c, on) => { el.on = on; } } };
+    toggle(el, 'travelClasses', 'ANY_CLASS');
+    expect(wizData.framework.offerSearchOptions).toEqual({ travelClasses: ['FIRST', 'SECOND'] });
+    expect(el.on).toBe(false);
+    toggle(el, 'travelClasses', 'ANY_CLASS');
+    expect(wizData.framework.offerSearchOptions.travelClasses).toEqual(['FIRST', 'SECOND', 'ANY_CLASS']);
+    expect(el.on).toBe(true);
+    toggle(el, 'nothing', 'X');
+    expect(Object.keys(wizData.framework.offerSearchOptions)).toEqual(['travelClasses']);
+    const declared = lift('fwOfferSearchOptionDeclared', {});
+    const esc = (v) => String(v);
+    const html = lift('offerSearchOptionsPanelHtml', { FW_OFFER_SEARCH_OPTIONS, fwOfferSearchOptionDeclared: declared, esc })({ offerSearchOptions: { offerModes: ['INDIVIDUAL'] } });
+    expect(html).toContain('data-key="offerModes" data-val="INDIVIDUAL"');
+    expect((html.match(/class="pill selected"/g) || []).length).toBe(1 + 8 + 3 + 5);
+    expect(page).toContain('${offerSearchOptionsPanelHtml(fw)}');
+    expect(page).toContain("case 'fw-offer-search-option':");
+  });
+});

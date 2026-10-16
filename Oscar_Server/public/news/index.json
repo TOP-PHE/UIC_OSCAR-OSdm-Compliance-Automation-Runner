@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-offer-search-options",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Offer search options: declared, and checked in every run",
+    "summary": "The Test Framework now says which offer search options a provider takes, and every run says whether the offers keep to the options sent.",
+    "content": "Under Offer requests, the Test Framework has a new part, Offer search options: the offer mode, offer parts, travel classes and service classes the provider takes. Nothing ticked differently means every value. A scenario sending a value that is not ticked gets a warning in its run. After the offer step, every run now says whether the offers keep to what was asked: offer mode, offer parts, flexibilities, travel and service classes, product tags. When no offer does, it is a warning; when only some do not, it is noted for information, because OSDM lets a provider return other offers too. When the provider says it ignored an option, the warning says so. This is the first part of a larger change: reference scenarios for each declared option, and random combinations of options, will follow."
+  },
+  {
     "id": "2026-10-16-return-calendar",
     "date": "October 16, 2026",
     "tag": "Fix",

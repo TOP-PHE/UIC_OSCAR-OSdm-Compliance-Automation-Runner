@@ -90,6 +90,17 @@ const PLACE_SELECTION_TEXT = Object.freeze({
   MANUAL_PLACE_SELECTION_WITH_FEE: 'of a named place, with a fee',
 });
 
+// #780: the offer search options a provider takes (framework.offerSearchOptions):
+// per OSDM OfferSearchCriteria member, the values it supports. A key absent =
+// every value (frameworks from before 1.11.306); [] = none. `field` is the
+// member of a scenario's offerSearchCriteria that holds it.
+const OFFER_SEARCH_OPTIONS = Object.freeze({
+  offerModes: { member: 'offerMode', field: 'offerMode', values: ['INDIVIDUAL', 'COLLECTIVE'] },
+  requestedOfferParts: { member: 'requestedOfferParts', field: 'requestedOfferParts', values: ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL'] },
+  travelClasses: { member: 'travelClasses', field: 'travelClass', values: ['FIRST', 'SECOND', 'ANY_CLASS'] },
+  serviceClassTypes: { member: 'serviceClassTypes', field: 'serviceClass', values: ['BEST', 'HIGH', 'STANDARD', 'BASIC', 'ANY_CLASS'] },
+});
+
 module.exports = {
   gatingRules,
   isScenarioArmedForField,
@@ -111,6 +122,10 @@ module.exports = {
   deriveSalesFlowsAdditions,
   applyFrameworkMigration,
   annotateDatafile,
+  OFFER_SEARCH_OPTIONS,
+  scenarioOfferCriteria,
+  offerSearchOptionsOf,
+  offerSearchOptionDeclared,
 };
 
 // Truthy values used across the codebase to mean "on" for scenario flags.
@@ -210,6 +225,39 @@ function placeSelectionFlowOf(scenario) {
   if (typeof raw === 'string') preferences = raw.split(/[\s,;]+/);
   if (preferences.some((p) => typeof p === 'string' && p.trim() !== '')) return 'AUTOMATIC_PLACE_SELECTION';
   return null;
+}
+
+/**
+ * #780: the offerSearchCriteria a scenario sends, as the collection resolves
+ * it (scenarioParser): its own, else the first of its offerSearchCriteriaList
+ * entry. null when it has none.
+ */
+function scenarioOfferCriteria(scenario, datafile) {
+  if (!scenario || typeof scenario !== 'object') return null;
+  if (scenario.offerSearchCriteria && typeof scenario.offerSearchCriteria === 'object') return scenario.offerSearchCriteria;
+  if (scenario.offerSearchCriteriaListId == null) return null;
+  const lists = Array.isArray(datafile?.offerSearchCriteriaList) ? datafile.offerSearchCriteriaList : [];
+  const entry = lists.find((e) => e && typeof e === 'object' && e.id === scenario.offerSearchCriteriaListId);
+  const first = Array.isArray(entry?.offerSearchCriteria) ? entry.offerSearchCriteria[0] : null;
+  return first && typeof first === 'object' ? first : null;
+}
+
+/** #780: the values of each offer search option a scenario sends, by framework key. */
+function offerSearchOptionsOf(scenario, datafile) {
+  const criteria = scenarioOfferCriteria(scenario, datafile) || {};
+  const out = {};
+  for (const [key, { field }] of Object.entries(OFFER_SEARCH_OPTIONS)) {
+    const raw = criteria[field];
+    const list = Array.isArray(raw) ? raw : [raw];
+    out[key] = [...new Set(list.filter((v) => typeof v === 'string' && v.trim() !== '').map((v) => v.trim()))];
+  }
+  return out;
+}
+
+/** #780: true when the framework takes this value of the option: no list, or listed. */
+function offerSearchOptionDeclared(framework, key, value) {
+  const declared = framework?.offerSearchOptions?.[key];
+  return !Array.isArray(declared) || declared.includes(value);
 }
 
 /** #766: true when the framework lets a place be chosen this way: no flow, no list, or listed. */
@@ -350,11 +398,29 @@ function applyFrameworkMigration(framework, scenarios, nowIso) {
   return { migrated, additions };
 }
 
+// One scenario's warnings, including those that need the data file.
+function datafileScenarioWarnings(sc, framework, datafile) {
+  const warnings = scenarioWarnings(sc, framework);
+  // #748: an offer request in a form the framework does not take. Named
+  // with the form, so that the collection can say which.
+  const form = offerRequestFormOf(sc, datafile);
+  if (!offerRequestFormDeclared(framework, form)) warnings.push(`offerRequestBy:${form}`);
+  // #766: a place chosen in a way the framework does not declare.
+  const flow = placeSelectionFlowOf(sc);
+  if (!placeSelectionFlowDeclared(framework, flow)) warnings.push(`placeSelectionBy:${flow}`);
+  // #780: an offer search option value the framework does not declare.
+  for (const [key, values] of Object.entries(offerSearchOptionsOf(sc, datafile))) {
+    for (const value of values) if (!offerSearchOptionDeclared(framework, key, value)) warnings.push(`offerOption:${key}=${value}`);
+  }
+  return warnings;
+}
+
 /**
  * Annotate a datafile object in place: each scenario that arms an
  * undeclared feature gets `__featureNotDeclaredWarnings: [field, ...]`, and
  * one whose offer request form is not declared `offerRequestBy:<form>` (#748),
- * one whose place selection flow is not declared `placeSelectionBy:<flow>` (#766).
+ * one whose place selection flow is not declared `placeSelectionBy:<flow>` (#766),
+ * one per offer search option value not declared `offerOption:<key>=<value>` (#780).
  * Removes the field when there are no warnings (avoids stale annotations
  * surviving a framework change).
  *
@@ -367,14 +433,7 @@ function annotateDatafile(datafile, framework) {
   let count = 0;
   for (const sc of datafile.scenarios) {
     if (!sc || typeof sc !== 'object') continue; // a Test Manager's save can store null
-    const warnings = scenarioWarnings(sc, framework);
-    // #748: an offer request in a form the framework does not take. Named
-    // with the form, so that the collection can say which.
-    const form = offerRequestFormOf(sc, datafile);
-    if (!offerRequestFormDeclared(framework, form)) warnings.push(`offerRequestBy:${form}`);
-    // #766: a place chosen in a way the framework does not declare.
-    const flow = placeSelectionFlowOf(sc);
-    if (!placeSelectionFlowDeclared(framework, flow)) warnings.push(`placeSelectionBy:${flow}`);
+    const warnings = datafileScenarioWarnings(sc, framework, datafile);
     if (warnings.length > 0) {
       sc.__featureNotDeclaredWarnings = warnings;
       count++;

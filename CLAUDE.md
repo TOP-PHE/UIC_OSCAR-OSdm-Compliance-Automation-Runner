@@ -179,6 +179,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `referencePlace` for `AUTO`. Simulator 0.30.0: DELETE of an unconfirmed
     booking; on a map train, an automatic place is a free saloon seat of
     coach 7 (a reference place must be on the map there).
+  - **Offer search options** (#780, PR 1 = 1.11.306): `offerSearchOptions`
+    (`offerModes`, `requestedOfferParts`, `travelClasses`,
+    `serviceClassTypes`), each absent = every value. Not the old
+    `offerCriteria` members: no page ever showed them, so their stored
+    defaults (SECOND, STANDARD…) are not declarations; only
+    `offerCriteria.flexibilities` is. Warning `offerOption:<key>=<value>`
+    from `annotateDatafile()`, the criteria read as the collection does
+    (`scenarioOfferCriteria()`: own, else the list entry's first). After 01,
+    `checkOfferSearchCriteria()` (`offerCriteria.js`) says whether the offers
+    keep to each option sent: never a failure (OSDM: classes may differ),
+    WARNING when no offer does, INFO when some do not. The page's
+    `FW_OFFER_SEARCH_OPTIONS` is pinned to `OFFER_SEARCH_OPTIONS`.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
