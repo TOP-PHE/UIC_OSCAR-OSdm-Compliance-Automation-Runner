@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-16-place-after-booking",
+    "date": "October 16, 2026",
+    "tag": "Feature",
+    "title": "Choosing a place after the booking",
+    "summary": "A reservation added after the booking can now carry a seat preference, a named seat or a place near a given one.",
+    "content": "When a scenario adds its optional reservations after the booking (Optional reservations: ADD_LATER) and names a place selection flow, OSCAR now makes the same choice it makes in a booking: it asks the provider for the preferences, the place map or the places nearby of the booking itself (BOOKING context), then names the choice in the request that adds the reservation. The checks of the booked places are the same as for a booking. Three reference scenarios cover it. This is the last of the five steps covering every way OSDM lets a place be chosen."
+  },
+  {
     "id": "2026-10-16-nearby-place",
     "date": "October 16, 2026",
     "tag": "Feature",
