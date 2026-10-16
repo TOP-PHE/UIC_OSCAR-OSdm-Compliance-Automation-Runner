@@ -1071,11 +1071,19 @@ function parseScenarioData(jsonData) {
               tripRequirement.legs.forEach(function (leg, legIndex) {
                 const legPrefix = `leg${legIndex + 1}`;
                 const _legCtx = `tripRequirement (SPECIFICATION) leg ${legIndex + 1}`;
-                const startDatetime = subTripDate(leg.startDatetime, _specTripDate, 'startDatetime', _legCtx);
+                const _storedStart = subTripDate(leg.startDatetime, _specTripDate, 'startDatetime', _legCtx);
                 const _sameDayEnd = subTripDate(leg.endDatetime, _specTripDate, 'endDatetime', _legCtx);
-                const endDatetime = arrivalAfterDeparture(startDatetime, _sameDayEnd);
-                if (endDatetime !== _sameDayEnd) {
-                  validationLogger(`[INFO] ${_legCtx}: arrival ${_sameDayEnd} is not after the departure ${startDatetime} — taken as the next day, ${endDatetime}.`);
+                const _storedEnd = arrivalAfterDeparture(_storedStart, _sameDayEnd);
+                if (_storedEnd !== _sameDayEnd) {
+                  validationLogger(`[INFO] ${_legCtx}: arrival ${_sameDayEnd} is not after the departure ${_storedStart} — taken as the next day, ${_storedEnd}.`);
+                }
+                // #772: the stored offset is that of the day the service was
+                // seen; the trip date may be on the other side of a clock change.
+                const { onTheDay } = require('./stationTimeZones.js');
+                const startDatetime = onTheDay(_storedStart, leg.origin);
+                const endDatetime = onTheDay(_storedEnd, leg.destination);
+                if (startDatetime !== _storedStart || endDatetime !== _storedEnd) {
+                  validationLogger(`[INFO] ${_legCtx}: times given the offset of the trip date in the stop places' time zone — ${startDatetime} to ${endDatetime} (stored ${_storedStart} to ${_storedEnd}).`);
                 }
 
                 bru.setEnvVar(`${legPrefix}StartStopPlaceRef`, leg.origin);

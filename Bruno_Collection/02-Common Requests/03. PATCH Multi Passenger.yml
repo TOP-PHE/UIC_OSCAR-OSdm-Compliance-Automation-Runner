@@ -138,6 +138,8 @@ runtime:
         if (_set(data.updateEmail)) _contact.email = data.updateEmail;
         if (_set(data.updatePhoneNumber)) _contact.phoneNumber = data.updatePhoneNumber;
         if (Object.keys(_contact).length > 0) _patch.detail.contact = _contact;
+        // #772: below OSDM 3.4 email and phone go flat in detail, as in the booking.
+        _patch.detail = require(bru.getEnvVar("library_base") + "personContact.js").withContactShape(_patch.detail, bru.getEnvVar("osdmVersion"));
         req.setBody(_patch);
     - type: after-response
       code: |-

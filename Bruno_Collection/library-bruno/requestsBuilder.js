@@ -317,6 +317,8 @@ function buildBookingPurchaserBody() {
       + ` — expecting the provider to reject.`);
   }
 
+  // #772: below OSDM 3.4 email and phone go flat in detail, as in the booking.
+  body.detail = require("./personContact.js").withContactShape(body.detail, bru.getEnvVar("osdmVersion"));
   bru.setVar("bookingPurchaserBody", JSON.stringify(body));
   return body;
 }

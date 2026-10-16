@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.336",
+  "current_release": "2026.337",
   "releases": [
+    {
+      "release": "2026.337",
+      "date": "2026-10-16",
+      "server": "1.11.302",
+      "collection": "OTST_V2.0.173",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "A specification trip's times take the offset of the trip date in the stop places' time zone; the passenger update and the purchaser body put email and phone where the OSDM version takes them; an unknown trip answered with no offer passes; a trip search not provided is a warning (#772)."
+      ]
+    },
     {
       "release": "2026.336",
       "date": "2026-10-16",
