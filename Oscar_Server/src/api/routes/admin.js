@@ -17,6 +17,8 @@
  * POST   /v1/admin/users/:id/reset-password — reset password
  * DELETE /v1/admin/users/:id             — delete user
  * GET    /v1/admin/activity              — server activity metrics
+ * GET    /v1/admin/ai-access-requests    — Test Managers' requests for the AI analysis (#801)
+ * POST   /v1/admin/ai-access-requests/:id/approve|refuse|revoke
  */
 
 const express = require('express');
@@ -28,7 +30,9 @@ const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth'
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
 const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
-const { sendTestEmail, isSmtpConfigured } = require('../../utils/mailer');
+const { sendTestEmail, sendAiAccessNotice, isSmtpConfigured } = require('../../utils/mailer');
+const AiAccess = require('../../utils/aiAccess');
+const log = require('../../utils/logger').child({ module: 'admin' });
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
@@ -461,7 +465,7 @@ router.get('/activity', (req, res) => {
 
 router.get('/companies', (req, res) => {
   const rows = all(
-    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at,
+    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, c.ai_analysis_enabled,
             COUNT(u.id) AS user_count
      FROM companies c
      LEFT JOIN users u ON u.company_id = c.id
@@ -499,27 +503,58 @@ router.patch('/companies/:id', (req, res) => {
   if (company.slug === PLATFORM_SLUG) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The platform root company cannot be modified.' });
   }
-  const { name, slug } = req.body || {};
+  const { name, slug, ai_analysis_enabled: aiEnabled } = req.body || {};
+  const ai = aiSwitch(company, aiEnabled);
+  const plan = companyUpdates(companyId, name, slug, ai, aiEnabled);
+  if (plan.refusal) return res.status(plan.refusal.status).json(plan.refusal);
+  const { updates, values } = plan;
+  if (updates.length === 0) {
+    // Sending the switch as it already is changes nothing, and is not an error.
+    if (ai.applies) return res.json({ company: companyRow(companyId) });
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No update fields provided.' });
+  }
+  values.push(companyId);
+  run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
+  if (ai.change) auditLog(req.user.id, companyId, req.user.email, aiEnabled ? 'ai_analysis_enabled' : 'ai_analysis_disabled');
+  return res.json({ company: companyRow(companyId) });
+});
+
+// The SET clauses of a company update, or the refusal to send.
+function companyUpdates(companyId, name, slug, ai, aiEnabled) {
+  if (ai.invalid) return { refusal: { status: 400, title: 'Bad Request', detail: 'ai_analysis_enabled must be true or false.' } };
+  const newSlug = slug ? freeSlug(slug, companyId) : null;
+  if (newSlug === false) return { refusal: { status: 409, title: 'Conflict', detail: 'Company slug already in use.' } };
   const updates = [];
   const values = [];
   if (name) { updates.push('name = ?'); values.push(name); }
-  if (slug) {
-    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const existing = get('SELECT id FROM companies WHERE slug = ? AND id != ?', [cleanSlug, companyId]);
-    if (existing) return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Company slug already in use.' });
-    updates.push('slug = ?');
-    values.push(cleanSlug);
-  }
-  if (updates.length === 0) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No update fields provided.' });
-  values.push(companyId);
-  run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
-  const updated = get(
-    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, COUNT(u.id) AS user_count
+  if (ai.change) { updates.push('ai_analysis_enabled = ?'); values.push(aiEnabled ? 1 : 0); }
+  if (newSlug) { updates.push('slug = ?'); values.push(newSlug); }
+  return { updates, values };
+}
+
+// The slug cleaned, or false when another company already uses it.
+function freeSlug(slug, companyId) {
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return get('SELECT id FROM companies WHERE slug = ? AND id != ?', [cleanSlug, companyId]) ? false : cleanSlug;
+}
+
+function companyRow(companyId) {
+  return get(
+    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, c.ai_analysis_enabled, COUNT(u.id) AS user_count
      FROM companies c LEFT JOIN users u ON u.company_id = c.id WHERE c.id = ? GROUP BY c.id`,
     [companyId]
   );
-  return res.json({ company: updated });
-});
+}
+
+// #801: the administrator's switch for the AI analysis, top-level companies
+// only. invalid: not a boolean; applies: a boolean for a top-level company;
+// change: it differs from the stored value.
+function aiSwitch(company, value) {
+  if (value === undefined) return { invalid: false, applies: false, change: false };
+  if (typeof value !== 'boolean') return { invalid: true, applies: false, change: false };
+  const applies = !company.parent_id;
+  return { invalid: false, applies, change: applies && !!company.ai_analysis_enabled !== value };
+}
 
 router.delete('/companies/:id', (req, res) => {
   const companyId = req.params.id;
@@ -550,6 +585,68 @@ router.delete('/companies/:id', (req, res) => {
   });
   auditLog(req.user.id, companyId, req.user.email, `company_deleted:${company.name}`);
   return res.json({ deleted: true, id: companyId, name: company.name });
+});
+
+// ── AI analysis access requests (#801) ───────────────────────────────────────
+// The administrator decides; the content of an analysis is never read here.
+
+const AI_DECISIONS = {
+  approve: { from: ['pending'], to: 'approved', event: 'ai_access_approved' },
+  refuse:  { from: ['pending'], to: 'refused',  event: 'ai_access_refused' },
+  revoke:  { from: ['approved'], to: 'revoked', event: 'ai_access_revoked' },
+};
+
+router.get('/ai-access-requests', (req, res) => {
+  const rows = all(
+    `SELECT r.id, r.state, r.text_version, r.accepted_at, r.decided_at, r.reason, r.created_at,
+            c.id AS company_id, c.name AS company_name, c.ai_analysis_enabled,
+            u.email AS user_email, u.role AS user_role, d.email AS decided_by_email
+       FROM ai_access_request r
+       JOIN companies c ON c.id = r.company_id
+       JOIN users u ON u.id = r.user_id
+       LEFT JOIN users d ON d.id = r.decided_by
+      ORDER BY CASE r.state WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, r.accepted_at DESC`);
+  return res.json({
+    textVersion: AiAccess.COMMITMENT.version,
+    requests: rows.map(r => ({
+      id: r.id, state: r.state, textVersion: r.text_version, acceptedAt: r.accepted_at,
+      decidedAt: r.decided_at, decidedBy: r.decided_by_email || null, reason: r.reason,
+      company: { id: r.company_id, name: r.company_name, aiAnalysisEnabled: !!r.ai_analysis_enabled },
+      user: { email: r.user_email, role: normalizeRole(r.user_role) },
+    })),
+  });
+});
+
+router.post('/ai-access-requests/:id/:decision', (req, res) => {
+  const decision = Object.hasOwn(AI_DECISIONS, req.params.decision) ? AI_DECISIONS[req.params.decision] : null;
+  if (!decision) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Unknown decision.' });
+  const row = get(
+    `SELECT r.*, c.name AS company_name, u.email AS user_email
+       FROM ai_access_request r JOIN companies c ON c.id = r.company_id JOIN users u ON u.id = r.user_id
+      WHERE r.id = ?`, [req.params.id]);
+  if (!row) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Request not found.' });
+  if (!decision.from.includes(row.state)) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: `This request is ${row.state}.` });
+  }
+  const rawReason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  const reason = rawReason.slice(0, 500) || null;
+  if (decision.to !== 'approved' && !reason) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Give the Test Manager a reason.' });
+  }
+  run(`UPDATE ai_access_request SET state = ?, decided_by = ?, decided_at = datetime('now'), reason = ? WHERE id = ?`,
+    [decision.to, req.user.id, decision.to === 'approved' ? null : reason, row.id]);
+  auditLog(req.user.id, row.company_id, req.user.email, `${decision.event}:${row.user_email}`);
+  const appUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const verdict = { approved: 'approved', refused: 'refused', revoked: 'withdrawn' }[decision.to];
+  sendAiAccessNotice({
+    to: row.user_email,
+    subject: `OSCAR — AI analysis access ${verdict}`,
+    heading: `AI analysis access ${verdict}`,
+    lines: [`Your access to the AI analysis of results for ${row.company_name} was ${verdict} by an OSCAR administrator.`,
+      ...(reason && decision.to !== 'approved' ? [`Reason: ${reason}`] : [])],
+    url: `${appUrl}/ai-analysis.html`,
+  }).catch(err => log.warn({ err: err.message }, 'AI access decision notice not sent'));
+  return res.json({ id: row.id, state: decision.to });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

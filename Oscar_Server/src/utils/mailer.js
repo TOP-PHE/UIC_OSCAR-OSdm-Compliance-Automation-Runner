@@ -390,4 +390,38 @@ If you did not request this reset, ignore this email — your password is unchan
   }
 }
 
-module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, isSmtpConfigured };
+/**
+ * #801 — a notice about AI analysis access: a request for the
+ * administrators, or the decision for the Test Manager. `lines` are plain
+ * sentences. Callers do not wait for it: the page is the reliable signal.
+ */
+async function sendAiAccessNotice({ to, subject, heading, lines, url }) {
+  if (!isSmtpConfigured()) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS in oscar-server.env');
+    }
+    log.warn({ to, subject }, 'DEV MODE — SMTP not configured. AI access notice not sent.');
+    return { devMode: true };
+  }
+  const from = getConfig('SMTP_FROM', 'OSCAR Platform <noreply@oscar.uic.org>');
+  const paragraphs = (lines || []).map(l => `<p style="color:#546e7a;font-size:14px;line-height:1.6;margin:0 0 10px">${escHtml(l)}</p>`).join('');
+  const link = url ? `<p style="margin:18px 0 0"><a href="${escHtml(url)}" style="color:#0090D4">${escHtml(url)}</a></p>` : '';
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head>
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#f5f7f9;margin:0;padding:30px 16px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:10px;padding:32px">
+    <h2 style="color:#37474f;font-size:20px;margin:0 0 12px">${escHtml(heading)}</h2>${paragraphs}${link}
+  </div>
+</body></html>`;
+  const text = [`OSCAR — ${heading}`, '', ...(lines || []), ...(url ? ['', url] : [])].join('\n');
+  try {
+    const info = await createTransport().sendMail({ from, to, subject, text, html });
+    smtpSends.inc({ result: 'success', kind: 'ai_access' });
+    return info;
+  } catch (sendErr) {
+    log.error({ err: sendErr.message, code: sendErr.code }, 'AI access notice send FAILED');
+    smtpSends.inc({ result: 'failure', kind: 'ai_access' });
+    throw sendErr;
+  }
+}
+
+module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, sendAiAccessNotice, isSmtpConfigured };

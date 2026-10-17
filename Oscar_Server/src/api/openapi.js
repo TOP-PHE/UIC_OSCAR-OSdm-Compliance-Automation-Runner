@@ -304,6 +304,27 @@ module.exports = {
       post: { tags: ['Admin'], summary: 'Rotate the JWT secret — invalidates ALL existing sessions', security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Rotated' } } },
     },
+    '/v1/company/ai-analysis/access': {
+      get: { tags: ['Company'], summary: 'Where the Test Manager stands on the AI analysis, and the commitment text to accept (#801)', security: [{ bearerAuth: [] }],
+        description: 'Decided per top-level company (a provider named by X-Provider-Id acts in its distributor). state: disabled | none | pending | approved | needs_acceptance. commitment: { version, title, points, hash }.',
+        responses: { 200: { description: 'Access state' }, 403: { description: 'Test Managers only' } } },
+    },
+    '/v1/company/ai-analysis/access/request': {
+      post: { tags: ['Company'], summary: 'Ask for access to the AI analysis, accepting the commitment text (#801)', security: [{ bearerAuth: [] }],
+        description: 'Body: { version, hash } of the text accepted, as GET returned it. A new request waits for an administrator (201); an approved Test Manager accepting a new version keeps the approval (200).',
+        responses: { 200: { description: 'New text accepted, access kept' }, 201: { description: 'Request waiting for an administrator' }, 400: { description: 'Not the text in force' }, 403: { description: 'Test Managers only' }, 409: { description: 'Not enabled for the company, already waiting, or already approved' } } },
+    },
+    '/v1/admin/ai-access-requests': {
+      get: { tags: ['Admin'], summary: 'Test Managers\' requests for the AI analysis (#801)', security: [{ bearerAuth: [] }],
+        responses: { 200: { description: '{ textVersion, requests: [{ id, state, textVersion, acceptedAt, decidedAt, decidedBy, reason, company, user }] }' } } },
+    },
+    '/v1/admin/ai-access-requests/{id}/{decision}': {
+      post: { tags: ['Admin'], summary: 'Approve or refuse a pending request, or withdraw an approved access (#801)', security: [{ bearerAuth: [] }],
+        description: 'decision: approve | refuse | revoke. Body: { reason } (required to refuse or withdraw; the Test Manager reads it). The Test Manager is told by e-mail.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'decision', in: 'path', required: true, schema: { type: 'string', enum: ['approve', 'refuse', 'revoke'] } }],
+        responses: { 200: { description: '{ id, state }' }, 400: { description: 'No reason given' }, 404: { description: 'Unknown request or decision' }, 409: { description: 'Not in a state this decision applies to' } } },
+    },
     '/v1/company/scenario-copy/preview': {
       post: { tags: ['Company'], summary: 'Prepare a copy of scenarios from another company or provider of yours into this one', security: [{ bearerAuth: [] }],
         description: 'Body: { source_id } (a company or provider id, or "catalogue" for the scenario catalogue). Returns the source scenarios with warnings (features the target Test Framework does not declare, fulfillment reduced, OSDM version), each trip entry to map once, and the target trains and journeys. The target is the request\'s company (X-Provider-Id).',
