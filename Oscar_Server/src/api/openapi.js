@@ -306,13 +306,13 @@ module.exports = {
     },
     '/v1/company/ai-analysis/access': {
       get: { tags: ['Company'], summary: 'Where the Test Manager stands on the AI analysis, and the commitment text to accept (#801)', security: [{ bearerAuth: [] }],
-        description: 'Decided per top-level company (a provider named by X-Provider-Id acts in its distributor). state: disabled | none | pending | approved | needs_acceptance. commitment: { version, title, points, hash }.',
+        description: 'Asked and decided per company or provider. targets: the distributor and each provider the Test Manager may use, each { id, name, provider, state, request }; state: none | pending | approved | needs_acceptance. commitment: { version, title, points, hash }.',
         responses: { 200: { description: 'Access state' }, 403: { description: 'Test Managers only' } } },
     },
     '/v1/company/ai-analysis/access/request': {
       post: { tags: ['Company'], summary: 'Ask for access to the AI analysis, accepting the commitment text (#801)', security: [{ bearerAuth: [] }],
-        description: 'Body: { version, hash } of the text accepted, as GET returned it. A new request waits for an administrator (201); an approved Test Manager accepting a new version keeps the approval (200).',
-        responses: { 200: { description: 'New text accepted, access kept' }, 201: { description: 'Request waiting for an administrator' }, 400: { description: 'Not the text in force' }, 403: { description: 'Test Managers only' }, 409: { description: 'Not enabled for the company, already waiting, or already approved' } } },
+        description: 'Body: { version, hash, companies } — the text accepted, as GET returned it, and the ids of the targets asked for. A new request waits for an administrator (201); an approved Test Manager accepting a new version keeps the approval (200).',
+        responses: { 200: { description: 'New text accepted, access kept' }, 201: { description: 'Request waiting for an administrator' }, 400: { description: 'Not the text in force, or no target named' }, 403: { description: 'Test Managers only' }, 404: { description: 'A target the Test Manager may not use' }, 409: { description: 'A target already waiting or already approved' } } },
     },
     '/v1/admin/ai-access-requests': {
       get: { tags: ['Admin'], summary: 'Test Managers\' requests for the AI analysis (#801)', security: [{ bearerAuth: [] }],

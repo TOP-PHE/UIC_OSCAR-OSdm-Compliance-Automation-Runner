@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.354",
+  "current_release": "2026.355",
   "releases": [
+    {
+      "release": "2026.355",
+      "date": "2026-10-17",
+      "server": "1.11.320",
+      "collection": "OTST_V2.0.182",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis access (#801): no administrator switch any more. A Test Manager asks directly, accepting the commitment text, for the company and each provider ticked; the administrator decides each one on its own, so a refusal for one provider does not block the others."
+      ]
+    },
     {
       "release": "2026.354",
       "date": "2026-10-17",
