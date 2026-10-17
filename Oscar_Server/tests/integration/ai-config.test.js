@@ -39,14 +39,14 @@ const KEY = 'sk-ant-test-0123456789';
 
 // ── The stub AI service ──────────────────────────────────────────────────────
 const calls = [];
-let reply = null;   // (req, body) => { status, json?, text?, headers? }
+let reply = null;   // (req) => { status, json?, text?, headers? }
 const stub = http.createServer((req, res) => {
   let raw = '';
   req.on('data', c => { raw += c; });
   req.on('end', () => {
     const body = raw ? JSON.parse(raw) : null;
     calls.push({ method: req.method, url: req.url, headers: req.headers, body });
-    const r = reply ? reply(req, body) : defaultReply(req, body);
+    const r = reply ? reply(req) : defaultReply(req, body);
     res.writeHead(r.status, { 'content-type': 'application/json', ...(r.headers || {}) });
     res.end(r.text ?? JSON.stringify(r.json));
   });
