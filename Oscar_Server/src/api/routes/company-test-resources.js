@@ -26,6 +26,7 @@ const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
 const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe, serviceFindings, servicesUnseen, dayOfWeekCode } = require('../../services/timetable-discovery');
+const { journeyPlan, probeDates, compareAnswer, probeSummary } = require('../../services/journeyProbe');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
@@ -629,6 +630,74 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
 
   log.info({ companyId: targetCompanyId, routes: routes.length, updatedCount }, 'Offer re-probe completed');
   return res.json({ routes, updated: updatedCount });
+});
+
+// #813: one day of a journey probe. The trip search first, /offers when it
+// fails or is not there; `state.endpoint` keeps the one that answered.
+async function _probeJourneyDay({ company, token, extraHeaders }, plan, date, state) {
+  const origin = plan.legs[0].origin;
+  const destination = plan.legs.at(-1).destination;
+  const atTime = plan.legs[0].departure ? `${plan.legs[0].departure}:00` : undefined;
+  const endpoints = state.endpoint ? [state.endpoint] : TRIP_SEARCH_ENDPOINTS;
+  let last = { date, status: null, via: null, error: 'not searched' };
+  for (const endpoint of endpoints) {
+    let r;
+    try {
+      r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination, company.api_base, atTime), extraHeaders);
+    } catch (err) {
+      last = { date, status: null, via: endpoint, error: err.name === 'AbortError' ? 'no answer within 20 s' : 'the call failed' };
+      continue;
+    }
+    if (!r.ok) {
+      last = { date, status: r.status, via: endpoint, error: `HTTP ${r.status}` };
+      continue;
+    }
+    state.endpoint = endpoint;
+    return { date, status: r.status, via: endpoint, ...compareAnswer(plan.legs, r.json) };
+  }
+  return last;
+}
+
+// ── POST /v1/company/test-resources/:id/probe-journey (#813) ──────────────────
+// Does the provider offer this Test Data journey? Its trips are searched from
+// the first stop place to the last, at the first departure, on the next days
+// all its trains run, and each answer is compared with the journey's legs.
+// Nothing is written.
+router.post('/test-resources/:id/probe-journey', async (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+
+  const decoded = (r) => {
+    let data = {};
+    try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
+    return { id: r.id, resource_type: r.resource_type, label: r.label, data };
+  };
+  const row = get('SELECT * FROM test_resources WHERE id = ? AND company_id = ? AND resource_type = ?',
+                  [req.params.id, targetCompanyId, 'JOURNEY']);
+  if (!row) return res.status(404).json({ status: 404, title: 'Not Found' });
+  const journey = decoded(row);
+  const trains = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN']).map(decoded);
+
+  const plan = journeyPlan(journey, trains);
+  const refuse = (detail) => res.status(400).json({ status: 400, title: 'Bad Request', detail });
+  if (plan.legs.length === 0) return refuse('This journey has no leg whose train set is in Test Data.');
+  if (plan.missingLegs > 0) return refuse(`${plan.missingLegs} leg(s) of this journey name a train set that is no longer in Test Data.`);
+  if (!plan.legs[0].origin || !plan.legs.at(-1).destination) return refuse('The journey has no first stop place or no last stop place.');
+  const dates = probeDates(plan.days, new Date());
+  if (dates.length === 0) return refuse('The trains of this journey have no operating day in common.');
+
+  const session = await _vendorSession(req, res, targetCompanyId);
+  if (!session) return;
+
+  // One day after the other: a provider's gateway may block a burst (#646).
+  const state = { endpoint: null };
+  const days = [];
+  await dates.reduce((previous, date) => previous.then(async () => {
+    days.push(await _probeJourneyDay(session, plan, date, state));
+  }), Promise.resolve());
+  log.info({ companyId: targetCompanyId, journey: journey.id, days: days.map(d => d.outcome || d.error) }, 'Journey probed');
+  return res.json({ journey: { id: journey.id, label: journey.label }, legs: plan.legs, days, summary: probeSummary(days) });
 });
 
 module.exports = router;

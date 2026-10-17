@@ -1700,6 +1700,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   route and a service's number *as before the edit* (`blocksBuiltFrom()`,
   `trip-apply.js`) that the edit would change (`tripUpdatesFromTrain()`) are
   refilled after a confirmation, except trips of a read-only scenario.
+  **A journey can be probed** (#813, 1.11.323): `POST
+  /test-resources/:id/probe-journey` searches first stop place → last, at the
+  first departure, on the next 3 days all its trains run (`probeDates()`,
+  within 14), trips-collection then `/offers` (kept once one answers), in
+  sequence. `services/journeyProbe.js` (pure) compares with the legs
+  (`stopKey()`, train number without punctuation, `HH:MM`): found, the
+  closest trip of as many legs and what differs, or not found with what is
+  offered. Writes nothing; the page shows it under the row
+  (`journeyProbeHtml()`, escaped). A journey whose train set is gone is a 400.
 - **A run goes on a day its trip's trains run** (#717, 1.11.273 /
   OTST_V2.0.153). Trips keep no calendar, so the server matches each trip
   requirement against the TRAIN resources when it serves the run's copy

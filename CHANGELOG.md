@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.323] / [collection-OTST_V2.0.183] — 2026-10-17
+
+Issue #813, release 2026.358. Server and pages only.
+
+### Added
+- **Probe a Test Data journey.** A journey chains train sets, and nothing said whether the provider offers that connection. Each saved journey now has a 🔎 Probe button (Test Managers):
+  - OSCAR searches the provider's trips from the journey's first stop place to its last, at its first departure, on the next 3 days all its trains run (within 14 days), one search after the other. `POST /trips-collection` first; `/offers` when the trip search fails or is not there (501, 404, an error), and then for the following days.
+  - Each day's answer is compared with the journey's legs: same stop places (leading zeros aside), train numbers and times to the minute. "Offered as defined", or the closest trip with as many legs and what differs, or "not offered" with up to 5 trips the provider offers instead.
+  - The result shows under the journey. Nothing in Test Data is changed.
+  - `POST /v1/company/test-resources/:id/probe-journey`; the rules are in `services/journeyProbe.js` (pure).
+
+Checked:
+- `journey-probe.test.js` (the rules), `journey-probe-route.test.js` (a stubbed provider: the three searches and their body, the fallback to `/offers` kept for the next days, a provider that answers nothing, a tester refused, another company's journey and a train set answered 404, nothing written), `journey-probe-page.test.js` (the result escaped, the button on saved journeys only and hidden from testers).
+- The route against the local simulator: on `gamma` (trip search) and `alpha` (no trip search, so `/offers`), a journey offered as defined, one whose train number differs, and a two-leg journey the simulator does not offer (it sells direct trips only); the result block drawn in Chromium.
+
+---
+
 ## [server-1.11.322] / [collection-OTST_V2.0.183] — 2026-10-17
 
 Issue #810, release 2026.357. Server and pages only.
