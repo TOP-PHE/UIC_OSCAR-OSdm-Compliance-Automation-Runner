@@ -273,8 +273,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`needsTest()`, 422 when it fails). A stored key goes only to the
     service and host it was typed for (`keyRefusal()`), is never returned or
     logged, and is masked in echoed errors (`maskKey()`). Tests use a local
-    stub, never a real service. The monthly token limit is stored, not yet
-    counted.
+    stub, never a real service.
+    **PR 3 (1.11.326): the analysis** (`company-ai-analysis-results.js`,
+    `utils/aiAnalysis.js` pure, `ai_analysis` migration 34). Preview then run:
+    the run must carry the preview's `hash` (sha256 of instructions + input),
+    so nothing is sent that was not shown. The input is the #735 grouping
+    (`api/helpers/batchFailures.js`, shared): check and sample error through
+    `checkText()`, problem *code* only (title and detail can hold names), the
+    framework without `_` keys, findings' title/category/step. Two batches:
+    OSCAR computes fixed / still / new by group key, the model only explains.
+    Over ~50k tokens it is summarised by step. The call runs after a 202
+    (`callModel()`, 5 min); one running per Test Manager; a stale `running`
+    reads `interrupted`. The monthly cap is counted from `ai_analysis`
+    tokens. History is read by any Test Manager `canUseCompany()` admits
+    (`req.companyId`), approved or not; an answer not in the JSON asked is
+    kept raw as `unreadable`.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

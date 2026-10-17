@@ -64,32 +64,32 @@ function parseJson(text) {
 }
 
 /**
- * Send the connection test. `config` is { connector, baseUrl, model, apiKey }.
- * Resolves { ok: true, answer, stopReason, model, usage, ms } or
- * { ok: false, error, status? }; never rejects.
+ * Send one request to the model. `config` is { connector, baseUrl, model,
+ * apiKey }, `request` a C.messageRequest(). Resolves { ok: true, answer,
+ * text, stopReason, model, usage, ms } or { ok: false, error, status? };
+ * never rejects. `purpose` names the call in the log line.
  */
-async function testConnection(config, { timeoutMs = TIMEOUT_MS } = {}) {
-  const req = C.testRequest(config);
-  const refusal = await usableUrlRefusal(req.url, 'AI service address');
+async function callModel(config, request, { timeoutMs = TIMEOUT_MS, purpose = 'call' } = {}) {
+  const refusal = await usableUrlRefusal(request.url, 'AI service address');
   if (refusal) return { ok: false, error: refusal };
 
   const started = Date.now();
-  const where = { connector: config.connector, host: hostOf(req.url) };
+  const where = { connector: config.connector, host: hostOf(request.url), purpose };
   let res;
   let text;
   try {
-    res = await fetch(req.url, {
-      method: 'POST', headers: req.headers, body: JSON.stringify(req.body),
+    res = await fetch(request.url, {
+      method: 'POST', headers: request.headers, body: JSON.stringify(request.body),
       redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
     });
     text = await readCapped(res, MAX_ANSWER_BYTES);
   } catch (err) {
     const error = failureOf(err, timeoutMs);
-    log.warn({ ...where, ms: Date.now() - started, failure: err?.name || 'error' }, 'AI connection test failed');
+    log.warn({ ...where, ms: Date.now() - started, failure: err?.name || 'error' }, 'AI call failed');
     return { ok: false, error };
   }
   const ms = Date.now() - started;
-  log.info({ ...where, status: res.status, ms }, 'AI connection test');
+  log.info({ ...where, status: res.status, ms }, 'AI call');
 
   if (res.status >= 300 && res.status < 400) {
     return { ok: false, status: res.status,
@@ -105,4 +105,9 @@ async function testConnection(config, { timeoutMs = TIMEOUT_MS } = {}) {
   return { ok: true, ...answer, ms };
 }
 
-module.exports = { testConnection, TIMEOUT_MS, MAX_ANSWER_BYTES };
+/** The connection test: { ok, answer, … } as callModel gives it. */
+function testConnection(config, options = {}) {
+  return callModel(config, C.testRequest(config), { ...options, purpose: 'test' });
+}
+
+module.exports = { callModel, testConnection, TIMEOUT_MS, MAX_ANSWER_BYTES };

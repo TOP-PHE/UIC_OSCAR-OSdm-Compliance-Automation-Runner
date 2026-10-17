@@ -330,6 +330,32 @@ module.exports = {
         description: 'One small request ("reply with the single word OK"). Body: empty to test the stored service, or the same fields as PUT. Answer: { test: { ok, answer, stopReason, model, usage: { input, output }, ms } | { ok: false, error, status } }.',
         responses: { 200: { description: 'The test result' }, 400: { description: 'A field refused' }, 403: { description: 'Test Managers only, with approved access' }, 404: { description: 'Nothing configured, and nothing given' } } },
     },
+    '/v1/company/ai-analysis/batches': {
+      get: { tags: ['Company'], summary: 'The batches an AI analysis can read, for the request\'s company or provider (#801)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers with approved access only. { batches: [{ batchId, runs, finishedRuns, started, finished }], languages }.',
+        responses: { 200: { description: 'Batches' }, 403: { description: 'Test Managers only, with approved access' } } },
+    },
+    '/v1/company/ai-analysis/preview': {
+      post: { tags: ['Company'], summary: 'Exactly what an AI analysis would send, its size and estimated tokens (#801)', security: [{ bearerAuth: [] }],
+        description: 'Body: { batches: [id] | [id, id], language }. Two batches are compared, the earlier first. Sends nothing. Answer: { mode, batches, model, instructions, input, chars, estimatedTokens, summarisedByStep, tooLarge, counts, monthly: { cap, used }, hash }. The input holds the failed checks with the run\'s values replaced, the scenario codes and descriptions, the Test Framework\'s declarations and the findings (title, category, step); never a token, credential, endpoint, response body or passenger detail.',
+        responses: { 200: { description: 'The preview' }, 400: { description: 'No batch, or the same one twice' }, 403: { description: 'Test Managers only, with approved access' }, 404: { description: 'No such batch here' }, 409: { description: 'No AI service configured here' } } },
+    },
+    '/v1/company/ai-analysis/run': {
+      post: { tags: ['Company'], summary: 'Send what the preview showed and analyse it (#801)', security: [{ bearerAuth: [] }],
+        description: 'Body: the preview\'s { batches, language } and its { hash }. Answers 202 { id, status: running }; read the result with GET /history/{id}. Refused when what would be sent changed since the preview, when the monthly token limit would be passed, or when another of the Test Manager\'s analyses is running.',
+        responses: { 202: { description: 'Started' }, 403: { description: 'Test Managers only, with approved access' }, 409: { description: 'Changed since the preview, monthly limit, another analysis running, or no AI service' }, 422: { description: 'Too large to send' } } },
+    },
+    '/v1/company/ai-analysis/history': {
+      get: { tags: ['Company'], summary: 'The AI analyses of the request\'s company or provider (#801)', security: [{ bearerAuth: [] }],
+        description: 'Every Test Manager who may use the company or provider. { analyses: [{ id, mode, batches, language, connector, model, status, by, inputChars, summarisedByStep, inputHash, tokens, error, createdAt, finishedAt }] }, the 50 latest. status: running | done | unreadable | failed | interrupted.',
+        responses: { 200: { description: 'Analyses' }, 403: { description: 'Test Managers only' } } },
+    },
+    '/v1/company/ai-analysis/history/{id}': {
+      get: { tags: ['Company'], summary: 'One AI analysis with its result (#801)', security: [{ bearerAuth: [] }],
+        description: 'The same fields, plus result: { summary, groups: [{ title, cause, owner: provider | oscar | unclear, why, steps, scenarios }], comparison: { fixed, stillFailing, new } }, or { raw } when the answer could not be read.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'The analysis' }, 404: { description: 'Not one of this company or provider' } } },
+    },
     '/v1/admin/ai-access-requests': {
       get: { tags: ['Admin'], summary: 'Test Managers\' requests for the AI analysis (#801)', security: [{ bearerAuth: [] }],
         responses: { 200: { description: '{ textVersion, requests: [{ id, state, textVersion, acceptedAt, decidedAt, decidedBy, reason, company, user }] }' } } },

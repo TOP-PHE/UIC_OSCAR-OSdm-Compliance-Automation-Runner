@@ -164,6 +164,129 @@ function testResultHtml(test) {
   return `<div style="${NOTE}${OK}">The service answered in ${esc(test.ms)} ms${usage}: ${answer}${model}</div>`;
 }
 
+// ── The analysis (PR 3) ─────────────────────────────────────────────────────
+
+const OWNER_LABEL = { provider: 'Provider', oscar: 'OSCAR', unclear: 'Unclear' };
+const OWNER_STYLE = { provider: 'background:#fff3e0;color:#e65100', oscar: 'background:#e3f2fd;color:#0d47a1', unclear: 'background:#eceff1;color:#455a64' };
+
+/** The analysis card: where, which batches, which language. Filled by loadAnalysisTarget(). */
+function analysisPanelHtml(targets) {
+  if (!targets.length) return '';
+  const options = targets.map(t => `<option value="${esc(t.id)}" data-provider="${t.provider ? '1' : ''}">${esc(t.name)}</option>`).join('');
+  return `<div class="card" style="padding:16px 20px" id="ai-analysis">
+    <h3 style="margin:0 0 4px">Analyse results</h3>
+    <div style="font-size:12px;color:#78909c">One batch: what failed, grouped by probable cause. Two batches: what is fixed, still failing or new.
+      You see exactly what will be sent before anything leaves OSCAR.</div>
+    <label for="ai-an-target" style="${FIELD}">Company or provider</label>
+    <select id="ai-an-target" data-ai-action="an-target" style="${WIDE}">${options}</select>
+    <label for="ai-an-a" style="${FIELD}">Batch</label>
+    <select id="ai-an-a" style="${WIDE}"></select>
+    <label for="ai-an-b" style="${FIELD}">Compare with a later batch (optional)</label>
+    <select id="ai-an-b" style="${WIDE}"></select>
+    <label for="ai-an-lang" style="${FIELD}">Language of the answer</label>
+    <select id="ai-an-lang" style="${WIDE}"></select>
+    <div style="margin-top:12px"><button class="btn" data-ai-action="an-preview">See what will be sent</button></div>
+    <div id="ai-an-preview" style="margin-top:12px"></div>
+    <div id="ai-an-result" style="margin-top:12px"></div>
+    <h4 style="margin:18px 0 6px">Earlier analyses</h4>
+    <div id="ai-an-history" style="font-size:13px"></div>
+  </div>`;
+}
+
+function batchLabel(b) {
+  const when = b.started ? esc(b.started) : 'date unknown';
+  return `${when} — ${esc(b.runs)} run(s), ${esc(b.finishedRuns)} finished`;
+}
+
+function batchOptionsHtml(batches, withNone) {
+  const none = withNone ? '<option value="">(no comparison)</option>' : '';
+  return none + batches.map(b => `<option value="${esc(b.batchId)}">${batchLabel(b)}</option>`).join('');
+}
+
+/** What will be sent, its size and cost, and the button that sends it. */
+function previewHtml(p) {
+  const cap = p.monthly?.cap !== null && p.monthly?.cap !== undefined
+    ? `${esc(p.monthly.used)} of your ${esc(p.monthly.cap)} tokens used this month.` : `${esc(p.monthly?.used ?? 0)} tokens used this month (no limit set).`;
+  const counts = p.mode === 'compare'
+    ? `${esc(p.counts.fixed)} problem(s) fixed, ${esc(p.counts.stillFailing)} still failing, ${esc(p.counts.new)} new, as OSCAR counts them.`
+    : `${esc(p.counts.groups)} group(s) of failed checks.`;
+  const summarised = p.summarisedByStep
+    ? `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">Too large to send check by check: the failures are summarised by step.</div>` : '';
+  const truncated = (p.batches || []).some(b => b.truncated)
+    ? `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">A batch has more failed checks than OSCAR reads; only the first ones are sent.</div>` : '';
+  const send = p.tooLarge
+    ? `<div style="${NOTE}background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;">Too large to send, even summarised by step.</div>`
+    : `<button class="btn btn-primary" data-ai-action="an-run">Send to ${esc(p.model)} and analyse</button>`;
+  return `<div style="${NOTE}${INFO}">${counts}<br>About <strong>${esc(p.estimatedTokens)}</strong> tokens (${esc(p.chars)} characters) to ${esc(p.model)}, plus the answer. ${cap}</div>
+    ${summarised}${truncated}
+    <details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:13px">Exactly what will be sent</summary>
+      <div style="font-size:12px;color:#546e7a;margin:8px 0 4px">Instructions</div>
+      <pre style="white-space:pre-wrap;font-size:11px;max-height:240px;overflow:auto;background:#fafafa;padding:8px;border:1px solid #eceff1">${esc(p.instructions)}</pre>
+      <div style="font-size:12px;color:#546e7a;margin:8px 0 4px">Results</div>
+      <pre style="white-space:pre-wrap;font-size:11px;max-height:360px;overflow:auto;background:#fafafa;padding:8px;border:1px solid #eceff1">${esc(p.input)}</pre>
+    </details>
+    ${send}`;
+}
+
+function listHtml(items) {
+  if (!items.length) return '<span style="color:#90a4ae">none</span>';
+  const lines = items.map(x => '<li>' + esc(x) + '</li>').join('');
+  return `<ul style="margin:4px 0 0 18px;padding:0">${lines}</ul>`;
+}
+
+function groupRowHtml(g) {
+  const owner = OWNER_LABEL[g.owner] ? g.owner : 'unclear';
+  const badge = `<span style="font-size:11px;padding:2px 8px;border-radius:10px;${OWNER_STYLE[owner]}">${OWNER_LABEL[owner]}</span>`;
+  const where = [g.steps?.length ? 'Steps: ' + g.steps.map(esc).join(', ') : '', g.scenarios?.length ? 'Scenarios: ' + g.scenarios.map(esc).join(', ') : '']
+    .filter(Boolean).join('<br>');
+  const why = g.why ? `<div style="color:#78909c;margin-top:4px">${esc(g.why)}</div>` : '';
+  return `<tr><td style="${CELL}">${badge}</td><td style="${CELL}"><strong>${esc(g.title)}</strong><div>${esc(g.cause)}</div>${why}
+    <div style="font-size:11px;color:#90a4ae;margin-top:4px">${where}</div></td></tr>`;
+}
+
+function comparisonHtml(c) {
+  if (!c) return '';
+  return `<div style="display:flex;gap:18px;flex-wrap:wrap;margin:10px 0">
+    <div><strong style="color:#1b5e20">Fixed</strong>${listHtml(c.fixed || [])}</div>
+    <div><strong style="color:#7a4f01">Still failing</strong>${listHtml(c.stillFailing || [])}</div>
+    <div><strong style="color:#b71c1c">New</strong>${listHtml(c.new || [])}</div></div>`;
+}
+
+/** One stored analysis, as the history read gives it. */
+function resultHtml(a) {
+  const head = `<div style="font-size:12px;color:#78909c;margin-bottom:8px">${esc(a.createdAt)} · ${esc(a.by || '')} · ${esc(a.model)} ·
+    ${a.mode === 'compare' ? 'two batches compared' : 'one batch'}${a.summarisedByStep ? ' · summarised by step' : ''}</div>`;
+  if (a.status === 'running') return head + `<div style="${NOTE}${INFO}">⏳ The AI service is reading the results…</div>`;
+  if (a.status === 'failed' || a.status === 'interrupted') {
+    return head + `<div style="${NOTE}background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;">${a.status === 'interrupted' ? 'Interrupted (the server restarted).' : esc(a.error || 'Failed.')}</div>`;
+  }
+  if (a.status === 'unreadable') {
+    return head + `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">The answer could not be read as asked (${esc(a.error)}). Here it is as it came:</div>
+      <pre style="white-space:pre-wrap;font-size:12px">${esc(a.result?.raw || '')}</pre>`;
+  }
+  const r = a.result || {};
+  const rows = (r.groups || []).map(groupRowHtml).join('');
+  const groups = rows ? '<div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">' + rows + '</table></div>' : '';
+  return head + `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">An AI opinion: it can be wrong, and it is not a test result or a finding.</div>
+    <p style="font-size:13px;line-height:1.55">${esc(r.summary || '')}</p>${comparisonHtml(r.comparison)}
+    ${groups}
+    <div style="font-size:11px;color:#90a4ae;margin-top:8px">Tokens: ${esc(a.tokens?.input ?? '?')} in, ${esc(a.tokens?.output ?? '?')} out.</div>`;
+}
+
+const STATUS_LABEL = { running: 'Running', done: 'Done', failed: 'Failed', unreadable: 'Answer not readable', interrupted: 'Interrupted' };
+
+/** The earlier analyses of a company or provider. */
+function historyHtml(list) {
+  if (!list.length) return '<span style="color:#90a4ae">None yet.</span>';
+  const rows = list.map(a => `<tr><td style="${CELL}">${esc(a.createdAt)}</td><td style="${CELL}">${esc(a.by || '')}</td>
+    <td style="${CELL}">${a.mode === 'compare' ? 'Compare' : 'One batch'}</td><td style="${CELL}">${esc(a.model)}</td>
+    <td style="${CELL}">${esc(STATUS_LABEL[a.status] || a.status)}</td>
+    <td style="${CELL}"><button class="btn" data-ai-action="an-show" data-id="${esc(a.id)}">Show</button></td></tr>`).join('');
+  return `<div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">
+    <thead><tr><th style="${CELL}">When</th><th style="${CELL}">By</th><th style="${CELL}">What</th><th style="${CELL}">Model</th><th style="${CELL}">Status</th><th style="${CELL}"></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
 let current = null;
 
 function show(message, kind) {
@@ -197,6 +320,7 @@ async function servicesHtml(targets) {
   const answers = await Promise.all(approved.map(serviceAnswer));
   const shown = answers.find(Boolean);
   if (current && shown) current.connectorsShown = shown.connectors || [];
+  if (current) current.configured = approved.filter((t, n) => answers[n]?.config);
   return approved.map((t, n) => (answers[n] ? serviceHtml(t, answers[n], n) : '')).join('');
 }
 
@@ -206,8 +330,9 @@ async function load() {
   document.getElementById('loading').style.display = 'none';
   if (!res.ok) { show(await readError(res, 'Could not read your access.'), 'error'); return; }
   current = await res.json();
-  root.innerHTML = accessHtml(current) + await servicesHtml(current.targets || []);
+  root.innerHTML = accessHtml(current) + await servicesHtml(current.targets || []) + analysisPanelHtml(current.configured || []);
   root.style.display = 'block';
+  if ((current.configured || []).length) await loadAnalysisTarget().catch(err => show(err.message, 'error'));
 }
 
 function fieldsOf(section) {
@@ -276,6 +401,96 @@ async function requestAccess() {
   show(res.status === 201 ? 'Your request was sent to the OSCAR administrators.' : 'Thank you: your access is kept.', 'ok');
   await load();
 }
+
+// The analysis card's company or provider, as a header naming it.
+function analysisHeaders(extra = {}) {
+  const sel = document.getElementById('ai-an-target');
+  const opt = sel.options[sel.selectedIndex];
+  return { ...extra, 'X-Provider-Id': opt?.dataset.provider ? sel.value : '' };
+}
+
+async function loadAnalysisTarget() {
+  document.getElementById('ai-an-preview').innerHTML = '';
+  document.getElementById('ai-an-result').innerHTML = '';
+  const res = await fetch('/v1/company/ai-analysis/batches', { headers: analysisHeaders() });
+  if (!res.ok) { show(await readError(res, 'Could not read the batches.'), 'error'); return; }
+  const data = await res.json();
+  document.getElementById('ai-an-a').innerHTML = batchOptionsHtml(data.batches || [], false);
+  document.getElementById('ai-an-b').innerHTML = batchOptionsHtml(data.batches || [], true);
+  document.getElementById('ai-an-lang').innerHTML = (data.languages || ['English']).map(l => `<option>${esc(l)}</option>`).join('');
+  await loadHistory();
+}
+
+async function loadHistory() {
+  const res = await fetch('/v1/company/ai-analysis/history', { headers: analysisHeaders() });
+  const el = document.getElementById('ai-an-history');
+  el.innerHTML = res.ok ? historyHtml((await res.json()).analyses || []) : esc(await readError(res, 'Could not read the earlier analyses.'));
+}
+
+let previewed = null;
+
+function analysisChoice() {
+  const a = document.getElementById('ai-an-a').value;
+  const b = document.getElementById('ai-an-b').value;
+  // The comparison reads the batch chosen first as the earlier one; the server orders them by date.
+  return { batches: b ? [a, b] : [a], language: document.getElementById('ai-an-lang').value };
+}
+
+async function previewAnalysis() {
+  const box = document.getElementById('ai-an-preview');
+  box.innerHTML = '⏳ Reading the results…';
+  const choice = analysisChoice();
+  const res = await fetch('/v1/company/ai-analysis/preview', { method: 'POST', headers: analysisHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(choice) });
+  if (!res.ok) { box.innerHTML = testResultHtml({ ok: false, error: await readError(res, 'The preview failed.') }); return; }
+  const p = await res.json();
+  previewed = { ...choice, hash: p.hash };
+  box.innerHTML = previewHtml(p);
+}
+
+async function showAnalysis(id) {
+  const res = await fetch('/v1/company/ai-analysis/history/' + encodeURIComponent(id), { headers: analysisHeaders() });
+  const box = document.getElementById('ai-an-result');
+  if (!res.ok) { box.innerHTML = testResultHtml({ ok: false, error: await readError(res, 'Could not read the analysis.') }); return null; }
+  const a = await res.json();
+  box.innerHTML = resultHtml(a);
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return a;
+}
+
+async function runAnalysis() {
+  if (!previewed) return;
+  if (!confirm('Send these results to the AI service and analyse them? Your account with it is billed.')) return;
+  const res = await fetch('/v1/company/ai-analysis/run', { method: 'POST', headers: analysisHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(previewed) });
+  if (!res.ok) { document.getElementById('ai-an-preview').innerHTML += testResultHtml({ ok: false, error: await readError(res, 'The analysis could not start.') }); return; }
+  const { id } = await res.json();
+  document.getElementById('ai-an-preview').innerHTML = '';
+  previewed = null;
+  await followAnalysis(id, 120);
+  await loadHistory();
+}
+
+// Show a running analysis every 3 s until it ends, at most `left` more times.
+async function followAnalysis(id, left) {
+  const a = await showAnalysis(id);
+  if (a?.status !== 'running' || left <= 0) return;
+  await new Promise(r => setTimeout(r, 3000));
+  await followAnalysis(id, left - 1);
+}
+
+document.addEventListener('change', (e) => {
+  if (e.target.closest('[data-ai-action="an-target"]')) loadAnalysisTarget().catch(err => show(err.message, 'error'));
+  else if (e.target.closest('#ai-an-a, #ai-an-b, #ai-an-lang')) { previewed = null; document.getElementById('ai-an-preview').innerHTML = ''; }
+});
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"]');
+  if (!el) return;
+  const act = el.dataset.aiAction;
+  let job;
+  if (act === 'an-preview') job = previewAnalysis();
+  else if (act === 'an-run') job = runAnalysis();
+  else job = showAnalysis(el.dataset.id);
+  job.catch(err => show(err.message, 'error'));
+});
 
 document.addEventListener('change', (e) => {
   if (e.target.closest('[data-ai-action="accept"], [data-ai-action="target"]')) updateButton();

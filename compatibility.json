@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.360",
+  "current_release": "2026.361",
   "releases": [
+    {
+      "release": "2026.361",
+      "date": "2026-10-17",
+      "server": "1.11.326",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis, part 3 (#801): a Test Manager sends the failed checks of one batch, or of two batches compared, to their AI service, after seeing exactly what is sent and its estimated tokens. The answer groups the failures by probable cause (provider, OSCAR or unclear) and, for two batches, says what is fixed, still failing or new. Stored encrypted, with a history per company or provider."
+      ]
+    },
     {
       "release": "2026.360",
       "date": "2026-10-17",

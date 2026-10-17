@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.326] / [collection-OTST_V2.0.183] — 2026-10-17
+
+Issue #801 part 3, release 2026.361. Server and pages only.
+
+### Added
+- **The AI analysis of results.** On the AI Analysis page, a Test Manager whose access is approved and whose AI service is configured (parts 1 and 2) chooses a company or provider, a batch, optionally a later batch to compare with, and the language of the answer.
+  - **See what will be sent** shows, before anything leaves OSCAR, the instructions and the results exactly as they will be sent, their size, the estimated tokens and the tokens used this month. **Send** sends only that: the run refuses a request whose hash is not the preview's (409), so new results, findings or settings mean a new look.
+  - **What is sent**: the failed checks, grouped as the finding suggestions group them (#735: step, check with the run's values replaced, HTTP status, problem code), with a masked sample error; the scenario codes and descriptions they concern; the Test Framework's declarations; the findings (title, category, severity, status, step, scenario). **Never** a token, credential, endpoint, response body, problem title or detail, or passenger detail. A batch too large for about 50,000 tokens is summarised by step, and the page says so.
+  - **Two batches**: OSCAR sorts the groups itself into fixed, still failing and new (by the groups' keys); the model explains them.
+  - **The answer** is one JSON object (summary; groups with a probable cause and a provider / OSCAR / unclear call; the comparison), read by `readResult()` and cut to size. An answer that is not that JSON is kept as it came and shown as "not readable".
+  - The call runs after the answer (202) for up to 5 minutes; the page follows it. One analysis at a time per Test Manager; one left running by a restart reads as interrupted.
+  - **The monthly token limit** of part 2 is now counted: an analysis whose estimate would pass it is refused before anything is sent.
+  - **Stored** encrypted (`ai_analysis`, migration 34) with who, when, the batches, the model, the tokens and the sha256 of what was sent (not the content). **Every Test Manager who may use the company or provider** reads its history, approved or not, through `canUseCompany()`. Each start and end is an audit event (ids, model, tokens; never the key or the content).
+  - Routes: `GET /v1/company/ai-analysis/batches`, `POST …/preview`, `POST …/run`, `GET …/history`, `GET …/history/{id}`. Rules in `utils/aiAnalysis.js` (pure); the batch reading shared with the finding suggestions moved to `api/helpers/batchFailures.js`; the connector's call is `callModel()` in `services/aiConnector.js`, which the connection test now uses too.
+
+Checked:
+- `ai-analysis.test.js` (unit: values masked, problem title and detail never sent, groups, framework without `_` keys, findings, compare sorting, summary by step, tokens and hash, instructions, reading the answer, the page's panel, preview, result and history, each request naming its company or provider) and `ai-analysis-results.test.js` (integration, against a local stub AI service: role, approval and configuration refusals, another company's batch, what is sent with no name, contact, key or endpoint in it, two batches in either order, the hash of the preview, the stub receiving exactly the preview, the result encrypted and read back, the audit, the monthly limit, an unreadable answer, a refused call with the key masked, one analysis at a time, an interrupted one, the history read by another Test Manager and refused to another company and to a provider).
+- The hash check, the company filter of a stored analysis, the monthly limit and the masking of errors were each removed on purpose and the tests failed.
+- In Chromium through a throwaway server and a stub AI service: two batches compared, the preview, the send, the result and the history.
+
+---
+
 ## [server-1.11.325] / [collection-OTST_V2.0.183] — 2026-10-17
 
 Issue #801 part 2, release 2026.360. Server and pages only.

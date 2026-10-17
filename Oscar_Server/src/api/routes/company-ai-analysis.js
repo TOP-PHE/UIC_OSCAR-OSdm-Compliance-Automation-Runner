@@ -386,3 +386,7 @@ router.delete('/ai-analysis/config', configLimiter, (req, res) => {
 
 module.exports = router;
 module.exports.topCompanyOf = topCompanyOf;
+module.exports.scopeForTestManager = scopeForTestManager;
+module.exports.configScope = configScope;
+module.exports.configOf = configOf;
+module.exports.storedKey = storedKey;
