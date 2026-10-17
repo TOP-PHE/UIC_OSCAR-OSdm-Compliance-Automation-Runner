@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-logos",
+    "date": "October 17, 2026",
+    "tag": "Fix",
+    "title": "The UIC and OSDM logos are back",
+    "summary": "The banner showed two broken images: the logos were loaded from uic.org, which no longer serves them.",
+    "content": "Every page loaded the UIC and OSDM logos from the uic.org website. When uic.org stopped serving them, the banner showed two broken images. OSCAR now serves both logos itself, so the banner no longer depends on another site."
+  },
+  {
     "id": "2026-10-17-ai-analysis-access",
     "date": "October 17, 2026",
     "tag": "Feature",
