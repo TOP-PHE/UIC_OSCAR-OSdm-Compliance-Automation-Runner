@@ -202,13 +202,17 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
-  if (requirements.purchaserAfterBooking && fw.purchaserAfterBooking === false) {
-    missing.push('a purchaser written after the booking (Passenger Types)');
-  }
   return [
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
+    ...stepsMissing(requirements, fw),
   ];
+}
+
+// #809: a step the framework says the provider does not offer, as a sentence.
+function stepsMissing(requirements, fw) {
+  return requirements.purchaserAfterBooking && fw.purchaserAfterBooking === false
+    ? ['a purchaser written after the booking (Passenger Types)'] : [];
 }
 
 // #766: a place chosen in a way the framework does not declare, as a sentence.
