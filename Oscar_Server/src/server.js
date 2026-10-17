@@ -182,7 +182,7 @@ app.use(helmet({
       defaultSrc:    ["'self'"],
       scriptSrc:     ["'self'", "'unsafe-inline'"],   // inline <script> blocks in HTML pages
       styleSrc:      ["'self'", "'unsafe-inline'"],
-      imgSrc:        ["'self'", 'data:', 'https://uic.org', 'https://*.uic.org'],
+      imgSrc:        ["'self'", 'data:'],
       connectSrc:    ["'self'"],
       frameAncestors: ["'none'"]
     }

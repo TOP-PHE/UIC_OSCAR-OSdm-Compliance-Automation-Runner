@@ -6,7 +6,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
 .uic-banner-left,.uic-banner-right{display:flex;align-items:center}
 .uic-banner-logo{height:46px;width:auto}
-.osdm-banner-logo{height:34px;width:auto;display:block}
+.osdm-banner-logo{height:46px;width:auto;display:block}
 .uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
 .uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
 .uic-banner-nav .brand img{height:22px;width:auto}
