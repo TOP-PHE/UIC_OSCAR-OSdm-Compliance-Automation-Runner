@@ -1319,7 +1319,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-fill-calendars"], [data-action="wiz-download-places"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-find-journeys"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-fill-calendars"], [data-action="wiz-download-places"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-find-journeys"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"], [data-action="wiz-probe-journey"]').forEach(el => el.style.display = 'none');
   }
 
   // #450 — show how many stop places are cached (drives the origin/destination
@@ -4926,10 +4926,12 @@ function renderWizardStep2() {
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
           <span class="toggle-arrow" id="journey-arrow-${esc(jidx)}">▶</span>
+          ${j.id && !j._unsaved ? `<button class="btn btn-sm btn-secondary" data-action="wiz-probe-journey" data-jidx="${esc(jidx)}" data-id="${esc(j.id)}" title="Ask the provider whether it offers this journey (trip search, next 3 operating days). Nothing is changed." style="font-size:11px;padding:3px 8px">🔎 Probe</button>` : ''}
           <button class="btn btn-sm btn-secondary" data-action="wiz-duplicate-journey" data-jidx="${esc(jidx)}" title="Duplicate this journey" style="font-size:11px;padding:3px 8px">🗐 Duplicate</button>
           <button class="row-delete-btn" data-action="wiz-delete-journey" data-id="${esc(j.id)}" title="Delete this journey">🗑</button>
         </div>
       </div>
+      <div id="journey-probe-${esc(jidx)}"></div>
       <div class="train-detail" id="journey-detail-${esc(jidx)}"></div>
     </div>`).join('');
 
@@ -6200,6 +6202,47 @@ function journeySetLeg(jidx, li, value) {
     j.data.legs[li] = { trainResourceId: parsedId, serviceIndex: Number.parseInt(svcIdxStr, 10) || 0 };
   }
   reRenderJourneyBody(jidx);
+}
+
+// #813: the answer of POST /test-resources/:id/probe-journey, as HTML. Every
+// text comes from the provider or Test Data: always through esc().
+const PROBE_OUTCOMES = {
+  found: { icon: '✅', text: 'offered as defined', color: '#2e7d32' },
+  differences: { icon: '⚠️', text: 'a close trip differs', color: '#ef6c00' },
+  notFound: { icon: '❌', text: 'not offered', color: '#c62828' },
+};
+
+function journeyProbeHtml(result) {
+  const days = Array.isArray(result?.days) ? result.days : [];
+  const rows = days.map((d) => {
+    const o = PROBE_OUTCOMES[d.outcome];
+    const head = o
+      ? `<span style="color:${o.color};font-weight:600">${o.icon} ${esc(d.date)}: ${esc(o.text)}</span> <span style="color:#78909c">(${esc(d.via)}, ${esc(d.trips)} trip(s))</span>`
+      : `<span style="color:#c62828;font-weight:600">⛔ ${esc(d.date)}: no answer</span> <span style="color:#78909c">(${esc([d.via, d.error].filter(Boolean).join(', '))})</span>`;
+    const diffs = (d.differences || []).map((x) => `<li>${esc(x)}</li>`).join('');
+    const offered = (d.offered || []).map((x) => `<li><code>${esc(x)}</code></li>`).join('');
+    let extra = '';
+    if (diffs) extra += `<ul style="margin:2px 0 2px 18px">${diffs}</ul>`;
+    if (offered && d.outcome !== 'found') extra += `<div style="color:#546e7a;margin-left:18px">Offered instead:</div><ul style="margin:2px 0 2px 36px">${offered}</ul>`;
+    return `<div style="margin-top:4px">${head}${extra}</div>`;
+  }).join('');
+  return `<div style="margin:4px 0 8px;padding:8px 12px;background:#f5f9fc;border:1px solid #cfd8dc;border-radius:6px;font-size:12.5px;line-height:1.5">
+    <div style="font-weight:700">🔎 ${esc(result?.summary || '')}</div>${rows}
+    <div style="color:#78909c;margin-top:4px">Nothing was changed in Test Data.</div>
+  </div>`;
+}
+
+async function wizProbeJourney(jidx, id) {
+  const box = document.getElementById('journey-probe-' + jidx);
+  if (!box || !id) return;
+  box.innerHTML = '<div style="margin:4px 0 8px;font-size:12.5px;color:#546e7a">🔎 Asking the provider… (up to 3 searches, one after the other)</div>';
+  const res = await fetch(`/v1/company/test-resources/${encodeURIComponent(id)}/probe-journey`, { method: 'POST' });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    box.innerHTML = `<div style="margin:4px 0 8px;font-size:12.5px;color:#c62828">⛔ ${esc(body.detail || body.title || ('HTTP ' + res.status))}</div>`;
+    return;
+  }
+  box.innerHTML = journeyProbeHtml(body);
 }
 
 async function wizSaveJourney(jidx) {
@@ -8058,6 +8101,8 @@ document.body.addEventListener('click', function(e) {
       e.stopPropagation(); wizDuplicateJourney(Number.parseInt(el.dataset.jidx)); break;
     case 'wiz-delete-journey':
       e.stopPropagation(); wizDeleteJourney(el.dataset.id).catch(reportActionError); break;
+    case 'wiz-probe-journey':
+      e.stopPropagation(); wizProbeJourney(Number.parseInt(el.dataset.jidx, 10), el.dataset.id).catch(reportActionError); break;
     case 'wiz-save-journey':
       wizSaveJourney(Number.parseInt(el.dataset.jidx)).catch(reportActionError); break;
     case 'journey-add-leg':

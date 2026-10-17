@@ -794,6 +794,7 @@ module.exports = {
   timePartOf,
   searchDates,
   harvestTrips,
+  tripLegRecords,
   harvestConnections,
   journeysFromConnections,
   calendarFromHarvest,

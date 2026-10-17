@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-journey-probe",
+    "date": "October 17, 2026",
+    "tag": "Feature",
+    "title": "Test Data: probe a journey",
+    "summary": "Ask the provider whether it offers a Test Data journey, and see what differs or what it offers instead.",
+    "content": "In Test Config, Test Data, each saved journey has a Probe button. OSCAR searches the provider's trips from the journey's first stop place to its last, at its first departure, on the next 3 days all its trains run. For each day it says whether the journey is offered as defined, which leg differs (stop place, train number or time), or which trips the provider offers instead. Nothing in Test Data is changed. Test Managers only."
+  },
+  {
     "id": "2026-10-17-full-configuration",
     "date": "October 17, 2026",
     "tag": "Feature",
