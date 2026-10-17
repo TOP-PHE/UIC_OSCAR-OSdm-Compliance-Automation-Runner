@@ -11,14 +11,14 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadProviders, checkProvider } = require('../src/config');
+const { checkProvider } = require('../src/config');
 const { buildOfferCollection } = require('../src/osdm/offers');
 const { daysAhead } = require('../src/osdm/salesHorizon');
-const { PROVIDERS_DIR, offerRequest } = require('./helpers');
+const { loadAllProviders, offerRequest } = require('./helpers');
 
-const providers = loadProviders(PROVIDERS_DIR);
+const providers = loadAllProviders();
 const gamma = providers.get('gamma');
-const alpha = providers.get('alpha');
+const plain = providers.get('plain');
 // 2026-10-11 at 23:30 UTC: already the 12th in gamma's +02:00, still the 11th in UTC.
 const NOW = Date.parse('2026-10-11T23:30:00Z');
 
@@ -30,9 +30,11 @@ const on = (date, stopPlaceRef = gamma.salesHorizon.from) => offerRequest({
   },
 });
 
-test('gamma sells 90 days ahead from its own stop place; alpha has no horizon', () => {
-  assert.deepEqual(gamma.salesHorizon, { from: 'urn:uic:stn:0000094', days: 90 });
-  assert.equal(alpha.salesHorizon, undefined);
+test('every provider sells 90 days ahead from its own stop place; plain has no horizon', () => {
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    assert.deepEqual(providers.get(key).salesHorizon, { from: 'urn:uic:stn:0000094', days: 90 }, key);
+  }
+  assert.equal(plain.salesHorizon, undefined);
 });
 
 test('days ahead count from today in UTC to the date written in the trip', () => {
@@ -64,10 +66,10 @@ test('a departure in the past is refused with 400 DEPARTURE_IN_PAST', () => {
     (e) => e.status === 400 && e.code === 'DEPARTURE_IN_PAST');
 });
 
-test('other stop places, and alpha, sell any date as before', () => {
+test('other stop places, and a provider without a horizon, sell any date as before', () => {
   for (const date of ['2026-10-10', '2027-06-01']) {
     assert.ok(buildOfferCollection(on(date, 'urn:uic:stn:0000001'), gamma, NOW).response.offers.length > 0);
-    assert.ok(buildOfferCollection(on(date), alpha, NOW).response.offers.length > 0);
+    assert.ok(buildOfferCollection(on(date), plain, NOW).response.offers.length > 0);
   }
 });
 

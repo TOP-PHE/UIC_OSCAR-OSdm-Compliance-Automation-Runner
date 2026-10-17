@@ -13,13 +13,13 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadProviders, checkProvider } = require('../src/config');
+const { checkProvider } = require('../src/config');
 const { buildOfferCollection } = require('../src/osdm/offers');
 const { createBooking, addOfferParts } = require('../src/osdm/bookings');
 const { preferenceAvailability } = require('../src/osdm/reservations');
-const { PROVIDERS_DIR, SECRETS, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
+const { SECRETS, loadAllProviders, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
 
-const providers = loadProviders(PROVIDERS_DIR);
+const providers = loadAllProviders();
 const gamma = providers.get('gamma');
 const NOW = Date.parse('2026-10-11T08:00:00Z');
 const FROM = 'urn:uic:stn:0000092';
@@ -57,11 +57,14 @@ function placing(offer, trip, placeProperties, lastName) {
 }
 const placesOf = (booking) => booking.bookedOffers[0].reservations[0].placeAllocation.reservedPlaces[0];
 
-test('profile: gamma offers place preferences from one stop place, one of them sold out', () => {
-  assert.equal(gamma.placePreferences.from, FROM);
-  assert.deepEqual(gamma.placePreferences.groups.flatMap((g) => g.preferences), ['WINDOW', 'AISLE', 'TABLE', 'POWER']);
-  assert.deepEqual(gamma.placePreferences.soldOut, ['TABLE']);
-  assert.equal(providers.get('alpha').placePreferences, undefined);
+test('profile: every provider offers place preferences from one stop place, one of them sold out; plain none', () => {
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    const provider = providers.get(key);
+    assert.equal(provider.placePreferences.from, FROM, key);
+    assert.deepEqual(provider.placePreferences.groups.flatMap((g) => g.preferences), ['WINDOW', 'AISLE', 'TABLE', 'POWER']);
+    assert.deepEqual(provider.placePreferences.soldOut, ['TABLE']);
+  }
+  assert.equal(providers.get('plain').placePreferences, undefined);
 });
 
 test('profile: a wrong placePreferences is refused', () => {
@@ -156,18 +159,20 @@ test('availability: GET /availabilities/preferences leaves out what is sold out'
   assert.deepEqual(plain.availablePlaces, []);
 });
 
-test('route: GET /availabilities/preferences answers on gamma, 501 elsewhere, and only to GET', async (t) => {
+test('route: GET /availabilities/preferences answers on every provider, 501 on one without preferences, and only to GET', async (t) => {
   const sim = await startSimulator();
   t.after(() => sim.close());
-  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
-  const { offers } = (await call(sim.base, token, 'POST', '/gamma/offers', tripFrom(FROM))).body;
-  const part = offers[0].reservationOfferParts[0];
-  const url = `/gamma/availabilities/preferences?contextId=${offers[0].offerId}&contextType=OFFER&resourceId=${part.id}&resourceType=RESERVATION`;
-  const res = await call(sim.base, token, 'GET', url);
-  assert.equal(res.status, 200);
-  assert.deepEqual(res.body.availablePlaces[0].placeProperties, ['WINDOW', 'AISLE', 'POWER']);
-  assert.equal((await call(sim.base, token, 'POST', url, {})).status, 405);
-  assert.equal((await call(sim.base, token, 'GET', '/gamma/availabilities/on-demand-services')).status, 501);
-  const alphaToken = await tokenFor(sim.base, 'alpha', SECRETS.alpha[0]);
-  assert.equal((await call(sim.base, alphaToken, 'GET', '/alpha/availabilities/preferences?contextId=x')).status, 501);
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    const token = await tokenFor(sim.base, key, SECRETS[key][0]);
+    const { offers } = (await call(sim.base, token, 'POST', `/${key}/offers`, tripFrom(FROM))).body;
+    const part = offers[0].reservationOfferParts[0];
+    const url = `/${key}/availabilities/preferences?contextId=${offers[0].offerId}&contextType=OFFER&resourceId=${part.id}&resourceType=RESERVATION`;
+    const res = await call(sim.base, token, 'GET', url);
+    assert.equal(res.status, 200, key);
+    assert.deepEqual(res.body.availablePlaces[0].placeProperties, ['WINDOW', 'AISLE', 'POWER']);
+    assert.equal((await call(sim.base, token, 'POST', url, {})).status, 405);
+    assert.equal((await call(sim.base, token, 'GET', `/${key}/availabilities/on-demand-services`)).status, 501);
+  }
+  const plainToken = await tokenFor(sim.base, 'plain', SECRETS.plain[0]);
+  assert.equal((await call(sim.base, plainToken, 'GET', '/plain/availabilities/preferences?contextId=x')).status, 501);
 });

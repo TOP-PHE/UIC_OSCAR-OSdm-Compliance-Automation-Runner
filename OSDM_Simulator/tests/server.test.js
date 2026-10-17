@@ -18,7 +18,7 @@ const { createApp, createRateLimiter } = require('../src/app');
 const { createTokenService } = require('../src/tokens');
 const { start, logLine } = require('../server');
 const makeClients = require('../scripts/make-clients');
-const { PROVIDERS_DIR, SECRETS, tempDir, writeClientsFile, basic } = require('./helpers');
+const { PROVIDERS_DIR, SECRETS, REAL_SECRETS, tempDir, writeClientsFile, basic } = require('./helpers');
 
 const baseDir = path.join(__dirname, '..');
 const listening = (server) => new Promise((resolve) => server.once('listening', resolve));
@@ -40,7 +40,7 @@ test('run as a program without a clients file, it ends with status 1 and one lin
 test('started with a clients file, it listens where told and serves a token', async (t) => {
   const lines = [];
   t.mock.method(console, 'log', (line) => lines.push(line));
-  const server = start({ SIM_PORT: '0', SIM_CLIENTS_FILE: writeClientsFile() }, baseDir);
+  const server = start({ SIM_PORT: '0', SIM_CLIENTS_FILE: writeClientsFile(REAL_SECRETS) }, baseDir);
   await listening(server);
   t.after(() => closed(server));
   const { address, port } = server.address();
@@ -83,7 +83,7 @@ test('an error that is a bug answers 500 with no detail, and is logged', async (
   const tokens = createTokenService();
   const app = createApp({
     providers,
-    clients: loadClients(writeClientsFile(), providers),
+    clients: loadClients(writeClientsFile(REAL_SECRETS), providers),
     tokens,
     store: { get() { throw new Error('store is broken: internal detail'); }, put() {} },
     limits: { bodyBytes: 1024, requestsPerMinute: 1000 },
@@ -113,7 +113,7 @@ test('over the limit a caller gets 429; behind a proxy the caller is the forward
   const providers = loadProviders(PROVIDERS_DIR);
   const app = createApp({
     providers,
-    clients: loadClients(writeClientsFile(), providers),
+    clients: loadClients(writeClientsFile(REAL_SECRETS), providers),
     tokens: createTokenService(),
     store: { get() {}, put() {} },
     limits: { bodyBytes: 1024, requestsPerMinute: 2 },
@@ -137,7 +137,7 @@ test('not behind a proxy, a forwarded address is ignored: it cannot be used to d
   const providers = loadProviders(PROVIDERS_DIR);
   const app = createApp({
     providers,
-    clients: loadClients(writeClientsFile(), providers),
+    clients: loadClients(writeClientsFile(REAL_SECRETS), providers),
     tokens: createTokenService(),
     store: { get() {}, put() {} },
     limits: { bodyBytes: 1024, requestsPerMinute: 2 },

@@ -138,17 +138,20 @@ test('booking: named places on a trip without a map are ignored, as before', () 
   assert.notDeepEqual(r.placeAllocation.reservedPlaces[0].placeNumbers, ['99', '98']);
 });
 
-test('route: POST /availabilities/vehicle-place-map on gamma, 501 elsewhere, POST only', async (t) => {
+test('route: POST /availabilities/vehicle-place-map on every provider, 501 on one without a map, POST only', async (t) => {
   const sim = await startSimulator();
   t.after(() => sim.close());
-  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
-  const { offers } = (await call(sim.base, token, 'POST', '/gamma/offers', tripFrom(FROM))).body;
-  const res = await call(sim.base, token, 'POST', '/gamma/availabilities/vehicle-place-map', restriction(offers[0]));
-  assert.equal(res.status, 200);
-  assert.equal(res.body.vehicle.coaches[0].number, '7');
-  assert.equal((await call(sim.base, token, 'GET', '/gamma/availabilities/vehicle-place-map')).status, 405);
-  const alphaToken = await tokenFor(sim.base, 'alpha', SECRETS.alpha[0]);
-  assert.equal((await call(sim.base, alphaToken, 'POST', '/alpha/availabilities/vehicle-place-map', restriction(offers[0]))).status, 501);
+  let offers;
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    const token = await tokenFor(sim.base, key, SECRETS[key][0]);
+    ({ offers } = (await call(sim.base, token, 'POST', `/${key}/offers`, tripFrom(FROM))).body);
+    const res = await call(sim.base, token, 'POST', `/${key}/availabilities/vehicle-place-map`, restriction(offers[0]));
+    assert.equal(res.status, 200, key);
+    assert.equal(res.body.vehicle.coaches[0].number, '7');
+    assert.equal((await call(sim.base, token, 'GET', `/${key}/availabilities/vehicle-place-map`)).status, 405);
+  }
+  const plainToken = await tokenFor(sim.base, 'plain', SECRETS.plain[0]);
+  assert.equal((await call(sim.base, plainToken, 'POST', '/plain/availabilities/vehicle-place-map', restriction(offers[0]))).status, 501);
 });
 
 // ── #766 PR 4: a place near a reference place ───────────────────────────────

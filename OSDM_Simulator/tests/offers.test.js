@@ -9,14 +9,14 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadProviders } = require('../src/config');
 const { HttpError } = require('../src/http');
 const { buildOfferCollection } = require('../src/osdm/offers');
-const { PROVIDERS_DIR, offerRequest } = require('./helpers');
+const { loadAllProviders, offerRequest } = require('./helpers');
 
-const providers = loadProviders(PROVIDERS_DIR);
+const providers = loadAllProviders();
 const NOW = Date.parse('2026-11-02T09:00:00Z');
-const build = (request, provider = 'alpha') => buildOfferCollection(request, providers.get(provider), NOW).response;
+// plain has none of the optional functions (#824), as alpha had before.
+const build = (request, provider = 'plain') => buildOfferCollection(request, providers.get(provider), NOW).response;
 
 const refused = (request, pattern) => assert.throws(() => build(request), (error) => {
   assert.ok(error instanceof HttpError);
@@ -228,9 +228,9 @@ test('an unknown card is ignored with a Problem naming it; a provider with no ca
   assert.equal(partOf(unknown.offers[0], 'P1').appliedPassengerTypes, undefined);
   assert.deepEqual(unknown.problems.map((p) => p.code), ['REDUCTION_CARD_NOT_APPLIED']);
   assert.match(unknown.problems[0].detail, /Passenger P1: reduction card "NO_SUCH_CARD" is not known/);
-  const alpha = build(withCards([card('SIM_CARD_25')]));
-  assert.equal(alpha.problems.length, 1);
-  assert.equal(partOf(alpha.offers[0], 'P1').appliedPassengerTypes, undefined);
+  const withoutCards = build(withCards([card('SIM_CARD_25')]));
+  assert.equal(withoutCards.problems.length, 1);
+  assert.equal(partOf(withoutCards.offers[0], 'P1').appliedPassengerTypes, undefined);
 });
 
 test('cards that are not a list of typed cards are refused', () => {
@@ -241,7 +241,7 @@ test('cards that are not a list of typed cards are refused', () => {
 
 // ── named products (#598) ─────────────────────────────────────────────────
 
-test('gamma sells named products, one offer each; alpha one per flexibility, as before', () => {
+test('gamma sells named products, one offer each, as alpha and beta do; a provider without products one per flexibility, as before', () => {
   const gamma = build(offerRequest(), 'gamma');
   assert.deepEqual(gamma.offers.map((o) => [o.products[0].code, o.products[0].summary, o.offerSummary.overallFlexibility, o.products[0].isTrainBound]), [
     ['SIM_FLEXI_BASIC', 'Flexi basic', 'FULL_FLEXIBLE', false],
@@ -256,7 +256,10 @@ test('gamma sells named products, one offer each; alpha one per flexibility, as 
   const [basic, allDay, saver, bound] = gamma.offers.map((o) => o.offerSummary.minimalPrice.amount);
   assert.ok(allDay > basic && basic > saver && saver > bound);
   assert.equal(gamma.offers[3].admissionOfferParts[0].refundable, 'NO', 'conditions follow the flexibility');
-  assert.deepEqual(build(offerRequest()).offers.map((o) => o.products[0].code), ['ALPHA-FULL_FLEXIBLE-SECOND', 'ALPHA-SEMI_FLEXIBLE-SECOND', 'ALPHA-NON_FLEXIBLE-SECOND']);
+  for (const key of ['alpha', 'beta']) {
+    assert.deepEqual(build(offerRequest(), key).offers.map((o) => o.products[0].code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND'], key);
+  }
+  assert.deepEqual(build(offerRequest()).offers.map((o) => o.products[0].code), ['PLAIN-FULL_FLEXIBLE-SECOND', 'PLAIN-SEMI_FLEXIBLE-SECOND', 'PLAIN-NON_FLEXIBLE-SECOND']);
 });
 
 test('asking a flexibility gives the named products of that flexibility', () => {
@@ -342,9 +345,9 @@ test('age is counted on the day of travel; a provider without group products say
   const response = build(groupRequest(people(ADULT, ADULT, '2011-11-21')), 'gamma');
   assert.ok(!codes(response).includes('SIM_WEEKEND_GROUP'));
   assert.ok(codes(build(groupRequest(people(ADULT, ADULT, '2011-11-22')), 'gamma')).includes('SIM_WEEKEND_GROUP'));
-  const alpha = build(groupRequest(people(ADULT, ADULT)));
-  assert.equal(alpha.offers.length, 3);
-  assert.match(alpha.problems[0].detail, /this provider sells no group product/);
+  const individual = build(groupRequest(people(ADULT, ADULT)));
+  assert.equal(individual.offers.length, 3);
+  assert.match(individual.problems[0].detail, /this provider sells no group product/);
 });
 
 test('nineteen passengers can travel as a group; twenty are refused', () => {
@@ -400,14 +403,14 @@ test('first class on a trip with a regional leg: a second-class admission for bo
   assert.ok(upgraded.every((o) => o.summary.endsWith('first class where the train has one')));
 });
 
-test('no regional leg: plain first-class offers; only regional legs: no first-class offer; another provider: first everywhere', () => {
+test('no regional leg: plain first-class offers; only regional legs: no first-class offer; a provider without such categories: first everywhere', () => {
   const ic = build(twoLegs('IC'), 'gamma');
   assert.ok(ic.offers.every((o) => o.admissionOfferParts.length === 1 && ['FIRST', 'SECOND'].includes(o.offerSummary.overallTravelClass)));
   const allRegional = twoLegs('R');
   allRegional.tripSpecifications[0].legs[0].timedLeg.service.productCategory.shortName = 'Os';
   assert.deepEqual([...new Set(build(allRegional, 'gamma').offers.map((o) => o.offerSummary.overallTravelClass))], ['SECOND']);
-  const alpha = build(twoLegs('R'));
-  assert.deepEqual(alpha.offers.map((o) => o.offerSummary.overallTravelClass), ['FIRST', 'FIRST', 'FIRST', 'SECOND', 'SECOND', 'SECOND']);
+  const anyCategory = build(twoLegs('R'));
+  assert.deepEqual(anyCategory.offers.map((o) => o.offerSummary.overallTravelClass), ['FIRST', 'FIRST', 'FIRST', 'SECOND', 'SECOND', 'SECOND']);
 });
 
 test('a leg category that is not plain text is replaced by the simulator\'s own', () => {

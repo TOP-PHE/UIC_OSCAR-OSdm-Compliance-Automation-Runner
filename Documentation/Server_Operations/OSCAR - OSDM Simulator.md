@@ -19,7 +19,12 @@ One server that plays three providers, told apart by the first part of the path:
 | `gamma` | `https://<simulator-host>/gamma` | CZK | 3.8.0 | 15 minutes |
 
 The version is what each provider reports; the answers have the 3.8 shapes on
-all three.
+all three. Since #824 the three providers offer the same functions (exchange,
+reservations and place selection, products and reduction cards, trip ids,
+documents, idempotency, the checks behind the negative tests…), so every
+reference scenario of the catalogue can be copied for and run on any of them.
+The one exception is OSDM's own: a return in one offer (`outboundTripIds`)
+needs OSDM 3.7, so `alpha` (3.6) does not declare it.
 
 Every identifier a provider returns starts with its name (`ALPHA-BKG-…`,
 `BETA-OFR-…`), and its carrier is named after it, so a report shows at a glance
@@ -183,7 +188,9 @@ file; it never replaces existing ones.
    [`Bruno_Collection/data_base/simulator_datafile.json`](../../Bruno_Collection/data_base/simulator_datafile.json).
    Its scenarios are shared with the company's testers. Each ends in the
    OSDM version of its provider (`_36` `alpha`, `_37` `beta`, `_38` `gamma`);
-   the new functions are on `gamma` only. What each one tests, what the
+   the functions added since are tested by the `_38` scenarios, and run on
+   `alpha` and `beta` too through the reference scenarios (Test Config →
+   *Copy scenarios* → the catalogue). What each one tests, what the
    simulator answers and what a run must show: the
    [scenario catalogue](OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick

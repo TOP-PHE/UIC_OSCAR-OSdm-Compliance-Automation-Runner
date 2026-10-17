@@ -1194,8 +1194,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   scenario before any status check; while it is on, Test Config offers every
   listed code (`overruleCodeChoices()`), since the point is a code the
   framework does not declare. The simulator restricts codes per provider
-  (`overruleCodes` in the profile, `gamma` only), so `alpha` is where the
-  refusal test is seen to fail.
+  (`overruleCodes` in the profile, on all three since #824, so the refusal
+  test passes on each).
 - **A reduction card is sent, and proved applied twice** (#597, 1.11.228 /
   OTST_V2.0.112). `library-bruno/reductionCards.js` (pure) turns a
   passenger's `reductionCards` into `{ type: REDUCTION_CARD, code, issuer }`;
@@ -1795,8 +1795,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Test Manager, then `PATCH /v1/company`, `PATCH /v1/me/credentials`,
     `PUT /v1/company/datafile/json`, `POST /v1/runs`.
   - **One OSDM version per provider** (#614): `alpha` 3.6.0, `beta` 3.7.0,
-    `gamma` 3.8.0, which receives each new function. Only `/versions`
-    differs; the answers have the 3.8 shapes on all three. The data file
+    `gamma` 3.8.0. **Since #824 (0.34.0) the three have the same
+    functions**: alpha and beta hold every optional key of gamma's profile
+    with the same values, and a second currency each (alpha EUR + CHF, beta
+    CHF + EUR); `tests/config.test.js` pins it, so a new function goes in all
+    three files. Tests of a provider without a function use `plain`
+    (`tests/fixtures/providers/`, loaded by `tests/helpers.js` only, never
+    shipped). Only a COMBINED return is not run on alpha: OSDM 3.6 has no
+    `outboundTripIds`. Only `/versions` differs; the answers have the 3.8 shapes on all three. The data file
     holds each sale scenario once per version (`_36`, `_37`, `_38`), and
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;
