@@ -114,7 +114,10 @@ function tripDifferences(legs, trip) {
 
 // One trip in words: "5454212 → 5454300 (1061, 04:05–04:38) · 5454300 → …".
 function describeTrip(trip) {
-  return trip.map((l) => `${short(l.originURN)} → ${short(l.destinationURN)} (${[l.vehicleNumber, `${clock(l.departureTime)}–${clock(l.arrivalTime)}`].filter(Boolean).join(', ')})`).join(' · ');
+  return trip.map((l) => {
+    const times = clock(l.departureTime) + '–' + clock(l.arrivalTime);
+    return `${short(l.originURN)} → ${short(l.destinationURN)} (${[l.vehicleNumber, times].filter(Boolean).join(', ')})`;
+  }).join(' · ');
 }
 
 /**
