@@ -17,12 +17,11 @@ let sim;
 before(async () => { sim = await startSimulator(); });
 after(async () => { await sim.close(); });
 
-const [alphaOne] = SECRETS.alpha;
-const [gammaOne] = SECRETS.gamma;
+const clientOf = { alpha: SECRETS.alpha[0], beta: SECRETS.beta[0], gamma: SECRETS.gamma[0], plain: SECRETS.plain[0] };
 
 // A booking of one offer of the flexibility asked, confirmed unless told not to.
 async function booked(provider, flexibility = 'FULL_FLEXIBLE', { confirm = true } = {}) {
-  const token = await tokenFor(sim.base, provider, provider === 'gamma' ? gammaOne : alphaOne);
+  const token = await tokenFor(sim.base, provider, clientOf[provider]);
   const offers = (await call(sim.base, token, 'POST', `/${provider}/offers`, offerRequest())).body.offers;
   const offer = offers.find((o) => o.offerSummary.overallFlexibility === flexibility);
   const booking = (await call(sim.base, token, 'POST', `/${provider}/bookings`, bookingRequest(offer))).body.booking;
@@ -34,8 +33,17 @@ async function booked(provider, flexibility = 'FULL_FLEXIBLE', { confirm = true 
 const exchangeRequest = (fulfillmentIds, extra = {}) => ({ ...offerRequest(), fulfillmentIds, ...extra });
 const partsOf = (booking) => booking.bookedOffers.flatMap((o) => [...o.admissions, ...(o.reservations || [])]);
 
+test('exchange: alpha and beta offer exchanges too (#824)', async () => {
+  for (const provider of ['alpha', 'beta']) {
+    const { token, base, fulfillments } = await booked(provider);
+    const res = await call(sim.base, token, 'POST', `${base}/exchange-offers`, exchangeRequest([fulfillments[0].id]));
+    assert.equal(res.status, 200, provider);
+    assert.ok(res.body.exchangeOffers.length > 0, provider);
+  }
+});
+
 test('exchange: a provider without it answers 501', async () => {
-  const { token, base, fulfillments } = await booked('alpha');
+  const { token, base, fulfillments } = await booked('plain');
   const res = await call(sim.base, token, 'POST', `${base}/exchange-offers`, exchangeRequest([fulfillments[0].id]));
   assert.equal(res.status, 501);
   assert.equal((await call(sim.base, token, 'POST', `${base}/exchange-operations`, {})).status, 501);

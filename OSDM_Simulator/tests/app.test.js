@@ -18,6 +18,9 @@ after(async () => { await sim.close(); });
 const [alphaOne, alphaTwo, alphaSame] = SECRETS.alpha;
 const [betaOne, betaSame] = SECRETS.beta;
 const [gammaOne] = SECRETS.gamma;
+// A provider with none of the optional functions (#824).
+const [plainOne] = SECRETS.plain;
+const REAL = [['alpha', alphaOne], ['beta', betaOne], ['gamma', gammaOne]];
 const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
 
 async function tokenRequest(provider, { headers = {}, body = 'grant_type=client_credentials', method = 'POST' } = {}) {
@@ -154,28 +157,41 @@ test('the version check reports the provider\'s OSDM version', async () => {
 });
 
 test('OSDM resources the simulator does not provide answer 501 with a Problem', async () => {
-  const token = await tokenFor(sim.base, 'alpha', alphaOne);
-  for (const url of ['/alpha/places', '/alpha/products', '/alpha/products/abc', '/alpha/coach-deck-layouts', '/alpha/coach-layouts', '/alpha/trips-collection',
-    '/alpha/bookings/any/reimbursements', '/alpha/bookings/any/exchange-operations/x', '/alpha/bookings/any/booked-offers/x/reservations']) {
+  const notProvided = async (token, url) => {
     const res = await call(sim.base, token, 'GET', url);
     assert.equal(res.status, 501, url);
     assert.equal(res.body.code, 'NOT_IMPLEMENTED');
     assert.equal(res.body.status, 501);
     assert.equal(res.headers.get('content-type'), 'application/problem+json; charset=utf-8');
+  };
+  // Not provided anywhere.
+  for (const [key, client] of REAL) {
+    const token = await tokenFor(sim.base, key, client);
+    for (const path of ['/places', '/coach-deck-layouts', '/coach-layouts', '/bookings/any/reimbursements', '/bookings/any/booked-offers/x/reservations']) {
+      await notProvided(token, `/${key}${path}`);
+    }
+  }
+  // Without the functions that provide them (#824: plain), products and trips collection too.
+  const token = await tokenFor(sim.base, 'plain', plainOne);
+  for (const path of ['/places', '/products', '/products/abc', '/coach-deck-layouts', '/coach-layouts', '/trips-collection',
+    '/bookings/any/reimbursements', '/bookings/any/exchange-operations/x', '/bookings/any/booked-offers/x/reservations']) {
+    await notProvided(token, `/plain${path}`);
   }
 });
 
-test('reduction cards: gamma lists its cards, a provider without cards answers 501 (#597)', async () => {
-  const token = await tokenFor(sim.base, 'gamma', gammaOne);
-  const res = await call(sim.base, token, 'GET', '/gamma/reduction-cards');
-  assert.equal(res.status, 200);
-  assert.deepEqual(res.body.reductionCardTypes.map((c) => c.code), ['SIM_CARD_25', 'SIM_CARD_50', 'SIM_STUDENT']);
-  for (const type of res.body.reductionCardTypes) {
-    assert.equal(type.issuer, 'urn:x_osdm_simulator:carrier:gamma');
-    assert.ok(type.name.id && type.name.text && type.reductionsGranted[0].description);
+test('reduction cards: every provider lists its cards, a provider without cards answers 501 (#597)', async () => {
+  for (const [key, client] of REAL) {
+    const token = await tokenFor(sim.base, key, client);
+    const res = await call(sim.base, token, 'GET', `/${key}/reduction-cards`);
+    assert.equal(res.status, 200, key);
+    assert.deepEqual(res.body.reductionCardTypes.map((c) => c.code), ['SIM_CARD_25', 'SIM_CARD_50', 'SIM_STUDENT']);
+    for (const type of res.body.reductionCardTypes) {
+      assert.equal(type.issuer, `urn:x_osdm_simulator:carrier:${key}`);
+      assert.ok(type.name.id && type.name.text && type.reductionsGranted[0].description);
+    }
   }
-  const alpha = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'GET', '/alpha/reduction-cards');
-  assert.equal(alpha.status, 501);
+  const plain = await call(sim.base, await tokenFor(sim.base, 'plain', plainOne), 'GET', '/plain/reduction-cards');
+  assert.equal(plain.status, 501);
 });
 
 test('products: gamma lists its named products in both classes and gives one by id (#598)', async () => {
@@ -373,8 +389,10 @@ test('the date of a later inbound journey, on the first call, changes nothing', 
 // ── refunds, one offer per fulfillment (#595) ─────────────────────────────
 
 // A confirmed return: two fulfillments, one per direction.
+const clientOf = { alpha: alphaOne, gamma: gammaOne, plain: plainOne };
+
 async function confirmedReturn(flexibility = 'FULL_FLEXIBLE', provider = 'alpha') {
-  const token = await tokenFor(sim.base, provider, provider === 'gamma' ? gammaOne : alphaOne);
+  const token = await tokenFor(sim.base, provider, clientOf[provider]);
   const outbound = (await call(sim.base, token, 'POST', `/${provider}/offers`, offerRequest())).body;
   const pick = (list) => list.offers.find((o) => o.offerSummary.overallFlexibility === flexibility);
   const both = (await call(sim.base, token, 'POST', `/${provider}/offers`, inboundRequest({ outboundTripIds: [outbound.trips[0].id] }))).body;
@@ -432,8 +450,8 @@ test('refund: the fee follows the flexibility of the parts', async () => {
   }
 });
 
-test('refund: an overrule code waives the fee and is named in the offer', async () => {
-  const { token, fulfillments, base } = await confirmedReturn('NON_FLEXIBLE');
+test('refund: an overrule code waives the fee and is named in the offer; a provider without a list takes any code', async () => {
+  const { token, fulfillments, base } = await confirmedReturn('NON_FLEXIBLE', 'plain');
   const [offer] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id], overruleCode: 'STRIKE' })).body.refundOffers;
   assert.equal(offer.refundFee.amount, 0);
   assert.ok(offer.refundableAmount.amount > 0);
@@ -460,16 +478,18 @@ test('refund: without a code, the same product keeps its fee on gamma (#596)', a
   assert.ok(offers.reduce((sum, o) => sum + o.refundableAmount.amount, 0) < booking.confirmedPrice.amount);
 });
 
-test('refund: gamma refuses another overrule code with a Problem naming it; alpha takes any (#596)', async () => {
-  const { token, fulfillments, base } = await confirmedReturn('SEMI_FLEXIBLE', 'gamma');
-  const refused = await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id], overruleCode: 'STRIKE' });
-  assert.equal(refused.status, 400);
-  assert.equal(refused.body.code, 'OVERRULE_CODE_NOT_SUPPORTED');
-  assert.match(refused.body.detail, /overruleCode "STRIKE" is not accepted/);
-  // Nothing was proposed by the refused request.
-  assert.equal((await call(sim.base, token, 'GET', `${base}/refund-offers`)).body.refundOffers.length, 0);
-  const alpha = await confirmedReturn('SEMI_FLEXIBLE');
-  const [offer] = (await call(sim.base, alpha.token, 'POST', `${alpha.base}/refund-offers`, { fulfillmentIds: [alpha.fulfillments[0].id], overruleCode: 'STRIKE' })).body.refundOffers;
+test('refund: alpha and gamma refuse another overrule code with a Problem naming it; a provider without a list takes any (#596)', async () => {
+  for (const provider of ['alpha', 'gamma']) {
+    const { token, fulfillments, base } = await confirmedReturn('SEMI_FLEXIBLE', provider);
+    const refused = await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id], overruleCode: 'STRIKE' });
+    assert.equal(refused.status, 400, provider);
+    assert.equal(refused.body.code, 'OVERRULE_CODE_NOT_SUPPORTED');
+    assert.match(refused.body.detail, /overruleCode "STRIKE" is not accepted/);
+    // Nothing was proposed by the refused request.
+    assert.equal((await call(sim.base, token, 'GET', `${base}/refund-offers`)).body.refundOffers.length, 0);
+  }
+  const plain = await confirmedReturn('SEMI_FLEXIBLE', 'plain');
+  const [offer] = (await call(sim.base, plain.token, 'POST', `${plain.base}/refund-offers`, { fulfillmentIds: [plain.fulfillments[0].id], overruleCode: 'STRIKE' })).body.refundOffers;
   assert.equal(offer.appliedOverruleCode, 'STRIKE');
 });
 
@@ -533,8 +553,9 @@ test('refund: a booking not confirmed has nothing to refund; an offer past its t
 });
 
 test('passenger and purchaser can be read and changed; id, reference and type cannot', async () => {
-  const { token, booking } = await sale('alpha', alphaOne);
-  const url = `/alpha/bookings/${booking.id}/passengers/${booking.passengers[0].id}`;
+  // On a provider without person checks (#824: plain): any value is kept.
+  const { token, booking } = await sale('plain', plainOne);
+  const url = `/plain/bookings/${booking.id}/passengers/${booking.passengers[0].id}`;
   assert.deepEqual((await call(sim.base, token, 'GET', url)).body.passenger, booking.passengers[0]);
   const patched = await call(sim.base, token, 'PATCH', url, {
     id: 'forged', externalRef: 'forged', type: 'DOG', dateOfBirth: '1990-01-16', gender: 'X',
@@ -549,10 +570,10 @@ test('passenger and purchaser can be read and changed; id, reference and type ca
   assert.equal(passenger.detail.firstName, 'Alexis');
   assert.equal(passenger.detail.contact.phoneNumber, '+33199000002');
   assert.deepEqual((await call(sim.base, token, 'GET', url)).body.passenger, passenger);
-  assert.equal((await call(sim.base, token, 'GET', `/alpha/bookings/${booking.id}/passengers/unknown`)).status, 404);
+  assert.equal((await call(sim.base, token, 'GET', `/plain/bookings/${booking.id}/passengers/unknown`)).status, 404);
   assert.equal((await call(sim.base, token, 'DELETE', url)).status, 405);
 
-  const purchaserUrl = `/alpha/bookings/${booking.id}/purchaser`;
+  const purchaserUrl = `/plain/bookings/${booking.id}/purchaser`;
   assert.equal((await call(sim.base, token, 'GET', purchaserUrl)).body.purchaser.detail.firstName, 'Paula');
   for (const [method, firstName] of [['PATCH', 'Pauline'], ['POST', 'Paulette']]) {
     const res = await call(sim.base, token, method, purchaserUrl, { detail: { firstName } });
@@ -897,7 +918,7 @@ test('reservations: added to a pre-booked booking with offer-parts, once, then o
 
 const tripSearch = () => offerRequest().tripSearchCriteria;
 
-test('trips collection: gamma answers four departures, each with a train of its own; the others answer 501', async () => {
+test('trips collection: gamma answers four departures, each with a train of its own; so do alpha and beta; a provider without it answers 501', async () => {
   const token = await tokenFor(sim.base, 'gamma', gammaOne);
   const res = await call(sim.base, token, 'POST', '/gamma/trips-collection', tripSearch());
   assert.equal(res.status, 200);
@@ -913,8 +934,13 @@ test('trips collection: gamma answers four departures, each with a train of its 
   assert.equal(searched.id, res.body.trips[1].id);
   assert.equal(searched.legs[0].timedLeg.service.vehicleNumbers[0], numbers[1]);
 
-  const alpha = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'POST', '/alpha/trips-collection', tripSearch());
-  assert.equal(alpha.status, 501);
+  for (const [key, client] of REAL.slice(0, 2)) {
+    const other = await call(sim.base, await tokenFor(sim.base, key, client), 'POST', `/${key}/trips-collection`, tripSearch());
+    assert.equal(other.status, 200, key);
+    assert.equal(new Set(other.body.trips.map((t) => t.legs[0].timedLeg.service.vehicleNumbers[0])).size, 4, key);
+  }
+  const plain = await call(sim.base, await tokenFor(sim.base, 'plain', plainOne), 'POST', '/plain/trips-collection', tripSearch());
+  assert.equal(plain.status, 501);
   const get = await call(sim.base, token, 'GET', '/gamma/trips-collection');
   assert.equal(get.status, 405);
 });
@@ -999,13 +1025,13 @@ test('documents: only the media asked for; a provider without documents issues n
   const confirmed = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body;
   assert.deepEqual(confirmed.fulfillmentDocuments.map((d) => d.medium), ['PDF_A4']);
 
-  const alpha = await tokenFor(sim.base, 'alpha', alphaOne);
-  const alphaOffer = (await call(sim.base, alpha, 'POST', '/alpha/offers', offerRequest({ requestedFulfillmentOptions: bothMedia }))).body.offers[0];
-  const alphaBooking = (await call(sim.base, alpha, 'POST', '/alpha/bookings', bookingRequest(alphaOffer))).body.booking;
-  const alphaConfirmed = (await call(sim.base, alpha, 'POST', `/alpha/bookings/${alphaBooking.id}/fulfillments`, {})).body;
-  assert.equal(alphaConfirmed.fulfillmentDocuments, undefined);
-  assert.equal(alphaConfirmed.fulfillments[0].fulfillmentDocumentRefs, undefined);
-  assert.equal((await call(sim.base, alpha, 'GET', `/alpha/fulfillments/${alphaConfirmed.fulfillments[0].id}`)).status, 501);
+  const plain = await tokenFor(sim.base, 'plain', plainOne);
+  const plainOffer = (await call(sim.base, plain, 'POST', '/plain/offers', offerRequest({ requestedFulfillmentOptions: bothMedia }))).body.offers[0];
+  const plainBooking = (await call(sim.base, plain, 'POST', '/plain/bookings', bookingRequest(plainOffer))).body.booking;
+  const plainConfirmed = (await call(sim.base, plain, 'POST', `/plain/bookings/${plainBooking.id}/fulfillments`, {})).body;
+  assert.equal(plainConfirmed.fulfillmentDocuments, undefined);
+  assert.equal(plainConfirmed.fulfillments[0].fulfillmentDocumentRefs, undefined);
+  assert.equal((await call(sim.base, plain, 'GET', `/plain/fulfillments/${plainConfirmed.fulfillments[0].id}`)).status, 501);
 });
 
 test('GET /fulfillments/{id}: the fulfillment and its documents; the merged PDF comes with a Problem', async () => {
@@ -1090,10 +1116,10 @@ test('idempotency: the confirmation replayed gives the same fulfillments; a key 
   assert.deepEqual(again.body, first.body);
   // The confirmation key used on POST /bookings is another request: refused.
   assert.equal((await postWithKey(token, '/gamma/bookings', bookingRequest(offer), 'conf-1')).status, 409);
-  // alpha keeps no answers: the header is ignored.
-  const alpha = await tokenFor(sim.base, 'alpha', alphaOne);
-  const alphaOffer = (await call(sim.base, alpha, 'POST', '/alpha/offers', offerRequest())).body.offers[0];
-  const a1 = await postWithKey(alpha, '/alpha/bookings', bookingRequest(alphaOffer), 'k');
-  const a2 = await postWithKey(alpha, '/alpha/bookings', bookingRequest(alphaOffer), 'k');
+  // A provider without idempotency (#824: plain) keeps no answers: the header is ignored.
+  const plain = await tokenFor(sim.base, 'plain', plainOne);
+  const plainOffer = (await call(sim.base, plain, 'POST', '/plain/offers', offerRequest())).body.offers[0];
+  const a1 = await postWithKey(plain, '/plain/bookings', bookingRequest(plainOffer), 'k');
+  const a2 = await postWithKey(plain, '/plain/bookings', bookingRequest(plainOffer), 'k');
   assert.notEqual(a1.body.booking.id, a2.body.booking.id);
 });

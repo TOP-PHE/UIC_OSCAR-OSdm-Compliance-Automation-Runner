@@ -17,12 +17,11 @@ let sim;
 before(async () => { sim = await startSimulator(); });
 after(async () => { await sim.close(); });
 
-const [alphaOne] = SECRETS.alpha;
-const [gammaOne] = SECRETS.gamma;
+const clientOf = { alpha: SECRETS.alpha[0], beta: SECRETS.beta[0], gamma: SECRETS.gamma[0], plain: SECRETS.plain[0] };
 const from = (stopPlaceRef) => offerRequest({ tripSearchCriteria: { ...offerRequest().tripSearchCriteria, origin: { objectType: 'StopPlaceRef', stopPlaceRef } } });
 
 async function booked(provider, { stop = 'urn:uic:stn:0000001', purchaser = true } = {}) {
-  const token = await tokenFor(sim.base, provider, provider === 'gamma' ? gammaOne : alphaOne);
+  const token = await tokenFor(sim.base, provider, clientOf[provider]);
   const offers = (await call(sim.base, token, 'POST', `/${provider}/offers`, from(stop))).body.offers;
   const body = bookingRequest(offers[0]);
   if (!purchaser) delete body.purchaser;
@@ -30,7 +29,7 @@ async function booked(provider, { stop = 'urn:uic:stn:0000001', purchaser = true
   return { token, offers, booking, base: `/${provider}/bookings/${booking.id}` };
 }
 
-test('gamma refuses an invalid passenger update, naming the field; alpha keeps any value', async () => {
+test('gamma refuses an invalid passenger update, naming the field, as alpha and beta do; a provider without person checks keeps any value', async () => {
   const { token, booking, base } = await booked('gamma');
   const url = `${base}/passengers/${booking.passengers[0].id}`;
   const cases = [
@@ -51,8 +50,14 @@ test('gamma refuses an invalid passenger update, naming the field; alpha keeps a
   const ok = await call(sim.base, token, 'PATCH', url, { gender: 'FEMALE', dateOfBirth: '1990-02-28', detail: { firstName: 'A', contact: { email: 'a@example.org', phoneNumber: '+33 1 23 45 67' } } });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.passenger.gender, 'FEMALE');
-  const alpha = await booked('alpha');
-  assert.equal((await call(sim.base, alpha.token, 'PATCH', `${alpha.base}/passengers/${alpha.booking.passengers[0].id}`, { detail: { contact: { email: 'x' } } })).status, 200);
+  for (const provider of ['alpha', 'beta']) {
+    const other = await booked(provider);
+    const refused = await call(sim.base, other.token, 'PATCH', `${other.base}/passengers/${other.booking.passengers[0].id}`, { detail: { contact: { email: 'x' } } });
+    assert.equal(refused.status, 400, provider);
+    assert.equal(refused.body.code, 'INVALID_PERSON_DATA');
+  }
+  const plain = await booked('plain');
+  assert.equal((await call(sim.base, plain.token, 'PATCH', `${plain.base}/passengers/${plain.booking.passengers[0].id}`, { detail: { contact: { email: 'x' } } })).status, 200);
 });
 
 test('a refused update changes nothing', async () => {
@@ -88,7 +93,7 @@ test('a booking made without a purchaser has none until one is written, and it n
 // Only the main passenger may be changed, and only the main
 // passenger's names are kept (no date of birth, no contact).
 async function bookedTwo(lastNames) {
-  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const token = await tokenFor(sim.base, 'gamma', clientOf.gamma);
   const two = [{ externalRef: '00001', type: 'PERSON', dateOfBirth: '1990-01-15' }, { externalRef: '00002', type: 'PERSON', dateOfBirth: '1991-02-16' }];
   const offers = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest({ anonymousPassengerSpecifications: two }))).body.offers;
   const body = bookingRequest(offers[0]);

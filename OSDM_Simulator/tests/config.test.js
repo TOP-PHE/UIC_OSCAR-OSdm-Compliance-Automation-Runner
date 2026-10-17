@@ -12,7 +12,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { ConfigError, loadProviders, loadClients, clientMatches, loadSettings } = require('../src/config');
-const { PROVIDERS_DIR, SECRETS, tempDir, writeClientsFile } = require('./helpers');
+const { PROVIDERS_DIR, SECRETS, loadAllProviders, tempDir, writeClientsFile } = require('./helpers');
+
+const REAL = ['alpha', 'beta', 'gamma'];
 
 const profile = (overrides = {}) => ({
   name: 'Test Rail',
@@ -44,8 +46,47 @@ test('the shipped profiles load: three providers that differ where it shows', ()
   assert.equal(new Set(all.map((p) => p.carrier.ref)).size, 3);
   assert.equal(new Set(all.map((p) => p.tokenLifetimeSeconds)).size, 3);
   // Not every provider is on 3.8, and the collection sends and checks
-  // according to the version (#614). gamma receives each new function.
+  // according to the version (#614). Every function is on all three (#824).
   assert.deepEqual(all.map((p) => p.osdmVersion), ['3.6.0', '3.7.0', '3.8.0']);
+});
+
+// Identity keys: what makes a provider itself. Every other key is a function,
+// and every provider has every function (#824).
+const IDENTITY_KEYS = ['name', 'carrier', 'currency', 'priceFactor', 'otherCurrencies', 'osdmVersion', 'idPrefix', 'utcOffset', 'tokenLifetimeSeconds'];
+
+test('alpha and beta hold every function of gamma, with the same values, and keep their own identity (#824)', () => {
+  const raw = (key) => JSON.parse(fs.readFileSync(path.join(PROVIDERS_DIR, `${key}.json`), 'utf8'));
+  const gamma = raw('gamma');
+  const functions = Object.keys(gamma).filter((key) => !IDENTITY_KEYS.includes(key));
+  assert.ok(functions.length >= 18, `gamma has ${functions.length} functions`);
+  for (const key of ['alpha', 'beta']) {
+    const profile = raw(key);
+    for (const fn of functions) {
+      assert.deepEqual(profile[fn], gamma[fn], `${key}.${fn} must equal gamma.${fn}`);
+    }
+    for (const own of Object.keys(profile).filter((k) => !IDENTITY_KEYS.includes(k))) {
+      assert.ok(functions.includes(own), `${key}.${own} is a function gamma does not have`);
+    }
+  }
+  const identity = (p) => [p.osdmVersion, p.currency, p.idPrefix];
+  assert.deepEqual(identity(raw('alpha')), ['3.6.0', 'EUR', 'ALPHA']);
+  assert.deepEqual(identity(raw('beta')), ['3.7.0', 'CHF', 'BETA']);
+  assert.deepEqual(identity(raw('gamma')), ['3.8.0', 'CZK', 'GAMMA']);
+  // Each sells one other currency of its own, so each refuses one it does not sell.
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    const other = Object.keys(raw(key).otherCurrencies || {});
+    assert.ok(other.length > 0, `${key} sells another currency`);
+    assert.ok(!other.includes(raw(key).currency), key);
+  }
+});
+
+test('the test-only plain provider has none of the functions (#824)', () => {
+  const plain = loadAllProviders().get('plain');
+  const gamma = JSON.parse(fs.readFileSync(path.join(PROVIDERS_DIR, 'gamma.json'), 'utf8'));
+  for (const fn of Object.keys(gamma).filter((key) => !IDENTITY_KEYS.includes(key))) {
+    assert.equal(plain[fn], undefined, `plain.${fn}`);
+  }
+  assert.equal(loadProviders(PROVIDERS_DIR).has('plain'), false);
 });
 
 test('a profile with a missing or wrong field stops the start', () => {
@@ -60,30 +101,36 @@ test('a profile with a missing or wrong field stops the start', () => {
   assert.throws(() => loadProviders(providersDir({ 'test.json': 'null' })), /must be an object/);
 });
 
-test('overrule codes: gamma lists the four it accepts; a wrong list stops the start (#596)', () => {
-  const providers = loadProviders(PROVIDERS_DIR);
-  assert.deepEqual(providers.get('gamma').overruleCodes, ['CONNECTION_BROKEN', 'PAYMENT_FAILURE', 'SALES_STAFF_ERROR', 'TECHNICAL_FAILURE']);
-  assert.equal(providers.get('alpha').overruleCodes, undefined);
+test('overrule codes: every provider lists the four it accepts, plain none; a wrong list stops the start (#596)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) {
+    assert.deepEqual(providers.get(key).overruleCodes, ['CONNECTION_BROKEN', 'PAYMENT_FAILURE', 'SALES_STAFF_ERROR', 'TECHNICAL_FAILURE'], key);
+  }
+  assert.equal(providers.get('plain').overruleCodes, undefined);
   for (const wrong of [[], 'STRIKE', ['strike'], ['STRIKE', 'STRIKE'], [7], Array.from({ length: 31 }, (_, i) => `CODE_${i}`)]) {
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ overruleCodes: wrong }) })), /overruleCodes/, JSON.stringify(wrong));
   }
   assert.deepEqual(loadProviders(providersDir({ 'test.json': profile({ overruleCodes: ['STRIKE'] }) })).get('test').overruleCodes, ['STRIKE']);
 });
 
-test('reduction cards: gamma lists three; a wrong list stops the start (#597)', () => {
-  const providers = loadProviders(PROVIDERS_DIR);
-  assert.deepEqual(providers.get('gamma').reductionCards.map((c) => [c.code, c.percent]), [['SIM_CARD_25', 25], ['SIM_CARD_50', 50], ['SIM_STUDENT', 30]]);
-  assert.equal(providers.get('alpha').reductionCards, undefined);
+test('reduction cards: every provider lists three, plain none; a wrong list stops the start (#597)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) {
+    assert.deepEqual(providers.get(key).reductionCards.map((c) => [c.code, c.percent]), [['SIM_CARD_25', 25], ['SIM_CARD_50', 50], ['SIM_STUDENT', 30]], key);
+  }
+  assert.equal(providers.get('plain').reductionCards, undefined);
   const good = { code: 'CARD_A', name: 'Card A', percent: 10 };
   for (const wrong of [[], 'CARD_A', [{ ...good, code: 'a' }], [{ ...good, name: '' }], [{ ...good, percent: 0 }], [{ ...good, percent: 95 }], [{ ...good, percent: 2.5 }], [good, good]]) {
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ reductionCards: wrong }) })), /reductionCards/, JSON.stringify(wrong));
   }
 });
 
-test('products: gamma sells four named products and two group ones; a wrong list stops the start (#598, #599)', () => {
-  const providers = loadProviders(PROVIDERS_DIR);
-  assert.deepEqual(providers.get('gamma').products.map((p) => p.code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND', 'SIM_WEEKEND_GROUP', 'SIM_GROUP']);
-  assert.equal(providers.get('alpha').products, undefined);
+test('products: every provider sells four named products and two group ones, plain none; a wrong list stops the start (#598, #599)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) {
+    assert.deepEqual(providers.get(key).products.map((p) => p.code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND', 'SIM_WEEKEND_GROUP', 'SIM_GROUP'], key);
+  }
+  assert.equal(providers.get('plain').products, undefined);
   const good = { code: 'P_A', name: 'Product A', flexibility: 'FULL_FLEXIBLE', factor: 1, isTrainBound: false };
   for (const wrong of [[], [{ ...good, code: 'a' }], [{ ...good, flexibility: 'ANY' }], [{ ...good, factor: 4 }], [{ ...good, isTrainBound: 'no' }], [good, good]]) {
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ products: wrong }) })), /products/, JSON.stringify(wrong));
@@ -137,20 +184,23 @@ test('the example clients file cannot be used as it is', () => {
 });
 
 test('a client is recognised only with its own secret, for its own provider', () => {
-  const providers = loadProviders(PROVIDERS_DIR);
+  const providers = loadAllProviders();
   const clients = loadClients(writeClientsFile(), providers);
   const [one, two] = SECRETS.alpha;
   assert.equal(clientMatches(clients, 'alpha', one.client_id, one.client_secret), true);
   assert.equal(clientMatches(clients, 'alpha', one.client_id, two.client_secret), false);
   assert.equal(clientMatches(clients, 'beta', one.client_id, one.client_secret), false);
   assert.equal(clientMatches(clients, 'gamma', one.client_id, one.client_secret), false);
+  assert.equal(clientMatches(clients, 'plain', one.client_id, one.client_secret), false);
+  assert.equal(clientMatches(clients, 'plain', SECRETS.plain[0].client_id, SECRETS.plain[0].client_secret), true);
+  assert.equal(clientMatches(clients, 'alpha', SECRETS.plain[0].client_id, SECRETS.plain[0].client_secret), false);
   assert.equal(clientMatches(clients, 'alpha', 'nobody', one.client_secret), false);
   assert.equal(clientMatches(clients, 'alpha', undefined, undefined), false);
   assert.equal(clientMatches(clients, 'alpha', one.client_id, { length: 99 }), false);
 });
 
 test('the secrets themselves are not kept in memory, only their digests', () => {
-  const clients = loadClients(writeClientsFile(), loadProviders(PROVIDERS_DIR));
+  const clients = loadClients(writeClientsFile(), loadAllProviders());
   const kept = clients.get('alpha').get(SECRETS.alpha[0].client_id);
   assert.ok(Buffer.isBuffer(kept));
   assert.equal(kept.length, 32);
@@ -186,35 +236,41 @@ test('group rules: gamma\'s two group products; a wrong rule stops the start (#5
   assert.ok(pricedPassengers);
 });
 
-test('second-class-only categories: gamma names R and Os; a wrong list stops the start (#600)', () => {
-  assert.deepEqual(loadProviders(PROVIDERS_DIR).get('gamma').secondClassOnlyCategories, ['R', 'Os']);
-  assert.equal(loadProviders(PROVIDERS_DIR).get('alpha').secondClassOnlyCategories, undefined);
+test('second-class-only categories: every provider names R and Os, plain none; a wrong list stops the start (#600)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) assert.deepEqual(providers.get(key).secondClassOnlyCategories, ['R', 'Os'], key);
+  assert.equal(providers.get('plain').secondClassOnlyCategories, undefined);
   for (const wrong of [[], 'R', ['R', 'R'], ['R x'], ['ABCDEFGHIJK'], new Array(11).fill(0).map((_, i) => `C${i}`)]) {
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ secondClassOnlyCategories: wrong }) })), /secondClassOnlyCategories/, JSON.stringify(wrong));
   }
 });
 
-test('reservations: gamma\'s SuperCity mandatory, EuroCity optional; a wrong map stops the start (#601)', () => {
-  assert.deepEqual(loadProviders(PROVIDERS_DIR).get('gamma').reservations, { SC: 'MANDATORY', EC: 'OPTIONAL' });
+test('reservations: every provider\'s SuperCity mandatory, EuroCity optional, plain none; a wrong map stops the start (#601)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) assert.deepEqual(providers.get(key).reservations, { SC: 'MANDATORY', EC: 'OPTIONAL' }, key);
+  assert.equal(providers.get('plain').reservations, undefined);
   for (const wrong of [{}, [], { SC: 'YES' }, { 'S C': 'MANDATORY' }, 'SC']) {
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ reservations: wrong }) })), /reservations/, JSON.stringify(wrong));
   }
 });
 
-test('trips collection: only gamma answers it; a value that is not true or false stops the start (#602)', () => {
-  const providers = loadProviders(PROVIDERS_DIR);
-  assert.equal(providers.get('gamma').tripsCollection, true);
-  assert.equal(providers.get('alpha').tripsCollection, undefined);
+test('trips collection: every provider answers it, plain does not; a value that is not true or false stops the start (#602)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) assert.equal(providers.get(key).tripsCollection, true, key);
+  assert.equal(providers.get('plain').tripsCollection, undefined);
   assert.equal(loadProviders(providersDir({ 'test.json': profile({ tripsCollection: false }) })).get('test').tripsCollection, undefined);
   for (const wrong of ['yes', 1, null]) {
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ tripsCollection: wrong }) })), /tripsCollection/, JSON.stringify(wrong));
   }
 });
 
-test('documents: gamma issues PDF_A4 and RETAILER_APP, its receipt after 30 s; a wrong profile stops the start (#603)', () => {
-  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
-  assert.deepEqual([gamma.documents, gamma.refundReceiptDelaySeconds], [['PDF_A4', 'RETAILER_APP'], 30]);
-  assert.equal(loadProviders(PROVIDERS_DIR).get('alpha').documents, undefined);
+test('documents: every provider issues PDF_A4 and RETAILER_APP, its receipt after 30 s, plain none; a wrong profile stops the start (#603)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) {
+    const provider = providers.get(key);
+    assert.deepEqual([provider.documents, provider.refundReceiptDelaySeconds], [['PDF_A4', 'RETAILER_APP'], 30], key);
+  }
+  assert.equal(providers.get('plain').documents, undefined);
   for (const wrong of [[], ['PDF_A4', 'PDF_A4'], ['RCT2'], 'PDF_A4']) {
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ documents: wrong, refundReceiptDelaySeconds: 30 }) })), /documents/, JSON.stringify(wrong));
   }
@@ -223,8 +279,9 @@ test('documents: gamma issues PDF_A4 and RETAILER_APP, its receipt after 30 s; a
   }
 });
 
-test('idempotency: gamma keeps the answers; a value that is not true or false stops the start (#604)', () => {
-  assert.equal(loadProviders(PROVIDERS_DIR).get('gamma').idempotency, true);
-  assert.equal(loadProviders(PROVIDERS_DIR).get('beta').idempotency, undefined);
+test('idempotency: every provider keeps the answers, plain does not; a value that is not true or false stops the start (#604)', () => {
+  const providers = loadAllProviders();
+  for (const key of REAL) assert.equal(providers.get(key).idempotency, true, key);
+  assert.equal(providers.get('plain').idempotency, undefined);
   assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ idempotency: 'yes' }) })), /idempotency/);
 });

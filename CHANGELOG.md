@@ -62,6 +62,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.34.0] — 2026-10-17
+
+Issue #824. Simulator 0.34.0. Server and collection unchanged.
+
+### Simulator 0.34.0
+
+- **`alpha` and `beta` have every function of `gamma`.** A company set up on
+  alpha could not copy many reference scenarios, and 18 checks of a full run
+  on alpha failed: every one was a probe of something only gamma did
+  (passenger and purchaser checks, past departure, overrule codes,
+  Idempotency-Key, refund receipt). Each optional key of gamma's profile is
+  now in alpha's and beta's with the same value: products, reduction cards,
+  reservations, place map and preferences, documents and refund receipt,
+  idempotency, exchange, trips search, person checks, variants, ticketing,
+  sales horizon, age tariffs, short deadlines, overrule codes, offer options.
+- **A second currency each**: alpha sells EUR and CHF, beta CHF and EUR (a
+  CHF price is 1.25 times the EUR one), so every provider refuses a currency
+  it does not sell with `400 CURRENCY_NOT_SUPPORTED`, as gamma does.
+- What still tells them apart: name, carrier, currency, prices, OSDM version
+  (3.6.0 / 3.7.0 / 3.8.0), id prefix, offset and token lifetime. The answers
+  were already 3.8 answers on all three.
+- `tests/config.test.js` pins that alpha and beta keep gamma's functions.
+  Tests of a provider without a function use `plain`, a provider file in
+  `tests/fixtures/providers/` that `tests/helpers.js` alone loads; it is
+  never shipped.
+
+### Documentation
+
+- `OSCAR - What is tested.md`, the simulator's README and its two operations
+  pages say that the three providers are alike, with the one exception of the
+  collection's: a COMBINED return names `outboundTripIds`, which OSDM 3.6 does
+  not have, so it is not run on alpha.
+
+### Default decisions (taken without asking)
+
+- **The same values as gamma, not values of their own.** The stop places that
+  switch a function on (`0000093` to `0000099`) and the products are those of
+  the simulator's data file, so one data file serves the three providers.
+- **The basic provider moved to the tests.** Nothing shipped is left without a
+  function, so a test that checks a 501 or "any code accepted" runs on `plain`.
+
+Checked: the 11 `_36` and `_37` scenarios of the simulator's data file
+replayed on alpha and beta with this profile, none with a failed check, the
+same check counts as their `_38` twins. Simulator tests 256 → 260, lint clean.
+
+Not checked: a full catalogue run through OSCAR on alpha and beta; the
+installed simulator updates when this version reaches `main`.
+
+---
+
 ## [server-1.11.326] / [collection-OTST_V2.0.183] — 2026-10-17
 
 Issue #801 part 3, release 2026.361. Server and pages only.

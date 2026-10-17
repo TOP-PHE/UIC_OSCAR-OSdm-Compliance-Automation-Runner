@@ -17,10 +17,14 @@ const { createStore } = require('../src/store');
 const { createApp } = require('../src/app');
 
 const PROVIDERS_DIR = path.join(__dirname, '..', 'providers');
+// A provider with none of the optional functions, for the tests of a provider
+// without them (#824): alpha, beta and gamma all have every function.
+const PLAIN_DIR = path.join(__dirname, 'fixtures', 'providers');
 
-// Two clients for alpha, one for beta, one for gamma, and one id, "same-id", that exists on
-// both with different secrets: only the provider tells those two apart. The
-// secrets only exist in the test.
+// Two clients for alpha, one for beta, one for gamma, one for the test-only
+// plain, and one id, "same-id", that exists on alpha and beta with different
+// secrets: only the provider tells those two apart. The secrets only exist in
+// the test.
 const SECRETS = {
   alpha: [
     { client_id: 'alpha-one', client_secret: 'a1'.repeat(24) },
@@ -34,7 +38,19 @@ const SECRETS = {
   gamma: [
     { client_id: 'gamma-one', client_secret: 'g1'.repeat(24) },
   ],
+  plain: [
+    { client_id: 'plain-one', client_secret: 'p1'.repeat(24) },
+  ],
 };
+
+// The clients of the shipped providers only, for a test that loads
+// providers/ alone (as the server does) and not the test-only plain.
+const REAL_SECRETS = Object.fromEntries(Object.entries(SECRETS).filter(([key]) => key !== 'plain'));
+
+// The shipped providers and the test-only plain, as the test simulator has them.
+function loadAllProviders() {
+  return new Map([...loadProviders(PROVIDERS_DIR), ...loadProviders(PLAIN_DIR)]);
+}
 
 // Every temporary folder of a test process lives under one root, which is
 // removed when the process ends. Each test file runs in a process of its own,
@@ -62,7 +78,7 @@ function writeClientsFile(content = SECRETS) {
 async function startSimulator({ limits = {}, store: givenStore } = {}) {
   const clock = { ms: Date.parse('2026-11-02T09:00:00Z') };
   const now = () => clock.ms;
-  const providers = loadProviders(PROVIDERS_DIR);
+  const providers = loadAllProviders();
   const allLimits = { bodyBytes: 64 * 1024, offersPerClient: 50, bookingsPerClient: 5, ttlSeconds: 3600, requestsPerMinute: 10000, ...limits };
   const store = givenStore || createStore({
     limits: { offer: allLimits.offersPerClient, trip: allLimits.offersPerClient, booking: allLimits.bookingsPerClient, fulfillment: allLimits.offersPerClient, idempotency: allLimits.offersPerClient },
@@ -131,4 +147,4 @@ const bookingRequest = (offer) => ({
   purchaser: { detail: { firstName: 'Paula', lastName: 'Purchaser', contact: { email: 'paula.purchaser@example.org', phoneNumber: '+33199000010' } } },
 });
 
-module.exports = { PROVIDERS_DIR, SECRETS, tempDir, writeClientsFile, startSimulator, basic, tokenFor, call, offerRequest, bookingRequest };
+module.exports = { PROVIDERS_DIR, PLAIN_DIR, SECRETS, REAL_SECRETS, loadAllProviders, tempDir, writeClientsFile, startSimulator, basic, tokenFor, call, offerRequest, bookingRequest };

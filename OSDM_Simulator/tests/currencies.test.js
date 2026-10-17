@@ -19,6 +19,8 @@ before(async () => { sim = await startSimulator(); });
 after(async () => { await sim.close(); });
 
 const [alphaOne] = SECRETS.alpha;
+const [betaOne] = SECRETS.beta;
+const [plainOne] = SECRETS.plain;
 const [gammaOne] = SECRETS.gamma;
 const asking = (currency) => offerRequest(currency ? { offerSearchCriteria: { currency } } : {});
 
@@ -57,9 +59,22 @@ test('offers: in the currency asked, in CZK when none is asked, refused in one n
   assert.equal((await sale('eur')).offers.status, 400, 'not an ISO 4217 code');
 });
 
+test('alpha and beta sell their own currency and one other, and refuse any other (#824)', async () => {
+  for (const [key, client, own, other] of [['alpha', alphaOne, 'EUR', 'CHF'], ['beta', betaOne, 'CHF', 'EUR']]) {
+    const token = await tokenFor(sim.base, key, client);
+    const ask = async (currency) => call(sim.base, token, 'POST', `/${key}/offers`, asking(currency));
+    assert.deepEqual([...currencies((await ask(undefined)).body.offers)], [own], key);
+    assert.deepEqual([...currencies((await ask(other)).body.offers)], [other], key);
+    const usd = await ask('USD');
+    assert.equal(usd.status, 400, key);
+    assert.equal(usd.body.code, 'CURRENCY_NOT_SUPPORTED');
+    assert.match(usd.body.detail, new RegExp(`USD.*Sold in: ${[own, other].join(', ')}`));
+  }
+});
+
 test('a provider naming no other currency answers in its own, as before', async () => {
-  const token = await tokenFor(sim.base, 'alpha', alphaOne);
-  const res = await call(sim.base, token, 'POST', '/alpha/offers', asking('USD'));
+  const token = await tokenFor(sim.base, 'plain', plainOne);
+  const res = await call(sim.base, token, 'POST', '/plain/offers', asking('USD'));
   assert.equal(res.status, 200);
   assert.equal(currencies(res.body.offers).has('USD'), false);
 });

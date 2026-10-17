@@ -1,0 +1,13 @@
+{
+  "name": "Plain Rail",
+  "carrier": {
+    "ref": "urn:x_osdm_simulator:carrier:plain",
+    "name": "Plain Rail (test only)"
+  },
+  "currency": "EUR",
+  "priceFactor": 1,
+  "osdmVersion": "3.6.0",
+  "idPrefix": "PLAIN",
+  "utcOffset": "+01:00",
+  "tokenLifetimeSeconds": 3600
+}

@@ -11,15 +11,15 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadProviders, checkProvider } = require('../src/config');
+const { checkProvider } = require('../src/config');
 const { buildOfferCollection } = require('../src/osdm/offers');
 const { createBooking, confirmBooking } = require('../src/osdm/bookings');
 const { createRefundOffers, confirmRefundOffer } = require('../src/osdm/refunds');
-const { PROVIDERS_DIR, offerRequest, bookingRequest } = require('./helpers');
+const { loadAllProviders, offerRequest, bookingRequest } = require('./helpers');
 
-const providers = loadProviders(PROVIDERS_DIR);
+const providers = loadAllProviders();
 const gamma = providers.get('gamma');
-const alpha = providers.get('alpha');
+const plain = providers.get('plain');
 const NOW = Date.parse('2026-10-11T08:00:00Z');
 const TWO = [{ externalRef: '00001', type: 'PERSON' }, { externalRef: '00002', type: 'PERSON' }];
 const parts = (booking) => booking.bookedOffers.flatMap((o) => o.admissions);
@@ -56,9 +56,11 @@ function booked(request, provider = gamma) {
   return { booking, offer: response.offers[0] };
 }
 
-test('gamma names its two stop places; alpha has none', () => {
-  assert.deepEqual(gamma.ticketing, { perPassengerFrom: 'urn:uic:stn:0000096', perLegFrom: 'urn:uic:stn:0000095' });
-  assert.equal(alpha.ticketing, undefined);
+test('every provider names the two stop places; plain has none', () => {
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    assert.deepEqual(providers.get(key).ticketing, { perPassengerFrom: 'urn:uic:stn:0000096', perLegFrom: 'urn:uic:stn:0000095' }, key);
+  }
+  assert.equal(plain.ticketing, undefined);
 });
 
 test('per passenger: one ticket per passenger, and one passenger refunded alone', () => {
@@ -106,7 +108,7 @@ test('a leg\'s share of the price follows its travel time (2 h of 3)', () => {
 });
 
 test('elsewhere, and on a provider without ticketing, one ticket per direction and a scoped refund is refused', () => {
-  for (const provider of [gamma, alpha]) {
+  for (const provider of [gamma, plain]) {
     const stop = provider === gamma ? 'urn:uic:stn:0000001' : 'urn:uic:stn:0000096';
     const { booking } = booked(searchFrom(stop), provider);
     assert.equal(booking.fulfillments.length, 1);

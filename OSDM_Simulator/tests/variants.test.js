@@ -11,17 +11,16 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadProviders } = require('../src/config');
 const { buildOfferCollection } = require('../src/osdm/offers');
 const { createBooking, confirmBooking } = require('../src/osdm/bookings');
 const { createRefundOffers, confirmRefundOffer } = require('../src/osdm/refunds');
 const { createExchangeOffers } = require('../src/osdm/exchanges');
 const { variantsOf } = require('../src/osdm/variants');
-const { PROVIDERS_DIR, offerRequest, bookingRequest } = require('./helpers');
+const { loadAllProviders, offerRequest, bookingRequest } = require('./helpers');
 
-const providers = loadProviders(PROVIDERS_DIR);
+const providers = loadAllProviders();
 const gamma = providers.get('gamma');
-const alpha = providers.get('alpha');
+const plain = providers.get('plain');
 const NOW = Date.parse('2026-10-11T08:00:00Z');
 const TWO = [{ externalRef: '00001', type: 'PERSON' }, { externalRef: '00002', type: 'PERSON' }];
 const parts = (booking) => booking.bookedOffers.flatMap((o) => o.admissions);
@@ -37,11 +36,12 @@ function booked(provider, variant, { confirm = true, request = offerRequest({ an
   return { booking, offer: response.offers[0] };
 }
 
-test('the variants named by last names, any case; unknown names and other providers give none', () => {
+test('the variants named by last names, any case, on every provider; unknown names and a provider without variants give none', () => {
   const specs = (...names) => names.map((lastName) => ({ detail: { lastName } }));
   assert.deepEqual([...variantsOf(specs('SIMVARIANT-Reordered', 'simvariant-minimal', 'Example'), gamma)], ['reordered', 'minimal']);
   assert.deepEqual([...variantsOf(specs('Simvariant-unknown', 'Simvariant'), gamma)], []);
-  assert.deepEqual([...variantsOf(specs('Simvariant-Reordered'), alpha)], []);
+  for (const key of ['alpha', 'beta']) assert.deepEqual([...variantsOf(specs('Simvariant-Reordered'), providers.get(key))], ['reordered'], key);
+  assert.deepEqual([...variantsOf(specs('Simvariant-Reordered'), plain)], []);
   assert.deepEqual([...variantsOf('x', gamma)], []);
 });
 
@@ -105,12 +105,12 @@ test('the deliberately wrong answers are one cent off, or the wrong status', () 
   assert.equal(eo.amountToBePaid?.amount ?? -eo.refundableAmount.amount, balance);
 });
 
-test('offers from the wrong-offers stop place have minimalPrice one cent off; elsewhere, the sum', () => {
+test('offers from the wrong-offers stop place have minimalPrice one cent off; elsewhere, and on a provider without variants, the sum', () => {
   const sumOf = (offer) => [...offer.admissionOfferParts, ...(offer.reservationOfferParts || [])].reduce((t, p) => t + p.price.amount, 0);
   const at = (stopPlaceRef, provider) => buildOfferCollection(offerRequest({
     tripSearchCriteria: { ...offerRequest().tripSearchCriteria, origin: { objectType: 'StopPlaceRef', stopPlaceRef } },
   }), provider, NOW).response.offers;
   for (const offer of at(gamma.variants.wrongOffersFrom, gamma)) assert.equal(offer.offerSummary.minimalPrice.amount, sumOf(offer) + 1);
   for (const offer of at('urn:uic:stn:0000001', gamma)) assert.equal(offer.offerSummary.minimalPrice.amount, sumOf(offer));
-  for (const offer of at(gamma.variants.wrongOffersFrom, alpha)) assert.equal(offer.offerSummary.minimalPrice.amount, sumOf(offer));
+  for (const offer of at(gamma.variants.wrongOffersFrom, plain)) assert.equal(offer.offerSummary.minimalPrice.amount, sumOf(offer));
 });

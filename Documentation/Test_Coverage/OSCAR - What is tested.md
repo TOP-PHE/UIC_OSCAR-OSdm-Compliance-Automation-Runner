@@ -61,35 +61,40 @@ them.
 
 The simulator is a stub OSDM provider. It builds a trip from the request
 (no timetable: the same request gives the same trip and prices) and answers
-with OSDM 3.8 shapes on every provider. The three providers differ by the
-version they report, their currency and what they implement:
+with OSDM 3.8 shapes on every provider. Since #824 the three providers offer
+the same functions; they differ by the version they report, their currency,
+their identifiers and their token lifetime:
 
 | | `alpha` | `beta` | `gamma` |
 |---|---|---|---|
 | OSDM version reported | 3.6.0 | 3.7.0 | 3.8.0 |
-| Currency | EUR | CHF | CZK |
-| Token lifetime | one hour | two minutes (a long run renews its token) | one hour |
+| Currency | EUR, and CHF when asked | CHF, and EUR when asked | CZK, and EUR when asked |
+| Identifiers | `ALPHA-…` | `BETA-…` | `GAMMA-…` |
+| Token lifetime | one hour | two minutes (a long run renews its token) | 15 minutes |
 | Offers, booking, passengers, purchaser, confirmation, refund | yes | yes | yes |
 | Return in two offers (`outwardOfferIds`) | yes | yes | yes |
-| Return in one offer (`outboundTripIds`, OSDM 3.7+) | — | yes | yes |
-| Overrule codes on a refund | any code accepted | any code accepted | four codes, any other refused |
-| Named products, group products, reduction cards | — | — | yes |
-| Two-leg trips with a second-class-only train, upgrade parts | — | — | yes |
-| Mandatory and optional seat reservations | — | — | yes |
-| `POST /trips-collection` and offers by trip id | 501 | 501 | yes |
-| Fulfilment documents, `GET /fulfillments/{id}`, refund receipt | none, 501 | none, 501 | yes |
-| `Idempotency-Key` | ignored | ignored | yes |
-| Exchange | 501 | 501 | yes |
-| Expiry after 60 s for trips from station 0000099 | — | — | yes |
-| Response variants, deliberately wrong answers | — | — | yes |
-| Requested information and passenger data checks | — | — | yes |
+| Return in one offer (`outboundTripIds`) | — (not in OSDM 3.6) | yes | yes |
+| Overrule codes on a refund: four codes, any other refused | yes | yes | yes |
+| Named products, group products, reduction cards | yes | yes | yes |
+| Two-leg trips with a second-class-only train, upgrade parts | yes | yes | yes |
+| Mandatory and optional seat reservations, place preferences, place map | yes | yes | yes |
+| `POST /trips-collection` and offers by trip id | yes | yes | yes |
+| Fulfilment documents, `GET /fulfillments/{id}`, refund receipt | yes | yes | yes |
+| `Idempotency-Key` | yes | yes | yes |
+| Exchange | yes | yes | yes |
+| Expiry after 60 s for trips from station 0000099 | yes | yes | yes |
+| Response variants, deliberately wrong answers | yes | yes | yes |
+| Requested information and passenger data checks, sales horizon, age tariffs | yes | yes | yes |
 
-Every new function goes to `gamma`; `alpha` and `beta` keep the basic sale
-and refund, which also keeps the "not implemented by this provider" path
-(a `501`) under test. The scenarios of the simulator's data file are named
-after their provider: `_36` runs on `alpha`, `_37` on `beta`, `_38` on
-`gamma`. The answer the simulator gives to each scenario, and the warnings a
-run must show, are in
+Every new function goes to all three providers: a test of the simulator
+(`config.test.js`) fails when `alpha` or `beta` lacks a setting `gamma` has.
+Every reference scenario of the catalogue can therefore be copied for, and
+run on, each of them; the one exception is a return in one offer on `alpha`,
+which OSDM 3.6 does not have. The "not implemented by this provider" path (a
+`501`) is tested with a test-only provider. The scenarios of the simulator's
+data file are named after their provider: `_36` runs on `alpha`, `_37` on
+`beta`, `_38` on `gamma`. The answer the simulator gives to each scenario,
+and the warnings a run must show, are in
 [OSCAR - OSDM Simulator scenarios](../Server_Operations/OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
 
 ## 3. What the Bruno collection checks, step by step

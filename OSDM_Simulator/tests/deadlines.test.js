@@ -11,14 +11,13 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadProviders } = require('../src/config');
 const { buildOfferCollection, OFFER_LIFETIME_MS } = require('../src/osdm/offers');
 const { createBooking, confirmBooking, releaseIfExpired } = require('../src/osdm/bookings');
 const { createRefundOffers } = require('../src/osdm/refunds');
 const { createExchangeOffers, createExchangeOperation } = require('../src/osdm/exchanges');
-const { PROVIDERS_DIR, offerRequest, bookingRequest } = require('./helpers');
+const { PROVIDERS_DIR, loadAllProviders, offerRequest, bookingRequest } = require('./helpers');
 
-const providers = loadProviders(PROVIDERS_DIR);
+const providers = loadAllProviders();
 const gamma = providers.get('gamma');
 const NOW = Date.parse('2026-10-11T08:00:00Z');
 const SHORT_MS = gamma.shortDeadlines.seconds * 1000;
@@ -36,10 +35,11 @@ function sale(provider, stopPlaceRef, { confirm = false } = {}) {
   return { offers: response.offers, booking };
 }
 
-test('the profile: gamma has the short-deadline stop place, alpha and beta do not', () => {
-  assert.deepEqual(gamma.shortDeadlines, { stopPlaceRef: 'urn:uic:stn:0000099', seconds: 60 });
-  assert.equal(providers.get('alpha').shortDeadlines, undefined);
-  assert.equal(providers.get('beta').shortDeadlines, undefined);
+test('the profile: every provider has the short-deadline stop place, plain does not', () => {
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    assert.deepEqual(providers.get(key).shortDeadlines, { stopPlaceRef: 'urn:uic:stn:0000099', seconds: 60 }, key);
+  }
+  assert.equal(providers.get('plain').shortDeadlines, undefined);
 });
 
 test('a trip from that stop place: offers, booking, refund and exchange offers all expire after 60 s', () => {
@@ -55,8 +55,8 @@ test('a trip from that stop place: offers, booking, refund and exchange offers a
     (error) => error.status === 409 && error.code === 'OFFER_EXPIRED');
 });
 
-test('any other trip, and the same stop place on another provider, keep the 30 minutes', () => {
-  for (const [provider, stop] of [[gamma, 'urn:uic:stn:0000001'], [providers.get('alpha'), gamma.shortDeadlines.stopPlaceRef]]) {
+test('any other trip, and the same stop place on a provider without short deadlines, keep the 30 minutes', () => {
+  for (const [provider, stop] of [[gamma, 'urn:uic:stn:0000001'], [providers.get('plain'), gamma.shortDeadlines.stopPlaceRef]]) {
     const { offers, booking } = sale(provider, stop);
     assert.equal(offers[0].preBookableUntil, iso(NOW + OFFER_LIFETIME_MS));
     assert.equal(booking.confirmationTimeLimit, iso(NOW + 30 * 60 * 1000));

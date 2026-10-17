@@ -14,7 +14,7 @@ row in the same change as the scenario.
 
 - **Provider.** The suffix of the code names the OSDM version and so the
   provider to run it against: `_36` → `alpha` (3.6.0), `_37` → `beta`
-  (3.7.0), `_38` → `gamma` (3.8.0). Every new function is on `gamma` only.
+  (3.7.0), `_38` → `gamma` (3.8.0). Since #824 every function is on all three (a COMBINED return excepted on `alpha`: OSDM 3.6 has no `outboundTripIds`).
   Run a scenario against another provider and it tests something else, or
   fails.
 - **Expected result.** Every scenario passes with **no failed check**. A
@@ -39,28 +39,30 @@ row in the same change as the scenario.
 These come from the steps every sale runs, so they are not repeated in each
 row below:
 
-- **`06b. GET Fulfillment`** reads each ticket of the booking.
-  - `gamma` answers it.
-  - `alpha` and `beta` answer `501`, which is reported as "not implemented by
-    this provider": a passing row, not a failure.
-- **On `alpha` and `beta`:** one warning, *"the PDF_A4 medium asked for is
-  delivered — 0 document(s)"*. These two providers issue no documents.
-- **On `gamma`:**
-  - Every booking gets its documents: one PDF for the whole booking, plus a
-    PNG per ticket when the scenario asks for `RETAILER_APP`.
-  - A booking with two tickets (a return) therefore shows two warnings at
-    06b, one per ticket: *"document … covers this fulfillment only — it also
-    holds …"*. That is the merged PDF, as ČD delivers it.
+- **`06b. GET Fulfillment`** reads each ticket of the booking; every provider
+  answers it.
+- Every booking gets its documents, on every provider since #824: one PDF for
+  the whole booking, plus a PNG per ticket when the scenario asks for
+  `RETAILER_APP`. A booking with two tickets (a return) therefore shows two
+  warnings at 06b, one per ticket: *"document … covers this fulfillment only —
+  it also holds …"*. That is the merged PDF, as ČD delivers it.
+
+Since #824, `alpha` and `beta` offer every function `gamma` has, so a scenario
+gives the same checks on each (the `_36`, `_37` and `_38` copies of one
+scenario: 234, 294, 314, 527 and 455 checks; 356 for the return in one offer
+on `beta` and `gamma`). Before, `alpha` and `beta` sold three unnamed offers
+and issued no documents, which showed as one warning, *"the PDF_A4 medium
+asked for is delivered — 0 document(s)"*.
 
 ## alpha — OSDM 3.6.0
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
-| `SIM_SALE_SEARCH_1ADT_36` | A sale by search criteria for one adult, passenger details updated after the booking (PATCH, then GET passenger). | One direct trip and three offers (flexible, semi-flexible, saver); the flexible one is booked and confirmed. One ticket. | No failed check. |
+| `SIM_SALE_SEARCH_1ADT_36` | A sale by search criteria for one adult, passenger details updated after the booking (PATCH, then GET passenger). | One direct trip and the named products, from flexible to saver; the flexible one is booked and confirmed. One ticket and its PDF. | No failed check. |
 | `SIM_SALE_SEARCH_2ADT_SAVER_36` | A sale of the non-flexible offer for two adults, on trip 2. | The saver offer for both passengers, one ticket. | No failed check. |
-| `SIM_RETURN_SEPARATE_1ADT_36` | A return in two offers: the inbound request names the outbound offer (`outwardOfferIds`). Both offers booked together. | Inbound offers for the outbound one; one booking, one ticket per direction. | No failed check. |
-| `SIM_REFUND_RETURN_1ADT_36` | A full refund of a return: one refund offer per ticket, each confirmed, then the booking read again. | Two refund offers (no fee: flexible); each confirmed refunds its ticket and lowers the confirmed price. | No failed check. |
-| `SIM_REFUND_INBOUND_1ADT_36` | A partial refund by fulfillment: the inbound ticket only, named in `fulfillmentIds`. | One refund offer for the inbound ticket; the outbound one stays FULFILLED. | No failed check. |
+| `SIM_RETURN_SEPARATE_1ADT_36` | A return in two offers: the inbound request names the outbound offer (`outwardOfferIds`). Both offers booked together. | Inbound offers for the outbound one; one booking, one ticket per direction. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_RETURN_1ADT_36` | A full refund of a return: one refund offer per ticket, each confirmed, then the booking read again. | Two refund offers (no fee: flexible); each confirmed refunds its ticket and lowers the confirmed price. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_INBOUND_1ADT_36` | A partial refund by fulfillment: the inbound ticket only, named in `fulfillmentIds`. | One refund offer for the inbound ticket; the outbound one stays FULFILLED. | No failed check; the two merged-PDF warnings. |
 
 ## beta — OSDM 3.7.0
 
@@ -71,10 +73,10 @@ defines from 3.7.
 |---|---|---|---|
 | `SIM_SALE_SEARCH_1ADT_37` | As `SIM_SALE_SEARCH_1ADT_36`, in 3.7. | As on `alpha`. | No failed check. |
 | `SIM_SALE_SEARCH_2ADT_SAVER_37` | As `SIM_SALE_SEARCH_2ADT_SAVER_36`, in 3.7. | As on `alpha`. | No failed check. |
-| `SIM_RETURN_SEPARATE_1ADT_37` | As `SIM_RETURN_SEPARATE_1ADT_36`; from 3.7 the inbound date goes in `offerSearchCriteria.inboundDate`. | As on `alpha`. | No failed check. |
-| `SIM_RETURN_COMBINED_1ADT_37` | A return in one offer: the inbound request names the outbound trip (`outboundTripIds`); the offer chosen covers both trips and is booked alone. | Offers covering both trips at a return price; one booking, one ticket per direction. | No failed check. |
-| `SIM_REFUND_RETURN_1ADT_37` | As `SIM_REFUND_RETURN_1ADT_36`, in 3.7. | As on `alpha`. | No failed check. |
-| `SIM_REFUND_INBOUND_1ADT_37` | As `SIM_REFUND_INBOUND_1ADT_36`, in 3.7. | As on `alpha`. | No failed check. |
+| `SIM_RETURN_SEPARATE_1ADT_37` | As `SIM_RETURN_SEPARATE_1ADT_36`; from 3.7 the inbound date goes in `offerSearchCriteria.inboundDate`. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
+| `SIM_RETURN_COMBINED_1ADT_37` | A return in one offer: the inbound request names the outbound trip (`outboundTripIds`); the offer chosen covers both trips and is booked alone. | Offers covering both trips at a return price; one booking, one ticket per direction. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_RETURN_1ADT_37` | As `SIM_REFUND_RETURN_1ADT_36`, in 3.7. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_INBOUND_1ADT_37` | As `SIM_REFUND_INBOUND_1ADT_36`, in 3.7. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
 
 ## gamma — OSDM 3.8.0
 
@@ -82,7 +84,7 @@ defines from 3.7.
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
-| `SIM_SALE_SEARCH_1ADT_38` | As `SIM_SALE_SEARCH_1ADT_36`, in 3.8. | As on `alpha`, with gamma's named products and one PDF for the booking. | No failed check. |
+| `SIM_SALE_SEARCH_1ADT_38` | As `SIM_SALE_SEARCH_1ADT_36`, in 3.8. | As on `alpha`. | No failed check. |
 | `SIM_SALE_SEARCH_2ADT_SAVER_38` | As `SIM_SALE_SEARCH_2ADT_SAVER_36`, in 3.8. | The train-bound saver for both passengers. | No failed check. |
 | `SIM_RETURN_SEPARATE_1ADT_38` | As `SIM_RETURN_SEPARATE_1ADT_36`, in 3.8. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
 | `SIM_RETURN_COMBINED_1ADT_38` | As `SIM_RETURN_COMBINED_1ADT_37`, in 3.8. | As on `beta`. | No failed check; the two merged-PDF warnings. |
@@ -168,7 +170,7 @@ without a code, it would cost a quarter of its price.
 | `SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38` | As above, with `PAYMENT_FAILURE`. | As above. | As above. |
 | `SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38` | As above, with `SALES_STAFF_ERROR`. | As above. | As above. |
 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` | As above, with `TECHNICAL_FAILURE`. | As above. | As above. |
-| `SIM_REFUND_OVERRULE_REFUSED_38` | Negative test: a refund asked with `STRIKE`, a code gamma does not support, must be refused. The scenario ends at the refund offer request. | `400 OVERRULE_CODE_NOT_SUPPORTED` with a Problem. | No failed check (the refusal is graded); the same four warnings as above. On `alpha`, which accepts any code, this scenario fails, as it should. |
+| `SIM_REFUND_OVERRULE_REFUSED_38` | Negative test: a refund asked with `STRIKE`, a code gamma does not support, must be refused. The scenario ends at the refund offer request. | `400 OVERRULE_CODE_NOT_SUPPORTED` with a Problem. | No failed check (the refusal is graded); the same four warnings as above. Every provider refuses it since #824 (before, `alpha` accepted any code and this scenario failed there). |
 | `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38` | As `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38`, on a return sold as one offer. | As above. | As `SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38`. |
 
 ### Reduction cards (#597)
@@ -233,7 +235,7 @@ Each asks for offers with one option of the offer search criteria alone (`offerS
 
 ### Currencies (#781)
 
-Gamma sells in its own currency, CZK, and in EUR (profile `otherCurrencies`, at a 24th of the CZK price). Without a currency asked, it answers in CZK. A sale keeps its currency through the booking, the refund and the exchange. A currency it does not sell is refused with `400 CURRENCY_NOT_SUPPORTED`. Alpha and beta name no other currency and answer in their own whatever is asked.
+Gamma sells in its own currency, CZK, and in EUR (profile `otherCurrencies`, at a 24th of the CZK price). Without a currency asked, it answers in CZK. A sale keeps its currency through the booking, the refund and the exchange. A currency it does not sell is refused with `400 CURRENCY_NOT_SUPPORTED`. Since #824 alpha and beta do the same with a second currency each: alpha sells EUR and CHF, beta CHF and EUR; on both a CHF price is 1.25 times the EUR one.
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
@@ -301,7 +303,7 @@ These five are negative probes: each waits until a deadline has passed and expec
 
 ### Response variants (#611)
 
-A variant is chosen by a passenger's last name at booking time: `Simvariant-<name>` (passenger lists 11 to 18). It holds for the life of the booking. gamma only (profile `variants`).
+A variant is chosen by a passenger's last name at booking time: `Simvariant-<name>` (passenger lists 11 to 18). It holds for the life of the booking. Every provider (profile `variants`).
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|

@@ -12,13 +12,12 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadProviders } = require('../src/config');
 const { buildOfferCollection } = require('../src/osdm/offers');
-const { PROVIDERS_DIR, offerRequest } = require('./helpers');
+const { PROVIDERS_DIR, loadAllProviders, offerRequest } = require('./helpers');
 
-const providers = loadProviders(PROVIDERS_DIR);
+const providers = loadAllProviders();
 const gamma = providers.get('gamma');
-const alpha = providers.get('alpha');
+const plain = providers.get('plain');
 const NOW = Date.parse('2026-10-11T08:00:00Z');
 
 function answer(criteria, { provider = gamma, from = 'urn:uic:stn:0000001' } = {}) {
@@ -56,13 +55,15 @@ test('offer parts without an admission: the usual offers, and a problem saying t
   }
 });
 
-test('from the ignoring stop place, gamma answers as if no criteria were sent; elsewhere and on alpha, it keeps to them', () => {
+test('from the ignoring stop place, every provider answers as if no criteria were sent; elsewhere and on a provider without variants, it keeps to them', () => {
   const from = gamma.variants.ignoresOfferOptionsFrom;
   assert.equal(from, 'urn:uic:stn:0000090');
-  assert.deepEqual(classes(answer({ travelClasses: ['FIRST'] }, { from })), ['SECOND']);
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    assert.deepEqual(classes(answer({ travelClasses: ['FIRST'] }, { provider: providers.get(key), from })), ['SECOND'], key);
+  }
   assert.equal(answer({ requestedOfferParts: ['RESERVATION'] }, { from }).problems, undefined);
   assert.deepEqual(classes(answer({ travelClasses: ['FIRST'] })), ['FIRST']);
-  assert.deepEqual(classes(answer({ travelClasses: ['FIRST'] }, { provider: alpha, from })), ['FIRST']);
+  assert.deepEqual(classes(answer({ travelClasses: ['FIRST'] }, { provider: plain, from })), ['FIRST']);
 });
 
 test('the variant stop place is optional in a provider profile, and must be text when given', () => {
