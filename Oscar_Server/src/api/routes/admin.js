@@ -512,13 +512,9 @@ router.patch('/companies/:id', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'ai_analysis_enabled must be true or false.' });
   }
   if (ai.change) { updates.push('ai_analysis_enabled = ?'); values.push(aiEnabled ? 1 : 0); }
-  if (slug) {
-    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const existing = get('SELECT id FROM companies WHERE slug = ? AND id != ?', [cleanSlug, companyId]);
-    if (existing) return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Company slug already in use.' });
-    updates.push('slug = ?');
-    values.push(cleanSlug);
-  }
+  const newSlug = slug ? freeSlug(slug, companyId) : null;
+  if (newSlug === false) return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Company slug already in use.' });
+  if (newSlug) { updates.push('slug = ?'); values.push(newSlug); }
   if (updates.length === 0) {
     // Sending the switch as it already is changes nothing, and is not an error.
     if (ai.applies) return res.json({ company: companyRow(companyId) });
@@ -529,6 +525,12 @@ router.patch('/companies/:id', (req, res) => {
   if (ai.change) auditLog(req.user.id, companyId, req.user.email, aiEnabled ? 'ai_analysis_enabled' : 'ai_analysis_disabled');
   return res.json({ company: companyRow(companyId) });
 });
+
+// The slug cleaned, or false when another company already uses it.
+function freeSlug(slug, companyId) {
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return get('SELECT id FROM companies WHERE slug = ? AND id != ?', [cleanSlug, companyId]) ? false : cleanSlug;
+}
 
 function companyRow(companyId) {
   return get(
