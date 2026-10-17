@@ -88,8 +88,10 @@
     return testData.journeys.map(j => ({ value: 'journey::' + j.id, text: `🧭 ${j.label} · ${j.legs} leg${j.legs === 1 ? '' : 's'}` }));
   }
 
+  // The scenario boxes only: the "Tick all" box sits in the same list, and its
+  // value is the browser's "on" (#802).
   function selectedCodes() {
-    return Array.from(document.querySelectorAll('#sc-copy-scenarios input[type=checkbox]:checked')).map(b => b.value);
+    return Array.from(document.querySelectorAll('#sc-copy-scenarios input[data-copy-action="toggle-code"]:checked')).map(b => b.value);
   }
 
   function renderTrips() {

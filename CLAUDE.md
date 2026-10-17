@@ -245,7 +245,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`journeysMissing()`, `catalogueMatch.js`, the rule of `suggestTrip()`):
     preview field `journeyLegsMissing`, `isLocked()` in `scenario-copy.js`
     (row, "Tick all"). Catalogue only; a company-to-company copy still takes
-    any journey.
+    any journey. **The "Tick all" box sits in the scenario list**: anything
+    reading the list's checkboxes must select `data-copy-action="toggle-code"`,
+    or it reads the box's value `on` as a code (#802, 1.11.317).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
