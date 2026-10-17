@@ -245,21 +245,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`journeysMissing()`, `catalogueMatch.js`, the rule of `suggestTrip()`):
     preview field `journeyLegsMissing`, `isLocked()` in `scenario-copy.js`
     (row, "Tick all"). Catalogue only; a company-to-company copy still takes
-    any journey.
+    any journey. **The "Tick all" box sits in the scenario list**: anything
+    reading the list's checkboxes must select `data-copy-action="toggle-code"`,
+    or it reads the box's value `on` as a code (#802, 1.11.317).
   - **AI analysis of results** (#801; PR 1 = 1.11.318, access only). Three
-  locks: `companies.ai_analysis_enabled` (administrator, top-level companies,
-  Manage Companies), a Test Manager's `ai_access_request` (one row per company
-  and user, updated in place; the audit log keeps the history) naming the
-  commitment text accepted by version and sha256 (`utils/aiAccess.js`, which
-  holds the text: change the text = bump `version`, and every approved Test
-  Manager accepts again without a new approval), and the administrator's
-  approve / refuse / revoke (`admin.js`, reason required to refuse or
-  withdraw). Access is the distributor's when working on a provider
-  (`topCompanyOf()`, from `req.companyId`, never `req.user.companyId`).
-  Switching off closes the page and keeps approvals. PR 2 configures the
-  company's AI (Anthropic Messages or OpenAI-compatible, key encrypted, base
-  URL through `urlPolicy.js`), PR 3 the analysis; the plan is in #801.
-- **The run gets the annotation too** since 1.11.236: `/data/:filename`
+    locks: `companies.ai_analysis_enabled` (administrator, top-level companies,
+    Manage Companies), a Test Manager's `ai_access_request` (one row per company
+    and user, updated in place; the audit log keeps the history) naming the
+    commitment text accepted by version and sha256 (`utils/aiAccess.js`, which
+    holds the text: change the text = bump `version`, and every approved Test
+    Manager accepts again without a new approval), and the administrator's
+    approve / refuse / revoke (`admin.js`, reason required to refuse or
+    withdraw). Access is the distributor's when working on a provider
+    (`topCompanyOf()`, from `req.companyId`, never `req.user.companyId`).
+    Switching off closes the page and keeps approvals. PR 2 configures the
+    company's AI (Anthropic Messages or OpenAI-compatible, key encrypted, base
+    URL through `urlPolicy.js`), PR 3 the analysis; the plan is in #801.
+  - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
     collection's `[WARNING]` never reached a run log.

@@ -15,6 +15,17 @@
       ]
     },
     {
+      "release": "2026.352",
+      "date": "2026-10-17",
+      "server": "1.11.317",
+      "collection": "OTST_V2.0.182",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Copy scenarios: Tick all no longer makes the copy fail with 'Scenario on is not in the source.' (#802)."
+      ]
+    },
+    {
       "release": "2026.351",
       "date": "2026-10-17",
       "server": "1.11.316",

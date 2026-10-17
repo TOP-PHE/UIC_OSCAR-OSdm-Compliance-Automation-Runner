@@ -146,6 +146,21 @@ describe('Copy scenarios: tick all', () => {
     expect([all.checked, all.indeterminate]).toEqual([false, false]);
   });
 
+  // #802: the "Tick all" box's value ("on") was sent as a scenario code.
+  test('the codes copied are read from the scenario boxes only, never the "Tick all" box', () => {
+    const SELECTED = lift('function selectedCodes(', '\n  }');
+    const all = { value: 'on', checked: true, dataset: { copyAction: 'toggle-all' } };
+    const boxes = [all, { value: 'A', checked: true, dataset: { copyAction: 'toggle-code' } },
+      { value: 'B', checked: false, dataset: { copyAction: 'toggle-code' } }];
+    const document = {
+      querySelectorAll: (sel) => boxes.filter(b => b.checked
+        && (!sel.includes('[data-copy-action="toggle-code"]') || b.dataset.copyAction === 'toggle-code')),
+    };
+    const ctx = vm.createContext({ document, Array });
+    vm.runInContext(`${SELECTED}\nthis.selectedCodes = selectedCodes;`, ctx);
+    expect(ctx.selectedCodes()).toEqual(['A']);
+  });
+
   test('the page wires both boxes', () => {
     expect(SOURCE).toContain("el.dataset.copyAction === 'toggle-all' && preview) { tickAll(el.checked); renderTrips(); renderReport(); }");
     expect(SOURCE).toContain("el.dataset.copyAction === 'toggle-code' && preview) { syncSelectAll(); renderTrips(); renderReport(); }");

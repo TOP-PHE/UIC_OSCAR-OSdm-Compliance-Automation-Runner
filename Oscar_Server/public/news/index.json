@@ -8,6 +8,14 @@
     "content": "An AI service your company chooses will read the results of a batch, or compare two batches, and say what failed and why. Results then leave OSCAR, so access is given in three steps: an OSCAR administrator enables it for the company; a Test Manager reads and accepts the commitment text on the new AI Analysis page (data, permission to share, the AI service's terms, costs, an analysis is an opinion, everything is recorded); an administrator approves the request. This release opens the access; configuring your company's AI and the analysis itself come next."
   },
   {
+    "id": "2026-10-17-copy-tick-all",
+    "date": "October 17, 2026",
+    "tag": "Fix",
+    "title": "Copy scenarios: Tick all works again",
+    "summary": "Copying with Tick all failed with 'Scenario on is not in the source.'",
+    "content": "In Copy scenarios, ticking 'Tick all that can be copied' and pressing Copy failed with 'Scenario on is not in the source.' There was no such scenario: the page sent the Tick all box itself as a scenario code. It now sends the ticked scenarios only."
+  },
+  {
     "id": "2026-10-17-catalogue-journeys",
     "date": "October 17, 2026",
     "tag": "Fix",
