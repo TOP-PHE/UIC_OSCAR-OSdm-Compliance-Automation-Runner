@@ -27,24 +27,23 @@ const log = require('../utils/logger').child({ module: 'ai-connector' });
 const TIMEOUT_MS = 30000;
 const MAX_ANSWER_BYTES = 256 * 1024;
 
-// Read at most `limit` bytes of the body; more is an error, not a cut.
-function readCapped(res, limit) {
-  if (!res.body) return Promise.resolve('');
+// Read at most `limit` bytes of the body; more is an error, not a cut. One
+// chunk per step, by recursion: the body is read as it arrives.
+async function readCapped(res, limit) {
+  if (!res.body) return '';
   const reader = res.body.getReader();
   const chunks = [];
-  let size = 0;
-  const next = () => reader.read().then(({ done, value }) => {
+  const step = async (size) => {
+    const { done, value } = await reader.read();
     if (done) return Buffer.concat(chunks).toString('utf8');
-    size += value.byteLength;
-    if (size > limit) {
-      return reader.cancel().catch(() => {}).then(() => {
-        throw Object.assign(new Error('answer too large'), { code: 'AI_ANSWER_TOO_LARGE' });
-      });
+    if (size + value.byteLength > limit) {
+      await reader.cancel().catch(() => {});
+      throw Object.assign(new Error('answer too large'), { code: 'AI_ANSWER_TOO_LARGE' });
     }
     chunks.push(Buffer.from(value));
-    return next();
-  });
-  return next();
+    return step(size + value.byteLength);
+  };
+  return step(0);
 }
 
 function hostOf(url) {
