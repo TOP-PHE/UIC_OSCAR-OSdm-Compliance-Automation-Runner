@@ -6204,45 +6204,116 @@ function journeySetLeg(jidx, li, value) {
   reRenderJourneyBody(jidx);
 }
 
-// #813: the answer of POST /test-resources/:id/probe-journey, as HTML. Every
-// text comes from the provider or Test Data: always through esc().
+// #813: how each outcome of a probed day is shown.
 const PROBE_OUTCOMES = {
   found: { icon: '✅', text: 'offered as defined', color: '#2e7d32' },
   differences: { icon: '⚠️', text: 'a close trip differs', color: '#ef6c00' },
   notFound: { icon: '❌', text: 'not offered', color: '#c62828' },
 };
 
-function journeyProbeHtml(result) {
+// One day of a probe: its outcome and what differs.
+function journeyProbeDayHtml(d) {
+  const o = PROBE_OUTCOMES[d.outcome];
+  const head = o
+    ? `<span style="color:${o.color};font-weight:600">${o.icon} ${esc(d.date)}: ${esc(o.text)}</span> <span style="color:#78909c">(${esc(d.via)}, ${esc(d.trips)} trip(s))</span>`
+    : `<span style="color:#c62828;font-weight:600">⛔ ${esc(d.date)}: no answer</span> <span style="color:#78909c">(${esc([d.via, d.error].filter(Boolean).join(', '))})</span>`;
+  const diffs = (d.differences || []).map((x) => `<li>${esc(x)}</li>`).join('');
+  const extra = diffs ? `<ul style="margin:2px 0 2px 18px">${diffs}</ul>` : '';
+  return `<div style="margin-top:4px">${head}${extra}</div>`;
+}
+
+// #815: a trip the provider offers, with the button that keeps it.
+function offeredTripHtml(t, key, i) {
+  const mark = t.asDefined ? ' <span style="color:#2e7d32">(as defined)</span>' : '';
+  return `<li style="margin:3px 0"><code>${esc(t.text)}</code>${mark}
+    <span style="color:#78909c">· ${esc((t.days || []).join(' '))}</span>
+    <button class="btn btn-sm btn-secondary" data-action="probe-keep-trip" data-key="${esc(key)}" data-idx="${esc(i)}" title="Store its legs as train services and make a journey of them" style="font-size:11px;padding:1px 7px;margin-left:6px">➕ Use this trip</button></li>`;
+}
+
+// #813: the answer of a journey probe, as HTML. Every text comes from the
+// provider or Test Data: always through esc(). `key` names the stored answer
+// (probeResults) the "Use this trip" buttons read.
+function journeyProbeHtml(result, key) {
   const days = Array.isArray(result?.days) ? result.days : [];
-  const rows = days.map((d) => {
-    const o = PROBE_OUTCOMES[d.outcome];
-    const head = o
-      ? `<span style="color:${o.color};font-weight:600">${o.icon} ${esc(d.date)}: ${esc(o.text)}</span> <span style="color:#78909c">(${esc(d.via)}, ${esc(d.trips)} trip(s))</span>`
-      : `<span style="color:#c62828;font-weight:600">⛔ ${esc(d.date)}: no answer</span> <span style="color:#78909c">(${esc([d.via, d.error].filter(Boolean).join(', '))})</span>`;
-    const diffs = (d.differences || []).map((x) => `<li>${esc(x)}</li>`).join('');
-    const offered = (d.offered || []).map((x) => `<li><code>${esc(x)}</code></li>`).join('');
-    let extra = '';
-    if (diffs) extra += `<ul style="margin:2px 0 2px 18px">${diffs}</ul>`;
-    if (offered && d.outcome !== 'found') extra += `<div style="color:#546e7a;margin-left:18px">Offered instead:</div><ul style="margin:2px 0 2px 36px">${offered}</ul>`;
-    return `<div style="margin-top:4px">${head}${extra}</div>`;
-  }).join('');
+  const trips = Array.isArray(result?.offeredTrips) ? result.offeredTrips : [];
+  const offered = trips.length
+    ? `<div style="color:#546e7a;margin-top:6px">Trips the provider offers (days seen):</div><ul style="margin:2px 0 2px 18px">${trips.map((t, i) => offeredTripHtml(t, key, i)).join('')}</ul>`
+    : '';
   return `<div style="margin:4px 0 8px;padding:8px 12px;background:#f5f9fc;border:1px solid #cfd8dc;border-radius:6px;font-size:12.5px;line-height:1.5">
-    <div style="font-weight:700">🔎 ${esc(result?.summary || '')}</div>${rows}
-    <div style="color:#78909c;margin-top:4px">Nothing was changed in Test Data.</div>
+    <div style="font-weight:700">🔎 ${esc(result?.summary || '')}</div>${days.map(journeyProbeDayHtml).join('')}${offered}
+    <div style="color:#78909c;margin-top:4px">Nothing is changed in Test Data until you use a trip.</div>
   </div>`;
+}
+
+// #815: probe answers by key ('j<index>' for a journey, 'f<index>' for a
+// result of Find journeys), for the "Use this trip" buttons.
+const probeResults = {};
+
+// #813/#815: ask for a probe and draw its answer in `box`.
+async function runJourneyProbe(box, key, url, body) {
+  box.innerHTML = '<div style="margin:4px 0 8px;font-size:12.5px;color:#546e7a">🔎 Asking the provider… (up to 3 searches, one after the other)</div>';
+  const init = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { method: 'POST' };
+  const res = await fetch(url, init);
+  const answer = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    box.innerHTML = `<div style="margin:4px 0 8px;font-size:12.5px;color:#c62828">⛔ ${esc(answer.detail || answer.title || ('HTTP ' + res.status))}</div>`;
+    return;
+  }
+  probeResults[key] = answer;
+  box.innerHTML = journeyProbeHtml(answer, key);
 }
 
 async function wizProbeJourney(jidx, id) {
   const box = document.getElementById('journey-probe-' + jidx);
   if (!box || !id) return;
-  box.innerHTML = '<div style="margin:4px 0 8px;font-size:12.5px;color:#546e7a">🔎 Asking the provider… (up to 3 searches, one after the other)</div>';
-  const res = await fetch(`/v1/company/test-resources/${encodeURIComponent(id)}/probe-journey`, { method: 'POST' });
+  await runJourneyProbe(box, 'j' + jidx, `/v1/company/test-resources/${encodeURIComponent(id)}/probe-journey`);
+}
+
+// #815: probe a result of Find journeys, before it is made a journey.
+async function journeyFinderProbe(idx) {
+  const j = journeyFinderResults[idx];
+  const box = document.getElementById('jf-probe-' + idx);
+  if (!j || !box) return;
+  await runJourneyProbe(box, 'f' + idx, '/v1/company/test-resources/probe-journey', { legs: j.legs });
+}
+
+// #815: keep a trip a probe listed: its legs become train services and a
+// journey is made of them, then Test Data is read again.
+async function keepProbedTrip(key, idx) {
+  const trip = probeResults[key]?.offeredTrips?.[idx];
+  if (!trip) return;
+  const res = await fetch('/v1/company/test-resources/journey-from-trip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ legs: trip.legs, days: trip.days }),
+  });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    box.innerHTML = `<div style="margin:4px 0 8px;font-size:12.5px;color:#c62828">⛔ ${esc(body.detail || body.title || ('HTTP ' + res.status))}</div>`;
+    oscarToast(`Could not use this trip: ${body.detail || body.title || res.status}`, 'error');
     return;
   }
-  box.innerHTML = journeyProbeHtml(body);
+  const trains = (body.trainsCreated || []).length;
+  const withTrains = trains ? ', with ' + trains + ' new train set(s)' : '';
+  oscarToast(body.created
+    ? `Journey "${body.journey.label}" made${withTrains}.`
+    : `This trip is already the journey "${body.journey.label}".`, 'success');
+  if (key.startsWith('f')) closeJourneyFinder();
+  await refreshAllSections();
+  showJourneyInTestData(body.journey.id);
+}
+
+// Open Test Data on the journey `id`: the section is drawn closed.
+function showJourneyInTestData(id) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const jidx = journeys.findIndex(j => j.id === id);
+  renderWizardStep2InSection();
+  const row = document.querySelector(`[data-action="toggle-journey-detail"][data-jidx="${jidx}"]`);
+  const section = row?.closest('.fw-section-body');
+  if (section) {
+    section.classList.add('open');
+    section.previousElementSibling?.classList.add('open');
+  }
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function wizSaveJourney(jidx) {
@@ -6407,9 +6478,11 @@ function journeyFinderResultHtml(j, i) {
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
       <b style="font-size:12.5px;color:#263238">${esc(journeyFinderClock(j.departureTime))} → ${esc(journeyFinderClock(j.arrivalTime))}</b>
       <span style="font-size:11px;color:#78909c">${esc(j.durationMinutes)} min · ${esc(j.legs.length)} legs · transfer ${esc(waits)} · ${esc(days)}</span>
-      <button class="btn btn-secondary btn-sm" data-action="jf-create" data-idx="${esc(i)}" style="margin-left:auto">➕ Create journey</button>
+      <button class="btn btn-secondary btn-sm" data-action="jf-probe" data-idx="${esc(i)}" title="Ask the provider whether it offers this journey (trip search, next 3 operating days)" style="margin-left:auto">🔎 Probe</button>
+      <button class="btn btn-secondary btn-sm" data-action="jf-create" data-idx="${esc(i)}">➕ Create journey</button>
     </div>
     ${j.steps.map(journeyFinderStepHtml).join('')}
+    <div id="jf-probe-${esc(i)}"></div>
   </div>`;
 }
 
@@ -8095,6 +8168,10 @@ document.body.addEventListener('click', function(e) {
       runJourneyFinder(); break;
     case 'jf-close':
       closeJourneyFinder(); break;
+    case 'jf-probe':
+      journeyFinderProbe(Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); break;
+    case 'probe-keep-trip':
+      e.stopPropagation(); keepProbedTrip(el.dataset.key, Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); break;
     case 'jf-create':
       journeyFinderCreate(Number.parseInt(el.dataset.idx, 10)); break;
     case 'wiz-duplicate-journey':

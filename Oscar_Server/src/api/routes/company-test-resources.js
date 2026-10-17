@@ -25,8 +25,8 @@ const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = requi
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
-const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe, serviceFindings, servicesUnseen, dayOfWeekCode } = require('../../services/timetable-discovery');
-const { journeyPlan, probeDates, compareAnswer, probeSummary } = require('../../services/journeyProbe');
+const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, fitsOneTripDate, searchDates, classifyOfferProbe, summarizeOfferProbe, serviceFindings, servicesUnseen, dayOfWeekCode } = require('../../services/timetable-discovery');
+const { journeyPlan, probeDates, compareAnswer, probeSummary, collectOfferedTrips, tripToKeep } = require('../../services/journeyProbe');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
@@ -658,6 +658,37 @@ async function _probeJourneyDay({ company, token, extraHeaders }, plan, date, st
   return last;
 }
 
+// Test Data entries of a company, decrypted: [{ id, resource_type, label, data }].
+function _resourcesOf(companyId, type) {
+  return all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [companyId, type]).map((r) => {
+    let data = {};
+    try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
+    return { id: r.id, resource_type: r.resource_type, label: r.label, data };
+  });
+}
+
+// #813: probe `journey` (its legs name `trains`) and answer the request.
+async function _probeJourney(req, res, companyId, journey, trains) {
+  const plan = journeyPlan(journey, trains);
+  const refuse = (detail) => res.status(400).json({ status: 400, title: 'Bad Request', detail });
+  if (plan.legs.length === 0) return refuse('This journey has no leg whose train set is in Test Data.');
+  if (plan.missingLegs > 0) return refuse(`${plan.missingLegs} leg(s) of this journey name a train set that is no longer in Test Data.`);
+  if (!plan.legs[0].origin || !plan.legs.at(-1).destination) return refuse('The journey has no first stop place or no last stop place.');
+  const dates = probeDates(plan.days, new Date());
+  if (dates.length === 0) return refuse('The trains of this journey have no operating day in common.');
+
+  const session = await _vendorSession(req, res, companyId);
+  if (!session) return;
+
+  // One day after the other: a provider's gateway may block a burst (#646).
+  const state = { endpoint: null };
+  const days = [];
+  await inSequence(dates, async (date) => { days.push(await _probeJourneyDay(session, plan, date, state)); });
+  const offeredTrips = collectOfferedTrips(days);
+  log.info({ companyId, journey: journey.id || null, days: days.map(d => d.outcome || d.error) }, 'Journey probed');
+  return res.json({ journey: { id: journey.id || null, label: journey.label || '' }, legs: plan.legs, days, offeredTrips, summary: probeSummary(days) });
+}
+
 // ── POST /v1/company/test-resources/:id/probe-journey (#813) ──────────────────
 // Does the provider offer this Test Data journey? Its trips are searched from
 // the first stop place to the last, at the first departure, on the next days
@@ -667,37 +698,73 @@ router.post('/test-resources/:id/probe-journey', async (req, res) => {
   if (!requireTestManager(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
+  const journey = _resourcesOf(targetCompanyId, 'JOURNEY').find((j) => j.id === req.params.id);
+  if (!journey) return res.status(404).json({ status: 404, title: 'Not Found' });
+  return _probeJourney(req, res, targetCompanyId, journey, _resourcesOf(targetCompanyId, 'TRAIN'));
+});
 
-  const decoded = (r) => {
-    let data = {};
-    try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
-    return { id: r.id, resource_type: r.resource_type, label: r.label, data };
-  };
-  const row = get('SELECT * FROM test_resources WHERE id = ? AND company_id = ? AND resource_type = ?',
-                  [req.params.id, targetCompanyId, 'JOURNEY']);
-  if (!row) return res.status(404).json({ status: 404, title: 'Not Found' });
-  const journey = decoded(row);
-  const trains = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN']).map(decoded);
+// ── POST /v1/company/test-resources/probe-journey (#815) ──────────────────────
+// The same, for a journey not saved yet: a result of Find journeys, whose
+// legs ({ trainResourceId, serviceIndex }) name saved train sets.
+router.post('/test-resources/probe-journey', async (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+  const raw = req.body?.legs;
+  const legOk = (l) => l && typeof l.trainResourceId === 'string' && Number.isInteger(l.serviceIndex) && l.serviceIndex >= 0;
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 5 || !raw.every(legOk)) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'legs must hold 1 to 5 { trainResourceId, serviceIndex }.' });
+  }
+  const journey = { id: null, label: '', data: { legs: raw.map((l) => ({ trainResourceId: l.trainResourceId, serviceIndex: l.serviceIndex })) } };
+  return _probeJourney(req, res, targetCompanyId, journey, _resourcesOf(targetCompanyId, 'TRAIN'));
+});
 
-  const plan = journeyPlan(journey, trains);
-  const refuse = (detail) => res.status(400).json({ status: 400, title: 'Bad Request', detail });
-  if (plan.legs.length === 0) return refuse('This journey has no leg whose train set is in Test Data.');
-  if (plan.missingLegs > 0) return refuse(`${plan.missingLegs} leg(s) of this journey name a train set that is no longer in Test Data.`);
-  if (!plan.legs[0].origin || !plan.legs.at(-1).destination) return refuse('The journey has no first stop place or no last stop place.');
-  const dates = probeDates(plan.days, new Date());
-  if (dates.length === 0) return refuse('The trains of this journey have no operating day in common.');
+// ── POST /v1/company/test-resources/journey-from-trip (#815) ──────────────────
+// Keep a trip a probe listed: its legs are stored as train services the way
+// Discover timetable stores them (manual edits kept), on the weekdays the
+// probe saw it, and a journey is made of them. A journey with the same legs
+// is named, not made twice.
+router.post('/test-resources/journey-from-trip', (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+  const trip = tripToKeep(req.body);
+  if (trip.error) return res.status(400).json({ status: 400, title: 'Bad Request', detail: trip.error });
+  // Checked before anything is written.
+  if (!fitsOneTripDate(trip.legs)) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'These legs do not make one journey on one trip date: a leg leaves before the previous one arrives.' });
+  }
 
-  const session = await _vendorSession(req, res, targetCompanyId);
-  if (!session) return;
+  const { toCreate, toUpdate } = groupAndMerge(trip.records, _resourcesOf(targetCompanyId, 'TRAIN'), {});
+  const trainsCreated = toCreate.map((c) => {
+    const id = uuidv4();
+    run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', ?, ?)`,
+      [id, targetCompanyId, c.label, colEncrypt(JSON.stringify(c.data))]);
+    return { id, label: c.label };
+  });
+  const trainsUpdated = toUpdate.map((u) => {
+    run(`UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
+      [colEncrypt(JSON.stringify(u.data)), u.id, targetCompanyId]);
+    return { id: u.id, label: u.label };
+  });
 
-  // One day after the other: a provider's gateway may block a burst (#646).
-  const state = { endpoint: null };
-  const days = [];
-  await dates.reduce((previous, date) => previous.then(async () => {
-    days.push(await _probeJourneyDay(session, plan, date, state));
-  }), Promise.resolve());
-  log.info({ companyId: targetCompanyId, journey: journey.id, days: days.map(d => d.outcome || d.error) }, 'Journey probed');
-  return res.json({ journey: { id: journey.id, label: journey.label }, legs: plan.legs, days, summary: probeSummary(days) });
+  // The journey, from the records of the first weekday seen.
+  const firstDay = trip.records.filter((r) => r.dayOfWeek === trip.days[0]);
+  const { toCreate: made } = journeysFromConnections([firstDay], _resourcesOf(targetCompanyId, 'TRAIN'), []);
+  if (made.length === 0) {
+    // Not expected: the trains were just stored with these services.
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The journey could not be made from the train services stored.', trainsCreated, trainsUpdated });
+  }
+  const legsKey = (legs) => legs.map((l) => `${l.trainResourceId}#${l.serviceIndex}`).join('>');
+  const same = _resourcesOf(targetCompanyId, 'JOURNEY').find((j) => Array.isArray(j.data.legs) && legsKey(j.data.legs) === legsKey(made[0].data.legs));
+  if (same) {
+    return res.json({ journey: { id: same.id, label: same.label }, created: false, trainsCreated, trainsUpdated });
+  }
+  const id = uuidv4();
+  run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'JOURNEY', ?, ?)`,
+    [id, targetCompanyId, made[0].label, colEncrypt(JSON.stringify(made[0].data))]);
+  log.info({ companyId: targetCompanyId, journey: id, trainsCreated: trainsCreated.length, trainsUpdated: trainsUpdated.length }, 'Journey kept from a probe');
+  return res.status(201).json({ journey: { id, label: made[0].label }, created: true, trainsCreated, trainsUpdated });
 });
 
 module.exports = router;

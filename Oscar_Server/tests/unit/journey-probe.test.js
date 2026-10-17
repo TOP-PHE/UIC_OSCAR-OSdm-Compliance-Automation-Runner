@@ -9,7 +9,7 @@
 
 // #813: does the provider offer a Test Data journey? The pure part.
 
-const { journeyPlan, probeDates, compareAnswer, probeSummary, clock } = require('../../src/services/journeyProbe');
+const { journeyPlan, probeDates, compareAnswer, probeSummary, collectOfferedTrips, tripToKeep, clock } = require('../../src/services/journeyProbe');
 
 const A = 'urn:uic:stn:5454212';
 const B = 'urn:uic:stn:5454300';
@@ -23,10 +23,11 @@ const trains = [
 const journey = { id: 'j1', resource_type: 'JOURNEY', data: { legs: [{ trainResourceId: 't1', serviceIndex: 0 }, { trainResourceId: 't2', serviceIndex: 0 }] } };
 
 // A provider's trip, legs as [origin, destination, number, dep, arr].
-const trip = (...legs) => ({ legs: legs.map(([o, d, n, dep, arr]) => ({ timedLeg: {
-  start: { stopPlaceRef: o, serviceDeparture: { timetabledTime: `2026-10-20T${dep}:00+02:00` } },
-  end: { stopPlaceRef: d, serviceArrival: { timetabledTime: `2026-10-20T${arr}:00+02:00` } },
+const tripOn = (date, ...legs) => ({ legs: legs.map(([o, d, n, dep, arr]) => ({ timedLeg: {
+  start: { stopPlaceRef: o, serviceDeparture: { timetabledTime: `${date}T${dep}:00+02:00` } },
+  end: { stopPlaceRef: d, serviceArrival: { timetabledTime: `${date}T${arr}:00+02:00` } },
   service: { vehicleNumbers: [n] } } })) });
+const trip = (...legs) => tripOn('2026-10-20', ...legs);
 
 describe('journeyPlan', () => {
   test('legs from Test Data, times to the minute, days all trains run', () => {
@@ -82,7 +83,8 @@ describe('compareAnswer', () => {
 
   test('notFound: no trip with as many legs, or none at all', () => {
     const r = compareAnswer(legs, { trips: [trip([A, C, '99', '04:00', '07:00'])] });
-    expect(r).toEqual({ outcome: 'notFound', differences: [], offered: ['5454212 → 5400014 (99, 04:00–07:00)'], trips: 1 });
+    expect(r).toMatchObject({ outcome: 'notFound', differences: [], offered: ['5454212 → 5400014 (99, 04:00–07:00)'], trips: 1 });
+    expect(r.candidates).toHaveLength(1);
     expect(compareAnswer(legs, {}).outcome).toBe('notFound');
     expect(compareAnswer(legs, null).trips).toBe(0);
   });
@@ -106,5 +108,56 @@ describe('probeSummary and clock', () => {
     expect(clock('04:05:00+02:00')).toBe('04:05');
     expect(clock('2026-10-20T23:59:00Z')).toBe('23:59');
     expect(clock('')).toBe('');
+  });
+});
+
+describe('collectOfferedTrips (#815)', () => {
+  const legs = journeyPlan(journey, trains).legs;
+  const other = (date) => tripOn(date, [A, B, '1061', '04:05', '04:38'], [B, C, 'R 11', '05:20', '06:10']);
+  const day = (date, answer) => ({ date, ...compareAnswer(legs, answer) });
+
+  test('each trip once, with the weekdays and dates it was offered; candidates taken out', () => {
+    const days = [
+      day('2026-10-20', { trips: [other('2026-10-20')] }),
+      day('2026-10-21', { trips: [other('2026-10-21'), trip([A, C, '99', '04:00', '07:00'])] }),
+      { date: '2026-10-22', error: 'HTTP 500' },
+    ];
+    const offered = collectOfferedTrips(days);
+    expect(days.every((d) => !('candidates' in d))).toBe(true);
+    expect(offered).toHaveLength(2);
+    expect(offered[0]).toMatchObject({ text: '5454212 → 5454300 (1061, 04:05–04:38) · 5454300 → 5400014 (R 11, 05:20–06:10)', days: ['TUE', 'WED'], dates: ['2026-10-20', '2026-10-21'], asDefined: false });
+    expect(offered[0].legs[1]).toMatchObject({ originURN: B, destinationURN: C, vehicleNumber: 'R 11', departureTime: '05:20:00+02:00' });
+    expect(offered[0].legs[0]).not.toHaveProperty('dayOfWeek');
+  });
+
+  test('a trip as defined is marked', () => {
+    const offered = collectOfferedTrips([day('2026-10-20', { trips: [trip([A, B, '1061', '04:05', '04:38'], [B, C, 'R 9', '05:00', '06:10'])] })]);
+    expect(offered[0].asDefined).toBe(true);
+  });
+});
+
+describe('tripToKeep (#815)', () => {
+  const leg = { originURN: A, destinationURN: B, vehicleNumber: '1061', departureTime: '04:05:00', arrivalTime: '04:38:00' };
+
+  test('one record per leg and weekday, in weekday order, unknown days dropped', () => {
+    const r = tripToKeep({ legs: [leg, { ...leg, originURN: B, destinationURN: C, departureTime: '05:00', arrivalTime: '06:00' }], days: ['WED', 'MON', 'XYZ'] });
+    expect(r.days).toEqual(['MON', 'WED']);
+    expect(r.records).toHaveLength(4);
+    expect(r.records[0]).toMatchObject({ ...leg, dayOfWeek: 'MON', operatorCode: '' });
+  });
+
+  test.each([
+    [{ legs: [], days: ['MON'] }, /1 to 5 legs/],
+    [{ legs: [leg, leg, leg, leg, leg, leg], days: ['MON'] }, /1 to 5 legs/],
+    [{ legs: [leg], days: [] }, /at least one weekday/],
+    [{ legs: ['x'], days: ['MON'] }, /not an object/],
+    [{ legs: [{ ...leg, vehicleNumber: 7 }], days: ['MON'] }, /vehicleNumber is not text/],
+    [{ legs: [{ ...leg, originName: 'x'.repeat(201) }], days: ['MON'] }, /longer than 200/],
+    [{ legs: [{ ...leg, originName: '{{access_token}}' }], days: ['MON'] }, /holds "\{\{"/],
+    [{ legs: [{ ...leg, originURN: '' }], days: ['MON'] }, /no stop place/],
+    [{ legs: [{ ...leg, arrivalTime: 'soon' }], days: ['MON'] }, /no departure or arrival time/],
+    [null, /1 to 5 legs/],
+  ])('refuses %#', (body, message) => {
+    expect(tripToKeep(body).error).toMatch(message);
   });
 });

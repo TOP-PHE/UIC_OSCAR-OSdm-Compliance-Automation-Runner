@@ -220,7 +220,8 @@ function _journeyLabel(legs) {
   const name = (n, urn) => n || _stopShort(urn);
   // A change of train: the next leg's start, else the previous leg's end.
   const via = legs.slice(1).map((l, i) => name(l.originName || legs[i].destName, l.originURN)).join(', ');
-  return `${name(first.originName, first.originURN)} → ${name(last.destName, last.destinationURN)} via ${via} (${String(first.departureTime).slice(0, 5)})`;
+  const through = via ? ` via ${via}` : '';   // #815: a direct trip has no change
+  return `${name(first.originName, first.originURN)} → ${name(last.destName, last.destinationURN)}${through} (${String(first.departureTime).slice(0, 5)})`;
 }
 
 /**
@@ -797,6 +798,7 @@ module.exports = {
   tripLegRecords,
   harvestConnections,
   journeysFromConnections,
+  fitsOneTripDate: _fitsOneTripDate,
   calendarFromHarvest,
   harvestOfferCatalog,
   routeKey,

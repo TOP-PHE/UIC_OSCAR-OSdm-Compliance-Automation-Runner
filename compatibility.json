@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.358",
+  "current_release": "2026.359",
   "releases": [
+    {
+      "release": "2026.359",
+      "date": "2026-10-17",
+      "server": "1.11.324",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "A trip the journey probe finds can be kept: its legs become train services and a journey is made of them (#815). Find journeys results can be probed before they are made journeys."
+      ]
+    },
     {
       "release": "2026.358",
       "date": "2026-10-17",

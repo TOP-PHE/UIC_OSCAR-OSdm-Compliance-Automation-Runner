@@ -1709,6 +1709,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   closest trip of as many legs and what differs, or not found with what is
   offered. Writes nothing; the page shows it under the row
   (`journeyProbeHtml()`, escaped). A journey whose train set is gone is a 400.
+  **A trip it finds can be kept** (#815, 1.11.324): the answer's
+  `offeredTrips` (`collectOfferedTrips()`: each trip once, weekdays seen),
+  and `POST /test-resources/journey-from-trip` stores the legs with
+  Discover's `groupAndMerge` then `journeysFromConnections`; the trip date
+  check (`fitsOneTripDate`) runs before any write. `POST
+  /test-resources/probe-journey` probes legs not saved as a journey (Find
+  journeys). The page keeps answers in `probeResults` by key (`j<n>` /
+  `f<n>`).
 - **A run goes on a day its trip's trains run** (#717, 1.11.273 /
   OTST_V2.0.153). Trips keep no calendar, so the server matches each trip
   requirement against the TRAIN resources when it serves the run's copy

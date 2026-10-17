@@ -133,3 +133,94 @@ test('a provider that answers no search: each day says why', async () => {
     expect(res.body.summary).toMatch(/answered no search/);
   });
 });
+
+// ── #815 ──────────────────────────────────────────────────────────────────────
+const { all, colDecrypt } = require('../../src/db/db');
+const tm = () => token('test_manager', tmId);
+
+test('#815: the trips offered over the days, each once, ready to keep', async () => {
+  await withProvider((url, body) => {
+    const date = body.departureTime.slice(0, 10);
+    const trips = [{ legs: [leg(A, B, 'IC 1', '08:00', '09:00', date), leg(B, C, 'RE 4', '09:45', '10:30', date)] }];
+    return { ok: true, status: 200, text: async () => JSON.stringify({ trips }) };
+  }, async () => {
+    const res = await probe();
+    expect(res.body.offeredTrips).toHaveLength(1);
+    const t = res.body.offeredTrips[0];
+    expect(t.dates).toHaveLength(3);
+    expect(t.days).toHaveLength(3);
+    expect(t.legs.map(l => l.vehicleNumber)).toEqual(['IC 1', 'RE 4']);
+    expect(res.body.days.every(d => !('candidates' in d))).toBe(true);
+  });
+});
+
+test('#815: a result of Find journeys is probed by its legs', async () => {
+  const bad = await request(app).post('/v1/company/test-resources/probe-journey').set('Authorization', tm()).send({ legs: [{ trainResourceId: t1, serviceIndex: -1 }] });
+  expect(bad.status).toBe(400);
+  expect((await request(app).post('/v1/company/test-resources/probe-journey').set('Authorization', token('company_user', testerId)).send({ legs: [] })).status).toBe(403);
+  await withProvider((url, body) => {
+    const date = body.departureTime.slice(0, 10);
+    return { ok: true, status: 200, text: async () => JSON.stringify({ trips: [{ legs: [leg(A, B, 'IC 1', '08:00', '09:00', date), leg(B, C, 'RE 2', '09:15', '10:00', date)] }] }) };
+  }, async (calls) => {
+    const res = await request(app).post('/v1/company/test-resources/probe-journey').set('Authorization', tm())
+      .send({ legs: [{ trainResourceId: t1, serviceIndex: 0 }, { trainResourceId: t2, serviceIndex: 0 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.journey.id).toBeNull();
+    expect(res.body.summary).toBe('Offered on every day searched (3).');
+    expect(calls[0].body.destination.stopPlaceRef).toBe(C);
+  });
+  const gone = await request(app).post('/v1/company/test-resources/probe-journey').set('Authorization', tm()).send({ legs: [{ trainResourceId: 'gone', serviceIndex: 0 }] });
+  expect(gone.status).toBe(400);
+});
+
+describe('#815: journey-from-trip', () => {
+  const D = 'urn:uic:stn:8000009';
+  const kept = { legs: [
+    { originURN: A, destinationURN: B, vehicleNumber: 'IC 1', departureTime: '08:00:00', arrivalTime: '09:00:00' },
+    { originURN: B, destinationURN: D, originName: 'Bee', destName: 'Dee', vehicleNumber: 'S 7', departureTime: '09:20:00', arrivalTime: '09:50:00' },
+  ], days: ['MON', 'TUE'] };
+  const keep = (body, auth = tm()) => request(app).post('/v1/company/test-resources/journey-from-trip').set('Authorization', auth).send(body);
+  const trainsOf = () => all(`SELECT * FROM test_resources WHERE company_id = ? AND resource_type = 'TRAIN'`, [companyId])
+    .map(r => ({ id: r.id, data: JSON.parse(colDecrypt(r.data)) }));
+
+  test('403 for a tester, 400 for a trip that is not one', async () => {
+    expect((await keep(kept, token('company_user', testerId))).status).toBe(403);
+    expect((await keep({ legs: [], days: ['MON'] })).status).toBe(400);
+    const count = () => get('SELECT COUNT(*) AS n FROM test_resources WHERE company_id = ?', [companyId]).n;
+    const before = count();
+    const t1Before = get('SELECT data FROM test_resources WHERE id = ?', [t1]).data;
+    const night = await keep({ legs: [kept.legs[0], { ...kept.legs[1], departureTime: '07:00:00', arrivalTime: '07:30:00' }], days: ['MON'] });
+    expect(night.status).toBe(400);
+    expect(night.body.detail).toMatch(/one trip date/);
+    // Nothing written.
+    expect(count()).toBe(before);
+    expect(get('SELECT data FROM test_resources WHERE id = ?', [t1]).data).toBe(t1Before);
+  });
+
+  test('the legs become train services, the journey points at them; asked twice, made once', async () => {
+    const before = trainsOf().length;
+    const res = await keep(kept);
+    expect(res.status).toBe(201);
+    expect(res.body.created).toBe(true);
+    expect(res.body.journey.label).toBe('8000001 → Dee via Bee (08:00)');
+    // A → B already has IC 1 (no calendar): it gets the days; B → D is new.
+    expect(res.body.trainsCreated).toHaveLength(1);
+    expect(res.body.trainsUpdated.map(t => t.id)).toEqual([t1]);
+    expect(trainsOf().length).toBe(before + 1);
+    const newSet = trainsOf().find(t => t.data.destinationURN === D);
+    expect(newSet.data.daysOfWeek).toEqual(['MON', 'TUE']);
+    expect(newSet.data.services).toEqual([{ vehicleNumber: 'S 7', departureTime: '09:20:00', arrivalTime: '09:50:00' }]);
+    const stored = JSON.parse(colDecrypt(get('SELECT data FROM test_resources WHERE id = ?', [res.body.journey.id]).data));
+    expect(stored.legs).toEqual([{ trainResourceId: t1, serviceIndex: 0 }, { trainResourceId: newSet.id, serviceIndex: 0 }]);
+
+    const again = await keep(kept);
+    expect(again.status).toBe(200);
+    expect(again.body).toMatchObject({ created: false, journey: { id: res.body.journey.id }, trainsCreated: [] });
+  });
+
+  test('a direct trip makes a one-leg journey named without "via"', async () => {
+    const res = await keep({ legs: [{ originURN: A, destinationURN: C, vehicleNumber: 'EC 5', departureTime: '11:00:00', arrivalTime: '13:00:00' }], days: ['SAT'] });
+    expect(res.status).toBe(201);
+    expect(res.body.journey.label).toBe('8000001 → 8000003 (11:00)');
+  });
+});
