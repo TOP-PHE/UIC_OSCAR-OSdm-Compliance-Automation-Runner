@@ -504,17 +504,10 @@ router.patch('/companies/:id', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The platform root company cannot be modified.' });
   }
   const { name, slug, ai_analysis_enabled: aiEnabled } = req.body || {};
-  const updates = [];
-  const values = [];
-  if (name) { updates.push('name = ?'); values.push(name); }
   const ai = aiSwitch(company, aiEnabled);
-  if (ai.invalid) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'ai_analysis_enabled must be true or false.' });
-  }
-  if (ai.change) { updates.push('ai_analysis_enabled = ?'); values.push(aiEnabled ? 1 : 0); }
-  const newSlug = slug ? freeSlug(slug, companyId) : null;
-  if (newSlug === false) return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Company slug already in use.' });
-  if (newSlug) { updates.push('slug = ?'); values.push(newSlug); }
+  const plan = companyUpdates(companyId, name, slug, ai, aiEnabled);
+  if (plan.refusal) return res.status(plan.refusal.status).json(plan.refusal);
+  const { updates, values } = plan;
   if (updates.length === 0) {
     // Sending the switch as it already is changes nothing, and is not an error.
     if (ai.applies) return res.json({ company: companyRow(companyId) });
@@ -525,6 +518,19 @@ router.patch('/companies/:id', (req, res) => {
   if (ai.change) auditLog(req.user.id, companyId, req.user.email, aiEnabled ? 'ai_analysis_enabled' : 'ai_analysis_disabled');
   return res.json({ company: companyRow(companyId) });
 });
+
+// The SET clauses of a company update, or the refusal to send.
+function companyUpdates(companyId, name, slug, ai, aiEnabled) {
+  if (ai.invalid) return { refusal: { status: 400, title: 'Bad Request', detail: 'ai_analysis_enabled must be true or false.' } };
+  const newSlug = slug ? freeSlug(slug, companyId) : null;
+  if (newSlug === false) return { refusal: { status: 409, title: 'Conflict', detail: 'Company slug already in use.' } };
+  const updates = [];
+  const values = [];
+  if (name) { updates.push('name = ?'); values.push(name); }
+  if (ai.change) { updates.push('ai_analysis_enabled = ?'); values.push(aiEnabled ? 1 : 0); }
+  if (newSlug) { updates.push('slug = ?'); values.push(newSlug); }
+  return { updates, values };
+}
 
 // The slug cleaned, or false when another company already uses it.
 function freeSlug(slug, companyId) {
