@@ -40,6 +40,15 @@ function requestFormHtml(c, label) {
     <button class="btn btn-primary" id="ai-request" data-ai-action="request" disabled>${esc(label)}</button>`);
 }
 
+// A refused or withdrawn request, with its reason, above a new one.
+function pastRequestHtml(r) {
+  if (r.state !== 'refused' && r.state !== 'revoked') return '';
+  const verdict = r.state === 'refused' ? 'refused' : 'withdrawn';
+  const reason = r.reason ? ': ' + esc(r.reason) : '';
+  return `<div style="${NOTE}${WARN}">Your last request was ${verdict}${reason}.
+            You may ask again.</div>`;
+}
+
 /** The page's body for a GET /ai-analysis/access answer. */
 function accessHtml(data) {
   const c = data.commitment || {};
@@ -58,13 +67,9 @@ function accessHtml(data) {
     case 'needs_acceptance':
       return `<div style="${NOTE}${WARN}">The commitment text has changed since you accepted it. Read it and accept
         it again to keep your access; no new approval is needed.</div>` + requestFormHtml(c, 'Accept the new text');
-    default: {
-      const past = r.state === 'refused' || r.state === 'revoked'
-        ? `<div style="${NOTE}${WARN}">Your last request was ${r.state === 'refused' ? 'refused' : 'withdrawn'}${r.reason ? `: ${esc(r.reason)}` : ''}.
-            You may ask again.</div>` : '';
-      return past + `<div style="${NOTE}${INFO}">The AI analysis sends test results to an AI service your company
+    default:
+      return pastRequestHtml(r) + `<div style="${NOTE}${INFO}">The AI analysis sends test results to an AI service your company
         chooses. Read what that means before you ask for access.</div>` + requestFormHtml(c, 'Ask for access');
-    }
   }
 }
 
@@ -73,7 +78,8 @@ let current = null;
 function show(message, kind) {
   const el = document.getElementById('msg');
   el.textContent = message || '';
-  el.className = message ? `msg ${kind === 'error' ? 'msg-err' : 'msg-ok'}` : 'msg';
+  const tone = kind === 'error' ? 'msg-err' : 'msg-ok';
+  el.className = message ? 'msg ' + tone : 'msg';
   el.style.display = message ? 'block' : 'none';
 }
 

@@ -93,6 +93,42 @@ function appUrl(req) {
   return (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
 }
 
+function alreadyAsked(state) {
+  return state === 'pending' ? 'Your request is already waiting for an administrator.' : 'You already have access.';
+}
+
+// The text accepted now: a new request waits for an administrator; a new
+// version accepted by an approved Test Manager keeps the decision.
+function saveAcceptance(existing, companyId, userId, reaccept) {
+  if (!existing) {
+    run(`INSERT INTO ai_access_request (id, company_id, user_id, state, text_version, text_hash)
+         VALUES (?, ?, ?, 'pending', ?, ?)`, [randomUUID(), companyId, userId, A.COMMITMENT.version, A.commitmentHash()]);
+    return;
+  }
+  const keep = reaccept ? 1 : 0;
+  run(`UPDATE ai_access_request
+         SET state = ?, text_version = ?, text_hash = ?, accepted_at = datetime('now'),
+             decided_by = CASE WHEN ? THEN decided_by ELSE NULL END,
+             decided_at = CASE WHEN ? THEN decided_at ELSE NULL END,
+             reason = NULL
+       WHERE id = ?`,
+  [reaccept ? 'approved' : 'pending', A.COMMITMENT.version, A.commitmentHash(), keep, keep, existing.id]);
+}
+
+// Fire-and-forget: the administrators' card is the reliable signal.
+function notifyAdministrators(req, company) {
+  const admins = all("SELECT email FROM users WHERE role = 'administrator' AND (status IS NULL OR status = 'active')").map(r => r.email);
+  if (!admins.length) return;
+  sendAiAccessNotice({
+    to: admins,
+    subject: `OSCAR — AI analysis access requested (${company.name})`,
+    heading: 'AI analysis access requested',
+    lines: [`${req.user.email} (${company.name}) asks for access to the AI analysis of results, and has accepted version ${A.COMMITMENT.version} of the commitment text.`,
+      'Approve or refuse the request in Manage Companies.'],
+    url: `${appUrl(req)}/admin.html?tab=companies`,
+  }).catch(err => log.warn({ err: err.message }, 'AI access request notice not sent'));
+}
+
 // ── GET /ai-analysis/access ──────────────────────────────────────────────────
 router.get('/ai-analysis/access', readLimiter, (req, res) => {
   const company = scopeForTestManager(req, res);
@@ -123,41 +159,16 @@ router.post('/ai-analysis/access/request', requestLimiter, (req, res) => {
   const existing = requestOf(company.id, req.user.id);
   const state = A.accessState(true, existing);
   if (!A.mayRequest(state)) {
-    return res.status(409).json({ status: 409, title: 'Conflict',
-      detail: state === 'pending' ? 'Your request is already waiting for an administrator.' : 'You already have access.' });
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: alreadyAsked(state) });
   }
 
   // An approved Test Manager accepting a new version of the text keeps the
   // approval; any other request waits for an administrator again.
   const reaccept = state === 'needs_acceptance';
-  if (existing) {
-    run(`UPDATE ai_access_request
-           SET state = ?, text_version = ?, text_hash = ?, accepted_at = datetime('now'),
-               decided_by = CASE WHEN ? THEN decided_by ELSE NULL END,
-               decided_at = CASE WHEN ? THEN decided_at ELSE NULL END,
-               reason = NULL
-         WHERE id = ?`,
-    [reaccept ? 'approved' : 'pending', A.COMMITMENT.version, A.commitmentHash(), reaccept ? 1 : 0, reaccept ? 1 : 0, existing.id]);
-  } else {
-    run(`INSERT INTO ai_access_request (id, company_id, user_id, state, text_version, text_hash)
-         VALUES (?, ?, ?, 'pending', ?, ?)`, [randomUUID(), company.id, req.user.id, A.COMMITMENT.version, A.commitmentHash()]);
-  }
+  saveAcceptance(existing, company.id, req.user.id, reaccept);
   auditLog(req.user.id, company.id, req.user.email,
     `${reaccept ? 'ai_access_reaccepted' : 'ai_access_requested'}:v${A.COMMITMENT.version}`);
-
-  if (!reaccept) {
-    const admins = all("SELECT email FROM users WHERE role = 'administrator' AND (status IS NULL OR status = 'active')").map(r => r.email);
-    if (admins.length) {
-      sendAiAccessNotice({
-        to: admins,
-        subject: `OSCAR — AI analysis access requested (${company.name})`,
-        heading: 'AI analysis access requested',
-        lines: [`${req.user.email} (${company.name}) asks for access to the AI analysis of results, and has accepted version ${A.COMMITMENT.version} of the commitment text.`,
-          'Approve or refuse the request in Manage Companies.'],
-        url: `${appUrl(req)}/admin.html?tab=companies`,
-      }).catch(err => log.warn({ err: err.message }, 'AI access request notice not sent'));
-    }
-  }
+  if (!reaccept) notifyAdministrators(req, company);
 
   const request = requestOf(company.id, req.user.id);
   return res.status(reaccept ? 200 : 201).json({

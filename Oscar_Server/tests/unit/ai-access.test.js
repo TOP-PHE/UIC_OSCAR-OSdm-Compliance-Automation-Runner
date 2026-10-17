@@ -74,7 +74,7 @@ describe('#801 the page', () => {
   };
   const consts = lines.filter((l) => /^const (NOTE|INFO|WARN|OK) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
-  vm.runInContext(`${consts}\n${lift('commitmentHtml')}\n${lift('requestFormHtml')}\n${lift('accessHtml')}\nthis.accessHtml = accessHtml;`, ctx);
+  vm.runInContext(`${consts}\n${lift('commitmentHtml')}\n${lift('requestFormHtml')}\n${lift('pastRequestHtml')}\n${lift('accessHtml')}\nthis.accessHtml = accessHtml;`, ctx);
   const commitment = A.commitmentForPage();
   const page = (state, request = null) => ctx.accessHtml({ state, request, commitment, company: { name: 'Acme <b>' } });
 

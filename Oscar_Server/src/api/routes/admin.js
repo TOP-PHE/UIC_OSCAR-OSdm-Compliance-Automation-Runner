@@ -507,12 +507,11 @@ router.patch('/companies/:id', (req, res) => {
   const updates = [];
   const values = [];
   if (name) { updates.push('name = ?'); values.push(name); }
-  // #801: the administrator's switch for the AI analysis, top-level companies only.
-  const aiChange = typeof aiEnabled === 'boolean' && !company.parent_id && (company.ai_analysis_enabled ? 1 : 0) !== (aiEnabled ? 1 : 0);
-  if (aiEnabled !== undefined && typeof aiEnabled !== 'boolean') {
+  const ai = aiSwitch(company, aiEnabled);
+  if (ai.invalid) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'ai_analysis_enabled must be true or false.' });
   }
-  if (aiChange) { updates.push('ai_analysis_enabled = ?'); values.push(aiEnabled ? 1 : 0); }
+  if (ai.change) { updates.push('ai_analysis_enabled = ?'); values.push(aiEnabled ? 1 : 0); }
   if (slug) {
     const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const existing = get('SELECT id FROM companies WHERE slug = ? AND id != ?', [cleanSlug, companyId]);
@@ -522,23 +521,32 @@ router.patch('/companies/:id', (req, res) => {
   }
   if (updates.length === 0) {
     // Sending the switch as it already is changes nothing, and is not an error.
-    if (typeof aiEnabled === 'boolean' && !company.parent_id) {
-      return res.json({ company: get(
-        `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, c.ai_analysis_enabled, COUNT(u.id) AS user_count
-         FROM companies c LEFT JOIN users u ON u.company_id = c.id WHERE c.id = ? GROUP BY c.id`, [companyId]) });
-    }
+    if (ai.applies) return res.json({ company: companyRow(companyId) });
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No update fields provided.' });
   }
   values.push(companyId);
   run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
-  if (aiChange) auditLog(req.user.id, companyId, req.user.email, aiEnabled ? 'ai_analysis_enabled' : 'ai_analysis_disabled');
-  const updated = get(
+  if (ai.change) auditLog(req.user.id, companyId, req.user.email, aiEnabled ? 'ai_analysis_enabled' : 'ai_analysis_disabled');
+  return res.json({ company: companyRow(companyId) });
+});
+
+function companyRow(companyId) {
+  return get(
     `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, c.ai_analysis_enabled, COUNT(u.id) AS user_count
      FROM companies c LEFT JOIN users u ON u.company_id = c.id WHERE c.id = ? GROUP BY c.id`,
     [companyId]
   );
-  return res.json({ company: updated });
-});
+}
+
+// #801: the administrator's switch for the AI analysis, top-level companies
+// only. invalid: not a boolean; applies: a boolean for a top-level company;
+// change: it differs from the stored value.
+function aiSwitch(company, value) {
+  if (value === undefined) return { invalid: false, applies: false, change: false };
+  if (typeof value !== 'boolean') return { invalid: true, applies: false, change: false };
+  const applies = !company.parent_id;
+  return { invalid: false, applies, change: applies && !!company.ai_analysis_enabled !== value };
+}
 
 router.delete('/companies/:id', (req, res) => {
   const companyId = req.params.id;

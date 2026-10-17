@@ -677,7 +677,7 @@ async function loadCompaniesPanel() {
       <td><input id="coslug-${c.id}" value="${esc(c.slug)}" class="mono" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
       <td>${c.user_count}</td>
       <td>${fmtDate(c.created_at)}</td>
-      <td>${c.slug === 'platform-root' ? '' : `<input type="checkbox" data-action="toggle-ai" data-company-id="${c.id}" aria-label="AI analysis for ${esc(c.name)}"${c.ai_analysis_enabled ? ' checked' : ''}>`}</td>
+      <td>${aiSwitchCell(c)}</td>
       <td>
         <button class="btn btn-small btn-secondary" data-action="save-company" data-company-id="${c.id}">Save</button>
         <button class="btn btn-small btn-danger" data-action="delete-company" data-company-id="${c.id}" data-name="${esc(c.name)}">Delete</button>
@@ -686,6 +686,19 @@ async function loadCompaniesPanel() {
   `).join('');
   await loadCompanies();
   await loadAiRequests();
+}
+
+// #801: no switch for the platform company.
+function aiSwitchCell(c) {
+  if (c.slug === 'platform-root') return '';
+  const checked = c.ai_analysis_enabled ? ' checked' : '';
+  return `<input type="checkbox" data-action="toggle-ai" data-company-id="${c.id}" aria-label="AI analysis for ${esc(c.name)}"${checked}>`;
+}
+
+function aiDecidedCell(r) {
+  if (!r.decidedAt) return '';
+  const by = r.decidedBy ? ' · ' + esc(r.decidedBy) : '';
+  return fmtDate(r.decidedAt) + by;
 }
 
 // #801: the administrator's switch for the AI analysis, one company at a time.
@@ -721,7 +734,7 @@ function aiRequestRow(r, textVersion) {
       <td>${esc(r.user.email)}</td>
       <td>${esc(r.state)}${oldText}${reason}</td>
       <td>v${esc(r.textVersion)} · ${fmtDate(r.acceptedAt)}</td>
-      <td>${r.decidedAt ? `${fmtDate(r.decidedAt)}${r.decidedBy ? ' · ' + esc(r.decidedBy) : ''}` : ''}</td>
+      <td>${aiDecidedCell(r)}</td>
       <td>${aiRequestActions(r)}</td>
     </tr>`;
 }
