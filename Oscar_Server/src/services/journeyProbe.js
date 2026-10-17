@@ -163,20 +163,32 @@ function collectOfferedTrips(days) {
     const candidates = Array.isArray(day.candidates) ? day.candidates : [];
     delete day.candidates;
     for (const trip of candidates) {
-      const text = describeTrip(trip);
-      let t = byText.get(text);
-      if (!t) {
-        if (byText.size >= OFFERED_TRIPS_KEPT) continue;
-        t = { text, legs: trip.map((l) => Object.fromEntries(LEG_FIELDS.map((f) => [f, String(l[f] || '')]))), days: [], dates: [], asDefined: false };
-        byText.set(text, t);
-      }
-      const weekday = trip[0]?.dayOfWeek || dayOfWeekCode(day.date);
-      if (weekday && !t.days.includes(weekday)) t.days.push(weekday);
-      if (!t.dates.includes(day.date)) t.dates.push(day.date);
-      if (day.outcome === 'found') t.asDefined = true;
+      const t = offeredTripEntry(byText, trip);
+      if (t) noteDaySeen(t, trip, day);
     }
   }
   return [...byText.values()];
+}
+
+// The entry of `trip` in `byText`, made on first sight; null once
+// OFFERED_TRIPS_KEPT other trips are kept.
+function offeredTripEntry(byText, trip) {
+  const text = describeTrip(trip);
+  if (byText.has(text)) return byText.get(text);
+  if (byText.size >= OFFERED_TRIPS_KEPT) return null;
+  const legs = trip.map((l) => Object.fromEntries(LEG_FIELDS.map((f) => [f, String(l[f] || '')])));
+  const t = { text, legs, days: [], dates: [], asDefined: false };
+  byText.set(text, t);
+  return t;
+}
+
+// Record that `t` was offered on `day`: its weekday (the provider's own date
+// of departure, else the day searched) and date.
+function noteDaySeen(t, trip, day) {
+  const weekday = trip[0]?.dayOfWeek || dayOfWeekCode(day.date);
+  if (weekday && !t.days.includes(weekday)) t.days.push(weekday);
+  if (!t.dates.includes(day.date)) t.dates.push(day.date);
+  if (day.outcome === 'found') t.asDefined = true;
 }
 
 const MAX_LEGS_KEPT = 5;
