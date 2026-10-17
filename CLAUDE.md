@@ -714,6 +714,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     an edited page with no file could neither save nor copy, and the refusal
     sat screens above the Copy button. `scenario-copy-page.test.js` lifts both
     helpers out of the IIFE by text.
+- **A full configuration is the data file, the Test Framework and the Test
+  Data in one file** (#810, 1.11.322). `utils/configurationBundle.js` (pure)
+  builds and reads it (root `__oscarConfiguration: { format: 1 }`, which the
+  data-file upload refuses through `NOT_THE_COMPANY_FILE`) and plans the Test
+  Data (`planTestData()`: `add` skips an entry whose data the target holds,
+  compared with `canonical()`; `replace` removes TRAIN and JOURNEY first).
+  Routes in `company.js`: `GET /configuration/download`, `POST
+  /configuration/import` (Test Manager, `uploadPolicy`, field
+  `configuration`, choices as form fields, none guessed). **Only journeys name
+  other resources** (`legs[].trainResourceId`): the data file holds copies of
+  train values, so new ids are remapped in journeys and nowhere else; a new
+  field that stores a resource id must be added to the remap. The data file
+  goes through the upload's checks and `storeUpload()` with `undoable` (a
+  snapshot of the two files and the company row), then the framework and Test
+  Data in one `db.transaction`; a failed transaction calls the undo. The route
+  calls `db.transaction` through the module so a test can make it fail. Values
+  deeper than `MAX_DEPTH` are refused before anything recursive runs. The
+  datafile part is stored re-indented (4 spaces), not as the source's bytes.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network

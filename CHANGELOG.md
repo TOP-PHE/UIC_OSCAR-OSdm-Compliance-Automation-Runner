@@ -62,6 +62,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.322] / [collection-OTST_V2.0.182] — 2026-10-17
+
+Issue #810, release 2026.357. Server and pages only.
+
+### Added
+- **A full configuration in one file: the scenarios, the Test Framework and the Test Data.** "Download JSON" gave the data file only; the framework and the trains and journeys stayed behind, so a data file taken to another company or provider named trips whose trains it lacked.
+  - **Download** now asks (Test Manager): "Scenarios only", the stored data file byte for byte as before (#549), or "Full configuration", `{slug}-configuration-{date}.json`: `{ "__oscarConfiguration": { "format": 1, … }, "datafile", "framework", "testResources" }` with the TRAIN and JOURNEY entries. No credential, endpoint or dedicated header goes in. A tester's download is unchanged.
+  - **Uploading** such a file opens a panel instead of the data-file confirmation: scenarios (replace, the current file kept as the previous one, or keep), Test Framework (replace or keep), Test Data (add what is missing, replace all, or keep).
+  - "Add" adds a train or journey only when the target holds none with the same data. Every added entry gets a new id, and each journey leg names its train's id in the target. The data file names no Test Data id (a trip holds copies of the train's values), so nothing in it is remapped.
+  - `GET /v1/company/configuration/download` and `POST /v1/company/configuration/import`, Test Managers only, for the company or provider the request names. The import is authorised before its file is read, held in memory, and every part is checked before anything is written: the data file as an upload checks it (schema, marked downloads, templates), the framework's OSDM version, each Test Data entry. The framework and Test Data are written in one transaction; if it fails, the data file is put back. Under the data file lock.
+  - The data-file upload refuses a full configuration and says to import it instead.
+
+Checked:
+- `company-configuration.test.js`: a download from a company imported into its provider (scenarios, framework, trains added, the journey's legs on the new ids, the previous file kept); a second "add" adding nothing; "replace" removing the provider's own train; a tester refused both ways; every refusal (choice missing, invalid data file, template, OSDM version) changing none of the three stores; a failed database step putting the data file back. Each guard mutation-checked.
+- `configuration-bundle.test.js` (the rules, pure), `configuration-page.test.js` and `scenarios-load-guard.test.js` (the page's functions).
+- The page in Chromium through the real server: a full configuration downloaded from a company and imported into its provider.
+
+---
+
 ## [server-1.11.320] / [collection-OTST_V2.0.182] — 2026-10-17
 
 Issue #801, release 2026.355. Server and pages only.

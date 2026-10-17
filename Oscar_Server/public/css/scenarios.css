@@ -158,6 +158,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .save-error{background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:none}
 .save-error-title{font-size:13px;font-weight:800;color:#c62828;margin-bottom:4px}
 .save-error-body{font-size:13px;color:#37474f}
+/* #810: the download choice and the import of a full configuration */
+.config-panel{background:#f5f9ff;border:1px solid #b3d4f0;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:none}
+.config-panel-title{font-size:13px;font-weight:800;color:#0b5c8f;margin-bottom:8px}
+.config-panel-body{font-size:13px;color:#37474f;line-height:1.6}
+.config-panel-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0}
+.config-panel-row label{min-width:140px;font-weight:700}
+.config-panel-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.config-panel-note{font-size:12px;color:#607d8b}
 
 /* ── Data file banner ────────────────────────────────────────────────────── */
 .df-banner{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}

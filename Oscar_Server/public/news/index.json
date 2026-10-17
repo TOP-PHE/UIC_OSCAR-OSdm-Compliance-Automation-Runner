@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-full-configuration",
+    "date": "October 17, 2026",
+    "tag": "Feature",
+    "title": "Test Config: download and upload a full configuration",
+    "summary": "One file with the scenarios, the Test Framework and the Test Data trains and journeys, to set up another company or provider in one go.",
+    "content": "In Test Config, Download now offers two files: the scenarios only, as before, or the full configuration, which also holds the Test Framework and the Test Data trains and journeys. Upload the full configuration in another company or provider and Test Config asks what to take: the scenarios, the Test Framework, and the trains and journeys (add the missing ones, or replace them all). Journeys keep pointing at the right trains. The file holds no credential and no endpoint. Test Managers only."
+  },
+  {
     "id": "2026-10-17-ai-analysis-per-provider",
     "date": "October 17, 2026",
     "tag": "Change",

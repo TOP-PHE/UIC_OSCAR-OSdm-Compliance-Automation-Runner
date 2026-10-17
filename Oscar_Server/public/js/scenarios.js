@@ -852,7 +852,8 @@ async function refreshAllSections() {
   renderScenariosSection(framework, resources, datafile);
 
   // Show/hide download button
-  document.getElementById('btn-download').style.display = datafile ? '' : 'none';
+  // #810: a Test Manager can download a full configuration without a data file.
+  document.getElementById('btn-download').style.display = (datafile || user.role === 'test_manager') ? '' : 'none';
 
   // Tester restrictions: hide upload button and section delete buttons
   if (isTester) {
@@ -1476,7 +1477,8 @@ function uploadRefusalText(status, data) {
   return `${detail}\n\n${list}${more}`;
 }
 
-function showUploadError(text) {
+function showUploadError(text, title = '⚠️ Not done — the data file was not changed') {
+  document.querySelector('#upload-error .save-error-title').textContent = title;
   document.getElementById('ue-detail').textContent = text;
   document.getElementById('upload-error').style.display = 'block';
 }
@@ -1487,6 +1489,8 @@ async function handleFileUpload(input) {
   try {
     let parsed = null;
     try { parsed = JSON.parse(await file.text()); } catch { parsed = null; }
+    // #810: a full configuration asks which parts to take.
+    if (isConfigurationFile(parsed)) { openConfigurationImport(file, parsed); return; }
     // A file that is not JSON goes to the server unconfirmed: it is refused
     // there with the reason, and nothing is replaced.
     if (parsed !== null) {
@@ -1513,6 +1517,98 @@ async function handleFileUpload(input) {
   } finally {
     input.value = '';
   }
+}
+
+// ── Importing a full configuration (#810) ────────────────────────────────────
+// The file Download → "Full configuration" gives, from this company or another
+// one. The server takes the parts chosen here, all or nothing.
+let pendingConfiguration = null;
+
+function isConfigurationFile(parsed) {
+  return !!parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Object.hasOwn(parsed, '__oscarConfiguration');
+}
+
+// What the file holds, in one sentence.
+function configurationSummary(cfg) {
+  const meta = cfg.__oscarConfiguration && typeof cfg.__oscarConfiguration === 'object' ? cfg.__oscarConfiguration : {};
+  const resources = Array.isArray(cfg.testResources) ? cfg.testResources : [];
+  const count = type => resources.filter(r => r?.resource_type === type).length;
+  const df = cfg.datafile && typeof cfg.datafile === 'object' ? cfg.datafile : null;
+  const fw = cfg.framework && typeof cfg.framework === 'object' ? cfg.framework : null;
+  const parts = [
+    df ? `${countScenarios(df) ?? 0} scenario(s)` : 'no data file',
+    fw ? `a Test Framework${fw.osdmVersion ? ` (OSDM ${fw.osdmVersion})` : ''}` : 'no Test Framework',
+    `${count('TRAIN')} train(s) and ${count('JOURNEY')} journey(s)`,
+  ];
+  const from = [meta.company, typeof meta.exported_at === 'string' ? meta.exported_at.slice(0, 10) : ''].filter(Boolean).join(', ');
+  return `${from ? `From ${from}: ` : ''}${parts.join(', ')}.`;
+}
+
+// The server's answer to an import, for the message.
+function importResultText(data) {
+  const lines = [];
+  if (data.scenarios?.replaced) {
+    lines.push(`data file replaced (${data.scenarios.scenarios_count} scenario(s)${data.scenarios.previous ? '; the previous one is kept' : ''})`);
+  }
+  if (data.framework?.replaced) lines.push('Test Framework replaced');
+  const td = data.testData;
+  if (td && td.mode !== 'keep') {
+    const removed = td.removed ? `${td.removed} removed, ` : '';
+    const there = td.already_there ? `, ${td.already_there} already there` : '';
+    lines.push(`Test Data: ${removed}${td.trains_added} train(s) and ${td.journeys_added} journey(s) added${there}`);
+    if (td.unresolved_legs) lines.push(`${td.unresolved_legs} journey leg(s) name a train that is not in the file: check them in Test Data`);
+  }
+  return `✅ Configuration imported: ${lines.join('; ')}.`;
+}
+
+function setChoice(id, value, canReplace) {
+  const select = document.getElementById(id);
+  const replace = select.querySelector('option[value="replace"]');
+  if (replace) replace.disabled = !canReplace;
+  select.value = canReplace ? value : 'keep';
+}
+
+function openConfigurationImport(file, parsed) {
+  hidePanels();
+  pendingConfiguration = { file, parsed };
+  document.getElementById('ci-summary').textContent = `"${file.name}". ${configurationSummary(parsed)}`;
+  setChoice('ci-scenarios', 'replace', !!parsed.datafile);
+  setChoice('ci-framework', 'replace', !!parsed.framework);
+  document.getElementById('ci-test-data').value = 'add';
+  const panel = document.getElementById('config-import');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function runConfigurationImport() {
+  if (!pendingConfiguration) return;
+  const choices = {
+    scenarios: document.getElementById('ci-scenarios').value,
+    framework: document.getElementById('ci-framework').value,
+    testData:  document.getElementById('ci-test-data').value,
+  };
+  if (dirty && !confirm('This page has edits that are not saved: they will be lost. Import anyway?')) return;
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(choices)) fd.append(k, v);
+  fd.append('configuration', pendingConfiguration.file);
+  hidePanels();
+  const res = await fetch('/v1/company/configuration/import', { method: 'POST', body: fd });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { logout(); return; }
+  if (!res.ok) {
+    showUploadError(uploadRefusalText(res.status, data), '⚠️ Not done — nothing was changed');
+    return;
+  }
+  pendingConfiguration = null;
+  dirty = false;
+  await loadDatafile();
+  showMsg(importResultText(data), true);
+}
+
+function closeConfigPanels() {
+  pendingConfiguration = null;
+  document.getElementById('download-choice').style.display = 'none';
+  document.getElementById('config-import').style.display = 'none';
 }
 
 // ── A Test Framework and trains from an uploaded file, for a company with none ─
@@ -3801,6 +3897,8 @@ function showMsg(text, isOk) {
 
 // ── Save & Apply ──────────────────────────────────────────────────────────────
 function hidePanels() {
+  document.getElementById('download-choice').style.display = 'none';
+  document.getElementById('config-import').style.display = 'none';
   document.getElementById('save-confirm').style.display = 'none';
   document.getElementById('save-error').style.display = 'none';
   document.getElementById('upload-error').style.display = 'none';
@@ -3953,22 +4051,49 @@ function saveBlob(blob, name) {
   URL.revokeObjectURL(url);
 }
 
+// #810: a Test Manager chooses between the data file and a full
+// configuration (data file, Test Framework and Test Data). A tester gets the
+// data file view as before.
 async function downloadJson() {
+  if (isTester) { await downloadScenarios(); return; }
+  hidePanels();
+  document.getElementById('btn-download-scenarios').disabled = !state;
+  const panel = document.getElementById('download-choice');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Fetches a download and saves it; false when it failed (the reason shown).
+async function fetchDownload(url, fallbackName) {
   let res;
   try {
-    res = await fetch('/v1/company/datafile/download');
+    res = await fetch(url);
   } catch (e) {
     showMsg(`Download failed: the server could not be reached (${e.message}).`, false);
-    return;
+    return false;
   }
-  if (res.status === 401) { logout(); return; }
+  if (res.status === 401) { logout(); return false; }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     const why = data.detail || `the server answered ${res.status}`;
     showMsg(`Download failed: ${why}`, false);
-    return;
+    return false;
   }
-  saveBlob(await res.blob(), downloadFileName(res.headers.get('Content-Disposition'), 'datafile.json'));
+  saveBlob(await res.blob(), downloadFileName(res.headers.get('Content-Disposition'), fallbackName));
+  return true;
+}
+
+async function downloadConfiguration() {
+  hidePanels();
+  if (!await fetchDownload('/v1/company/configuration/download', 'configuration.json')) return;
+  showMsg(dirty
+    ? '⬇ Downloaded the full configuration as stored on the server. The edits not yet saved on this page are not in it.'
+    : '⬇ Downloaded the full configuration: scenarios, Test Framework and Test Data. Upload it in another company or provider to choose what to take.', true);
+}
+
+async function downloadScenarios() {
+  hidePanels();
+  if (!await fetchDownload('/v1/company/datafile/download', 'datafile.json')) return;
   if (isTester) {
     showMsg('⬇ Downloaded your personal view of the data file: your scenarios, the shared ones and your run list. It cannot be uploaded as the company data file.', true);
   } else if (dirty) {
@@ -7417,6 +7542,14 @@ document.body.addEventListener('click', function(e) {
       downloadJson().catch(reportActionError); break;
     case 'download-edits':
       downloadUnsavedEdits(); break;
+    case 'download-scenarios':
+      downloadScenarios().catch(reportActionError); break;
+    case 'download-configuration':
+      downloadConfiguration().catch(reportActionError); break;
+    case 'config-import-run':
+      runConfigurationImport().catch(reportActionError); break;
+    case 'close-config-panel':
+      closeConfigPanels(); break;
     case 'restore-previous':
       restorePreviousDatafile().catch(reportActionError); break;
     case 'save-datafile':

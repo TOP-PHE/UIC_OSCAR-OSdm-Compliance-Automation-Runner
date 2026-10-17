@@ -119,7 +119,7 @@ describe('loadForEdit', () => {
 });
 
 describe('refreshAllSections (page load and every refresh)', () => {
-  function setup(routes) {
+  function setup(routes, role = 'company_user') {
     const { fetch, calls } = fakeFetch({ [`GET ${COMPANY}`]: response(200, { name: 'ACME Rail' }), ...routes });
     const rendered = [];
     const elements = {};
@@ -135,6 +135,7 @@ describe('refreshAllSections (page load and every refresh)', () => {
       state: before.state,
       dirty: false,
       isTester: false,
+      user: { role },
       wizProfile: {},
       wizData: { framework: before.framework, resources: before.resources },
       emptyFramework: () => ({ empty: true }),
@@ -188,6 +189,16 @@ describe('refreshAllSections (page load and every refresh)', () => {
     expect(t.rendered).toEqual([['framework', null], ['data', []], ['scenarios', null]]);
     expect(t.elements['btn-download'].style.display).toBe('none');
     expect(t.ctx.datafileLoadedVersion).toBeNull();         // #540: the next save says "there was none"
+  });
+
+  test('#810: a Test Manager keeps Download without a data file, for the full configuration', async () => {
+    const t = setup({
+      [`GET ${FRAMEWORK}`]: response(404, {}),
+      [`GET ${RESOURCES}`]: response(200, []),
+      [`GET ${DATAFILE}`]: response(404, {}),
+    }, 'test_manager');
+    await t.ctx.refreshAllSections();
+    expect(t.elements['btn-download'].style.display).toBe('');
   });
 
   describe.each([
@@ -281,7 +292,7 @@ describe('upload (handleFileUpload): the data file and nothing else', () => {
       trip: { origin: 'urn:uic:stn:1', destination: 'urn:uic:stn:2', startDatetime: '%TRIP_DATE%T08:00:00+02:00', vehicleNumber: '123' },
     }],
   };
-  const NAMES = ['handleFileUpload', 'countScenarios', 'uploadConfirmText', 'uploadRefusalText', 'offerBuildFromUpload', 'buildOfferText',
+  const NAMES = ['handleFileUpload', 'isConfigurationFile', 'countScenarios', 'uploadConfirmText', 'uploadRefusalText', 'offerBuildFromUpload', 'buildOfferText',
     'loadForEdit', 'frameworkFromDatafile', 'trainFromTrip', 'trainsFromDatafile'];
 
   function setup({ uploadAnswer = response(200, { scenarios_count: 2, previous: { scenarios_count: 5 } }),
@@ -305,9 +316,20 @@ describe('upload (handleFileUpload): the data file and nothing else', () => {
       showMsg(m, ok) { ctx.messages.push([ok, m]); },
       showUploadError(m) { ctx.errors.push(m); },
       oscarToast(m, k) { ctx.toasts.push([k, m]); },
+      opened: [],
+      openConfigurationImport(file, parsed) { ctx.opened.push([file.name, parsed]); },
     });
     return { ctx, calls, input };
   }
+
+  test('#810: a full configuration opens the import panel: no confirmation, no request', async () => {
+    const cfg = { __oscarConfiguration: { format: 1 }, datafile: UPLOADED, framework: null, testResources: [] };
+    const t = setup({ fileText: JSON.stringify(cfg) });
+    await t.ctx.handleFileUpload(t.input);
+    expect(t.calls).toEqual([]);
+    expect(t.ctx.asked).toEqual([]);
+    expect(t.ctx.opened).toEqual([['mine.json', cfg]]);
+  });
 
   test('with a framework and trains: one request, the upload, and nothing written elsewhere', async () => {
     const t = setup();
@@ -396,11 +418,14 @@ describe('upload (handleFileUpload): the data file and nothing else', () => {
   });
 });
 
-describe('Download JSON (downloadJson): the server\'s file, never the page\'s copy', () => {
-  function setup(answer) {
-    const { fetch, calls } = fakeFetch({ [`GET ${DATAFILE}/download`]: answer });
-    const ctx = page(['downloadJson', 'downloadFileName'], {
-      fetch, isTester: false, dirty: true, saved: [], messages: [], loggedOut: 0,
+describe('Download JSON (downloadScenarios): the server\'s file, never the page\'s copy', () => {
+  function setup(answer, isTester = false) {
+    const { fetch, calls } = fakeFetch({ [`GET ${DATAFILE}/download`]: answer, [`GET /v1/company/configuration/download`]: answer });
+    const elements = {};
+    const ctx = page(['downloadJson', 'downloadScenarios', 'downloadConfiguration', 'fetchDownload', 'downloadFileName'], {
+      fetch, isTester, dirty: true, saved: [], messages: [], loggedOut: 0, elements,
+      hidePanels() {},
+      document: { getElementById: (id) => (elements[id] ||= { style: {}, scrollIntoView() {} }) },
       state: { scenarios: ['what the page holds'] },
       saveBlob(blob, name) { ctx.saved.push([blob, name]); },
       showMsg(m, ok) { ctx.messages.push([ok, m]); },
@@ -411,9 +436,31 @@ describe('Download JSON (downloadJson): the server\'s file, never the page\'s co
   const file = (status, bytes, disposition) => ({ ...response(status, {}), blob: async () => bytes,
     headers: { get: h => (h === 'Content-Disposition' ? disposition : null) } });
 
+  test('#810: a Test Manager is asked which file; nothing is fetched yet', async () => {
+    const t = setup(file(200, 'stored bytes', null));
+    await t.ctx.downloadJson();
+    expect(t.calls).toEqual([]);
+    expect(t.ctx.elements['download-choice'].style.display).toBe('block');
+    expect(t.ctx.elements['btn-download-scenarios'].disabled).toBe(false);
+  });
+
+  test('a tester gets their view straight away', async () => {
+    const t = setup(file(200, 'view', 'attachment; filename="acme-datafile-personal-view-2026-10-09.json"'), true);
+    await t.ctx.downloadJson();
+    expect(t.calls).toEqual([`GET ${DATAFILE}/download`]);
+    expect(t.ctx.saved).toEqual([['view', 'acme-datafile-personal-view-2026-10-09.json']]);
+  });
+
+  test('#810: "Full configuration" saves the configuration the server sends', async () => {
+    const t = setup(file(200, 'bundle', 'attachment; filename="acme-configuration-2026-10-17.json"'));
+    await t.ctx.downloadConfiguration();
+    expect(t.calls).toEqual(['GET /v1/company/configuration/download']);
+    expect(t.ctx.saved).toEqual([['bundle', 'acme-configuration-2026-10-17.json']]);
+  });
+
   test('saves what the server sends, under the name it gives', async () => {
     const t = setup(file(200, 'stored bytes', 'attachment; filename="acme-datafile-2026-10-09.json"'));
-    await t.ctx.downloadJson();
+    await t.ctx.downloadScenarios();
     expect(t.calls).toEqual([`GET ${DATAFILE}/download`]);
     expect(t.ctx.saved).toEqual([['stored bytes', 'acme-datafile-2026-10-09.json']]);
     expect(t.ctx.messages[0][1]).toContain('not yet saved on this page are not in it');
@@ -421,7 +468,7 @@ describe('Download JSON (downloadJson): the server\'s file, never the page\'s co
 
   test('a refusal is shown, and nothing is saved', async () => {
     const t = setup(response(404, { detail: 'No data file uploaded yet.' }));
-    await t.ctx.downloadJson();
+    await t.ctx.downloadScenarios();
     expect(t.ctx.saved).toEqual([]);
     expect(t.ctx.messages).toEqual([[false, 'Download failed: No data file uploaded yet.']]);
   });

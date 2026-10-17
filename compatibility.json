@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.355",
+  "current_release": "2026.357",
   "releases": [
+    {
+      "release": "2026.357",
+      "date": "2026-10-17",
+      "server": "1.11.322",
+      "collection": "OTST_V2.0.182",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Config downloads and uploads a full configuration (#810): the scenarios, the Test Framework and the Test Data trains and journeys in one file. Uploaded into another company or provider, it asks which parts to take, and journeys follow their trains' new ids."
+      ]
+    },
     {
       "release": "2026.355",
       "date": "2026-10-17",
