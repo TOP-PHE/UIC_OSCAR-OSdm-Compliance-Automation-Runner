@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.359",
+  "current_release": "2026.360",
   "releases": [
+    {
+      "release": "2026.360",
+      "date": "2026-10-17",
+      "server": "1.11.325",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis, part 2 (#801): where their access is approved, a Test Manager configures the AI service of each company or provider (Anthropic Messages API or an OpenAI-compatible Chat Completions API). The key is encrypted and never shown again; a new service, address, model or key is tested before it is saved."
+      ]
+    },
     {
       "release": "2026.359",
       "date": "2026-10-17",

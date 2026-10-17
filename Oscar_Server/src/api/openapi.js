@@ -314,6 +314,22 @@ module.exports = {
         description: 'Body: { version, hash, companies } — the text accepted, as GET returned it, and the ids of the targets asked for. A new request waits for an administrator (201); an approved Test Manager accepting a new version keeps the approval (200).',
         responses: { 200: { description: 'New text accepted, access kept' }, 201: { description: 'Request waiting for an administrator' }, 400: { description: 'Not the text in force, or no target named' }, 403: { description: 'Test Managers only' }, 404: { description: 'A target the Test Manager may not use' }, 409: { description: 'A target already waiting or already approved' } } },
     },
+    '/v1/company/ai-analysis/config': {
+      get: { tags: ['Company'], summary: 'The Test Manager\'s AI service for the request\'s company or provider (#801)', security: [{ bearerAuth: [] }],
+        description: 'Per (company or provider, Test Manager), where that Test Manager\'s access is approved; the company or provider is the request\'s (X-Provider-Id). config: { connector, baseUrl, model, hasKey, monthlyTokenCap, instruction, testedAt, updatedAt } or null; the key is never returned. connectors: [{ id, label, defaultBaseUrl, keyRequired }].',
+        responses: { 200: { description: 'The AI service' }, 403: { description: 'Test Managers only, with approved access' } } },
+      put: { tags: ['Company'], summary: 'Save the AI service; a new service, address, model or key is tested first (#801)', security: [{ bearerAuth: [] }],
+        description: 'Body: { connector: anthropic | openai_compatible, baseUrl (https, public host), model, apiKey (empty = keep the stored one; required again for another service or host), monthlyTokenCap, instruction }. Nothing is saved when the test fails (422, with the test).',
+        responses: { 200: { description: '{ config, test }' }, 201: { description: 'First save: { config, test }' }, 400: { description: 'A field refused, or the key to type again' }, 403: { description: 'Test Managers only, with approved access' }, 422: { description: 'The connection test failed: { detail, test }' } } },
+      delete: { tags: ['Company'], summary: 'Remove the AI service, key included (#801)', security: [{ bearerAuth: [] }],
+        description: 'Allowed whether or not the access is still approved.',
+        responses: { 204: { description: 'Removed' }, 404: { description: 'Nothing configured' } } },
+    },
+    '/v1/company/ai-analysis/config/test': {
+      post: { tags: ['Company'], summary: 'Test the AI service: the stored one, or the one given, without saving (#801)', security: [{ bearerAuth: [] }],
+        description: 'One small request ("reply with the single word OK"). Body: empty to test the stored service, or the same fields as PUT. Answer: { test: { ok, answer, stopReason, model, usage: { input, output }, ms } | { ok: false, error, status } }.',
+        responses: { 200: { description: 'The test result' }, 400: { description: 'A field refused' }, 403: { description: 'Test Managers only, with approved access' }, 404: { description: 'Nothing configured, and nothing given' } } },
+    },
     '/v1/admin/ai-access-requests': {
       get: { tags: ['Admin'], summary: 'Test Managers\' requests for the AI analysis (#801)', security: [{ bearerAuth: [] }],
         responses: { 200: { description: '{ textVersion, requests: [{ id, state, textVersion, acceptedAt, decidedAt, decidedBy, reason, company, user }] }' } } },

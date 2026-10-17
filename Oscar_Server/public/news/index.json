@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-ai-service",
+    "date": "October 17, 2026",
+    "tag": "Feature",
+    "title": "AI Analysis: configure your AI service",
+    "summary": "Where your access is approved, configure the AI service of each company or provider, and test it.",
+    "content": "On the AI Analysis page, each company or provider your access is approved for has its own section: the kind of service (Anthropic, or any service with an OpenAI-compatible Chat Completions API), its address, the model, your key, an optional monthly token limit and an optional instruction of your own. Test the connection sends one small request and shows the answer. A new service, address, model or key is tested before it is saved. The key is encrypted and never shown again. The analysis itself comes in the next release. Test Managers only."
+  },
+  {
     "id": "2026-10-17-probe-keep-trip",
     "date": "October 17, 2026",
     "tag": "Feature",

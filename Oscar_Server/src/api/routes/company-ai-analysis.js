@@ -9,13 +9,24 @@
 
 /**
  * company-ai-analysis.js — the AI analysis of results, Test Manager side
- * (#801). PR 1: access only.
+ * (#801). PR 1: access; PR 2: the AI service.
  *
  *   GET  /v1/company/ai-analysis/access          — the text, and where the Test
  *                                                  Manager stands for the company
  *                                                  and each provider they may use
  *   POST /v1/company/ai-analysis/access/request  — { version, hash, companies }:
  *                                                  the text accepted, for these
+ *   GET    /v1/company/ai-analysis/config        — the AI service of the request's
+ *                                                  company or provider (never the key)
+ *   PUT    /v1/company/ai-analysis/config        — save it; tested first when the
+ *                                                  service, address, model or key changes
+ *   POST   /v1/company/ai-analysis/config/test   — test the stored or the given one
+ *   DELETE /v1/company/ai-analysis/config        — remove it, key included
+ *
+ * The AI service is configured like the access is asked: per (company or
+ * provider, Test Manager), and only where that Test Manager's access is
+ * approved. The company or provider is the request's (X-Provider-Id), as on
+ * every other page.
  *
  * Access is asked and decided per company or provider: one request row per
  * (company or provider, Test Manager), so a refusal for one provider leaves
@@ -28,12 +39,14 @@
 const express = require('express');
 const { randomUUID } = require('node:crypto');
 const rateLimit = require('express-rate-limit');
-const { get, all, run } = require('../../db/db');
+const { get, all, run, encrypt, decrypt } = require('../../db/db');
 const { requireAuth }   = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, auditLog } = require('../helpers/shared');
 const { canUseCompany } = require('../helpers/provider-access');
 const A = require('../../utils/aiAccess');
+const C = require('../../utils/aiConfig');
+const { testConnection } = require('../../services/aiConnector');
 const { sendAiAccessNotice } = require('../../utils/mailer');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis' });
 
@@ -209,6 +222,166 @@ router.post('/ai-analysis/access/request', requestLimiter, (req, res) => {
   return res.status(asked.length ? 201 : 200).json({
     targets: plan.chosen.map(t => targetView(t, req.user.id)),
   });
+});
+
+// ── The AI service (PR 2) ────────────────────────────────────────────────────
+
+const configLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many changes in a short window — please wait a moment.' }
+});
+
+// Each test is a call to the AI service, billed to the company's account.
+const testLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many connection tests in a short window — please wait a moment.' }
+});
+
+// The request's company or provider, for a Test Manager. With `approved`, the
+// Test Manager's access to it must be approved and its text accepted.
+function configScope(req, res, { approved = true } = {}) {
+  const company = scopeForTestManager(req, res);
+  if (!company) return null;
+  const target = get('SELECT id, name, parent_id FROM companies WHERE id = ?', [req.companyId]);
+  if (!target) {
+    res.status(404).json({ status: 404, title: 'Not Found', detail: 'Company not found.' });
+    return null;
+  }
+  if (approved) {
+    const state = A.accessState(requestOf(target.id, req.user.id));
+    if (state !== 'approved') {
+      const detail = state === 'needs_acceptance'
+        ? 'The commitment text has changed: accept it again on this page before you configure the AI service.'
+        : `Your access to the AI analysis is not approved for ${target.name}.`;
+      res.status(403).json({ status: 403, title: 'Forbidden', detail });
+      return null;
+    }
+  }
+  return target;
+}
+
+function configOf(companyId, userId) {
+  return get('SELECT * FROM ai_config WHERE company_id = ? AND user_id = ?', [companyId, userId]) || null;
+}
+
+function storedKey(row) {
+  return row?.api_key_enc ? decrypt(row.api_key_enc) : null;
+}
+
+const refuse = (res, status, detail) => res.status(status).json({
+  status, title: status === 422 ? 'Unprocessable Content' : 'Bad Request', detail });
+
+// What a PUT or a test names: { next, key } or the refusal already sent.
+function candidateOf(req, res, stored) {
+  const checked = C.checkConfig(req.body);
+  if (checked.refusal) { refuse(res, 400, checked.refusal); return null; }
+  const next = checked.value;
+  const keyProblem = C.keyRefusal(stored, next);
+  if (keyProblem) { refuse(res, 400, keyProblem); return null; }
+  return { next, key: next.apiKey || storedKey(stored) };
+}
+
+const testView = (t) => (t.ok
+  ? { ok: true, answer: t.answer, stopReason: t.stopReason, model: t.model, usage: t.usage, ms: t.ms }
+  : { ok: false, error: t.error, status: t.status ?? null });
+
+// ── GET /ai-analysis/config ──────────────────────────────────────────────────
+router.get('/ai-analysis/config', readLimiter, (req, res) => {
+  const target = configScope(req, res);
+  if (!target) return;
+  return res.json({
+    company: { id: target.id, name: target.name, provider: !!target.parent_id },
+    config: C.configView(configOf(target.id, req.user.id)),
+    connectors: C.connectorsForPage(),
+    limits: { instruction: C.LIMITS.instruction, minTokenCap: C.LIMITS.minTokenCap },
+  });
+});
+
+// ── PUT /ai-analysis/config ──────────────────────────────────────────────────
+router.put('/ai-analysis/config', configLimiter, async (req, res) => {
+  const target = configScope(req, res);
+  if (!target) return;
+  const stored = configOf(target.id, req.user.id);
+  const candidate = candidateOf(req, res, stored);
+  if (!candidate) return;
+  const { next, key } = candidate;
+
+  // A new service, address, model or key is tested before it is saved.
+  let test = null;
+  if (C.needsTest(stored, next)) {
+    test = await testConnection({ connector: next.connector, baseUrl: next.baseUrl, model: next.model, apiKey: key });
+    if (!test.ok) {
+      return res.status(422).json({ status: 422, title: 'Unprocessable Content',
+        detail: `Not saved: the connection test failed. ${test.error}`, test: testView(test) });
+    }
+  }
+
+  const keyEnc = next.apiKey ? encrypt(next.apiKey) : (stored?.api_key_enc ?? null);
+  const testedAt = test ? new Date().toISOString() : stored.tested_at;
+  run(`INSERT INTO ai_config (company_id, user_id, connector, base_url, model, api_key_enc, monthly_token_cap, instruction,
+         tested_at, tested_base_url, tested_model)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (company_id, user_id) DO UPDATE SET
+         connector = excluded.connector, base_url = excluded.base_url, model = excluded.model,
+         api_key_enc = excluded.api_key_enc, monthly_token_cap = excluded.monthly_token_cap,
+         instruction = excluded.instruction, tested_at = excluded.tested_at,
+         tested_base_url = excluded.tested_base_url, tested_model = excluded.tested_model,
+         updated_at = datetime('now')`,
+  [target.id, req.user.id, next.connector, next.baseUrl, next.model, keyEnc, next.monthlyTokenCap, next.instruction,
+    testedAt, next.baseUrl, next.model]);
+  const fields = C.changedFields(stored, next);
+  auditLog(req.user.id, target.id, req.user.email,
+    `ai_config_saved:${next.connector}${fields.length ? ':' + fields.join(',') : ''}${test ? ':tested' : ''}`);
+
+  return res.status(stored ? 200 : 201).json({
+    config: C.configView(configOf(target.id, req.user.id)),
+    test: test ? testView(test) : null,
+  });
+});
+
+// ── POST /ai-analysis/config/test ────────────────────────────────────────────
+// No body: test the stored service. A body: test it without saving.
+router.post('/ai-analysis/config/test', testLimiter, async (req, res) => {
+  const target = configScope(req, res);
+  if (!target) return;
+  const stored = configOf(target.id, req.user.id);
+  const given = req.body && typeof req.body === 'object' && req.body.connector !== undefined;
+  let config;
+  if (given) {
+    const candidate = candidateOf(req, res, stored);
+    if (!candidate) return;
+    const { next, key } = candidate;
+    config = { connector: next.connector, baseUrl: next.baseUrl, model: next.model, apiKey: key };
+  } else if (stored) {
+    config = { connector: stored.connector, baseUrl: stored.base_url, model: stored.model, apiKey: storedKey(stored) };
+  } else {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No AI service is configured here yet.' });
+  }
+
+  const test = await testConnection(config);
+  if (!given && test.ok) {
+    run(`UPDATE ai_config SET tested_at = ? WHERE company_id = ? AND user_id = ?`, [new Date().toISOString(), target.id, req.user.id]);
+  }
+  auditLog(req.user.id, target.id, req.user.email, `ai_config_tested:${config.connector}:${test.ok ? 'ok' : 'failed'}`);
+  return res.json({ test: testView(test) });
+});
+
+// ── DELETE /ai-analysis/config ───────────────────────────────────────────────
+// Removing one's own service is always allowed, approved or not.
+router.delete('/ai-analysis/config', configLimiter, (req, res) => {
+  const target = configScope(req, res, { approved: false });
+  if (!target) return;
+  const stored = configOf(target.id, req.user.id);
+  if (!stored) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No AI service is configured here.' });
+  run('DELETE FROM ai_config WHERE company_id = ? AND user_id = ?', [target.id, req.user.id]);
+  auditLog(req.user.id, target.id, req.user.email, `ai_config_removed:${stored.connector}`);
+  return res.status(204).end();
 });
 
 module.exports = router;

@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.325] / [collection-OTST_V2.0.183] — 2026-10-17
+
+Issue #801 part 2, release 2026.360. Server and pages only.
+
+### Added
+- **The AI service of each company or provider.** On the AI Analysis page, where a Test Manager's access is approved (part 1), one section per company or provider configures the AI service the analysis will use. As the access is, it is per (company or provider, Test Manager): table `ai_config` (migration 33).
+  - Two kinds of service: the Anthropic Messages API, and the Chat Completions API that OpenAI and others (Mistral, vLLM, Ollama, LiteLLM…) answer. Fields: address, model, key, an optional monthly token limit (stored now, counted by part 3) and an optional instruction added to OSCAR's prompt.
+  - **Test the connection** sends one small request ("reply with the single word OK") and shows the answer, the tokens and the time, or the service's error.
+  - **A new service, address, model or key is tested before it is saved**; a failed test saves nothing (422). A limit or an instruction is saved without a call.
+  - **The key** is encrypted like the OSDM credentials, never sent back to a page, never logged, and masked in any error the service echoes it in. A stored key is only sent to the service it was typed for: another kind of service or another host asks for it again.
+  - **The address** goes through `urlPolicy.js` like an OSDM endpoint (https on a public host). Redirects are not followed, the answer is read up to 256 KB, and a call gives up after 30 s (`services/aiConnector.js`).
+  - Removing a service is allowed whether or not the access is still approved.
+  - Routes: `GET`, `PUT`, `DELETE /v1/company/ai-analysis/config` and `POST /v1/company/ai-analysis/config/test`, for the request's company or provider (`X-Provider-Id`). Rules in `utils/aiConfig.js` (pure).
+
+Checked:
+- `ai-config.test.js` (unit: the fields and their refusals, when a key is asked again, when a save is tested, the two request shapes, reading answers, errors with the key masked, the page section) and `ai-config.test.js` (integration, against a local stub AI service: role and approval refusals, a failed test saving nothing, the Anthropic headers, the key encrypted and never returned, no call for a limit, a new model tested with the stored key, another host refused without the key, a redirect not followed, the address rule, a test without saving, a provider's own OpenAI-compatible service, removing after a withdrawal, a timeout, an oversized answer).
+- The redirect and key guards were each broken on purpose and the tests failed.
+- In Chromium through a throwaway server and a stub AI service: a wrong key refused with the key masked, a test, a save, a provider's section switching kind.
+
+---
+
 ## [server-1.11.324] / [collection-OTST_V2.0.183] — 2026-10-17
 
 Issue #815, release 2026.359. Server and pages only.
