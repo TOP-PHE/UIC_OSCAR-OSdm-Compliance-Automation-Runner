@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.349",
+  "current_release": "2026.350",
   "releases": [
+    {
+      "release": "2026.350",
+      "date": "2026-10-17",
+      "server": "1.11.315",
+      "collection": "OTST_V2.0.182",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Framework: clearer help for the random offer combinations (Number, Seed), the currency field (separators) and the choice for a mandatory reservation without a seat choice (#797)."
+      ]
+    },
     {
       "release": "2026.349",
       "date": "2026-10-16",

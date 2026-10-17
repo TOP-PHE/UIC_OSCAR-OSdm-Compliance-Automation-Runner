@@ -378,7 +378,7 @@ function currenciesHtml(fw) {
   const sold = Array.isArray(c.sold) ? c.sold.join(', ') : '';
   const def = typeof c.default === 'string' ? c.default : '';
   return `
-        <div style="margin:10px 0 2px;font-size:12px;color:#546e7a">💱 Currencies — ISO 4217 codes the provider sells in (offerSearchCriteria.currency), and its default when none is asked; the catalogue offers a sale and an exchange per currency, a sale in the default and a probe with a currency not listed</div>
+        <div style="margin:10px 0 2px;font-size:12px;color:#546e7a">💱 Currencies — ISO 4217 codes the provider sells in (offerSearchCriteria.currency), and its default when none is asked; the catalogue offers a sale and an exchange per currency, a sale in the default and a probe with a currency not listed. Separate several codes with a comma, a semicolon or a space (EUR, CHF); lower case is accepted. The default is one code only, and it is added to those sold.</div>
         <label for="fw-currencies-sold" style="font-size:12px">Sold in</label>
         <input type="text" id="fw-currencies-sold" value="${esc(sold)}" placeholder="EUR, CHF" data-action="fw-currencies" data-field="sold" style="width:160px">
         <label for="fw-currencies-default" style="font-size:12px;margin-left:10px">Default</label>
@@ -425,7 +425,7 @@ function offerCombinationsHtml(fw) {
   const count = Number.isInteger(c.count) ? c.count : '';
   const seed = Number.isInteger(c.seed) ? c.seed : '';
   return `
-        <div style="margin:10px 0 2px;font-size:12px;color:#546e7a">Random combinations — the catalogue offers this many scenarios combining two or more of the values ticked, drawn from the seed; the same seed gives the same combinations</div>
+        <div style="margin:10px 0 2px;font-size:12px;color:#546e7a">Random combinations — <b>Number</b> (1 to 20): how many extra reference scenarios the catalogue offers, OTST_OFFER_COMBO_1, _2… Each one is a single offer search mixing two or more of the options above, one value each, drawn from the values ticked (for example offer parts RESERVATION with travel class FIRST; travel and service class are never drawn together). <b>Seed</b>: the number the draw starts from; the same seed always gives the same combinations, so a batch can be run again identically, and New seed draws other ones. Leave Number empty for none.</div>
         <label for="fw-offer-combinations-count" style="font-size:12px">Number</label>
         <input type="number" id="fw-offer-combinations-count" min="1" max="20" value="${esc(count)}" data-action="fw-offer-combinations" data-field="count" style="width:70px">
         <label for="fw-offer-combinations-seed" style="font-size:12px;margin-left:10px">Seed</label>
@@ -512,6 +512,7 @@ function mandatoryReservationFormHtml(fw) {
             <div style="margin-top:10px;font-size:12px">
               <label for="fw-mandatory-reservation-form">A mandatory reservation booked without a seat choice</label>
               <select id="fw-mandatory-reservation-form" data-action="fw-mandatory-reservation-form" style="margin-left:6px">${options}</select>
+              <div style="margin-top:4px;font-size:11px;color:#78909c">For a reservation an admission makes mandatory, when the scenario chooses no seat. <b>In placeSelections</b> (default): the booking request names it in a placeSelection with only its trip and leg; some providers require it ("not covered by any placeSelection"). <b>Not named</b>: the booking request names it nowhere and the provider books it with the ticket and gives the seat; some providers refuse a placeSelection that asks nothing. Either way the booking is checked to hold the reservation, and a scenario that chooses a seat (preferences, a named place, a place next to another) always sends its placeSelection.</div>
             </div>`;
 }
 

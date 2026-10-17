@@ -75,6 +75,16 @@ describe('#793 the Test Framework page', () => {
     expect(change('other', { value: 'NONE' })).toBe(false);
   });
 
+  // #797: the help says what each choice sends, and the other two fields how to fill them.
+  test('the help texts say what each field does', () => {
+    const html = lift('mandatoryReservationFormHtml', { esc, FW_MANDATORY_RESERVATION_FORMS: forms })({});
+    expect(html).toContain('names it nowhere and the provider books it with the ticket');
+    expect(html).toContain('always sends its placeSelection');
+    const source = lines.join('\n');
+    expect(source).toContain('Separate several codes with a comma, a semicolon or a space');
+    expect(source).toContain('the same seed always gives the same combinations');
+  });
+
   test('the panel shows it and the change handler is wired before the switch', () => {
     const source = lines.join('\n');
     expect(source).toContain('${mandatoryReservationFormHtml(fw)}');
