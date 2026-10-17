@@ -168,6 +168,8 @@ function requirementsOf(scenario, datafile) {
     passengerTypes: types,
     offerRequest: offerRequestOf(scenario, datafile),
     placeSelectionFlow: placeSelectionFlowOf(scenario),
+    // #809: a purchaser written after the booking (POST /bookings/{id}/purchaser).
+    purchaserAfterBooking: require('./undeclaredSteps').purchaserAfterBooking(scenario),
   };
 }
 
@@ -203,7 +205,14 @@ function missingFor(requirements, framework) {
   return [
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
+    ...stepsMissing(requirements, fw),
   ];
+}
+
+// #809: a step the framework says the provider does not offer, as a sentence.
+function stepsMissing(requirements, fw) {
+  return requirements.purchaserAfterBooking && fw.purchaserAfterBooking === false
+    ? ['a purchaser written after the booking (Passenger Types)'] : [];
 }
 
 // #766: a place chosen in a way the framework does not declare, as a sentence.

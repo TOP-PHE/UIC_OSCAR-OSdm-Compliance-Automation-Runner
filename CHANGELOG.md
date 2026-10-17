@@ -62,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.322] / [collection-OTST_V2.0.182] — 2026-10-17
+## [server-1.11.322] / [collection-OTST_V2.0.183] — 2026-10-17
 
 Issue #810, release 2026.357. Server and pages only.
 
@@ -78,6 +78,26 @@ Checked:
 - `company-configuration.test.js`: a download from a company imported into its provider (scenarios, framework, trains added, the journey's legs on the new ids, the previous file kept); a second "add" adding nothing; "replace" removing the provider's own train; a tester refused both ways; every refusal (choice missing, invalid data file, template, OSDM version) changing none of the three stores; a failed database step putting the data file back. Each guard mutation-checked.
 - `configuration-bundle.test.js` (the rules, pure), `configuration-page.test.js` and `scenarios-load-guard.test.js` (the page's functions).
 - The page in Chromium through the real server: a full configuration downloaded from a company and imported into its provider.
+
+---
+
+## [server-1.11.321] / [collection-OTST_V2.0.183] — 2026-10-17
+
+Issue #809, release 2026.356. From two real providers' catalogue runs.
+
+### Fixed
+- **A trip specification is never sent with an empty carrier.** OSDM requires `DatedJourney.carriers` with a `ref`. When the Test Data train had no operator code, OSCAR sent `carriers: [{}]`, and the provider refused the whole offer request (24 runs). Now the leg goes without `carriers`, with a failed check and an `[ERROR]` that names the train and says to give it its operator code in Test Data. A leg that has its carrier gets no new check, so the check counts of other runs do not move.
+  - The simulator's specification trips named an empty operator code (`ref: ""`, which the request check let through). They now name gamma's carrier.
+
+### Changed
+- **"The provider lets a booked passenger be updated" off now holds in every run**, not only in the copies of the catalogue. The run's copy of the data file turns the passenger update off, and the run log says why. Before, every booking scenario on a provider without that route stopped at step 03, and nothing after the booking was tested.
+
+### Added
+- **Test Framework, Passenger Types: "The provider takes the purchaser after the booking"** (`purchaserAfterBooking`, absent = yes). Off: the catalogue's late-purchaser scenario cannot be copied, and a scenario of yours with `bookingPurchaserMode: deferred` runs with a warning. A provider answered 501 to `POST /bookings/{id}/purchaser`.
+
+Checked:
+- `provider-declarations.test.js`: the parser on a simulator specification scenario with the operator code present, absent, empty and blank; the warnings; the run's copy; the catalogue's refusal. The carrier test fails when the empty carrier is put back.
+- `server.test.js`: the run's copy of the data file, through `/data/:filename`.
 
 ---
 

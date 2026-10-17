@@ -3790,10 +3790,14 @@ function changeOfferCombination(action, el) {
   return true;
 }
 
+// #709, #809: steps the provider offers unless the framework says false.
+const FW_STEP_FLAGS = { 'fw-passenger-update': 'passengerUpdate', 'fw-purchaser-after-booking': 'purchaserAfterBooking' };
+
 function changePassengerUpdate(action, el) {
-  if (action !== 'fw-passenger-update') return false;
-  if (el.checked) delete wizData.framework.passengerUpdate;
-  else wizData.framework.passengerUpdate = false;
+  const key = Object.hasOwn(FW_STEP_FLAGS, action) ? FW_STEP_FLAGS[action] : null;
+  if (!key) return false;
+  if (el.checked) delete wizData.framework[key];
+  else wizData.framework[key] = false;
   saveFrameworkDebounced();
   return true;
 }
@@ -4629,7 +4633,14 @@ function renderWizardStep1() {
           <input type="checkbox" id="fw-passenger-update" data-action="fw-passenger-update" ${fw.passengerUpdate === false ? '' : 'checked'}>
           The provider lets a booked passenger be updated (PATCH /bookings/{id}/passengers/{id})
         </label>
-        <div style="font-size:11px;color:#90a4ae;margin-top:4px;line-height:1.5">Off: scenarios copied from the catalogue do not update their passengers (step 03 is skipped).</div>
+        <div style="font-size:11px;color:#90a4ae;margin-top:4px;line-height:1.5">Off: no scenario updates its passengers when it runs (step 03 is skipped, with a warning), and the copies of the catalogue do not either.</div>
+      </div>
+      <div class="fw-subsection">
+        <label class="fw-subsection-label" for="fw-purchaser-after-booking" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="fw-purchaser-after-booking" data-action="fw-purchaser-after-booking" ${fw.purchaserAfterBooking === false ? '' : 'checked'}>
+          The provider takes the purchaser after the booking (POST /bookings/{id}/purchaser)
+        </label>
+        <div style="font-size:11px;color:#90a4ae;margin-top:4px;line-height:1.5">Off: the catalogue's scenario with a purchaser written after the booking cannot be copied, and a scenario of yours doing it runs with a warning.</div>
       </div>
     </div>
   </div>

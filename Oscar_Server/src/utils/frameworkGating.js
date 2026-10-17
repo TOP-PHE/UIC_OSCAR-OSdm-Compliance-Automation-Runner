@@ -417,6 +417,8 @@ function datafileScenarioWarnings(sc, framework, datafile) {
   const currency = scenarioOfferCriteria(sc, datafile)?.currency;
   if (typeof currency === 'string' && currency && !isArmedValue(sc.currencyExpectRejection)
       && !require('./currencies').currencyDeclared(framework, currency)) warnings.push(`currency:${currency}`);
+  // #809: a passenger update or a late purchaser the provider does not offer.
+  warnings.push(...require('./undeclaredSteps').undeclaredStepWarnings(sc, framework));
   return warnings;
 }
 

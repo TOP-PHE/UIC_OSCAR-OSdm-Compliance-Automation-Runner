@@ -1604,6 +1604,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   continuous leg is checked for its start and end, not a train
   (`otherLegOf()`). `PERSON` alone in `appliedPassengerTypes` is "no band
   stated" (WARNING) in `passengerAges.js`.
+  **Since #809 (1.11.321) it holds in every run**: the run's copy turns
+  `patchPassengers` off (`withoutUndeclaredPassengerUpdate()`,
+  `utils/undeclaredSteps.js`, after the annotation that warns
+  `passengerUpdate`); a provider without the route stopped every booking
+  scenario at 03 and nothing after the booking was tested. Its twin
+  `purchaserAfterBooking: false` (same section) refuses the catalogue's
+  late-purchaser entry (`missingFor()`) and warns `bookingPurchaserMode:
+  deferred`. **A trip specification leg without an operator code is sent
+  without `carriers`** (OSDM requires a `ref`; `[{}]` was refused as a whole
+  request), with a failed check and an `[ERROR]` only then, so other runs
+  keep their check counts; the simulator's specification trips name gamma's
+  carrier.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says

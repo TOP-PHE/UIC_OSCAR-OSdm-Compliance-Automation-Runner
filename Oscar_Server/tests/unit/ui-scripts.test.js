@@ -1126,9 +1126,29 @@ describe('#709 the passenger update in the Test Framework', () => {
     expect(src).toContain('<label class="fw-subsection-label" for="fw-passenger-update"');
     expect(src).toContain(`<input type="checkbox" id="fw-passenger-update" data-action="fw-passenger-update" \${fw.passengerUpdate === false ? '' : 'checked'}>`);
     const fn = src.slice(src.indexOf('function changePassengerUpdate('), src.indexOf('function setPaxField('));
-    expect(fn).toContain('if (el.checked) delete wizData.framework.passengerUpdate;');
-    expect(fn).toContain('else wizData.framework.passengerUpdate = false;');
+    expect(fn).toContain('if (el.checked) delete wizData.framework[key];');
+    expect(fn).toContain('else wizData.framework[key] = false;');
     expect(src).not.toContain("case 'fw-passenger-update'");
+  });
+
+  test('#809 the purchaser after the booking: a labelled checkbox, set by the same handler', () => {
+    const src = read('js/scenarios.js');
+    expect(src).toContain('<label class="fw-subsection-label" for="fw-purchaser-after-booking"');
+    expect(src).toContain(`<input type="checkbox" id="fw-purchaser-after-booking" data-action="fw-purchaser-after-booking" \${fw.purchaserAfterBooking === false ? '' : 'checked'}>`);
+    expect(src).toContain("const FW_STEP_FLAGS = { 'fw-passenger-update': 'passengerUpdate', 'fw-purchaser-after-booking': 'purchaserAfterBooking' };");
+    const vm = require('node:vm');
+    const ctx = { wizData: { framework: {} }, saves: 0 };
+    ctx.saveFrameworkDebounced = () => { ctx.saves += 1; };
+    vm.createContext(ctx);
+    const flags = src.split('\n').find((l) => l.startsWith('const FW_STEP_FLAGS'));
+    vm.runInContext(`${flags}\n${src.slice(src.indexOf('function changePassengerUpdate('), src.indexOf('function setPaxField('))}\nthis.change = changePassengerUpdate;`, ctx);
+    expect(ctx.change('fw-purchaser-after-booking', { checked: false })).toBe(true);
+    expect(ctx.wizData.framework).toEqual({ purchaserAfterBooking: false });
+    ctx.change('fw-passenger-update', { checked: false });
+    ctx.change('fw-purchaser-after-booking', { checked: true });
+    expect(ctx.wizData.framework).toEqual({ passengerUpdate: false });
+    expect(ctx.change('toString', { checked: false })).toBe(false);
+    expect(ctx.saves).toBe(3);
   });
 });
 

@@ -4307,7 +4307,7 @@
           "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
           "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
           "vehicleNumber": "101",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
           "productCategoryName": "InterCity",
           "productCategoryShortName": "IC"
@@ -4318,7 +4318,7 @@
           "startDatetime": "%TRIP_DATE%T10:20:00+01:00",
           "endDatetime": "%TRIP_DATE%T11:20:00+01:00",
           "vehicleNumber": "2202",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
           "productCategoryName": "Regional",
           "productCategoryShortName": "R"
@@ -4336,7 +4336,7 @@
           "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
           "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
           "vehicleNumber": "501",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:SC",
           "productCategoryName": "SuperCity",
           "productCategoryShortName": "SC"
@@ -4347,7 +4347,7 @@
           "startDatetime": "%TRIP_DATE%T10:20:00+01:00",
           "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
           "vehicleNumber": "172",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
           "productCategoryName": "EuroCity",
           "productCategoryShortName": "EC"
@@ -4445,7 +4445,7 @@
           "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
           "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
           "vehicleNumber": "101",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
           "productCategoryName": "InterCity",
           "productCategoryShortName": "IC"
@@ -4456,7 +4456,7 @@
           "startDatetime": "%TRIP_DATE%T10:20:00+01:00",
           "endDatetime": "%TRIP_DATE%T11:20:00+01:00",
           "vehicleNumber": "2202",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
           "productCategoryName": "Regional",
           "productCategoryShortName": "R"
@@ -4524,7 +4524,7 @@
           "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
           "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
           "vehicleNumber": "511",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:SC",
           "productCategoryName": "SuperCity",
           "productCategoryShortName": "SC"
@@ -4542,7 +4542,7 @@
           "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
           "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
           "vehicleNumber": "521",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:SC",
           "productCategoryName": "SuperCity",
           "productCategoryShortName": "SC"
@@ -4560,7 +4560,7 @@
           "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
           "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
           "vehicleNumber": "171",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
           "productCategoryName": "EuroCity",
           "productCategoryShortName": "EC"
@@ -4578,7 +4578,7 @@
           "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
           "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
           "vehicleNumber": "173",
-          "operatorCode": "",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
           "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
           "productCategoryName": "EuroCity",
           "productCategoryShortName": "EC"
