@@ -11,11 +11,16 @@
  * company-ai-analysis.js — the AI analysis of results, Test Manager side
  * (#801). PR 1: access only.
  *
- *   GET  /v1/company/ai-analysis/access          — where the Test Manager stands, and the text
- *   POST /v1/company/ai-analysis/access/request  — { version, hash } of the text accepted
+ *   GET  /v1/company/ai-analysis/access          — the text, and where the Test
+ *                                                  Manager stands for the company
+ *                                                  and each provider they may use
+ *   POST /v1/company/ai-analysis/access/request  — { version, hash, companies }:
+ *                                                  the text accepted, for these
  *
- * Access is decided per top-level company: a provider's request acts in its
- * distributor (users belong to top-level companies only, #540). Testers,
+ * Access is asked and decided per company or provider: one request row per
+ * (company or provider, Test Manager), so a refusal for one provider leaves
+ * the others open. The targets are the distributor and the providers
+ * canUseCompany() admits, whichever one the page is working on. Testers,
  * certifiers and administrators are refused; the administrator's side lives
  * in admin.js.
  */
@@ -27,6 +32,7 @@ const { get, all, run } = require('../../db/db');
 const { requireAuth }   = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, auditLog } = require('../helpers/shared');
+const { canUseCompany } = require('../helpers/provider-access');
 const A = require('../../utils/aiAccess');
 const { sendAiAccessNotice } = require('../../utils/mailer');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis' });
@@ -50,13 +56,22 @@ const readLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests in a short window — please wait a moment.' }
 });
 
-// The company the switch and the request belong to: the request's company,
-// or the distributor of the provider it names.
+// The distributor: the request's company, or the distributor of the provider
+// it names.
 function topCompanyOf(companyId) {
-  const row = get('SELECT id, name, parent_id, ai_analysis_enabled FROM companies WHERE id = ?', [companyId]);
+  const row = get('SELECT id, name, parent_id FROM companies WHERE id = ?', [companyId]);
   if (!row) return null;
   if (!row.parent_id) return row;
-  return get('SELECT id, name, parent_id, ai_analysis_enabled FROM companies WHERE id = ?', [row.parent_id]);
+  return get('SELECT id, name, parent_id FROM companies WHERE id = ?', [row.parent_id]);
+}
+
+// What a Test Manager may ask access for: the distributor, then each provider
+// they may use, by name.
+function targetsOf(user, company) {
+  const providers = all('SELECT id, name FROM companies WHERE parent_id = ? ORDER BY name', [company.id])
+    .filter(p => canUseCompany(user, p.id));
+  return [{ id: company.id, name: company.name, provider: false },
+    ...providers.map(p => ({ id: p.id, name: p.name, provider: true }))];
 }
 
 function scopeForTestManager(req, res) {
@@ -116,7 +131,7 @@ function saveAcceptance(existing, companyId, userId, reaccept) {
 }
 
 // Fire-and-forget: the administrators' card is the reliable signal.
-function notifyAdministrators(req, company) {
+function notifyAdministrators(req, company, names) {
   const admins = all("SELECT email FROM users WHERE role = 'administrator' AND (status IS NULL OR status = 'active')").map(r => r.email);
   if (!admins.length) return;
   sendAiAccessNotice({
@@ -124,21 +139,39 @@ function notifyAdministrators(req, company) {
     subject: `OSCAR — AI analysis access requested (${company.name})`,
     heading: 'AI analysis access requested',
     lines: [`${req.user.email} (${company.name}) asks for access to the AI analysis of results, and has accepted version ${A.COMMITMENT.version} of the commitment text.`,
-      'Approve or refuse the request in Manage Companies.'],
+      `For: ${names.join(', ')}.`,
+      'Approve or refuse each one in Manage Companies.'],
     url: `${appUrl(req)}/admin.html?tab=companies`,
   }).catch(err => log.warn({ err: err.message }, 'AI access request notice not sent'));
+}
+
+function targetView(target, userId) {
+  const request = requestOf(target.id, userId);
+  return { ...target, state: A.accessState(request), request: toApiRequest(request) };
+}
+
+const MAX_TARGETS = 100;
+
+// The targets a request names, or the refusal to send.
+function chosenTargets(body, targets) {
+  const ids = body?.companies;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_TARGETS || !ids.every(id => typeof id === 'string')) {
+    return { refusal: { status: 400, title: 'Bad Request', detail: 'Choose the company or the providers you ask access for.' } };
+  }
+  const chosen = targets.filter(t => ids.includes(t.id));
+  if (chosen.length !== new Set(ids).size) {
+    return { refusal: { status: 404, title: 'Not Found', detail: 'Company or provider not found.' } };
+  }
+  return { chosen };
 }
 
 // ── GET /ai-analysis/access ──────────────────────────────────────────────────
 router.get('/ai-analysis/access', readLimiter, (req, res) => {
   const company = scopeForTestManager(req, res);
   if (!company) return;
-  const request = requestOf(company.id, req.user.id);
   return res.json({
     company: { id: company.id, name: company.name },
-    enabled: !!company.ai_analysis_enabled,
-    state: A.accessState(!!company.ai_analysis_enabled, request),
-    request: toApiRequest(request),
+    targets: targetsOf(req.user, company).map(t => targetView(t, req.user.id)),
     commitment: A.commitmentForPage(),
   });
 });
@@ -147,33 +180,34 @@ router.get('/ai-analysis/access', readLimiter, (req, res) => {
 router.post('/ai-analysis/access/request', requestLimiter, (req, res) => {
   const company = scopeForTestManager(req, res);
   if (!company) return;
-  if (!company.ai_analysis_enabled) {
-    return res.status(409).json({ status: 409, title: 'Conflict',
-      detail: 'The AI analysis is not enabled for your company. Ask an OSCAR administrator.' });
-  }
-  const { version, hash } = req.body || {};
-  if (!A.acceptsCurrentText({ version, hash })) {
+  const body = req.body || {};
+  if (!A.acceptsCurrentText(body)) {
     return res.status(400).json({ status: 400, title: 'Bad Request',
       detail: 'The text you accepted is not the one in force. Reload the page and read it again.' });
   }
-  const existing = requestOf(company.id, req.user.id);
-  const state = A.accessState(true, existing);
-  if (!A.mayRequest(state)) {
-    return res.status(409).json({ status: 409, title: 'Conflict', detail: alreadyAsked(state) });
+  const plan = chosenTargets(body, targetsOf(req.user, company));
+  if (plan.refusal) return res.status(plan.refusal.status).json(plan.refusal);
+  const refused = plan.chosen.map(t => targetView(t, req.user.id)).filter(t => !A.mayRequest(t.state));
+  if (refused.length) {
+    return res.status(409).json({ status: 409, title: 'Conflict',
+      detail: refused.map(t => `${t.name}: ${alreadyAsked(t.state)}`).join(' ') });
   }
 
   // An approved Test Manager accepting a new version of the text keeps the
   // approval; any other request waits for an administrator again.
-  const reaccept = state === 'needs_acceptance';
-  saveAcceptance(existing, company.id, req.user.id, reaccept);
-  auditLog(req.user.id, company.id, req.user.email,
-    `${reaccept ? 'ai_access_reaccepted' : 'ai_access_requested'}:v${A.COMMITMENT.version}`);
-  if (!reaccept) notifyAdministrators(req, company);
+  const asked = [];
+  for (const target of plan.chosen) {
+    const existing = requestOf(target.id, req.user.id);
+    const reaccept = A.accessState(existing) === 'needs_acceptance';
+    saveAcceptance(existing, target.id, req.user.id, reaccept);
+    auditLog(req.user.id, target.id, req.user.email,
+      `${reaccept ? 'ai_access_reaccepted' : 'ai_access_requested'}:v${A.COMMITMENT.version}`);
+    if (!reaccept) asked.push(target.name);
+  }
+  if (asked.length) notifyAdministrators(req, company, asked);
 
-  const request = requestOf(company.id, req.user.id);
-  return res.status(reaccept ? 200 : 201).json({
-    state: A.accessState(true, request),
-    request: toApiRequest(request),
+  return res.status(asked.length ? 201 : 200).json({
+    targets: plan.chosen.map(t => targetView(t, req.user.id)),
   });
 });
 

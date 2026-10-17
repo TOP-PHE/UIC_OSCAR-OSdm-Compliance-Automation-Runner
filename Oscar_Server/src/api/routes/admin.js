@@ -465,7 +465,7 @@ router.get('/activity', (req, res) => {
 
 router.get('/companies', (req, res) => {
   const rows = all(
-    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, c.ai_analysis_enabled,
+    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at,
             COUNT(u.id) AS user_count
      FROM companies c
      LEFT JOIN users u ON u.company_id = c.id
@@ -503,31 +503,23 @@ router.patch('/companies/:id', (req, res) => {
   if (company.slug === PLATFORM_SLUG) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The platform root company cannot be modified.' });
   }
-  const { name, slug, ai_analysis_enabled: aiEnabled } = req.body || {};
-  const ai = aiSwitch(company, aiEnabled);
-  const plan = companyUpdates(companyId, name, slug, ai, aiEnabled);
+  const { name, slug } = req.body || {};
+  const plan = companyUpdates(companyId, name, slug);
   if (plan.refusal) return res.status(plan.refusal.status).json(plan.refusal);
   const { updates, values } = plan;
-  if (updates.length === 0) {
-    // Sending the switch as it already is changes nothing, and is not an error.
-    if (ai.applies) return res.json({ company: companyRow(companyId) });
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No update fields provided.' });
-  }
+  if (updates.length === 0) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No update fields provided.' });
   values.push(companyId);
   run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
-  if (ai.change) auditLog(req.user.id, companyId, req.user.email, aiEnabled ? 'ai_analysis_enabled' : 'ai_analysis_disabled');
   return res.json({ company: companyRow(companyId) });
 });
 
 // The SET clauses of a company update, or the refusal to send.
-function companyUpdates(companyId, name, slug, ai, aiEnabled) {
-  if (ai.invalid) return { refusal: { status: 400, title: 'Bad Request', detail: 'ai_analysis_enabled must be true or false.' } };
+function companyUpdates(companyId, name, slug) {
   const newSlug = slug ? freeSlug(slug, companyId) : null;
   if (newSlug === false) return { refusal: { status: 409, title: 'Conflict', detail: 'Company slug already in use.' } };
   const updates = [];
   const values = [];
   if (name) { updates.push('name = ?'); values.push(name); }
-  if (ai.change) { updates.push('ai_analysis_enabled = ?'); values.push(aiEnabled ? 1 : 0); }
   if (newSlug) { updates.push('slug = ?'); values.push(newSlug); }
   return { updates, values };
 }
@@ -540,20 +532,10 @@ function freeSlug(slug, companyId) {
 
 function companyRow(companyId) {
   return get(
-    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, c.ai_analysis_enabled, COUNT(u.id) AS user_count
+    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, COUNT(u.id) AS user_count
      FROM companies c LEFT JOIN users u ON u.company_id = c.id WHERE c.id = ? GROUP BY c.id`,
     [companyId]
   );
-}
-
-// #801: the administrator's switch for the AI analysis, top-level companies
-// only. invalid: not a boolean; applies: a boolean for a top-level company;
-// change: it differs from the stored value.
-function aiSwitch(company, value) {
-  if (value === undefined) return { invalid: false, applies: false, change: false };
-  if (typeof value !== 'boolean') return { invalid: true, applies: false, change: false };
-  const applies = !company.parent_id;
-  return { invalid: false, applies, change: applies && !!company.ai_analysis_enabled !== value };
 }
 
 router.delete('/companies/:id', (req, res) => {
@@ -588,7 +570,8 @@ router.delete('/companies/:id', (req, res) => {
 });
 
 // ── AI analysis access requests (#801) ───────────────────────────────────────
-// The administrator decides; the content of an analysis is never read here.
+// The administrator decides, one company or provider at a time (a Test
+// Manager's request names each); the content of an analysis is never read here.
 
 const AI_DECISIONS = {
   approve: { from: ['pending'], to: 'approved', event: 'ai_access_approved' },
@@ -599,10 +582,11 @@ const AI_DECISIONS = {
 router.get('/ai-access-requests', (req, res) => {
   const rows = all(
     `SELECT r.id, r.state, r.text_version, r.accepted_at, r.decided_at, r.reason, r.created_at,
-            c.id AS company_id, c.name AS company_name, c.ai_analysis_enabled,
+            c.id AS company_id, c.name AS company_name, p.name AS parent_name,
             u.email AS user_email, u.role AS user_role, d.email AS decided_by_email
        FROM ai_access_request r
        JOIN companies c ON c.id = r.company_id
+       LEFT JOIN companies p ON p.id = c.parent_id
        JOIN users u ON u.id = r.user_id
        LEFT JOIN users d ON d.id = r.decided_by
       ORDER BY CASE r.state WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, r.accepted_at DESC`);
@@ -611,7 +595,7 @@ router.get('/ai-access-requests', (req, res) => {
     requests: rows.map(r => ({
       id: r.id, state: r.state, textVersion: r.text_version, acceptedAt: r.accepted_at,
       decidedAt: r.decided_at, decidedBy: r.decided_by_email || null, reason: r.reason,
-      company: { id: r.company_id, name: r.company_name, aiAnalysisEnabled: !!r.ai_analysis_enabled },
+      company: { id: r.company_id, name: r.company_name, providerOf: r.parent_name || null },
       user: { email: r.user_email, role: normalizeRole(r.user_role) },
     })),
   });

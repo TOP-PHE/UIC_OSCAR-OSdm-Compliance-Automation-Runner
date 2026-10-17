@@ -10,10 +10,11 @@
 /**
  * aiAccess.js — who may use the AI analysis of results (#801, PR 1). Pure.
  *
- * Three locks: the administrator enables the feature for a company; a Test
- * Manager of it requests access and accepts the commitment text; the
- * administrator approves the request. A new version of the text asks the
- * Test Manager to accept again, without a new approval.
+ * A Test Manager asks for access, accepting the commitment text, for the
+ * company and each provider they choose; the OSCAR administrator approves or
+ * refuses each one on its own, so a refusal for one provider leaves the others
+ * open. A new version of the text asks the Test Manager to accept again,
+ * without a new approval.
  */
 
 const crypto = require('node:crypto');
@@ -58,18 +59,16 @@ function acceptsCurrentText(accepted) {
 const STATES = Object.freeze(['pending', 'approved', 'refused', 'revoked']);
 
 /**
- * Where a Test Manager stands. `enabled` is the company switch; `request` the
+ * Where a Test Manager stands for one company or provider. `request` is the
  * stored row ({ state, text_version, … }) or null.
  *
- *   disabled            the administrator has not enabled it for the company
- *   none                enabled, no request yet (or the last was refused or
- *                       revoked: `request` then says which)
+ *   none                no request yet (or the last was refused or revoked:
+ *                       `request` then says which)
  *   pending             waiting for the administrator
  *   needs_acceptance    approved, but the text changed since it was accepted
- *   approved            the tab is open
+ *   approved            open
  */
-function accessState(enabled, request) {
-  if (!enabled) return 'disabled';
+function accessState(request) {
   if (!request || !STATES.includes(request.state)) return 'none';
   if (request.state === 'pending') return 'pending';
   if (request.state === 'approved') {

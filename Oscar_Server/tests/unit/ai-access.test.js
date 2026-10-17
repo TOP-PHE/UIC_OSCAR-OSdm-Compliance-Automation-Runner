@@ -44,23 +44,22 @@ describe('#801 the commitment text', () => {
   });
 });
 
-describe('#801 where a Test Manager stands', () => {
+describe('#801 where a Test Manager stands, for one company or provider', () => {
   const v = A.COMMITMENT.version;
   test.each([
-    [false, { state: 'approved', text_version: v }, 'disabled'],
-    [true, null, 'none'],
-    [true, { state: 'pending', text_version: v }, 'pending'],
-    [true, { state: 'approved', text_version: v }, 'approved'],
-    [true, { state: 'approved', text_version: v - 1 }, 'needs_acceptance'],
-    [true, { state: 'refused', text_version: v }, 'none'],
-    [true, { state: 'revoked', text_version: v }, 'none'],
-    [true, { state: 'odd', text_version: v }, 'none'],
-  ])('enabled %s, request %j → %s', (enabled, request, state) => {
-    expect(A.accessState(enabled, request)).toBe(state);
+    [null, 'none'],
+    [{ state: 'pending', text_version: v }, 'pending'],
+    [{ state: 'approved', text_version: v }, 'approved'],
+    [{ state: 'approved', text_version: v - 1 }, 'needs_acceptance'],
+    [{ state: 'refused', text_version: v }, 'none'],
+    [{ state: 'revoked', text_version: v }, 'none'],
+    [{ state: 'odd', text_version: v }, 'none'],
+  ])('request %j → %s', (request, state) => {
+    expect(A.accessState(request)).toBe(state);
   });
 
   test('a request may be made from none and needs_acceptance only', () => {
-    expect(['disabled', 'none', 'pending', 'approved', 'needs_acceptance'].filter(A.mayRequest)).toEqual(['none', 'needs_acceptance']);
+    expect(['none', 'pending', 'approved', 'needs_acceptance'].filter(A.mayRequest)).toEqual(['none', 'needs_acceptance']);
   });
 });
 
@@ -72,41 +71,53 @@ describe('#801 the page', () => {
     const end = lines.findIndex((l, i) => i > start && l === '}');
     return lines.slice(start, end + 1).join('\n');
   };
-  const consts = lines.filter((l) => /^const (NOTE|INFO|WARN|OK) =/.test(l)).join('\n');
+  const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
-  vm.runInContext(`${consts}\n${lift('commitmentHtml')}\n${lift('requestFormHtml')}\n${lift('pastRequestHtml')}\n${lift('accessHtml')}\nthis.accessHtml = accessHtml;`, ctx);
+  const names = ['commitmentHtml', 'requestFormHtml', 'pastRequestHtml', 'stateHtml', 'mayAsk', 'targetRowHtml', 'accessHtml'];
+  vm.runInContext(`${consts}\n${names.map(lift).join('\n')}\nthis.accessHtml = accessHtml;`, ctx);
   const commitment = A.commitmentForPage();
-  const page = (state, request = null) => ctx.accessHtml({ state, request, commitment, company: { name: 'Acme <b>' } });
+  const target = (id, state, request = null, provider = true) => ({ id, name: `${id} <b>`, provider, state, request });
+  const page = (...targets) => ctx.accessHtml({ targets, commitment, company: { name: 'Acme' } });
 
-  test('switched off: no text, no button, the company named as text', () => {
-    const html = page('disabled');
-    expect(html).toContain('not enabled for Acme &lt;b&gt;');
-    expect(html).not.toContain('data-ai-action="request"');
-  });
-
-  test('no request: the whole text, a box to tick, and a button that starts disabled', () => {
-    const html = page('none');
+  test('nothing asked yet: one box per company or provider, the whole text, a box to tick, a button that starts disabled', () => {
+    const html = page(target('own', 'none', null, false), target('p1', 'none'));
     for (const p of commitment.points) expect(html).toContain(esc(p));
+    expect(html).toContain('value="own"');
+    expect(html).toContain('value="p1"');
+    expect(html).toContain('p1 &lt;b&gt;');
     expect(html).toContain('data-ai-action="accept"');
-    expect(html).toMatch(/data-ai-action="request" disabled>Ask for access</);
+    expect(html).toMatch(/data-ai-action="request" disabled>Send the request</);
   });
 
-  test('refused or withdrawn: the reason is shown, escaped, and a new request is offered', () => {
-    const html = page('none', { state: 'refused', reason: 'No <contract>' });
-    expect(html).toContain('was refused: No &lt;contract&gt;');
-    expect(html).toContain('Ask for access');
-    expect(page('none', { state: 'revoked', reason: 'Ended' })).toContain('was withdrawn: Ended');
+  test('a refused provider shows its reason and can be asked again; the others keep their state, without a box', () => {
+    const html = page(target('own', 'approved', null, false), target('p1', 'none', { state: 'refused', reason: 'No <contract>' }),
+      target('p2', 'pending', { textVersion: 1, acceptedAt: '2026-10-17 06:00:00' }));
+    expect(html).toContain('Refused: No &lt;contract&gt;');
+    expect(html).toContain('value="p1"');
+    expect(html).not.toContain('value="own"');
+    expect(html).not.toContain('value="p2"');
+    expect(html).toContain('Waiting for an OSCAR administrator');
+    expect(page(target('p1', 'none', { state: 'revoked', reason: 'Ended' }))).toContain('Withdrawn: Ended');
   });
 
-  test('pending, approved, and a text to accept again', () => {
-    expect(page('pending', { textVersion: 1, acceptedAt: '2026-10-17 06:00:00' })).toContain('waiting for an OSCAR administrator');
-    expect(page('pending', { textVersion: 1 })).not.toContain('data-ai-action="request"');
-    expect(page('approved')).toContain('Your access is approved');
-    expect(page('needs_acceptance')).toContain('Accept the new text');
+  test('nothing to ask: the text without a button; approved says what comes next', () => {
+    const waiting = page(target('own', 'pending', { textVersion: 1 }, false));
+    expect(waiting).not.toContain('data-ai-action="request"');
+    const open = page(target('own', 'approved', null, false));
+    expect(open).toContain('Approved');
+    expect(open).toContain('comes in the next releases');
+    expect(open).not.toContain('data-ai-action="request"');
   });
 
-  test('the page sends back the version and hash it showed', () => {
-    expect(source).toContain('JSON.stringify({ version: current.commitment.version, hash: current.commitment.hash })');
+  test('a changed text is accepted again, from a box like the others', () => {
+    const html = page(target('own', 'needs_acceptance', { state: 'approved', textVersion: 0 }, false));
+    expect(html).toContain('accept it again');
+    expect(html).toContain('value="own"');
+    expect(html).toContain('data-ai-action="request"');
+  });
+
+  test('the page sends back the version and hash it showed, and the ticked targets', () => {
+    expect(source).toContain('JSON.stringify({ version: current.commitment.version, hash: current.commitment.hash, companies })');
   });
 
   test('the menu offers it to Test Managers only', () => {

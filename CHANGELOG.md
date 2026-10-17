@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.320] / [collection-OTST_V2.0.182] — 2026-10-17
+
+Issue #801, release 2026.355. Server and pages only.
+
+### Changed
+- **AI analysis access is asked and decided per company or provider, with no switch to turn on first** (maintainer decision after 1.11.318).
+  - The OSCAR administrator's per-company switch is gone: a Test Manager asks directly, accepting the commitment text, and the administrator approves or refuses.
+  - The Test Manager ticks the company and the providers they ask access for (those `canUseCompany()` admits). Each one is a request of its own, decided on its own: a refusal for one provider leaves the company and the other providers open.
+  - `POST /v1/company/ai-analysis/access/request` takes `companies` (the ids asked for) beside `version` and `hash`; an id the Test Manager may not use is 404, one already waiting or approved is 409 and nothing is saved. `GET …/access` answers `targets`, each with its state; the `disabled` state is gone.
+  - Manage Companies shows a provider's request with its distributor, and has no "AI analysis" column any more.
+  - The `companies.ai_analysis_enabled` column of migration 32 stays, unused. Requests made under 1.11.318 belong to the distributor and keep their state.
+
+Checked:
+- `ai-analysis-access.test.js`: the list of targets, from the company and from a provider; a refused provider beside an approved company; asking again for one alone; another distributor's provider refused; a new text accepted again beside a new request.
+- The page in Chromium through the real server: the company and two providers, two ticked and sent, one refused by the administrator, the other approved.
+
+---
+
 ## [server-1.11.319] / [collection-OTST_V2.0.182] — 2026-10-17
 
 Issue #805, release 2026.354. Pages only.

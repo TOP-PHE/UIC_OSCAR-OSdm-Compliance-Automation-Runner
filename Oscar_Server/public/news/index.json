@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-ai-analysis-per-provider",
+    "date": "October 17, 2026",
+    "tag": "Change",
+    "title": "AI analysis: ask for access per company or provider",
+    "summary": "A Test Manager now asks directly, and chooses the company and the providers the request covers.",
+    "content": "There is no switch for an administrator to turn on first any more. On the AI Analysis page, a Test Manager ticks the company and the providers they want the AI analysis for, accepts the commitment text and sends the request. The OSCAR administrator approves or refuses each one on its own: if one provider is refused, the company and the other providers are not blocked. Configuring your company's AI comes next, once access is approved."
+  },
+  {
     "id": "2026-10-17-logos",
     "date": "October 17, 2026",
     "tag": "Fix",
