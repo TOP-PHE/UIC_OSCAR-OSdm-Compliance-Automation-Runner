@@ -9,13 +9,16 @@
 'use strict';
 
 /**
- * ai-analysis.js — the AI analysis page (#801). PR 1: access only.
+ * ai-analysis.js — the AI analysis page (#801). PR 1: access; PR 2: the
+ * AI service.
  *
  * A Test Manager reads the commitment text, ticks the company and the
  * providers they ask access for, accepts the text and sends the request; the
- * OSCAR administrator decides each one on its own. The analysis itself comes
- * in a later release. `accessHtml(data)` is pure (lifted by the page test);
- * the rest is wiring.
+ * OSCAR administrator decides each one on its own. Where access is approved,
+ * the Test Manager configures the AI service, one section per company or
+ * provider, each saved and tested on its own. The analysis itself comes in a
+ * later release. `accessHtml(data)` and `serviceHtml(...)` are pure (lifted
+ * by the page test); the rest is wiring.
  */
 
 const NOTE = 'padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.5;margin-bottom:14px;';
@@ -93,10 +96,72 @@ function accessHtml(data) {
       chooses. Read what that means before you ask for access.</div>` + table + requestFormHtml(c);
   }
   const open = targets.some(t => t.state === 'approved')
-    ? `<div style="${NOTE}${OK}">The analysis itself (configuring your company's AI, then analysing a batch or
-      comparing two) comes in the next releases.</div>`
+    ? `<div style="${NOTE}${OK}">Configure the AI service of each company or provider below. The analysis itself
+      (a batch, or two batches compared) comes in the next release.</div>`
     : '';
   return open + table + commitmentHtml(c);
+}
+
+const FIELD = 'display:block;font-size:12px;color:#546e7a;margin:10px 0 4px';
+const WIDE = 'width:100%;max-width:560px;box-sizing:border-box';
+
+function connectorOptionsHtml(connectors, chosen) {
+  return connectors.map(c => `<option value="${esc(c.id)}"${c.id === chosen ? ' selected' : ''}>${esc(c.label)}</option>`).join('');
+}
+
+function testedHtml(config) {
+  if (!config) return '<span style="color:#78909c">Not configured yet.</span>';
+  const when = config.testedAt ? `last tested ${esc(config.testedAt)}` : 'not tested';
+  return `<span style="color:#1b5e20">Configured</span>: ${esc(config.model)}, ${when}.`;
+}
+
+/**
+ * One company's or provider's AI service. `n` makes the field ids unique on
+ * the page; the script finds the fields by data-f inside the section.
+ */
+function serviceHtml(target, answer, n) {
+  const config = answer.config;
+  const connectors = answer.connectors || [];
+  const connector = config?.connector || connectors[0]?.id || '';
+  const defaults = connectors.find(c => c.id === connector) || {};
+  const id = (f) => `ai-${f}-${n}`;
+  const keyHint = config?.hasKey ? 'A key is stored. Leave empty to keep it.' : 'The key of your account with this service.';
+  const removeButton = config
+    ? '<button class="btn" data-ai-action="remove">Remove</button>'
+    : '';
+  return `<div class="card" style="padding:16px 20px" data-ai-target="${esc(target.id)}" data-ai-provider="${target.provider ? '1' : ''}">
+    <h3 style="margin:0 0 4px">AI service — ${esc(target.name)}</h3>
+    <div style="font-size:12px;color:#78909c" data-f="status">${testedHtml(config)}</div>
+    <label for="${id('connector')}" style="${FIELD}">Kind of service</label>
+    <select id="${id('connector')}" data-f="connector" data-ai-action="connector" style="${WIDE}">${connectorOptionsHtml(connectors, connector)}</select>
+    <label for="${id('baseUrl')}" style="${FIELD}">Address (https)</label>
+    <input id="${id('baseUrl')}" data-f="baseUrl" style="${WIDE}" type="url" value="${esc(config?.baseUrl || defaults.defaultBaseUrl || '')}" autocomplete="off">
+    <label for="${id('model')}" style="${FIELD}">Model</label>
+    <input id="${id('model')}" data-f="model" style="${WIDE}" type="text" value="${esc(config?.model || '')}" placeholder="claude-opus-5-5, gpt-4o, mistral-large-latest…" autocomplete="off">
+    <label for="${id('apiKey')}" style="${FIELD}">Key</label>
+    <input id="${id('apiKey')}" data-f="apiKey" style="${WIDE}" type="password" value="" placeholder="${esc(keyHint)}" autocomplete="new-password">
+    <div style="font-size:11px;color:#90a4ae;margin-top:3px">Never shown again once saved. Changing the service or its host asks for it again.</div>
+    <label for="${id('cap')}" style="${FIELD}">Monthly token limit (optional)</label>
+    <input id="${id('cap')}" data-f="monthlyTokenCap" style="${WIDE}" type="number" min="${esc(answer.limits?.minTokenCap ?? 1000)}" step="1" value="${esc(config?.monthlyTokenCap ?? '')}">
+    <label for="${id('instruction')}" style="${FIELD}">Your own instruction, added to OSCAR's (optional)</label>
+    <textarea id="${id('instruction')}" data-f="instruction" style="${WIDE}" rows="3" maxlength="${esc(answer.limits?.instruction ?? 2000)}">${esc(config?.instruction || '')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn" data-ai-action="test">Test the connection</button>
+      <button class="btn btn-primary" data-ai-action="save">Save</button>${removeButton}
+    </div>
+    <div data-f="result" style="margin-top:10px"></div>
+  </div>`;
+}
+
+/** What a connection test answered, in words. */
+function testResultHtml(test) {
+  if (!test) return '';
+  if (!test.ok) return `<div style="${NOTE}background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;">${esc(test.error)}</div>`;
+  const usage = test.usage && (test.usage.input != null || test.usage.output != null)
+    ? ` · ${esc(test.usage.input ?? '?')} tokens in, ${esc(test.usage.output ?? '?')} out` : '';
+  const answer = test.answer ? `“${esc(test.answer)}”` : '(no text in the answer)';
+  const model = test.model ? ' — model ' + esc(test.model) : '';
+  return `<div style="${NOTE}${OK}">The service answered in ${esc(test.ms)} ms${usage}: ${answer}${model}</div>`;
 }
 
 let current = null;
@@ -113,14 +178,79 @@ async function readError(res, fallback) {
   try { const body = await res.json(); return body.detail || body.title || fallback; } catch { return fallback; }
 }
 
+// Every request of a section names its company or provider: an empty
+// X-Provider-Id is the own company (nav.js then adds nothing).
+function inTarget(section, init = {}) {
+  const provider = section.dataset.aiProvider ? section.dataset.aiTarget : '';
+  return { ...init, headers: { ...init.headers, 'X-Provider-Id': provider } };
+}
+
+// One target's answer, or null after saying why it could not be read.
+async function serviceAnswer(t) {
+  const res = await fetch('/v1/company/ai-analysis/config', { headers: { 'X-Provider-Id': t.provider ? t.id : '' } });
+  if (!res.ok) { show(await readError(res, `Could not read the AI service of ${t.name}.`), 'error'); return null; }
+  return res.json();
+}
+
+async function servicesHtml(targets) {
+  const approved = targets.filter(x => x.state === 'approved');
+  const answers = await Promise.all(approved.map(serviceAnswer));
+  const shown = answers.find(Boolean);
+  if (current && shown) current.connectorsShown = shown.connectors || [];
+  return approved.map((t, n) => (answers[n] ? serviceHtml(t, answers[n], n) : '')).join('');
+}
+
 async function load() {
   const root = document.getElementById('ai-root');
   const res = await fetch('/v1/company/ai-analysis/access');
   document.getElementById('loading').style.display = 'none';
   if (!res.ok) { show(await readError(res, 'Could not read your access.'), 'error'); return; }
   current = await res.json();
-  root.innerHTML = accessHtml(current);
+  root.innerHTML = accessHtml(current) + await servicesHtml(current.targets || []);
   root.style.display = 'block';
+}
+
+function fieldsOf(section) {
+  const value = (f) => section.querySelector(`[data-f="${f}"]`).value;
+  return { connector: value('connector'), baseUrl: value('baseUrl'), model: value('model'), apiKey: value('apiKey'),
+    monthlyTokenCap: value('monthlyTokenCap'), instruction: value('instruction') };
+}
+
+function showResult(section, html) {
+  section.querySelector('[data-f="result"]').innerHTML = html;
+}
+
+async function serviceAction(section, action) {
+  const url = '/v1/company/ai-analysis/config';
+  const json = { 'Content-Type': 'application/json' };
+  let res;
+  if (action === 'test') {
+    showResult(section, '⏳ Testing…');
+    res = await fetch(url + '/test', inTarget(section, { method: 'POST', headers: json, body: JSON.stringify(fieldsOf(section)) }));
+  } else if (action === 'save') {
+    showResult(section, '⏳ Saving (a new service, address, model or key is tested first)…');
+    res = await fetch(url, inTarget(section, { method: 'PUT', headers: json, body: JSON.stringify(fieldsOf(section)) }));
+  } else {
+    if (!confirm('Remove this AI service, key included?')) return;
+    res = await fetch(url, inTarget(section, { method: 'DELETE' }));
+  }
+  if (res.status === 204) { show('AI service removed.', 'ok'); await load(); return; }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    showResult(section, body.test ? testResultHtml(body.test) : testResultHtml({ ok: false, error: body.detail || 'The request failed.' }));
+    return;
+  }
+  if (action === 'test') { showResult(section, testResultHtml(body.test)); return; }
+  show('AI service saved.', 'ok');
+  await load();
+}
+
+// A new kind of service starts from its usual address, unless one was typed.
+function connectorChanged(section) {
+  const chosen = (current?.connectorsShown || []).find(c => c.id === section.querySelector('[data-f="connector"]').value);
+  const address = section.querySelector('[data-f="baseUrl"]');
+  const defaults = (current?.connectorsShown || []).map(c => c.defaultBaseUrl);
+  if (chosen && (address.value === '' || defaults.includes(address.value))) address.value = chosen.defaultBaseUrl;
 }
 
 function ticked() {
@@ -149,10 +279,17 @@ async function requestAccess() {
 
 document.addEventListener('change', (e) => {
   if (e.target.closest('[data-ai-action="accept"], [data-ai-action="target"]')) updateButton();
+  const kind = e.target.closest('[data-ai-action="connector"]');
+  if (kind) connectorChanged(kind.closest('[data-ai-target]'));
 });
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-ai-action="request"]');
   if (el) requestAccess().catch(err => show(err.message, 'error'));
+  const service = e.target.closest('[data-ai-action="test"], [data-ai-action="save"], [data-ai-action="remove"]');
+  if (service) {
+    const section = service.closest('[data-ai-target]');
+    serviceAction(section, service.dataset.aiAction).catch(err => showResult(section, testResultHtml({ ok: false, error: err.message })));
+  }
 });
 
 if (typeof window !== 'undefined' && document.getElementById('ai-root')) {

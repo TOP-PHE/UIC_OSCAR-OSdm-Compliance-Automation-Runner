@@ -743,6 +743,28 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_ai_access_request_state ON ai_access_request(state)');
   }},
+  { version: 33, name: 'ai-config', up: () => {
+      // #801 PR 2 - a Test Manager's AI service, per company or provider, as
+      // their access is: one row per (company or provider, user). The key is
+      // encrypted (encrypt(), like the OSDM credentials) and never read back
+      // to a browser. tested_* name what the last successful test reached.
+      db.exec(`CREATE TABLE IF NOT EXISTS ai_config (
+        company_id         TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        user_id            TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+        connector          TEXT NOT NULL,
+        base_url           TEXT NOT NULL,
+        model              TEXT NOT NULL,
+        api_key_enc        TEXT,
+        monthly_token_cap  INTEGER,
+        instruction        TEXT,
+        tested_at          TEXT,
+        tested_base_url    TEXT,
+        tested_model       TEXT,
+        created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (company_id, user_id)
+      )`);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

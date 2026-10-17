@@ -262,9 +262,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     never decide access for the distributor as a whole. A request naming one
     target already waiting or approved saves nothing (409). The 1.11.318
     administrator switch is gone; `companies.ai_analysis_enabled` (migration
-    32) is dormant. PR 2 configures the AI (Anthropic Messages or
-    OpenAI-compatible, key encrypted, base URL through `urlPolicy.js`), PR 3
-    the analysis; the plan is in #801.
+    32) is dormant. PR 3 is the analysis; the plan is in #801.
+    **PR 2 (1.11.325): the AI service**, per (company or provider, Test
+    Manager) like the access, only where it is approved (`ai_config`,
+    migration 33; the target is `req.companyId`, X-Provider-Id). Anthropic
+    Messages or OpenAI-compatible Chat Completions, by plain `fetch` in
+    `services/aiConnector.js` (the one place OSCAR calls an AI): address
+    through `urlPolicy.js`, `redirect: 'manual'`, 256 KB answer cap, 30 s.
+    A new service, address, model or key is tested before it is saved
+    (`needsTest()`, 422 when it fails). A stored key goes only to the
+    service and host it was typed for (`keyRefusal()`), is never returned or
+    logged, and is masked in echoed errors (`maskKey()`). Tests use a local
+    stub, never a real service. The monthly token limit is stored, not yet
+    counted.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

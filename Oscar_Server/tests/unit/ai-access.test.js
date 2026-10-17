@@ -105,7 +105,7 @@ describe('#801 the page', () => {
     expect(waiting).not.toContain('data-ai-action="request"');
     const open = page(target('own', 'approved', null, false));
     expect(open).toContain('Approved');
-    expect(open).toContain('comes in the next releases');
+    expect(open).toContain('Configure the AI service of each company or provider below');
     expect(open).not.toContain('data-ai-action="request"');
   });
 
