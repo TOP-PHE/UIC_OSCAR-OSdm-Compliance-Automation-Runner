@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.316] / [collection-OTST_V2.0.182] — 2026-10-17
+
+Issue #799, release 2026.351. Copy scenarios only.
+
+### Fixed
+- **A reference scenario that needs a journey the Test Data lacks is greyed out** in Copy scenarios → the catalogue. Before, a scenario whose trip has 2 or 3 legs could be ticked, and "Tick all" ticked it, with no journey of that many legs in the Test Data. The copy then stopped at the trip step ("Choose a train or journey for every trip"), and one such scenario blocked the whole selection.
+  - The row says "Needs in the Test Data: a journey of 2 legs" and points to Test Data → Find journeys. The scenario cannot be ticked and is not counted in "Tick all".
+  - The rule is `journeysMissing()` (`catalogueMatch.js`): a journey with the same number of legs. `suggestTrip()` already uses it to propose the journey. The preview gives each reference scenario `journeyLegsMissing`.
+  - Catalogue only: a copy from another company still lets the person pick any journey.
+
+Checked: unit tests for the rule and the page row, the preview route test; both mutations (rule, page lock) make them fail.
+
+---
+
 ## [server-1.11.315] / [collection-OTST_V2.0.182] — 2026-10-17
 
 Issue #797, release 2026.350. Page text only.

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.350",
+  "current_release": "2026.351",
   "releases": [
+    {
+      "release": "2026.351",
+      "date": "2026-10-17",
+      "server": "1.11.316",
+      "collection": "OTST_V2.0.182",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Copy scenarios from the catalogue: a scenario whose trip has several legs is greyed out, with the reason, when the Test Data has no journey of as many legs; it is no longer ticked by Tick all (#799)."
+      ]
+    },
     {
       "release": "2026.350",
       "date": "2026-10-17",

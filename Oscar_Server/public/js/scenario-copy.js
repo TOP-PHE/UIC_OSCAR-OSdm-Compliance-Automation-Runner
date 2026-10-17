@@ -113,15 +113,31 @@
         ? `<div style="${NOTE_STYLE}${ERR_COLORS}">A trip with several legs needs a journey, and this company's Test Data has none.</div>` : '');
   }
 
+  // #799: the journeys a reference scenario's trips need and the Test Data
+  // does not have, as the person reads them.
+  function journeyNeeds(s) {
+    return (Array.isArray(s.journeyLegsMissing) ? s.journeyLegsMissing : []).map(n => `a journey of ${n} legs`);
+  }
+
+  // A scenario that cannot be copied as things stand: the Test Framework does
+  // not declare what it needs, or the Test Data has no journey for its trip.
+  function isLocked(s) {
+    return (Array.isArray(s.missing) && s.missing.length > 0) || journeyNeeds(s).length > 0;
+  }
+
   // One scenario of the preview. A reference scenario of the catalogue (#612)
   // says what it tests; one that needs what the Test Framework does not
   // declare is greyed out and cannot be ticked (the server refuses it too).
+  // So is one whose trip needs a journey the Test Data does not have (#799).
   function scenarioRow(s) {
     const missing = Array.isArray(s.missing) ? s.missing : [];
-    const locked = missing.length > 0;
+    const locked = isLocked(s);
     const probe = s.kind === 'NHF' ? '🚫 Negative probe · ' : '';
     const purpose = s.purpose ? `<br><span style="font-size:12px;color:#546e7a">${probe}${esc(s.purpose)}</span>` : '';
-    const needs = locked ? `<br><span style="font-size:12px;color:#90a4ae">Needs in the Test Framework: ${esc(missing.join(', '))}</span>` : '';
+    const needs = missing.length ? `<br><span style="font-size:12px;color:#90a4ae">Needs in the Test Framework: ${esc(missing.join(', '))}</span>` : '';
+    const journeys = journeyNeeds(s);
+    const needsJourney = journeys.length
+      ? `<br><span style="font-size:12px;color:#90a4ae">Needs in the Test Data: ${esc(journeys.join(', '))} (Test Data → Find journeys makes one from your trains)</span>` : '';
     // #681: what the scenario needs from this provider's data, to pick its train.
     const dataNeeds = Array.isArray(s.dataNeeds) && s.dataNeeds.length
       ? `<br><span style="font-size:12px;color:#78909c">Needs in the data: ${esc(s.dataNeeds.join(', '))}</span>` : '';
@@ -133,7 +149,7 @@
     return `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:${locked ? 'not-allowed' : 'pointer'};${locked ? 'opacity:.55' : ''}">
         <input type="checkbox" value="${esc(s.code)}" data-copy-action="toggle-code" style="width:auto;margin-top:3px"${locked ? ' disabled' : ''}>
         <span><strong>${esc(s.code)}</strong> <span style="color:#90a4ae">${esc(s.scenarioType)}${s.scenarioAction ? ' · ' + esc(s.scenarioAction) : ''}</span>
-        ${purpose}${dataNeeds}${toCheck}${toComplete}${needs}${s.warnings.map(warningLine).join('')}</span></label>`;
+        ${purpose}${dataNeeds}${toCheck}${toComplete}${needs}${needsJourney}${s.warnings.map(warningLine).join('')}</span></label>`;
   }
 
   // #681: what the ticked reference scenarios will be once copied: ready,
@@ -149,9 +165,10 @@
   }
 
   // One box ticks or unticks every scenario that can be copied; the greyed-out
-  // ones (not declared in the Test Framework) stay unticked.
+  // ones (not declared in the Test Framework, no journey in the Test Data) stay
+  // unticked.
   function selectAllRow(scenarios) {
-    const copyable = scenarios.filter(sc => !(Array.isArray(sc.missing) && sc.missing.length)).length;
+    const copyable = scenarios.filter(sc => !isLocked(sc)).length;
     if (copyable < 2) return '';
     return `<label style="display:flex;gap:8px;align-items:center;padding:4px 0 8px;margin-bottom:4px;font-size:13px;font-weight:700;border-bottom:1px solid #eceff1;cursor:pointer">
         <input type="checkbox" id="sc-copy-all" data-copy-action="toggle-all" style="width:auto">
