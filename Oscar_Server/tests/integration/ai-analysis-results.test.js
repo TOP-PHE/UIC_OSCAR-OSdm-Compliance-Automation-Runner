@@ -45,7 +45,7 @@ const stub = http.createServer((req, res) => {
   req.on('end', () => {
     const body = JSON.parse(raw);
     calls.push({ url: req.url, headers: req.headers, body, raw });
-    const r = reply ? reply(body) : { status: 200, json: answerOf(defaultAnswer) };
+    const r = reply ? reply() : { status: 200, json: answerOf(defaultAnswer) };
     res.writeHead(r.status, { 'content-type': 'application/json' });
     res.end(JSON.stringify(r.json));
   });
