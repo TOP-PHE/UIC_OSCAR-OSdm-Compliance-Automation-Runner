@@ -62,6 +62,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.317] / [collection-OTST_V2.0.182] — 2026-10-17
+
+Issue #802, release 2026.352. Copy scenarios only.
+
+### Fixed
+- **"Tick all" no longer makes the copy fail with "Scenario on is not in the source."** The "Tick all" box sits in the same list as the scenario boxes, and the page read every ticked box as a scenario code: the browser gives a box without a value the value `on`. The server then refused the whole copy. `selectedCodes()` now reads the scenario boxes only (`data-copy-action="toggle-code"`), as `codeBoxes()` does.
+
+Checked: a page test lifts `selectedCodes()`; it fails on the old selector.
+
+---
+
 ## [server-1.11.316] / [collection-OTST_V2.0.182] — 2026-10-17
 
 Issue #799, release 2026.351. Copy scenarios only.

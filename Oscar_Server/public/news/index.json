@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-copy-tick-all",
+    "date": "October 17, 2026",
+    "tag": "Fix",
+    "title": "Copy scenarios: Tick all works again",
+    "summary": "Copying with Tick all failed with 'Scenario on is not in the source.'",
+    "content": "In Copy scenarios, ticking 'Tick all that can be copied' and pressing Copy failed with 'Scenario on is not in the source.' There was no such scenario: the page sent the Tick all box itself as a scenario code. It now sends the ticked scenarios only."
+  },
+  {
     "id": "2026-10-17-catalogue-journeys",
     "date": "October 17, 2026",
     "tag": "Fix",
