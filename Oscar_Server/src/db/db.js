@@ -721,6 +721,28 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_finding_suggestion_company ON finding_suggestion(company_id, state)');
   }},
+  { version: 32, name: 'ai-analysis-access', up: () => {
+      // #801 - the AI analysis of results. The administrator's switch is per
+      // top-level company; a Test Manager's request (one row per company and
+      // user, updated in place: the audit log keeps the history) records the
+      // text accepted, by version and hash, and the administrator's decision.
+      _safeAlter('ALTER TABLE companies ADD COLUMN ai_analysis_enabled INTEGER NOT NULL DEFAULT 0');
+      db.exec(`CREATE TABLE IF NOT EXISTS ai_access_request (
+        id            TEXT PRIMARY KEY,
+        company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        user_id       TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+        state         TEXT NOT NULL DEFAULT 'pending',
+        text_version  INTEGER NOT NULL,
+        text_hash     TEXT NOT NULL,
+        accepted_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        decided_by    TEXT,
+        decided_at    TEXT,
+        reason        TEXT,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (company_id, user_id)
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_ai_access_request_state ON ai_access_request(state)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

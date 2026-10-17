@@ -62,6 +62,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.318] / [collection-OTST_V2.0.182] — 2026-10-17
+
+Issue #801 (PR 1 of 3), release 2026.353. Access to the AI analysis of results; the analysis itself comes in PRs 2 and 3.
+
+### Added
+- **Three locks before any AI analysis.**
+  - The administrator switches the AI analysis on per company (Manage Companies, new column; top-level companies only, never the platform company).
+  - A Test Manager of that company reads the commitment text on the new **AI Analysis** page (Test Managers' menu), ticks that they accept it, and asks for access. The text covers what leaves OSCAR, the company's right to send it, the AI service's own terms, costs, the fact that an analysis is an opinion, and the record kept.
+  - The administrator approves or refuses the request (new card under Manage Companies), and can withdraw an approved access. Refusing and withdrawing need a reason, which the Test Manager reads on the page.
+- **What is recorded.**
+  - The text accepted, by version and sha256 (`utils/aiAccess.js`), so a request names exactly the text shown. A new version asks for acceptance again, without a new approval.
+  - Every switch, request, acceptance and decision is an audit event.
+  - The administrators are e-mailed on a request, and the Test Manager on a decision. Mails are fire-and-forget; the pages are the reliable signal.
+- **Rules.**
+  - Access is per top-level company: working on a provider, the request is the distributor's.
+  - Switching off closes the page but keeps approvals.
+  - Testers, certifiers and administrators get 403 on the Test Manager's routes.
+- Migration 32: `companies.ai_analysis_enabled`, table `ai_access_request`.
+- Routes:
+  - `GET /v1/company/ai-analysis/access`;
+  - `POST /v1/company/ai-analysis/access/request`;
+  - `GET /v1/admin/ai-access-requests`;
+  - `POST /v1/admin/ai-access-requests/:id/approve|refuse|revoke`;
+  - `PATCH /v1/admin/companies/:id` takes `ai_analysis_enabled`.
+
+Checked:
+- Unit tests for the text, hash and states, and for the page's rendering.
+- Route tests for the three locks, roles, a provider, a new text version, refusal and withdrawal. Mutations of the role check, the text check and the version rule each fail them.
+- Both pages driven in Chromium on a throwaway server: switch on, request, refuse with a reason, request again, approve; no page error.
+
+---
+
 ## [server-1.11.316] / [collection-OTST_V2.0.182] — 2026-10-17
 
 Issue #799, release 2026.351. Copy scenarios only.

@@ -172,8 +172,19 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
       <h3>Company Directory</h3>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Slug</th><th>Users</th><th>Created</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Slug</th><th>Users</th><th>Created</th><th>AI analysis</th><th>Actions</th></tr></thead>
           <tbody id="companies-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>AI Analysis Access Requests</h3>
+      <div style="font-size:12px;color:#78909c;margin-bottom:10px">Test Managers of a company with the AI analysis enabled ask for access and accept the commitment text.
+        Approve or refuse each request; an approved access can be withdrawn.</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Company</th><th>Test Manager</th><th>State</th><th>Text accepted</th><th>Decided</th><th>Actions</th></tr></thead>
+          <tbody id="ai-requests-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -666,6 +677,7 @@ async function loadCompaniesPanel() {
       <td><input id="coslug-${c.id}" value="${esc(c.slug)}" class="mono" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
       <td>${c.user_count}</td>
       <td>${fmtDate(c.created_at)}</td>
+      <td>${c.slug === 'platform-root' ? '' : `<input type="checkbox" data-action="toggle-ai" data-company-id="${c.id}" aria-label="AI analysis for ${esc(c.name)}"${c.ai_analysis_enabled ? ' checked' : ''}>`}</td>
       <td>
         <button class="btn btn-small btn-secondary" data-action="save-company" data-company-id="${c.id}">Save</button>
         <button class="btn btn-small btn-danger" data-action="delete-company" data-company-id="${c.id}" data-name="${esc(c.name)}">Delete</button>
@@ -673,6 +685,72 @@ async function loadCompaniesPanel() {
     </tr>
   `).join('');
   await loadCompanies();
+  await loadAiRequests();
+}
+
+// #801: the administrator's switch for the AI analysis, one company at a time.
+async function toggleAi(companyId, enabled) {
+  const res = await fetch(`/v1/admin/companies/${companyId}`, {
+    method: 'PATCH',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ai_analysis_enabled: enabled })
+  });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'Update failed.', false); loadCompaniesPanel(); return; }
+  showMsg(`AI analysis ${enabled ? 'enabled' : 'disabled'} for ${data.company.name}.`, true);
+  loadAiRequests();
+}
+
+function aiRequestActions(r) {
+  if (r.state === 'pending') {
+    return `<button class="btn btn-small btn-primary" data-action="ai-decide" data-decision="approve" data-request-id="${esc(r.id)}">Approve</button>
+      <button class="btn btn-small btn-danger" data-action="ai-decide" data-decision="refuse" data-request-id="${esc(r.id)}">Refuse</button>`;
+  }
+  if (r.state === 'approved') {
+    return `<button class="btn btn-small btn-secondary" data-action="ai-decide" data-decision="revoke" data-request-id="${esc(r.id)}">Withdraw</button>`;
+  }
+  return '';
+}
+
+function aiRequestRow(r, textVersion) {
+  const off = r.company.aiAnalysisEnabled ? '' : ' <span style="color:#90a4ae">(switched off)</span>';
+  const oldText = r.state === 'approved' && r.textVersion !== textVersion ? ' <span style="color:#a85b00">(older text)</span>' : '';
+  const reason = r.reason ? `<br><span style="font-size:11px;color:#78909c">${esc(r.reason)}</span>` : '';
+  return `<tr>
+      <td>${esc(r.company.name)}${off}</td>
+      <td>${esc(r.user.email)}</td>
+      <td>${esc(r.state)}${oldText}${reason}</td>
+      <td>v${esc(r.textVersion)} · ${fmtDate(r.acceptedAt)}</td>
+      <td>${r.decidedAt ? `${fmtDate(r.decidedAt)}${r.decidedBy ? ' · ' + esc(r.decidedBy) : ''}` : ''}</td>
+      <td>${aiRequestActions(r)}</td>
+    </tr>`;
+}
+
+async function loadAiRequests() {
+  const tbody = document.getElementById('ai-requests-tbody');
+  const res = await fetch('/v1/admin/ai-access-requests', { headers: authHeaders });
+  if (!res.ok) { tbody.innerHTML = '<tr><td colspan="6">Could not read the requests.</td></tr>'; return; }
+  const data = await res.json();
+  tbody.innerHTML = data.requests.length
+    ? data.requests.map(r => aiRequestRow(r, data.textVersion)).join('')
+    : '<tr><td colspan="6" style="color:#90a4ae">No request yet.</td></tr>';
+}
+
+async function decideAiRequest(id, decision) {
+  let reason = '';
+  if (decision !== 'approve') {
+    reason = prompt(decision === 'refuse' ? 'Why is the request refused? The Test Manager reads this.' : 'Why is the access withdrawn? The Test Manager reads this.');
+    if (reason === null) return;
+  }
+  const res = await fetch(`/v1/admin/ai-access-requests/${encodeURIComponent(id)}/${decision}`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason })
+  });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'The decision failed.', false); return; }
+  showMsg(`Request ${data.state}.`, true);
+  loadAiRequests();
 }
 
 function autoSlug() {
@@ -1115,6 +1193,13 @@ document.getElementById('companies-tbody').addEventListener('click', function(e)
   var companyId = el.dataset.companyId;
   if (action === 'save-company') saveCompany(companyId);
   else if (action === 'delete-company') deleteCompany(companyId, el.dataset.name);
+  else if (action === 'toggle-ai') toggleAi(companyId, el.checked);
+});
+
+// #801: AI analysis requests
+document.getElementById('ai-requests-tbody').addEventListener('click', function(e) {
+  var el = e.target.closest('[data-action="ai-decide"]');
+  if (el) decideAiRequest(el.dataset.requestId, el.dataset.decision);
 });
 
 // Pending deletion table delegation (click + change)
