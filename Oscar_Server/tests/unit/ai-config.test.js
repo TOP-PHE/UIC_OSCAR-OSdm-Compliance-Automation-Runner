@@ -121,10 +121,10 @@ describe('#801 PR 2 the test request and its answer', () => {
   test('answers are read per connector; an unknown shape is null', () => {
     expect(C.readAnswer('anthropic', { model: 'claude-opus-5-5', stop_reason: 'end_turn',
       content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: 'OK' }], usage: { input_tokens: 20, output_tokens: 2 } }))
-      .toEqual({ answer: 'OK', stopReason: 'end_turn', model: 'claude-opus-5-5', usage: { input: 20, output: 2 } });
+      .toEqual({ answer: 'OK', text: 'OK', stopReason: 'end_turn', model: 'claude-opus-5-5', usage: { input: 20, output: 2 } });
     expect(C.readAnswer('openai_compatible', { model: 'gpt-4o', choices: [{ message: { content: ' OK\n' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 18, completion_tokens: 1 } }))
-      .toEqual({ answer: 'OK', stopReason: 'stop', model: 'gpt-4o', usage: { input: 18, output: 1 } });
+      .toEqual({ answer: 'OK', text: ' OK\n', stopReason: 'stop', model: 'gpt-4o', usage: { input: 18, output: 1 } });
     expect(C.readAnswer('anthropic', { choices: [] })).toBeNull();
     expect(C.readAnswer('openai_compatible', { content: [] })).toBeNull();
     expect(C.readAnswer('anthropic', null)).toBeNull();

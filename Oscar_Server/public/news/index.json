@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-ai-analysis",
+    "date": "October 17, 2026",
+    "tag": "Feature",
+    "title": "AI Analysis: read a batch, or compare two",
+    "summary": "Send a batch's failed checks to your AI service and get them grouped by probable cause, or compare two batches.",
+    "content": "On the AI Analysis page, once your access is approved and your AI service configured, choose a company or provider and a batch, and optionally a later batch to compare with. See what will be sent shows exactly the text that will leave OSCAR, its size and its estimated tokens; nothing is sent before you confirm. The answer groups the failures by probable cause and says whether each looks like the provider's, OSCAR's or unclear; for two batches, what is fixed, still failing or new. No token, credential, endpoint, response body or passenger detail is ever sent. Every Test Manager of the company or provider sees the earlier analyses. An AI analysis is an opinion, not a test result. Test Managers only."
+  },
+  {
     "id": "2026-10-17-ai-service",
     "date": "October 17, 2026",
     "tag": "Feature",

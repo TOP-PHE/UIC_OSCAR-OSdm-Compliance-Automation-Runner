@@ -580,6 +580,7 @@ app.use('/v1/company',         require('./api/routes/company-finding-suggestions
 app.use('/v1/company',         require('./api/routes/company-findings'));
 app.use('/v1/company',         require('./api/routes/company-scenario-copy'));
 app.use('/v1/company',         require('./api/routes/company-ai-analysis'));
+app.use('/v1/company',         require('./api/routes/company-ai-analysis-results'));
 app.use('/v1/runs',            require('./api/routes/runs'));
 app.use('/v1/reports',         require('./api/routes/reports'));
 app.use('/v1/admin',           require('./api/routes/admin'));

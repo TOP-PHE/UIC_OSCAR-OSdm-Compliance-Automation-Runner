@@ -765,6 +765,35 @@ const MIGRATIONS = [
         PRIMARY KEY (company_id, user_id)
       )`);
   }},
+  { version: 34, name: 'ai-analysis', up: () => {
+      // #801 PR 3 - an AI analysis of one batch or two compared. The result is
+      // encrypted; input_hash is the sha256 of exactly what was sent (the
+      // content itself is not kept). Read by every Test Manager who may use
+      // the company or provider (company_id), through canUseCompany().
+      db.exec(`CREATE TABLE IF NOT EXISTS ai_analysis (
+        id             TEXT PRIMARY KEY,
+        company_id     TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        user_id        TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+        mode           TEXT NOT NULL,
+        batch_a        TEXT NOT NULL,
+        batch_b        TEXT,
+        language       TEXT NOT NULL,
+        connector      TEXT NOT NULL,
+        model          TEXT NOT NULL,
+        input_hash     TEXT NOT NULL,
+        input_chars    INTEGER NOT NULL,
+        summarised     INTEGER NOT NULL DEFAULT 0,
+        status         TEXT NOT NULL DEFAULT 'running',
+        input_tokens   INTEGER,
+        output_tokens  INTEGER,
+        result_enc     TEXT,
+        error          TEXT,
+        created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+        finished_at    TEXT
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_ai_analysis_company ON ai_analysis(company_id, created_at)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_ai_analysis_user ON ai_analysis(user_id, created_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

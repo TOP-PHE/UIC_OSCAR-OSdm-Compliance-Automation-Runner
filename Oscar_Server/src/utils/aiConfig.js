@@ -166,24 +166,32 @@ function anthropicEndpoint(baseUrl) {
   return (base.endsWith('/v1') ? base : `${base}/v1`) + '/messages';
 }
 
-/** The test request: { url, headers, body }. */
-function testRequest({ connector, baseUrl, model, apiKey }) {
+/**
+ * A request to the model: { url, headers, body }. `system` is optional;
+ * `maxTokens` is sent to Anthropic only (it requires one). An
+ * OpenAI-compatible service gets no token limit: newer models refuse
+ * max_tokens and older services do not know max_completion_tokens.
+ */
+function messageRequest({ connector, baseUrl, model, apiKey }, { system = null, user, maxTokens }) {
   if (connector === 'anthropic') {
+    const body = { model, max_tokens: maxTokens, messages: [{ role: 'user', content: user }] };
+    if (system) body.system = system;
     return {
       url: anthropicEndpoint(baseUrl),
       headers: { 'content-type': 'application/json', 'anthropic-version': ANTHROPIC_VERSION, 'x-api-key': apiKey || '' },
-      body: { model, max_tokens: TEST_MAX_TOKENS, messages: [{ role: 'user', content: TEST_PROMPT }] },
+      body,
     };
   }
   const headers = { 'content-type': 'application/json' };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-  // No token limit: newer models refuse max_tokens and older services do not
-  // know max_completion_tokens; the answer asked for is one word.
-  return {
-    url: `${trimSlashes(baseUrl)}/chat/completions`,
-    headers,
-    body: { model, messages: [{ role: 'user', content: TEST_PROMPT }] },
-  };
+  const messages = system ? [{ role: 'system', content: system }] : [];
+  messages.push({ role: 'user', content: user });
+  return { url: `${trimSlashes(baseUrl)}/chat/completions`, headers, body: { model, messages } };
+}
+
+/** The connection test: one small question, one word asked back. */
+function testRequest(config) {
+  return messageRequest(config, { user: TEST_PROMPT, maxTokens: TEST_MAX_TOKENS });
 }
 
 const ANSWER_SHOWN = 200;
@@ -213,6 +221,7 @@ function readAnswer(connector, json) {
     const text = json.content.filter(b => b?.type === 'text' && typeof b.text === 'string').map(b => b.text).join('');
     return {
       answer: shorten(text, ANSWER_SHOWN),
+      text,
       stopReason: typeof json.stop_reason === 'string' ? json.stop_reason : null,
       model: typeof json.model === 'string' ? json.model : null,
       usage: { input: numberOr(json.usage?.input_tokens), output: numberOr(json.usage?.output_tokens) },
@@ -221,8 +230,10 @@ function readAnswer(connector, json) {
   const choice = Array.isArray(json.choices) ? json.choices[0] : null;
   if (!choice || typeof choice !== 'object') return null;
   const content = choice.message?.content;
+  const text = typeof content === 'string' ? content : '';
   return {
-    answer: shorten(typeof content === 'string' ? content : '', ANSWER_SHOWN),
+    answer: shorten(text, ANSWER_SHOWN),
+    text,
     stopReason: typeof choice.finish_reason === 'string' ? choice.finish_reason : null,
     model: typeof json.model === 'string' ? json.model : null,
     usage: { input: numberOr(json.usage?.prompt_tokens), output: numberOr(json.usage?.completion_tokens) },
@@ -265,6 +276,6 @@ function changedFields(stored, next) {
 
 module.exports = {
   CONNECTORS, LIMITS, TEST_PROMPT, TEST_MAX_TOKENS, ANTHROPIC_VERSION,
-  connectorsForPage, checkConfig, keyRefusal, needsTest, testRequest, readAnswer, describeError,
+  connectorsForPage, checkConfig, keyRefusal, needsTest, messageRequest, testRequest, readAnswer, describeError,
   maskKey, configView, changedFields, anthropicEndpoint,
 };

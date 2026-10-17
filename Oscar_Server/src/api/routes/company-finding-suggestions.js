@@ -33,6 +33,7 @@ const { resolveCompanyScope } = require('../helpers/shared');
 const { toApiFinding, createFinding } = require('../helpers/findings');
 const { reprojectDatafile } = require('../../utils/knownDeviationProjection');
 const S = require('../../utils/findingSuggestions');
+const { failuresOfBatch, batchesOf, runsOfBatch, MAX_FAILURES, FINISHED } = require('../helpers/batchFailures');
 const log = require('../../utils/logger').child({ module: 'company-finding-suggestions' });
 
 const router = express.Router();
@@ -49,8 +50,6 @@ const analyseLimiter = rateLimit({
 
 // The most failed checks one analysis reads: a batch of a hundred scenarios
 // failing everywhere stays well under it.
-const MAX_FAILURES = 5000;
-const FINISHED = new Set(['COMPLETED', 'FAILED']);
 
 function scopeForTestManager(req, res) {
   if (req.user.role !== 'test_manager') {
@@ -95,54 +94,11 @@ function toApiSuggestion(row) {
   };
 }
 
-// ── Reading a batch's failures ────────────────────────────────────────────────
-
-function failuresOfBatch(companyId, batchId) {
-  const rows = all(
-    `SELECT a.assertion_name, a.error_msg, rq.id AS request_id, rq.request_name, rq.http_status,
-            rq.response_body, r.id AS run_id, r.scenario_code, r.completed_at, s.scenario_name
-       FROM run_assertions a
-       JOIN run_requests rq ON rq.id = a.request_id
-       JOIN run_suites   s  ON s.id  = a.suite_id
-       JOIN runs         r  ON r.id  = a.run_id
-      WHERE r.company_id = ? AND r.batch_id = ? AND r.status IN (?, ?) AND a.passed = 0
-      ORDER BY r.queued_at ASC, rq.id ASC, a.id ASC
-      LIMIT ?`,
-    [companyId, batchId, ...FINISHED, MAX_FAILURES]
-  );
-  const problems = new Map();   // one decryption per request
-  return rows.map((r) => {
-    if (!problems.has(r.request_id)) {
-      let body = null;
-      try { body = r.response_body ? colDecrypt(r.response_body) : null; } catch { body = null; }
-      problems.set(r.request_id, S.problemOf(body));
-    }
-    const p = problems.get(r.request_id);
-    return {
-      runId: r.run_id, at: r.completed_at || null, scenarioCode: r.scenario_code || r.scenario_name || null,
-      step: r.request_name, check: r.assertion_name, error: r.error_msg || null, status: r.http_status,
-      problemCode: p?.code || null, problemTitle: p?.title || null, problemDetail: p?.detail || null,
-    };
-  });
-}
-
 // ── GET /findings/suggestions/batches ─────────────────────────────────────────
 router.get('/findings/suggestions/batches', (req, res) => {
   const companyId = scopeForTestManager(req, res);
   if (companyId === null) return;
-  const batches = all(
-    `SELECT batch_id, COUNT(*) AS runs, MIN(queued_at) AS started, MAX(completed_at) AS finished,
-            SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) AS finished_runs
-       FROM runs
-      WHERE company_id = ? AND batch_id IS NOT NULL
-      GROUP BY batch_id
-      ORDER BY MIN(queued_at) DESC
-      LIMIT 30`,
-    [...FINISHED, companyId]
-  );
-  res.json({ batches: batches.map((b) => ({
-    batchId: b.batch_id, runs: b.runs, finishedRuns: b.finished_runs, started: b.started, finished: b.finished,
-  })) });
+  res.json({ batches: batchesOf(companyId) });
 });
 
 // ── POST /findings/suggestions/analyse ────────────────────────────────────────
@@ -168,9 +124,7 @@ router.post('/findings/suggestions/analyse', analyseLimiter, (req, res) => {
   const companyId = scopeForTestManager(req, res);
   if (companyId === null) return;
   const batchId = typeof req.body?.batchId === 'string' ? req.body.batchId.trim() : '';
-  const batchRuns = batchId
-    ? all('SELECT id, scenario_code, status FROM runs WHERE company_id = ? AND batch_id = ?', [companyId, batchId])
-    : [];
+  const batchRuns = batchId ? runsOfBatch(companyId, batchId) : [];
   if (batchRuns.length === 0) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No batch of this company with that id.' });
   }
