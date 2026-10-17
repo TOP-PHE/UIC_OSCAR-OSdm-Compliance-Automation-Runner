@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-provider-declarations",
+    "date": "October 17, 2026",
+    "tag": "Fix",
+    "title": "Trip specifications, passenger update and late purchaser",
+    "summary": "A trip specification no longer goes out without its carrier, and two Test Framework settings now hold in every run.",
+    "content": "When a Test Data train had no operator code, OSCAR sent its trip specification with an empty carrier and the provider refused the request. The run now says which train lacks its operator code; give it one in Test Data. Turning off 'The provider lets a booked passenger be updated' in the Test Framework now holds in every run, not only in the scenarios copied from the catalogue: before, every booking scenario on a provider without that update stopped at step 03. And a new setting under Passenger Types says whether the provider takes the purchaser after the booking."
+  },
+  {
     "id": "2026-10-17-ai-analysis-per-provider",
     "date": "October 17, 2026",
     "tag": "Change",
