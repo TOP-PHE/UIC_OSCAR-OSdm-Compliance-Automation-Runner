@@ -105,7 +105,7 @@ Issue #824. Simulator 0.34.0. Server and collection unchanged.
 
 Checked: the 11 `_36` and `_37` scenarios of the simulator's data file
 replayed on alpha and beta with this profile, none with a failed check, the
-same check counts as their `_38` twins. TESTCOUNTS
+same check counts as their `_38` twins. Simulator tests 256 → 260, lint clean.
 
 Not checked: a full catalogue run through OSCAR on alpha and beta; the
 installed simulator updates when this version reaches `main`.
