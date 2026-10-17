@@ -237,6 +237,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     seat-map ancillary (`seatMapAncillarySelections()`, `namedPlaces.js`, type
     containing `SEAT_MAP`). Simulator 0.33.0: variant
     `refuses-bare-place-selection`; its offers have no ancillary parts.
+    The page's help under the choice (and under random combinations and
+    currencies) was written out in #797 (1.11.315), pinned by
+    `mandatory-reservation.test.js`: change the text there too.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

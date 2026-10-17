@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.315] / [collection-OTST_V2.0.182] — 2026-10-17
+
+Issue #797, release 2026.350. Page text only.
+
+### Changed
+- **Clearer help on three Test Framework fields** (maintainer feedback: "if I ask myself, everyone will"):
+  - **Random combinations:** what Number makes (extra reference scenarios `OTST_OFFER_COMBO_<n>`, each one offer search mixing two or more options, one value each), with an example. What the seed is for: the same seed gives the same draw, so a batch can be run again.
+  - **Currencies:** codes are separated by a comma, a semicolon or a space; lower case is accepted; the default is one code, added to those sold.
+  - **A mandatory reservation booked without a seat choice:** what each choice sends and why providers differ. A seat choice always sends its `placeSelection`.
+
+Checked: `mandatory-reservation.test.js` pins the texts; the page tests.
+
+---
+
 ## [server-1.11.314] / [collection-OTST_V2.0.182] — 2026-10-16
 
 Issue #793, release 2026.349. Simulator 0.33.0. A mandatory reservation without a seat choice, and a named place that needs a seat-map ancillary.
