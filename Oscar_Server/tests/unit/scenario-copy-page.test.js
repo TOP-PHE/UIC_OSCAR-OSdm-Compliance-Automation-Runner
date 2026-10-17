@@ -77,6 +77,9 @@ describe('showMsg', () => {
 // follows the scenario boxes. The greyed-out ones stay unticked.
 describe('Copy scenarios: tick all', () => {
   const SELECT_ALL = lift('function selectAllRow(', '\n  }');
+  const JOURNEY_NEEDS = lift('function journeyNeeds(', '\n  }');
+  const IS_LOCKED = lift('function isLocked(', '\n  }');
+  const ROW = lift('function scenarioRow(', '\n  }');
   const CODE_BOXES = lift('function codeBoxes(', '\n  }');
   const TICK_ALL = lift('function tickAll(', '\n  }');
   const SYNC = lift('function syncSelectAll(', '\n  }');
@@ -97,11 +100,28 @@ describe('Copy scenarios: tick all', () => {
 
   test('the box is drawn only when two or more scenarios can be copied, and counts them', () => {
     const ctx = vm.createContext({ Array });
-    vm.runInContext(`${SELECT_ALL}\nthis.selectAllRow = selectAllRow;`, ctx);
+    vm.runInContext(`${JOURNEY_NEEDS}\n${IS_LOCKED}\n${SELECT_ALL}\nthis.selectAllRow = selectAllRow;`, ctx);
     const html = ctx.selectAllRow([{ missing: [] }, {}, { missing: ['x'] }]);
     expect(html).toContain('data-copy-action="toggle-all"');
     expect(html).toContain('Tick all that can be copied (2)');
     expect(ctx.selectAllRow([{}, { missing: ['x'] }])).toBe('');
+    // #799: one waiting for a journey is not counted either.
+    expect(ctx.selectAllRow([{}, {}, { journeyLegsMissing: [2] }])).toContain('Tick all that can be copied (2)');
+  });
+
+  // #799: a scenario whose trip needs a journey the Test Data lacks is greyed out, and says why.
+  test('a scenario without a journey of its legs cannot be ticked and names what is missing', () => {
+    const ctx = vm.createContext({ Array, esc: (v) => String(v), warningLine: () => '' });
+    vm.runInContext(`${JOURNEY_NEEDS}\n${IS_LOCKED}\n${ROW}\nthis.scenarioRow = scenarioRow;`, ctx);
+    const base = { code: 'C', scenarioType: 'SALE', warnings: [] };
+    const waiting = ctx.scenarioRow({ ...base, journeyLegsMissing: [2, 3] });
+    expect(waiting).toContain(' disabled>');
+    expect(waiting).toContain('Needs in the Test Data: a journey of 2 legs, a journey of 3 legs (Test Data → Find journeys makes one from your trains)');
+    expect(waiting).not.toContain('Needs in the Test Framework');
+    const free = ctx.scenarioRow({ ...base, journeyLegsMissing: [] });
+    expect(free).not.toContain(' disabled>');
+    expect(free).not.toContain('Needs in the Test Data');
+    expect(ctx.scenarioRow({ ...base, missing: ['x'] })).toContain('Needs in the Test Framework: x');
   });
 
   test('ticking all leaves the greyed-out scenarios unticked; unticking clears the others', () => {

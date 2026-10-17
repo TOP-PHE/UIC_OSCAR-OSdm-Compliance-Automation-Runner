@@ -16,7 +16,7 @@
 const path = require('node:path');
 
 process.env.COLLECTION_PATH = path.resolve(__dirname, '../../../Bruno_Collection');
-const { adaptReferenceScenario, adaptCatalogueDatafile, suggestTrip, OVERRULE_CODES } = require('../../src/utils/catalogueMatch');
+const { adaptReferenceScenario, adaptCatalogueDatafile, suggestTrip, journeysMissing, OVERRULE_CODES } = require('../../src/utils/catalogueMatch');
 const { catalogueDatafile, catalogueFor } = require('../../src/utils/scenarioCatalogue');
 
 const DATA = path.resolve(__dirname, '../../../Bruno_Collection/data_base');
@@ -156,6 +156,32 @@ describe('suggestTrip', () => {
     expect(suggestTrip({ legs: 1 }, { trains: [{ id: 'T2', services: [] }], journeys: [] })).toBe('train::T2::0');
     expect(suggestTrip({ legs: 1 }, { trains: [], journeys: [{ id: 'J9', legs: 1 }] })).toBe('journey::J9');
     expect(suggestTrip({ legs: 1 }, { trains: [], journeys: [] })).toBeNull();
+  });
+});
+
+// #799: a scenario whose trip has several legs cannot be copied without a
+// journey of as many legs in the Test Data.
+describe('journeysMissing', () => {
+  const trips = [
+    { legs: 1, needsJourney: false, usedBy: ['ONE'] },
+    { legs: 2, needsJourney: true, usedBy: ['TWO', 'BOTH'] },
+    { legs: 3, needsJourney: true, usedBy: ['THREE', 'BOTH'] },
+  ];
+
+  test('each scenario names the leg counts no journey has', () => {
+    expect(journeysMissing(trips, { journeys: [] })).toEqual({ TWO: [2], BOTH: [2, 3], THREE: [3] });
+    expect(journeysMissing(trips, { journeys: [{ id: 'J', legs: 3 }] })).toEqual({ TWO: [2], BOTH: [2] });
+  });
+
+  test('a journey of as many legs, or a one-leg trip, needs nothing', () => {
+    expect(journeysMissing(trips, { journeys: [{ legs: 2 }, { legs: 3 }] })).toEqual({});
+    expect(journeysMissing([{ legs: 1, usedBy: ['ONE'] }], {})).toEqual({});
+    expect(journeysMissing(null, null)).toEqual({});
+  });
+
+  test('a count is named once per scenario, whatever the number of its trips', () => {
+    const twice = [{ legs: 2, needsJourney: true, usedBy: ['A'] }, { legs: 2, needsJourney: true, usedBy: ['A'] }];
+    expect(journeysMissing(twice, { journeys: [] })).toEqual({ A: [2] });
   });
 });
 

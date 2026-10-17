@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-catalogue-journeys",
+    "date": "October 17, 2026",
+    "tag": "Fix",
+    "title": "Copy scenarios: a multi-leg scenario waits for its journey",
+    "summary": "A reference scenario whose trip has several legs is greyed out when your Test Data has no journey of as many legs.",
+    "content": "In Copy scenarios, from the catalogue, a scenario whose trip has 2 or 3 legs could be ticked, and Tick all ticked it, even when the Test Data had no journey of that many legs. The copy then stopped at the trip step and asked for a train or journey that did not exist. Such a scenario is now greyed out, like one the Test Framework does not allow, and its line says what it needs: for example 'a journey of 2 legs'. Test Data, Find journeys, builds one from your train sets; open Copy scenarios again and the scenario can be ticked."
+  },
+  {
     "id": "2026-10-16-mandatory-reservation",
     "date": "October 16, 2026",
     "tag": "Feature",

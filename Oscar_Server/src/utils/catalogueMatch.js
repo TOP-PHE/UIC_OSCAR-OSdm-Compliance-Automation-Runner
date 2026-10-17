@@ -396,6 +396,27 @@ function suggestTrip(trip, testData) {
   return `train::${train.id}::${service ? service.index : 0}`;
 }
 
+/**
+ * The scenarios that cannot be copied from the catalogue as the Test Data
+ * stands: one of their trips has several legs, and no journey of the Test
+ * Data has as many (the same rule as `suggestTrip()`). `{ code: [legs] }`,
+ * each count once, in order.
+ */
+function journeysMissing(trips, testData) {
+  const counts = new Set(arr(testData?.journeys).map((j) => j.legs));
+  const out = {};
+  for (const trip of arr(trips)) {
+    const legs = Number(trip?.legs) || 1;
+    if (!(trip?.needsJourney || legs > 1) || counts.has(legs)) continue;
+    for (const code of arr(trip.usedBy)) {
+      const list = out[code] || (out[code] = []);
+      if (!list.includes(legs)) list.push(legs);
+    }
+  }
+  for (const list of Object.values(out)) list.sort((a, b) => a - b);
+  return out;
+}
+
 module.exports = {
-  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, withOfferRequestForms, withOfferOptions, withCurrencies, OVERRULE_CODES,
+  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, journeysMissing, withOfferRequestForms, withOfferOptions, withCurrencies, OVERRULE_CODES,
 };

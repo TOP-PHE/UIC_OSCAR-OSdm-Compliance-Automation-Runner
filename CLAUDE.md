@@ -240,6 +240,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     The page's help under the choice (and under random combinations and
     currencies) was written out in #797 (1.11.315), pinned by
     `mandatory-reservation.test.js`: change the text there too.
+  - **A reference scenario whose trip has several legs is greyed out in Copy
+    scenarios** (#799, 1.11.316) when no Test Data journey has as many legs
+    (`journeysMissing()`, `catalogueMatch.js`, the rule of `suggestTrip()`):
+    preview field `journeyLegsMissing`, `isLocked()` in `scenario-copy.js`
+    (row, "Tick all"). Catalogue only; a company-to-company copy still takes
+    any journey.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

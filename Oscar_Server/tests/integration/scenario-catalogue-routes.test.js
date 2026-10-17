@@ -158,6 +158,12 @@ describe('copy from the catalogue', () => {
     const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
     for (const t of preview.trips.filter(x => !x.needsJourney)) expect(t.suggested).toBe(`train::${train(ids.P)[0]}::0`);
     expect(preview.trips.filter(x => x.needsJourney).every(t => t.suggested === null)).toBe(true);
+    // #799: no journey in this Test Data, so a scenario with a multi-leg trip says so.
+    const multi = new Set(preview.trips.filter(t => t.needsJourney).flatMap(t => t.usedBy));
+    expect(multi.size).toBeGreaterThan(0);
+    for (const s of preview.scenarios) {
+      expect(s.journeyLegsMissing.length > 0).toBe(multi.has(s.code));
+    }
     const tech = preview.scenarios.find(s => s.code === 'OTST_REFUND_TECHNICAL_CANCELLATION_1ADT');
     expect(tech.toComplete).toEqual([expect.stringMatching(/overrule code/)]);
     expect(preview.scenarios.find(s => s.code === 'OTST_SALE_RESERVATION_MANDATORY_2ADT').toCheck)
