@@ -79,6 +79,7 @@ Issue #801 part 2, release 2026.360. Server and pages only.
 Checked:
 - `ai-config.test.js` (unit: the fields and their refusals, when a key is asked again, when a save is tested, the two request shapes, reading answers, errors with the key masked, the page section) and `ai-config.test.js` (integration, against a local stub AI service: role and approval refusals, a failed test saving nothing, the Anthropic headers, the key encrypted and never returned, no call for a limit, a new model tested with the stored key, another host refused without the key, a redirect not followed, the address rule, a test without saving, a provider's own OpenAI-compatible service, removing after a withdrawal, a timeout, an oversized answer).
 - The redirect and key guards were each broken on purpose and the tests failed.
+- CodeQL `js/request-forgery` (alert 433) on the call in `aiConnector.js` is dismissed as intended use: the address is the Test Manager's choice by design, and is held to the rule of every OSDM endpoint (`urlPolicy.js`, no redirect). The OSDM calls are not flagged only because their address is read back from the database.
 - In Chromium through a throwaway server and a stub AI service: a wrong key refused with the key masked, a test, a save, a provider's section switching kind.
 
 ---
