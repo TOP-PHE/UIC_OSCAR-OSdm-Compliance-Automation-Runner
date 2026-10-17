@@ -205,7 +205,7 @@ function batchOptionsHtml(batches, withNone) {
 
 /** What will be sent, its size and cost, and the button that sends it. */
 function previewHtml(p) {
-  const cap = p.monthly && p.monthly.cap !== null && p.monthly.cap !== undefined
+  const cap = p.monthly?.cap !== null && p.monthly?.cap !== undefined
     ? `${esc(p.monthly.used)} of your ${esc(p.monthly.cap)} tokens used this month.` : `${esc(p.monthly?.used ?? 0)} tokens used this month (no limit set).`;
   const counts = p.mode === 'compare'
     ? `${esc(p.counts.fixed)} problem(s) fixed, ${esc(p.counts.stillFailing)} still failing, ${esc(p.counts.new)} new, as OSCAR counts them.`
@@ -229,7 +229,9 @@ function previewHtml(p) {
 }
 
 function listHtml(items) {
-  return items.length ? `<ul style="margin:4px 0 0 18px;padding:0">${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<span style="color:#90a4ae">none</span>';
+  if (!items.length) return '<span style="color:#90a4ae">none</span>';
+  const lines = items.map(x => '<li>' + esc(x) + '</li>').join('');
+  return `<ul style="margin:4px 0 0 18px;padding:0">${lines}</ul>`;
 }
 
 function groupRowHtml(g) {
@@ -463,12 +465,16 @@ async function runAnalysis() {
   const { id } = await res.json();
   document.getElementById('ai-an-preview').innerHTML = '';
   previewed = null;
-  let a = await showAnalysis(id);
-  for (let i = 0; a?.status === 'running' && i < 120; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    a = await showAnalysis(id);
-  }
+  await followAnalysis(id, 120);
   await loadHistory();
+}
+
+// Show a running analysis every 3 s until it ends, at most `left` more times.
+async function followAnalysis(id, left) {
+  const a = await showAnalysis(id);
+  if (a?.status !== 'running' || left <= 0) return;
+  await new Promise(r => setTimeout(r, 3000));
+  await followAnalysis(id, left - 1);
 }
 
 document.addEventListener('change', (e) => {

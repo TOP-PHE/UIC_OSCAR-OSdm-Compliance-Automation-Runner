@@ -106,7 +106,7 @@ function scenariosNamed(groups, scenarios) {
   const named = new Set();
   for (const g of groups) for (const code of g.scenarios) named.add(code);
   const byCode = new Map((scenarios || []).filter((s) => s?.code).map((s) => [s.code, s]));
-  return [...named].sort().map((code) => ({ code, description: byCode.has(code) ? short(byCode.get(code).description, 200) : null }));
+  return [...named].sort((a, b) => a.localeCompare(b)).map((code) => ({ code, description: byCode.has(code) ? short(byCode.get(code).description, 200) : null }));
 }
 
 function batchHeader(b) {
