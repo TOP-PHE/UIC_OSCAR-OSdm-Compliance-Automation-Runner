@@ -1609,6 +1609,16 @@ section, as before.
   `{slug}-datafile-{date}.json`; for a tester their view, marked with a root
   `__oscarPersonalView` key, which the upload refuses. Administrators and
   certifiers are refused, as on every data file route.
+- **A full configuration** (#810, 1.11.322): Download's second choice,
+  `GET /v1/company/configuration/download`, gives the data file, the Test
+  Framework and the Test Data trains and journeys in one file,
+  `{slug}-configuration-{date}.json`, marked with a root
+  `__oscarConfiguration` key (no credential, endpoint or dedicated header).
+  `POST /v1/company/configuration/import` takes the parts a Test Manager
+  chooses (scenarios, framework, Test Data: add or replace), checks every part
+  before writing, keeps the replaced data file as the previous one, and puts
+  it back if the database step fails. The data-file upload refuses such a
+  file. Test Managers only, both ways.
 - Nothing to configure. The upload is still not checked against `If-Match`
   (§15.21): it replaces the file on purpose.
 

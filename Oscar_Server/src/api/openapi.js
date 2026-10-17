@@ -325,6 +325,16 @@ module.exports = {
           { name: 'decision', in: 'path', required: true, schema: { type: 'string', enum: ['approve', 'refuse', 'revoke'] } }],
         responses: { 200: { description: '{ id, state }' }, 400: { description: 'No reason given' }, 404: { description: 'Unknown request or decision' }, 409: { description: 'Not in a state this decision applies to' } } },
     },
+    '/v1/company/configuration/download': {
+      get: { tags: ['Company'], summary: 'The full configuration: data file, Test Framework and Test Data trains and journeys in one file (#810)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers only, for the company the request names (X-Provider-Id). { "__oscarConfiguration": { format: 1, company, exported_by, exported_at }, datafile, framework, testResources: [{ id, resource_type, label, data }] }. No credential, endpoint or dedicated header. The data-file upload refuses this file.',
+        responses: { 200: { description: 'The configuration file' }, 403: { description: 'Test Managers only' }, 404: { description: 'No data file, no Test Framework and no Test Data' }, 409: { description: 'The stored data file is not a JSON object' } } },
+    },
+    '/v1/company/configuration/import': {
+      post: { tags: ['Company'], summary: 'Take the chosen parts of a full configuration (#810)', security: [{ bearerAuth: [] }],
+        description: 'Multipart: the file in the field "configuration", and the fields scenarios = replace | keep, framework = replace | keep, testData = add | replace | keep. add adds the trains and journeys whose data is not already there; replace removes the trains and journeys first. Journeys name the trains\' new ids. A replaced data file is kept as the previous file. Every part is checked before anything is written; if the database step fails, the data file is put back.',
+        responses: { 200: { description: '{ imported, choices, scenarios, framework, testData: { mode, removed, trains_added, journeys_added, already_there, unresolved_legs } }' }, 400: { description: 'Not a configuration, a choice missing, or a part refused (schema problems, template, OSDM version)' }, 403: { description: 'Test Managers only' }, 413: { description: 'Larger than 5 MB' } } },
+    },
     '/v1/company/scenario-copy/preview': {
       post: { tags: ['Company'], summary: 'Prepare a copy of scenarios from another company or provider of yours into this one', security: [{ bearerAuth: [] }],
         description: 'Body: { source_id } (a company or provider id, or "catalogue" for the scenario catalogue). Returns the source scenarios with warnings (features the target Test Framework does not declare, fulfillment reduced, OSDM version), each trip entry to map once, and the target trains and journeys. The target is the request\'s company (X-Provider-Id).',

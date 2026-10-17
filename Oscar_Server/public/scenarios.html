@@ -78,6 +78,52 @@ Copyright [2026] [International Union of Railways (UIC)]
     <div class="save-error-title">⚠️ Not done — the data file was not changed</div>
     <div class="save-error-body" id="ue-detail" style="white-space:pre-line"></div>
   </div>
+  <!-- #810: what to download -->
+  <div id="download-choice" class="config-panel">
+    <div class="config-panel-title">⬇ Download</div>
+    <div class="config-panel-body">
+      <div class="config-panel-actions">
+        <button class="btn btn-secondary" data-action="download-scenarios" id="btn-download-scenarios">Scenarios only (the data file)</button>
+        <button class="btn btn-secondary" data-action="download-configuration">Full configuration: scenarios, Test Framework and Test Data</button>
+        <button class="btn btn-secondary" data-action="close-config-panel">Cancel</button>
+      </div>
+      <div class="config-panel-note">The full configuration can be uploaded into another company or provider, which asks which parts to take. Neither file holds a credential or the endpoint.</div>
+    </div>
+  </div>
+  <!-- #810: what to take from a full configuration -->
+  <div id="config-import" class="config-panel">
+    <div class="config-panel-title">📤 Import a full configuration</div>
+    <div class="config-panel-body">
+      <div id="ci-summary"></div>
+      <div class="config-panel-row">
+        <label for="ci-scenarios">Scenarios</label>
+        <select id="ci-scenarios">
+          <option value="replace">Replace the data file (the current one is kept as the previous file)</option>
+          <option value="keep">Keep the current data file</option>
+        </select>
+      </div>
+      <div class="config-panel-row">
+        <label for="ci-framework">Test Framework</label>
+        <select id="ci-framework">
+          <option value="replace">Replace the Test Framework</option>
+          <option value="keep">Keep the current Test Framework</option>
+        </select>
+      </div>
+      <div class="config-panel-row">
+        <label for="ci-test-data">Test Data</label>
+        <select id="ci-test-data">
+          <option value="add">Add the trains and journeys that are missing</option>
+          <option value="replace">Replace all trains and journeys</option>
+          <option value="keep">Keep the current Test Data</option>
+        </select>
+      </div>
+      <div class="config-panel-actions">
+        <button class="btn btn-success" data-action="config-import-run">Import</button>
+        <button class="btn btn-secondary" data-action="close-config-panel">Cancel</button>
+      </div>
+      <div class="config-panel-note">Nothing is changed if any part is refused.</div>
+    </div>
+  </div>
 
   <!-- loading spinner -->
   <div id="loading" class="placeholder">⏳ Loading…</div>

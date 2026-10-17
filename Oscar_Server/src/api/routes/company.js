@@ -19,6 +19,8 @@
  * GET    /v1/company/datafile/download         — the file to save: stored bytes, or a tester's marked view (#549)
  * GET    /v1/company/datafile/previous         — what an upload replaced, if anything (#549)
  * POST   /v1/company/datafile/previous/restore — put it back (#549)
+ * GET    /v1/company/configuration/download    — data file + Test Framework + Test Data in one file (#810)
+ * POST   /v1/company/configuration/import      — take the parts of such a file the Test Manager chose (#810)
  */
 
 const express   = require('express');
@@ -27,7 +29,8 @@ const fs        = require('node:fs');
 const crypto    = require('node:crypto');
 const multer    = require('multer');
 const rateLimit = require('express-rate-limit');
-const { get, all, run, colDecrypt, colEncrypt } = require('../../db/db');
+const db = require('../../db/db');
+const { get, all, run, colDecrypt, colEncrypt } = db;
 const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
@@ -39,6 +42,8 @@ const { getRunSelection, setRunSelection } = require('../../utils/runSelections'
 const { withDatafileLock } = require('../../utils/datafileLock');
 const { datafileVersion, etag, staleSaveRefusal } = require('../../utils/datafileVersion');
 const { schemaProblems, loadDatafileSchema } = require('../../utils/datafileSchema');
+const { isOsdmVersion } = require('../../utils/osdmVersion');
+const configurationBundle = require('../../utils/configurationBundle');
 const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
@@ -150,8 +155,12 @@ const upload = multer({
 // the size limit, and answered 500 "Internal Server Error".
 class UploadRefusal extends Error {}
 
-function parseUpload(req, res, next) {
-  upload.single('datafile')(req, res, err => {
+// The parser of one file field: "datafile" for the upload, "configuration"
+// for the import of a full configuration (#810).
+const parseUpload = parseFileField('datafile');
+
+function parseFileField(field) {
+  return (req, res, next) => upload.single(field)(req, res, err => {
     if (!err) return next();
     if (err instanceof UploadRefusal) {
       return res.status(400).json({ status: 400, title: 'Bad Request', detail: err.message });
@@ -160,7 +169,7 @@ function parseUpload(req, res, next) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({ status: 413, title: 'File Too Large', detail: 'Maximum upload size is 5 MB.' });
       }
-      return res.status(400).json({ status: 400, title: 'Bad Request', detail: `The upload could not be read (${err.code}). Send one file in the field "datafile".` });
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: `The upload could not be read (${err.code}). Send one file in the field "${field}".` });
     }
     return next(err);
   });
@@ -179,6 +188,8 @@ const PERSONAL_VIEW_KEY = '__oscarPersonalView';
 const NOT_THE_COMPANY_FILE = Object.freeze({
   [PERSONAL_VIEW_KEY]: 'This file is a tester\'s personal view of the data file, downloaded from Test Config: it leaves out other testers\' private scenarios and carries one person\'s run list. It cannot replace the company data file. Download the file as a Test Manager instead.',
   __oscarUnsavedEdits: 'This file is a copy of the Test Config page with edits that were not saved, not a data file downloaded from the server. It cannot replace the company data file. Save the edits in Test Config instead.',
+  // #810: a full configuration holds a data file, but is not one.
+  [configurationBundle.CONFIGURATION_KEY]: 'This file is a full OSCAR configuration (scenarios, Test Framework and Test Data), not a data file. Upload it in Test Config, which asks which parts to take (POST /v1/company/configuration/import).',
 });
 
 function notTheCompanyFile(uploaded) {
@@ -483,10 +494,13 @@ async function currentDatafile(companyId, unreadableIsNone) {
 // fails, nothing is replaced. Atomic temp+rename inside the writer: a crash
 // mid-write leaves the previous datafile intact, which matters because Bruno
 // reads it during runs. Returns { refusal } or { previous }.
-async function storeUpload(company, plaintext, uploaded, hash) {
+// #810: `undoable` also returns undo(), which puts back the two files and the
+// company row as they were, for an import whose next step fails.
+async function storeUpload(company, plaintext, uploaded, hash, { undoable = false } = {}) {
   const current = await currentDatafile(company.id, true);
   const refusal = saveRefusal(templatesAddedBy(current.parsed, uploaded));
   if (refusal) return { refusal };
+  const undo = undoable ? snapshotDatafiles(company) : null;
   let previous = null;
   fs.mkdirSync(DATAFILES_DIR, { recursive: true });
   if (current.plain) {
@@ -502,7 +516,23 @@ async function storeUpload(company, plaintext, uploaded, hash) {
     `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
     [livePath, hash, company.id]
   );
-  return { previous };
+  return { previous, undo };
+}
+
+// The live and previous files as stored (still encrypted) and the company
+// row's data file fields, and a function that writes them back.
+function snapshotDatafiles(company) {
+  const files = [liveDatafilePath(company.slug), previousDatafilePath(company.slug)]
+    .map(file => ({ file, bytes: fs.existsSync(file) ? fs.readFileSync(file) : null }));
+  const row = get('SELECT datafile_path, datafile_hash, datafile_updated_at FROM companies WHERE id = ?', [company.id]);
+  return () => {
+    for (const { file, bytes } of files) {
+      if (bytes) fs.writeFileSync(file, bytes);
+      else fs.rmSync(file, { force: true });
+    }
+    run('UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = ? WHERE id = ?',
+      [row?.datafile_path ?? null, row?.datafile_hash ?? null, row?.datafile_updated_at ?? null, company.id]);
+  };
 }
 
 // ── POST /v1/company/datafile ─────────────────────────────────────────────────
@@ -627,6 +657,196 @@ router.get('/datafile/download', datafileReadLimiter, authorizeDatafileWrite(sav
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Length', String(bytes.length));
   return res.end(bytes);
+});
+
+// ── A full configuration (#810) ──────────────────────────────────────────────
+// The data file, the Test Framework and the Test Data trains and journeys of
+// the company the request names, in one file (utils/configurationBundle). Taken
+// to another company or provider, the import asks which parts to take. Test
+// Managers only, both ways: the file holds every tester's private scenarios.
+function frameworkConfigOf(companyId) {
+  const row = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
+  if (!row) return null;
+  try {
+    const config = JSON.parse(colDecrypt(row.config));
+    return config && typeof config === 'object' && !Array.isArray(config) ? config : null;
+  } catch {
+    return null;
+  }
+}
+
+function testResourcesOf(companyId) {
+  return all('SELECT id, resource_type, label, data FROM test_resources WHERE company_id = ? ORDER BY created_at ASC, id ASC', [companyId])
+    .map(r => {
+      let data = {};
+      try { data = JSON.parse(colDecrypt(r.data)); } catch { data = {}; }
+      return { id: r.id, resource_type: r.resource_type, label: r.label, data: data && typeof data === 'object' && !Array.isArray(data) ? data : {} };
+    });
+}
+
+router.get('/configuration/download', datafileReadLimiter, authorizeDatafileWrite(uploadPolicy), async (req, res) => {
+  const { id: companyId, slug } = req.datafileCompany;
+  let plain = null;
+  try {
+    plain = (await currentDatafile(companyId, false)).plain;
+  } catch (err) {
+    log.error({ err, companyId }, 'configuration download: datafile unreadable');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Datafile decryption failed.' });
+  }
+  let datafile = null;
+  if (plain) {
+    try { datafile = JSON.parse(plain.toString('utf8')); } catch { datafile = null; }
+    if (!datafile || typeof datafile !== 'object' || Array.isArray(datafile)) {
+      return res.status(409).json({ status: 409, title: 'Conflict',
+        detail: 'The stored data file is not a JSON object, so it cannot go into a configuration. Download it with "Scenarios only".' });
+    }
+  }
+  const framework = frameworkConfigOf(companyId);
+  const resources = testResourcesOf(companyId);
+  if (!datafile && !framework && !resources.some(r => configurationBundle.RESOURCE_TYPES.includes(r.resource_type))) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'This company has no data file, no Test Framework and no Test Data yet.' });
+  }
+  const bundle = configurationBundle.buildConfiguration({
+    datafile, framework, resources, company: slug, exportedBy: req.user.email,
+  });
+  const bytes = Buffer.from(JSON.stringify(bundle, null, 4), 'utf8');
+  res.setHeader('Content-Disposition', `attachment; filename="${slug}-configuration-${utcDate()}.json"`);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Length', String(bytes.length));
+  return res.end(bytes);
+});
+
+// The import, after every check: the data file first (its undo kept), then the
+// Test Framework and Test Data in one transaction. If the transaction fails,
+// the data file is put back: all or nothing.
+async function applyConfiguration(company, configuration, choices, datafileBytes) {
+  const outcome = { scenarios: null, framework: null, testData: null };
+  let undo = null;
+  if (choices.scenarios === 'replace') {
+    const hash = crypto.createHash('sha256').update(datafileBytes).digest('hex');
+    const stored = await storeUpload(company, datafileBytes, configuration.datafile, hash, { undoable: true });
+    if (stored.refusal) return { refusal: stored.refusal };
+    undo = stored.undo;
+    outcome.scenarios = { replaced: true, hash, scenarios_count: scenarioCount(configuration.datafile), previous: stored.previous };
+  } else {
+    outcome.scenarios = { replaced: false };
+  }
+  try {
+    db.transaction(() => {
+      outcome.framework = { replaced: false };
+      if (choices.framework === 'replace') {
+        storeFramework(company.id, configuration.framework);
+        outcome.framework.replaced = true;
+      }
+      outcome.testData = storeTestData(company.id, configuration.testResources, choices.testData);
+    });
+  } catch (err) {
+    if (undo) {
+      try { undo(); } catch (undoErr) { log.error({ err: undoErr, companyId: company.id }, 'configuration import: the data file could not be put back'); }
+    }
+    throw err;
+  }
+  return { outcome };
+}
+
+function storeFramework(companyId, config) {
+  const json = colEncrypt(JSON.stringify(config));
+  const existing = get('SELECT id FROM test_frameworks WHERE company_id = ?', [companyId]);
+  if (existing) {
+    run(`UPDATE test_frameworks SET config = ?, updated_at = datetime('now') WHERE company_id = ?`, [json, companyId]);
+  } else {
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)', [crypto.randomUUID(), companyId, json]);
+  }
+}
+
+function storeTestData(companyId, incoming, mode) {
+  const plan = configurationBundle.planTestData(testResourcesOf(companyId), incoming, mode, () => crypto.randomUUID());
+  for (const id of plan.deleteIds) run('DELETE FROM test_resources WHERE id = ? AND company_id = ?', [id, companyId]);
+  for (const r of plan.create) {
+    run('INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, ?, ?, ?)',
+      [r.id, companyId, r.resource_type, r.label, colEncrypt(JSON.stringify(r.data))]);
+  }
+  return {
+    mode,
+    removed: plan.deleteIds.length,
+    trains_added: plan.trainsAdded,
+    journeys_added: plan.journeysAdded,
+    already_there: plan.alreadyThere,
+    unresolved_legs: plan.unresolvedLegs,
+  };
+}
+
+// The data file part goes through the upload's checks: not a marked download,
+// the runs' schema, then (under the lock, in storeUpload) no template added.
+function datafilePartRefusal(datafile, companyId) {
+  const marked = notTheCompanyFile(datafile);
+  if (marked) return { status: 400, detail: `The configuration's data file: ${marked}` };
+  let schema;
+  try {
+    schema = loadDatafileSchema();
+  } catch (err) {
+    log.error({ err, companyId }, 'configuration import: schema not readable — refusing the import');
+    return { status: 503, detail: 'The data file schema could not be read, so the configuration cannot be checked. Nothing was changed.' };
+  }
+  const { problems, more } = schemaProblems(datafile, schema);
+  if (!problems.length) return null;
+  return { status: 400, problems, more,
+    detail: `The configuration's data file is not a valid data file: ${problems.length}${more ? ' or more' : ''} problem(s), the first being: ${problems[0]} Nothing was changed.` };
+}
+
+// The parts the import will write, checked before anything is: null, or the
+// refusal ({ status, detail, problems?, more? }).
+function importPartsRefusal(configuration, choices, companyId) {
+  if (choices.scenarios === 'replace') {
+    const problem = datafilePartRefusal(configuration.datafile, companyId);
+    if (problem) return problem;
+  }
+  if (choices.framework === 'replace') {
+    const version = configuration.framework.osdmVersion;
+    if (version != null && version !== '' && !isOsdmVersion(version)) {
+      return { status: 400, detail: `The configuration's Test Framework names the OSDM version "${String(version).slice(0, 40)}", which is not a version: digits and dots, such as 3.8 or 3.0.5. Nothing was changed.` };
+    }
+  }
+  return null;
+}
+
+// POST /v1/company/configuration/import — multipart: the file in the field
+// "configuration", and the three choices as fields: scenarios = replace|keep,
+// framework = replace|keep, testData = add|replace|keep. Authorised before
+// the parser, held in memory, every part checked before anything is written.
+router.post('/configuration/import', datafileMutationLimiter, authorizeDatafileWrite(uploadPolicy), parseFileField('configuration'), async (req, res) => {
+  const company = req.datafileCompany;
+  const refuse = (detail, extra, status = 400) => res.status(status).json({ status, title: status === 400 ? 'Bad Request' : 'Service Unavailable', detail, ...extra });
+  if (!req.file) return refuse('No file uploaded. Use field name "configuration".');
+
+  let parsed;
+  try { parsed = JSON.parse(req.file.buffer.toString('utf8')); }
+  catch { return refuse('Uploaded file is not valid JSON.'); }
+  const read = configurationBundle.readConfiguration(parsed);
+  if (read.refusal) return refuse(read.refusal);
+  const { configuration } = read;
+  const chosen = configurationBundle.readChoices(req.body, configuration);
+  if (chosen.refusal) return refuse(`${chosen.refusal} Nothing was changed.`);
+  const { choices } = chosen;
+
+  const problem = importPartsRefusal(configuration, choices, company.id);
+  if (problem) return refuse(problem.detail, problem.problems ? { problems: problem.problems, problems_truncated: problem.more } : undefined, problem.status);
+  const datafileBytes = choices.scenarios === 'replace'
+    ? Buffer.from(JSON.stringify(configuration.datafile, null, 4), 'utf8')
+    : null;
+
+  let result;
+  try {
+    result = await withDatafileLock(company.id, () => applyConfiguration(company, configuration, choices, datafileBytes));
+  } catch (err) {
+    log.error({ err, companyId: company.id }, 'configuration import failed');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The configuration could not be imported. Nothing was changed.' });
+  }
+  if (result.refusal) return refuse(`The configuration's data file: ${result.refusal}`);
+
+  auditLog(req.user.id, company.id, req.user.email, 'configuration_imported');
+  return res.json({ imported: true, choices, ...result.outcome });
 });
 
 // ── The previous data file (#549) ─────────────────────────────────────────────
