@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-probe-keep-trip",
+    "date": "October 17, 2026",
+    "tag": "Feature",
+    "title": "Test Data: keep a trip the provider offers",
+    "summary": "A journey probe now lets you keep any trip the provider offers, and Find journeys results can be probed.",
+    "content": "When you probe a journey, the trips the provider offers are listed once, with the days they were seen. Use this trip stores its legs as train services, the way Discover timetable does, and makes a journey of them; Test Data then opens on it. If the same journey exists already, nothing is added twice. In Find journeys, each result now has a Probe button too, so you can check with the provider before making it a journey. Test Managers only."
+  },
+  {
     "id": "2026-10-17-journey-probe",
     "date": "October 17, 2026",
     "tag": "Feature",

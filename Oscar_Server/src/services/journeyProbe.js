@@ -129,18 +129,109 @@ function describeTrip(trip) {
 function compareAnswer(legs, answer) {
   const opts = { searchedOrigin: legs[0]?.origin, searchedDestination: legs.at(-1)?.destination };
   const trips = (Array.isArray(answer?.trips) ? answer.trips : []).map((t) => tripLegRecords(t, opts)).filter((t) => t.length);
-  const offered = trips.slice(0, TRIPS_SHOWN).map(describeTrip);
-  if (trips.length === 0) return { outcome: 'notFound', differences: [], offered, trips: 0 };
+  // `candidates` are the leg records of the trips listed in `offered`, in the
+  // same order (#815: a trip offered can be kept as a journey).
+  const listed = (shown) => ({ offered: shown.map(describeTrip), candidates: shown });
+  if (trips.length === 0) return { outcome: 'notFound', differences: [], ...listed([]), trips: 0 };
   let best = null;
   for (const trip of trips) {
     const differences = tripDifferences(legs, trip);
-    if (differences.length === 0) return { outcome: 'found', differences: [], offered: [describeTrip(trip)], trips: trips.length };
+    if (differences.length === 0) return { outcome: 'found', differences: [], ...listed([trip]), trips: trips.length };
     const sameShape = trip.length === legs.length;
     const score = (sameShape ? 0 : 100) + differences.length;
     if (!best || score < best.score) best = { score, differences, trip };
   }
-  if (best.trip.length !== legs.length) return { outcome: 'notFound', differences: [], offered, trips: trips.length };
-  return { outcome: 'differences', differences: best.differences, offered: [describeTrip(best.trip), ...offered.filter((o) => o !== describeTrip(best.trip))].slice(0, TRIPS_SHOWN), trips: trips.length };
+  if (best.trip.length !== legs.length) return { outcome: 'notFound', differences: [], ...listed(trips.slice(0, TRIPS_SHOWN)), trips: trips.length };
+  const others = trips.filter((t) => t !== best.trip);
+  return { outcome: 'differences', differences: best.differences, ...listed([best.trip, ...others].slice(0, TRIPS_SHOWN)), trips: trips.length };
+}
+
+// The members of a leg record a trip offered keeps (#815): what Discover
+// timetable stores of a leg, without the day it ran.
+const LEG_FIELDS = ['originURN', 'destinationURN', 'originName', 'destName', 'operatorCode',
+  'productCategoryRef', 'productCategoryName', 'productCategoryShortName', 'vehicleNumber', 'departureTime', 'arrivalTime'];
+const OFFERED_TRIPS_KEPT = 10;
+
+/**
+ * #815: the trips the provider offered over all the days probed, each once:
+ * { text, legs, days (weekday codes), dates, asDefined }. Takes the
+ * `candidates` out of each day (they are only for this).
+ */
+function collectOfferedTrips(days) {
+  const byText = new Map();
+  for (const day of days) {
+    const candidates = Array.isArray(day.candidates) ? day.candidates : [];
+    delete day.candidates;
+    for (const trip of candidates) {
+      const t = offeredTripEntry(byText, trip);
+      if (t) noteDaySeen(t, trip, day);
+    }
+  }
+  return [...byText.values()];
+}
+
+// The entry of `trip` in `byText`, made on first sight; null once
+// OFFERED_TRIPS_KEPT other trips are kept.
+function offeredTripEntry(byText, trip) {
+  const text = describeTrip(trip);
+  if (byText.has(text)) return byText.get(text);
+  if (byText.size >= OFFERED_TRIPS_KEPT) return null;
+  const legs = trip.map((l) => Object.fromEntries(LEG_FIELDS.map((f) => [f, String(l[f] || '')])));
+  const t = { text, legs, days: [], dates: [], asDefined: false };
+  byText.set(text, t);
+  return t;
+}
+
+// Record that `t` was offered on `day`: its weekday (the provider's own date
+// of departure, else the day searched) and date.
+function noteDaySeen(t, trip, day) {
+  const weekday = trip[0]?.dayOfWeek || dayOfWeekCode(day.date);
+  if (weekday && !t.days.includes(weekday)) t.days.push(weekday);
+  if (!t.dates.includes(day.date)) t.dates.push(day.date);
+  if (day.outcome === 'found') t.asDefined = true;
+}
+
+const MAX_LEGS_KEPT = 5;
+const MAX_FIELD_LENGTH = 200;
+const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+// One leg sent back by the page, checked: { leg } or { error }.
+function checkedLeg(raw, n) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: `leg ${n} is not an object` };
+  const leg = {};
+  for (const f of LEG_FIELDS) {
+    const v = raw[f] ?? '';
+    if (typeof v !== 'string') return { error: `leg ${n}: ${f} is not text` };
+    if (v.length > MAX_FIELD_LENGTH) return { error: `leg ${n}: ${f} is longer than ${MAX_FIELD_LENGTH} characters` };
+    if (v.includes('{{')) return { error: `leg ${n}: ${f} holds "{{"` };
+    leg[f] = v.trim();
+  }
+  if (!leg.originURN || !leg.destinationURN) return { error: `leg ${n} has no stop place` };
+  if (!/^\d{2}:\d{2}/.test(leg.departureTime) || !/^\d{2}:\d{2}/.test(leg.arrivalTime)) return { error: `leg ${n} has no departure or arrival time` };
+  return { leg };
+}
+
+/**
+ * #815: a trip the page asks to keep ({ legs, days }), checked, as the leg
+ * records Discover timetable stores: one per leg and weekday seen.
+ * { legs, days, records } or { error }.
+ */
+function tripToKeep(body) {
+  const rawLegs = body?.legs;
+  if (!Array.isArray(rawLegs) || rawLegs.length === 0 || rawLegs.length > MAX_LEGS_KEPT) {
+    return { error: `legs must hold 1 to ${MAX_LEGS_KEPT} legs` };
+  }
+  const legs = [];
+  for (let i = 0; i < rawLegs.length; i++) {
+    const r = checkedLeg(rawLegs[i], i + 1);
+    if (r.error) return { error: r.error };
+    legs.push(r.leg);
+  }
+  const rawDays = Array.isArray(body?.days) ? body.days : [];
+  const days = WEEKDAYS.filter((d) => rawDays.includes(d));
+  if (days.length === 0) return { error: 'days must name at least one weekday (MON … SUN)' };
+  const records = days.flatMap((dayOfWeek) => legs.map((l) => ({ ...l, dayOfWeek })));
+  return { legs, days, records };
 }
 
 /** One line for the whole probe, from its days. */
@@ -155,4 +246,4 @@ function probeSummary(days) {
     : 'Not offered: no trip with these legs (see what the provider offers instead).';
 }
 
-module.exports = { journeyPlan, probeDates, compareAnswer, probeSummary, clock, DAYS_TO_PROBE };
+module.exports = { journeyPlan, probeDates, compareAnswer, probeSummary, collectOfferedTrips, tripToKeep, describeTrip, clock, DAYS_TO_PROBE };

@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.324] / [collection-OTST_V2.0.183] — 2026-10-17
+
+Issue #815, release 2026.359. Server and pages only.
+
+### Added
+- **Keep a trip the provider offers.** The probe of a journey (#813) lists the trips the provider offers, which are real itineraries with offers. They are now listed once for the whole probe, with the weekdays each was seen on, and each has a ➕ Use this trip button (Test Managers):
+  - its legs are stored as train services the way Discover timetable stores them (`groupAndMerge`: a set of the same route and calendar gets the service, a set without days gets the days, manual edits are kept), on the weekdays the probe saw it;
+  - a journey is made of them (`journeysFromConnections`); if a journey with the same legs exists, it is named and nothing is made twice;
+  - legs that do not make one journey on one trip date are refused before anything is written;
+  - Test Data opens on the new journey.
+  - `POST /v1/company/test-resources/journey-from-trip` (`{ legs, days }`, 1 to 5 legs, each field text of at most 200 characters, no `{{`; `tripToKeep()` in `services/journeyProbe.js`).
+- **Probe the results of Find journeys.** Each result has a 🔎 Probe button, before the journey is made: `POST /v1/company/test-resources/probe-journey` with its `legs` (`{ trainResourceId, serviceIndex }`). The trips offered can be kept from there too.
+- A journey of one leg is named without "via".
+
+Checked:
+- `journey-probe.test.js` (the trips offered collected over the days, the trip to keep and its refusals), `journey-probe-route.test.js` (the probe by legs, keeping a trip: a set without days completed, a new set for the other leg, the journey on both, the same trip twice made once, a refused trip writing nothing), `journey-probe-page.test.js` (the list escaped, the buttons, Find journeys' Probe).
+- In Chromium through a throwaway server and the local simulator: a two-leg journey probed, a direct trip offered kept (one new train set, the journey shown), a result of Find journeys probed.
+
+---
+
 ## [server-1.11.323] / [collection-OTST_V2.0.183] — 2026-10-17
 
 Issue #813, release 2026.358. Server and pages only.

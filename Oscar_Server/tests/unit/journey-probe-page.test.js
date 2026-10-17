@@ -26,23 +26,43 @@ function loadFunction(name, context = {}) {
 
 const { esc } = require('../../public/js/esc.js');
 const PROBE_OUTCOMES = vm.runInNewContext(`(${/const PROBE_OUTCOMES = (\{[\s\S]*?\n\});/.exec(source)[1]})`);
-const render = loadFunction('journeyProbeHtml', { esc, PROBE_OUTCOMES });
+const journeyProbeDayHtml = loadFunction('journeyProbeDayHtml', { esc, PROBE_OUTCOMES });
+const offeredTripHtml = loadFunction('offeredTripHtml', { esc });
+const render = loadFunction('journeyProbeHtml', { esc, journeyProbeDayHtml, offeredTripHtml });
 
-test('each day, its differences and what is offered instead; provider text escaped', () => {
+test('each day and its differences, then the trips offered once with their keep buttons; provider text escaped', () => {
   const html = render({ summary: 'Offered on 1 of 2 day(s) searched.', days: [
-    { date: '2026-10-20', via: 'trips-collection', trips: 1, outcome: 'found', differences: [], offered: ['A → B'] },
-    { date: '2026-10-21', via: 'offers', trips: 2, outcome: 'differences', differences: ['leg 2 is train <b>X</b>, not 9'], offered: ['A → <i>C</i>'] },
+    { date: '2026-10-20', via: 'trips-collection', trips: 1, outcome: 'found', differences: [] },
+    { date: '2026-10-21', via: 'offers', trips: 2, outcome: 'differences', differences: ['leg 2 is train <b>X</b>, not 9'] },
     { date: '2026-10-22', via: 'offers', error: 'HTTP 500' },
-  ] });
+  ], offeredTrips: [
+    { text: 'A → B', days: ['TUE'], asDefined: true, legs: [] },
+    { text: 'A → <i>C</i>', days: ['WED', '<s>'], asDefined: false, legs: [] },
+  ] }, 'j"3');
   expect(html).toContain('Offered on 1 of 2 day(s) searched.');
   expect(html).toContain('2026-10-20: offered as defined');
   expect(html).toContain('leg 2 is train &lt;b&gt;X&lt;/b&gt;, not 9');
   expect(html).toContain('A → &lt;i&gt;C&lt;/i&gt;');
+  expect(html).toContain('WED &lt;s&gt;');
   expect(html).toContain('2026-10-22: no answer');
   expect(html).toContain('offers, HTTP 500');
-  expect(html).not.toMatch(/<b>X|<i>C/);
-  // what a found day was offered is not listed as "instead"
-  expect(html.split('Offered instead').length).toBe(2);
+  expect(html).not.toMatch(/<b>X|<i>C|<s>/);
+  expect(html.match(/data-action="probe-keep-trip"/g)).toHaveLength(2);
+  expect(html).toContain('data-key="j&quot;3" data-idx="1"');
+  expect(html.match(/\(as defined\)/g)).toHaveLength(1);
+});
+
+test('no trip offered: no list', () => {
+  expect(render({ summary: 's', days: [] }, 'j0')).not.toContain('Trips the provider offers');
+});
+
+test('Find journeys: each result has a Probe button and a box for its answer; both actions awaited', () => {
+  const resultHtml = loadFunction('journeyFinderResultHtml', { esc, stnShort: (x) => x, journeyFinderClock: (t) => t, journeyFinderStepHtml: () => '' });
+  const html = resultHtml({ waits: [5], via: ['B'], days: null, departureTime: '08:00', arrivalTime: '10:00', durationMinutes: 120, legs: [{}, {}], steps: [] }, 4);
+  expect(html).toContain('data-action="jf-probe" data-idx="4"');
+  expect(html).toContain('id="jf-probe-4"');
+  expect(source).toContain('journeyFinderProbe(Number.parseInt(el.dataset.idx, 10)).catch(reportActionError)');
+  expect(source).toContain('keepProbedTrip(el.dataset.key, Number.parseInt(el.dataset.idx, 10)).catch(reportActionError)');
 });
 
 test('the Probe button: a saved journey only, hidden from testers, its action awaited', () => {
