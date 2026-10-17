@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.353",
+  "current_release": "2026.354",
   "releases": [
+    {
+      "release": "2026.354",
+      "date": "2026-10-17",
+      "server": "1.11.319",
+      "collection": "OTST_V2.0.182",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "The UIC and OSDM logos are served by OSCAR itself; uic.org no longer served them and every banner showed two broken images (#805)."
+      ]
+    },
     {
       "release": "2026.353",
       "date": "2026-10-17",

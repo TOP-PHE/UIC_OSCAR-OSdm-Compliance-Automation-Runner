@@ -1821,6 +1821,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     argument that reaches a file path as a vulnerability, and one
     vulnerability fails the gate like one bug does: `make-clients.js` now
     writes to one of two fixed places.
+- **Every image a page shows is served by OSCAR** (#805, 1.11.319). The
+  banner's UIC and OSDM logos were loaded from uic.org and broke on every page
+  when uic.org stopped serving them. They are `public/uic-logo.png` and
+  `public/osdm-logo.png` (the maintainer's files; the originals are in the
+  private repository), the content security policy's `imgSrc` is `'self'` and
+  `data:` only, and `page-images.test.js` fails on a page loading an image
+  from another site. A new page copies the banner of an existing one.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image** — a `refresh-collection.yml`
   workflow `git pull`s the VPS on every push to `main`.

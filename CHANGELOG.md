@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.319] / [collection-OTST_V2.0.182] — 2026-10-17
+
+Issue #805, release 2026.354. Pages only.
+
+### Fixed
+- **The UIC and OSDM logos show again in the banner.** Every page loaded them from uic.org, which no longer serves them, so 17 pages showed two broken images.
+  - OSCAR now serves both files itself: `public/uic-logo.png` and `public/osdm-logo.png`, provided by the maintainer.
+  - The old `public/uic-logo.svg` was a 1 KB fragment no page used, not the UIC logo; it is removed.
+  - The OSDM logo is now 46 px high, like the UIC logo: it is square, and was 34 px high.
+- **The content security policy no longer allows images from uic.org** (`imgSrc` is `'self'` and `data:`).
+
+Checked:
+- `page-images.test.js`: no page loads an image from another site, every banner uses the two files, and the policy allows no other origin. It fails on the old pages.
+- Both logos load in Chromium through the real server with its policy; no request failed.
+
+---
+
 ## [server-1.11.318] / [collection-OTST_V2.0.182] — 2026-10-17
 
 Issue #801 (PR 1 of 3), release 2026.353. Access to the AI analysis of results; the analysis itself comes in PRs 2 and 3.
