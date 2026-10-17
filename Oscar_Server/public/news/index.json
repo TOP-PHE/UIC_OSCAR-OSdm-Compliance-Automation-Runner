@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-17-ai-analysis-access",
+    "date": "October 17, 2026",
+    "tag": "Feature",
+    "title": "AI analysis of results: ask for access",
+    "summary": "Test Managers can ask for the AI analysis of results, once an administrator enables it for their company.",
+    "content": "An AI service your company chooses will read the results of a batch, or compare two batches, and say what failed and why. Results then leave OSCAR, so access is given in three steps: an OSCAR administrator enables it for the company; a Test Manager reads and accepts the commitment text on the new AI Analysis page (data, permission to share, the AI service's terms, costs, an analysis is an opinion, everything is recorded); an administrator approves the request. This release opens the access; configuring your company's AI and the analysis itself come next."
+  },
+  {
     "id": "2026-10-17-copy-tick-all",
     "date": "October 17, 2026",
     "tag": "Fix",

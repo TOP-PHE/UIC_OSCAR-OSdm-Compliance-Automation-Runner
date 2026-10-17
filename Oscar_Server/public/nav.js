@@ -14,7 +14,7 @@
  * Menu per role:
  *   administrator      : Manage Users | Manage Companies | All Reports | Server Activity | Report Builder
  *   certification_user : All Reports | Report Builder | Compare
- *   test_manager        : Dashboard | New Run | Report Builder | Compare | API Config | Scenarios
+ *   test_manager        : Dashboard | New Run | Report Builder | Compare | API Config | Scenarios (+ Manage Users, Providers, AI Analysis)
  *   tester (all others): Dashboard | New Run | Report Builder | Compare | API Config
  *
  * Nav bar right side (all roles): Company: XYZ | email [Badge] | Sign Out
@@ -304,6 +304,8 @@
       if (role === 'test_manager') {
         items.push({ href: '/admin.html?tab=users', label: 'Manage Users', page: 'admin-users' });
         items.push({ href: '/providers.html', label: 'Providers', page: 'providers' });
+        // #801: the page says whether the company has it and where the Test Manager stands.
+        items.push({ href: '/ai-analysis.html', label: 'AI Analysis', page: 'ai-analysis' });
       }
     }
 
