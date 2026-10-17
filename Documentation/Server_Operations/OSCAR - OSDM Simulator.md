@@ -156,6 +156,15 @@ without a token answers 401, and an unknown provider answers 404.
 
 ## 5. Point a company at it
 
+Every setting of this section and the next, for each provider (API Config,
+Test Framework, Test Data, the special stop places and the scenarios that fail
+on purpose), is in that provider's pre-filled set-up checklist (#819):
+[alpha](Simulator%20checklists/OSCAR_Test_Config_Checklist_Simulator_alpha.docx),
+[beta](Simulator%20checklists/OSCAR_Test_Config_Checklist_Simulator_beta.docx),
+[gamma](Simulator%20checklists/OSCAR_Test_Config_Checklist_Simulator_gamma.docx).
+They are generated with the provider checklists' generator (kept in the
+private repository), never edited by hand.
+
 Use a company made for this. **Do not do it on a company that tests a real
 provider:** step 3 replaces the company's data file. When the company has no
 Test Framework or no train yet, OSCAR then offers to create them from the
