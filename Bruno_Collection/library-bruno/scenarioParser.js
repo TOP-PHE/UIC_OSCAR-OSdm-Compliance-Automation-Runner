@@ -1637,6 +1637,14 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
   bru.setEnvVar("offerTripSearchCriteria", JSON.stringify(tripSearchCriteria));
 }
 
+// #809: why a trip specification leg has no carrier, and what to do.
+function carrierMissingText(n, legDef) {
+  const train = isText(legDef.vehicleNumber) ? `train ${legDef.vehicleNumber}` : 'its train';
+  return `Leg ${n} (${train}, ${legDef.startStopPlaceRef} → ${legDef.endStopPlaceRef}) has no operator code. ` +
+    'OSDM requires the carrier in a trip specification (DatedJourney.carriers), so the provider cannot read the request. ' +
+    'Give the train its operator code in Test Data (e.g. urn:uic:rics:1185), then Apply test data to this trip.';
+}
+
 // Function to set trip specifications
 function osdmTripSpecification(legDefinitions, returnOpts) {
   test('Trip Specification has at least one leg', function () {
@@ -1677,7 +1685,18 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
       validationLogger(`[INFO] Leg ${n}: product category not sent — OSDM needs its reference, name and short name together.`);
     }
 
-    const datedJourney = new DatedJourney(productCategory, [legDef.vehicleNumber], [new NamedCompany(legDef.carrier)]);
+    // #809: OSDM's DatedJourney requires the carrier (NamedCompany.ref). It
+    // comes from the Test Data train's operator code; `[{}]` went out when the
+    // train had none, and the provider refused the whole request.
+    // A check only when it is missing, so that a run with carriers keeps its count.
+    const carrier = isText(legDef.carrier) ? legDef.carrier.trim() : null;
+    if (!carrier) {
+      validationLogger(`[ERROR] ${carrierMissingText(n, legDef)}`);
+      test(`Trip specification leg ${n} names its carrier (operator code)`, function () {
+        expect(carrier, carrierMissingText(n, legDef)).to.be.a('string');
+      });
+    }
+    const datedJourney = new DatedJourney(productCategory, [legDef.vehicleNumber], carrier ? [new NamedCompany(carrier)] : undefined);
 
     const timedLegSpec = new TimedLegSpecification(
       boardSpec,
@@ -1766,6 +1785,13 @@ function featureNotDeclaredWarning(scenario, field) {
   if (typeof field === 'string' && field.startsWith('offerRequestBy:')) {
     const form = OFFER_REQUEST_TEXT[field.slice('offerRequestBy:'.length)] || field.slice('offerRequestBy:'.length);
     return `[WARNING] Scenario "${scenario.code}" asks for offers ${form}, which the Test Framework does not declare (Offer requests). The run will proceed; the provider may refuse the request. Declare the form in the Test Framework, or change the trip type of the scenario's trip.`;
+  }
+  // #809: steps the Test Framework says the provider does not offer.
+  if (field === 'passengerUpdate') {
+    return `[WARNING] Scenario "${scenario.code}" updates its passengers, but the Test Framework says the provider does not (Passenger Types). Step 03 is skipped in this run. Turn the passenger update off on the scenario to silence this warning.`;
+  }
+  if (field === 'purchaserAfterBooking') {
+    return `[WARNING] Scenario "${scenario.code}" writes its purchaser after the booking (bookingPurchaserMode deferred), but the Test Framework says the provider does not take it (Passenger Types). The run will proceed; the provider may refuse POST /bookings/{id}/purchaser.`;
   }
   if (field === 'returnModel') {
     const model = scenario?.offerSearchCriteria?.returnModel || 'SEPARATE';

@@ -367,6 +367,31 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #809: and no passenger update where the framework says there is none, with its warning.
+  test('a run\'s copy turns the passenger update off when the framework declares none, and warns', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [uuidv4(), companyId, colEncrypt(JSON.stringify({ passengerUpdate: false }))]);
+    const stored = JSON.stringify({ scenarios: [{ code: 'A' }, { code: 'B', salesFlowActions: { patchPassengers: false } }] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.body.scenarios.map((s) => s.salesFlowActions.patchPassengers)).toEqual([false, false]);
+      expect(forRun.body.scenarios[0].__featureNotDeclaredWarnings).toContain('passengerUpdate');
+      expect(forRun.body.scenarios[1].__featureNotDeclaredWarnings ?? []).not.toContain('passengerUpdate');
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // #717: the run's copy says the days its trip's Test Data trains run.
   test('a run gets its trips\' calendars in its copy; a Test Manager the stored file', async () => {
     const { companyId, userId, slug } = seedCompanyUser();

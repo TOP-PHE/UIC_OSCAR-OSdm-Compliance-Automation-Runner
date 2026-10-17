@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.355",
+  "current_release": "2026.356",
   "releases": [
+    {
+      "release": "2026.356",
+      "date": "2026-10-17",
+      "server": "1.11.321",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "A trip specification is never sent with an empty carrier; the run says which Test Data train lacks its operator code (#809).",
+        "The Test Framework's 'no passenger update' holds in every run, and 'purchaser after the booking' can be declared (#809)."
+      ]
+    },
     {
       "release": "2026.355",
       "date": "2026-10-17",

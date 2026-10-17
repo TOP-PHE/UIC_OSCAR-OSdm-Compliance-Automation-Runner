@@ -215,7 +215,8 @@ var DatedJourney = class {
     // Written only when there is one (#729): null is not a ProductCategory.
     if (productCategory) this.productCategory = productCategory;
     this.vehicleNumbers = vehicleNumbers;
-    this.carriers = carriers;
+    // #809: none rather than `[{}]` when the train has no operator code.
+    if (carriers) this.carriers = carriers;
   }
 };
 

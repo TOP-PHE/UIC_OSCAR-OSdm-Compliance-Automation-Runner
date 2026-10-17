@@ -168,6 +168,8 @@ function requirementsOf(scenario, datafile) {
     passengerTypes: types,
     offerRequest: offerRequestOf(scenario, datafile),
     placeSelectionFlow: placeSelectionFlowOf(scenario),
+    // #809: a purchaser written after the booking (POST /bookings/{id}/purchaser).
+    purchaserAfterBooking: require('./undeclaredSteps').purchaserAfterBooking(scenario),
   };
 }
 
@@ -200,6 +202,9 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
+  if (requirements.purchaserAfterBooking && fw.purchaserAfterBooking === false) {
+    missing.push('a purchaser written after the booking (Passenger Types)');
+  }
   return [
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
