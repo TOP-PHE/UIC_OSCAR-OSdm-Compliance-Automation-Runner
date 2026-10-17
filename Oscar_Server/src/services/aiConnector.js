@@ -28,22 +28,23 @@ const TIMEOUT_MS = 30000;
 const MAX_ANSWER_BYTES = 256 * 1024;
 
 // Read at most `limit` bytes of the body; more is an error, not a cut.
-async function readCapped(res, limit) {
-  if (!res.body) return '';
+function readCapped(res, limit) {
+  if (!res.body) return Promise.resolve('');
   const reader = res.body.getReader();
   const chunks = [];
   let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  const next = () => reader.read().then(({ done, value }) => {
+    if (done) return Buffer.concat(chunks).toString('utf8');
     size += value.byteLength;
     if (size > limit) {
-      await reader.cancel().catch(() => {});
-      throw Object.assign(new Error('answer too large'), { code: 'AI_ANSWER_TOO_LARGE' });
+      return reader.cancel().catch(() => {}).then(() => {
+        throw Object.assign(new Error('answer too large'), { code: 'AI_ANSWER_TOO_LARGE' });
+      });
     }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks.map(c => Buffer.from(c))).toString('utf8');
+    chunks.push(Buffer.from(value));
+    return next();
+  });
+  return next();
 }
 
 function hostOf(url) {
@@ -56,7 +57,7 @@ function failureOf(err, timeoutMs) {
   }
   if (err?.code === 'AI_ANSWER_TOO_LARGE') return `The AI service sent an answer larger than ${MAX_ANSWER_BYTES / 1024} KB.`;
   const code = err?.cause?.code || err?.code;
-  return `The AI service could not be reached${code ? ` (${code})` : ''}.`;
+  return code ? `The AI service could not be reached (${code}).` : 'The AI service could not be reached.';
 }
 
 function parseJson(text) {

@@ -195,7 +195,7 @@ describe('#801 PR 2 the page section', () => {
   });
 
   test('every request of a section names its company or provider', () => {
-    expect(source).toContain("headers: { ...(init.headers || {}), 'X-Provider-Id': provider }");
+    expect(source).toContain("headers: { ...init.headers, 'X-Provider-Id': provider }");
     expect(source.match(/fetch\(url[^\n]*\n?/g).every(l => l.includes('inTarget(section'))).toBe(true);
   });
 });

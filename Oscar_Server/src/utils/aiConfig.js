@@ -73,6 +73,44 @@ function baseUrlRefusal(raw) {
   return null;
 }
 
+// Each optional field: { value } (null when empty) or { refusal }.
+function checkModel(raw) {
+  const model = typeof raw === 'string' ? raw.trim() : '';
+  if (!model) return { refusal: 'Give the model to use.' };
+  if (model.length > LIMITS.model || !MODEL_PATTERN.test(model)) {
+    return { refusal: 'The model is a name such as claude-opus-5-5 or gpt-4o: letters, digits and . _ : / @ - only.' };
+  }
+  return { value: model };
+}
+
+const isEmpty = (v) => v === undefined || v === null || v === '';
+
+function checkKey(raw) {
+  if (isEmpty(raw)) return { value: null };
+  const key = typeof raw === 'string' ? raw.trim() : '';
+  if (!key || key.length > LIMITS.apiKey || !KEY_PATTERN.test(key)) {
+    return { refusal: 'The key is one word of printable characters, without spaces.' };
+  }
+  return { value: key };
+}
+
+function checkCap(raw) {
+  if (isEmpty(raw)) return { value: null };
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < LIMITS.minTokenCap || n > LIMITS.maxTokenCap) {
+    return { refusal: `The monthly token limit is a whole number from ${LIMITS.minTokenCap} to ${LIMITS.maxTokenCap}, or empty for none.` };
+  }
+  return { value: n };
+}
+
+function checkInstruction(raw) {
+  if (raw === undefined || raw === null) return { value: null };
+  if (typeof raw !== 'string') return { refusal: 'The instruction is text.' };
+  const text = raw.trim();
+  if (text.length > LIMITS.instruction) return { refusal: `The instruction is longer than ${LIMITS.instruction} characters.` };
+  return { value: text || null };
+}
+
 /**
  * Check what a page sends. Returns { value } with the cleaned fields, or
  * { refusal } with a sentence. `apiKey` is in value only when one was typed
@@ -82,42 +120,17 @@ function checkConfig(body) {
   const b = body && typeof body === 'object' ? body : {};
   const connector = CONNECTORS[b.connector] ? b.connector : null;
   if (!connector) return { refusal: 'Choose the kind of AI service.' };
-
   const urlRefusal = baseUrlRefusal(b.baseUrl);
   if (urlRefusal) return { refusal: urlRefusal };
-  const baseUrl = trimSlashes(b.baseUrl.trim());
 
-  const model = typeof b.model === 'string' ? b.model.trim() : '';
-  if (!model) return { refusal: 'Give the model to use.' };
-  if (model.length > LIMITS.model || !MODEL_PATTERN.test(model)) {
-    return { refusal: 'The model is a name such as claude-opus-5-5 or gpt-4o: letters, digits and . _ : / @ - only.' };
-  }
+  const fields = { model: checkModel(b.model), apiKey: checkKey(b.apiKey),
+    monthlyTokenCap: checkCap(b.monthlyTokenCap), instruction: checkInstruction(b.instruction) };
+  const refused = Object.values(fields).find(f => f.refusal);
+  if (refused) return { refusal: refused.refusal };
 
-  const value = { connector, baseUrl, model, monthlyTokenCap: null, instruction: null };
-
-  if (b.apiKey !== undefined && b.apiKey !== null && b.apiKey !== '') {
-    const key = typeof b.apiKey === 'string' ? b.apiKey.trim() : '';
-    if (!key || key.length > LIMITS.apiKey || !KEY_PATTERN.test(key)) {
-      return { refusal: 'The key is one word of printable characters, without spaces.' };
-    }
-    value.apiKey = key;
-  }
-
-  const cap = b.monthlyTokenCap;
-  if (cap !== undefined && cap !== null && cap !== '') {
-    const n = Number(cap);
-    if (!Number.isInteger(n) || n < LIMITS.minTokenCap || n > LIMITS.maxTokenCap) {
-      return { refusal: `The monthly token limit is a whole number from ${LIMITS.minTokenCap} to ${LIMITS.maxTokenCap}, or empty for none.` };
-    }
-    value.monthlyTokenCap = n;
-  }
-
-  if (b.instruction !== undefined && b.instruction !== null) {
-    if (typeof b.instruction !== 'string') return { refusal: 'The instruction is text.' };
-    const text = b.instruction.trim();
-    if (text.length > LIMITS.instruction) return { refusal: `The instruction is longer than ${LIMITS.instruction} characters.` };
-    value.instruction = text || null;
-  }
+  const value = { connector, baseUrl: trimSlashes(b.baseUrl.trim()), model: fields.model.value,
+    monthlyTokenCap: fields.monthlyTokenCap.value, instruction: fields.instruction.value };
+  if (fields.apiKey.value) value.apiKey = fields.apiKey.value;
   return { value };
 }
 

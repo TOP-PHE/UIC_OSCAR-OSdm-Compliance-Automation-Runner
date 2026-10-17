@@ -160,7 +160,8 @@ function testResultHtml(test) {
   const usage = test.usage && (test.usage.input != null || test.usage.output != null)
     ? ` · ${esc(test.usage.input ?? '?')} tokens in, ${esc(test.usage.output ?? '?')} out` : '';
   const answer = test.answer ? `“${esc(test.answer)}”` : '(no text in the answer)';
-  return `<div style="${NOTE}${OK}">The service answered in ${esc(test.ms)} ms${usage}: ${answer}${test.model ? ` — model ${esc(test.model)}` : ''}</div>`;
+  const model = test.model ? ' — model ' + esc(test.model) : '';
+  return `<div style="${NOTE}${OK}">The service answered in ${esc(test.ms)} ms${usage}: ${answer}${model}</div>`;
 }
 
 let current = null;
@@ -181,20 +182,22 @@ async function readError(res, fallback) {
 // X-Provider-Id is the own company (nav.js then adds nothing).
 function inTarget(section, init = {}) {
   const provider = section.dataset.aiProvider ? section.dataset.aiTarget : '';
-  return { ...init, headers: { ...(init.headers || {}), 'X-Provider-Id': provider } };
+  return { ...init, headers: { ...init.headers, 'X-Provider-Id': provider } };
+}
+
+// One target's answer, or null after saying why it could not be read.
+async function serviceAnswer(t) {
+  const res = await fetch('/v1/company/ai-analysis/config', { headers: { 'X-Provider-Id': t.provider ? t.id : '' } });
+  if (!res.ok) { show(await readError(res, `Could not read the AI service of ${t.name}.`), 'error'); return null; }
+  return res.json();
 }
 
 async function servicesHtml(targets) {
-  const parts = [];
-  let n = 0;
-  for (const t of targets.filter(x => x.state === 'approved')) {
-    const res = await fetch('/v1/company/ai-analysis/config', { headers: { 'X-Provider-Id': t.provider ? t.id : '' } });
-    if (!res.ok) { show(await readError(res, `Could not read the AI service of ${t.name}.`), 'error'); continue; }
-    const answer = await res.json();
-    if (current) current.connectorsShown = answer.connectors || [];
-    parts.push(serviceHtml(t, answer, n++));
-  }
-  return parts.join('');
+  const approved = targets.filter(x => x.state === 'approved');
+  const answers = await Promise.all(approved.map(serviceAnswer));
+  const shown = answers.find(Boolean);
+  if (current && shown) current.connectorsShown = shown.connectors || [];
+  return approved.map((t, n) => (answers[n] ? serviceHtml(t, answers[n], n) : '')).join('');
 }
 
 async function load() {
