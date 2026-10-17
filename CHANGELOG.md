@@ -72,6 +72,7 @@ Issue #805, release 2026.354. Pages only.
   - The old `public/uic-logo.svg` was a 1 KB fragment no page used, not the UIC logo; it is removed.
   - The OSDM logo is now 46 px high, like the UIC logo: it is square, and was 34 px high.
 - **The content security policy no longer allows images from uic.org** (`imgSrc` is `'self'` and `data:`).
+- **Sonar: the HTML pages are left out of copy-paste detection** (`sonar.cpd.exclusions`; their issues are still analysed). Each page copies the banner of the others, so the two logo lines of each page counted as 18.6% duplicated new code. #807 will share the banner and styles, then remove the exclusion.
 
 Checked:
 - `page-images.test.js`: no page loads an image from another site, every banner uses the two files, and the policy allows no other origin. It fails on the old pages.
