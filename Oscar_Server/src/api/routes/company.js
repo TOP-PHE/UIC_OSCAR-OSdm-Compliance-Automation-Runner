@@ -795,6 +795,22 @@ function datafilePartRefusal(datafile, companyId) {
     detail: `The configuration's data file is not a valid data file: ${problems.length}${more ? ' or more' : ''} problem(s), the first being: ${problems[0]} Nothing was changed.` };
 }
 
+// The parts the import will write, checked before anything is: null, or the
+// refusal ({ status, detail, problems?, more? }).
+function importPartsRefusal(configuration, choices, companyId) {
+  if (choices.scenarios === 'replace') {
+    const problem = datafilePartRefusal(configuration.datafile, companyId);
+    if (problem) return problem;
+  }
+  if (choices.framework === 'replace') {
+    const version = configuration.framework.osdmVersion;
+    if (version != null && version !== '' && !isOsdmVersion(version)) {
+      return { status: 400, detail: `The configuration's Test Framework names the OSDM version "${String(version).slice(0, 40)}", which is not a version: digits and dots, such as 3.8 or 3.0.5. Nothing was changed.` };
+    }
+  }
+  return null;
+}
+
 // POST /v1/company/configuration/import — multipart: the file in the field
 // "configuration", and the three choices as fields: scenarios = replace|keep,
 // framework = replace|keep, testData = add|replace|keep. Authorised before
@@ -814,18 +830,11 @@ router.post('/configuration/import', datafileMutationLimiter, authorizeDatafileW
   if (chosen.refusal) return refuse(`${chosen.refusal} Nothing was changed.`);
   const { choices } = chosen;
 
-  let datafileBytes = null;
-  if (choices.scenarios === 'replace') {
-    const problem = datafilePartRefusal(configuration.datafile, company.id);
-    if (problem) return refuse(problem.detail, problem.problems ? { problems: problem.problems, problems_truncated: problem.more } : undefined, problem.status);
-    datafileBytes = Buffer.from(JSON.stringify(configuration.datafile, null, 4), 'utf8');
-  }
-  if (choices.framework === 'replace') {
-    const version = configuration.framework.osdmVersion;
-    if (version != null && version !== '' && !isOsdmVersion(version)) {
-      return refuse(`The configuration's Test Framework names the OSDM version "${String(version).slice(0, 40)}", which is not a version: digits and dots, such as 3.8 or 3.0.5. Nothing was changed.`);
-    }
-  }
+  const problem = importPartsRefusal(configuration, choices, company.id);
+  if (problem) return refuse(problem.detail, problem.problems ? { problems: problem.problems, problems_truncated: problem.more } : undefined, problem.status);
+  const datafileBytes = choices.scenarios === 'replace'
+    ? Buffer.from(JSON.stringify(configuration.datafile, null, 4), 'utf8')
+    : null;
 
   let result;
   try {

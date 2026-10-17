@@ -162,7 +162,8 @@ function readChoices(input, configuration) {
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (isPlainObject(value)) {
-    return `{${Object.keys(value).sort(byText).map(k => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
+    const members = Object.keys(value).sort(byText).map(k => JSON.stringify(k) + ':' + canonical(value[k]));
+    return '{' + members.join(',') + '}';
   }
   return JSON.stringify(value === undefined ? null : value);
 }

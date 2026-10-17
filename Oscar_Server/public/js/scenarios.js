@@ -1535,13 +1535,16 @@ function configurationSummary(cfg) {
   const count = type => resources.filter(r => r?.resource_type === type).length;
   const df = cfg.datafile && typeof cfg.datafile === 'object' ? cfg.datafile : null;
   const fw = cfg.framework && typeof cfg.framework === 'object' ? cfg.framework : null;
+  let framework = 'no Test Framework';
+  if (fw) framework = fw.osdmVersion ? 'a Test Framework (OSDM ' + fw.osdmVersion + ')' : 'a Test Framework';
   const parts = [
     df ? `${countScenarios(df) ?? 0} scenario(s)` : 'no data file',
-    fw ? `a Test Framework${fw.osdmVersion ? ` (OSDM ${fw.osdmVersion})` : ''}` : 'no Test Framework',
+    framework,
     `${count('TRAIN')} train(s) and ${count('JOURNEY')} journey(s)`,
   ];
   const from = [meta.company, typeof meta.exported_at === 'string' ? meta.exported_at.slice(0, 10) : ''].filter(Boolean).join(', ');
-  return `${from ? `From ${from}: ` : ''}${parts.join(', ')}.`;
+  const prefix = from ? 'From ' + from + ': ' : '';
+  return `${prefix}${parts.join(', ')}.`;
 }
 
 // The server's answer to an import, for the message.
