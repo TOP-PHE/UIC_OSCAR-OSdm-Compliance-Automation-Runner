@@ -654,6 +654,16 @@ describe('js/scenarios.js — random test data (#542)', () => {
   });
 });
 
+describe('no page draws an id from Math.random (#841)', () => {
+  // Sonar S2245 on report-builder.html; the rule of #542 and #758 everywhere.
+  const pages = fs.readdirSync(PUBLIC_DIR).filter(f => f.endsWith('.html'))
+    .concat(fs.readdirSync(path.join(PUBLIC_DIR, 'js')).filter(f => f.endsWith('.js')).map(f => `js/${f}`));
+
+  test.each(pages)('%s', (rel) => {
+    expect(read(rel)).not.toContain('Math.random(');
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });

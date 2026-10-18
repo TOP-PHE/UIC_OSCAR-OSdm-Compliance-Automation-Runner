@@ -975,7 +975,7 @@ function renderLogs() {
           var ts  = o.ts ? parseServerTs(o.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
           var label = jsonBlockLabel(o);
           var lineCount = item.body.split('\n').length;
-          var bodyId = 'json-body-' + (o.id || Math.random().toString(36).slice(2));
+          var bodyId = 'json-body-' + (o.id || crypto.getRandomValues(new Uint32Array(2)).join('-'));
           html += '<div class="log-json-row">'
             + '<span class="log-ts">' + escHtml(ts) + '</span>'
             + '<span class="log-level l-' + escHtml(lvl) + '">' + escHtml(lvl) + '</span>'

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.370",
+  "current_release": "2026.371",
   "releases": [
+    {
+      "release": "2026.371",
+      "date": "2026-10-18",
+      "server": "1.11.336",
+      "collection": "OTST_V2.0.186",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server (#841): the report builder's log blocks without an id take their page id from crypto.getRandomValues() instead of Math.random() (Sonar S2245); a test keeps Math.random out of every page script. The Alertmanager reload address finding (S5332, internal Docker network) is accepted in Sonar with its reason."
+      ]
+    },
     {
       "release": "2026.370",
       "date": "2026-10-18",

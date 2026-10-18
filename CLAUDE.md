@@ -1529,6 +1529,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     in `scenarioParser.js` uses `node:crypto`, else a time-and-counter value
     (S2245). `bruno-library-security.test.js` fails on `new Function(`,
     `Math.random(` or `eval(` anywhere in the library's code.
+    The pages follow the same rule since #841 (1.11.336): `ui-scripts.test.js`
+    refuses `Math.random(` in any `public/` page or script. Sonar's S5332 on
+    the Alertmanager reload address (internal Docker network) is *Accepted*
+    in Sonar with its reason, by the maintainer's decision.
   - **An unset variable in a header template goes out as text** (#692,
     OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
     provider without a requestor got that text on every request. The

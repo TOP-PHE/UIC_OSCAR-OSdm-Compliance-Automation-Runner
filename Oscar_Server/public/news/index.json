@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-sonar-vulnerabilities",
+    "date": "October 18, 2026",
+    "tag": "Security",
+    "title": "Last code-scanning findings cleared",
+    "summary": "The Report Builder no longer uses a weak random generator, and no page may use one.",
+    "content": "The Report Builder now draws the ids of its log blocks from the browser's cryptographic generator. A test keeps the weak generator out of every page. Nothing changes in what the pages show."
+  },
+  {
     "id": "2026-10-18-reference-configuration-update",
     "date": "October 18, 2026",
     "tag": "Feature",
