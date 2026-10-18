@@ -23,11 +23,13 @@ const crypto = require('node:crypto');
 function createTokenService({ key = crypto.randomBytes(32), now = Date.now } = {}) {
   const sign = (payload) => crypto.createHmac('sha256', key).update(payload).digest('base64url');
 
-  function issue(provider, clientId, lifetimeSeconds) {
+  // `faults` (#833): the faults every request with this token is answered with.
+  function issue(provider, clientId, lifetimeSeconds, faults = []) {
     const payload = Buffer.from(JSON.stringify({
       p: provider,
       c: clientId,
       e: Math.floor(now() / 1000) + lifetimeSeconds,
+      ...(faults.length ? { f: faults } : {}),
       // Two tokens issued in the same second for the same client still differ.
       n: crypto.randomBytes(6).toString('base64url'),
     })).toString('base64url');
@@ -52,7 +54,8 @@ function createTokenService({ key = crypto.randomBytes(32), now = Date.now } = {
     }
     if (!claims || typeof claims.p !== 'string' || typeof claims.c !== 'string' || typeof claims.e !== 'number') return null;
     if (claims.e <= Math.floor(now() / 1000)) return null;
-    return { provider: claims.p, clientId: claims.c, expiresAt: claims.e };
+    const faults = Array.isArray(claims.f) ? claims.f.filter((f) => typeof f === 'string') : [];
+    return { provider: claims.p, clientId: claims.c, expiresAt: claims.e, faults };
   }
 
   return { issue, verify };

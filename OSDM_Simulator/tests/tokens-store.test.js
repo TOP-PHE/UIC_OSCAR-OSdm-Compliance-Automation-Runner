@@ -15,7 +15,7 @@ const { createStore } = require('../src/store');
 test('a token says which provider and client it was issued for', () => {
   const tokens = createTokenService({ now: () => 1000000 });
   const claims = tokens.verify(tokens.issue('alpha', 'client-1', 60));
-  assert.deepEqual(claims, { provider: 'alpha', clientId: 'client-1', expiresAt: 1060 });
+  assert.deepEqual(claims, { provider: 'alpha', clientId: 'client-1', expiresAt: 1060, faults: [] });
 });
 
 test('two tokens issued in the same second are different', () => {

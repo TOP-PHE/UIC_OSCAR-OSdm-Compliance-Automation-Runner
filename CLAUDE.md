@@ -1861,7 +1861,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     by name in `versionShapes.js` only when the earlier version has it in no
     schema. `Problem.pointers` are ProblemPointer objects; the collection
     reads both forms (`pointerText()`). Restarting a local simulator: check
-    the new process did start (EADDRINUSE) before recording a replay. The data file
+    the new process did start (EADDRINUSE) before recording a replay.
+    **Faults on demand (#833 PR B, 0.36.0)**: `src/osdm/faults.js`, asked by
+    the header `X-Simulator-Faults` or a token scope `sim-faults:…` (claim
+    `f`); unknown codes are refused. A fault changes a copy of one answer
+    (after `shapeAnswer`), never the stored state; error faults change the
+    Problem in `handle()`'s catch. Each entry's `expect` (step, check text,
+    level) is what OSCAR must report; the detection report (PR D) reads it,
+    so a fault without a reliable expectation does not belong there. The data file
     holds each sale scenario once per version (`_36`, `_37`, `_38`), and
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;

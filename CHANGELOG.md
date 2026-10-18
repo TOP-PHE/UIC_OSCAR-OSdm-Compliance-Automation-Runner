@@ -62,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.36.0] — 2026-10-18
+
+Issue #833 (PR B). Simulator 0.36.0. Server and collection unchanged. Errors injected on demand, to prove that OSCAR's checks catch them.
+
+### Simulator 0.36.0
+- **A catalogue of faults** (`src/osdm/faults.js`): twelve faults over offers, bookings, passengers, fulfilments, refunds and error answers. Each changes one kind of answer, after it is built and put in the provider's version shapes; the stored bookings and offers are never changed. Each names what OSCAR must report (`expect`: the step, a stable part of the check's text, FAIL or WARNING).
+- **Asked per request** with the header `X-Simulator-Faults: code, code`, or **per token** with the scope `sim-faults:code,code`: every request of that token is then faulty. An unknown code is refused (400 `UNKNOWN_FAULT`; `invalid_scope` at the token endpoint), so a typing mistake never looks like a fault OSCAR missed.
+- A token carries its faults (`f` claim); a refusal can be turned into a 500 or lose its problem code; an answer can be an HTML page.
+- `Documentation/Server_Operations/OSCAR - OSDM Simulator.md` § 6b lists the faults and what OSCAR must report.
+
+### Default decisions (taken without asking)
+- **The expectations are the collection's check texts as the replay shows them** (`OSCAR - Checks by scenario.md`). PR C runs the SIM_FAULT_* scenarios and corrects any expectation the runs contradict.
+- **A fault never changes the simulator's state**: a later request without the fault sees the true booking, as a real provider's bug in one answer would show.
+
+---
+
 ## [server-1.11.331 / collection-OTST_V2.0.184] — 2026-10-18 · Release 2026.366
 
 Issue #833 (PR A). Simulator 0.35.0. The simulator answers in each provider's own OSDM version, and every answer is checked against the OSDM response schema of that version.

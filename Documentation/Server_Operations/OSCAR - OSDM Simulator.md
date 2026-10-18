@@ -257,6 +257,44 @@ sent to `beta` is refused with 401. A mix-up between providers is a failed run,
 not a passing one, and every identifier in a report starts with the name of the
 provider that answered.
 
+## 6b. Faults on demand (#833)
+
+The simulator can answer with chosen errors, to check that OSCAR's checks catch
+them and that the AI analysis explains them. Each fault changes one kind of
+answer; the bookings and offers stored are not changed.
+
+Two ways to ask for them:
+
+- **For one scenario:** the request header `X-Simulator-Faults: code, code`.
+  The scenario field `simulatorFaults` makes the collection send it (#833 PR C).
+- **For a whole provider:** a token asked with the scope
+  `sim-faults:code,code` (the scope field of the tester's API Config), so every
+  request made with that token is faulty. A second provider in OSCAR, for
+  example "Gamma (faults)", pointing at the same simulator endpoint with such a
+  scope, keeps the normal provider clean.
+
+An unknown code is refused (HTTP 400 `UNKNOWN_FAULT`, or `invalid_scope` at the
+token endpoint), so a typing mistake never looks like "OSCAR detected nothing".
+
+| Code | What the simulator does | What OSCAR must report |
+|---|---|---|
+| `offer.price-below-parts` | an offer's minimalPrice is one unit below the sum of its admissions | 01: "Offer minimalPrice >= sum of admission parts price" fails |
+| `offer.trip-unknown` | an offer covers a trip id the answer does not have | 01: "… is part of Trip ids" fails |
+| `booking.currency-changed` | a new booking is priced in another currency | 02: "booking.provisionalPrice.currency matches offer currency" fails |
+| `booking.passenger-dropped` | a new booking loses its last passenger | 02: "Booking contains exactly the expected number of passengers" fails |
+| `booking.not-prebooked` | a new booking's admissions say CONFIRMED | 02: "Status is PREBOOKED for admission" fails |
+| `passenger.name-altered` | a passenger update answers another last name | 03: "Last name is correct" fails |
+| `fulfillment.wrong-status` | a confirmation gives fulfilments that say REFUNDED | 06: the fulfilment status comparison fails |
+| `refund.amount-above-paid` | a refund offer gives back ten times its amount | 10: "Refund response bounds" fails |
+| `refund.not-refunded` | a booking read after a refund shows its tickets FULFILLED | 14: the REFUNDED status check fails |
+| `answer.html` | a booking read is answered with an HTML "Request Rejected" page | 05: "Content-Type is JSON" fails |
+| `error.problem-without-code` | every refusal (4xx) leaves out its problem code | the negative tests: "error body is an RFC … Problem" fails |
+| `error.server-error-for-refusal` | every refusal (4xx) comes as HTTP 500 | the negative tests: "provider rejects with a client error (4xx)" fails |
+
+The catalogue is `OSDM_Simulator/src/osdm/faults.js`; each entry says what
+OSCAR must report (`expect`), which the detection report (#833 PR D) compares
+with a run.
+
 ## 7. Day to day
 
 The `docker compose` commands are run from the deploy folder. In a new session
