@@ -38,8 +38,8 @@ function handleAccessTokenResponse(res, opts) {
   let token = null;
   if (body && typeof body === 'object') {
     const fields = ['access_token', 'accessToken', 'token'];
-    for (let i = 0; i < fields.length; i++) {
-      const v = body[fields[i]];
+    for (const field of fields) {
+      const v = body[field];
       if (typeof v === 'string' && v.length > 0) { token = v; break; }
     }
   }
