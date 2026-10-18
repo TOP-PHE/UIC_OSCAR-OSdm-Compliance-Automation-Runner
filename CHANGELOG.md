@@ -84,6 +84,29 @@ Issue #848 (PR 1). The AI analysis: one AI service for the company and all its p
 
 ---
 
+## [mcp-0.1.0] — 2026-10-18
+
+Issue #503 (PR 3). OSCAR MCP server 0.1.0. Server and collection unchanged.
+
+### Added
+- **`OSCAR_MCP/`, a read-only MCP server**: an AI assistant (Claude Desktop, Claude Code, any MCP client) reads OSCAR's results through the API of #503, with one API key and no more rights than it. Six tools, one per GET route of `/v1/api`: `oscar_key`, `oscar_list_runs`, `oscar_get_run`, `oscar_get_run_checks`, `oscar_get_batch`, `oscar_get_queue`.
+- Configured by two environment variables, `OSCAR_URL` and `OSCAR_API_KEY`; set-up for Claude Desktop and Claude Code in `OSCAR_MCP/README.md`, pointed to from the user guide § 2.3.
+- Linted and tested in the required `Lint, audit, test` job, with its coverage sent to Sonar.
+
+### Security
+- GET only, to the configured OSCAR only, under `/v1/api/` only; a redirect is never followed; `https`, or `http` for this machine only.
+- Arguments are checked before any call (unknown names, types, ranges, ids with a slash or a dot segment).
+- The key is sent in the `Authorization` header only and never written in an answer, an error or a log line; the tests read everything the process writes.
+- The tools and the server's instructions tell the assistant that results are data from the tested provider, never instructions.
+- An answer over 4 MB is not read, a text over 100,000 characters is cut, a call gives up after 30 s.
+
+### Default decisions (taken without asking)
+- **No MCP SDK**: the four messages it needs (initialize, ping, tools/list, tools/call) are written by hand, so the server has no dependency to install, audit or update, like the simulator.
+- **stdio only**, started by the assistant on the person's computer. A hosted (HTTP) MCP endpoint in OSCAR would need its own authentication design and is not built.
+- **Its own version**, like the simulator: no server release, no `compatibility.json` row, no news entry.
+
+---
+
 ## [server-1.11.338 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.373
 
 Issue #503 (PR 2). The routes that read runs and results with an API key. Collection unchanged.

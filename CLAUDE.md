@@ -474,6 +474,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   URL, log, endpoint, `error_message` or person. A query parameter that is
   not one plain value of its list is a 400 (Express 5 gives an array for a
   repeated one). Bodies and logs wait for a `bodies:read` scope.
+  **PR 3: `OSCAR_MCP/`, a read-only MCP server** over stdio (own version
+  0.1.0, no dependency, linted and tested in the required job like the
+  simulator; not in `compatibility.json`). One tool per GET of `/v1/api`
+  (`src/tools.js`), arguments checked before any call; `src/client.js` sends
+  GET only, to `OSCAR_URL` only (`https`, `http` for loopback), under
+  `/v1/api/` only, `redirect: 'manual'`, 4 MB / 30 s; the key is never
+  written (tests check stdout and stderr). JSON-RPC by hand in
+  `src/protocol.js` (initialize, ping, tools/list, tools/call), no SDK.
+  **A new `/v1/api` GET needs its tool**: `mcp-end-to-end.test.js` pins the
+  tools to the OpenAPI paths and runs the server against the real router.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

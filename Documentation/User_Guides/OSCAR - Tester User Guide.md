@@ -222,6 +222,11 @@ chosen in **Working on**.
   ```bash
   curl -H "Authorization: Bearer $OSCAR_KEY" https://<oscar>/v1/api/runs?status=FAILED
   ```
+- **With an AI assistant**: `OSCAR_MCP/` in the repository is an MCP server
+  that gives an assistant (Claude Desktop, Claude Code…) these same reads as
+  tools, with one key and no more rights than it. Make a key for it, then
+  follow [OSCAR_MCP/README.md](../../OSCAR_MCP/README.md). Revoking the key
+  stops it.
 
 ## 3. Provider setup — Framework, Test data & Discovery
 
