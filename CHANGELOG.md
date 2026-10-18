@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.334 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.369
+
+Issue #838 (PR 1). The configuration of each simulated provider is in the repository, so the companies that test the simulator can follow it (PR 2).
+
+### Added
+- **`Bruno_Collection/data_base/reference/simulator-alpha.json`, `-beta.json`, `-gamma.json`**: what a company testing that provider must hold.
+  - The Test Framework: the editor's defaults, with every `fw.*` answer of the provider's checklist (`Documentation/Server_Operations/Simulator checklists/`). The OSDM version is the simulator profile's (3.6.0, 3.7.0, 3.8.0).
+  - The Test Data: one train per distinct leg of the data file's trips (20), one journey per trip of several legs (3).
+  - The run list: the scenarios of the provider's OSDM version, none of those that fail on purpose.
+  - The scenarios themselves are not copied: the reference names `simulator_datafile.json`.
+- **`Oscar_Server/src/utils/referenceConfiguration.js`** (pure) and **`scripts/generate-reference-configurations.js`**. The files are generated, never edited by hand. `reference-configuration.test.js` fails when they differ from what the generator gives, when they disagree with the simulator (version, currencies, return models), or when the editor's defaults change without them. A checklist question the module does not place stops the generator.
+- `OSCAR - OSDM Simulator.md` § 5 and the data folder's README name them.
+
+### Default decisions (taken without asking)
+- **The framework comes from the checklists**, which are generated with the simulator, and the OSDM version from the simulator's profile; a disagreement between the two stops the generator.
+- **The IRREGULAR codes always hold the four the editor makes mandatory**: the checklist lists the optional ones only.
+- **The Test Data has no calendar** (`daysOfWeek` empty): the simulator answers every day.
+- **Nothing reads the files yet.** PR 2 links a company to a reference and updates it.
+
+---
+
 ## [server-1.11.333 / collection-OTST_V2.0.185] — 2026-10-18 · Release 2026.368
 
 Issue #833 (PR D). The fault detection report: did OSCAR, and did the AI analysis, see the faults the OSDM simulator was asked for? Collection unchanged.

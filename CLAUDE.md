@@ -1894,7 +1894,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     two agree. Route `GET /ai-analysis/fault-detection?batch=&analysis=`
     (Test Manager, no model called); page buttons in the AI analysis card.
     `tests/helpers/fault-replay.json` is the replay's failures and warnings of
-    the 12 SIM_FAULT scenarios: re-extract it when a fault's checks move. The data file
+    the 12 SIM_FAULT scenarios: re-extract it when a fault's checks move.
+    **Reference configurations (#838, PR 1 = 1.11.334 / OTST_V2.0.186):**
+    `Bruno_Collection/data_base/reference/simulator-<provider>.json`, what a
+    company testing that provider must hold: framework (the editor's
+    `emptyFramework()`, restated as `defaultFramework()` and pinned by a test,
+    with every `fw.*` answer of the provider's checklist over it; IRREGULAR
+    codes always get the mandatory four; a list asked with nothing ticked is
+    `[]`), Test Data (`testResourcesFromDatafile()`: a train per distinct leg,
+    a journey per trip of several legs) and run list (the provider's OSDM
+    version, no `SIM_WRONG_`/`SIM_FAULT_`). The scenarios are named, not
+    copied: `configurationOf()` joins reference and data file in the #810
+    format. **Generated** (`scripts/generate-reference-configurations.js`)
+    from the checklist, the profile and the data file: a test fails until it
+    is rerun after any of them changes, and a checklist question the module
+    does not place stops the generator. The OSDM version is the profile's
+    (`3.6.0`), checked against the checklist's (`3.6`). The data file
     holds each sale scenario once per version (`_36`, `_37`, `_38`), and
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;

@@ -17,6 +17,7 @@ Each data file corresponds to a specific **implementor sandbox** and defines the
 | `sqills_datafile.json` | Sqills | 3.4 | EUR |
 | `turnit_datafile.json` | Turnit | 3.0.5 | EUR |
 | `simulator_datafile.json` | OSDM simulator (`OSDM_Simulator/`), providers `alpha`, `beta`, `gamma` | 3.6.0, 3.7.0, 3.8.0 (one scenario pair each) | any |
+| `reference/simulator-<provider>.json` | Reference configuration of each simulated provider (#838): Test Framework, Test Data and run list, with `simulator_datafile.json`. Generated, never edited by hand | the provider's | the provider's |
 | `datafile_template.md` | — | — | Template reference |
 
 ---

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-reference-configurations",
+    "date": "October 18, 2026",
+    "tag": "Improvement",
+    "title": "Reference configurations of the simulated providers",
+    "summary": "The Test Framework, the Test Data and the run list of the OSDM simulator's providers alpha, beta and gamma are now kept in the repository.",
+    "content": "Each simulated provider of the OSDM simulator (alpha, beta, gamma) now has a reference configuration in the repository: the Test Framework of its checklist, Test Data naming its trains and journeys, and the scenarios of its OSDM version. They are generated with the simulator, so they stay up to date. The next release lets a Test Manager update a company from them in one click."
+  },
+  {
     "id": "2026-10-18-fault-detection",
     "date": "October 18, 2026",
     "tag": "Improvement",
