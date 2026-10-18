@@ -172,7 +172,7 @@ describe('#801 PR 3 the preview is what is sent', () => {
     const res = await preview(['batch-2', 'batch-1']);
     expect(res.body.mode).toBe('compare');
     expect(res.body.batches.map(b => b.batchId)).toEqual(['batch-1', 'batch-2']);
-    expect(res.body.counts).toEqual({ fixed: 1, stillFailing: 1, new: 1 });
+    expect(res.body.counts).toEqual({ fixed: 1, stillFailing: 1, new: 1, warningGroups: 0 });
   });
 });
 

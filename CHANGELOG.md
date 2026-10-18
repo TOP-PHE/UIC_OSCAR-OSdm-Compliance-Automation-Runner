@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.341 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.376
+
+Issue #823 (PR 1). The AI analysis sees the warnings, and what each scenario is written for. Collection unchanged.
+
+The first analysis with a real AI service (a batch of the simulator's whole data file, run on `alpha`, which declares OSDM 3.6.0) blamed OSCAR for scenarios written for OSDM 3.8: it was told neither the scenarios' versions nor what the Test Framework does not declare.
+
+### Added
+- **The warnings are sent, apart from the failures.** The `[WARNING]` lines of the batch's run logs, grouped like the failed checks (step and text, the run's values replaced), from finished runs only. With two batches, OSCAR sorts them into gone, still warned and new. The instructions say a warning is not a failure and must never be reported as one.
+- **Each scenario names its OSDM version and what the Test Framework does not declare of it** (`osdmVersion`, `notDeclaredInTestFramework`, the golden rule's warnings). The instructions say that a scenario written for another version than the provider declares, or arming a feature the framework does not declare, is the configuration's first.
+- **Too large: the warnings are summarised by step first**, then the failures too. The preview counts the warning groups and says which part was summarised.
+- User guide § 2.4: what is sent and what is not, reading the answer, history and limits.
+
+### Default decisions (taken without asking)
+- **The warnings are read from the run log** (`run_events`, level `warn`), under the request each line was logged with: the collection keeps no other record of them. At most 20,000 log rows per batch; 300 warning groups.
+- **The instructions changed**, so an analysis sent now does not have the same content hash as one of the same batch sent before.
+
+---
+
 ## [server-1.11.340 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.375
 
 Issue #848 (PR 2). The AI Analysis page in three tabs, and the analysis asked step by step. Collection unchanged.

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.375",
+  "current_release": "2026.376",
   "releases": [
+    {
+      "release": "2026.376",
+      "date": "2026-10-18",
+      "server": "1.11.341",
+      "collection": "OTST_V2.0.186",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis (#823 PR 1): the warnings the runs logged are sent apart from the failures, and each scenario names its OSDM version and what the Test Framework does not declare of it. The instructions say a warning is not a failure, and that a scenario of another version than the provider's is the configuration's first. User guide § 2.4: what is sent and what is not, reading the answer, history and limits."
+      ]
+    },
     {
       "release": "2026.375",
       "date": "2026-10-18",

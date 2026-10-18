@@ -48,7 +48,7 @@ const { requireAuth }   = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
 const { toApiFinding } = require('../helpers/findings');
-const { failuresOfBatch, batchesOf, runsOfBatch, MAX_FAILURES } = require('../helpers/batchFailures');
+const { failuresOfBatch, warningsOfBatch, batchesOf, runsOfBatch, MAX_FAILURES } = require('../helpers/batchFailures');
 const { decryptFromFileAsync } = require('../../utils/at-rest');
 const C = require('../../utils/aiConfig');
 const AN = require('../../utils/aiAnalysis');
@@ -59,6 +59,7 @@ const CL = require('../../utils/checklistAnswers');
 const MK = require('../../utils/aiMask');
 const M = require('../../utils/aiModels');
 const FD = require('../../utils/faultDetection');
+const { annotateDatafile } = require('../../utils/frameworkGating');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis-results' });
 
 const router = express.Router();
@@ -83,11 +84,14 @@ const refuse = (res, status, detail) => res.status(status).json({ status, title:
 
 // ── What is sent ─────────────────────────────────────────────────────────────
 
-async function scenariosOf(companyId) {
+// The data file's scenarios; with a Test Framework, each annotated with what
+// the framework does not declare of it (#823), as the run's copy is.
+async function scenariosOf(companyId, framework = null) {
   const row = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
   if (!row?.datafile_path || !fs.existsSync(row.datafile_path)) return [];
   try {
     const df = JSON.parse((await decryptFromFileAsync(row.datafile_path)).toString('utf8'));
+    if (framework) annotateDatafile(df, framework);
     return Array.isArray(df?.scenarios) ? df.scenarios.filter((x) => x && typeof x === 'object') : [];
   } catch (err) {
     log.warn({ err: err.message, companyId }, 'AI analysis: data file unreadable, scenarios sent without descriptions');
@@ -174,11 +178,12 @@ async function buildFor(target, user, body) {
   if (chosen.refusal) return chosen;
   const batches = chosen.batches.map((b) => {
     const records = failuresOfBatch(target.id, b.batchId);
-    return { ...b, records, truncated: records.length >= MAX_FAILURES };
+    const logged = warningsOfBatch(target.id, b.batchId);
+    return { ...b, records, truncated: records.length >= MAX_FAILURES, warnings: logged.warnings, warningsTruncated: logged.truncated };
   });
   const findings = all('SELECT * FROM finding WHERE company_id = ?', [target.id]).map(toApiFinding);
   const framework = frameworkOf(target.id);
-  const built = AN.buildInput({ batches, framework, findings, scenarios: await scenariosOf(target.id),
+  const built = AN.buildInput({ batches, framework, findings, scenarios: await scenariosOf(target.id, framework),
     catalogue: catalogueEntries(), checklist: checklistContext(target.id), sampleOf: sampleReader(target.id) });
   const system = AN.systemPrompt({ language: languageOf(body), instruction: stored?.instruction || null, compare: batches.length === 2,
     osdmVersion: framework?.osdmVersion || null });
@@ -218,7 +223,8 @@ router.post('/ai-analysis/preview', readLimiter, async (req, res) => {
   const { built } = plan;
   const estimatedTokens = AN.estimateTokens(plan.system) + built.estimatedTokens;
   res.json({
-    batches: plan.batches.map(({ records, truncated, ...b }) => ({ ...b, failedChecks: records.length, truncated })),
+    batches: plan.batches.map(({ records, truncated, warnings, warningsTruncated, ...b }) =>
+      ({ ...b, failedChecks: records.length, truncated, warnings: warnings.length, warningsTruncated })),
     mode: plan.batches.length === 2 ? 'compare' : 'one',
     connector: plan.stored.connector, model: plan.model, configuredModel: plan.stored.model,
     price: plan.price, estimatedCost: M.estimateOf(plan.price, estimatedTokens, AN.MAX_ANSWER_TOKENS),
@@ -228,6 +234,7 @@ router.post('/ai-analysis/preview', readLimiter, async (req, res) => {
     chars: built.chars + plan.system.length,
     estimatedTokens,
     summarisedByStep: built.summarisedByStep,
+    warningsSummarisedByStep: built.warningsSummarisedByStep,
     tooLarge: built.tooLarge,
     counts: built.counts,
     monthly: monthly(plan.stored, target.id, req.user.id),

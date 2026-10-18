@@ -60,7 +60,7 @@ describe('#801 PR 3 what is sent', () => {
     expect(input.comparison.fixed.map(g => g.step)).toEqual(['06. POST Fulfillments']);
     expect(input.comparison.stillFailing.map(g => g.step)).toEqual(['02. POST Booking']);
     expect(input.comparison.new.map(g => g.step)).toEqual(['10. POST Refund Offers']);
-    expect(counts).toEqual({ fixed: 1, stillFailing: 1, new: 1 });
+    expect(counts).toEqual({ fixed: 1, stillFailing: 1, new: 1, warningGroups: 0 });
     expect(input.failures).toBeUndefined();
   });
 
@@ -153,6 +153,21 @@ describe('#801 PR 3 the page', () => {
     expect(html).toContain('{&quot;a&quot;:&quot;&lt;b&gt;&quot;}');
     expect(html).toContain('data-ai-action="an-run"');
     expect(ctx.previewHtml({ ...p, tooLarge: true })).not.toContain('data-ai-action="an-run"');
+  });
+
+  test('#823 the preview counts the warnings apart, and says which part was summarised', () => {
+    const p = { mode: 'one', counts: { groups: 2, warningGroups: 7 }, estimatedTokens: 1, chars: 4, model: 'm', monthly: { cap: null, used: 0 },
+      summarisedByStep: false, warningsSummarisedByStep: true, batches: [{ truncated: false, warningsTruncated: true }], instructions: '', input: '' };
+    const html = ctx.previewHtml(p);
+    expect(html).toContain('2 group(s) of failed checks. 7 group(s) of warnings, sent apart: a warning is not a failure.');
+    expect(html).toContain('the warnings are summarised by step, the failures are sent one by one');
+    expect(html).toContain('more failed checks or log lines than OSCAR reads');
+    expect(ctx.previewHtml({ ...p, mode: 'compare', counts: { fixed: 0, stillFailing: 0, new: 0, warningGroups: 3 } }))
+      .toContain('3 group(s) of warnings in the later batch');
+    const both = ctx.previewHtml({ ...p, summarisedByStep: true, batches: [] });
+    expect(both).toContain('the failures and the warnings are summarised by step');
+    expect(both).not.toContain('failures are sent one by one');
+    expect(both).not.toContain('log lines than OSCAR reads');
   });
 
   test('a result: the opinion warning, the summary, the comparison and each group with its owner, escaped', () => {

@@ -359,6 +359,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     throwaway server: seed with `require('src/db/db')` under
     `OSCAR_DB_PATH`, sign a token with the `server_config` JWT secret, put it
     in `localStorage.oscar_token`.
+    **#823 PR 1 (1.11.341): warnings and scenario versions.** The first real
+    analysis (the whole simulator data file run on alpha, OSDM 3.6.0) blamed
+    OSCAR for `_38` scenarios: it knew neither their version nor what the
+    framework leaves undeclared. Now `warningsOfBatch()`
+    (`batchFailures.js`: `run_events` level `warn`, lines holding
+    `[WARNING]`, step = `request_name`, finished runs only) feeds
+    `warningGroupsOf()` (`groupFailures()` over `warningText()`), sent as
+    `warnings` (or `warningComparison` gone / stillWarned / new), never mixed
+    with the failures; too large → warnings by step first, then failures.
+    `scenariosOf(id, framework)` annotates the data file, so
+    `scenarios[]` carries `osdmVersion` and `notDeclaredInTestFramework`.
+    That run also showed a simulator gap: alpha (3.6) serves only
+    `…/booked-offers/{id}/offer-parts`, which is 3.7+; 3.6 has only
+    `…/reservations` (the collection picks by version).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
