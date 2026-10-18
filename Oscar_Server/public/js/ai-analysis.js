@@ -384,7 +384,10 @@ function faultReportHtml(r) {
     if (!f.known) seen = '❓ unknown fault code';
     else if (f.asExpected) seen = '✅ detected';
     else if (f.detected) seen = '🟡 partly detected';
-    const where = (f.expectations || []).map(e => `${esc(e.level)} at ${esc(e.step)}: “${esc(e.check)}” — ${e.found.length ? `seen ${e.found.length}×` : 'not seen'}`).join('<br>');
+    const where = (f.expectations || []).map(e => {
+      const times = e.found.length ? 'seen ' + e.found.length + '×' : 'not seen';
+      return `${esc(e.level)} at ${esc(e.step)}: “${esc(e.check)}” — ${times}`;
+    }).join('<br>');
     const v = verdicts.get(`${f.runId}|${f.code}`);
     let ai = '';
     if (r.analysis) ai = `<td style="${CELL}">${faultVerdictHtml(v)}</td>`;
@@ -394,11 +397,14 @@ function faultReportHtml(r) {
   let score = '';
   if (r.analysis) {
     const a = r.analysis.summary;
-    score = ` · AI analysis (${esc(r.analysis.model)}): ${a.explained} of ${a.judged} explained${a.score == null ? '' : ` (score ${esc(a.score)})`}, ${a.misattributed} given another owner, ${a.missed} in no group`;
+    const rate = a.score == null ? '' : ' (score ' + esc(a.score) + ')';
+    score = ` · AI analysis (${esc(r.analysis.model)}): ${a.explained} of ${a.judged} explained${rate}, ${a.misattributed} given another owner, ${a.missed} in no group`;
   }
-  return `<div style="${NOTE}${s.detected === s.injected ? OK : INFO}">OSCAR detected ${s.detected} of ${s.injected} faults asked for (${s.asExpected} with every expected check)${s.unknown ? `, ${s.unknown} unknown` : ''}${score}.</div>
+  const unknown = s.unknown ? ', ' + s.unknown + ' unknown' : '';
+  const aiHead = r.analysis ? '<th style="' + CELL + '">AI analysis</th>' : '';
+  return `<div style="${NOTE}${s.detected === s.injected ? OK : INFO}">OSCAR detected ${s.detected} of ${s.injected} faults asked for (${s.asExpected} with every expected check)${unknown}${score}.</div>
     <div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">
-    <thead><tr><th style="${CELL}">Fault</th><th style="${CELL}">OSCAR</th><th style="${CELL}">Expected checks</th>${r.analysis ? `<th style="${CELL}">AI analysis</th>` : ''}</tr></thead>
+    <thead><tr><th style="${CELL}">Fault</th><th style="${CELL}">OSCAR</th><th style="${CELL}">Expected checks</th>${aiHead}</tr></thead>
     <tbody>${rows}</tbody></table></div>
     <div style="font-size:11px;color:#90a4ae;margin-top:6px">The AI analysis is judged only on the faults OSCAR failed (a warning is not sent to it), by the owner, step and scenario of its groups, not by the wording of the cause.</div>`;
 }
