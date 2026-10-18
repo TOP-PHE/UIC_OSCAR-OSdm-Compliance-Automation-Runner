@@ -223,8 +223,7 @@ function buildBookingRequest() {
       offers.push({ offerId: inboundOfferId, passengerRefs });
       validationLogger(`[INFO] 🔁 Return booking (separate) — inbound only (${inboundOfferId}).`);
     } else {
-      offers.push(outboundOffer);
-      offers.push({ offerId: inboundOfferId, passengerRefs });
+      offers.push(outboundOffer, { offerId: inboundOfferId, passengerRefs });
       validationLogger(`[INFO] 🔁 Return booking (combined) — outbound (${outboundOfferId}) + inbound (${inboundOfferId}).`);
     }
   } else {

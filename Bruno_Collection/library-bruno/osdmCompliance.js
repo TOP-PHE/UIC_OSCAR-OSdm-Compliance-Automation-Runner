@@ -319,8 +319,8 @@ function validateProductTags(body) {
       if (!isType(n, 'object') || !isType(n.tag, 'string')) badTag.push(i);
       if (!isType(n, 'object') || !isType(n.description, 'object')) badDesc.push(i);
     });
-    checks.push({ name: `GET ${ep} → every productTagName has required "tag" (string)`, ok: badTag.length === 0, message: badTag.length === 0 ? '' : `index ${badTag.join(', ')}` });
-    checks.push({ name: `GET ${ep} → every productTagName has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
+    checks.push({ name: `GET ${ep} → every productTagName has required "tag" (string)`, ok: badTag.length === 0, message: badTag.length === 0 ? '' : `index ${badTag.join(', ')}` },
+      { name: `GET ${ep} → every productTagName has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
   }
 
   if (groupsArr) {
@@ -330,8 +330,8 @@ function validateProductTags(body) {
       if (!isType(g, 'object') || !isType(g.code, 'string')) badCode.push(i);
       if (!isType(g, 'object') || !isType(g.description, 'object')) badDesc.push(i);
     });
-    checks.push({ name: `GET ${ep} → every productTagGroup has required "code" (string)`, ok: badCode.length === 0, message: badCode.length === 0 ? '' : `index ${badCode.join(', ')}` });
-    checks.push({ name: `GET ${ep} → every productTagGroup has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
+    checks.push({ name: `GET ${ep} → every productTagGroup has required "code" (string)`, ok: badCode.length === 0, message: badCode.length === 0 ? '' : `index ${badCode.join(', ')}` },
+      { name: `GET ${ep} → every productTagGroup has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
   }
 
   return checks;
@@ -612,13 +612,11 @@ function validateAncillaryOfferParts(offer, endpoint) {
     name: `${ep} → every AncillaryOfferPart has required "id" (non-empty string)`,
     ok: badId.length === 0,
     message: badId.length === 0 ? '' : `AncillaryOfferParts with missing/invalid "id": index ${badId.join(', ')}`,
-  });
-  checks.push({
+  }, {
     name: `${ep} → every AncillaryOfferPart has required "type" (AncillaryType string)`,
     ok: badType.length === 0,
     message: badType.length === 0 ? '' : `AncillaryOfferParts with missing/invalid "type": index ${badType.join(', ')}`,
-  });
-  checks.push({
+  }, {
     name: `${ep} → AncillaryOfferPart "category" (when present) is a string`,
     ok: badCategory.length === 0,
     message: badCategory.length === 0 ? '' : `AncillaryOfferParts with non-string "category": index ${badCategory.join(', ')}`,
