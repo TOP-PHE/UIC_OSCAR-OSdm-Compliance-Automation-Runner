@@ -113,6 +113,36 @@ function bearerToken(header) {
   return match ? match[1] : '';
 }
 
+// #833: the faults a request is answered with, from its header and its token.
+function faultsOf(req, claims) {
+  try {
+    return faults.requestedFaults(req.headers[faults.HEADER], claims.faults);
+  } catch (error) {
+    if (error instanceof faults.FaultRefusal) throw new HttpError(400, 'UNKNOWN_FAULT', 'Unknown simulator fault', error.message);
+    throw error;
+  }
+}
+
+// The answer to a request that threw, with the error faults applied; returns the status sent.
+function answerError(req, res, error, asked) {
+  const known = error instanceof HttpError;
+  const headers = { ...(known ? error.headers : {}) };
+  // A request refused before its body was read must not be followed by
+  // another on the same connection: the rest of that body is still coming.
+  if (!req.complete) headers.Connection = 'close';
+  if (res.headersSent) {
+    res.destroy();
+    return res.statusCode;
+  }
+  if (!known) {
+    sendProblem(res, 500, 'INTERNAL_ERROR', 'Internal error', undefined, headers);
+    return 500;
+  }
+  const p = faults.faultyProblem(asked, { status: error.status, code: error.code, title: error.title, detail: error.detail });
+  sendProblem(res, p.status, p.code, p.title, p.detail, headers, error.extra);
+  return p.status;
+}
+
 function createApp({ providers, clients, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
   const allow = createRateLimiter({ perMinute: limits.requestsPerMinute, now });
 
@@ -173,16 +203,6 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
         'A valid access token issued for this provider is required.', { 'WWW-Authenticate': 'Bearer' });
     }
     return claims;
-  }
-
-  // #833: the faults a request is answered with, from its header and its token.
-  function faultsOf(req, claims) {
-    try {
-      return faults.requestedFaults(req.headers[faults.HEADER], claims.faults);
-    } catch (error) {
-      if (error instanceof faults.FaultRefusal) throw new HttpError(400, 'UNKNOWN_FAULT', 'Unknown simulator fault', error.message);
-      throw error;
-    }
   }
 
   const bodyOf = async (req) => parseJsonObject(await readBody(req, limits.bodyBytes));
@@ -509,19 +529,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     try {
       status = await dispatch(req, res, seen);
     } catch (error) {
-      const headers = { ...(error instanceof HttpError ? error.headers : {}) };
-      // A request refused before its body was read must not be followed by
-      // another on the same connection: the rest of that body is still coming.
-      if (!req.complete) headers.Connection = 'close';
-      if (res.headersSent) {
-        res.destroy();
-      } else if (error instanceof HttpError) {
-        const p = faults.faultyProblem(seen.faults || [], { status: error.status, code: error.code, title: error.title, detail: error.detail });
-        sendProblem(res, p.status, p.code, p.title, p.detail, headers, error.extra);
-      } else {
-        sendProblem(res, 500, 'INTERNAL_ERROR', 'Internal error', undefined, headers);
-      }
-      status = res.headersSent ? res.statusCode : (error instanceof HttpError ? error.status : 500);
+      status = answerError(req, res, error, seen.faults || []);
       if (!(error instanceof HttpError)) failure = error;
     }
     // The path without its query string; never a header, never a body.
