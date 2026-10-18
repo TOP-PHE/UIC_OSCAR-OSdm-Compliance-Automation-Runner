@@ -318,7 +318,7 @@ module.exports = {
     },
     '/v1/company/ai-analysis/config': {
       get: { tags: ['Company'], summary: 'The Test Manager\'s AI service for the request\'s company or provider (#801)', security: [{ bearerAuth: [] }],
-        description: 'Per (company or provider, Test Manager), where that Test Manager\'s access is approved; the company or provider is the request\'s (X-Provider-Id). config: { connector, baseUrl, model, hasKey, monthlyTokenCap, instruction, testedAt, updatedAt } or null; the key is never returned. connectors: [{ id, label, defaultBaseUrl, keyRequired }].',
+        description: 'Per (company or provider, Test Manager), where that Test Manager\'s access is approved; the company or provider is the request\'s (X-Provider-Id). config: { connector, baseUrl, model, hasKey, monthlyTokenCap, instruction, testedAt, updatedAt } or null; the key is never returned. connectors: [{ id, label, defaultBaseUrl, keyRequired }]. #848: mode (shared | per_provider) and serviceOf { id, name }, the company whose service is used (the distributor\'s when shared); PUT, test and DELETE act on that service.',
         responses: { 200: { description: 'The AI service' }, 403: { description: 'Test Managers only, with approved access' } } },
       put: { tags: ['Company'], summary: 'Save the AI service; a new service, address, model or key is tested first (#801)', security: [{ bearerAuth: [] }],
         description: 'Body: { connector: anthropic | openai_compatible, baseUrl (https, public host), model, apiKey (empty = keep the stored one; required again for another service or host), monthlyTokenCap, instruction }. Nothing is saved when the test fails (422, with the test).',
@@ -336,6 +336,19 @@ module.exports = {
       post: { tags: ['Company'], summary: 'The models an Anthropic AI service offers (#831)', security: [{ bearerAuth: [] }],
         description: 'Body: empty for the stored service, or { connector: anthropic, baseUrl, apiKey? }; a stored key only goes to the host it was typed for. Asks the service\'s GET /v1/models. Answer: { models: [{ id, label, input, output, note, above }] }, prices in US dollars per million tokens when OSCAR knows them, else null.',
         responses: { 200: { description: 'The models' }, 400: { description: 'Not an Anthropic service, or a field refused' }, 403: { description: 'Test Managers only, with approved access' }, 404: { description: 'Nothing configured, and nothing given' }, 502: { description: 'The service refused or did not answer' } } },
+    },
+    '/v1/company/ai-analysis/setup': {
+      get: { tags: ['Company'], summary: 'One AI service for all, or one per provider, and the services stored (#848)', security: [{ bearerAuth: [] }],
+        description: 'Per (distributor, Test Manager). { company, mode: shared | per_provider, modes, services: [{ company: { id, name, provider }, connector, model, inUse }] }. No choice made reads as shared: the distributor\'s service is used for every company or provider whose access is approved.',
+        responses: { 200: { description: 'The set-up' }, 403: { description: 'Test Managers only' } } },
+      put: { tags: ['Company'], summary: 'Choose one AI service for all, or one per provider (#848)', security: [{ bearerAuth: [] }],
+        description: 'Body: { mode: shared | per_provider }. No service is deleted: those not used by the new mode are kept and listed with inUse false. Access stays per company or provider.',
+        responses: { 200: { description: 'The set-up' }, 400: { description: 'Not one of the two modes' }, 403: { description: 'Test Managers only' } } },
+    },
+    '/v1/company/ai-analysis/overview': {
+      get: { tags: ['Company'], summary: 'Per company or provider: access, AI service used, analyses and their cost, with the totals (#848)', security: [{ bearerAuth: [] }],
+        description: '{ company, mode, currency, targets: [{ id, name, provider, access, service: { connector, model, of: { id, name } } | null, analyses, tokens, cost, unpriced }], totals: { analyses, tokens, cost, unpriced } }. The analyses are every Test Manager\'s, as the history shows them; the service is the reader\'s. Costs at the model\'s list price in US dollars, an estimate.',
+        responses: { 200: { description: 'The overview' }, 403: { description: 'Test Managers only' } } },
     },
     '/v1/company/ai-analysis/spend': {
       get: { tags: ['Company'], summary: 'What the AI analyses of the request\'s company or provider cost (#831)', security: [{ bearerAuth: [] }],

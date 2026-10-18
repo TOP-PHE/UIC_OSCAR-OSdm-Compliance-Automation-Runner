@@ -846,6 +846,25 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_api_key_company ON api_key(company_id, created_at)');
   }},
+  { version: 39, name: 'ai-setup', up: () => {
+      // #848 - how a Test Manager's AI service is used across a distributor
+      // and its providers: 'shared' (one service, the distributor's row of
+      // ai_config, for every company or provider) or 'per_provider' (each its
+      // own row, the #801 behaviour). No row reads as 'shared'. A Test Manager
+      // who already has a service on a provider keeps 'per_provider', so no
+      // analysis changes service with this migration.
+      db.exec(`CREATE TABLE IF NOT EXISTS ai_setup (
+        company_id  TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        user_id     TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+        mode        TEXT NOT NULL CHECK (mode IN ('shared', 'per_provider')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (company_id, user_id)
+      )`);
+      db.exec(`INSERT OR IGNORE INTO ai_setup (company_id, user_id, mode)
+               SELECT DISTINCT c.parent_id, a.user_id, 'per_provider'
+                 FROM ai_config a JOIN companies c ON c.id = a.company_id
+                WHERE c.parent_id IS NOT NULL`);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

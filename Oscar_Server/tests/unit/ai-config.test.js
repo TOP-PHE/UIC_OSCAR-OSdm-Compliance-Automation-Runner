@@ -199,3 +199,28 @@ describe('#801 PR 2 the page section', () => {
     expect(source.match(/fetch\(url[^\n]*\n?/g).every(l => l.includes('inTarget(section'))).toBe(true);
   });
 });
+
+describe('#848 a shared service is one section on the page', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 'ai-analysis.js'), 'utf8');
+  const lines = source.split('\n');
+  const start = lines.findIndex((l) => l.startsWith('function serviceSections('));
+  const end = lines.findIndex((l, i) => i > start && l === '}');
+  const ctx = vm.createContext({});
+  vm.runInContext(`${lines.slice(start, end + 1).join('\n')}\nthis.serviceSections = serviceSections;`, ctx);
+  const co = { id: 'c', name: 'Co', provider: false };
+  const alpha = { id: 'a', name: 'Alpha', provider: true };
+  const beta = { id: 'b', name: 'Beta', provider: true };
+
+  test('shared: one section, on the first target, named for every target using it', () => {
+    const shared = { serviceOf: { id: 'c' } };
+    const sections = ctx.serviceSections([co, alpha, beta], [shared, shared, null]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0]).toMatchObject({ target: { id: 'c', name: 'Co, Alpha' }, n: 0 });
+  });
+
+  test('per provider: one section each; an unreadable target is left out', () => {
+    const sections = ctx.serviceSections([co, alpha, beta], [{ serviceOf: { id: 'c' } }, { serviceOf: { id: 'a' } }, null]);
+    expect(sections.map(s => [s.target.name, s.n])).toEqual([['Co', 0], ['Alpha', 1]]);
+    expect(ctx.serviceSections([alpha], [{}])[0].target.name).toBe('Alpha');
+  });
+});

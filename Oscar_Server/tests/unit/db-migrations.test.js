@@ -223,6 +223,35 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
     expect(after).not.toContain(SECRET);                // no plaintext secret left
     expect(after).not.toBe(plaintext);
   });
+
+  // #848 - migration 39: a Test Manager who already has a service on a provider
+  // keeps one service per provider; one with the company's service only, or
+  // none, gets the new default (no row = shared).
+  test('ai_setup (migration 39) keeps per_provider for a Test Manager with a provider service', () => {
+    const dbFile = tempDbPath();
+    bootDbAgainst(dbFile);
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec(`INSERT INTO companies (id, name, slug) VALUES ('m39-co', 'Co', 'm39-co');
+              INSERT INTO companies (id, name, slug, parent_id) VALUES ('m39-p', 'P', 'm39-p', 'm39-co');
+              INSERT INTO users (id, company_id, email, password_hash, role) VALUES ('m39-a', 'm39-co', 'a@m39', 'x', 'test_manager');
+              INSERT INTO users (id, company_id, email, password_hash, role) VALUES ('m39-b', 'm39-co', 'b@m39', 'x', 'test_manager');
+              INSERT INTO ai_config (company_id, user_id, connector, base_url, model) VALUES ('m39-p', 'm39-a', 'anthropic', 'https://x', 'm');
+              INSERT INTO ai_config (company_id, user_id, connector, base_url, model) VALUES ('m39-co', 'm39-a', 'anthropic', 'https://x', 'm');
+              INSERT INTO ai_config (company_id, user_id, connector, base_url, model) VALUES ('m39-co', 'm39-b', 'anthropic', 'https://x', 'm');
+              DROP TABLE ai_setup;
+              DELETE FROM schema_version WHERE version >= 39;`);
+      d.close();
+    }
+    bootDbAgainst(dbFile);
+    const d = new DatabaseSync(dbFile);
+    try {
+      expect(d.prepare('SELECT company_id, user_id, mode FROM ai_setup ORDER BY user_id').all().map(r => ({ ...r })))
+        .toEqual([{ company_id: 'm39-co', user_id: 'm39-a', mode: 'per_provider' }]);
+    } finally {
+      d.close();
+    }
+  });
 });
 
 function readExtraHeaders(dbFile) {

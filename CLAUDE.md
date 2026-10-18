@@ -335,6 +335,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the service's `GET /v1/models` through the same guarded `exchange()` as
     `callModel()` (`aiConnector.js`), the stored key under `keyRefusal()`.
     Migration 36.
+    **#848 PR 1 (1.11.339): one service for all, or one per provider.**
+    `ai_setup` (migration 39) holds a Test Manager's mode per distributor:
+    `shared` (no row = shared, the default) uses the distributor's
+    `ai_config` row for every company or provider; `per_provider` is the
+    #801 behaviour. **`configOf()` is the row in use** (`serviceOwnerOf()`);
+    the config routes write that row, `rowOf()` reads one company's own. A
+    shared service has one monthly limit over the whole family
+    (`usageScopeOf()`). Access stays per target in both modes. The migration
+    gives `per_provider` to every Test Manager who already had a provider
+    service, so no analysis changed service. `GET`/`PUT /ai-analysis/setup`
+    (switching deletes nothing; unused services are listed `inUse: false`),
+    `GET /ai-analysis/overview` (per target: access, service used, every Test
+    Manager's analyses and cost via `M.totalOf()`; totals by `M.sumOf()`).
+    PR 2 splits the page into Connection / Status / Analysis tabs.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

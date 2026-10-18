@@ -132,6 +132,8 @@ describe('#801 PR 3 who may analyse', () => {
 
   test('approved but no AI service configured: 409', async () => {
     approve(providerId, tmId);
+    // #848: with one service per provider, this provider has none (shared, it would use the company's).
+    run(`INSERT INTO ai_setup (company_id, user_id, mode) VALUES (?, ?, 'per_provider')`, [companyId, tmId]);
     const res = await request(app).post(`${BASE}/preview`).set('Authorization', tm()).set('X-Provider-Id', providerId).send({ batches: ['batch-1'] });
     expect(res.status).toBe(404);   // the provider has no such batch
     seedRun('batch-p', 'P', '02. POST Booking', 400, {}, [['x', null]], providerId);

@@ -217,6 +217,12 @@ describe('#801 PR 2 saving is testing first', () => {
 });
 
 describe('#801 PR 2 testing, per provider, and removing', () => {
+  // #848: one service per provider is a choice now; the default shares the company's.
+  beforeAll(async () => {
+    const res = await request(app).put('/v1/company/ai-analysis/setup').set('Authorization', tm()).send({ mode: 'per_provider' });
+    expect(res.status).toBe(200);
+  });
+
   test('the stored service is tested on demand; a candidate is tested without being saved', async () => {
     const before = stored().tested_at;
     const res = await request(app).post(`${CONFIG}/test`).set('Authorization', tm()).send({});

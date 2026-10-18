@@ -501,13 +501,29 @@ async function serviceAnswer(t) {
   return res.json();
 }
 
+/**
+ * #848: the targets drawn as service sections: one per service, so a service
+ * shared by the company and its providers is one form, named for all of them.
+ */
+function serviceSections(approved, answers) {
+  const byService = new Map();
+  approved.forEach((t, n) => {
+    const answer = answers[n];
+    if (!answer) return;
+    const of = answer.serviceOf?.id || t.id;
+    if (!byService.has(of)) byService.set(of, { target: t, answer, n, names: [] });
+    byService.get(of).names.push(t.name);
+  });
+  return [...byService.values()].map(x => (x.names.length > 1 ? { ...x, target: { ...x.target, name: x.names.join(', ') } } : x));
+}
+
 async function servicesHtml(targets) {
   const approved = targets.filter(x => x.state === 'approved');
   const answers = await Promise.all(approved.map(serviceAnswer));
   const shown = answers.find(Boolean);
   if (current && shown) current.connectorsShown = shown.connectors || [];
   if (current) current.configured = approved.filter((t, n) => answers[n]?.config);
-  return approved.map((t, n) => (answers[n] ? serviceHtml(t, answers[n], n) : '')).join('');
+  return serviceSections(approved, answers).map(x => serviceHtml(x.target, x.answer, x.n)).join('');
 }
 
 async function load() {
