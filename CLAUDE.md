@@ -377,6 +377,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `…/booked-offers/{id}/reservations` (`addReservations()`, every version,
     the only form in 3.6) next to `…/offer-parts` (3.7 and later only; the
     collection picks by version).
+    **#823 PR 2 (1.11.344): finding drafts.** `POST /ai-analysis/history/:id/
+    groups/:index/draft` puts a group in `finding_suggestion` (#735) under
+    key `ai:<analysis>:<index>` (`draftKeyOf()`; one per group, 409 after):
+    `draftOfAnalysisGroup()` (pure) names analysis, model and batches, shows
+    the AI's owner in `source.owner` and the evidence, and keeps `category`
+    `open`, never the owner. `GET /history/:id` returns `drafts` by group
+    index; Test Findings shows the origin (`draftOrigin()` in `findings.js`).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

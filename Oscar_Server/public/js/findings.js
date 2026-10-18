@@ -539,6 +539,7 @@
     h += '<div class="card"><div class="card-body" style="padding:14px">'
       + '<div style="font-size:15px;font-weight:700;color:#37474f;margin-bottom:4px">🧩 Suggested from runs</div>'
       + '<div style="font-size:12px;color:#78909c;margin-bottom:10px">The failed checks of a batch, grouped: one draft per problem, with the scenarios that showed it. '
+      + 'A group of an AI analysis can be sent here too (AI Analysis › Make a finding draft). '
       + 'A draft is yours to accept, edit then accept, reject, or keep as an OSCAR issue. Testers and the provider never see drafts.</div>'
       + renderBatchPicker(sg) + '</div></div>';
     if (sg.analysis) h += renderAnalysis(sg.analysis);
@@ -584,6 +585,18 @@
     return h + '</div></div>';
   }
 
+  // #823: where a draft comes from: a batch's failures (#735) or a group of an
+  // AI analysis, whose owner is shown, never taken as the category.
+  function draftOrigin(d) {
+    var src = d.draft && d.draft.source;
+    if (src && src.kind === 'ai_analysis') {
+      return '🤖 From an AI analysis (' + esc(src.model) + ', ' + esc(src.createdAt) + ') · the AI names: ' + esc(src.owner)
+        + ' · ' + esc(d.scenarios.join(', ')) + ' · step ' + esc(d.draft.step || '—');
+    }
+    return d.occurrences + ' failure(s) · ' + esc(d.scenarios.join(', ')) + ' · step ' + esc(d.draft.step || '—')
+      + (d.draft.expectedStatus ? (' · HTTP ' + esc(d.draft.expectedStatus)) : '');
+  }
+
   function renderDraft(d) {
     var x = draftFields(d);
     var pills = CAT_ORDER.map(function (k) {
@@ -598,8 +611,7 @@
       return '<label for="' + esc(fid) + '" style="font-size:11px;color:#78909c;display:block;margin-top:8px">' + esc(label) + '</label>' + input;
     }
     return '<div class="card" style="margin-bottom:10px"><div class="card-body" style="padding:12px">'
-      + '<div style="font-size:11px;color:#90a4ae">' + d.occurrences + ' failure(s) · ' + esc(d.scenarios.join(', ')) + ' · step ' + esc(d.draft.step || '—')
-      + (d.draft.expectedStatus ? (' · HTTP ' + esc(d.draft.expectedStatus)) : '') + '</div>'
+      + '<div style="font-size:11px;color:#90a4ae">' + draftOrigin(d) + '</div>'
       + (maybe ? '<div style="font-size:12px;color:#a85b00;margin-top:4px">⚠ May already be recorded as <a href="#" data-action="open-finding" data-id="' + esc(maybe.id) + '">' + esc(maybe.title) + '</a> (same step and scenario).</div>' : '')
       + renderSimulatorHint(d.draft.simulatorHint)
       + field('title', 'Title') + '<div style="margin-top:8px">' + pills

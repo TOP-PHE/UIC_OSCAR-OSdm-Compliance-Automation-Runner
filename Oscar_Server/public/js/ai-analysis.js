@@ -403,17 +403,27 @@ function listHtml(items) {
   return `<ul style="margin:4px 0 0 18px;padding:0">${lines}</ul>`;
 }
 
-function groupRowHtml(g, n) {
+// #823: a group's finding draft, made or to make.
+const DRAFT_STATE = { draft: 'waiting in Test Findings', accepted: 'accepted as a finding', rejected: 'rejected', oscar_issue: 'marked as OSCAR\'s' };
+function draftButtonHtml(n, draft) {
+  if (draft) {
+    return `<span style="font-size:12px;color:#2e7d32">Finding draft ${esc(DRAFT_STATE[draft.state] || draft.state)} — <a href="/findings.html">Test Findings</a> › 🧩 Suggested from runs</span>`;
+  }
+  return `<button class="btn" data-ai-action="an-draft" data-group="${esc(n)}"
+    title="A draft in Test Findings › 🧩 Suggested from runs, where you accept, edit or reject it. It names this analysis; the category stays yours to choose.">Make a finding draft</button>`;
+}
+
+function groupRowHtml(g, n, draft) {
   const owner = OWNER_LABEL[g.owner] ? g.owner : 'unclear';
   const badge = `<span style="font-size:11px;padding:2px 8px;border-radius:10px;${OWNER_STYLE[owner]}">${OWNER_LABEL[owner]}</span>`;
   const where = [g.steps?.length ? 'Steps: ' + g.steps.map(esc).join(', ') : '', g.scenarios?.length ? 'Scenarios: ' + g.scenarios.map(esc).join(', ') : '']
     .filter(Boolean).join('<br>');
   const why = g.why ? `<div style="color:#78909c;margin-top:4px">${esc(g.why)}</div>` : '';
   const action = g.action ? `<div style="margin-top:4px"><strong>Next:</strong> ${esc(g.action)}</div>` : '';
-  const copy = owner === 'oscar'
-    ? `<div style="margin-top:6px"><button class="btn" data-ai-action="an-copy-issue" data-group="${esc(n)}">Copy as an OSCAR issue</button></div>` : '';
+  const copy = owner === 'oscar' ? `<button class="btn" data-ai-action="an-copy-issue" data-group="${esc(n)}">Copy as an OSCAR issue</button> ` : '';
+  const buttons = `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${copy}${draftButtonHtml(n, draft)}</div>`;
   return `<tr><td style="${CELL}">${badge}</td><td style="${CELL}"><strong>${esc(g.title)}</strong><div>${esc(g.cause)}</div>${why}${action}
-    <div style="font-size:11px;color:#90a4ae;margin-top:4px">${where}</div>${copy}</td></tr>`;
+    <div style="font-size:11px;color:#90a4ae;margin-top:4px">${where}</div>${buttons}</td></tr>`;
 }
 
 /** A group the model gives to OSCAR, as the text of a GitHub issue (Markdown). */
@@ -444,7 +454,7 @@ function resultHtml(a) {
       <pre style="white-space:pre-wrap;font-size:12px">${esc(a.result?.raw || '')}</pre>`;
   }
   const r = a.result || {};
-  const rows = (r.groups || []).map((g, n) => groupRowHtml(g, n)).join('');
+  const rows = (r.groups || []).map((g, n) => groupRowHtml(g, n, a.drafts?.[n])).join('');
   const groups = rows ? '<div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">' + rows + '</table></div>' : '';
   return head + `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">An AI opinion: it can be wrong, and it is not a test result or a finding.</div>
     <p style="font-size:13px;line-height:1.55">${esc(r.summary || '')}</p>${comparisonHtml(r.comparison)}
@@ -976,6 +986,16 @@ async function copyIssue(n) {
   }
 }
 
+// #823: a group of the analysis shown becomes a finding draft; the analysis is drawn again.
+async function makeDraft(n) {
+  if (!shownAnalysis) return;
+  const draftPath = '/v1/company/ai-analysis/history/' + encodeURIComponent(shownAnalysis.id) + '/groups/' + encodeURIComponent(n) + '/draft';
+  const res = await fetch(draftPath, { method: 'POST', headers: analysisHeaders() });
+  if (!res.ok) { show(await readError(res, 'The draft could not be made.'), 'error'); return; }
+  show('Draft made: Test Findings › 🧩 Suggested from runs.', 'ok');
+  await showAnalysis(shownAnalysis.id);
+}
+
 async function runAnalysis() {
   if (!previewed) return;
   if (!confirm('Send these results to the AI service and analyse them? Your account with it is billed.')) return;
@@ -1012,7 +1032,7 @@ document.addEventListener('click', (e) => {
   if (tab) showTab(tab.dataset.aiTab).catch(err => show(err.message, 'error'));
 });
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-side"], [data-ai-action="an-faults"]');
+  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-draft"], [data-ai-action="an-side"], [data-ai-action="an-faults"]');
   if (!el) return;
   const act = el.dataset.aiAction;
   let job;
@@ -1020,6 +1040,7 @@ document.addEventListener('click', (e) => {
   else if (act === 'an-run') job = runAnalysis();
   else if (act === 'an-checklist-remove') job = removeChecklist();
   else if (act === 'an-copy-issue') job = copyIssue(el.dataset.group);
+  else if (act === 'an-draft') job = makeDraft(el.dataset.group);
   else if (act === 'an-side') job = showSideBySide();
   else if (act === 'an-faults') job = showFaults(el.dataset.batch, el.dataset.id);
   else job = showAnalysis(el.dataset.id);

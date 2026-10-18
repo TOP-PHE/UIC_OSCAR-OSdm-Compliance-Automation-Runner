@@ -17,7 +17,8 @@
  *   POST /v1/company/ai-analysis/run            — the same, plus { hash } of the preview
  *                                                 confirmed: starts the analysis (202)
  *   GET  /v1/company/ai-analysis/history        — the analyses of this company or provider
- *   GET  /v1/company/ai-analysis/history/:id    — one, with its result
+ *   GET  /v1/company/ai-analysis/history/:id    — one, with its result and the finding drafts made from it
+ *   POST /v1/company/ai-analysis/history/:id/groups/:index/draft — a group as a finding draft (#823)
  *   GET  /v1/company/ai-analysis/spend          — what the analyses cost: today, this
  *                                                 month, per month and per model (#831)
  *
@@ -344,16 +345,58 @@ router.get('/ai-analysis/history', readLimiter, (req, res) => {
   res.json({ analyses: rows.map(rowView) });
 });
 
-router.get('/ai-analysis/history/:id', readLimiter, (req, res) => {
-  const company = scopeForTestManager(req, res);
-  if (!company) return;
+// One stored analysis of the company or provider, with its result, or null.
+function storedAnalysis(req) {
   const row = get('SELECT * FROM ai_analysis WHERE id = ? AND company_id = ?', [String(req.params.id), req.companyId]);
-  if (!row) return refuse(res, 404, 'No analysis with that id here.');
+  if (!row) return null;
   let result = null;
   if (row.result_enc) {
     try { result = JSON.parse(colDecrypt(row.result_enc)); } catch { result = null; }
   }
-  res.json({ ...rowView(row), result });
+  return { ...rowView(row), result };
+}
+
+// The finding drafts made from an analysis's groups (#823 PR 2), by group index.
+function draftsOf(companyId, analysisId) {
+  const prefix = AN.draftKeyOf(analysisId, '');
+  const out = {};
+  for (const r of all('SELECT id, group_key, state FROM finding_suggestion WHERE company_id = ? AND substr(group_key, 1, ?) = ?',
+    [companyId, prefix.length, prefix])) {
+    out[r.group_key.slice(prefix.length)] = { id: r.id, state: r.state };
+  }
+  return out;
+}
+
+router.get('/ai-analysis/history/:id', readLimiter, (req, res) => {
+  const company = scopeForTestManager(req, res);
+  if (!company) return;
+  const analysis = storedAnalysis(req);
+  if (!analysis) return refuse(res, 404, 'No analysis with that id here.');
+  res.json({ ...analysis, drafts: draftsOf(req.companyId, analysis.id) });
+});
+
+// ── POST /ai-analysis/history/:id/groups/:index/draft (#823 PR 2) ────────────
+// A group of an analysis becomes a draft in Test Findings' suggested findings
+// (#735), where a Test Manager accepts, edits or rejects it. One draft per
+// group: the key is the analysis and the group's place in it.
+router.post('/ai-analysis/history/:id/groups/:index/draft', readLimiter, (req, res) => {
+  const company = scopeForTestManager(req, res);
+  if (!company) return;
+  const analysis = storedAnalysis(req);
+  if (!analysis) return refuse(res, 404, 'No analysis with that id here.');
+  const index = /^\d{1,3}$/.test(String(req.params.index)) ? Number(req.params.index) : -1;
+  const draft = analysis.status === 'done' ? AN.draftOfAnalysisGroup(analysis, index) : null;
+  if (!draft) return refuse(res, 404, 'No such group in that analysis.');
+  const key = AN.draftKeyOf(analysis.id, index);
+  const existing = get('SELECT id, state FROM finding_suggestion WHERE company_id = ? AND group_key = ?', [req.companyId, key]);
+  if (existing) return refuse(res, 409, `This group already has a finding draft (${existing.state}).`);
+  const id = randomUUID();
+  const scenarios = (analysis.result.groups[index].scenarios || []).filter((s) => typeof s === 'string');
+  run(`INSERT INTO finding_suggestion (id, company_id, group_key, draft, scenarios, runs, occurrences, last_batch_id)
+       VALUES (?, ?, ?, ?, ?, '[]', 0, ?)`,
+  [id, req.companyId, key, colEncrypt(JSON.stringify(draft)), JSON.stringify(scenarios), analysis.batches.at(-1) || null]);
+  auditLog(req.user.id, req.companyId, req.user.email, `ai_analysis_draft:${analysis.id}:${index}`);
+  res.status(201).json({ suggestion: { id, state: 'draft', draft } });
 });
 
 // ── GET /ai-analysis/fault-detection (#833 PR D) ─────────────────────────────

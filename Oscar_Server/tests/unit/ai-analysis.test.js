@@ -124,9 +124,9 @@ describe('#801 PR 3 the page', () => {
     const end = lines.findIndex((l, i) => i > start && l === '}');
     return lines.slice(start, end + 1).join('\n');
   };
-  const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL) =/.test(l)).join('\n');
+  const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL|DRAFT_STATE) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
-  const names = ['analysisTabHtml', 'batchLabel', 'batchOptionsHtml', 'usd', 'estimateText', 'previewHtml', 'listHtml', 'groupRowHtml', 'comparisonHtml',
+  const names = ['analysisTabHtml', 'batchLabel', 'batchOptionsHtml', 'usd', 'estimateText', 'previewHtml', 'listHtml', 'draftButtonHtml', 'groupRowHtml', 'comparisonHtml',
     'resultHtml', 'inputLetters', 'historyHtml', 'sideBySideHtml', 'spendRow', 'spendHtml', 'priceText', 'analysisModelOptionsHtml'];
   vm.runInContext(`${consts}\n${names.map(lift).join('\n')}\n${names.map(n => `this.${n} = ${n};`).join('\n')}`, ctx);
 
@@ -316,8 +316,8 @@ describe('#827 PR C questioning the test', () => {
     return lines.slice(start, end + 1).join('\n');
   };
   const ctx = vm.createContext({ esc });
-  const consts = lines.filter((l) => /^const (CELL|OWNER_LABEL|OWNER_STYLE) =/.test(l)).join('\n');
-  vm.runInContext(`${consts}\n${lift('groupRowHtml')}\n${lift('issueText')}\nthis.groupRowHtml = groupRowHtml; this.issueText = issueText;`, ctx);
+  const consts = lines.filter((l) => /^const (CELL|OWNER_LABEL|OWNER_STYLE|DRAFT_STATE) =/.test(l)).join('\n');
+  vm.runInContext(`${consts}\n${lift('draftButtonHtml')}\n${lift('groupRowHtml')}\n${lift('issueText')}\nthis.groupRowHtml = groupRowHtml; this.issueText = issueText;`, ctx);
 
   test('the page shows the configuration owner and the action, and offers an OSCAR issue only for OSCAR\'s groups', () => {
     const conf = ctx.groupRowHtml({ title: 'T', cause: 'C', owner: 'configuration', action: 'Untick <x>' }, 0);

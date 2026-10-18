@@ -300,6 +300,13 @@ says who should act:
 
 Check each group against the run before acting on it.
 
+**Make a finding draft** (under each group, since 1.11.344) sends the group
+to Test Findings › 🧩 Suggested from runs, where you accept, edit or reject it
+like any suggested finding. The draft names the analysis and its model. The
+AI's call (provider, OSCAR, configuration, unclear) is shown with it, but the
+category stays "Open point" for you to choose. A group gives one draft; the
+group then says what became of it.
+
 **History and limits.** Every analysis is kept with its model, tokens and
 estimated cost. Any Test Manager of the company sees them, even without
 access. Two analyses of the same input with different models can be compared
