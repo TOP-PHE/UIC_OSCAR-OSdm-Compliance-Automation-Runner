@@ -25,6 +25,7 @@ reports — without requiring testers to install a local toolchain.
 | [`Bruno_Collection/`](Bruno_Collection/) | OSDM conformance scenarios (`.bru` files) |
 | [`OSCAR_Deploy/`](OSCAR_Deploy/) | Docker Compose stack, nginx snippets, alerting + observability overlay |
 | [`OSDM_Simulator/`](OSDM_Simulator/) | A stub OSDM provider for testing OSCAR itself: issues the token, answers a basic sale flow, simulates several providers |
+| [`OSCAR_MCP/`](OSCAR_MCP/) | A read-only MCP server: lets an AI assistant read a company's run results through OSCAR's API, with an API key |
 | [`Documentation/`](Documentation/) | Architecture, specification, admin and operations guides |
 | [`compatibility.json`](compatibility.json) | Tested-together server ↔ collection version matrix |
 | [`CHANGELOG.md`](CHANGELOG.md) | Combined release history |
