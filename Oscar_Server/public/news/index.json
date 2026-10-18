@@ -8,6 +8,14 @@
     "content": "Under each group of an analysis, Make a finding draft sends it to Test Findings › Suggested from runs, where you accept, edit or reject it. The draft names the analysis and its model. The AI's view of who should act is shown with it, but the category is yours to choose."
   },
   {
+    "id": "2026-10-18-receipt-token",
+    "date": "October 18, 2026",
+    "tag": "Fix",
+    "title": "Waiting for a refund receipt keeps the token valid",
+    "summary": "While a scenario waits for the refund receipt, OSCAR now renews the access token before each read of the booking.",
+    "content": "A provider whose access tokens are short-lived (two minutes, for example) used to answer 401 during the wait for the refund receipt, after the refund itself had gone through. The wait now renews the token when it is near its end."
+  },
+  {
     "id": "2026-10-18-ai-warning-lines",
     "date": "October 18, 2026",
     "tag": "Fix",
