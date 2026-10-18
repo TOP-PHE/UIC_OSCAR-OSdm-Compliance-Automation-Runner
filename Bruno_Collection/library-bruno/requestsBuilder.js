@@ -423,7 +423,7 @@ function placesForPassengers(picked, passengerRefs) {
   // SINGULAR. Emitting "passengerRefs" (plural array) — or numeric coach/place —
   // makes the vendor reject the booking with 400 "Invalid request content".
   return refs.map((ref, i) => {
-    const pk = picked[i] || picked[picked.length - 1];
+    const pk = picked[i] || picked.at(-1);
     return {
       coachNumber: String(pk.coachNumber),
       placeNumber: String(pk.placeNumber),

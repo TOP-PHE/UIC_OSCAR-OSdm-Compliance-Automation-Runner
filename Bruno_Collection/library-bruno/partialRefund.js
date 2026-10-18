@@ -179,7 +179,7 @@ module.exports = {
 // Pick "first" or "last" from an array.
 function pickFromArray(arr, sel) {
   if (!Array.isArray(arr) || arr.length === 0) return null;
-  return (String(sel || 'first').toLowerCase() === 'last') ? arr[arr.length - 1] : arr[0];
+  return (String(sel || 'first').toLowerCase() === 'last') ? arr.at(-1) : arr[0];
 }
 
 // Map "outbound" / "inbound" onto first / last for single-trip lists.
