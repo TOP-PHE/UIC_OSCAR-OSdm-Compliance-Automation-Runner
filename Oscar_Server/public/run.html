@@ -148,6 +148,23 @@ function addWarn(msg)  {
   warnEl.style.display = 'block';
 }
 
+// #838: the warning to show when this company or provider follows a reference
+// configuration of the repository and is not up to date with it; null otherwise.
+function referenceNoticeText(state) {
+  if (!state || !state.linked || state.up_to_date) return null;
+  if (state.missing) return `This configuration follows the reference ${esc(state.linked)}, which this server cannot read.`;
+  return `This configuration is not up to date with the reference ${esc(state.linked)}: a Test Manager can update it in <a href="/scenarios.html">Test Config</a> (Reference configuration).`;
+}
+
+async function referenceNotice() {
+  try {
+    const res = await fetch('/v1/company/reference');
+    return res.ok ? referenceNoticeText(await res.json()) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadProfile() {
   // Two endpoints since v12: company-shared bits (api_base, datafile_*) and
   // per-tester credentials (auth_mode, OAuth profile, has_token, etc.) live
@@ -250,6 +267,10 @@ async function loadProfile() {
       testReady = true;
     }
   }
+
+  // #838: a configuration that follows a reference and is older than it.
+  const referenceWarning = await referenceNotice();
+  if (referenceWarning) warnings.push(referenceWarning);
 
   // Aggregate warnings
   if (warnings.length > 0) {

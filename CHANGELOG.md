@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.335 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.370
+
+Issue #838 (PR 2). A company that tests the OSDM simulator follows the repository's reference configuration of its provider, and is updated from it in one click.
+
+### Added
+- **Test Config → Reference configuration** (`public/js/reference-config.js`). A Test Manager chooses `simulator-alpha`, `-beta` or `-gamma` and clicks *Update from the reference*. The update replaces:
+  - the scenarios, with the provider's run list (the current data file stays the previous one, *Restore previous file*);
+  - the Test Framework;
+  - the Test Data trains and journeys (journeys name the new trains).
+  The endpoint and the credentials are never changed. Testers see the state only.
+- **Staleness warning**: when the reference or the simulator's data file changed since the last update, Test Config and the run page say the configuration is not up to date.
+- Routes `GET`/`PUT /v1/company/reference` and `POST /v1/company/reference/apply` (OpenAPI). Migration 37: `companies.reference_name`, `reference_version`, `reference_applied_at`.
+- `utils/referenceStore.js` reads the references from the collection on the server (`OTST_V2.0.186ECTION_PATH`, pulled from the repository on every push to `main`), the repository copy as fallback. No call to GitHub.
+
+### Default decisions (taken without asking)
+- **The update is the full configuration import (#810) with every part replaced.** Scenarios a tester added to such a company are replaced too; the confirmation says so.
+- **The version is a hash of the reference and the data file**, so a change of either reads as "not up to date". Nothing is updated without a Test Manager's click.
+- **Choosing another reference forgets the applied version**: the company reads as "not updated from it yet".
+- **Only the three names of the list can be chosen**, never a path.
+
+---
+
 ## [server-1.11.334 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.369
 
 Issue #838 (PR 1). The configuration of each simulated provider is in the repository, so the companies that test the simulator can follow it (PR 2).

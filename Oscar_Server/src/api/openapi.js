@@ -393,6 +393,19 @@ module.exports = {
         description: 'Multipart: the file in the field "configuration", and the fields scenarios = replace | keep, framework = replace | keep, testData = add | replace | keep. add adds the trains and journeys whose data is not already there; replace removes the trains and journeys first. Journeys name the trains\' new ids. A replaced data file is kept as the previous file. Every part is checked before anything is written; if the database step fails, the data file is put back.',
         responses: { 200: { description: '{ imported, choices, scenarios, framework, testData: { mode, removed, trains_added, journeys_added, already_there, unresolved_legs } }' }, 400: { description: 'Not a configuration, a choice missing, or a part refused (schema problems, template, OSDM version)' }, 403: { description: 'Test Managers only' }, 413: { description: 'Larger than 5 MB' } } },
     },
+    '/v1/company/reference': {
+      get: { tags: ['Company'], summary: 'Which reference configuration of the repository the company or provider follows, and whether it is up to date (#838)', security: [{ bearerAuth: [] }],
+        description: '{ available: [{ name, provider, osdmVersion }], linked, applied_version, applied_at, current_version, up_to_date, missing }. The references are read from the collection on the server, never from GitHub.',
+        responses: { 200: { description: 'The state' }, 403: { description: 'Administrators and certifiers have no access' } } },
+      put: { tags: ['Company'], summary: 'Follow a reference configuration, or none (#838)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers only. Body: { name } (simulator-alpha | simulator-beta | simulator-gamma) or { name: null }. Nothing is replaced until the update; another reference forgets the applied version.',
+        responses: { 200: { description: 'The new state' }, 400: { description: 'Not one of the references' }, 403: { description: 'Test Managers only' } } },
+    },
+    '/v1/company/reference/apply': {
+      post: { tags: ['Company'], summary: 'Update the configuration from the reference it follows (#838)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers only. Replaces the scenarios (the replaced data file is kept as the previous file), the Test Framework and the Test Data trains and journeys with the reference\'s, as a full configuration import with every part replaced. The endpoint and the credentials are not changed.',
+        responses: { 200: { description: '{ applied, reference, scenarios, framework, testData, state }' }, 403: { description: 'Test Managers only' }, 409: { description: 'No reference followed' }, 503: { description: 'The reference cannot be read on this server' } } },
+    },
     '/v1/company/scenario-copy/preview': {
       post: { tags: ['Company'], summary: 'Prepare a copy of scenarios from another company or provider of yours into this one', security: [{ bearerAuth: [] }],
         description: 'Body: { source_id } (a company or provider id, or "catalogue" for the scenario catalogue). Returns the source scenarios with warnings (features the target Test Framework does not declare, fulfillment reduced, OSDM version), each trip entry to map once, and the target trains and journeys. The target is the request\'s company (X-Provider-Id).',

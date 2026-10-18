@@ -818,6 +818,14 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE ai_config ADD COLUMN price_input REAL');
       _safeAlter('ALTER TABLE ai_config ADD COLUMN price_output REAL');
   }},
+  { version: 37, name: 'reference-configuration', up: () => {
+      // #838 - a company or provider that follows a reference configuration
+      // of the repository (simulator-alpha…), and the version of it the last
+      // update applied (sha256 of the reference and its data file).
+      _safeAlter('ALTER TABLE companies ADD COLUMN reference_name TEXT');
+      _safeAlter('ALTER TABLE companies ADD COLUMN reference_version TEXT');
+      _safeAlter('ALTER TABLE companies ADD COLUMN reference_applied_at TEXT');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
