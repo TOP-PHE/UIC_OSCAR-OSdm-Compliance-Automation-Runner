@@ -58,6 +58,7 @@ const { checklistOf } = require('./company-ai-checklist');
 const CL = require('../../utils/checklistAnswers');
 const MK = require('../../utils/aiMask');
 const M = require('../../utils/aiModels');
+const FD = require('../../utils/faultDetection');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis-results' });
 
 const router = express.Router();
@@ -343,6 +344,62 @@ router.get('/ai-analysis/history/:id', readLimiter, (req, res) => {
     try { result = JSON.parse(colDecrypt(row.result_enc)); } catch { result = null; }
   }
   res.json({ ...rowView(row), result });
+});
+
+// ── GET /ai-analysis/fault-detection (#833 PR D) ─────────────────────────────
+// For a batch run against the OSDM simulator with faults asked for
+// (`simulatorFaults`): which faults OSCAR detected, and, with `analysis`,
+// whether that AI analysis explained them. Reads the runs only: no model is
+// called. Any Test Manager of the company or provider, like the history.
+
+const MAX_FAULT_EVENTS = 20000;
+
+// The [WARNING] lines the runs logged (a log row may hold several lines).
+function warningsOf(runIds) {
+  if (!runIds.length) return [];
+  const rows = all(
+    `SELECT run_id, message FROM run_events WHERE run_id IN (${runIds.map(() => '?').join(', ')}) ORDER BY id ASC LIMIT ?`,
+    [...runIds, MAX_FAULT_EVENTS]
+  );
+  const out = [];
+  for (const row of rows) {
+    let text = '';
+    try { text = colDecrypt(row.message) || ''; } catch { text = ''; }
+    for (const line of String(text).split('\n')) {
+      if (line.includes('[WARNING]')) out.push({ runId: row.run_id, message: line.trim() });
+    }
+  }
+  return out;
+}
+
+router.get('/ai-analysis/fault-detection', readLimiter, async (req, res) => {
+  const company = scopeForTestManager(req, res);
+  if (!company) return;
+  const batchId = typeof req.query.batch === 'string' ? req.query.batch : '';
+  const runs = batchId ? runsOfBatch(req.companyId, batchId) : [];
+  if (!runs.length) return refuse(res, 404, 'No batch with that id here.');
+  const scenarios = await scenariosOf(req.companyId);
+  const faulty = new Set(scenarios.filter((s) => FD.faultsOfScenario(s).length).map((s) => s.code));
+  const judged = runs.filter((r) => faulty.has(r.scenario_code));
+  const ids = new Set(judged.map((r) => r.id));
+  const report = FD.detect({
+    runs: judged.map((r) => ({ runId: r.id, scenarioCode: r.scenario_code })),
+    scenarios,
+    failures: failuresOfBatch(req.companyId, batchId).filter((f) => ids.has(f.runId)).map((f) => ({ runId: f.runId, step: f.step, check: f.check })),
+    warnings: warningsOf([...ids]),
+  });
+  let analysis = null;
+  if (typeof req.query.analysis === 'string' && req.query.analysis) {
+    const row = get('SELECT * FROM ai_analysis WHERE id = ? AND company_id = ?', [req.query.analysis, req.companyId]);
+    if (!row) return refuse(res, 404, 'No analysis with that id here.');
+    if (![row.batch_a, row.batch_b].includes(batchId)) return refuse(res, 400, 'That analysis did not read this batch.');
+    let result = null;
+    if (row.result_enc) {
+      try { result = JSON.parse(colDecrypt(row.result_enc)); } catch { result = null; }
+    }
+    analysis = { id: row.id, model: row.model, status: statusOf(row), ...FD.scoreAnalysis(report, result) };
+  }
+  res.json({ batch: batchId, runs: runs.length, ...report, analysis });
 });
 
 // ── GET /ai-analysis/spend (#831) ────────────────────────────────────────────

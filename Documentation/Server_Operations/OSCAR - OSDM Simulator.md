@@ -300,6 +300,19 @@ field `simulatorFaults` into a scenario of your own (Test Config, "Simulator
 faults", codes separated by commas). A real provider never sees the header:
 the collection sends it only when the field is set.
 
+**Reading the result (#833 PR D).** On the AI analysis page, choose the batch
+and press **Faults detected in this batch**: for each fault a run asked for,
+OSCAR says whether it was detected (every expected check seen, some, or
+none) and which checks it saw. Nothing is sent to an AI service for that.
+After an AI analysis of the same batch, **Score against the simulator's
+faults** under its result also says, for each fault OSCAR failed, whether
+the analysis explained it: a group with the provider as owner naming its
+step (and its scenario, or none), another owner, or no group at all. The
+score is the share explained; analysing the same batch with two models
+gives two scores to compare. A fault seen only as a WARNING is not scored:
+the analysis is sent failed checks only. The wording of the cause is not
+judged, only owner, step and scenario.
+
 ## 7. Day to day
 
 The `docker compose` commands are run from the deploy folder. In a new session

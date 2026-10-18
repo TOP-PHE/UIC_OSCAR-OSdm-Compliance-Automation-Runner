@@ -360,6 +360,12 @@ module.exports = {
         description: 'Every Test Manager who may use the company or provider. { analyses: [{ id, mode, batches, language, connector, model, status, by, inputChars, summarisedByStep, inputHash, contentHash, tokens, cost, error, createdAt, finishedAt }] } (cost in US dollars, #831), the 50 latest. status: running | done | unreadable | failed | interrupted.',
         responses: { 200: { description: 'Analyses' }, 403: { description: 'Test Managers only' } } },
     },
+    '/v1/company/ai-analysis/fault-detection': {
+      get: { tags: ['Company'], summary: 'Which faults asked of the OSDM simulator a batch detected, and whether an AI analysis explained them (#833)', security: [{ bearerAuth: [] }],
+        description: 'For the runs of a batch whose scenario names `simulatorFaults`: { batch, runs, faults: [{ runId, scenarioCode, code, title, known, expectations: [{ step, check, level, found }], detected, asExpected }], summary: { injected, unknown, detected, asExpected }, analysis }. With `analysis` (an analysis that read the batch): { id, model, status, judged: [{ code, verdict: explained | misattributed | missed, group }], summary: { judged, explained, misattributed, missed, score } }. Reads the runs only; no model is called.',
+        parameters: [{ name: 'batch', in: 'query', required: true, schema: { type: 'string' } }, { name: 'analysis', in: 'query', required: false, schema: { type: 'string' } }],
+        responses: { 200: { description: 'The report' }, 400: { description: 'That analysis did not read this batch' }, 403: { description: 'Test Managers only' }, 404: { description: 'No such batch or analysis here' } } },
+    },
     '/v1/company/ai-analysis/history/{id}': {
       get: { tags: ['Company'], summary: 'One AI analysis with its result (#801)', security: [{ bearerAuth: [] }],
         description: 'The same fields, plus result: { summary, groups: [{ title, cause, owner: provider | oscar | unclear, why, steps, scenarios }], comparison: { fixed, stillFailing, new } }, or { raw } when the answer could not be read.',
