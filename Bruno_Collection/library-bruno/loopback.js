@@ -105,7 +105,9 @@ function noteKnownDeviation(stepLabel, status, dev) {
  */
 function jsonObjectOrStop(body, label) {
   if (body !== null && typeof body === 'object' && !Array.isArray(body)) return true;
-  const kind = body === null || body === undefined ? 'nothing' : (Array.isArray(body) ? 'a list' : typeof body);
+  let kind = typeof body;
+  if (body === null || body === undefined) kind = 'nothing';
+  else if (Array.isArray(body)) kind = 'a list';
   const start = typeof body === 'string' ? ` starting "${body.slice(0, 40).replaceAll(/\s+/g, ' ')}"` : '';
   test(`The answer is a JSON object — got ${kind}${start}`, () => {
     throw new Error(`${label}: the answer is not a JSON object (${kind}). See the Content-Type check and the HTTP traffic.`);
