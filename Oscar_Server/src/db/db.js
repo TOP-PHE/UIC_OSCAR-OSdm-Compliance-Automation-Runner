@@ -794,6 +794,20 @@ const MIGRATIONS = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_ai_analysis_company ON ai_analysis(company_id, created_at)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_ai_analysis_user ON ai_analysis(user_id, created_at)');
   }},
+  { version: 35, name: 'provider-checklist', up: () => {
+      // #827 PR A - the answers of a company's or provider's filled set-up
+      // checklist (the Word file of #795), one row per company or provider,
+      // encrypted. Never the API Config or contact answers
+      // (utils/checklistAnswers.js keptAnswers). Told to the AI analysis.
+      db.exec(`CREATE TABLE IF NOT EXISTS provider_checklist (
+        company_id     TEXT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+        answers_enc    TEXT NOT NULL,
+        answer_count   INTEGER NOT NULL,
+        file_name      TEXT,
+        imported_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
+        imported_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

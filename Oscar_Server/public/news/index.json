@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-checklist",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "AI Analysis: the provider's checklist as context",
+    "summary": "Import the provider's filled set-up checklist, and the AI analysis knows what the provider says it does and does not do.",
+    "content": "In the analysis card of the AI Analysis page, choose the company or provider and import its filled set-up checklist (the Word file). OSCAR keeps its answers, never the API Config or contact ones, and tells them to the model: a failure on something the provider says it does not do is then recognised as such. The card shows exactly what the model is told. The model is now also told the OSDM version the Test Framework declares, so that it judges against that version, and what each reference scenario tests. Test Managers only."
+  },
+  {
     "id": "2026-10-17-ai-analysis",
     "date": "October 17, 2026",
     "tag": "Feature",

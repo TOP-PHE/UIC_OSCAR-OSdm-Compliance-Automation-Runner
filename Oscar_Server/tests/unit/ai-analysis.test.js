@@ -186,3 +186,56 @@ describe('#801 PR 3 the page', () => {
     }
   });
 });
+
+describe('#827 PR A the provider\'s context', () => {
+  const catalogue = [{ code: 'OTST_SALE_ONE_WAY_1ADT', purpose: 'One-way sale for one adult.' },
+    { code: 'OTST_SALE', purpose: 'too short a prefix: never chosen over a longer one' },
+    { code: 'NHF_SALE_DEPARTURE_IN_PAST', purpose: 'A past departure is refused.' }];
+
+  test('a copy of a reference scenario gets its purpose: same code, else the longest code it extends with "_"', () => {
+    expect(AN.catalogueEntryOf('OTST_SALE_ONE_WAY_1ADT', catalogue).purpose).toBe('One-way sale for one adult.');
+    expect(AN.catalogueEntryOf('OTST_SALE_ONE_WAY_1ADT_SPEC', catalogue).code).toBe('OTST_SALE_ONE_WAY_1ADT');
+    expect(AN.catalogueEntryOf('OTST_SALE_ONE_WAY_1ADTX', catalogue).code).toBe('OTST_SALE');
+    expect(AN.catalogueEntryOf('MY_OWN', catalogue)).toBeNull();
+    const { input } = AN.buildInput({ batches: [batch('b1', [rec({ scenarioCode: 'NHF_SALE_DEPARTURE_IN_PAST_SPEC' }), rec({ scenarioCode: 'MINE', step: 'x' })])],
+      framework: null, findings: [], scenarios: [{ code: 'MINE', description: 'mine' }], catalogue });
+    expect(input.scenarios).toEqual([{ code: 'MINE', description: 'mine' },
+      { code: 'NHF_SALE_DEPARTURE_IN_PAST_SPEC', description: null, purpose: 'A past departure is refused.' }]);
+  });
+
+  test('the declared OSDM version and the checklist go in the input, and the version in the instructions', () => {
+    const checklist = { answers: { 'info.pastDeparture': ['SOLD'] }, cut: 2 };
+    const { input } = AN.buildInput({ batches: [batch('b1', [rec()])], framework: { osdmVersion: '3.6' }, findings: [], scenarios: [], checklist });
+    expect(input.provider).toEqual({ declaredOsdmVersion: '3.6', checklist: { 'info.pastDeparture': ['SOLD'] }, checklistAnswersLeftOut: 2 });
+    const none = AN.buildInput({ batches: [batch('b1', [rec()])], framework: null, findings: [], scenarios: [] }).input;
+    expect(none.provider).toEqual({ declaredOsdmVersion: null, checklist: null });
+    expect(AN.systemPrompt({ osdmVersion: '3.6' })).toContain('The provider declares OSDM 3.6: judge every request and answer against OSDM 3.6');
+    expect(AN.systemPrompt({})).toContain('declares no OSDM version');
+    expect(AN.systemPrompt({})).toContain('provider.checklist');
+  });
+
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 'ai-analysis.js'), 'utf8');
+  const lines = source.split('\n');
+  const start = lines.findIndex((l) => l.startsWith('function checklistHtml('));
+  const end = lines.findIndex((l, i) => i > start && l === '}');
+  const ctx = vm.createContext({ esc });
+  vm.runInContext(`${lines.filter((l) => /^const (FIELD|WIDE) =/.test(l)).join('\n')}\n${lines.slice(start, end + 1).join('\n')}\nthis.checklistHtml = checklistHtml;`, ctx);
+
+  test('the page says what is imported and what the model is told, escaped, with a labelled file field', () => {
+    const none = ctx.checklistHtml(null);
+    expect(none).toContain('no checklist imported');
+    expect(none).toContain('<label for="ai-an-checklist-file"');
+    const html = ctx.checklistHtml({ fileName: 'a<b>.docx', answers: 264, importedAt: 't', importedBy: 'tm@x', cut: 3, sent: { 'info.x': '<y>' } });
+    expect(html).toContain('a&lt;b&gt;.docx');
+    expect(html).toContain('264 answers');
+    expect(html).toContain('3 left out for size');
+    expect(html).toContain('&lt;y&gt;');
+    expect(html).toContain('data-ai-action="an-checklist-remove"');
+  });
+
+  test('the checklist requests name the company or provider of the card', () => {
+    const fetches = lines.filter((l) => l.includes("fetch('/v1/company/ai-analysis/checklist'"));
+    expect(fetches).toHaveLength(3);
+    for (const line of fetches) expect(line).toContain('analysisHeaders(');
+  });
+});

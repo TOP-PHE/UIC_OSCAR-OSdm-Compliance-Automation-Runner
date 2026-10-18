@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.361",
+  "current_release": "2026.362",
   "releases": [
+    {
+      "release": "2026.362",
+      "date": "2026-10-18",
+      "server": "1.11.327",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis context (#827, part A): a Test Manager imports the provider's filled set-up checklist (Word) per company or provider; its answers, never the API Config or contact ones, are kept encrypted and told to the model. The model is also told the declared OSDM version, to judge against it, and the purpose of each reference scenario."
+      ]
+    },
     {
       "release": "2026.361",
       "date": "2026-10-17",

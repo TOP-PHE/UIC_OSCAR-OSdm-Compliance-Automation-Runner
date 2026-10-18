@@ -288,6 +288,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     tokens. History is read by any Test Manager `canUseCompany()` admits
     (`req.companyId`), approved or not; an answer not in the JSON asked is
     kept raw as `unreadable`.
+    **#827 PR A (1.11.327): context.** The provider's filled set-up
+    checklist (.docx, #795) is imported per company or provider
+    (`company-ai-checklist.js`, `provider_checklist` migration 35, encrypted);
+    `utils/checklistAnswers.js` (pure) reads the content controls by tag and
+    **never keeps `api.*` or `meta.*`**; `contextOf()` is what the model gets
+    (info/data/svc/jrn answers and `fw.*` comments, 20k chars, service
+    sheets cut first). `utils/zip.js` `readZipEntry()` reads one entry with an
+    inflation bound. The instructions name the declared OSDM version
+    (`systemPrompt({ osdmVersion })`), and each scenario carries its
+    catalogue `purpose` (`catalogueEntryOf()`: same code, else the longest
+    code it extends with `_`). The tests read the simulator's alpha checklist
+    in `Documentation/`: regenerating it changes their counts.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

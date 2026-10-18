@@ -101,12 +101,44 @@ function findingAsSent(f) {
     step: f.step || null, scenario: f.scenarioCode || null };
 }
 
-/** The scenarios the groups name, with the data file's description. */
-function scenariosNamed(groups, scenarios) {
+/**
+ * The reference scenario a code was copied from (#827): the catalogue entry
+ * of the same code, else the longest one it extends with "_…" (a copy per
+ * request form or currency: OTST_SALE_ONE_WAY_1ADT_SPEC, …_CURRENCY_EUR).
+ */
+function catalogueEntryOf(code, entries) {
+  let best = null;
+  for (const e of entries || []) {
+    if (typeof e?.code !== 'string') continue;
+    if (e.code === code) return e;
+    if (code.startsWith(e.code + '_') && (!best || e.code.length > best.code.length)) best = e;
+  }
+  return best;
+}
+
+/** The scenarios the groups name, with the data file's description and the catalogue's purpose. */
+function scenariosNamed(groups, scenarios, catalogue) {
   const named = new Set();
   for (const g of groups) for (const code of g.scenarios) named.add(code);
   const byCode = new Map((scenarios || []).filter((s) => s?.code).map((s) => [s.code, s]));
-  return [...named].sort((a, b) => a.localeCompare(b)).map((code) => ({ code, description: byCode.has(code) ? short(byCode.get(code).description, 200) : null }));
+  return [...named].sort((a, b) => a.localeCompare(b)).map((code) => {
+    const entry = catalogueEntryOf(code, catalogue);
+    const out = { code, description: byCode.has(code) ? short(byCode.get(code).description, 200) : null };
+    if (entry?.purpose) out.purpose = short(entry.purpose, 400);
+    return out;
+  });
+}
+
+/** What the input says of the provider: its declared OSDM version and its checklist answers. */
+function providerContext({ osdmVersion, checklist }) {
+  const out = { declaredOsdmVersion: typeof osdmVersion === 'string' && osdmVersion.trim() ? osdmVersion.trim() : null };
+  if (checklist && typeof checklist === 'object') {
+    out.checklist = checklist.answers || {};
+    if (checklist.cut) out.checklistAnswersLeftOut = checklist.cut;
+  } else {
+    out.checklist = null;
+  }
+  return out;
 }
 
 function batchHeader(b) {
@@ -118,7 +150,7 @@ function batchHeader(b) {
  * records, truncated } (two: the earlier first). Returns { input, text,
  * chars, estimatedTokens, summarisedByStep, counts }.
  */
-function buildInput({ batches, framework, findings, scenarios }) {
+function buildInput({ batches, framework, findings, scenarios, catalogue, checklist }) {
   const compare = batches.length === 2;
   const groups = batches.map((b) => groupsOf(b.records));
   const all = groups.flat();
@@ -127,9 +159,10 @@ function buildInput({ batches, framework, findings, scenarios }) {
     const input = {
       mode: compare ? 'compare' : 'one',
       batches: batches.map(batchHeader),
+      provider: providerContext({ osdmVersion: framework?.osdmVersion, checklist }),
       testFramework: frameworkDeclarations(framework),
       findings: (findings || []).map(findingAsSent),
-      scenarios: scenariosNamed(all, scenarios),
+      scenarios: scenariosNamed(all, scenarios, catalogue),
       summarisedByStep: summarise,
     };
     if (compare) {
@@ -169,12 +202,17 @@ const ANSWER_SHAPE = `{
 }`;
 
 /** The instructions: what OSCAR is, what to answer, and in what shape. */
-function systemPrompt({ language = 'English', instruction = null, compare = false } = {}) {
+function systemPrompt({ language = 'English', instruction = null, compare = false, osdmVersion = null } = {}) {
   const lang = LANGUAGES.includes(language) ? language : 'English';
+  const version = typeof osdmVersion === 'string' && osdmVersion.trim() ? osdmVersion.trim() : null;
   const lines = [
     'You read the results of OSCAR, a conformance test runner for OSDM (the UIC Open Sales and Distribution Model, a rail ticketing API).',
     'OSCAR runs scenarios (a sale, a refund, an exchange…) against a provider\'s OSDM API and checks each answer. The input lists the checks that failed, grouped by step, check text, HTTP status and OSDM problem code. Values a run met are replaced: N for a number, <id>, <instant>, "…" for a quoted value.',
     'A failure can be the provider\'s (its answer does not follow OSDM, or a function is missing), OSCAR\'s (its request or its check is wrong), or unclear. The Test Framework says what the provider declares it supports; the findings are what people already recorded.',
+    version
+      ? `The provider declares OSDM ${version}: judge every request and answer against OSDM ${version}, never against a later version.`
+      : 'The provider declares no OSDM version: say which version you judged against.',
+    'provider.checklist, when given, is what the provider said of its own system in OSCAR\'s set-up checklist (answer names: info.* its behaviour, data.* its test data and options, fw.*.comment its remarks on what it supports). A failure on something the provider says it does not do is expected: say so, and say whether the scenario should be left out or the Test Framework changed. scenarios[].purpose says what a reference scenario tests.',
     compare
       ? 'Two batches are compared. OSCAR has already sorted the groups into fixed (failing in the first batch only), stillFailing (in both) and new (in the second only): explain them, do not recount them.'
       : 'One batch is read: group the failures by probable cause.',
@@ -228,4 +266,5 @@ function inputHash(system, text) {
 module.exports = {
   LANGUAGES, OWNERS, MAX_INPUT_CHARS, MAX_ANSWER_TOKENS,
   groupsOf, compareGroups, byStep, buildInput, estimateTokens, systemPrompt, readResult, inputHash, frameworkDeclarations,
+  catalogueEntryOf, providerContext,
 };

@@ -32,6 +32,7 @@
 
 const express = require('express');
 const fs = require('node:fs');
+const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 const { get, all, run, colDecrypt, colEncrypt } = require('../../db/db');
@@ -45,6 +46,8 @@ const C = require('../../utils/aiConfig');
 const AN = require('../../utils/aiAnalysis');
 const { callModel } = require('../../services/aiConnector');
 const { scopeForTestManager, configScope, configOf, storedKey } = require('./company-ai-analysis');
+const { checklistOf } = require('./company-ai-checklist');
+const CL = require('../../utils/checklistAnswers');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis-results' });
 
 const router = express.Router();
@@ -87,6 +90,28 @@ function frameworkOf(companyId) {
   try { return JSON.parse(colDecrypt(row.config)); } catch { return null; }
 }
 
+// The scenario catalogue's entries (#827: their purpose), from the collection
+// the runs use, else the repository's copy; none when neither can be read.
+function catalogueEntries() {
+  const candidates = [
+    path.join(path.resolve(process.env.COLLECTION_PATH || '/collection'), 'data_base', 'scenario_catalogue.json'),
+    path.resolve(__dirname, '../../../../Bruno_Collection/data_base/scenario_catalogue.json'),
+  ];
+  for (const file of candidates) {
+    try {
+      const entries = JSON.parse(fs.readFileSync(file, 'utf8')).entries;
+      if (Array.isArray(entries)) return entries;
+    } catch { /* the next copy */ }
+  }
+  return [];
+}
+
+// What the provider's checklist tells the model (#827), or null when none is imported.
+function checklistContext(companyId) {
+  const stored = checklistOf(companyId);
+  return stored ? CL.contextOf(stored.answers) : null;
+}
+
 // The batches a request names, earlier first, or the refusal to send.
 function chosenBatches(companyId, body) {
   const ids = body?.batches;
@@ -116,9 +141,12 @@ async function buildFor(target, user, body) {
     return { ...b, records, truncated: records.length >= MAX_FAILURES };
   });
   const findings = all('SELECT * FROM finding WHERE company_id = ?', [target.id]).map(toApiFinding);
-  const built = AN.buildInput({ batches, framework: frameworkOf(target.id), findings, scenarios: await scenariosOf(target.id) });
+  const framework = frameworkOf(target.id);
+  const built = AN.buildInput({ batches, framework, findings, scenarios: await scenariosOf(target.id),
+    catalogue: catalogueEntries(), checklist: checklistContext(target.id) });
   const stored = configOf(target.id, user.id);
-  const system = AN.systemPrompt({ language: languageOf(body), instruction: stored?.instruction || null, compare: batches.length === 2 });
+  const system = AN.systemPrompt({ language: languageOf(body), instruction: stored?.instruction || null, compare: batches.length === 2,
+    osdmVersion: framework?.osdmVersion || null });
   return { batches, built, system, hash: AN.inputHash(system, built.text), stored };
 }
 
