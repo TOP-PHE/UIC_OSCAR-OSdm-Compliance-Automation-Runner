@@ -48,6 +48,7 @@ const { callModel } = require('../../services/aiConnector');
 const { scopeForTestManager, configScope, configOf, storedKey } = require('./company-ai-analysis');
 const { checklistOf } = require('./company-ai-checklist');
 const CL = require('../../utils/checklistAnswers');
+const MK = require('../../utils/aiMask');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis-results' });
 
 const router = express.Router();
@@ -112,6 +113,19 @@ function checklistContext(companyId) {
   return stored ? CL.contextOf(stored.answers) : null;
 }
 
+// The masked request and answer of one stored request of the company (#827
+// PR C), or null when it has neither. Never its headers or URL.
+function sampleReader(companyId) {
+  const decrypted = (v) => { try { return v ? colDecrypt(v) : null; } catch { return null; } };
+  return (requestId) => {
+    const row = get('SELECT request_body, response_body FROM run_requests WHERE id = ? AND company_id = ?', [requestId, companyId]);
+    if (!row) return null;
+    const request = MK.maskBody(decrypted(row.request_body));
+    const response = MK.maskBody(decrypted(row.response_body));
+    return request === null && response === null ? null : { request, response };
+  };
+}
+
 // The batches a request names, earlier first, or the refusal to send.
 function chosenBatches(companyId, body) {
   const ids = body?.batches;
@@ -143,7 +157,7 @@ async function buildFor(target, user, body) {
   const findings = all('SELECT * FROM finding WHERE company_id = ?', [target.id]).map(toApiFinding);
   const framework = frameworkOf(target.id);
   const built = AN.buildInput({ batches, framework, findings, scenarios: await scenariosOf(target.id),
-    catalogue: catalogueEntries(), checklist: checklistContext(target.id) });
+    catalogue: catalogueEntries(), checklist: checklistContext(target.id), sampleOf: sampleReader(target.id) });
   const stored = configOf(target.id, user.id);
   const system = AN.systemPrompt({ language: languageOf(body), instruction: stored?.instruction || null, compare: batches.length === 2,
     osdmVersion: framework?.osdmVersion || null });
