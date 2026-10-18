@@ -55,7 +55,6 @@ function token(role, uid, cid = companyId) {
   return `Bearer ${jwt.sign({ sub: uid, email: `${role}-${uid.slice(0, 4)}@ai-setup.com`, companyId: cid, role },
     process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' })}`;
 }
-const tm = (uid = tmId) => token('test_manager', uid);
 const as = (method, path, { uid = tmId, provider = '', role = 'test_manager' } = {}) =>
   request(app)[method](AI + path).set('Authorization', token(role, uid)).set('X-Provider-Id', provider);
 const anthropic = (over = {}) => ({ connector: 'anthropic', baseUrl: base, model: 'claude-opus-5-5', apiKey: KEY, ...over });
