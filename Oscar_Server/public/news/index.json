@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-18-receipt-token",
+    "date": "October 18, 2026",
+    "tag": "Fix",
+    "title": "Waiting for a refund receipt keeps the token valid",
+    "summary": "While a scenario waits for the refund receipt, OSCAR now renews the access token before each read of the booking.",
+    "content": "A provider whose access tokens are short-lived (two minutes, for example) used to answer 401 during the wait for the refund receipt, after the refund itself had gone through. The wait now renews the token when it is near its end."
+  },
+  {
+    "id": "2026-10-18-ai-warning-lines",
+    "date": "October 18, 2026",
+    "tag": "Fix",
+    "title": "AI analysis: only real warnings are sent",
+    "summary": "The AI analysis no longer sends pieces of debug lines as warnings.",
+    "content": "Some debug lines of the run log mention the word [WARNING] in their text. They were sent to the AI as warnings that could not be read, such as \"too.\". Only lines that are warnings are sent now; the fault detection report reads the logs the same way."
+  },
+  {
     "id": "2026-10-18-ai-warnings",
     "date": "October 18, 2026",
     "tag": "Improvement",

@@ -235,4 +235,34 @@ describe('the steps', () => {
       jest.useRealTimers();
     }
   });
+
+  describe('#854 the access token is renewed before each read', () => {
+    let sent;
+    let answer;
+    beforeEach(() => {
+      sent = [];
+      answer = { status: 200, body: { access_token: 'fresh-token' } };
+      global.bru.sendRequest = (req, cb) => { sent.push(req); cb(null, answer); };
+      envStore.__runId = 'run-1';
+      envStore.oscar_loopback_base = 'http://127.0.0.1:3001';
+      envStore.access_token = 'old-token';
+      envStore.__refundReceiptDeadline = String(Date.now() - 1);   // no pause
+    });
+    afterEach(() => { delete global.bru.sendRequest; });
+
+    test('OSCAR is asked for a token, not forced, after the pause; the read goes with it', async () => {
+      await steps.waitBeforeReceiptPoll();
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({ url: 'http://127.0.0.1:3001/v1/runs/run-1/refresh-access-token', method: 'POST' });
+      expect(envStore.access_token).toBe('fresh-token');
+    });
+
+    test('a refused renewal is a WARNING and the read goes with the token it has', async () => {
+      answer = { status: 500, body: { detail: 'down' } };
+      await steps.waitBeforeReceiptPoll();
+      expect(envStore.access_token).toBe('old-token');
+      expect(mockLogs.join('\n')).toContain('[WARNING] auth: refresh-access-token endpoint returned status=500');
+      expect(mockLogs.join('\n')).toContain('14b. GET Booking Refund Receipt will use the original token');
+    });
+  });
 });

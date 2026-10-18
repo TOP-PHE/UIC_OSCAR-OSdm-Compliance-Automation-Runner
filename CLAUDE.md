@@ -365,7 +365,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     framework leaves undeclared. Now `warningsOfBatch()`
     (`batchFailures.js`: `run_events` level `warn`, lines holding
     `[WARNING]`, step = `request_name`, finished runs only) feeds
-    `warningGroupsOf()` (`groupFailures()` over `warningText()`), sent as
+    `warningGroupsOf()` (`groupFailures()` over `warningText()`). A warning
+    line is one whose *first* level tag is `[WARNING]` (`isWarningLine()`,
+    1.11.342): the runner stores at level `warn` any line naming the tag, and
+    a `[DEBUG] … skip with a [WARNING] too.` line was sent as "too.". Sent as
     `warnings` (or `warningComparison` gone / stillWarned / new), never mixed
     with the failures; too large → warnings by step first, then failures.
     `scenariosOf(id, framework)` annotates the data file, so
@@ -1404,7 +1407,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `refundReceiptMaxWaitMinutes` is set. 06b and 14b are only ever reached by a
   script, and the run filter skips them otherwise. The wait has no on/off flag:
   its `EXPIRED_FLOW_TIMERS` entry has `flag: null`. The scripts decode base64 by
-  hand, because Bruno's sandbox need not give them a `Buffer`.
+  hand, because Bruno's sandbox need not give them a `Buffer`. **14b renews
+  the access token before each read** (#854, OTST_V2.0.187:
+  `refreshAccessTokenIfNeeded()`, not forced): beta's tokens last 120 s and
+  the wait outlived them (401). A new wait in the collection needs the same.
   `Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md` lists
   every scenario of the simulator's data file with its expected warnings.
   `datafile.test.js` fails when the two disagree, so a new scenario needs its

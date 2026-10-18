@@ -74,6 +74,25 @@ Issue #852. Simulator 0.37.0. Server and collection unchanged. Adding a reservat
 - **`…/offer-parts` is OSDM 3.7 and later**: alpha answers it 501.
 - Before, alpha answered 501 to `…/reservations`, the path the collection rightly calls below 3.7. Every "add the reservation later" scenario failed at `09. POST Add Reservation to Booking` on alpha (found by the AI analysis of an alpha batch, #823).
 - Ancillaries after the booking (`…/ancillaries`) stay 501.
+## [server-1.11.343 / collection-OTST_V2.0.187] — 2026-10-18 · Release 2026.378
+
+Issue #854. The refund receipt wait renews the access token. Server code unchanged.
+
+### Fixed
+- **`14b. GET Booking Refund Receipt` renews the access token before each read.** The step reads the booking every 15 s for up to `refundReceiptMaxWaitMinutes`, and nothing renewed the token during that wait. On the simulator's `beta`, whose tokens last 120 s, both receipt scenarios stopped at 14b with 401 after the refund had gone through (found by the AI analysis of a beta batch, #823).
+  - `waitBeforeReceiptPoll()` (`fulfillmentSteps.js`) now calls `refreshAccessTokenIfNeeded()` after its pause.
+  - The call is not forced: OSCAR's token cache keeps a 60 s safety margin and fetches a new token only when needed.
+  - A failed renewal logs a WARNING and the read goes with the token it has, as after the expired-booking wait (06).
+  - A standalone run (no OSCAR) is unchanged: the renewal needs OSCAR's loopback route and is skipped silently without it.
+
+---
+
+## [server-1.11.342 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.377
+
+Issue #823 (fix to PR 1). Collection unchanged.
+
+### Fixed
+- **The AI analysis sent pieces of debug lines as warnings.** The runner stores at level `warn` any log line that names `[WARNING]`, and 1.11.341 took every such line. A `[DEBUG]` line that says "… that test will skip with a [WARNING] too." was therefore sent as a warning reading "too.", and the first analysis of `gamma` reported several warnings it could not read. A line is a warning now only when its first level tag is `[WARNING]` (`isWarningLine()`). The fault detection report reads the run logs the same way.
 
 ---
 

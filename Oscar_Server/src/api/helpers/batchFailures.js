@@ -16,6 +16,7 @@
 
 const { all, colDecrypt } = require('../../db/db');
 const S = require('../../utils/findingSuggestions');
+const { isWarningLine } = require('../../utils/aiAnalysis');
 
 const MAX_FAILURES = 5000;
 const MAX_WARNING_EVENTS = 20000;
@@ -58,7 +59,8 @@ function failuresOfBatch(companyId, batchId) {
 }
 
 /**
- * The [WARNING] lines the runs of a finished batch logged (#823), oldest
+ * The [WARNING] lines the runs of a finished batch logged (#823, a line
+ * whose first level tag is [WARNING]: `isWarningLine()`), oldest
  * first: { runId, scenarioCode, step, message }, the step being the request
  * the line was logged under. At most MAX_WARNING_EVENTS log rows are read;
  * `truncated` says when that limit was met.
@@ -78,7 +80,7 @@ function warningsOfBatch(companyId, batchId) {
     let text = '';
     try { text = colDecrypt(row.message) || ''; } catch { text = ''; }
     for (const line of String(text).split('\n')) {
-      if (line.includes('[WARNING]')) warnings.push({ runId: row.run_id, scenarioCode: row.scenario_code || null, step: row.request_name || null, message: line.trim() });
+      if (isWarningLine(line)) warnings.push({ runId: row.run_id, scenarioCode: row.scenario_code || null, step: row.request_name || null, message: line.trim() });
     }
   }
   return { warnings, truncated: rows.length >= MAX_WARNING_EVENTS };

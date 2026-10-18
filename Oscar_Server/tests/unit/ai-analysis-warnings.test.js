@@ -20,6 +20,15 @@ const fail = (step, check, scenarioCode = 'OTST_A') => ({ runId: 'r1', scenarioC
 const batch = (id, records, warnings) => ({ batchId: id, runs: 1, finishedRuns: 1, records, warnings });
 
 describe('#823 warnings grouped like the failures', () => {
+  test('a warning line is one whose first level tag is [WARNING], not one that names the tag in its text', () => {
+    expect(AN.isWarningLine('[WARNING] ⚠️ x absent')).toBe(true);
+    expect(AN.isWarningLine('  14b. GET Booking [WARNING] Refund receipt: GET /bookings answered 401')).toBe(true);
+    expect(AN.isWarningLine('[DEBUG] no deadline → skipped; if expiredBookingTest=on, that test will skip with a [WARNING] too.')).toBe(false);
+    expect(AN.isWarningLine('[INFO] see the [WARNING] above')).toBe(false);
+    expect(AN.isWarningLine('[runner] Env file deletion attempt 1 failed')).toBe(false);
+    expect(AN.isWarningLine(null)).toBe(false);
+  });
+
   test('the tag and its marks are left out, the run\'s values replaced', () => {
     expect(AN.warningText('[WARNING] ⚠️ ❌ booking.price is 318834 (expected 318835)')).toBe('booking.price is N (expected N)');
     expect(AN.warningText('prefix [WARNING] Name "Jane Doe" not returned')).toBe('Name "…" not returned');
