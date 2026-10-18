@@ -139,6 +139,21 @@ function splitTag(tag) {
   return eq > 0 ? [tag.slice(0, eq), tag.slice(eq + 1)] : [tag, null];
 }
 
+// The answers told, by name: ticked codes as one list, text cut to 600.
+function toldByName(answers) {
+  const byName = new Map();
+  for (const [tag, value] of Object.entries(keptAnswers(answers))) {
+    const [name, code] = splitTag(tag);
+    const told = !name.startsWith('fw.') || name.endsWith('.comment');
+    if (told && code !== null && value === true) {
+      byName.set(name, [...(byName.get(name) || []), code]);
+    } else if (told && code === null && typeof value === 'string') {
+      byName.set(name, value.length > 600 ? value.slice(0, 600) + '…' : value);
+    }
+  }
+  return byName;
+}
+
 /**
  * What the AI analysis is told of the provider: each answer by its name, the
  * ticked codes of a question as one list. The Test Framework is sent apart,
@@ -146,19 +161,7 @@ function splitTag(tag) {
  * `cut` says how many answers were left out.
  */
 function contextOf(answers) {
-  const byName = new Map();
-  for (const [tag, value] of Object.entries(keptAnswers(answers))) {
-    const [name, code] = splitTag(tag);
-    if (name.startsWith('fw.') && !name.endsWith('.comment')) continue;
-    if (code !== null) {
-      if (value !== true) continue;
-      const list = byName.get(name);
-      if (Array.isArray(list)) list.push(code);
-      else byName.set(name, [code]);
-    } else if (typeof value === 'string') {
-      byName.set(name, value.length > 600 ? value.slice(0, 600) + '…' : value);
-    }
-  }
+  const byName = toldByName(answers);
   const out = {};
   let chars = 2;
   let cut = 0;
