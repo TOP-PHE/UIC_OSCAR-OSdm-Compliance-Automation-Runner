@@ -139,12 +139,6 @@ function splitTag(tag) {
   return eq > 0 ? [tag.slice(0, eq), tag.slice(eq + 1)] : [tag, null];
 }
 
-/**
- * What the AI analysis is told of the provider: each answer by its name, the
- * ticked codes of a question as one list. The Test Framework is sent apart,
- * so of the `fw.*` answers only the comments are. Capped at MAX_CONTEXT_CHARS;
- * `cut` says how many answers were left out.
- */
 // The answers told, by name: ticked codes as one list, text cut to 600.
 function toldByName(answers) {
   const byName = new Map();
@@ -160,6 +154,12 @@ function toldByName(answers) {
   return byName;
 }
 
+/**
+ * What the AI analysis is told of the provider: each answer by its name, the
+ * ticked codes of a question as one list. The Test Framework is sent apart,
+ * so of the `fw.*` answers only the comments are. Capped at MAX_CONTEXT_CHARS;
+ * `cut` says how many answers were left out.
+ */
 function contextOf(answers) {
   const byName = toldByName(answers);
   const out = {};
