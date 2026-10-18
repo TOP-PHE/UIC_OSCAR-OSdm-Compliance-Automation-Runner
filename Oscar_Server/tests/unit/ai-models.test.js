@@ -193,3 +193,24 @@ describe('#831 the page', () => {
     expect(ctx.spendHtml({ ...s, months: [], models: [], mine: { cap: null, used: 0 } })).toContain('(no limit set)');
   });
 });
+
+describe('#848 totals over analyses', () => {
+  test('stored cost first, else the list price now; no tokens = not counted; unknown model = unpriced', () => {
+    const rows = [
+      { model: 'claude-opus-5-5', input_tokens: 1000, output_tokens: 100, cost_usd: 0.5 },
+      { model: 'claude-opus-5-5', input_tokens: 1_000_000, output_tokens: 0, cost_usd: null },
+      { model: 'unknown-model', input_tokens: 10, output_tokens: 10, cost_usd: null },
+      { model: 'claude-opus-5-5', input_tokens: null, output_tokens: null, cost_usd: null },
+    ];
+    const listed = M.costOf(M.priceOf('claude-opus-5-5'), { input: 1_000_000, output: 0 });
+    expect(M.totalOf(rows)).toEqual({ analyses: 3, tokens: 1_001_120, cost: 0.5 + listed, unpriced: 1 });
+    expect(M.totalOf([])).toEqual({ analyses: 0, tokens: 0, cost: 0, unpriced: 0 });
+  });
+
+  test('totals add up, and an empty list is zero', () => {
+    const a = { analyses: 2, tokens: 10, cost: 0.1, unpriced: 0 };
+    const b = { analyses: 1, tokens: 5, cost: 0.2, unpriced: 1 };
+    expect(M.sumOf([a, b])).toEqual({ analyses: 3, tokens: 15, cost: 0.3, unpriced: 1 });
+    expect(M.sumOf([])).toEqual({ analyses: 0, tokens: 0, cost: 0, unpriced: 0 });
+  });
+});

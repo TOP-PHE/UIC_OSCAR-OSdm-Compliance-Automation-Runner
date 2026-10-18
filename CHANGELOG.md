@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.339 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.374
+
+Issue #848 (PR 1). The AI analysis: one AI service for the company and all its providers, or one per provider; and an overview of what each uses and costs. Collection unchanged.
+
+### Added
+- **One AI service for all, or one per provider.** A Test Manager chooses, for their company and its providers:
+  - **one service for all**, the new default: one service, stored on the company, is used for the company and every provider whose access is approved;
+  - **one service per provider**: each has its own service, as before.
+- **Access stays per company or provider** in both cases: a provider whose access is not approved is never analysed.
+- **Switching keeps everything**: no service is deleted when the choice changes; a service the choice does not use is kept and listed as not in use.
+- **A shared service has one monthly token limit**, counted over the company and all its providers.
+- **Overview**: per company or provider, the access, the AI service and model used, the number of analyses and their cost (every Test Manager's, at list price), with the totals.
+- Routes `GET`/`PUT /v1/company/ai-analysis/setup` and `GET /v1/company/ai-analysis/overview` (OpenAPI). `GET /ai-analysis/config` also says which service is used (`mode`, `serviceOf`). Migration 39 (`ai_setup`).
+- On the page, a service shared by several companies or providers is one form, named for all of them. The page itself is reorganised in PR 2: connection, status, analysis.
+
+### Default decisions (taken without asking)
+- **A Test Manager who already has a service on a provider keeps one service per provider**, set by the migration, so no analysis changes service with this release. Everyone else starts with one service for all.
+- **The choice is each Test Manager's**, like their services and access: two Test Managers of a company may choose differently.
+- **Removing the service from a provider, in shared mode, removes the shared service** (it is the one in use there).
+
+---
+
 ## [server-1.11.338 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.373
 
 Issue #503 (PR 2). The routes that read runs and results with an API key. Collection unchanged.

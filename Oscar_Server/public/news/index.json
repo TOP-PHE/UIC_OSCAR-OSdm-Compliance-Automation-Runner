@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-one-service",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "One AI service for all your providers",
+    "summary": "The AI analysis can now use one AI service for your company and all its providers, which is the default, or one per provider.",
+    "content": "A Test Manager can now configure the AI analysis once for the company and all its providers, which is the new default, or keep one AI service per provider when an agreement with a provider asks for it. Access is still approved per company or provider. A Test Manager who already had a service on a provider keeps one service per provider. The AI Analysis page will be split into connection, status and analysis in the next release."
+  },
+  {
     "id": "2026-10-18-api-read-routes",
     "date": "October 18, 2026",
     "tag": "Feature",

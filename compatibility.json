@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.373",
+  "current_release": "2026.374",
   "releases": [
+    {
+      "release": "2026.374",
+      "date": "2026-10-18",
+      "server": "1.11.339",
+      "collection": "OTST_V2.0.186",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#848 PR 1: one AI service for all the company's providers (the new default) or one per provider; an overview of the AI used per company or provider, its analyses and cost."
+      ]
+    },
     {
       "release": "2026.373",
       "date": "2026-10-18",

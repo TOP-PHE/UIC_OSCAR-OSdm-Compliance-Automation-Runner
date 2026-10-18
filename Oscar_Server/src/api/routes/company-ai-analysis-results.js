@@ -53,7 +53,7 @@ const { decryptFromFileAsync } = require('../../utils/at-rest');
 const C = require('../../utils/aiConfig');
 const AN = require('../../utils/aiAnalysis');
 const { callModel } = require('../../services/aiConnector');
-const { scopeForTestManager, configScope, configOf, storedKey } = require('./company-ai-analysis');
+const { scopeForTestManager, configScope, configOf, storedKey, usageScopeOf } = require('./company-ai-analysis');
 const { checklistOf } = require('./company-ai-checklist');
 const CL = require('../../utils/checklistAnswers');
 const MK = require('../../utils/aiMask');
@@ -186,11 +186,14 @@ async function buildFor(target, user, body) {
     contentHash: AN.inputHash(system, built.text), stored, price: M.priceOf(model.value, customOf(stored)) };
 }
 
-// Tokens this Test Manager's analyses used this month, for this company or provider.
+// Tokens this Test Manager's analyses used this month on the service of this
+// company or provider: its own, or the whole family's when the service is shared (#848).
 function tokensThisMonth(companyId, userId) {
+  const scope = usageScopeOf(companyId, userId);
   const row = get(`SELECT COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS used
                      FROM ai_analysis
-                    WHERE company_id = ? AND user_id = ? AND created_at >= datetime('now', 'start of month')`, [companyId, userId]);
+                    WHERE company_id IN (${scope.map(() => '?').join(', ')}) AND user_id = ?
+                      AND created_at >= datetime('now', 'start of month')`, [...scope, userId]);
   return row?.used || 0;
 }
 

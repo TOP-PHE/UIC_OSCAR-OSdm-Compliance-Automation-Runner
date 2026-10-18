@@ -126,6 +126,33 @@ function addTo(map, key, row) {
   map.set(key, s);
 }
 
+const EMPTY_SPEND = Object.freeze({ analyses: 0, tokens: 0, cost: 0, unpriced: 0 });
+
+// One analysis row as { tokens, cost }: its stored cost, else priced now. Null
+// for a row that used no tokens (failed before the call, still running).
+function pricedRow(r, custom) {
+  const usage = { input: r.input_tokens, output: r.output_tokens };
+  if (!Number.isFinite(usage.input) && !Number.isFinite(usage.output)) return null;
+  const cost = Number.isFinite(r.cost_usd) ? r.cost_usd : costOf(priceOf(r.model, custom), usage);
+  return { tokens: (usage.input || 0) + (usage.output || 0), cost };
+}
+
+/** All the analyses of `rows` together (#848): { analyses, tokens, cost, unpriced }, priced as spendOf() does. */
+function totalOf(rows, custom = null) {
+  const all = new Map();
+  for (const r of rows || []) {
+    const row = pricedRow(r, custom);
+    if (row) addTo(all, 'all', row);
+  }
+  return all.get('all') || { ...EMPTY_SPEND };
+}
+
+/** Add up totals ({ analyses, tokens, cost, unpriced }). */
+function sumOf(list) {
+  return (list || []).reduce((t, s) => ({ analyses: t.analyses + s.analyses, tokens: t.tokens + s.tokens,
+    cost: round6(t.cost + s.cost), unpriced: t.unpriced + s.unpriced }), { ...EMPTY_SPEND });
+}
+
 /**
  * Spend from analysis rows ({ created_at, model, input_tokens, output_tokens,
  * cost_usd }): today, this month, per month (latest first, at most 12) and
@@ -140,15 +167,13 @@ function spendOf(rows, now, custom = null) {
   const models = new Map();
   const days = new Map();
   for (const r of rows || []) {
-    const usage = { input: r.input_tokens, output: r.output_tokens };
-    if (!Number.isFinite(usage.input) && !Number.isFinite(usage.output)) continue;
-    const cost = Number.isFinite(r.cost_usd) ? r.cost_usd : costOf(priceOf(r.model, custom), usage);
-    const row = { tokens: (usage.input || 0) + (usage.output || 0), cost };
+    const row = pricedRow(r, custom);
+    if (!row) continue;
     addTo(months, monthOf(r.created_at), row);
     addTo(days, dayOf(r.created_at), row);
     if (monthOf(r.created_at) === month) addTo(models, r.model, row);
   }
-  const empty = { analyses: 0, tokens: 0, cost: 0, unpriced: 0 };
+  const empty = EMPTY_SPEND;
   return {
     today: days.get(today) || empty,
     month: months.get(month) || empty,
@@ -175,5 +200,5 @@ const SUGGESTED_INSTRUCTION = [
 
 module.exports = {
   ANTHROPIC_MODELS, SUGGESTED_MONTHLY_TOKENS, SUGGESTED_INSTRUCTION,
-  priceOf, costOf, estimateOf, customPrice, modelsForPage, modelsFromService, spendOf,
+  priceOf, costOf, estimateOf, customPrice, modelsForPage, modelsFromService, spendOf, totalOf, sumOf,
 };
