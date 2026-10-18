@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-osdm-reference",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "AI Analysis: the OSDM specification as reference",
+    "summary": "The AI analysis now gets an extract of the OSDM specification of the version the provider declares, for the operations that failed.",
+    "content": "Each group of failures now names its OSDM operation, and the model is given an extract of the OSDM specification for those operations: their request, their success response and the objects they name, with required members and member types. The extract is of the version the Test Framework declares (OSCAR holds 3.4 to 3.8; for another version, the nearest one, and the model is told so). The preview shows it like everything else that is sent. Test Managers only."
+  },
+  {
     "id": "2026-10-18-ai-checklist",
     "date": "October 18, 2026",
     "tag": "Feature",

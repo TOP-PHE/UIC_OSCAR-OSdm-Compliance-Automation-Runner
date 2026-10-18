@@ -27,6 +27,7 @@
 
 const crypto = require('node:crypto');
 const S = require('./findingSuggestions');
+const OR = require('./osdmReferences');
 
 const LANGUAGES = Object.freeze(['English', 'French', 'German', 'Italian', 'Spanish', 'Dutch', 'Czech', 'Polish', 'Portuguese', 'Swedish']);
 const OWNERS = Object.freeze(['provider', 'oscar', 'unclear']);
@@ -42,12 +43,17 @@ const short = (text, max = MAX_TEXT) => {
   return t.length > max ? t.slice(0, max) + '…' : t;
 };
 
-/** A batch's failure records as compact groups, the most frequent first. */
-function groupsOf(records) {
+/**
+ * A batch's failure records as compact groups, the most frequent first. With
+ * an OSDM version (#827), each group names the OSDM operation of its sample
+ * request, from its method and URL; the URL itself is never kept.
+ */
+function groupsOf(records, osdmVersion = null) {
   return S.groupFailures(records)
     .map((g) => ({
       key: g.key,
       step: short(g.step, 120),
+      ...(osdmVersion ? { operation: OR.operationOf(g.sample?.method, g.sample?.url, osdmVersion) } : {}),
       check: short(g.check),
       error: g.sample?.error ? short(S.checkText(g.sample.error)) : null,
       status: g.status,
@@ -76,7 +82,7 @@ function byStep(groups) {
   const steps = new Map();
   for (const g of groups) {
     const key = `${g.step}|${g.status}`;
-    if (!steps.has(key)) steps.set(key, { step: g.step, status: g.status, failures: 0, distinctChecks: 0, problemCodes: [], scenarios: [] });
+    if (!steps.has(key)) steps.set(key, { step: g.step, operation: g.operation ?? null, status: g.status, failures: 0, distinctChecks: 0, problemCodes: [], scenarios: [] });
     const s = steps.get(key);
     s.failures += g.failures;
     s.distinctChecks += 1;
@@ -152,8 +158,13 @@ function batchHeader(b) {
  */
 function buildInput({ batches, framework, findings, scenarios, catalogue, checklist }) {
   const compare = batches.length === 2;
-  const groups = batches.map((b) => groupsOf(b.records));
+  const reference = OR.versionFor(framework?.osdmVersion);
+  const groups = batches.map((b) => groupsOf(b.records, reference?.version));
   const all = groups.flat();
+  // The operations the failures concern, the most failing first (#827 PR B).
+  const failuresByOperation = new Map();
+  for (const g of all) if (g.operation) failuresByOperation.set(g.operation, (failuresByOperation.get(g.operation) || 0) + g.failures);
+  const operations = [...failuresByOperation.entries()].sort((a, b) => b[1] - a[1]).map(([op]) => op);
 
   const make = (summarise) => {
     const input = {
@@ -163,6 +174,7 @@ function buildInput({ batches, framework, findings, scenarios, catalogue, checkl
       testFramework: frameworkDeclarations(framework),
       findings: (findings || []).map(findingAsSent),
       scenarios: scenariosNamed(all, scenarios, catalogue),
+      osdmReference: OR.referencesFor(operations, framework?.osdmVersion),
       summarisedByStep: summarise,
     };
     if (compare) {
@@ -212,6 +224,7 @@ function systemPrompt({ language = 'English', instruction = null, compare = fals
     version
       ? `The provider declares OSDM ${version}: judge every request and answer against OSDM ${version}, never against a later version.`
       : 'The provider declares no OSDM version: say which version you judged against.',
+    'osdmReference is an extract of the OSDM specification for the operations the failures concern (groups name their operation): each schema with its required members and the type of each member, member descriptions left out. It is of the version the provider declares; when osdmReference.exact is false, OSCAR has no file of that version and the extract is of the nearest one, so say so where it matters. Quote it when you say what OSDM requires or allows.',
     'provider.checklist, when given, is what the provider said of its own system in OSCAR\'s set-up checklist (answer names: info.* its behaviour, data.* its test data and options, fw.*.comment its remarks on what it supports). A failure on something the provider says it does not do is expected: say so, and say whether the scenario should be left out or the Test Framework changed. scenarios[].purpose says what a reference scenario tests.',
     compare
       ? 'Two batches are compared. OSCAR has already sorted the groups into fixed (failing in the first batch only), stillFailing (in both) and new (in the second only): explain them, do not recount them.'

@@ -300,6 +300,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     catalogue `purpose` (`catalogueEntryOf()`: same code, else the longest
     code it extends with `_`). The tests read the simulator's alpha checklist
     in `Documentation/`: regenerating it changes their counts.
+    **#827 PR B (1.11.328): OSDM references.** Each group names its
+    `operation` (`utils/osdmReferences.js` `operationOf()`: the request's
+    method and URL, the template whose path ends the URL's; the URL is never
+    sent). `input.osdmReference` is the extract of the declared version
+    (`versionFor()`: exact, else nearest, else latest; `exact` says which),
+    request + 2xx responses + named schemas two levels down, level by level
+    across operations, 30k chars, 12 operations. `osdm-references.json` is
+    **generated** (`scripts/generate-osdm-references.js`, 3.4–3.8 from
+    gh-pages, 3.8 copied from the repository first); a test pins its 3.8.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.362",
+  "current_release": "2026.363",
   "releases": [
+    {
+      "release": "2026.363",
+      "date": "2026-10-18",
+      "server": "1.11.328",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis references (#827, part B): each group of failures names its OSDM operation, and the model is given an extract of the OSDM specification of the declared version (3.4 to 3.8; the nearest one otherwise, said so) for those operations: request, success response and the schemas they name, with required members and member types."
+      ]
+    },
     {
       "release": "2026.362",
       "date": "2026-10-18",
