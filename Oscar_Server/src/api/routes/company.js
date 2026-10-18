@@ -21,6 +21,9 @@
  * POST   /v1/company/datafile/previous/restore — put it back (#549)
  * GET    /v1/company/configuration/download    — data file + Test Framework + Test Data in one file (#810)
  * POST   /v1/company/configuration/import      — take the parts of such a file the Test Manager chose (#810)
+ * GET    /v1/company/reference                 — the reference configuration followed, and whether it is applied (#838)
+ * PUT    /v1/company/reference                 — follow a reference configuration, or none (#838)
+ * POST   /v1/company/reference/apply           — replace scenarios, framework and Test Data with the reference's (#838)
  */
 
 const express   = require('express');
@@ -44,6 +47,8 @@ const { datafileVersion, etag, staleSaveRefusal } = require('../../utils/datafil
 const { schemaProblems, loadDatafileSchema } = require('../../utils/datafileSchema');
 const { isOsdmVersion } = require('../../utils/osdmVersion');
 const configurationBundle = require('../../utils/configurationBundle');
+const referenceConfiguration = require('../../utils/referenceConfiguration');
+const referenceStore = require('../../utils/referenceStore');
 const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
@@ -847,6 +852,90 @@ router.post('/configuration/import', datafileMutationLimiter, authorizeDatafileW
 
   auditLog(req.user.id, company.id, req.user.email, 'configuration_imported');
   return res.json({ imported: true, choices, ...result.outcome });
+});
+
+// ── The reference configuration (#838) ───────────────────────────────────────
+// A company or provider testing the OSDM simulator follows a reference of the
+// repository (Bruno_Collection/data_base/reference/), read from the
+// collection on disk. Linking is the Test Manager's; the update replaces the
+// scenarios, the Test Framework and the Test Data through the import of
+// #810, so the replaced data file stays the previous one (restorable). The
+// endpoint and the credentials are never touched.
+
+function referenceState(companyId) {
+  const row = get('SELECT reference_name, reference_version, reference_applied_at FROM companies WHERE id = ?', [companyId]) || {};
+  const loaded = row.reference_name ? referenceStore.loadReference(row.reference_name) : null;
+  return {
+    available: referenceStore.availableReferences(),
+    linked: row.reference_name || null,
+    applied_version: row.reference_version || null,
+    applied_at: row.reference_applied_at || null,
+    current_version: loaded?.version ?? null,
+    up_to_date: Boolean(row.reference_version) && row.reference_version === loaded?.version,
+    missing: !!(row.reference_name && !loaded),
+  };
+}
+
+router.get('/reference', datafileReadLimiter, (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
+  const companyId = resolveCompanyScope(req, res);
+  if (companyId === null) return;
+  return res.json(referenceState(companyId));
+});
+
+router.put('/reference', datafileMutationLimiter, (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const companyId = resolveCompanyScope(req, res);
+  if (companyId === null) return;
+  const name = req.body?.name;
+  if (name !== null && !referenceStore.NAMES.includes(name)) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: `"name" must be null or one of ${referenceStore.NAMES.join(', ')}.` });
+  }
+  const current = get('SELECT reference_name FROM companies WHERE id = ?', [companyId]);
+  if (!current) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Company not found.' });
+  if ((current.reference_name || null) !== name) {
+    // Another reference, or none: what was applied no longer says anything.
+    run(`UPDATE companies SET reference_name = ?, reference_version = NULL, reference_applied_at = NULL, updated_at = datetime('now') WHERE id = ?`, [name, companyId]);
+    auditLog(req.user.id, companyId, req.user.email, name ? 'reference_linked' : 'reference_unlinked');
+  }
+  return res.json(referenceState(companyId));
+});
+
+router.post('/reference/apply', datafileMutationLimiter, authorizeDatafileWrite(uploadPolicy), async (req, res) => {
+  const company = req.datafileCompany;
+  const row = get('SELECT reference_name FROM companies WHERE id = ?', [company.id]);
+  if (!row?.reference_name) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: 'This company or provider follows no reference configuration: choose one first. Nothing was changed.' });
+  }
+  const loaded = referenceStore.loadReference(row.reference_name);
+  if (!loaded) {
+    return res.status(503).json({ status: 503, title: 'Service Unavailable', detail: `The reference ${row.reference_name} cannot be read on this server. Nothing was changed.` });
+  }
+  const read = configurationBundle.readConfiguration(referenceConfiguration.configurationOf(loaded.reference, loaded.datafile, { version: loaded.version }));
+  if (read.refusal) return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: `The reference ${row.reference_name} is not a configuration OSCAR reads: ${read.refusal}` });
+  const { configuration } = read;
+  const choices = { scenarios: 'replace', framework: 'replace', testData: 'replace' };
+  const problem = importPartsRefusal(configuration, choices, company.id);
+  if (problem) return res.status(problem.status).json({ status: problem.status, title: 'Bad Request', detail: problem.detail, problems: problem.problems });
+  const datafileBytes = Buffer.from(JSON.stringify(configuration.datafile, null, 4), 'utf8');
+
+  let result;
+  try {
+    result = await withDatafileLock(company.id, async () => {
+      const applied = await applyConfiguration(company, configuration, choices, datafileBytes);
+      if (!applied.refusal) {
+        run(`UPDATE companies SET reference_version = ?, reference_applied_at = datetime('now') WHERE id = ?`, [loaded.version, company.id]);
+      }
+      return applied;
+    });
+  } catch (err) {
+    log.error({ err, companyId: company.id }, 'reference configuration update failed');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The reference configuration could not be applied. Nothing was changed.' });
+  }
+  if (result.refusal) return res.status(400).json({ status: 400, title: 'Bad Request', detail: `The reference's data file: ${result.refusal}` });
+
+  auditLog(req.user.id, company.id, req.user.email, 'reference_applied');
+  return res.json({ applied: true, reference: row.reference_name, ...result.outcome, state: referenceState(company.id) });
 });
 
 // ── The previous data file (#549) ─────────────────────────────────────────────

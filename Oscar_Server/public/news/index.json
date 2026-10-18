@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-reference-configuration-update",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "Update a simulator company from its reference",
+    "summary": "A company that tests the OSDM simulator can follow the reference configuration of its provider and be updated from it in one click.",
+    "content": "In Test Config, a Test Manager of a company made for the OSDM simulator chooses the reference configuration of its provider (alpha, beta or gamma) and clicks Update from the reference. The scenarios, the Test Framework and the Test Data are replaced with the repository's; the endpoint and the credentials are kept. When the reference changes, Test Config and the run page say so."
+  },
+  {
     "id": "2026-10-18-reference-configurations",
     "date": "October 18, 2026",
     "tag": "Improvement",

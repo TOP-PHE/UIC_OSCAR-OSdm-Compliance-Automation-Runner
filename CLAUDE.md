@@ -1909,7 +1909,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     from the checklist, the profile and the data file: a test fails until it
     is rerun after any of them changes, and a checklist question the module
     does not place stops the generator. The OSDM version is the profile's
-    (`3.6.0`), checked against the checklist's (`3.6`). The data file
+    (`3.6.0`), checked against the checklist's (`3.6`).
+    **PR 2 (1.11.335): following a reference.** `companies.reference_name`
+    / `reference_version` / `reference_applied_at` (migration 37); routes
+    `GET`/`PUT /v1/company/reference` and `POST /reference/apply` in
+    `company.js`. The update is the #810 import with every part `replace`
+    (`applyConfiguration()`, under the datafile lock), never the endpoint
+    or credentials. `utils/referenceStore.js` reads a name of the fixed
+    list only, from `COLLECTION_PATH/data_base` (pulled on every push to
+    main: no call to GitHub), the repository copy as fallback; its
+    version is sha256 of the reference + data file text, so either moving
+    reads as "not up to date": in Test Config's box
+    (`public/js/reference-config.js`) and on the run page
+    (`referenceNoticeText()` in `run.html`), both pinned by
+    `reference-config-page.test.js`. The data file
     holds each sale scenario once per version (`_36`, `_37`, `_38`), and
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;

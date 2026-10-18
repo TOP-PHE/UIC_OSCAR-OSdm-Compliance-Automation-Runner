@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.369",
+  "current_release": "2026.370",
   "releases": [
+    {
+      "release": "2026.370",
+      "date": "2026-10-18",
+      "server": "1.11.335",
+      "collection": "OTST_V2.0.186",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server (#838 PR 2): a company or provider made for the OSDM simulator follows a reference configuration (Test Config → Reference configuration) and is updated from it in one click: scenarios, Test Framework and Test Data replaced, endpoint and credentials kept. Read from the collection on the server, no call to GitHub. Test Config and the run page say when the reference has moved on. Migration 37."
+      ]
+    },
     {
       "release": "2026.369",
       "date": "2026-10-18",
