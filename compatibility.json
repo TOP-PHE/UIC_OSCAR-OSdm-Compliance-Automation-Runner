@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.379",
+  "current_release": "2026.380",
   "releases": [
+    {
+      "release": "2026.380",
+      "date": "2026-10-18",
+      "server": "1.11.345",
+      "collection": "OTST_V2.0.188",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Sonar clean-up 5/5 (#528): the Bruno library rewritten rule by rule (377 code smells), with no change in what a run checks or reports; the simulator replay and the report pages are the same before and after."
+      ]
+    },
     {
       "release": "2026.379",
       "date": "2026-10-18",
