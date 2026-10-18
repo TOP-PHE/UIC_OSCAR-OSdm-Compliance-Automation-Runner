@@ -75,13 +75,13 @@ function newKeyHtml(created) {
     const d = await res.json().catch(() => ({}));
     return d.detail || d.title || fallback;
   }
-  function reportError(e) { showMsg((e && e.message) || 'Something went wrong.', false); }
+  function reportError(e) { showMsg(e?.message || 'Something went wrong.', false); }
 
   async function load() {
     const res = await fetch('/v1/company/api-keys');
     if (!res.ok) { list.innerHTML = ''; showMsg(await readError(res, 'Could not load the API keys.'), false); return; }
     const data = await res.json();
-    document.getElementById('keys-target').textContent = data.company ? data.company.name : '';
+    document.getElementById('keys-target').textContent = data.company?.name || '';
     const keys = data.keys || [];
     list.innerHTML = keys.length
       ? '<table><thead><tr><th>Name</th><th>State</th><th>Made by</th><th>Expires</th><th>Last used</th><th></th></tr></thead><tbody>'

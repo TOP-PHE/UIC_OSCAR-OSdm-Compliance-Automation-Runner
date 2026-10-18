@@ -45,7 +45,7 @@ function usableKey(token, now = new Date()) {
     if (!row || !K.secretMatches(parsed.secret, row.secret_hash)) return null;
     if (K.unusableBecause(row, now)) return null;
     const creator = get('SELECT id, company_id, role, status FROM users WHERE id = ?', [row.created_by]);
-    if (!creator || creator.status !== 'active' || creator.role !== 'test_manager') return null;
+    if (creator?.status !== 'active' || creator.role !== 'test_manager') return null;
     const asCreator = { id: creator.id, companyId: creator.company_id, role: 'test_manager' };
     if (!canUseCompany(asCreator, row.company_id)) return null;
     return row;
