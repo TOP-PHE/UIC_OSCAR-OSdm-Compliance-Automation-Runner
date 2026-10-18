@@ -398,6 +398,98 @@ is the only mitigation:
    reviewing release notes before manually unlocking auto-update if a
    suspicious release lands.
 
+### 7.1 Outbound calls to addresses a company chooses (accepted scanner findings)
+
+OSCAR calls addresses that its users type in, by design. Three fields are
+involved:
+
+| Field | Who sets it | What OSCAR does with it |
+|---|---|---|
+| OSDM endpoint (`companies.api_base`) | Test Manager | Every request of every run |
+| OAuth token address (`token_url`) | Tester | The token fetch |
+| AI service address (`ai_config.base_url`, #801/#831) | Test Manager with AI access approved by an administrator | The connection test, the list of models, each AI analysis |
+
+CodeQL (`js/request-forgery`) and Sonar (`jssecurity:S5144`) report these
+calls as server-side request forgery (SSRF). The findings are **accepted**:
+calling the address the company chose is the function itself. The risk
+they describe is real, and these controls cover it:
+
+- **https on a public host only** (`utils/urlPolicy.js`). Refused:
+  - loopback, private (RFC 1918), link-local (including the cloud
+    metadata address `169.254.169.254`), unique-local and CGNAT ranges;
+  - reserved ranges and single-label host names (Docker service names,
+    `localhost`).
+
+  The check runs when the field is saved, and again with a DNS lookup
+  just before each call (`usableUrlRefusal()`).
+- **No redirect is followed** (`redirect: 'manual'`): a public address
+  cannot bounce the call to an internal one.
+- **No credentials or query in the AI address**: name, password, query
+  and fragment are refused.
+- **Bounded answers**: an AI answer over 256 KB is refused. Every call has
+  a time limit: 30 s for a test, 15 s for the model list, 5 min for an
+  analysis.
+- **Who can set the AI address**: only an approved Test Manager, per
+  company or provider. Every save and test is in the audit log.
+- **Keys**: the AI key is encrypted at rest and never returned to a
+  browser. It is masked in any error that echoes it, and only sent to the
+  connector and host it was typed for (`keyRefusal()`).
+- **`ALLOW_PRIVATE_TARGETS=1`** turns the address rule off. It is for
+  development and self-hosted boxes only, and must never be set on the
+  production server.
+
+Accepted alerts, for the record:
+- the AI connector's single `fetch` (`services/aiConnector.js`), accepted
+  on `main` in 2026-10 and again on PR #832;
+- the earlier OSDM endpoint and token fetch findings (tracker S5).
+
+**Points worth testing in a penetration test:**
+1. **DNS rebinding.** The DNS answer checked by `usableUrlRefusal()` and
+   the one used by `fetch` come from two separate lookups. A host that
+   answers public, then private, could slip between them.
+2. **Address forms.** Mixed encodings that could reach an internal
+   address despite the parser: IPv6 forms, decimal or octal IPv4,
+   IPv4-mapped IPv6.
+3. **Token cross-over.** Whether one company's AI key or OSDM token can
+   be made to reach another company's address.
+4. **Rate limits on outbound calls.**
+   - Connection test and model list: 30 per 15 min.
+   - Analyses: 20 per hour.
+   - One analysis running per Test Manager.
+
+### 7.2 What the AI analysis sends out of OSCAR
+
+An analysis is sent to the company's own AI service, never to a service
+OSCAR chooses. Before anything is sent:
+- the Test Manager sees the exact text in a preview;
+- the run must carry that preview's hash, which also covers the model;
+- the commitment text is accepted per company or provider, and an
+  administrator approves each request.
+
+**What is sent:**
+- failed checks, with the run's values replaced;
+- HTTP statuses and OSDM problem codes;
+- scenario codes and their purpose;
+- the Test Framework's declarations;
+- findings (title, category, step);
+- extracts of the OSDM specification;
+- the provider's set-up checklist answers, never the `api.*` or `meta.*`
+  ones;
+- for the 15 most failing groups, one request and answer each.
+
+**What is masked in those request and answer samples**
+(`utils/aiMask.js`):
+- personal data of passengers and purchasers: names, birth date, gender,
+  contact, address, cards, identity documents;
+- connection data: tokens, client ids, secrets, requestor;
+- web addresses, replaced by `<url>`;
+- a Problem's title and detail.
+
+**Never sent:** headers.
+
+Each analysis stores its model, token counts and cost (#831) in
+`ai_analysis`, with the result encrypted.
+
 ---
 
 ## 8. Worked Example — 2026-05-15 v19 Migration Outage
@@ -501,6 +593,7 @@ When something happens, which doc to open first:
 | Date | Change | Author |
 |---|---|---|
 | 2026-05-15 | Initial issue. Captures policy state after issue #60 Phases 1–3 land. Worked example from same-day v19 migration outage included. | Patrick Heuguet |
+| 2026-10-18 | § 7.1 outbound calls to company-chosen addresses (accepted SSRF findings, points for the penetration test) and § 7.2 what the AI analysis sends. | Patrick Heuguet |
 
 This policy is reviewed half-yearly (§ 6.2). Substantive changes are
 recorded above with rationale.
