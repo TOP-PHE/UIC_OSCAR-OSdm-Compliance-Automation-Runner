@@ -401,16 +401,16 @@ function _statusBadge(status) {
  */
 function _deriveRunType(url) {
   const u = (url || '').toLowerCase().split('?')[0];
-  if (/\/versions$/.test(u)) return 'System Information';
+  if (u.endsWith('/versions')) return 'System Information';
   if (/\/coach-deck-layouts(\/[^/]+)?$/.test(u)) return 'System Information';
   if (/\/coach-layouts(\/[^/]+)?$/.test(u)) return 'System Information';
-  if (/\/passenger-categories$/.test(u)) return 'System Information';
-  if (/\/promotion-codes$/.test(u)) return 'System Information';
-  if (/\/reduction-cards$/.test(u)) return 'System Information';
-  if (/\/zones$/.test(u)) return 'System Information';
-  if (/\/products$/.test(u)) return 'System Information';
+  if (u.endsWith('/passenger-categories')) return 'System Information';
+  if (u.endsWith('/promotion-codes')) return 'System Information';
+  if (u.endsWith('/reduction-cards')) return 'System Information';
+  if (u.endsWith('/zones')) return 'System Information';
+  if (u.endsWith('/products')) return 'System Information';
   if (/\/products\/[^/]+$/.test(u)) return 'System Information';
-  if (/\/product-tags$/.test(u)) return 'System Information';
+  if (u.endsWith('/product-tags')) return 'System Information';
   if (/\/(refundoffer|refunds?)/.test(u)) return 'Refund';
   if (/\/(exchangeoffer|exchanges?)/.test(u)) return 'Exchange';
   return 'Common Requests';
