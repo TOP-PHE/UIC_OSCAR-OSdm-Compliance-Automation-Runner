@@ -316,7 +316,8 @@ function validateDataFileJsonWithTemplate(jsonData) {
         }
 
         function validateValueAgainstSchema(key, value, propertySchema, path = "") {
-          const fullPath = path ? (key ? `${path}.${key}` : path) : key;
+          let fullPath = key;
+          if (path) fullPath = key ? `${path}.${key}` : path;
 
           // Null handling.
           // #345 (v1.11.118): this branch fires for a property that is PRESENT

@@ -244,7 +244,10 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
     }
     test(`${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} exists in booking`, () => {
       expect(bookedCondition, `Condition '${condType}' not found in booking`).to.exist;
-      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking (paired by ${_pairKind === 'window' ? 'validity window' : _pairKind === 'order' ? 'type+order' : 'type re-use'})`);
+      let _pairedBy = 'type re-use';
+      if (_pairKind === 'window') _pairedBy = 'validity window';
+      else if (_pairKind === 'order') _pairedBy = 'type+order';
+      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking (paired by ${_pairedBy})`);
     });
     if (!bookedCondition) return;
     if (_pairKind === 'order' && (condition.validFrom || condition.validUntil || bookedCondition.validFrom || bookedCondition.validUntil)) {
@@ -672,8 +675,9 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   let selAcc = null;
   try { const raw = bru.getEnvVar("selectedAccommodation"); selAcc = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { selAcc = null; }
   const reservationId = bru.getEnvVar("reservationId");
+  const offeredSubType = selAcc?.accommodationSubType ? '/' + selAcc.accommodationSubType : '';
   const offeredLabel = selAcc
-    ? `${selAcc.accommodationType}${selAcc.accommodationSubType ? '/' + selAcc.accommodationSubType : ''}`
+    ? `${selAcc.accommodationType}${offeredSubType}`
     : String(requested);
 
   const bookedRes = (bookedOffers || []).flatMap(b => (b?.reservations) || []).filter(Boolean);
@@ -740,8 +744,8 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   const _resPlaces = Array.isArray(alloc.reservedPlaces) ? alloc.reservedPlaces : [];
   const _placeLabel = (p) => {
     if (!p || typeof p !== 'object') return '?';
-    const _coach = p.coachNumber != null ? p.coachNumber : (p.coach != null ? p.coach : null);
-    const _num   = p.placeNumber != null ? p.placeNumber : (p.number != null ? p.number : (p.place != null ? p.place : null));
+    const _coach = p.coachNumber ?? p.coach ?? null;
+    const _num   = p.placeNumber ?? p.number ?? p.place ?? null;
     if (_coach != null && _num != null) return `coach ${_coach} place ${_num}`;
     if (_num != null) return `place ${_num}`;
     return JSON.stringify(p).slice(0, 40);
@@ -784,8 +788,9 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   // placeProperties, so this only runs (and only WARNS, never fails) when
   // both sides actually carry a value to compare.
   if (selAcc && Array.isArray(selAcc.placeProperties) && selAcc.placeProperties.length > 0) {
-    const _bookedProps = Array.isArray(alloc.placeProperties) ? alloc.placeProperties
-      : (Array.isArray(_resPlaces[0]?.placeProperties) ? _resPlaces[0].placeProperties : null);
+    let _bookedProps = null;
+    if (Array.isArray(alloc.placeProperties)) _bookedProps = alloc.placeProperties;
+    else if (Array.isArray(_resPlaces[0]?.placeProperties)) _bookedProps = _resPlaces[0].placeProperties;
     if (Array.isArray(_bookedProps)) {
       const _requestedSet = selAcc.placeProperties;
       const _matches = _requestedSet.some(p => _bookedProps.includes(p));
@@ -879,7 +884,8 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   let _submittedRefs = [];
   try {
     const _raw = bru.getEnvVar("bookingPassengerReferences");
-    _submittedRefs = _raw ? (Array.isArray(_raw) ? _raw : JSON.parse(_raw)) : [];
+    if (Array.isArray(_raw)) _submittedRefs = _raw;
+    else if (_raw) _submittedRefs = JSON.parse(_raw);
   } catch { _submittedRefs = []; }
   const _align = alignPassengerIdsToSubmittedOrder(booking.passengers, _submittedRefs);
   const passengerIdList = _align.ids;
@@ -910,9 +916,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // Each fallback emits a `[WARNING]` documenting the vendor deviation so the
   // tester can see in the report which shape was used.
   let _confirmDeadline = booking.confirmationTimeLimit || booking.confirmableUntil || null;
-  let _confirmSource   = booking.confirmationTimeLimit
-    ? 'booking.confirmationTimeLimit (OSDM-standard)'
-    : (booking.confirmableUntil ? 'booking.confirmableUntil (vendor extension at booking level)' : null);
+  let _confirmSource   = null;
+  if (booking.confirmationTimeLimit) _confirmSource = 'booking.confirmationTimeLimit (OSDM-standard)';
+  else if (booking.confirmableUntil) _confirmSource = 'booking.confirmableUntil (vendor extension at booking level)';
 
   // Fallback 3 — dig into bookingParts and pick the earliest confirmableUntil.
   if (!_confirmDeadline) {

@@ -77,9 +77,9 @@ function patchMultiPassengerResponse(response, passengerIndex) {
   });
   // G1: id must still be in the list from the original booking
   const _passengerIdListRaw = bru.getEnvVar("passengerIdList");
-  const _passengerIdList = _passengerIdListRaw
-    ? (Array.isArray(_passengerIdListRaw) ? _passengerIdListRaw : JSON.parse(_passengerIdListRaw))
-    : [];
+  let _passengerIdList = [];
+  if (Array.isArray(_passengerIdListRaw)) _passengerIdList = _passengerIdListRaw;
+  else if (_passengerIdListRaw) _passengerIdList = JSON.parse(_passengerIdListRaw);
   if (_passengerIdList.length > 0 && _passengerId) {
     test(`Passenger ${passengerIndex} - id unchanged after PATCH (still in booking passengerIdList)`, () => {
       expect(_passengerIdList).to.include(_passengerId,

@@ -389,9 +389,9 @@ function _maskHeaderValue(name, value) {
 }
 
 function _statusBadge(status) {
-  const cls = (status >= 200 && status < 300) ? 'badge-ok'
-            : (status >= 400)                  ? 'badge-err'
-            :                                    'badge-warn';
+  let cls = 'badge-warn';
+  if (status >= 200 && status < 300) cls = 'badge-ok';
+  else if (status >= 400) cls = 'badge-err';
   return `<span class="badge ${cls}">${_esc(status)}</span>`;
 }
 
@@ -441,21 +441,20 @@ function _requestBlock(r, i) {
   });
 
   // Color class: green = 0 failures, orange = ≤30%, red = >30%
-  const colorClass = (fCount === 0) ? 'rc-green'
-    : (failRate <= 0.30)            ? 'rc-orange'
-    :                                  'rc-red';
+  let colorClass = 'rc-red';
+  if (fCount === 0) colorClass = 'rc-green';
+  else if (failRate <= 0.30) colorClass = 'rc-orange';
 
   const rspTime = (r.responseTime != null && r.responseTime !== 0) ? r.responseTime + ' ms' : 'N/A';
 
   // Mini assertion badges shown in the title bar
+  const failBadge = fCount > 0 ? ` <span class="abadge abadge-fail">${fCount} ❌</span>` : '';
   const titleBadges = tCount > 0
-    ? `<span class="abadge abadge-ok">${pCount} ✅</span>${fCount > 0 ? ` <span class="abadge abadge-fail">${fCount} ❌</span>` : ''}`
+    ? `<span class="abadge abadge-ok">${pCount} ✅</span>${failBadge}`
     : '';
-  const rspCodeClass = (r.responseStatus >= 400 || fCount > 0)
-    ? 'rcode-err'
-    : (hasWarningLogs || (r.responseStatus >= 300 && r.responseStatus < 400))
-      ? 'rcode-warn'
-      : 'rcode-ok';
+  let rspCodeClass = 'rcode-ok';
+  if (r.responseStatus >= 400 || fCount > 0) rspCodeClass = 'rcode-err';
+  else if (hasWarningLogs || (r.responseStatus >= 300 && r.responseStatus < 400)) rspCodeClass = 'rcode-warn';
   const titleRspCode = `<span class="rcode ${rspCodeClass}">↩ Rsp-code: ${_esc(r.responseStatus)}</span>`;
 
   // Summary stats bar (always visible once expanded)
@@ -585,6 +584,12 @@ function _generateHtml(meta, requests) {
     || authReqs.some(r => r.responseStatus >= 200 && r.responseStatus < 300);
 
   const overallPass = authOk && osdmFailed === 0;
+  let overallClass = 'overall-fail';
+  if (overallPass) overallClass = 'overall-ok';
+  else if (!authOk) overallClass = 'overall-auth';
+  let overallText = `❌ ${osdmFailed} OSDM assertion(s) failed`;
+  if (!authOk) overallText = '🔐 Authentication failed — check credentials in your environment file';
+  else if (osdmFailed === 0) overallText = '✅ All OSDM assertions passed';
 
   // Derive unique run types present in this run (preserving display order)
    const _runTypeOrder = ['System Information', 'Common Requests', 'Refund', 'Exchange'];
@@ -629,8 +634,9 @@ function _generateHtml(meta, requests) {
         const rtTests  = rqs.reduce((s, r) => s + (r.testResults || []).length, 0);
         const rtPassed = rqs.reduce((s, r) => s + (r.testResults || []).filter(t => t.passed).length, 0);
         const rtFailed = rtTests - rtPassed;
+        const rtFailBadge = rtFailed > 0 ? ` <span class="abadge abadge-fail">${rtFailed} failed</span>` : '';
         const rtBadge  = rtTests > 0
-          ? `<span class="abadge abadge-ok">${rtPassed} passed</span>${rtFailed > 0 ? ` <span class="abadge abadge-fail">${rtFailed} failed</span>` : ''}`
+          ? `<span class="abadge abadge-ok">${rtPassed} passed</span>${rtFailBadge}`
           : '';
         return `
 <details class="section-details">
@@ -838,12 +844,8 @@ h1{color:#1a3a6b;margin:0 0 6px;font-size:22px}
   <div class="sc sf"><div class="n">${osdmFailed}</div><div class="l">Failed</div></div>
 </div>
 
-<div class="overall ${overallPass ? 'overall-ok' : (!authOk ? 'overall-auth' : 'overall-fail')}">
-  ${!authOk
-    ? '🔐 Authentication failed — check credentials in your environment file'
-    : (osdmFailed === 0
-        ? '✅ All OSDM assertions passed'
-        : `❌ ${osdmFailed} OSDM assertion(s) failed`)}
+<div class="overall ${overallClass}">
+  ${overallText}
 </div>
 
 <div class="legend">

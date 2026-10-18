@@ -53,12 +53,19 @@ function pickSchemaVersion(target, available) {
   return best || avail[0];
 }
 
+// The JSON type of a value, as a message names it: null and array apart.
+function jsonTypeOf(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
 // Recursively collect schema violations as readable "path: message" strings.
 function collectIssues(value, schema, path, issues) {
   if (!schema || typeof schema !== 'object') return;
   const t = schema.type;
   if (t && !isType(value, t)) {
-    issues.push(`${path}: expected ${t}, got ${value === null ? 'null' : (Array.isArray(value) ? 'array' : typeof value)}`);
+    issues.push(`${path}: expected ${t}, got ${jsonTypeOf(value)}`);
     return; // wrong type — can't recurse meaningfully
   }
   if (schema.enum && value != null && !schema.enum.includes(value)) {

@@ -870,13 +870,15 @@ function parseScenarioData(jsonData) {
                         ["true", "on", "yes"].includes(String(scenario.partialRefundByPax).toLowerCase()));
       bru.setEnvVar("partialRefundByLeg", _prByLeg ? "true" : "false");
       bru.setEnvVar("partialRefundByPax", _prByPax ? "true" : "false");
+      const _legDefault = _prByLeg ? "first" : "";  // default to first when armed
+      const _paxDefault = _prByPax ? "first" : "";
       bru.setEnvVar("partialRefundLegSelection",
         ["", "null", null, undefined].includes(scenario.partialRefundLegSelection)
-          ? (_prByLeg ? "first" : "")  // default to first when armed
+          ? _legDefault
           : String(scenario.partialRefundLegSelection));
       bru.setEnvVar("partialRefundPaxSelection",
         ["", "null", null, undefined].includes(scenario.partialRefundPaxSelection)
-          ? (_prByPax ? "first" : "")
+          ? _paxDefault
           : String(scenario.partialRefundPaxSelection));
       // #595: the refund of one whole fulfillment (first, last, outbound,
       // inbound), for providers that refund per fulfillment only.

@@ -395,8 +395,7 @@ function collectAvailablePlaces(vehicle, count) {
     // is kept only as a fallback for non-spec vendors. Reading the wrong field
     // produced an undefined coachNumber → the booking's SelectedPlace was missing
     // its required coachNumber and the vendor rejected it (#188).
-    const cn = (coach.number != null) ? coach.number
-             : (coach.coachNumber != null ? coach.coachNumber : null);
+    const cn = coach.number ?? coach.coachNumber ?? null;
     const places = placesOf(coach);
     for (let pi = 0; pi < places.length && out.length < want; pi++) {
       const p = places[pi];
@@ -451,7 +450,9 @@ function assertPlaceSelectionConsistency() {
   // spec's TripCoverage {coveredTripId, coveredLegIds} form (mirror of
   // offers.js offerTripCoverage, kept local to avoid a module dependency).
   const covRaw = offer.tripCoverage;
-  const covArr = Array.isArray(covRaw) ? covRaw : (covRaw ? [covRaw] : []);
+  let covArr = [];
+  if (Array.isArray(covRaw)) covArr = covRaw;
+  else if (covRaw) covArr = [covRaw];
   const coverage = [];
   covArr.forEach(c => {
     if (!c) return;

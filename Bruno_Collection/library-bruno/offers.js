@@ -264,9 +264,8 @@ function ensureAuthorizationOr403() {
     }
     // bru.sendRequest expects headers as array of {key, value} objects (Postman/Bruno format)
     const headersArray = Object.entries(resolvedHeaders).map(([key, value]) => ({ key, value }));
-    const bodyStr = resolvedBody
-      ? (typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody))
-      : undefined;
+    let bodyStr;
+    if (resolvedBody) bodyStr = typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody);
     bru.sendRequest({
       url: resolvedUrl,
       method: method,
@@ -1688,6 +1687,12 @@ function validateAncillaries(selectedOffer) {
   }
 }
 
+// A value as a list: itself when it is one, [] when absent, else a list of it.
+function asList(value) {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
+}
+
 // Function to extract all tripId and legId from tripLegCoverage for a given accommodationType
 // #371: coverage the OFFER declares (tripCoverage, object or array) -
 // normalized to [{tripId, legId}]. The authoritative source for booking
@@ -1695,7 +1700,7 @@ function validateAncillaries(selectedOffer) {
 // stays the fallback for providers that only set it there.
 function offerTripCoverage(selectedOffer) {
   const tc = selectedOffer?.tripCoverage;
-  const arr = Array.isArray(tc) ? tc : (tc ? [tc] : []);
+  const arr = asList(tc);
   const out = [];
   arr.forEach(c => {
     if (!c) return;

@@ -72,9 +72,9 @@ function planExpiredFlow(opts) {
   const hardDeadlineMs         = Number.parseInt(bru.getEnvVar('runHardDeadlineMs') || '0', 10) || 0;
   const perScenarioBudgetEndMs = maxWaitMinutes > 0 ? (nowMs + maxWaitMinutes * 60 * 1000) : 0;
   const budgetEndMs            = perScenarioBudgetEndMs || hardDeadlineMs || (nowMs + 480000);
-  const budgetSource           = perScenarioBudgetEndMs
-    ? `scenario maxWaitMinutes=${maxWaitMinutes}`
-    : (hardDeadlineMs ? 'server RUN_TIMEOUT_MS' : 'conservative 8-min fallback');
+  let budgetSource             = 'conservative 8-min fallback';
+  if (perScenarioBudgetEndMs) budgetSource = `scenario maxWaitMinutes=${maxWaitMinutes}`;
+  else if (hardDeadlineMs) budgetSource = 'server RUN_TIMEOUT_MS';
 
   if ((wakeAtMs + POST_MARGIN_MS) > budgetEndMs) {
     const needS   = Math.ceil((wakeAtMs + POST_MARGIN_MS - nowMs) / 1000);

@@ -38,7 +38,8 @@
  * }}
  */
 function effectiveRefundability(part, atMs, action = 'REFUND') {
-  const flag = part ? (action === 'EXCHANGE' ? part.exchangeable : part.refundable) : undefined;
+  let flag;
+  if (part) flag = action === 'EXCHANGE' ? part.exchangeable : part.refundable;
   const out = {
     effective: 'FLAG',
     flag: flag,

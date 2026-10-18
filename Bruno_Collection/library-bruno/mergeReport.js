@@ -70,11 +70,11 @@ const _isIterWrap = Array.isArray(bruRaw)
   && bruRaw[0]
   && Array.isArray(bruRaw[0].results);
 
-const bruResults = _isIterWrap                        ? bruRaw[0].results
-                 : Array.isArray(bruRaw)              ? bruRaw
-                 : Array.isArray(bruRaw.results)      ? bruRaw.results
-                 : Array.isArray(bruRaw.testResults)  ? bruRaw.testResults
-                 : [];
+let bruResults = [];
+if (_isIterWrap) bruResults = bruRaw[0].results;
+else if (Array.isArray(bruRaw)) bruResults = bruRaw;
+else if (Array.isArray(bruRaw.results)) bruResults = bruRaw.results;
+else if (Array.isArray(bruRaw.testResults)) bruResults = bruRaw.testResults;
 
 const bruSummary = (_isIterWrap ? bruRaw[0].summary : null) || bruRaw.summary || {};
 
@@ -315,7 +315,9 @@ function headerTable(hdrs) {
 }
 
 function statusBadge(s) {
-  const cls = (s >= 200 && s < 300) ? 'badge-ok' : (s >= 400) ? 'badge-err' : 'badge-warn';
+  let cls = 'badge-warn';
+  if (s >= 200 && s < 300) cls = 'badge-ok';
+  else if (s >= 400) cls = 'badge-err';
   return `<span class="badge ${cls}">${esc(s)}</span>`;
 }
 
@@ -379,17 +381,21 @@ function requestBlock(r) {
 
 // ─── Full HTML ─────────────────────────────────────────────────────────────────
 const humanDate = dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-const overallBannerClass = !authOk ? 'overall-auth' : failTests === 0 ? 'overall-ok' : 'overall-fail';
-const overallMsg = !authOk
-  ? '🔐 Authentication failed — check credentials in your environment file'
-  : failTests === 0
-    ? '✅ All assertions passed'
-    : `❌ ${failTests} assertion(s) failed`;
+let overallBannerClass = 'overall-fail';
+let overallMsg = `❌ ${failTests} assertion(s) failed`;
+if (!authOk) {
+  overallBannerClass = 'overall-auth';
+  overallMsg = '🔐 Authentication failed — check credentials in your environment file';
+} else if (failTests === 0) {
+  overallBannerClass = 'overall-ok';
+  overallMsg = '✅ All assertions passed';
+}
 
 const authSection = '';
 
+const osdmPlural = osdmReqs.length > 1 ? 's' : '';
 const osdmSection = osdmReqs.length > 0 ? `
-<div class="section-title">🚂 OSDM Scenario Steps (${osdmReqs.length} request${osdmReqs.length > 1 ? 's' : ''})</div>
+<div class="section-title">🚂 OSDM Scenario Steps (${osdmReqs.length} request${osdmPlural})</div>
 ${osdmReqs.map(requestBlock).join('\n')}` : `
 <div class="warn-box">⚠️ No OSDM steps were executed. Check that authentication succeeded and credentials are set in your environment file.</div>`;
 

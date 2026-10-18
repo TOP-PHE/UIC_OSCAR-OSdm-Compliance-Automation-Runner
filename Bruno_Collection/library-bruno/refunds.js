@@ -695,9 +695,9 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     refundFeeLabel = 'missing';
   } else {
     const amt = refundOffer.refundFee.amount;
-    const retention = (amt === 0) ? ' (= no carrier retention)'
-                    : (typeof amt === 'number') ? ' (= kept by carrier per OSDM)'
-                    : '';
+    let retention = '';
+    if (amt === 0) retention = ' (= no carrier retention)';
+    else if (typeof amt === 'number') retention = ' (= kept by carrier per OSDM)';
     refundFeeLabel = `${_priceShape(refundOffer.refundFee)}${retention}`;
   }
   test(`Refund offer[${index}] refundFee Price structure is well-formed — ${refundFeeLabel}`, () => {
@@ -972,8 +972,9 @@ function validateRefundAppliedOverruleCode(appliedOverruleCode, expectedOverrule
   // null`) on the omitter. Treat both as equivalent: the OSDM contract says
   // the field is optional and absent / null are semantically the same.
   const normalisedApplied = (appliedOverruleCode === undefined) ? null : appliedOverruleCode;
+  const actualCode = appliedOverruleCode === undefined ? 'undefined → treated as null' : JSON.stringify(appliedOverruleCode);
   const title = expectedOverruleCode === null
-    ? `AppliedOverruleCode is null as expected (actual: ${appliedOverruleCode === undefined ? 'undefined → treated as null' : JSON.stringify(appliedOverruleCode)})`
+    ? `AppliedOverruleCode is null as expected (actual: ${actualCode})`
     : `AppliedOverruleCode matches expected — expected: ${expectedOverruleCode}, actual: ${JSON.stringify(appliedOverruleCode)}`;
   test(title, () => {
     expect(normalisedApplied).to.equal(expectedOverruleCode);

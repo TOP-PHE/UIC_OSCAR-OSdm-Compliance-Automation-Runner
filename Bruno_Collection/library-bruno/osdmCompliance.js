@@ -33,6 +33,13 @@ http://www.apache.org/licenses/LICENSE-2.0
 // System-Information status classifier below.
 const { getComplianceVersion, endpointMinVersion, isEndpointApplicable } = require('./osdmVersion.js');
 
+// The JSON type of a value, as a message names it: null and array apart.
+function jsonTypeOf(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
 // ── Primitive JSON-Schema-style type check ──────────────────────────────
 function isType(value, type) {
   switch (type) {
@@ -90,7 +97,7 @@ function validateApiVersions(body) {
   checks.push({
     name: 'GET /versions → response is an array<ApiVersion>',
     ok: isArr,
-    message: isArr ? '' : `Expected a JSON array of ApiVersion objects, got ${body === null ? 'null' : typeof body}`,
+    message: isArr ? '' : `Expected a JSON array of ApiVersion objects, got ${jsonTypeOf(body)}`,
   });
   if (!isArr) return checks;
 
@@ -162,7 +169,7 @@ function validateOsdmCollection(body, spec) {
     checks.push({
       name: `GET ${ep} → response is an array<${spec.itemLabel}>`,
       ok: isArr,
-      message: isArr ? '' : `Expected a JSON array, got ${body === null ? 'null' : typeof body}`,
+      message: isArr ? '' : `Expected a JSON array, got ${jsonTypeOf(body)}`,
     });
     if (!isArr) return checks;
     items = body;
@@ -171,7 +178,7 @@ function validateOsdmCollection(body, spec) {
     checks.push({
       name: `GET ${ep} → response is a collection object`,
       ok: isObj,
-      message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+      message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
     });
     if (!isObj) return checks;
 
@@ -180,7 +187,7 @@ function validateOsdmCollection(body, spec) {
     checks.push({
       name: `GET ${ep} → "${spec.payloadKey}" is an array<${spec.itemLabel}>`,
       ok: isArr,
-      message: isArr ? '' : `Property "${spec.payloadKey}" should be an array, got ${arr === undefined ? 'undefined' : typeof arr}`,
+      message: isArr ? '' : `Property "${spec.payloadKey}" should be an array, got ${typeof arr}`,
     });
     if (!isArr) return checks;
     items = arr;
@@ -210,9 +217,10 @@ function validateOsdmCollection(body, spec) {
       // sample so the tester can open a concrete example.
       let message = '';
       if (bad.length > 0) {
+        const more = bad.length > 10 ? `, … +${bad.length - 10} more` : '';
         const where = bad.length === items.length
           ? `ALL ${items.length} ${spec.itemLabel} entries`
-          : `${bad.length} of ${items.length} ${spec.itemLabel} entries (index ${bad.slice(0, 10).join(', ')}${bad.length > 10 ? `, … +${bad.length - 10} more` : ''})`;
+          : `${bad.length} of ${items.length} ${spec.itemLabel} entries (index ${bad.slice(0, 10).join(', ')}${more})`;
         message = `${describe(field, type)} on ${where}.`;
       }
       checks.push({ name: label(field, type), ok: bad.length === 0, message });
@@ -292,7 +300,7 @@ function validateProductTags(body) {
   checks.push({
     name: `GET ${ep} → response is a ProductTagsResponse object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -351,7 +359,7 @@ function validateOsdmResource(body, spec) {
   checks.push({
     name: `GET ${ep} → response is a resource object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -488,7 +496,7 @@ function validatePlaceAvailability(body, ep = '/availabilities/place-map') {
   checks.push({
     name: `GET ${ep} → response is a PlaceAvailabilityResponse object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -548,7 +556,7 @@ function validateBookedOfferPartResponse(body, ep = '/bookings/{id}/booked-offer
   checks.push({
     name: `POST ${ep} → response is a BookedOfferPartResponse object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -718,9 +726,9 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
   const _bareNotSupportedStatus = [403, 404, 405, 500].includes(statusCode);
   if (statusCode === 501 || _saysUnsupported || _bareNotSupportedStatus) {
     const _title = _problem?.title ? ` ("${_problem.title}")` : '';
-    const _via = _saysUnsupported
-      ? `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`
-      : (statusCode === 501 ? 'HTTP 501 Not Implemented' : `HTTP ${statusCode}`);
+    let _via = `HTTP ${statusCode}`;
+    if (_saysUnsupported) _via = `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`;
+    else if (statusCode === 501) _via = 'HTTP 501 Not Implemented';
     // A clean, unambiguous signal (501, 404, or a confirming Problem body)
     // is INFO — the provider told us clearly. A bare 403/405/500 with no
     // confirming body is a WARNING — accepted as "not supported" per this
