@@ -18,8 +18,11 @@ One server that plays three providers, told apart by the first part of the path:
 | `beta` | `https://<simulator-host>/beta` | CHF | 3.7.0 | 2 minutes |
 | `gamma` | `https://<simulator-host>/gamma` | CZK | 3.8.0 | 15 minutes |
 
-The version is what each provider reports; the answers have the 3.8 shapes on
-all three. Since #824 the three providers offer the same functions (exchange,
+Each provider answers in the shapes of its own version (#833): `alpha` gives
+OSDM 3.6 answers, `beta` 3.7, `gamma` 3.8. Below 3.8, for example, a
+fulfilment holds its documents instead of naming them, and below 3.7 an
+offer has no `inboundTripCoverage`. The simulator's tests check every answer
+against the OSDM response schema of the provider's version. Since #824 the three providers offer the same functions (exchange,
 reservations and place selection, products and reduction cards, trip ids,
 documents, idempotency, the checks behind the negative tests…), so every
 reference scenario of the catalogue can be copied for and run on any of them.

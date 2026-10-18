@@ -33,6 +33,7 @@ const { buildTripCollection } = require('./osdm/trips');
 const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
 const exchanges = require('./osdm/exchanges');
 const persons = require('./osdm/persons');
+const { shapeAnswer } = require('./osdm/versionShapes');
 const variants = require('./osdm/variants');
 const { version: VERSION } = require('../package.json');
 
@@ -462,7 +463,8 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       res.end();
       return 204;
     }
-    sendJson(res, 200, answer);
+    // #833: built in OSDM 3.8 shapes, sent in those of the provider's version.
+    sendJson(res, 200, shapeAnswer(answer, provider.osdmVersion));
     return 200;
   }
 

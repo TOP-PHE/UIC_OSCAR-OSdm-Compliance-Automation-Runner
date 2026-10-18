@@ -48,7 +48,7 @@ test('offer parts without an admission: the usual offers, and a problem saying t
     code: 'PARAMETER_NOT_SUPPORTED',
     title: "Parameter 'offerSearchCriteria.requestedOfferParts' was ignored.",
     detail: 'No offer without an admission is sold (asked: RESERVATION); offers with admissions are given.',
-    pointers: ['offerSearchCriteria.requestedOfferParts'],
+    pointers: [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }],
   }]);
   for (const parts of [['ADMISSION'], ['ADMISSION', 'RESERVATION'], ['ALL'], ['UNKNOWN']]) {
     assert.equal(answer({ requestedOfferParts: parts }).problems, undefined, parts.join());

@@ -61,9 +61,10 @@ them.
 
 The simulator is a stub OSDM provider. It builds a trip from the request
 (no timetable: the same request gives the same trip and prices) and answers
-with OSDM 3.8 shapes on every provider. Since #824 the three providers offer
-the same functions; they differ by the version they report, their currency,
-their identifiers and their token lifetime:
+in the shapes of each provider's own OSDM version (#833: before, every
+provider answered in 3.8 shapes). Since #824 the three providers offer the
+same functions; they differ by their OSDM version, their currency, their
+identifiers and their token lifetime:
 
 | | `alpha` | `beta` | `gamma` |
 |---|---|---|---|

@@ -192,4 +192,4 @@ module.exports = { requestSchemas };
 
 if (require.main === module) main();
 
-module.exports = { forVersion, OPERATIONS };
+module.exports = { forVersion, OPERATIONS, compact, subtypesOf };

@@ -161,7 +161,9 @@ function categoryOf(service) {
   const text = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
   if (!text(asked?.shortName, 10)) return PRODUCT_CATEGORY;
   const out = { shortName: asked.shortName, name: text(asked.name, 60) ? asked.name : asked.shortName };
-  if (text(asked.productCategoryRef, MAX_REF_LENGTH)) out.productCategoryRef = asked.productCategoryRef;
+  // #833: OSDM requires the reference: the request's, else one of the simulator's.
+  out.productCategoryRef = text(asked.productCategoryRef, MAX_REF_LENGTH) ? asked.productCategoryRef
+    : `urn:x_osdm_simulator:product-category:${encodeURIComponent(asked.shortName)}`;
   return out;
 }
 
@@ -329,7 +331,7 @@ function offerPartsIgnored(criteria) {
     code: 'PARAMETER_NOT_SUPPORTED',
     title: "Parameter 'offerSearchCriteria.requestedOfferParts' was ignored.",
     detail: `No offer without an admission is sold (asked: ${parts.join(', ')}); offers with admissions are given.`,
-    pointers: ['offerSearchCriteria.requestedOfferParts'],
+    pointers: [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }],
   };
 }
 
@@ -550,7 +552,9 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
     summary: mixed ? `${product.summary}, first class where the train has one` : `${product.summary}, ${serviceClass.name} class`,
     offerSummary: {
       minimalPrice: price(total),
-      ...(mixed ? {} : { overallServiceClass: serviceClass, overallTravelClass: travelClass }),
+      // #833: overallServiceClass is required; a first class on some legs only has no overall travel class.
+      overallServiceClass: serviceClass,
+      ...(mixed ? {} : { overallTravelClass: travelClass }),
       overallFlexibility: flexibility.key,
     },
     createdOn,

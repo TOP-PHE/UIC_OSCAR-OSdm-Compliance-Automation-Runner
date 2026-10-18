@@ -112,7 +112,6 @@ function reservationsOfDirection(trip, { passengers, tariff, provider, createdOn
       summaryProductId: product.id,
       products: [{ productId: product.id, legIds: [leg.id] }],
       availableFulfillmentOptions: fulfillmentOptions,
-      isReservationRequired: false,
       supportedPlaceSelectionFlows: ['AUTOMATIC_PLACE_SELECTION'],
     };
     // #766 PR 3: a reservation on a trip with a place map takes the manual flows.
@@ -284,7 +283,6 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
     availableFulfillmentOptions: part.availableFulfillmentOptions,
     refundable: part.refundable,
     exchangeable: part.exchangeable,
-    isReservationRequired: false,
     placeAllocation: {
       accommodationType: 'SEAT',
       accommodationSubType: named?.compartment ? 'COMPARTMENT' : 'ANY_SEAT',

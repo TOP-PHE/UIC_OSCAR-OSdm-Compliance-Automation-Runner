@@ -155,6 +155,10 @@ describe('patchMultiPassengerResponse: a member the provider says it ignored (#7
       .toEqual(['dateofbirth', 'gender']);
     expect(ignoredParameters({ problems: [{ code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED', title: 'x', pointers: ['/passenger/dateOfBirth'] }] }))
       .toEqual(['dateofbirth']);
+    // #833: OSDM's pointers are ProblemPointer objects.
+    expect(ignoredParameters({ problems: [{ code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED', title: 'x',
+      pointers: [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }, { responsePointer: '#/booking/x' }, null, 7] }] }))
+      .toEqual(['requestedofferparts', 'x']);
     expect(ignoredParameters({ problems: [{ code: 'urn:uic:problem:PROPERTY_SUBSTITUTED', title: "The value of item 'type' has been changed." }] }))
       .toEqual([]);
     expect(ignoredParameters({})).toEqual([]);
