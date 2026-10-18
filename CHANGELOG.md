@@ -62,6 +62,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.340 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.375
+
+Issue #848 (PR 2). The AI Analysis page in three tabs, and the analysis asked step by step. Collection unchanged.
+
+### Changed
+- **Three tabs**, each with its own address (`#connection`, `#status`, `#analysis`). The page opens on Analysis when an AI service is set up, else on Connection.
+  - **Connection**: the access requests; the choice of one AI service for all (recommended) or one per provider, with the services the choice leaves unused; the service forms.
+  - **Usage status**: per company or provider, the access, the AI service and model it uses, the analyses and their cost, then the totals; below, what was spent per month and per model for the company or provider chosen.
+  - **Analysis**, step by step, each step shown once the one before is chosen:
+    1. the company or provider;
+    2. the test results, and optionally a later batch to compare;
+    3. the set-up checklist: keep the stored one or import a new one (without one stored: import one, or go on without);
+    4. language, model, preview and send.
+    The earlier analyses follow.
+- **After a checklist is imported or removed, the step is drawn again from what is stored.** A new import is selected as the one used, and step 4 opens.
+- **The usage status names no AI service for a company or provider whose access is not approved**, even when the service is shared.
+- User guide § 2.4 (AI analysis of results).
+
+### Default decisions (taken without asking)
+- **Spend per month and per model moved to the Usage status tab**, under the overview, for one company or provider at a time.
+- **With only one company or provider set up, step 1 is chosen for you.**
+- **A stored checklist is kept by default; without one, nothing is chosen**, so the person decides between importing one and going on without.
+
+---
+
 ## [server-1.11.339 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.374
 
 Issue #848 (PR 1). The AI analysis: one AI service for the company and all its providers, or one per provider; and an overview of what each uses and costs. Collection unchanged.

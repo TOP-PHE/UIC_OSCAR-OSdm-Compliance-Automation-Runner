@@ -192,7 +192,7 @@ describe('#848 the overview', () => {
     expect(Object.keys(byName)).toEqual(['Setup Co', 'Alpha', 'Beta']);
     expect(byName['Setup Co']).toMatchObject({ provider: false, access: 'approved', service: { connector: 'anthropic', model: 'claude-opus-5-5', of: { id: companyId, name: 'Setup Co' } }, analyses: 1, tokens: 1200 });
     expect(byName.Alpha).toMatchObject({ provider: true, access: 'approved', service: { model: 'claude-opus-5-5', of: { name: 'Setup Co' } }, analyses: 3, unpriced: 1 });
-    expect(byName.Beta).toMatchObject({ access: 'none', analyses: 1, unpriced: 0 });
+    expect(byName.Beta).toMatchObject({ access: 'none', service: null, analyses: 1, unpriced: 0 });   // shared, but no access: no service
     expect(byName.Beta.cost).toBeGreaterThan(0);
     expect(res.body.totals.analyses).toBe(5);
     expect(res.body.totals.tokens).toBe(res.body.targets.reduce((n, t) => n + t.tokens, 0));

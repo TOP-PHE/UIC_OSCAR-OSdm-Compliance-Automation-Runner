@@ -24,6 +24,11 @@
  * side, the cost of each and what was spent, a suggested limit and instruction.
  * #833 PR D: the faults a simulator batch asked for, detected or not, and an
  * analysis scored against them (`faultReportHtml(r)`, pure).
+ * #848: three tabs (`tabsHtml`, the address's #connection / #status /
+ * #analysis): Connection (access, one service for all or one per provider
+ * with `setupHtml`, the service forms), Usage status (`overviewHtml`, then the
+ * spend of one company or provider), Analysis (`analysisTabHtml`), asked step
+ * by step: target, batch, checklist (keep or import, `checklistHtml`), send.
  */
 
 const NOTE = 'padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.5;margin-bottom:14px;';
@@ -201,57 +206,141 @@ function testResultHtml(test) {
 const OWNER_LABEL = { provider: 'Provider', oscar: 'OSCAR', configuration: 'Configuration', unclear: 'Unclear' };
 const OWNER_STYLE = { provider: 'background:#fff3e0;color:#e65100', oscar: 'background:#e3f2fd;color:#0d47a1', configuration: 'background:#f3e5f5;color:#6a1b9a', unclear: 'background:#eceff1;color:#455a64' };
 
-/** The analysis card: where, which batches, which language. Filled by loadAnalysisTarget(). */
-function analysisPanelHtml(targets) {
-  if (!targets.length) return '';
+// ── #848: three tabs ─────────────────────────────────────────────────────────
+
+const TABS = Object.freeze([['connection', 'Connection'], ['status', 'Usage status'], ['analysis', 'Analysis']]);
+
+/** The tab bar: one button per tab, `active` pressed. */
+function tabsHtml(active) {
+  const buttons = TABS.map(([id, label]) => `<button class="btn${id === active ? ' btn-primary' : ''}" role="tab" data-ai-tab="${id}"
+    aria-selected="${id === active ? 'true' : 'false'}" aria-controls="ai-panel-${id}">${label}</button>`).join('');
+  return `<div role="tablist" aria-label="AI analysis" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${buttons}</div>`;
+}
+
+/** One service for all, or one per provider (#848), and the stored services the choice does not use. */
+function setupHtml(setup) {
+  if (!setup) return '';
+  const radio = (value, title, text) => `<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:8px 0;cursor:pointer">
+      <input type="radio" name="ai-mode" value="${value}" data-ai-action="mode"${setup.mode === value ? ' checked' : ''} style="width:auto;margin-top:3px">
+      <span><strong>${title}</strong><br><span style="color:#546e7a">${text}</span></span></label>`;
+  const unused = (setup.services || []).filter(x => !x.inUse);
+  const keptNames = unused.map(x => esc(x.company.name) + ' (' + esc(x.model) + ')').join(', ');
+  const kept = unused.length
+    ? `<div style="font-size:12px;color:#78909c;margin-top:8px">Kept but not used with this choice: ${keptNames}.</div>`
+    : '';
+  return `<div class="card" style="padding:16px 20px">
+    <h3 style="margin:0 0 4px">How the AI service is used</h3>
+    <div style="font-size:12px;color:#78909c">Your choice, for ${esc(setup.company?.name || 'your company')} and its providers. Access is still approved for each one.</div>
+    ${radio('shared', 'One AI service for all (recommended)', 'One service, one key and one monthly limit, used for the company and every provider whose access is approved.')}
+    ${radio('per_provider', 'One AI service per provider', 'When an agreement with a provider names another AI service: each company or provider has its own.')}
+    ${kept}
+  </div>`;
+}
+
+const ACCESS_LABEL = Object.freeze({ approved: 'Approved', pending: 'Waiting for an administrator', needs_acceptance: 'Text to accept again',
+  refused: 'Refused', revoked: 'Withdrawn', none: 'Not asked' });
+const CONNECTOR_LABEL = Object.freeze({ anthropic: 'Anthropic', openai_compatible: 'OpenAI-compatible' });
+
+// The AI service a row uses, in words: "Anthropic · model", and whose it is when shared.
+function serviceCellHtml(t) {
+  if (!t.service) return '<span style="color:#90a4ae">none</span>';
+  const kind = CONNECTOR_LABEL[t.service.connector] || t.service.connector;
+  const shared = t.service.of && t.service.of.id !== t.id ? `<br><span style="font-size:11px;color:#78909c">shared, from ${esc(t.service.of.name)}</span>` : '';
+  return `${esc(kind)} · ${esc(t.service.model)}${shared}`;
+}
+
+/** The usage status (#848): per company or provider, its access, AI service, analyses and cost; then the totals. */
+function overviewHtml(o) {
+  const costCell = (t) => esc(usd(t.cost)) + (t.unpriced ? ' (' + esc(t.unpriced) + ' without a price)' : '');
+  const rows = (o.targets || []).map(t => `<tr><td style="${CELL}">${esc(t.name)}<br><span style="font-size:11px;color:#78909c">${t.provider ? 'Provider' : 'Company'}</span></td>
+    <td style="${CELL}">${esc(ACCESS_LABEL[t.access] || t.access)}</td><td style="${CELL}">${serviceCellHtml(t)}</td>
+    <td style="${CELL}">${esc(t.analyses)}</td><td style="${CELL}">${esc(Number(t.tokens).toLocaleString('en'))}</td>
+    <td style="${CELL}">${costCell(t)}</td></tr>`).join('');
+  const s = o.totals || {};
+  const total = `<tr style="font-weight:600"><td style="${CELL}">Total</td><td style="${CELL}"></td><td style="${CELL}"></td>
+    <td style="${CELL}">${esc(s.analyses ?? 0)}</td><td style="${CELL}">${esc(Number(s.tokens ?? 0).toLocaleString('en'))}</td><td style="${CELL}">${esc(usd(s.cost ?? 0))}</td></tr>`;
+  const mode = o.mode === 'per_provider' ? 'one AI service per provider' : 'one AI service for all';
+  return `<div class="card" style="padding:16px 20px">
+    <h3 style="margin:0 0 4px">AI services and use</h3>
+    <div style="font-size:12px;color:#78909c;margin-bottom:10px">Your choice: ${mode}. The analyses are every Test Manager's, at the model's list price in US dollars:
+      an estimate, the AI service's invoice is what counts.</div>
+    <div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">
+      <thead><tr><th style="${CELL}">Company or provider</th><th style="${CELL}">Access</th><th style="${CELL}">AI service</th>
+        <th style="${CELL}">Analyses</th><th style="${CELL}">Tokens</th><th style="${CELL}">Cost</th></tr></thead>
+      <tbody>${rows}${total}</tbody></table></div>
+  </div>`;
+}
+
+/**
+ * The analysis tab (#848): the company or provider first, then its test
+ * results, then the checklist, then the request. Each step is shown once the
+ * one before is chosen (filled by the page's wiring).
+ */
+function analysisTabHtml(targets) {
+  if (!targets.length) {
+    return `<div style="${NOTE}${INFO}">No company or provider has an AI service yet: set one up in the Connection tab.</div>`;
+  }
   const options = targets.map(t => `<option value="${esc(t.id)}" data-provider="${t.provider ? '1' : ''}">${esc(t.name)}</option>`).join('');
   return `<div class="card" style="padding:16px 20px" id="ai-analysis">
     <h3 style="margin:0 0 4px">Analyse results</h3>
     <div style="font-size:12px;color:#78909c">One batch: what failed, grouped by probable cause. Two batches: what is fixed, still failing or new.
       You see exactly what will be sent before anything leaves OSCAR.</div>
-    <label for="ai-an-target" style="${FIELD}">Company or provider</label>
-    <select id="ai-an-target" data-ai-action="an-target" style="${WIDE}">${options}</select>
-    <div id="ai-an-checklist" style="margin-top:10px"></div>
-    <label for="ai-an-a" style="${FIELD}">Batch</label>
-    <select id="ai-an-a" style="${WIDE}"></select>
-    <label for="ai-an-b" style="${FIELD}">Compare with a later batch (optional)</label>
-    <select id="ai-an-b" style="${WIDE}"></select>
-    <label for="ai-an-lang" style="${FIELD}">Language of the answer</label>
-    <select id="ai-an-lang" style="${WIDE}"></select>
-    <label for="ai-an-model" style="${FIELD}">Model for this analysis</label>
-    <select id="ai-an-model" style="${WIDE}"></select>
-    <div style="font-size:11px;color:#90a4ae;margin-top:3px">Analyse the same batch with another model to compare the answers: tick two in the list below.</div>
-    <div style="margin-top:12px"><button class="btn" data-ai-action="an-preview">See what will be sent</button>
-      <button class="btn" data-ai-action="an-faults" title="For a batch run on the OSDM simulator with faults asked for (simulatorFaults). Reads the runs only: no AI call.">Faults detected in this batch</button></div>
+    <label for="ai-an-target" style="${FIELD}">1. The company or provider to validate</label>
+    <select id="ai-an-target" data-ai-action="an-target" style="${WIDE}"><option value="">— choose —</option>${options}</select>
+    <div id="ai-an-step-batch" hidden>
+      <label for="ai-an-a" style="${FIELD}">2. The test results (batch)</label>
+      <select id="ai-an-a" data-ai-action="an-batch" style="${WIDE}"></select>
+      <label for="ai-an-b" style="${FIELD}">Compare with a later batch (optional)</label>
+      <select id="ai-an-b" style="${WIDE}"></select>
+    </div>
+    <div id="ai-an-step-checklist" hidden>
+      <div style="${FIELD}">3. The provider's set-up checklist</div>
+      <div id="ai-an-checklist"></div>
+    </div>
+    <div id="ai-an-step-send" hidden>
+      <label for="ai-an-lang" style="${FIELD}">4. Language of the answer</label>
+      <select id="ai-an-lang" style="${WIDE}"></select>
+      <label for="ai-an-model" style="${FIELD}">Model for this analysis</label>
+      <select id="ai-an-model" style="${WIDE}"></select>
+      <div style="font-size:11px;color:#90a4ae;margin-top:3px">Analyse the same batch with another model to compare the answers: tick two in the list below.</div>
+      <div style="margin-top:12px"><button class="btn btn-primary" data-ai-action="an-preview">See what will be sent</button>
+        <button class="btn" data-ai-action="an-faults" title="For a batch run on the OSDM simulator with faults asked for (simulatorFaults). Reads the runs only: no AI call.">Faults detected in this batch</button></div>
+    </div>
     <div id="ai-an-preview" style="margin-top:12px"></div>
     <div id="ai-an-faults" style="margin-top:12px"></div>
     <div id="ai-an-result" style="margin-top:12px"></div>
-    <h4 style="margin:18px 0 6px">Earlier analyses</h4>
-    <div id="ai-an-history" style="font-size:13px"></div>
-    <div id="ai-an-compare" style="margin-top:12px"></div>
-    <h4 style="margin:18px 0 6px">Spent on AI analysis</h4>
-    <div id="ai-an-spend" style="font-size:13px"></div>
+    <div id="ai-an-history-section" hidden>
+      <h4 style="margin:18px 0 6px">Earlier analyses</h4>
+      <div id="ai-an-history" style="font-size:13px"></div>
+      <div id="ai-an-compare" style="margin-top:12px"></div>
+    </div>
   </div>`;
 }
 
 /**
- * The provider's set-up checklist (#827): what was imported, what the model
- * is told of it, and the buttons to import another or remove it.
+ * The provider's set-up checklist (#827), as a choice (#848): keep the stored
+ * one (what it is, what the model is told) or import a new one; without one
+ * stored, import one or go on without. The file field shows for an import.
  */
 function checklistHtml(c) {
-  const input = `<label for="ai-an-checklist-file" style="${FIELD}">Import the filled set-up checklist (.docx)</label>
-    <input id="ai-an-checklist-file" type="file" accept=".docx" data-ai-action="an-checklist-file" style="${WIDE}">`;
+  const choice = (value, text, checked) => `<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:6px 0;cursor:pointer">
+      <input type="radio" name="ai-an-cl" value="${value}" data-ai-action="an-checklist-choice"${checked ? ' checked' : ''} style="width:auto;margin-top:3px"><span>${text}</span></label>`;
+  const file = `<div id="ai-an-checklist-import" hidden>
+    <label for="ai-an-checklist-file" style="${FIELD}">The filled set-up checklist (.docx)</label>
+    <input id="ai-an-checklist-file" type="file" accept=".docx" data-ai-action="an-checklist-file" style="${WIDE}"></div>`;
   if (!c) {
     return `<div style="font-size:12px;color:#78909c">Provider context: <strong>no checklist imported.</strong>
-      The model is told the provider's answers to OSCAR's set-up checklist when one is imported: what it does not do, its test data, its remarks.</div>${input}`;
+      The model is told the provider's answers to OSCAR's set-up checklist when one is imported: what it does not do, its test data, its remarks.</div>
+      ${choice('new', 'Import a checklist', false)}${choice('none', 'Go on without a checklist', false)}${file}`;
   }
   const by = c.importedBy ? ' by ' + esc(c.importedBy) : '';
   const cut = c.cut ? `, ${esc(c.cut)} left out for size` : '';
-  const sent = `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">What the model is told (${esc(Object.keys(c.sent || {}).length)} answers${cut})</summary>
+  const sent = `<details style="margin:4px 0 0 26px"><summary style="cursor:pointer;font-size:12px">What the model is told (${esc(Object.keys(c.sent || {}).length)} answers${cut})</summary>
     <pre style="white-space:pre-wrap;font-size:11px;max-height:240px;overflow:auto;background:#fafafa;padding:8px;border:1px solid #eceff1">${esc(JSON.stringify(c.sent || {}, null, 1))}</pre></details>`;
-  return `<div style="font-size:12px;color:#37474f">Provider context: checklist <strong>${esc(c.fileName || '')}</strong>, ${esc(c.answers)} answers,
-    imported ${esc(c.importedAt)}${by}. API Config and contact answers are never kept.
-    <button class="btn" data-ai-action="an-checklist-remove" style="margin-left:6px">Remove</button></div>${sent}${input}`;
+  const stored = `Use the stored checklist: <strong>${esc(c.fileName || '')}</strong>, ${esc(c.answers)} answers, imported ${esc(c.importedAt)}${by}`;
+  return `${choice('keep', stored, true)}${sent}${choice('new', 'Import a new checklist, which replaces it', false)}${file}
+    <div style="font-size:11px;color:#90a4ae;margin-top:4px">API Config and contact answers are never kept.
+      <button class="btn" data-ai-action="an-checklist-remove" style="margin-left:6px">Remove the stored checklist</button></div>`;
 }
 
 function batchLabel(b) {
@@ -526,15 +615,80 @@ async function servicesHtml(targets) {
   return serviceSections(approved, answers).map(x => serviceHtml(x.target, x.answer, x.n)).join('');
 }
 
+const TAB_IDS = new Set(TABS.map(([id]) => id));
+let setup = null;
+
+// The tab the address names (#connection, #status, #analysis), else null.
+function tabFromHash() {
+  const asked = (window.location.hash || '').slice(1);
+  return TAB_IDS.has(asked) ? asked : null;
+}
+
+async function readSetup() {
+  const res = await fetch('/v1/company/ai-analysis/setup');
+  return res.ok ? res.json() : null;
+}
+
 async function load() {
   const root = document.getElementById('ai-root');
   const res = await fetch('/v1/company/ai-analysis/access');
   document.getElementById('loading').style.display = 'none';
   if (!res.ok) { show(await readError(res, 'Could not read your access.'), 'error'); return; }
   current = await res.json();
-  root.innerHTML = accessHtml(current) + await servicesHtml(current.targets || []) + analysisPanelHtml(current.configured || []);
+  const anyApproved = (current.targets || []).some(t => t.state === 'approved');
+  setup = anyApproved ? await readSetup() : null;
+  const services = await servicesHtml(current.targets || []);
+  const panel = (id, html) => `<div role="tabpanel" id="ai-panel-${id}" data-ai-panel="${id}" hidden>${html}</div>`;
+  root.innerHTML = '<div id="ai-tabs"></div>'
+    + panel('connection', accessHtml(current) + (anyApproved ? setupHtml(setup) : '') + services)
+    + panel('status', '<div id="ai-status">⏳ Loading…</div><div class="card" style="padding:16px 20px" id="ai-spend-card"></div>')
+    + panel('analysis', analysisTabHtml(current.configured || []));
   root.style.display = 'block';
-  if ((current.configured || []).length) await loadAnalysisTarget().catch(err => show(err.message, 'error'));
+  await showTab(tabFromHash() || ((current.configured || []).length ? 'analysis' : 'connection'));
+}
+
+async function showTab(tab) {
+  document.getElementById('ai-tabs').innerHTML = tabsHtml(tab);
+  for (const el of document.querySelectorAll('[data-ai-panel]')) el.hidden = el.dataset.aiPanel !== tab;
+  if (window.location.hash !== '#' + tab) window.history.replaceState(null, '', '#' + tab);
+  if (tab === 'status') await loadStatus();
+  if (tab === 'analysis') {
+    const sel = document.getElementById('ai-an-target');
+    // One company or provider only: nothing to choose.
+    if (sel && !sel.value && sel.options.length === 2) { sel.selectedIndex = 1; await loadAnalysisTarget(); }
+  }
+}
+
+async function changeMode(mode) {
+  const res = await fetch('/v1/company/ai-analysis/setup', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+  if (!res.ok) { show(await readError(res, 'The choice could not be saved.'), 'error'); return; }
+  show(mode === 'shared' ? 'One AI service for all: saved.' : 'One AI service per provider: saved.', 'ok');
+  await load();
+}
+
+// ── Usage status (#848) ──────────────────────────────────────────────────────
+
+let statusTargets = [];
+
+async function loadStatus() {
+  const box = document.getElementById('ai-status');
+  const res = await fetch('/v1/company/ai-analysis/overview');
+  if (!res.ok) { box.innerHTML = testResultHtml({ ok: false, error: await readError(res, 'Could not read the usage status.') }); return; }
+  const o = await res.json();
+  box.innerHTML = overviewHtml(o);
+  statusTargets = o.targets || [];
+  const options = statusTargets.map(t => `<option value="${esc(t.id)}" data-provider="${t.provider ? '1' : ''}">${esc(t.name)}</option>`).join('');
+  document.getElementById('ai-spend-card').innerHTML = `<h3 style="margin:0 0 4px">Spent per month and per model</h3>
+    <label for="ai-spend-target" style="${FIELD}">Company or provider</label>
+    <select id="ai-spend-target" data-ai-action="spend-target" style="${WIDE}">${options}</select>
+    <div id="ai-an-spend" style="font-size:13px;margin-top:10px"></div>`;
+  await loadSpend();
+}
+
+function spendHeaders() {
+  const sel = document.getElementById('ai-spend-target');
+  const opt = sel?.options[sel.selectedIndex];
+  return { 'X-Provider-Id': opt?.dataset.provider ? sel.value : '' };
 }
 
 function fieldsOf(section) {
@@ -641,20 +795,50 @@ function analysisHeaders(extra = {}) {
   return { ...extra, 'X-Provider-Id': opt?.dataset.provider ? sel.value : '' };
 }
 
+// Show or hide one step of the analysis tab.
+function step(id, visible) {
+  const el = document.getElementById(id);
+  if (el) el.hidden = !visible;
+}
+
+function clearAnalysisOutput() {
+  previewed = null;
+  for (const id of ['ai-an-preview', 'ai-an-result', 'ai-an-faults']) document.getElementById(id).innerHTML = '';
+}
+
+// Step 1 chosen (or changed): its test results, models and history; the later steps wait.
 async function loadAnalysisTarget() {
-  document.getElementById('ai-an-preview').innerHTML = '';
-  document.getElementById('ai-an-result').innerHTML = '';
+  clearAnalysisOutput();
+  document.getElementById('ai-an-compare').innerHTML = '';
+  for (const id of ['ai-an-step-batch', 'ai-an-step-checklist', 'ai-an-step-send', 'ai-an-history-section']) step(id, false);
+  if (!document.getElementById('ai-an-target').value) return;
   const res = await fetch('/v1/company/ai-analysis/batches', { headers: analysisHeaders() });
   if (!res.ok) { show(await readError(res, 'Could not read the batches.'), 'error'); return; }
   const data = await res.json();
-  document.getElementById('ai-an-a').innerHTML = batchOptionsHtml(data.batches || [], false);
-  document.getElementById('ai-an-b').innerHTML = batchOptionsHtml(data.batches || [], true);
+  const batches = data.batches || [];
+  document.getElementById('ai-an-a').innerHTML = `<option value="">${batches.length ? '— choose the test results —' : 'No test results yet'}</option>${batchOptionsHtml(batches, false)}`;
+  document.getElementById('ai-an-b').innerHTML = batchOptionsHtml(batches, true);
   document.getElementById('ai-an-lang').innerHTML = (data.languages || ['English']).map(l => `<option>${esc(l)}</option>`).join('');
-  document.getElementById('ai-an-compare').innerHTML = '';
+  step('ai-an-step-batch', true);
+  step('ai-an-history-section', true);
   await loadModels();
-  await loadChecklist();
   await loadHistory();
-  await loadSpend();
+}
+
+// Step 2 chosen: the checklist question; step 4 once it is answered.
+async function batchChosen() {
+  clearAnalysisOutput();
+  const chosen = !!document.getElementById('ai-an-a').value;
+  step('ai-an-step-checklist', chosen);
+  step('ai-an-step-send', false);
+  if (chosen) await loadChecklist();
+}
+
+// Step 3 answered: keep or go on without → step 4; import → the file field first.
+function checklistChoice(value) {
+  step('ai-an-checklist-import', value === 'new');
+  step('ai-an-step-send', value === 'keep' || value === 'none');
+  clearAnalysisOutput();
 }
 
 /** The models an analysis may use (#831): the configured one first, then the list for Anthropic. */
@@ -671,7 +855,7 @@ async function loadModels() {
 }
 
 async function loadSpend() {
-  const res = await fetch('/v1/company/ai-analysis/spend', { headers: analysisHeaders() });
+  const res = await fetch('/v1/company/ai-analysis/spend', { headers: spendHeaders() });
   const el = document.getElementById('ai-an-spend');
   el.innerHTML = res.ok ? spendHtml(await res.json()) : esc(await readError(res, 'Could not read what was spent.'));
 }
@@ -691,12 +875,17 @@ async function showSideBySide() {
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// The checklist question of step 3, for the stored checklist or none; a stored one is kept by default.
 async function loadChecklist() {
   const el = document.getElementById('ai-an-checklist');
   const res = await fetch('/v1/company/ai-analysis/checklist', { headers: analysisHeaders() });
-  el.innerHTML = res.ok ? checklistHtml((await res.json()).checklist) : esc(await readError(res, 'Could not read the checklist.'));
+  if (!res.ok) { el.innerHTML = esc(await readError(res, 'Could not read the checklist.')); return; }
+  const { checklist } = await res.json();
+  el.innerHTML = checklistHtml(checklist);
+  checklistChoice(checklist ? 'keep' : '');
 }
 
+// #848: after an import the whole step is drawn again from what is stored now, and kept.
 async function importChecklist(input) {
   const file = input.files?.[0];
   if (!file) return;
@@ -705,19 +894,15 @@ async function importChecklist(input) {
   const res = await fetch('/v1/company/ai-analysis/checklist', { method: 'POST', headers: analysisHeaders(), body: form });
   if (!res.ok) { show(await readError(res, 'The checklist could not be imported.'), 'error'); input.value = ''; return; }
   const { checklist } = await res.json();
-  show(`Checklist imported: ${checklist.answers} answers.`, 'ok');
-  previewed = null;
-  document.getElementById('ai-an-preview').innerHTML = '';
-  document.getElementById('ai-an-checklist').innerHTML = checklistHtml(checklist);
+  show(`Checklist imported: ${checklist.answers} answers. It is the one used now.`, 'ok');
+  await loadChecklist();
 }
 
 async function removeChecklist() {
-  if (!confirm('Remove the imported checklist? The model will no longer be told its answers.')) return;
+  if (!confirm('Remove the stored checklist? The model will no longer be told its answers.')) return;
   const res = await fetch('/v1/company/ai-analysis/checklist', { method: 'DELETE', headers: analysisHeaders() });
   if (!res.ok) { show(await readError(res, 'The checklist could not be removed.'), 'error'); return; }
   show('Checklist removed.', 'ok');
-  previewed = null;
-  document.getElementById('ai-an-preview').innerHTML = '';
   await loadChecklist();
 }
 
@@ -738,8 +923,9 @@ function analysisChoice() {
 
 async function previewAnalysis() {
   const box = document.getElementById('ai-an-preview');
-  box.innerHTML = '⏳ Reading the results…';
   const choice = analysisChoice();
+  if (!choice.batches[0]) { box.innerHTML = testResultHtml({ ok: false, error: 'Choose the test results first.' }); return; }
+  box.innerHTML = '⏳ Reading the results…';
   const res = await fetch('/v1/company/ai-analysis/preview', { method: 'POST', headers: analysisHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(choice) });
   if (!res.ok) { box.innerHTML = testResultHtml({ ok: false, error: await readError(res, 'The preview failed.') }); return; }
   const p = await res.json();
@@ -795,7 +981,6 @@ async function runAnalysis() {
   previewed = null;
   await followAnalysis(id, 120);
   await loadHistory();
-  await loadSpend();
 }
 
 // Show a running analysis every 3 s until it ends, at most `left` more times.
@@ -807,9 +992,19 @@ async function followAnalysis(id, left) {
 }
 
 document.addEventListener('change', (e) => {
-  if (e.target.closest('[data-ai-action="an-target"]')) loadAnalysisTarget().catch(err => show(err.message, 'error'));
-  else if (e.target.closest('[data-ai-action="an-checklist-file"]')) importChecklist(e.target).catch(err => show(err.message, 'error'));
-  else if (e.target.closest('#ai-an-a, #ai-an-b, #ai-an-lang, #ai-an-model')) { previewed = null; document.getElementById('ai-an-preview').innerHTML = ''; }
+  const fail = (err) => show(err.message, 'error');
+  const action = e.target.closest('[data-ai-action]')?.dataset.aiAction;
+  if (action === 'an-target') loadAnalysisTarget().catch(fail);
+  else if (action === 'an-batch') batchChosen().catch(fail);
+  else if (action === 'an-checklist-choice') checklistChoice(e.target.value);
+  else if (action === 'an-checklist-file') importChecklist(e.target).catch(fail);
+  else if (action === 'mode') changeMode(e.target.value).catch(fail);
+  else if (action === 'spend-target') loadSpend().catch(fail);
+  else if (e.target.closest('#ai-an-b, #ai-an-lang, #ai-an-model')) clearAnalysisOutput();
+});
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-ai-tab]');
+  if (tab) showTab(tab.dataset.aiTab).catch(err => show(err.message, 'error'));
 });
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-side"], [data-ai-action="an-faults"]');

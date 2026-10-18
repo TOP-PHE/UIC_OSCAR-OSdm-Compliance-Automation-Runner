@@ -126,16 +126,18 @@ describe('#801 PR 3 the page', () => {
   };
   const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
-  const names = ['analysisPanelHtml', 'batchLabel', 'batchOptionsHtml', 'usd', 'estimateText', 'previewHtml', 'listHtml', 'groupRowHtml', 'comparisonHtml',
+  const names = ['analysisTabHtml', 'batchLabel', 'batchOptionsHtml', 'usd', 'estimateText', 'previewHtml', 'listHtml', 'groupRowHtml', 'comparisonHtml',
     'resultHtml', 'inputLetters', 'historyHtml', 'sideBySideHtml', 'spendRow', 'spendHtml', 'priceText', 'analysisModelOptionsHtml'];
   vm.runInContext(`${consts}\n${names.map(lift).join('\n')}\n${names.map(n => `this.${n} = ${n};`).join('\n')}`, ctx);
 
-  test('the panel lists the configured targets, escaped, with labelled fields', () => {
-    const html = ctx.analysisPanelHtml([{ id: 'own', name: 'Acme <b>', provider: false }, { id: 'p1', name: 'Beta', provider: true }]);
+  test('the analysis tab lists the configured targets after a choose line, escaped, with labelled fields; later steps hidden', () => {
+    const html = ctx.analysisTabHtml([{ id: 'own', name: 'Acme <b>', provider: false }, { id: 'p1', name: 'Beta', provider: true }]);
     expect(html).toContain('Acme &lt;b&gt;');
+    expect(html).toContain('<option value="">— choose —</option><option value="own" data-provider="">');
     expect(html).toContain('<option value="p1" data-provider="1">');
     for (const id of ['ai-an-target', 'ai-an-a', 'ai-an-b', 'ai-an-lang', 'ai-an-model']) expect(html).toContain(`<label for="${id}"`);
-    expect(ctx.analysisPanelHtml([])).toBe('');
+    for (const id of ['ai-an-step-batch', 'ai-an-step-checklist', 'ai-an-step-send', 'ai-an-history-section']) expect(html).toContain(`id="${id}" hidden`);
+    expect(ctx.analysisTabHtml([])).toContain('Connection tab');
   });
 
   test('the preview shows the counts, the size, the monthly use and exactly what is sent, escaped', () => {
@@ -185,12 +187,13 @@ describe('#801 PR 3 the page', () => {
   });
 
   test('every analysis request names the company or provider of the card', () => {
-    for (const url of ['/v1/company/ai-analysis/batches', '/v1/company/ai-analysis/history', '/v1/company/ai-analysis/preview', '/v1/company/ai-analysis/run',
-      '/v1/company/ai-analysis/spend']) {
+    for (const url of ['/v1/company/ai-analysis/batches', '/v1/company/ai-analysis/history', '/v1/company/ai-analysis/preview', '/v1/company/ai-analysis/run']) {
       const line = lines.find(l => l.includes(`fetch('${url}'`));
       expect(line).toContain('analysisHeaders(');
     }
     expect(lines.filter(l => l.includes("fetch('/v1/company/ai-analysis/config', { headers: analysisHeaders() })"))).toHaveLength(1);
+    // #848: the spend table names the company or provider chosen in the status tab.
+    expect(lines.find(l => l.includes("fetch('/v1/company/ai-analysis/spend'"))).toContain('spendHeaders()');
   });
 });
 
@@ -232,12 +235,22 @@ describe('#827 PR A the provider\'s context', () => {
     const none = ctx.checklistHtml(null);
     expect(none).toContain('no checklist imported');
     expect(none).toContain('<label for="ai-an-checklist-file"');
+    // #848: without a stored checklist, import one or go on without; nothing chosen yet.
+    expect(none).toContain('value="new" data-ai-action="an-checklist-choice" style');
+    expect(none).toContain('value="none" data-ai-action="an-checklist-choice" style');
+    expect(none).not.toContain(' checked');
+    expect(none).toContain('<div id="ai-an-checklist-import" hidden>');
     const html = ctx.checklistHtml({ fileName: 'a<b>.docx', answers: 264, importedAt: 't', importedBy: 'tm@x', cut: 3, sent: { 'info.x': '<y>' } });
     expect(html).toContain('a&lt;b&gt;.docx');
     expect(html).toContain('264 answers');
     expect(html).toContain('3 left out for size');
     expect(html).toContain('&lt;y&gt;');
     expect(html).toContain('data-ai-action="an-checklist-remove"');
+    // #848: a stored checklist is kept by default; a new one replaces it.
+    expect(html).toContain('value="keep" data-ai-action="an-checklist-choice" checked');
+    expect(html).toContain('Use the stored checklist: <strong>a&lt;b&gt;.docx</strong>, 264 answers, imported t by tm@x');
+    expect(html).toContain('value="new" data-ai-action="an-checklist-choice" style');
+    expect(html).not.toContain('value="none"');
   });
 
   test('the checklist requests name the company or provider of the card', () => {

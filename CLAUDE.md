@@ -348,7 +348,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (switching deletes nothing; unused services are listed `inUse: false`),
     `GET /ai-analysis/overview` (per target: access, service used, every Test
     Manager's analyses and cost via `M.totalOf()`; totals by `M.sumOf()`).
-    PR 2 splits the page into Connection / Status / Analysis tabs.
+    **PR 2 (1.11.340): the page in three tabs**, Connection / Usage status /
+    Analysis (`#connection`, `#status`, `#analysis`; opens on Analysis when a
+    service is configured). The analysis is asked step by step, each step
+    `hidden` until the one before is chosen (`step()`): target, batch,
+    checklist (`checklistHtml()` asks keep or import; without one stored,
+    import or go on without), send. After an import or removal the checklist
+    step is drawn again from what is stored (`loadChecklist()`). The overview
+    names no service where access is not approved. Checked in Chromium on a
+    throwaway server: seed with `require('src/db/db')` under
+    `OSCAR_DB_PATH`, sign a token with the `server_config` JWT secret, put it
+    in `localStorage.oscar_token`.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
