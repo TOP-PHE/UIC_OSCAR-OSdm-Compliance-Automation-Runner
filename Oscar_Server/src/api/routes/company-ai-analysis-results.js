@@ -376,7 +376,7 @@ function warningsOf(runIds) {
     let text = '';
     try { text = colDecrypt(row.message) || ''; } catch { text = ''; }
     for (const line of String(text).split('\n')) {
-      if (line.includes('[WARNING]')) out.push({ runId: row.run_id, message: line.trim() });
+      if (AN.isWarningLine(line)) out.push({ runId: row.run_id, message: line.trim() });
     }
   }
   return out;
