@@ -1868,7 +1868,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (after `shapeAnswer`), never the stored state; error faults change the
     Problem in `handle()`'s catch. Each entry's `expect` (step, check text,
     level) is what OSCAR must report; the detection report (PR D) reads it,
-    so a fault without a reliable expectation does not belong there. The data file
+    so a fault without a reliable expectation does not belong there.
+    **PR C (1.11.332 / OTST_V2.0.185): one `SIM_FAULT_<CODE>_38` scenario per
+    fault** (gamma, out of the run list), field `simulatorFaults` → env var →
+    header on every request (`applySimulatorFaults()`, `requestHeaders.js`,
+    in the collection's before-request and 01's loop-back branch); any safe
+    word goes out, so a typo is the simulator's 400, never a silent drop.
+    `datafile.test.js` pins one scenario per catalogue code. The first run
+    showed two OSCAR gaps: a refusal without `Problem.code` passed silently
+    (now a WARNING in `validateProblemResponse()`), and an HTML answer to a
+    booking read crashed the step's script ("Post-Response Script Error"):
+    every GET Booking step now starts with `jsonObjectOrStop()`
+    (`loopback.js`), one failed check and the scenario stops. The data file
     holds each sale scenario once per version (`_36`, `_37`, `_38`), and
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;

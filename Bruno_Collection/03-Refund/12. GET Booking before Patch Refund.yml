@@ -53,6 +53,7 @@ runtime:
             loopbackOrStop("GET Booking before Patch Refund (JSON parse)");
             return;
         }
+        if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking before Patch Refund")) return;
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,

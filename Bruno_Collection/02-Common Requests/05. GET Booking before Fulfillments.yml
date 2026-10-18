@@ -39,6 +39,7 @@ runtime:
         }
 
         const jsonData = res.getBody();
+        if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking before Fulfillments")) return;
 
         postCreateBookingResponse(
             bru.getEnvVar("offer"),

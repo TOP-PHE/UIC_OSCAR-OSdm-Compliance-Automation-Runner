@@ -287,13 +287,18 @@ token endpoint), so a typing mistake never looks like "OSCAR detected nothing".
 | `fulfillment.wrong-status` | a confirmation gives fulfilments that say REFUNDED | 06: the fulfilment status comparison fails |
 | `refund.amount-above-paid` | a refund offer gives back ten times its amount | 10: "Refund response bounds" fails |
 | `refund.not-refunded` | a booking read after a refund shows its tickets FULFILLED | 14: the REFUNDED status check fails |
-| `answer.html` | a booking read is answered with an HTML "Request Rejected" page | 05: "Content-Type is JSON" fails |
-| `error.problem-without-code` | every refusal (4xx) leaves out its problem code | the negative tests: "error body is an RFC … Problem" fails |
+| `answer.html` | a booking read is answered with an HTML "Request Rejected" page | 05: "Content-Type is JSON" and "The answer is a JSON object" fail; the scenario stops |
+| `error.problem-without-code` | every refusal (4xx) leaves out its problem code | the negative tests: a WARNING, "the refusal names no OSDM problem code" |
 | `error.server-error-for-refusal` | every refusal (4xx) comes as HTTP 500 | the negative tests: "provider rejects with a client error (4xx)" fails |
 
 The catalogue is `OSDM_Simulator/src/osdm/faults.js`; each entry says what
 OSCAR must report (`expect`), which the detection report (#833 PR D) compares
-with a run.
+with a run. The simulator's data file has one scenario per fault,
+`SIM_FAULT_<CODE>_38` on gamma (listed in "OSCAR - OSDM Simulator scenarios"),
+out of the run list because they fail on purpose: tick them, or copy the
+field `simulatorFaults` into a scenario of your own (Test Config, "Simulator
+faults", codes separated by commas). A real provider never sees the header:
+the collection sends it only when the field is set.
 
 ## 7. Day to day
 

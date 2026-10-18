@@ -2015,6 +2015,8 @@ function buildDetailHTML(idx) {
           'The product (tariff) the offer must hold (#598): its code, or words of its name. No offer holding it fails the scenario and stops it; the fulfilled booking must hold it. Empty: chosen on the flexibility only. A group tariff (#599) also needs the COLLECTIVE offer mode in the offer search criteria.')}
         ${buildText(idx, 'legTravelClasses', 'Travel class per leg', 'e.g. FIRST, SECOND',
           'The class expected on each leg, in the order of the legs (#600): for a train with a first class and one without. The request asks for every class named; the offer chosen must give each leg its class, by an admission of its own or by a supplement on that leg, and so must the booking. Empty: the travel class criterion applies.')}
+        ${buildText(idx, 'simulatorFaults', 'Simulator faults', 'e.g. offer.price-below-parts, booking.passenger-dropped',
+          'For the OSDM simulator only (#833): the faults it answers this scenario with, to check that OSCAR reports them. Codes of the simulator documentation, separated by commas. Sent in the X-Simulator-Faults header, which a real provider ignores. Empty: no fault.')}
         ${buildSelect(idx, 'expectedProductAbsent', 'Expected product absent', ENUMS.expectedProductAbsent,
           'Negative test (#599). On: no offer may hold the expected product above, for example a group its rules exclude (too many passengers, too many adults, a weekday). Passes when none does, fails when one does; the scenario ends after the offer either way.')}
         ${buildSelect(idx, 'offerSearchProbe', 'Offer search probe', ENUMS.offerSearchProbe,

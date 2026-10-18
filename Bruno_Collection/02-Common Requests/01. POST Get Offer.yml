@@ -38,6 +38,8 @@ runtime:
             await getScenarioData();
             initReport(bru.getEnvVar('library_base'));
             bru.setEnvVar('__reportInitDone', 'true');
+            // #833: this request was prepared before the next scenario was read.
+            require(bru.getEnvVar('library_base') + 'requestHeaders.js').applySimulatorFaults(req, bru.getEnvVar('simulatorFaults'));
             const _list = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _idx  = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
             console.log('🔄 Loop-back — starting scenario: ' + (bru.getEnvVar('scenarioCode') || '?') +

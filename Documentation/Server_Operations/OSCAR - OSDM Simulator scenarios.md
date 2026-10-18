@@ -332,6 +332,30 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 | `SIM_WRONG_OFFER_PROBE_RESERVATION_ONLY_38` | Offer search probe (#780), reservations only asked (`requestedOfferParts` `RESERVATION`). | Gamma sells nothing without an admission: the usual offers, and a `PARAMETER_NOT_SUPPORTED` problem naming `offerSearchCriteria.requestedOfferParts`. | One failed check at 01: the provider says it ignored the option. |
 | `SIM_WRONG_CURRENCY_DEFAULT_38` | No currency asked; the scenario expects EUR as the default (`expectedCurrency`). Deliberately wrong. | Offers in gamma's default, CZK. | One failed check at 01: the offers are not in the currency expected. |
 
+### Injected faults (#833)
+
+Each of these scenarios asks gamma for one fault of the simulator's catalogue
+(`simulatorFaults`, sent as the header `X-Simulator-Faults`; `src/osdm/faults.js`
+lists them with what OSCAR must report). The fault changes only what the
+caller is told, never the booking stored. They fail on purpose and stay out
+of the run list. The error faults are seen on the purchaser probe
+(`bookingPurchaserMode` `invalid`), which is where a sale is refused.
+
+| Scenario | Fault | What the simulator answers | Expected result |
+|---|---|---|---|
+| `SIM_FAULT_OFFER_PRICE_BELOW_PARTS_38` | `offer.price-below-parts` | Each offer's `minimalPrice` one unit below the sum of its admissions. | One failed check at 01: "Offer minimalPrice >= sum of admission parts price". |
+| `SIM_FAULT_OFFER_TRIP_UNKNOWN_38` | `offer.trip-unknown` | Each offer covers a trip id the answer does not have. | Two failed checks at 01: the selected offer's trip is not among the answer's trips. |
+| `SIM_FAULT_BOOKING_CURRENCY_CHANGED_38` | `booking.currency-changed` | The new booking's `provisionalPrice` in EUR, the offer in CZK. | Two failed checks at 02: the currency, and the price compared with the offer's. |
+| `SIM_FAULT_BOOKING_PASSENGER_DROPPED_38` | `booking.passenger-dropped` | Two passengers booked (list 2); the answer gives one. | Three failed checks: the number of passengers at 02, then 03 cannot update the passenger the answer left out. |
+| `SIM_FAULT_BOOKING_NOT_PREBOOKED_38` | `booking.not-prebooked` | The new booking's admissions say `CONFIRMED`. | One failed check at 02: "Status is PREBOOKED for admission[0]". |
+| `SIM_FAULT_PASSENGER_NAME_ALTERED_38` | `passenger.name-altered` | The passenger update answers the last name with `-X` added. | One failed check at 03: "Last name is correct". |
+| `SIM_FAULT_FULFILLMENT_WRONG_STATUS_38` | `fulfillment.wrong-status` | The confirmation gives fulfilments `REFUNDED`. | One failed check at 06: "Fulfillment[0] status comparison". |
+| `SIM_FAULT_ANSWER_HTML_38` | `answer.html` | Every booking read answers HTTP 200 with an HTML "Request Rejected" page. | Two failed checks at 05 (Content-Type, "The answer is a JSON object"), and the scenario stops there. |
+| `SIM_FAULT_REFUND_AMOUNT_ABOVE_PAID_38` | `refund.amount-above-paid` | Each refund offer gives back ten times its amount. | Three failed checks: "Refund response bounds" for both refund offers at 10, and at 13 the confirmed amount is not the one proposed. |
+| `SIM_FAULT_REFUND_NOT_REFUNDED_38` | `refund.not-refunded` | After the refund, the booking read gives its fulfilments and parts `FULFILLED`. | Nine failed checks at 14: each fulfilment and admission is not REFUNDED. |
+| `SIM_FAULT_ERROR_PROBLEM_WITHOUT_CODE_38` | `error.problem-without-code` | The purchaser probe's refusals (400) leave out `code`. | No failed check; four WARNINGs at 14: the refusal names no OSDM problem code. |
+| `SIM_FAULT_ERROR_SERVER_ERROR_FOR_REFUSAL_38` | `error.server-error-for-refusal` | The purchaser probe's refusals come as HTTP 500. | Two failed checks at 14: the provider rejects with a client error (4xx). |
+
 ### Requested information and purchaser (#611)
 
 gamma (profile `personChecks`) checks passenger and purchaser data when they are updated: a gender outside `MALE`, `FEMALE`, `X`, a date of birth that is no date, an e-mail or phone number of the wrong form, or an empty name is a `400` Problem naming the field, with a pointer. A purchaser written must have a first and a last name. The offers of a trip from station `0000097` (trip requirement 9) ask for each passenger's date of birth and phone number (`requestedInformation`), and so does the booking while one is missing.

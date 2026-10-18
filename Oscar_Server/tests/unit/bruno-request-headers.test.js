@@ -53,4 +53,29 @@ describe('Requestor header (#692)', () => {
     expect(idem).toContain("...requestorHeader(bru.getEnvVar('requestor'))");
     expect(idem).not.toContain("Requestor: bru.getEnvVar('requestor')");
   });
+
+  test('simulator faults (#833): a list or "a, b" becomes one header, sent only when set', () => {
+    const { simulatorFaultsValue, applySimulatorFaults } = require('../../../Bruno_Collection/library-bruno/requestHeaders.js');
+    expect(simulatorFaultsValue(['offer.trip-unknown', 'answer.html', 'offer.trip-unknown'])).toBe('offer.trip-unknown,answer.html');
+    expect(simulatorFaultsValue('offer.trip-unknown, Answer.HTML')).toBe('offer.trip-unknown,Answer.HTML');
+    expect(simulatorFaultsValue(null)).toBe('');
+    expect(simulatorFaultsValue('a\r\nX-Other: 1')).toBe('a,1', 'nothing that is not a safe word goes in the header');
+    expect(simulatorFaultsValue(Array.from({ length: 30 }, (_, i) => `f.${i}`)).split(',')).toHaveLength(20);
+    const sent = {};
+    const req = { setHeader: (k, v) => { sent[k] = v; } };
+    expect(applySimulatorFaults(req, '')).toBe('');
+    expect(sent).toEqual({});
+    expect(applySimulatorFaults(req, '["answer.html"]')).toBe('');
+    expect(applySimulatorFaults(req, 'answer.html')).toBe('answer.html');
+    expect(sent).toEqual({ 'X-Simulator-Faults': 'answer.html' });
+  });
+
+  test('simulator faults: every request carries them, the loop-back one included', () => {
+    const root = path.join(__dirname, '..', '..', '..', 'Bruno_Collection');
+    const collection = fs.readFileSync(path.join(root, 'opencollection.yml'), 'utf8');
+    const before = collection.slice(collection.indexOf('type: before-request'), collection.indexOf('type: after-response'));
+    expect(before).toContain('applySimulatorFaults(req, bru.getEnvVar("simulatorFaults"))');
+    expect(fs.readFileSync(path.join(root, '02-Common Requests', '01. POST Get Offer.yml'), 'utf8')).toContain('applySimulatorFaults(');
+  });
 });
+
