@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.372",
+  "current_release": "2026.373",
   "releases": [
+    {
+      "release": "2026.373",
+      "date": "2026-10-18",
+      "server": "1.11.338",
+      "collection": "OTST_V2.0.186",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#503 PR 2: the read routes of the API by key — GET /v1/api/runs, /runs/{id}, /runs/{id}/assertions, /batches/{batchId}, /queue. Statuses, times, counts and check results only; no body, log, URL or person. Every run through canUserSeeRun()."
+      ]
+    },
     {
       "release": "2026.372",
       "date": "2026-10-18",
