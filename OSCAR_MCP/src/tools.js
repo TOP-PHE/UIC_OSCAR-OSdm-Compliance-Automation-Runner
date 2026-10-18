@@ -77,7 +77,10 @@ const TOOLS = Object.freeze([
       required: ['run_id'],
       additionalProperties: false,
     },
-    path: (a) => `/v1/api/runs/${encodeURIComponent(a.run_id)}/assertions${a.result ? `?result=${a.result}` : ''}`,
+    path: (a) => {
+      const query = a.result ? '?result=' + a.result : '';
+      return `/v1/api/runs/${encodeURIComponent(a.run_id)}/assertions${query}`;
+    },
   },
   {
     name: 'oscar_get_batch',
@@ -95,20 +98,25 @@ const TOOLS = Object.freeze([
   },
 ].map(t => Object.freeze({ ...t, annotations: READ_ONLY })));
 
-/** One value against one property schema of the list above: an error text, or null. */
-function propertyError(name, value, schema) {
-  if (schema.type === 'integer') {
-    if (!Number.isInteger(value)) return `${name} must be a whole number.`;
-    if (schema.minimum !== undefined && value < schema.minimum) return `${name} must be ${schema.minimum} or more.`;
-    if (schema.maximum !== undefined && value > schema.maximum) return `${name} must be ${schema.maximum} at most.`;
-    return null;
-  }
+function integerError(name, value, schema) {
+  if (!Number.isInteger(value)) return `${name} must be a whole number.`;
+  if (schema.minimum !== undefined && value < schema.minimum) return `${name} must be ${schema.minimum} or more.`;
+  if (schema.maximum !== undefined && value > schema.maximum) return `${name} must be ${schema.maximum} at most.`;
+  return null;
+}
+
+function textError(name, value, schema) {
   if (typeof value !== 'string') return `${name} must be a text.`;
   if (schema.enum && !schema.enum.includes(value)) return `${name} must be one of ${schema.enum.join(', ')}.`;
   if (value.length < (schema.minLength || 0)) return `${name} must not be empty.`;
   if (schema.maxLength !== undefined && value.length > schema.maxLength) return `${name} has at most ${schema.maxLength} characters.`;
   if (schema.pattern && !ID_PATTERN.test(value)) return `${name} is not an OSCAR id.`;
   return null;
+}
+
+/** One value against one property schema of the list above: an error text, or null. */
+function propertyError(name, value, schema) {
+  return schema.type === 'integer' ? integerError(name, value, schema) : textError(name, value, schema);
 }
 
 /** The path a call asks for: { path } or { error }. */
