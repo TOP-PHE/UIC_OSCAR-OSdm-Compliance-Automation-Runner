@@ -79,6 +79,8 @@ beforeAll(() => {
     ['warn', '07. GET Booking after Fulfillments', '[WARNING] booked part afterSaleConditions absent for passenger "Jane Doe" (part 4711)'],
     ['warn', null, '[runner] Env file deletion attempt 1 failed: EBUSY'],
     ['info', '07. GET Booking after Fulfillments', '[INFO] confirmedPrice 5150'],
+    // Stored at level warn by the runner, which looks for the tag anywhere in the line.
+    ['warn', '05. GET Booking before Fulfillments', '[DEBUG] no deadline anywhere → deadline test skipped; that test will skip with a [WARNING] too.'],
   ]);
   seedRun('b-1', 'SIM_SALE_SEARCH_1ADT_36', [
     ['warn', '07. GET Booking after Fulfillments', '[WARNING] booked part afterSaleConditions absent for passenger "John Roe" (part 4712)'],
@@ -102,7 +104,7 @@ test('the preview sends the warnings of the finished runs, grouped and without v
   ]);
   expect(res.body.counts).toEqual({ groups: 1, warningGroups: 2 });
   expect(res.body.batches[0]).toMatchObject({ failedChecks: 2, warnings: 3, warningsTruncated: false });
-  for (const text of ['Jane Doe', 'John Roe', '4711', 'EBUSY', 'confirmedPrice', 'still running', 'another company']) expect(res.body.input).not.toContain(text);
+  for (const text of ['Jane Doe', 'John Roe', '4711', 'EBUSY', 'confirmedPrice', 'still running', 'another company', 'deadline', 'too.']) expect(res.body.input).not.toContain(text);
 });
 
 test('each scenario names its OSDM version and what the Test Framework does not declare of it', async () => {

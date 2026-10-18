@@ -70,6 +70,18 @@ function groupsOf(records, osdmVersion = null) {
     .sort((a, b) => b.failures - a.failures);
 }
 
+// The level tags the collection writes ([DEBUG], [INFO], [WARNING]…).
+const LEVEL_TAG = /\[(DEBUG|INFO|WARN|WARNING|ERROR)\]/;
+
+/**
+ * Whether a run log line is a warning: its first level tag is [WARNING].
+ * Another line may name the tag in its text ("[DEBUG] … that test will skip
+ * with a [WARNING] too."): it is not one.
+ */
+function isWarningLine(line) {
+  return LEVEL_TAG.exec(String(line ?? ''))?.[1] === 'WARNING';
+}
+
 /**
  * The text of a [WARNING] log line as grouped (#823): the tag and the marks
  * the collection puts before it left out, the run's values replaced.
@@ -389,6 +401,6 @@ function inputHash(system, text, model = null) {
 
 module.exports = {
   LANGUAGES, OWNERS, MAX_INPUT_CHARS, MAX_ANSWER_TOKENS,
-  groupsOf, compareGroups, byStep, buildInput, warningText, warningGroupsOf, warningsByStep, MAX_WARNING_GROUPS, estimateTokens, systemPrompt, readResult, inputHash, frameworkDeclarations,
+  groupsOf, compareGroups, byStep, buildInput, isWarningLine, warningText, warningGroupsOf, warningsByStep, MAX_WARNING_GROUPS, estimateTokens, systemPrompt, readResult, inputHash, frameworkDeclarations,
   catalogueEntryOf, providerContext,
 };
