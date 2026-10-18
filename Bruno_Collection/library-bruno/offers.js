@@ -2079,10 +2079,11 @@ function sweepCatalogFlagVsSchedule(offers) {
     let freeWindowed = 0;
     let consistent = 0;
     list.forEach((offer) => {
-      const parts = []
-        .concat((offer?.admissionOfferParts) || [])
-        .concat((offer?.reservationOfferParts) || [])
-        .concat((offer?.ancillaryOfferParts) || [])
+      const parts = [
+        offer?.admissionOfferParts || [],
+        offer?.reservationOfferParts || [],
+        offer?.ancillaryOfferParts || [],
+      ].flat()
         .filter((p) => p?.price && typeof p.price.amount === "number" && p.price.amount > 0);
       let hasContradiction = false;
       let hasFree = false;

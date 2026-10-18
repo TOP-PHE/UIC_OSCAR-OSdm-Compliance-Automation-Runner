@@ -261,10 +261,11 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
   }
 
   const { expectedRefundForParts } = require("./afterSalesRules.js");
-  const parts = []
-    .concat(exchangeOffer.admissionOfferParts || [])
-    .concat(exchangeOffer.reservationOfferParts || [])
-    .concat(exchangeOffer.ancillaryOfferParts || []);
+  const parts = [
+    exchangeOffer.admissionOfferParts || [],
+    exchangeOffer.reservationOfferParts || [],
+    exchangeOffer.ancillaryOfferParts || [],
+  ].flat();
 
   // expectedRefundForParts threads the action through effectiveRefundability;
   // its .expectedFee is the sum of the active-window fee over value-bearing parts

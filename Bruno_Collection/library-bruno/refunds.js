@@ -410,10 +410,11 @@ function validateRefundPermissibility(refundOffer, index) {
     validationLogger("[DEBUG] Refund permissibility check skipped — no selected offer in the environment.");
     return;
   }
-  const parts = []
-    .concat(Array.isArray(offer.admissionOfferParts) ? offer.admissionOfferParts : [])
-    .concat(Array.isArray(offer.reservationOfferParts) ? offer.reservationOfferParts : [])
-    .concat(Array.isArray(offer.ancillaryOfferParts) ? offer.ancillaryOfferParts : [])
+  const parts = [
+    Array.isArray(offer.admissionOfferParts) ? offer.admissionOfferParts : [],
+    Array.isArray(offer.reservationOfferParts) ? offer.reservationOfferParts : [],
+    Array.isArray(offer.ancillaryOfferParts) ? offer.ancillaryOfferParts : [],
+  ].flat()
     .filter(Boolean);
   if (parts.length === 0) {
     validationLogger("[DEBUG] Refund permissibility check skipped — the selected offer carries no parts.");
