@@ -848,7 +848,7 @@ function validateProblemResponse(o) {
     const fields = [...new Set(tgs.map((t) => t.scenarioField).filter(Boolean))];
     const blob = isObj ? JSON.stringify(body).toLowerCase() : '';
     const hasPointers = isObj && Array.isArray(body.pointers) && body.pointers.length > 0;
-    const namesField = fields.length > 0 && fields.some((f) => blob.includes(f.toLowerCase()));
+    const namesField = fields.some((f) => blob.includes(f.toLowerCase()));
     if (hasPointers || namesField) {
       log('INFO', `${pfx}: error identifies the offending field.`);
     } else {

@@ -469,7 +469,7 @@ function assertPlaceSelectionConsistency() {
           && !advertised.some(ap => ap.accommodationType === acc.accommodationType)) {
         issues.push(`placeSelections[${i}].accommodations[${j}].accommodationType '${acc.accommodationType}' is not advertised in the offer's availablePlaces`);
       }
-      if (acc?.accommodationSubType && advertised.length > 0
+      if (acc?.accommodationSubType
           && advertised.some(ap => ap.accommodationSubType)
           && !advertised.some(ap => ap.accommodationSubType === acc.accommodationSubType)) {
         issues.push(`placeSelections[${i}].accommodations[${j}].accommodationSubType '${acc.accommodationSubType}' is not advertised in the offer's availablePlaces`);
