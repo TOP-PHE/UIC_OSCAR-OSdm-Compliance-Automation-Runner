@@ -186,6 +186,14 @@ function postOfferResponsePreRequest() {
   // Swagger capture and header logging are intentionally omitted/disabled here as in original (commented-out).
 }
 
+function resolveVars(str) {
+  if (!str) return str;
+  return String(str).replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
+    const v = bru.getEnvVar(varName);
+    return v == null ? '' : String(v);
+  });
+}
+
 function ensureAuthorizationOr403() {
   // Log-audit round 2: this helper PREFLIGHTS the offer request — it sends
   // the same POST /offers once via bru.sendRequest purely to surface auth
@@ -205,14 +213,6 @@ function ensureAuthorizationOr403() {
     return;
   }
   validationLogger("[DEBUG] ➤ ensureAuthorizationOr403 — preflighting POST /offers to surface auth problems early");
-
-  function resolveVars(str) {
-    if (!str) return str;
-    return String(str).replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
-      const v = bru.getEnvVar(varName);
-      return v == null ? '' : String(v);
-    });
-  }
 
   try {
     const urlStr = (typeof req !== 'undefined' && req.getUrl) ? String(req.getUrl()) : '';
@@ -535,6 +535,29 @@ function searchTripOffers(body, { log = false } = {}) {
   return offers;
 }
 
+function validateSelectedOfferAdmission(selOffer, scenarioTypeStr, overallFlexibility) {
+  if (!selOffer?.admissionOfferParts) return;
+
+  // Do nothing if not FULL_FLEXIBLE or SEMI_FLEXIBLE
+  if (overallFlexibility !== "FULL_FLEXIBLE" && overallFlexibility !== "SEMI_FLEXIBLE") {
+    validationLogger(`[DEBUG] overallFlexibility is '${overallFlexibility}' - skipping admissionOfferParts validation`);
+    return;
+  }
+
+  function validateField(field, type) {
+    // #387: context only — the scenario-vs-offer verdict row is OWNED by
+    // ensureYesWhenRefundOrExchangeSelected. This used to be the FIRST of
+    // THREE rows registered for the same root cause (a REFUND/EXCHANGE
+    // scenario on a part that does not permit it).
+    const parts = selOffer.admissionOfferParts;
+    const allYes = parts.every(p => p[field] === "YES");
+    validationLogger(`[DEBUG] Selected offer admission ${type} flags (FULL/SEMI_FLEXIBLE context): [${parts.map(p => p[field]).join(", ")}]${allYes ? "" : " — not all YES; see the scenario-vs-offer verdict row."}`);
+  }
+
+  if (scenarioTypeStr?.includes("EXCHANGE")) validateField("exchangeable", "exchangeable");
+  if (scenarioTypeStr?.includes("REFUND")) validateField("refundable", "refundable");
+}
+
 function selectAndSetOffer(jsonData) {
   validationLogger("[DEBUG] ➤ selectAndSetOffer");
 
@@ -706,28 +729,6 @@ function selectAndSetOffer(jsonData) {
     });
   }
 
-  function validateSelectedOfferAdmission(selOffer, scenarioTypeStr, overallFlexibility) {
-    if (!selOffer?.admissionOfferParts) return;
-
-    // Do nothing if not FULL_FLEXIBLE or SEMI_FLEXIBLE
-    if (overallFlexibility !== "FULL_FLEXIBLE" && overallFlexibility !== "SEMI_FLEXIBLE") {
-      validationLogger(`[DEBUG] overallFlexibility is '${overallFlexibility}' - skipping admissionOfferParts validation`);
-      return;
-    }
-
-    function validateField(field, type) {
-      // #387: context only — the scenario-vs-offer verdict row is OWNED by
-      // ensureYesWhenRefundOrExchangeSelected. This used to be the FIRST of
-      // THREE rows registered for the same root cause (a REFUND/EXCHANGE
-      // scenario on a part that does not permit it).
-      const parts = selOffer.admissionOfferParts;
-      const allYes = parts.every(p => p[field] === "YES");
-      validationLogger(`[DEBUG] Selected offer admission ${type} flags (FULL/SEMI_FLEXIBLE context): [${parts.map(p => p[field]).join(", ")}]${allYes ? "" : " — not all YES; see the scenario-vs-offer verdict row."}`);
-    }
-
-    if (scenarioTypeStr?.includes("EXCHANGE")) validateField("exchangeable", "exchangeable");
-    if (scenarioTypeStr?.includes("REFUND")) validateField("refundable", "refundable");
-  }
   validateSelectedOfferAdmission(selectedOffer, scenarioType, selectedOffer.offerSummary?.overallFlexibility);
 
   return selectedOffer;

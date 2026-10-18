@@ -478,6 +478,10 @@ async function getScenarioData() {
   }
 }
 
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
 // Function to parse scenario data from JSON
 function parseScenarioData(jsonData) {
   // Apply root-level systemInfoParameters as env vars (e.g. masterDataLayoutId)
@@ -488,10 +492,6 @@ function parseScenarioData(jsonData) {
   const plusDays = Number.parseInt(bru.getEnvVar("departureDateFromToday"), 10) || 10;
   const today = new Date();
   today.setDate(today.getDate() + plusDays);
-
-  function pad(n) {
-    return String(n).padStart(2, '0');
-  }
 
   const nextWeekdayString = today.getFullYear() + "-" +
     pad(today.getMonth() + 1) + "-" +
