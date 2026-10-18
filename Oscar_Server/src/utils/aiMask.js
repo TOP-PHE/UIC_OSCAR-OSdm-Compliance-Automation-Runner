@@ -64,25 +64,32 @@ function maskString(s) {
   return s;
 }
 
+// A list: its first items, masked, and how many more there were.
+function maskList(list, depth) {
+  const shown = list.slice(0, MAX_ITEMS).map((v) => maskValue(v, depth + 1));
+  if (list.length > MAX_ITEMS) shown.push(`<${list.length - MAX_ITEMS} more>`);
+  return shown;
+}
+
+// An object: each member masked by its name, or by what it holds.
+function maskObject(object, depth) {
+  const problem = isProblem(object);
+  const out = {};
+  for (const [k, v] of Object.entries(object)) {
+    const n = norm(k);
+    const hidden = PERSONAL.has(n) || CONNECTION.has(n) || (problem && PROBLEM_TEXT.has(n));
+    if (!hidden) out[k] = maskValue(v, depth + 1);
+    else out[k] = v === null ? null : MASK;
+  }
+  return out;
+}
+
 function maskValue(value, depth) {
   if (depth > MAX_DEPTH) return '<…>';
   if (value === null || typeof value === 'number' || typeof value === 'boolean') return value;
   if (typeof value === 'string') return maskString(value);
-  if (Array.isArray(value)) {
-    const shown = value.slice(0, MAX_ITEMS).map((v) => maskValue(v, depth + 1));
-    if (value.length > MAX_ITEMS) shown.push(`<${value.length - MAX_ITEMS} more>`);
-    return shown;
-  }
-  if (typeof value === 'object') {
-    const problem = isProblem(value);
-    const out = {};
-    for (const [k, v] of Object.entries(value)) {
-      const n = norm(k);
-      if (PERSONAL.has(n) || CONNECTION.has(n) || (problem && PROBLEM_TEXT.has(n))) out[k] = v === null ? null : MASK;
-      else out[k] = maskValue(v, depth + 1);
-    }
-    return out;
-  }
+  if (Array.isArray(value)) return maskList(value, depth);
+  if (typeof value === 'object') return maskObject(value, depth);
   return null;
 }
 
