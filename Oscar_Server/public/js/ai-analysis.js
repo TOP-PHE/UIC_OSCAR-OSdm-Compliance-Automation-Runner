@@ -17,8 +17,9 @@
  * OSCAR administrator decides each one on its own. Where access is approved,
  * the Test Manager configures the AI service, one section per company or
  * provider, each saved and tested on its own. The analysis itself comes in a
- * later release. `accessHtml(data)` and `serviceHtml(...)` are pure (lifted
- * by the page test); the rest is wiring.
+ * later release. `accessHtml(data)`, `serviceHtml(...)` and `checklistHtml(c)`
+ * are pure (lifted by the page test); the rest is wiring. #827: the provider's
+ * set-up checklist is imported per company or provider in the analysis card.
  */
 
 const NOTE = 'padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.5;margin-bottom:14px;';
@@ -96,8 +97,7 @@ function accessHtml(data) {
       chooses. Read what that means before you ask for access.</div>` + table + requestFormHtml(c);
   }
   const open = targets.some(t => t.state === 'approved')
-    ? `<div style="${NOTE}${OK}">Configure the AI service of each company or provider below. The analysis itself
-      (a batch, or two batches compared) comes in the next release.</div>`
+    ? `<div style="${NOTE}${OK}">Configure the AI service of each company or provider below, then analyse a batch, or compare two.</div>`
     : '';
   return open + table + commitmentHtml(c);
 }
@@ -179,6 +179,7 @@ function analysisPanelHtml(targets) {
       You see exactly what will be sent before anything leaves OSCAR.</div>
     <label for="ai-an-target" style="${FIELD}">Company or provider</label>
     <select id="ai-an-target" data-ai-action="an-target" style="${WIDE}">${options}</select>
+    <div id="ai-an-checklist" style="margin-top:10px"></div>
     <label for="ai-an-a" style="${FIELD}">Batch</label>
     <select id="ai-an-a" style="${WIDE}"></select>
     <label for="ai-an-b" style="${FIELD}">Compare with a later batch (optional)</label>
@@ -191,6 +192,26 @@ function analysisPanelHtml(targets) {
     <h4 style="margin:18px 0 6px">Earlier analyses</h4>
     <div id="ai-an-history" style="font-size:13px"></div>
   </div>`;
+}
+
+/**
+ * The provider's set-up checklist (#827): what was imported, what the model
+ * is told of it, and the buttons to import another or remove it.
+ */
+function checklistHtml(c) {
+  const input = `<label for="ai-an-checklist-file" style="${FIELD}">Import the filled set-up checklist (.docx)</label>
+    <input id="ai-an-checklist-file" type="file" accept=".docx" data-ai-action="an-checklist-file" style="${WIDE}">`;
+  if (!c) {
+    return `<div style="font-size:12px;color:#78909c">Provider context: <strong>no checklist imported.</strong>
+      The model is told the provider's answers to OSCAR's set-up checklist when one is imported: what it does not do, its test data, its remarks.</div>${input}`;
+  }
+  const by = c.importedBy ? ' by ' + esc(c.importedBy) : '';
+  const cut = c.cut ? `, ${esc(c.cut)} left out for size` : '';
+  const sent = `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">What the model is told (${esc(Object.keys(c.sent || {}).length)} answers${cut})</summary>
+    <pre style="white-space:pre-wrap;font-size:11px;max-height:240px;overflow:auto;background:#fafafa;padding:8px;border:1px solid #eceff1">${esc(JSON.stringify(c.sent || {}, null, 1))}</pre></details>`;
+  return `<div style="font-size:12px;color:#37474f">Provider context: checklist <strong>${esc(c.fileName || '')}</strong>, ${esc(c.answers)} answers,
+    imported ${esc(c.importedAt)}${by}. API Config and contact answers are never kept.
+    <button class="btn" data-ai-action="an-checklist-remove" style="margin-left:6px">Remove</button></div>${sent}${input}`;
 }
 
 function batchLabel(b) {
@@ -418,7 +439,38 @@ async function loadAnalysisTarget() {
   document.getElementById('ai-an-a').innerHTML = batchOptionsHtml(data.batches || [], false);
   document.getElementById('ai-an-b').innerHTML = batchOptionsHtml(data.batches || [], true);
   document.getElementById('ai-an-lang').innerHTML = (data.languages || ['English']).map(l => `<option>${esc(l)}</option>`).join('');
+  await loadChecklist();
   await loadHistory();
+}
+
+async function loadChecklist() {
+  const el = document.getElementById('ai-an-checklist');
+  const res = await fetch('/v1/company/ai-analysis/checklist', { headers: analysisHeaders() });
+  el.innerHTML = res.ok ? checklistHtml((await res.json()).checklist) : esc(await readError(res, 'Could not read the checklist.'));
+}
+
+async function importChecklist(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('checklist', file);
+  const res = await fetch('/v1/company/ai-analysis/checklist', { method: 'POST', headers: analysisHeaders(), body: form });
+  if (!res.ok) { show(await readError(res, 'The checklist could not be imported.'), 'error'); input.value = ''; return; }
+  const { checklist } = await res.json();
+  show(`Checklist imported: ${checklist.answers} answers.`, 'ok');
+  previewed = null;
+  document.getElementById('ai-an-preview').innerHTML = '';
+  document.getElementById('ai-an-checklist').innerHTML = checklistHtml(checklist);
+}
+
+async function removeChecklist() {
+  if (!confirm('Remove the imported checklist? The model will no longer be told its answers.')) return;
+  const res = await fetch('/v1/company/ai-analysis/checklist', { method: 'DELETE', headers: analysisHeaders() });
+  if (!res.ok) { show(await readError(res, 'The checklist could not be removed.'), 'error'); return; }
+  show('Checklist removed.', 'ok');
+  previewed = null;
+  document.getElementById('ai-an-preview').innerHTML = '';
+  await loadChecklist();
 }
 
 async function loadHistory() {
@@ -479,15 +531,17 @@ async function followAnalysis(id, left) {
 
 document.addEventListener('change', (e) => {
   if (e.target.closest('[data-ai-action="an-target"]')) loadAnalysisTarget().catch(err => show(err.message, 'error'));
+  else if (e.target.closest('[data-ai-action="an-checklist-file"]')) importChecklist(e.target).catch(err => show(err.message, 'error'));
   else if (e.target.closest('#ai-an-a, #ai-an-b, #ai-an-lang')) { previewed = null; document.getElementById('ai-an-preview').innerHTML = ''; }
 });
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"]');
+  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"]');
   if (!el) return;
   const act = el.dataset.aiAction;
   let job;
   if (act === 'an-preview') job = previewAnalysis();
   else if (act === 'an-run') job = runAnalysis();
+  else if (act === 'an-checklist-remove') job = removeChecklist();
   else job = showAnalysis(el.dataset.id);
   job.catch(err => show(err.message, 'error'));
 });

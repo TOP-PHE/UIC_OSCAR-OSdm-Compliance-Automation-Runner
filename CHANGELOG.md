@@ -112,6 +112,32 @@ installed simulator updates when this version reaches `main`.
 
 ---
 
+## [server-1.11.327] / [collection-OTST_V2.0.183] — 2026-10-18
+
+Issue #827 part A, release 2026.362. Server and pages only.
+
+### Added
+- **The provider's set-up checklist is told to the AI analysis.** In the analysis card of the AI Analysis page, a Test Manager imports the provider's filled set-up checklist (the Word file of #795) for the company or provider chosen.
+  - OSCAR reads the answers back from the file's content controls (each tagged with its answer name) and keeps them encrypted, one set per company or provider (`provider_checklist`, migration 35). **It never keeps the API Config answers (`api.*`: endpoint, token address, authentication) or the contact ones (`meta.*`).** The file itself is read in memory and not kept.
+  - The card says what was imported, by whom and when, and shows exactly what the model is told. It can be replaced or removed.
+  - **What the model is told:** the `info.*` answers (the provider's behaviour), the `data.*` answers (its test data and options), the service sheets and journeys, and the comments of the `fw.*` answers. The `fw.*` declarations themselves are not sent: the Test Framework is. Capped at 20,000 characters, the service sheets cut first; the page says how many answers were left out.
+  - Routes: `GET`, `POST` (multipart, field `checklist`, 5 MB) and `DELETE /v1/company/ai-analysis/checklist`, for Test Managers of the company or provider. The role and company are checked before the file is parsed. A file that is not a Word file, or holds no answer, is refused with its reason. Import and removal are audit events.
+- **The declared OSDM version is in the instructions**: "judge every request and answer against OSDM <version>, never against a later version". The first real analysis judged a 3.6 provider against 3.8.
+- **The purpose of each reference scenario** from the scenario catalogue is sent with the scenario: the same code, or the longest catalogue code it extends (`…_SPEC`, `…_TRIPID`, `…_EUR`).
+- The instructions say that a failure on something the provider says it does not do is expected, and ask whether the scenario should be left out or the Test Framework changed.
+
+### Changed
+- `utils/zip.js` reads one entry of a ZIP file too (`readZipEntry`: stored or deflated, through the central directory). What one entry may inflate to is bounded, so a small file inflating to gigabytes is refused, not read.
+- The AI Analysis page no longer says the analysis "comes in the next release".
+
+Checked:
+- `checklist-answers.test.js`: the ZIP reader (stored, deflated, missing, not a ZIP, too large, a size understated, encrypted); the answers (ticked and unticked boxes, placeholders, text with lines and entities, the first control of a tag, a control inside another); the simulator's alpha checklist read back to its 276 answers, 264 kept; files refused; what the model is told and its size cap.
+- `ai-checklist.test.js` (integration): testers and certifiers refused, another company refused, import, encryption, audit, per company or provider, refusals that change nothing, the preview with the checklist, the declared version and a scenario's purpose, removal.
+- `ai-analysis.test.js`: the catalogue match, the provider context, the instructions, the page's checklist card escaped, and each checklist request naming its company or provider.
+- Two changes made on purpose, and the tests failed: keeping the `api.*` and `meta.*` answers, and removing the role and company check before the parser.
+
+---
+
 ## [server-1.11.326] / [collection-OTST_V2.0.183] — 2026-10-17
 
 Issue #801 part 3, release 2026.361. Server and pages only.

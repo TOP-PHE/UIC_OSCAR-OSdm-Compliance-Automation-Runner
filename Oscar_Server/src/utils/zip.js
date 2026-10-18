@@ -24,6 +24,8 @@
  * `name` is the in-archive path (forward slashes), `data` a Buffer or string.
  */
 
+const zlib = require('node:zlib');
+
 // ── CRC-32 (IEEE 802.3), self-contained so we don't depend on a particular
 // Node build exposing zlib.crc32. Table computed once, lazily. ───────────────
 let _crcTable = null;
@@ -113,4 +115,69 @@ function buildZip(entries) {
   return Buffer.concat([...parts, centralBuf, end]);
 }
 
-module.exports = { buildZip };
+// ── Reading one entry (#827) ──────────────────────────────────────────────────
+// Enough to read word/document.xml out of a .docx: stored or deflated
+// entries, found through the central directory. No ZIP64, no encryption.
+// `maxBytes` bounds what one entry may inflate to, so a small file that
+// inflates to gigabytes is refused, not read.
+
+class ZipError extends Error {}
+
+const METHOD_STORE = 0;
+const METHOD_DEFLATE = 8;
+const END_MIN = 22;
+const COMMENT_MAX = 0xFFFF;
+
+function findEnd(buf) {
+  const stop = Math.max(0, buf.length - END_MIN - COMMENT_MAX);
+  for (let at = buf.length - END_MIN; at >= stop; at--) {
+    if (buf.readUInt32LE(at) === SIG_END) return at;
+  }
+  throw new ZipError('not a ZIP file');
+}
+
+function centralEntries(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < END_MIN) throw new ZipError('not a ZIP file');
+  const end = findEnd(buf);
+  const count = buf.readUInt16LE(end + 10);
+  let at = buf.readUInt32LE(end + 16);
+  const entries = [];
+  for (let i = 0; i < count; i++) {
+    if (at + 46 > buf.length || buf.readUInt32LE(at) !== SIG_CENTRAL) throw new ZipError('damaged central directory');
+    const nameLength = buf.readUInt16LE(at + 28);
+    const extraLength = buf.readUInt16LE(at + 30);
+    const commentLength = buf.readUInt16LE(at + 32);
+    entries.push({
+      name: buf.toString('utf8', at + 46, at + 46 + nameLength),
+      flags: buf.readUInt16LE(at + 8),
+      method: buf.readUInt16LE(at + 10),
+      compressedSize: buf.readUInt32LE(at + 20),
+      size: buf.readUInt32LE(at + 24),
+      localOffset: buf.readUInt32LE(at + 42),
+    });
+    at += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+/** The bytes of the entry `name`, or null when the archive has none. */
+function readZipEntry(buf, name, { maxBytes = 10 * 1024 * 1024 } = {}) {
+  const entry = centralEntries(buf).find((e) => e.name === name);
+  if (!entry) return null;
+  if (entry.flags & 1) throw new ZipError('encrypted entry');
+  if (entry.size > maxBytes) throw new ZipError('entry too large');
+  const at = entry.localOffset;
+  if (at + 30 > buf.length || buf.readUInt32LE(at) !== SIG_LOCAL) throw new ZipError('damaged entry');
+  const start = at + 30 + buf.readUInt16LE(at + 26) + buf.readUInt16LE(at + 28);
+  const data = buf.subarray(start, start + entry.compressedSize);
+  if (data.length !== entry.compressedSize) throw new ZipError('damaged entry');
+  if (entry.method === METHOD_STORE) return Buffer.from(data);
+  if (entry.method !== METHOD_DEFLATE) throw new ZipError('unsupported compression');
+  try {
+    return zlib.inflateRawSync(data, { maxOutputLength: maxBytes });
+  } catch {
+    throw new ZipError('entry too large or damaged');
+  }
+}
+
+module.exports = { buildZip, readZipEntry, ZipError };
