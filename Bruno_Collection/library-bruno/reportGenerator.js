@@ -207,13 +207,13 @@ function initReport(libraryBase) {
       try {
         const data = JSON.parse(fs.readFileSync(tmp, 'utf8'));
         prevScenarioCode = (data?.meta?.scenarioCode) || null;
-      } catch (re) { _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (re?.message) + ') — treating as a different scenario.'); }
+      } catch (error_) { _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (error_?.message) + ') — treating as a different scenario.'); }
       let currentScenarioCode = null;
       try {
         if (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function') {
           currentScenarioCode = bru.getEnvVar('scenarioCode') || null;
         }
-      } catch (be) { _debugLog('[DEBUG] [reportGenerator] no bru context (' + (be?.message) + ') — falling through to clear previous run data.'); }
+      } catch (error_) { _debugLog('[DEBUG] [reportGenerator] no bru context (' + (error_?.message) + ') — falling through to clear previous run data.'); }
 
       if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
         // Log-audit round 2: report-accumulator bookkeeping → DEBUG (the
