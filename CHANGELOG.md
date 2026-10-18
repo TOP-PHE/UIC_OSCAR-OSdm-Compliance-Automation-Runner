@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.332 / collection-OTST_V2.0.185] — 2026-10-18 · Release 2026.367
+
+Issue #833 (PR C). Faults asked of the OSDM simulator from a scenario, and two gaps of OSCAR the faults showed.
+
+### Added
+- **Scenario field `simulatorFaults`** (data file schema, Test Config "Simulator faults"): fault codes of the OSDM simulator, a list or "a, b". The collection sends them as the header `X-Simulator-Faults` on every request of the scenario (`applySimulatorFaults()`, `requestHeaders.js`), and only when the field is set, so a real provider never sees it. Any word of safe characters goes out: a code the simulator does not know is its 400 `UNKNOWN_FAULT`, never a silent drop.
+- **One scenario per fault**, `SIM_FAULT_<CODE>_38` on gamma (12), out of the run list because they fail on purpose. Listed with what each must report in `OSCAR - OSDM Simulator scenarios.md`; `datafile.test.js` pins one scenario per catalogue code. The catalogue refuses them as sources, and the simulator hints of suggested findings leave them out, like the `SIM_WRONG_*`.
+
+### Fixed
+- **A refusal without its OSDM problem code passed unnoticed.** `validateProblemResponse()` now logs a WARNING ("the refusal names no OSDM problem code"): OSDM announces `code` as mandatory, and refusals are told apart by it.
+- **A booking read answered with an HTML page crashed the step's script** ("Post-Response Script Error", and the report lost the step). Every GET Booking step (05, 07, 12, 14, 16, exchange 13, 15, 17) now starts with `jsonObjectOrStop()` (`loopback.js`): one failed check naming what came, and the scenario stops there.
+
+### Replay
+- 131 scenarios: the 119 of before give exactly the same checks; the 12 `SIM_FAULT_*` are new, and each fault is detected as its catalogue entry expects. `OSCAR - Checks by scenario.md` and `simulator-checks.json` regenerated.
+
+### Default decisions (taken without asking)
+- **The faults are chosen per scenario** (the header), as decided with the maintainer; a whole provider is made faulty with the token scope `sim-faults:…` (PR B), not from the data file.
+- **The error faults are seen on the purchaser probe** (`bookingPurchaserMode` `invalid`): any refusal would do, and that probe gives four.
+
+---
+
 ## [simulator-0.36.0] — 2026-10-18
 
 Issue #833 (PR B). Simulator 0.36.0. Server and collection unchanged. Errors injected on demand, to prove that OSCAR's checks catch them.

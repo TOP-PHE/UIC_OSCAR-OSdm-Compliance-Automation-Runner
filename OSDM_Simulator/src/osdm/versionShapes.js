@@ -41,26 +41,29 @@ const ABSENT_BELOW = [
 ];
 
 // A FulfillmentDocument's members that 3.8 added.
-const DOCUMENT_MEMBERS_3_8 = ['id', 'controlNumber'];
+const DOCUMENT_MEMBERS_3_8 = new Set(['id', 'controlNumber']);
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+// The documents of one list that have an id.
+function addDocuments(list, found) {
+  for (const doc of list) {
+    if (isObject(doc) && doc.id) found.set(doc.id, doc);
+  }
+}
 
 // Every document of the answer that has an id, wherever a list of them is.
 function documentsById(value, found = new Map()) {
   if (Array.isArray(value)) {
     for (const item of value) documentsById(item, found);
   } else if (isObject(value)) {
-    for (const [key, child] of Object.entries(value)) {
-      if (key === 'fulfillmentDocuments' && Array.isArray(child)) {
-        for (const doc of child) if (isObject(doc) && doc.id) found.set(doc.id, doc);
-      }
-      documentsById(child, found);
-    }
+    if (Array.isArray(value.fulfillmentDocuments)) addDocuments(value.fulfillmentDocuments, found);
+    for (const child of Object.values(value)) documentsById(child, found);
   }
   return found;
 }
 
-const documentBefore38 = (doc) => Object.fromEntries(Object.entries(doc).filter(([k]) => !DOCUMENT_MEMBERS_3_8.includes(k)));
+const documentBefore38 = (doc) => Object.fromEntries(Object.entries(doc).filter(([k]) => !DOCUMENT_MEMBERS_3_8.has(k)));
 
 // Below 3.8: each fulfilment holds the documents it names; the lists of the
 // booking and of the answer go.

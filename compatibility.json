@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.366",
+  "current_release": "2026.367",
   "releases": [
+    {
+      "release": "2026.367",
+      "date": "2026-10-18",
+      "server": "1.11.332",
+      "collection": "OTST_V2.0.185",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Collection (#833 PR C): scenario field simulatorFaults, sent as the X-Simulator-Faults header; one SIM_FAULT_* scenario per fault of the simulator's catalogue, all detected by OSCAR. Two gaps the faults showed are closed: a refusal without its OSDM problem code is now a WARNING, and a booking read answered with something that is not JSON fails one check and stops the scenario instead of crashing the step's script. Replay: no check of the other 119 scenarios changed."
+      ]
+    },
     {
       "release": "2026.366",
       "date": "2026-10-18",

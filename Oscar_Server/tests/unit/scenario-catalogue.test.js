@@ -64,7 +64,7 @@ describe('the catalogue file', () => {
 });
 
 describe('problems a catalogue can have', () => {
-  const sim = { scenarios: [{ code: 'SIM_A_38', scenarioType: 'SALE' }, { code: 'SIM_WRONG_X_38' }] };
+  const sim = { scenarios: [{ code: 'SIM_A_38', scenarioType: 'SALE' }, { code: 'SIM_WRONG_X_38' }, { code: 'SIM_FAULT_X_38' }] };
   const entry = (over) => ({ code: 'OTST_A_ONE', source: 'SIM_A_38', purpose: 'A sale for one person.', checks: 10, needs: {}, ...over });
   test.each([
     [[], /no entry/],
@@ -75,6 +75,7 @@ describe('problems a catalogue can have', () => {
     [[entry({ checks: 0 })], /checks/],
     [[entry({ set: { tripRequirementId: 2 } })], /may change/],
     [[entry({ source: 'SIM_WRONG_X_38' })], /deliberately wrong/],
+    [[entry({ source: 'SIM_FAULT_X_38' })], /asks the simulator for faults/],
     [[entry({ needs: undefined })], /needs is missing/],
     [[entry({ needs: { train: 'SC' } })], /needs\.train is not a known need/],
   ])('%#', (entries, problem) => {
