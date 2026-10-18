@@ -503,19 +503,21 @@ router.put('/ai-analysis/setup', configLimiter, (req, res) => {
 // ── GET /ai-analysis/overview (#848) ─────────────────────────────────────────
 // Per company or provider the Test Manager may use: their access, the service
 // it uses for them, and every Test Manager's analyses of it (as the history
-// shows them), with the totals.
+// shows them), with the totals. No service is named where access is not approved.
 router.get('/ai-analysis/overview', readLimiter, (req, res) => {
   const company = scopeForTestManager(req, res);
   if (!company) return;
   const rows = targetsOf(req.user, company).map((t) => {
     const request = requestOf(t.id, req.user.id);
+    const access = A.accessState(request);
     const owner = serviceOwnerOf(t.id, req.user.id);
-    const service = rowOf(owner, req.user.id);
+    // A company or provider without approved access uses no service, shared or not.
+    const service = access === 'approved' ? rowOf(owner, req.user.id) : null;
     const ownerName = owner === t.id ? t.name : get('SELECT name FROM companies WHERE id = ?', [owner])?.name;
     const analyses = all('SELECT model, input_tokens, output_tokens, cost_usd FROM ai_analysis WHERE company_id = ?', [t.id]);
     return {
       ...t,
-      access: A.accessState(request),
+      access,
       service: service ? { connector: service.connector, model: service.model, of: { id: owner, name: ownerName ?? null } } : null,
       ...M.totalOf(analyses),
     };

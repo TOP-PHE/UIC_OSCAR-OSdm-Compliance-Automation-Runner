@@ -15,6 +15,7 @@
    - 2.1 Several providers in one company (distributors)
    - 2.2 Downloading and uploading the data file
    - 2.3 API keys (Test Managers)
+   - 2.4 AI analysis of results (Test Managers)
 3. [Provider setup — Framework, Test data & Discovery](#3-provider-setup--framework-test-data--discovery)
    - 3.1 Test Framework (capabilities) · 3.2 Train sets · 3.3 Journeys · 3.4 Timetable Discovery
 4. [Authoring a scenario](#4-authoring-a-scenario)
@@ -227,6 +228,42 @@ chosen in **Working on**.
   tools, with one key and no more rights than it. Make a key for it, then
   follow [OSCAR_MCP/README.md](../../OSCAR_MCP/README.md). Revoking the key
   stops it.
+
+### 2.4 AI analysis of results (Test Managers)
+
+An AI service your company chooses reads the failed checks of a batch, groups
+them by probable cause and says who should act: the provider, OSCAR or the
+configuration. The menu **AI Analysis** has three tabs (since 1.11.340).
+
+1. **Connection**, done once:
+   - **Ask for access** for the company and each provider. An OSCAR
+     administrator approves each one on its own.
+   - **Choose how the AI service is used**:
+     - **one AI service for all** (recommended): one service, one key and one
+       monthly limit for the company and every approved provider;
+     - **one per provider**: for a provider whose agreement names another AI.
+     Changing the choice deletes no service.
+   - **Set up the service**: kind, address, model, key, monthly limit and your
+     own instruction. It is tested before it is saved.
+2. **Usage status**:
+   - per company or provider: its access, the AI service and model it uses,
+     the number of analyses and their cost, then the totals;
+   - below it, what was spent per month and per model.
+   The costs are list prices, an estimate: the AI service's invoice is what
+   counts.
+3. **Analysis**, step by step; each step appears once the one before is
+   chosen:
+   1. the company or provider to validate;
+   2. the test results (a batch), and optionally a later batch to compare;
+   3. the provider's set-up checklist: keep the stored one, or import a new
+      one, which replaces it (without one stored: import one, or go on
+      without);
+   4. the language and model, then **See what will be sent**. Nothing leaves
+      OSCAR before you have seen it and pressed the send button.
+
+   The earlier analyses of that company or provider are listed below. Tick
+   two to show them side by side. An analysis is an AI opinion, not a test
+   result.
 
 ## 3. Provider setup — Framework, Test data & Discovery
 

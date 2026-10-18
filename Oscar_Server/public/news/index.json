@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-page-tabs",
+    "date": "October 18, 2026",
+    "tag": "Improvement",
+    "title": "AI Analysis in three tabs",
+    "summary": "The AI Analysis page is now in three tabs, Connection, Usage status and Analysis, and an analysis is asked step by step.",
+    "content": "Connection holds the access, the choice of one AI service for all or one per provider, and the service set-up. Usage status shows, for each company or provider, the AI used, the analyses and their cost, with the totals. Analysis asks step by step: the company or provider, the test results, then whether to keep the stored set-up checklist or import a new one, then the language and model before anything is sent."
+  },
+  {
     "id": "2026-10-18-ai-one-service",
     "date": "October 18, 2026",
     "tag": "Feature",
