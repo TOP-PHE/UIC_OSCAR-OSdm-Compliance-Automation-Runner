@@ -30,13 +30,14 @@ const S = require('./findingSuggestions');
 const OR = require('./osdmReferences');
 
 const LANGUAGES = Object.freeze(['English', 'French', 'German', 'Italian', 'Spanish', 'Dutch', 'Czech', 'Polish', 'Portuguese', 'Swedish']);
-const OWNERS = Object.freeze(['provider', 'oscar', 'unclear']);
+const OWNERS = Object.freeze(['provider', 'oscar', 'configuration', 'unclear']);
 
 // About 50,000 tokens of input. Above it, groups are summarised by step.
 const MAX_INPUT_CHARS = 200_000;
 const MAX_SCENARIOS_PER_GROUP = 20;
 const MAX_TEXT = 300;
 const MAX_ANSWER_TOKENS = 16_000;
+const MAX_SAMPLES = 15;
 
 const short = (text, max = MAX_TEXT) => {
   const t = String(text ?? '').replaceAll(/\s+/g, ' ').trim();
@@ -54,6 +55,7 @@ function groupsOf(records, osdmVersion = null) {
       key: g.key,
       step: short(g.step, 120),
       ...(osdmVersion ? { operation: OR.operationOf(g.sample?.method, g.sample?.url, osdmVersion) } : {}),
+      requestId: g.sample?.requestId ?? null,
       check: short(g.check),
       error: g.sample?.error ? short(S.checkText(g.sample.error)) : null,
       status: g.status,
@@ -92,8 +94,27 @@ function byStep(groups) {
   return [...steps.values()].sort((a, b) => b.failures - a.failures);
 }
 
-// The groups without their internal key; summarised by step when asked.
-const shown = (groups, summarise) => (summarise ? byStep(groups) : groups.map(({ key: _key, ...g }) => g));
+// The groups without their internal key and request id, each with its masked
+// sample when it has one (#827 PR C); summarised by step when asked.
+const shown = (groups, summarise, samples = new Map()) => (summarise ? byStep(groups)
+  : groups.map(({ key, requestId: _requestId, ...g }) => (samples.has(key) ? { ...g, sample: samples.get(key) } : g)));
+
+/**
+ * The masked request and answer of one failing request per group (#827 PR C),
+ * for the MAX_SAMPLES most failing groups, by group key. `sampleOf(requestId)`
+ * gives { request, response } already masked (utils/aiMask.js), or null.
+ */
+function samplesFor(groups, sampleOf) {
+  const samples = new Map();
+  if (typeof sampleOf !== 'function') return samples;
+  for (const g of [...groups].sort((a, b) => b.failures - a.failures)) {
+    if (samples.size >= MAX_SAMPLES) break;
+    if (samples.has(g.key) || g.requestId == null) continue;
+    const sample = sampleOf(g.requestId);
+    if (sample) samples.set(g.key, sample);
+  }
+  return samples;
+}
 
 /** The Test Framework as sent: its declarations, without OSCAR's own `_` keys. */
 function frameworkDeclarations(framework) {
@@ -156,7 +177,7 @@ function batchHeader(b) {
  * records, truncated } (two: the earlier first). Returns { input, text,
  * chars, estimatedTokens, summarisedByStep, counts }.
  */
-function buildInput({ batches, framework, findings, scenarios, catalogue, checklist }) {
+function buildInput({ batches, framework, findings, scenarios, catalogue, checklist, sampleOf }) {
   const compare = batches.length === 2;
   const reference = OR.versionFor(framework?.osdmVersion);
   const groups = batches.map((b) => groupsOf(b.records, reference?.version));
@@ -165,6 +186,7 @@ function buildInput({ batches, framework, findings, scenarios, catalogue, checkl
   const failuresByOperation = new Map();
   for (const g of all) if (g.operation) failuresByOperation.set(g.operation, (failuresByOperation.get(g.operation) || 0) + g.failures);
   const operations = [...failuresByOperation.entries()].sort((a, b) => b[1] - a[1]).map(([op]) => op);
+  const samples = samplesFor(all, sampleOf);
 
   const make = (summarise) => {
     const input = {
@@ -179,9 +201,9 @@ function buildInput({ batches, framework, findings, scenarios, catalogue, checkl
     };
     if (compare) {
       const c = compareGroups(groups[0], groups[1]);
-      input.comparison = { fixed: shown(c.fixed, summarise), stillFailing: shown(c.stillFailing, summarise), new: shown(c.new, summarise) };
+      input.comparison = { fixed: shown(c.fixed, summarise, samples), stillFailing: shown(c.stillFailing, summarise, samples), new: shown(c.new, summarise, samples) };
     } else {
-      input.failures = shown(groups[0], summarise);
+      input.failures = shown(groups[0], summarise, samples);
     }
     return input;
   };
@@ -207,7 +229,8 @@ const ANSWER_SHAPE = `{
   "summary": "a few sentences",
   "groups": [
     { "title": "short name of the problem", "cause": "the probable cause, in a few sentences",
-      "owner": "provider | oscar | unclear", "why": "what in the input points to that owner",
+      "owner": "provider | oscar | configuration | unclear", "why": "what in the input points to that owner",
+      "action": "what to do next, and who does it, in one or two sentences",
       "steps": ["step names"], "scenarios": ["scenario codes"] }
   ],
   "comparison": { "fixed": ["…"], "stillFailing": ["…"], "new": ["…"] }
@@ -220,7 +243,8 @@ function systemPrompt({ language = 'English', instruction = null, compare = fals
   const lines = [
     'You read the results of OSCAR, a conformance test runner for OSDM (the UIC Open Sales and Distribution Model, a rail ticketing API).',
     'OSCAR runs scenarios (a sale, a refund, an exchange…) against a provider\'s OSDM API and checks each answer. The input lists the checks that failed, grouped by step, check text, HTTP status and OSDM problem code. Values a run met are replaced: N for a number, <id>, <instant>, "…" for a quoted value.',
-    'A failure can be the provider\'s (its answer does not follow OSDM, or a function is missing), OSCAR\'s (its request or its check is wrong), or unclear. The Test Framework says what the provider declares it supports; the findings are what people already recorded.',
+    'A failure can be the provider\'s (its answer does not follow OSDM, or a function is missing), OSCAR\'s (its request or its check is wrong), the configuration\'s (the Test Framework declares something the provider does not do, the Test Data names a train, date or tariff the provider does not have, or the scenario should not be run on this provider), or unclear. The Test Framework says what the provider declares it supports; the findings are what people already recorded.',
+    'You may question a check itself: when the request OSCAR sent, or what the check expects, does not follow the OSDM extract, the owner is oscar; say which member or rule, quoting the extract. Each group\'s sample, when given, is the request OSCAR sent and the answer it received for one failure of the group, personal and connection data shown as <masked>, addresses of the web as <url>, long lists cut.',
     version
       ? `The provider declares OSDM ${version}: judge every request and answer against OSDM ${version}, never against a later version.`
       : 'The provider declares no OSDM version: say which version you judged against.',
@@ -261,6 +285,7 @@ function readResult(text, { compare = false } = {}) {
     cause: short(g.cause, 2000),
     owner: OWNERS.includes(g.owner) ? g.owner : 'unclear',
     why: short(g.why, 1000),
+    action: short(g.action, 600),
     steps: strings(g.steps),
     scenarios: strings(g.scenarios),
   }));

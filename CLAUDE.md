@@ -309,6 +309,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     across operations, 30k chars, 12 operations. `osdm-references.json` is
     **generated** (`scripts/generate-osdm-references.js`, 3.4–3.8 from
     gh-pages, 3.8 copied from the repository first); a test pins its 3.8.
+    **#827 PR C (1.11.329): questioning the test.** The 15 most failing
+    groups carry `sample` { request, response } (`sampleOf` in
+    `buildInput()`, read by the route from `run_requests` bodies of the
+    company, never headers or URL), masked by `utils/aiMask.js`: personal
+    keys (names, birth date, gender, contact, address, cards, identity
+    documents…) and connection keys anywhere, URLs to `<url>`, a Problem's
+    title/detail (its code kept), long text, lists of more than 3, 6k chars
+    a sample. Maintainer's rule: everything else a run sends or receives is
+    test data. Owners are provider / oscar / **configuration** / unclear,
+    each group has an `action`; an OSCAR group can be copied as issue
+    Markdown (`issueText()`, page only). The commitment text went to
+    version 2 with it: what is sent changed, so every Test Manager accepts
+    again (no new approval).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

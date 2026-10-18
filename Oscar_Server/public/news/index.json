@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-question-test",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "AI Analysis: requests and answers, configuration and next steps",
+    "summary": "The AI analysis now sees a masked example of what was sent and received, can say a problem is one of configuration, and proposes what to do next.",
+    "content": "For each of the most frequent problems, the model is now shown one request OSCAR sent and the answer received, with the personal data of passengers and purchasers (names, date of birth, e-mail, phone, address, cards) and all connection data masked; the preview shows exactly that. Besides provider, OSCAR and unclear, a problem can now be put down to the configuration (the Test Framework, the Test Data or the choice of scenarios), and each problem comes with a proposed next step. The model may also say that a check of OSCAR itself is wrong, quoting the OSDM specification; such a problem can be copied as the text of an OSCAR issue. Test Managers only."
+  },
+  {
     "id": "2026-10-18-ai-osdm-reference",
     "date": "October 18, 2026",
     "tag": "Feature",

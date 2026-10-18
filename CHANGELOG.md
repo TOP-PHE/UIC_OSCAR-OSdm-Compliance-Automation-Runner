@@ -112,6 +112,30 @@ installed simulator updates when this version reaches `main`.
 
 ---
 
+## [server-1.11.329] / [collection-OTST_V2.0.183] — 2026-10-18
+
+Issue #827 part C, release 2026.364. Server and pages only.
+
+### Added
+- **The model sees what was sent and received.** Each of the 15 most failing groups carries a `sample`: the request OSCAR sent and the answer it received for one failure of the group, from the run's stored bodies. Never their headers or URL. Masked by `utils/aiMask.js` (pure), on the maintainer's rule that what a run sends and receives is test data, except:
+  - **personal data of passengers and purchasers**, wherever they are: names, date of birth, gender, e-mail, phone, address, contact, documents of identity, reduction and loyalty cards, company name;
+  - **connection data**: tokens, client ids and secrets, passwords, the requestor, authorisation; and every address of the web (it names the provider's host);
+  - **a Problem's title and detail** (free text that often quotes a name); its code is kept.
+  - Long text (a document's base64) is replaced by its length, lists are cut to three items, and a sample is cut at 6,000 characters. A body that is not JSON is described by its length. A summary by step carries no sample.
+- **A fourth owner, `configuration`**: the Test Framework declares something the provider does not do, the Test Data names a train, date or tariff it does not have, or the scenario should not run on this provider. Shown in purple.
+- **An action per group**: what to do next and who does it, shown as "Next:".
+- **The instructions allow questioning a check**: when OSCAR's request or what a check expects does not follow the OSDM extract (part B), the owner is OSCAR, naming the member or rule from the extract.
+- **The commitment text is version 2.** Its first point now says that one request and its answer, and the provider's checklist answers, are sent too, and that the personal data of purchasers is masked as well as that of passengers. Every approved Test Manager is asked to accept it again on the AI Analysis page, without a new approval; until then their analyses wait.
+- **"Copy as an OSCAR issue"** on a group the model gives to OSCAR: its title, cause, reason, action, steps and scenarios as Markdown, naming the analysis, the model, and that it is an AI opinion to be checked.
+
+Checked:
+- `ai-mask.test.js`: personal data masked at any depth and in any spelling (`last_name`, `Gender`), test data kept (offers, prices, products, `age`, `preferredLanguage`); connection data and addresses of the web; a Problem's title and detail masked, its code kept, another object's title kept; long text, lists, depth; no body, not JSON, too large.
+- `ai-analysis.test.js`: samples on the most failing groups, at most 15, none when summarised, the request id never sent; the configuration owner and the action read from the answer; the instructions; the page's configuration badge, action and copy button (OSCAR's groups only); the issue text.
+- `ai-analysis-results.test.js` (integration): a stored request with a passenger, a purchaser, a token header and a provider URL, and its Problem answer: the preview carries the operation and the masked sample, and none of the names, the e-mail, the date of birth, the token or the host.
+- Two changes made on purpose, and the tests failed: not masking personal data, and not masking a Problem's title and detail.
+
+---
+
 ## [server-1.11.328] / [collection-OTST_V2.0.183] — 2026-10-18
 
 Issue #827 part B, release 2026.363. Server only.

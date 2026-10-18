@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.363",
+  "current_release": "2026.364",
   "releases": [
+    {
+      "release": "2026.364",
+      "date": "2026-10-18",
+      "server": "1.11.329",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis may question a test (#827, part C): each of the 15 most failing groups carries one failing request and its answer, personal data of passengers and purchasers and connection data masked; the model may give a group to the configuration and propose an action, and may say a check itself is wrong, quoting the OSDM extract; a group given to OSCAR can be copied as the text of an OSCAR issue."
+      ]
+    },
     {
       "release": "2026.363",
       "date": "2026-10-18",

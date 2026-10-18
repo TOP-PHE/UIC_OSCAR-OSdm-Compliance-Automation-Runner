@@ -259,3 +259,28 @@ describe('#801 PR 3 the history', () => {
     expect(provider.status).toBe(404);
   });
 });
+
+describe('#827 PR C the masked sample', () => {
+  test('one failing request of the group, its personal and connection data masked, never its headers or URL', async () => {
+    const runId = uuidv4();
+    run(`INSERT INTO runs (id, company_id, user_id, status, batch_id, scenario_code, queued_at, completed_at) VALUES (?, ?, ?, 'COMPLETED', 'batch-sample', 'OTST_S', '2026-10-16 09:00:00', '2026-10-16 09:00:00')`,
+      [runId, companyId, tmId]);
+    const suite = run(`INSERT INTO run_suites (run_id, company_id, scenario_name, suite_name) VALUES (?, ?, 'OTST_S', 'x')`, [runId, companyId]).lastInsertRowid;
+    const sent = { offers: [{ offerId: 'O-77' }], passengerSpecifications: [{ externalRef: 'p1', type: 'ADULT', detail: { firstName: 'Marie', lastName: 'Curie' }, dateOfBirth: '1990-02-03' }],
+      purchaser: { detail: { firstName: 'Pierre', contact: { email: 'pierre@example.com' } } } };
+    const got = { problems: [{ code: 'urn:uic:problem:MISSING_INFORMATION', title: 'Marie Curie needs a phone', detail: 'pierre@example.com' }] };
+    const reqId = run(`INSERT INTO run_requests (suite_id, run_id, company_id, request_name, http_method, http_url, http_status, request_headers, request_body, response_body)
+      VALUES (?, ?, ?, '02. POST Booking', 'POST', 'https://secret-host.example/alpha/bookings', 400, ?, ?, ?)`,
+    [suite, runId, companyId, colEncrypt(JSON.stringify({ Authorization: 'Bearer tok-123' })), colEncrypt(JSON.stringify(sent)), colEncrypt(JSON.stringify(got))]).lastInsertRowid;
+    run(`INSERT INTO run_assertions (request_id, suite_id, run_id, company_id, assertion_key, assertion_name, passed) VALUES (?, ?, ?, ?, 'k', 'status is 201', 0)`,
+      [reqId, suite, runId, companyId]);
+    const res = await preview(['batch-sample']);
+    expect(res.status).toBe(200);
+    const group = JSON.parse(res.body.input).failures[0];
+    expect(group.operation).toBe('POST /bookings');
+    expect(group.sample.request.offers).toEqual([{ offerId: 'O-77' }]);
+    expect(group.sample.request.passengerSpecifications[0]).toEqual({ externalRef: 'p1', type: 'ADULT', detail: { firstName: '<masked>', lastName: '<masked>' }, dateOfBirth: '<masked>' });
+    expect(group.sample.response.problems[0]).toEqual({ code: 'urn:uic:problem:MISSING_INFORMATION', title: '<masked>', detail: '<masked>' });
+    for (const secret of ['Marie', 'Curie', 'Pierre', 'pierre@', '1990-02-03', 'tok-123', 'secret-host']) expect(res.body.input).not.toContain(secret);
+  });
+});

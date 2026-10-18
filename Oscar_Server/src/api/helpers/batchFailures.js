@@ -23,7 +23,7 @@ const FINISHED = new Set(['COMPLETED', 'FAILED']);
 /**
  * The failed checks of a finished batch's runs, oldest first, at most
  * MAX_FAILURES: { runId, at, scenarioCode, step, check, error, status,
- * problemCode, problemTitle, problemDetail, method, url }. The URL is for
+ * problemCode, problemTitle, problemDetail, method, url, requestId }. The URL is for
  * finding the OSDM operation (#827): the AI analysis never sends it.
  */
 function failuresOfBatch(companyId, batchId) {
@@ -51,7 +51,7 @@ function failuresOfBatch(companyId, batchId) {
       runId: r.run_id, at: r.completed_at || null, scenarioCode: r.scenario_code || r.scenario_name || null,
       step: r.request_name, check: r.assertion_name, error: r.error_msg || null, status: r.http_status,
       problemCode: p?.code || null, problemTitle: p?.title || null, problemDetail: p?.detail || null,
-      method: r.http_method || null, url: r.http_url || null,
+      method: r.http_method || null, url: r.http_url || null, requestId: r.request_id,
     };
   });
 }

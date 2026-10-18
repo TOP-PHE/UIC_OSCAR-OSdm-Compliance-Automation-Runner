@@ -166,8 +166,8 @@ function testResultHtml(test) {
 
 // ── The analysis (PR 3) ─────────────────────────────────────────────────────
 
-const OWNER_LABEL = { provider: 'Provider', oscar: 'OSCAR', unclear: 'Unclear' };
-const OWNER_STYLE = { provider: 'background:#fff3e0;color:#e65100', oscar: 'background:#e3f2fd;color:#0d47a1', unclear: 'background:#eceff1;color:#455a64' };
+const OWNER_LABEL = { provider: 'Provider', oscar: 'OSCAR', configuration: 'Configuration', unclear: 'Unclear' };
+const OWNER_STYLE = { provider: 'background:#fff3e0;color:#e65100', oscar: 'background:#e3f2fd;color:#0d47a1', configuration: 'background:#f3e5f5;color:#6a1b9a', unclear: 'background:#eceff1;color:#455a64' };
 
 /** The analysis card: where, which batches, which language. Filled by loadAnalysisTarget(). */
 function analysisPanelHtml(targets) {
@@ -255,14 +255,24 @@ function listHtml(items) {
   return `<ul style="margin:4px 0 0 18px;padding:0">${lines}</ul>`;
 }
 
-function groupRowHtml(g) {
+function groupRowHtml(g, n) {
   const owner = OWNER_LABEL[g.owner] ? g.owner : 'unclear';
   const badge = `<span style="font-size:11px;padding:2px 8px;border-radius:10px;${OWNER_STYLE[owner]}">${OWNER_LABEL[owner]}</span>`;
   const where = [g.steps?.length ? 'Steps: ' + g.steps.map(esc).join(', ') : '', g.scenarios?.length ? 'Scenarios: ' + g.scenarios.map(esc).join(', ') : '']
     .filter(Boolean).join('<br>');
   const why = g.why ? `<div style="color:#78909c;margin-top:4px">${esc(g.why)}</div>` : '';
-  return `<tr><td style="${CELL}">${badge}</td><td style="${CELL}"><strong>${esc(g.title)}</strong><div>${esc(g.cause)}</div>${why}
-    <div style="font-size:11px;color:#90a4ae;margin-top:4px">${where}</div></td></tr>`;
+  const action = g.action ? `<div style="margin-top:4px"><strong>Next:</strong> ${esc(g.action)}</div>` : '';
+  const copy = owner === 'oscar'
+    ? `<div style="margin-top:6px"><button class="btn" data-ai-action="an-copy-issue" data-group="${esc(n)}">Copy as an OSCAR issue</button></div>` : '';
+  return `<tr><td style="${CELL}">${badge}</td><td style="${CELL}"><strong>${esc(g.title)}</strong><div>${esc(g.cause)}</div>${why}${action}
+    <div style="font-size:11px;color:#90a4ae;margin-top:4px">${where}</div>${copy}</td></tr>`;
+}
+
+/** A group the model gives to OSCAR, as the text of a GitHub issue (Markdown). */
+function issueText(g, a) {
+  const list = (title, items) => (items?.length ? `\n**${title}:** ${items.join(', ')}` : '');
+  return `## ${g.title}\n\n${g.cause}\n\n**Why OSCAR:** ${g.why || '—'}\n\n**Next:** ${g.action || '—'}\n${list('Steps', g.steps)}${list('Scenarios', g.scenarios)}\n\n`
+    + `_From an AI analysis (${a.model}, ${a.createdAt}, id ${a.id}). An AI opinion, to be checked before acting on it._\n`;
 }
 
 function comparisonHtml(c) {
@@ -286,7 +296,7 @@ function resultHtml(a) {
       <pre style="white-space:pre-wrap;font-size:12px">${esc(a.result?.raw || '')}</pre>`;
   }
   const r = a.result || {};
-  const rows = (r.groups || []).map(groupRowHtml).join('');
+  const rows = (r.groups || []).map((g, n) => groupRowHtml(g, n)).join('');
   const groups = rows ? '<div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">' + rows + '</table></div>' : '';
   return head + `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">An AI opinion: it can be wrong, and it is not a test result or a finding.</div>
     <p style="font-size:13px;line-height:1.55">${esc(r.summary || '')}</p>${comparisonHtml(r.comparison)}
@@ -504,9 +514,25 @@ async function showAnalysis(id) {
   const box = document.getElementById('ai-an-result');
   if (!res.ok) { box.innerHTML = testResultHtml({ ok: false, error: await readError(res, 'Could not read the analysis.') }); return null; }
   const a = await res.json();
+  shownAnalysis = a;
   box.innerHTML = resultHtml(a);
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return a;
+}
+
+let shownAnalysis = null;
+
+// #827: the text of an OSCAR issue for a group of the analysis shown, to the clipboard.
+async function copyIssue(n) {
+  const g = shownAnalysis?.result?.groups?.[Number(n)];
+  if (!g) return;
+  const text = issueText(g, shownAnalysis);
+  try {
+    await navigator.clipboard.writeText(text);
+    show('Copied: paste it in a new issue of the OSCAR repository.', 'ok');
+  } catch {
+    window.prompt('Copy this text into a new OSCAR issue:', text);
+  }
 }
 
 async function runAnalysis() {
@@ -535,13 +561,14 @@ document.addEventListener('change', (e) => {
   else if (e.target.closest('#ai-an-a, #ai-an-b, #ai-an-lang')) { previewed = null; document.getElementById('ai-an-preview').innerHTML = ''; }
 });
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"]');
+  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"]');
   if (!el) return;
   const act = el.dataset.aiAction;
   let job;
   if (act === 'an-preview') job = previewAnalysis();
   else if (act === 'an-run') job = runAnalysis();
   else if (act === 'an-checklist-remove') job = removeChecklist();
+  else if (act === 'an-copy-issue') job = copyIssue(el.dataset.group);
   else job = showAnalysis(el.dataset.id);
   job.catch(err => show(err.message, 'error'));
 });

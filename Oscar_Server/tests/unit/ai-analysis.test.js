@@ -239,3 +239,64 @@ describe('#827 PR A the provider\'s context', () => {
     for (const line of fetches) expect(line).toContain('analysisHeaders(');
   });
 });
+
+describe('#827 PR C questioning the test', () => {
+  const recs = [rec({ requestId: 11 }), rec({ requestId: 12, runId: 'r2' }), rec({ requestId: 13, step: '06. POST Fulfillments', check: 'fulfilled', status: 500 })];
+
+  test('each group gets the masked sample of one of its requests; the request id is never sent', () => {
+    const asked = [];
+    const sampleOf = (id) => { asked.push(id); return id === 11 ? { request: { offers: [{ offerId: 'O1' }] }, response: { problems: [{ code: 'X', title: '<masked>' }] } } : null; };
+    const { input, text } = AN.buildInput({ batches: [batch('b', recs)], framework: null, findings: [], scenarios: [], sampleOf });
+    expect(asked).toEqual([11, 13]);
+    expect(input.failures[0].sample).toEqual({ request: { offers: [{ offerId: 'O1' }] }, response: { problems: [{ code: 'X', title: '<masked>' }] } });
+    expect(input.failures[1].sample).toBeUndefined();
+    expect(text).not.toContain('requestId');
+  });
+
+  test('at most 15 samples, the most failing groups first; none when summarised by step', () => {
+    const many = Array.from({ length: 20 }, (_, i) => rec({ requestId: i, step: `s${i}`, check: `c${i}` }));
+    let calls = 0;
+    const { input } = AN.buildInput({ batches: [batch('b', many)], framework: null, findings: [], scenarios: [], sampleOf: () => { calls++; return { request: {}, response: {} }; } });
+    expect(calls).toBe(15);
+    expect(input.failures.filter((g) => g.sample)).toHaveLength(15);
+    expect(AN.byStep([{ step: 'a', status: 1, failures: 1, scenarios: [], sample: { x: 1 } }])[0].sample).toBeUndefined();
+  });
+
+  test('the answer may give a group to the configuration and propose an action; the instructions allow questioning a check', () => {
+    const r = AN.readResult(JSON.stringify({ summary: 's', groups: [{ title: 'T', cause: 'C', owner: 'configuration', action: 'Untick IDEMPOTENCY.' }, { title: 'U', owner: 'nobody' }] }));
+    expect(r.result.groups[0]).toMatchObject({ owner: 'configuration', action: 'Untick IDEMPOTENCY.' });
+    expect(r.result.groups[1]).toMatchObject({ owner: 'unclear', action: '' });
+    const prompt = AN.systemPrompt({});
+    expect(prompt).toContain('the configuration\'s');
+    expect(prompt).toContain('You may question a check itself');
+    expect(prompt).toContain('"owner": "provider | oscar | configuration | unclear"');
+    expect(prompt).toContain('"action"');
+  });
+
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 'ai-analysis.js'), 'utf8');
+  const lines = source.split('\n');
+  const lift = (name) => {
+    const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
+    const end = lines.findIndex((l, i) => i > start && l === '}');
+    return lines.slice(start, end + 1).join('\n');
+  };
+  const ctx = vm.createContext({ esc });
+  const consts = lines.filter((l) => /^const (CELL|OWNER_LABEL|OWNER_STYLE) =/.test(l)).join('\n');
+  vm.runInContext(`${consts}\n${lift('groupRowHtml')}\n${lift('issueText')}\nthis.groupRowHtml = groupRowHtml; this.issueText = issueText;`, ctx);
+
+  test('the page shows the configuration owner and the action, and offers an OSCAR issue only for OSCAR\'s groups', () => {
+    const conf = ctx.groupRowHtml({ title: 'T', cause: 'C', owner: 'configuration', action: 'Untick <x>' }, 0);
+    expect(conf).toContain('>Configuration</span>');
+    expect(conf).toContain('<strong>Next:</strong> Untick &lt;x&gt;');
+    expect(conf).not.toContain('an-copy-issue');
+    const oscar = ctx.groupRowHtml({ title: 'T', cause: 'C', owner: 'oscar' }, 3);
+    expect(oscar).toContain('data-ai-action="an-copy-issue" data-group="3"');
+  });
+
+  test('the issue text names the group, the model, the analysis and that it is an opinion', () => {
+    const text = ctx.issueText({ title: 'Check expects X', cause: 'OSDM 3.6 makes it optional.', why: 'Extract', action: 'Fix the check', steps: ['07. GET Booking'], scenarios: ['S1', 'S2'] },
+      { model: 'claude-sonnet-5-5', createdAt: '2026-10-18', id: 'a1' });
+    expect(text).toBe('## Check expects X\n\nOSDM 3.6 makes it optional.\n\n**Why OSCAR:** Extract\n\n**Next:** Fix the check\n\n**Steps:** 07. GET Booking\n**Scenarios:** S1, S2\n\n'
+      + '_From an AI analysis (claude-sonnet-5-5, 2026-10-18, id a1). An AI opinion, to be checked before acting on it._\n');
+  });
+});
