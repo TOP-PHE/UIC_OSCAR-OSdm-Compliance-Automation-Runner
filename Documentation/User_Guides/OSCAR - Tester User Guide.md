@@ -22,6 +22,7 @@
 6. [Reading the report](#6-reading-the-report)
 7. [Reference tables](#7-reference-tables)
 8. [Troubleshooting](#8-troubleshooting)
+9. [Testing OSCAR with the OSDM simulator](#9-testing-oscar-with-the-osdm-simulator)
 
 ---
 
@@ -1145,6 +1146,104 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Every run fails at once with **This run was not started: the data file holds text that contains "{{"** | The same, in text stored in your company's data file before this rule existed. The test engine reads the whole data file before every run, so one such text stops every run of the company. Nothing was sent to the provider. | The message says where. If it is in one of your scenarios, open it in Test Config, remove the `{{` and save. If the message says the text is in a part of the data file that you cannot see, ask your Test Manager, whose own run says where. |
 
 ---
+
+## 9. Testing OSCAR with the OSDM simulator
+
+The OSDM simulator is a test provider made for OSCAR. It answers like a real
+OSDM system, and it can answer **with errors chosen on purpose**, to check
+that OSCAR sees them. Its installation is in
+[OSCAR - OSDM Simulator](../Server_Operations/OSCAR%20-%20OSDM%20Simulator.md);
+this section is how a Test Manager uses it.
+
+### 9.1 The three simulated providers
+
+| Provider | OSDM version | Endpoint |
+|---|---|---|
+| `alpha` | 3.6.0 | `https://<simulator-host>/alpha` |
+| `beta` | 3.7.0 | `https://<simulator-host>/beta` |
+| `gamma` | 3.8.0 | `https://<simulator-host>/gamma` |
+
+All three offer the same functions; each answers in the shapes of its own
+OSDM version. Ask your OSCAR administrator for the simulator's address and
+for a client id and secret per tester (the simulator keeps them in its
+`clients.json`).
+
+### 9.2 Setting up a company for the simulator
+
+Use a company, or a provider of your company (§2.1), made **only** for the
+simulator: the steps below replace its scenarios, Test Framework and Test
+Data.
+
+1. **API Config**: the endpoint of the provider (table above); each tester
+   enters the OAuth2 credentials: token URL
+   `https://<simulator-host>/<provider>/oauth/token`, their client id and
+   secret, scope empty.
+2. **Test Config → 🔗 Reference configuration** (since 1.11.335): choose
+   `simulator-alpha`, `simulator-beta` or `simulator-gamma`, then
+   **Update from the reference**. OSCAR fills in the scenarios, the Test
+   Framework, the Test Data and the run list of that provider. The endpoint
+   and the credentials are not touched; the replaced data file can be got
+   back with *Restore previous file*.
+3. When the simulator's scenarios change in the repository, Test Config and
+   the **New Run** page say the configuration is **not up to date**. Press
+   **Update from the reference** again.
+
+### 9.3 A normal run
+
+Run the run list as usual (§5). The expected result of every scenario, its
+checks and its warnings, is in
+[OSCAR - OSDM Simulator scenarios](../Server_Operations/OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
+A failure there that the page does not list is OSCAR's or the simulator's to
+look at, never a provider's.
+
+### 9.4 Tests with errors (faults on demand)
+
+The simulator can break one kind of answer on request, for example a booking
+that loses a passenger or a refund that gives back too much. Each fault has a
+code, and OSCAR is expected to report it at a known step (the table of codes
+and expected checks is in
+[OSCAR - OSDM Simulator § 6b](../Server_Operations/OSCAR%20-%20OSDM%20Simulator.md#6b-faults-on-demand-833)).
+The bookings the simulator keeps are not changed, only the answers.
+
+Three ways to ask for faults:
+
+- **Ready-made scenarios** (gamma): the data file holds one scenario per
+  fault, `SIM_FAULT_<CODE>_38` (for example
+  `SIM_FAULT_BOOKING_PASSENGER_DROPPED_38`). They are not in the run list,
+  because they fail on purpose: tick the ones you want in the run list in
+  Test Config, then start the run from **New Run**.
+- **On a scenario of your own**: in Test Config, open the scenario and fill in
+  **Simulator faults** with one or more codes separated by commas, for
+  example `offer.price-below-parts, booking.passenger-dropped`. Every request
+  of that scenario then asks the simulator for those faults. Leave the field
+  empty on a scenario meant for a real provider; a real provider never
+  receives it anyway when it is empty.
+- **For a whole provider**: a tester puts `sim-faults:code,code` in the
+  **scope** field of their API Config. Every request made with that token is
+  then faulty. Do this on a second provider of your company (for example
+  "Gamma (faults)") pointing at the same endpoint, so that the normal one
+  stays clean.
+
+A code the simulator does not know is refused (HTTP 400 `UNKNOWN_FAULT`, or
+`invalid_scope` when the token is asked), so a typing mistake shows as an
+error and never as "OSCAR detected nothing".
+
+### 9.5 Did OSCAR see the faults?
+
+1. Open **AI Analysis**, choose the batch, and press **Faults detected in this
+   batch**. For each fault a run asked for, OSCAR says whether it was
+   detected (every expected check seen, some, or none) and which checks it
+   saw. No AI service is called for this.
+2. If your company uses the AI analysis (menu **AI Analysis**), analyse the same
+   batch, then press **Score against the simulator's faults** under the
+   result: for each fault OSCAR failed, it says whether the analysis
+   explained it (the provider named as owner, at the right step), blamed
+   someone else, or missed it. Analysing the same batch with two models gives
+   two scores to compare.
+
+A fault that OSCAR reports only as a WARNING is shown as detected but is not
+scored: the AI analysis is only sent failed checks.
+
 
 ## Glossary
 
