@@ -216,7 +216,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
       ...(exchangeOffer.admissionOfferParts || []).map(part => part.id),
       ...(exchangeOffer.reservationOfferParts || []).map(part => part.id),
       ...(exchangeOffer.ancillaryOfferParts || []).map(part => part.id)
-    ].filter(id => id);
+    ].filter(Boolean);
 
     admissionReservationAncillaryBookingPartsIds.push(...allPartIds);
     bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", admissionReservationAncillaryBookingPartsIds);
