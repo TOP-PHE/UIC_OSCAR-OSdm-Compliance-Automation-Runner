@@ -23,7 +23,8 @@
  * the caller is told. Each names what OSCAR must report (`expect`: the step,
  * a stable part of the check's text, FAIL or WARNING); the detection report
  * (#833 PR D) compares a run with it. `expect` is what the collection said
- * in the replay of the SIM_FAULT_* scenarios.
+ * in the replay of the SIM_FAULT_* scenarios (the error faults are seen on
+ * the purchaser probe those scenarios run: any refusal would do).
  */
 
 const HEADER = 'x-simulator-faults';
@@ -155,7 +156,10 @@ const FAULTS = [
     detail: 'GET /bookings/{id} answers HTTP 200 with an HTML "Request Rejected" page.',
     applies: (route) => is(route, 'GET', ['bookings', '*']),
     raw: { contentType: 'text/html; charset=utf-8', text: '<html><head><title>Request Rejected</title></head><body>The requested URL was rejected.</body></html>' },
-    expect: [{ step: '05. GET Booking before Fulfillments', check: 'Content-Type is JSON', level: 'FAIL' }],
+    expect: [
+      { step: '05. GET Booking before Fulfillments', check: 'Content-Type is JSON', level: 'FAIL' },
+      { step: '05. GET Booking before Fulfillments', check: 'The answer is a JSON object', level: 'FAIL' },
+    ],
   },
   {
     code: 'error.problem-without-code',
@@ -163,7 +167,7 @@ const FAULTS = [
     title: 'A refusal gives no problem code',
     detail: 'Every error answer (4xx) leaves out its OSDM problem code.',
     problem: (problem) => ({ ...problem, code: undefined }),
-    expect: [{ step: '*', check: 'error body is an RFC', level: 'FAIL' }],
+    expect: [{ step: '14. POST Booking Purchaser', check: 'the refusal names no OSDM problem code', level: 'WARNING' }],
   },
   {
     code: 'error.server-error-for-refusal',
@@ -171,7 +175,7 @@ const FAULTS = [
     title: 'A refusal comes as a server error',
     detail: 'Every client error (4xx) is answered HTTP 500 instead.',
     problem: (problem) => ({ ...problem, status: 500 }),
-    expect: [{ step: '*', check: 'provider rejects with a client error (4xx)', level: 'FAIL' }],
+    expect: [{ step: '14. POST Booking Purchaser', check: 'provider rejects with a client error (4xx)', level: 'FAIL' }],
   },
 ];
 
