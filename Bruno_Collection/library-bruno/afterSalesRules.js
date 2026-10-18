@@ -58,7 +58,7 @@ function effectiveRefundability(part, atMs, action) {
   if (!part || typeof part !== 'object') return out;
 
   const conds = (Array.isArray(part.afterSalesConditions) ? part.afterSalesConditions : [])
-    .filter((c) => c && c.condition === action);
+    .filter((c) => c?.condition === action);
   out.windows = conds.length;
   if (conds.length === 0) {
     // WITH_CONDITION promises conditions the client cannot read.
@@ -72,9 +72,9 @@ function effectiveRefundability(part, atMs, action) {
   const price = part.price;
   const priceOk = !!(price && typeof price.amount === 'number' && price.amount > 0);
   const feesOk = conds.every((c) => c.afterSaleFee && typeof c.afterSaleFee.amount === 'number');
-  const currencies = [...new Set(conds.map((c) => c.afterSaleFee && c.afterSaleFee.currency)
+  const currencies = [...new Set(conds.map((c) => c.afterSaleFee?.currency)
     .concat(priceOk ? [price.currency] : []).filter(Boolean))];
-  const scales = [...new Set(conds.map((c) => c.afterSaleFee && c.afterSaleFee.scale)
+  const scales = [...new Set(conds.map((c) => c.afterSaleFee?.scale)
     .concat(priceOk ? [price.scale] : []).filter((v) => v != null))];
   if (!priceOk || !feesOk || currencies.length > 1 || scales.length > 1) return out;
 
@@ -119,7 +119,7 @@ function effectiveRefundability(part, atMs, action) {
 function expectedRefundForParts(parts, atMs, action) {
   const res = { ok: true, expectedRefundable: 0, expectedFee: 0, currency: null, detail: [], reason: null };
   const list = (Array.isArray(parts) ? parts : [])
-    .filter((p) => p && p.price && typeof p.price.amount === 'number' && p.price.amount > 0);
+    .filter((p) => p?.price && typeof p.price.amount === 'number' && p.price.amount > 0);
   if (list.length === 0) {
     res.ok = false;
     res.reason = 'no value-bearing parts';
@@ -161,5 +161,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

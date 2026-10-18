@@ -395,7 +395,7 @@ function setKnownDeviations(jsonData) {
   if (list.length > 0) {
     validationLogger('[INFO] Known-deviation baseline: ' + list.length +
       ' documented provider deviation(s) loaded — ' +
-      list.map(function (d) { return (d && d.step) + '→' + (d && d.expectedStatus); }).join(', ') +
+      list.map(function (d) { return (d?.step) + '→' + (d?.expectedStatus); }).join(', ') +
       '. A matching response is reported as a documented deviation, not a failure.');
   }
 }
@@ -917,7 +917,7 @@ function parseScenarioData(jsonData) {
         if (_prByLeg) {
           const _tripReq = jsonData.tripRequirements?.find(
             (tr) => tr && tr.id === scenario.tripRequirementId);
-          if (_tripReq && _tripReq.tripType === "SPECIFICATION") {
+          if (_tripReq?.tripType === "SPECIFICATION") {
             const _legCount = Array.isArray(_tripReq.legs) ? _tripReq.legs.length : 0;
             if (_legCount < 2) {
               validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByLeg is on but the SPECIFICATION trip has ${_legCount} leg(s) — per-leg partial refund cannot fire. Either turn partialRefundByLeg off, or use a multi-leg trip.`);
@@ -979,7 +979,7 @@ function parseScenarioData(jsonData) {
       } catch (_e) {
         // With the path fixed, a throw here is a genuine feature failure:
         // armed expiry timers would not run their extra passes.
-        validationLogger(`[ERROR] expiredFlow queue build failed: ${_e && _e.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
+        validationLogger(`[ERROR] expiredFlow queue build failed: ${_e?.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
       }
 
       // Trip requirements — verify the scenario's reference resolves BEFORE
@@ -996,7 +996,7 @@ function parseScenarioData(jsonData) {
       const _tripWantId  = scenario.tripRequirementId;
       const _tripFound   = _tripList.some(function (tr) { return tr && tr.id === _tripWantId; });
       if (!_tripFound) {
-        const _availIds = _tripList.map(function (tr) { return tr && tr.id; }).filter(function (id) { return id != null; });
+        const _availIds = _tripList.map(function (tr) { return tr?.id; }).filter(function (id) { return id != null; });
         validationLogger(
           '[ERROR] Scenario "' + scenario.code + '" references tripRequirementId=' +
           JSON.stringify(_tripWantId) + ' but no matching entry exists in datafile.tripRequirements[]. ' +
@@ -1189,7 +1189,7 @@ function parseScenarioData(jsonData) {
             validationLogger(
               '[ERROR] Scenario "' + scenario.code + '": building TripType=' +
               tripRequirement.tripType + ' criteria for ' + _trCtx +
-              ' threw: ' + (_branchErr && _branchErr.message ? _branchErr.message : String(_branchErr)) +
+              ' threw: ' + (_branchErr?.message ? _branchErr.message : String(_branchErr)) +
               '. offerTripSearchCriteria / offerTripSpecifications stays unset and the request body cannot be built. ' +
               'Fix in the wizard: open Test Data → Trip Requirements, open this entry and verify the trip data is complete and dates parse correctly.'
             );
@@ -1245,7 +1245,7 @@ function parseScenarioData(jsonData) {
       const _paxWantId   = scenario.passengersListId;
       const _paxFound    = _paxLists.some(function (pl) { return pl && pl.id === _paxWantId; });
       if (!_paxFound) {
-        const _availIds = _paxLists.map(function (pl) { return pl && pl.id; }).filter(function (id) { return id != null; });
+        const _availIds = _paxLists.map(function (pl) { return pl?.id; }).filter(function (id) { return id != null; });
         validationLogger(
           '[ERROR] Scenario "' + scenario.code + '" references passengersListId=' +
           JSON.stringify(_paxWantId) + ' but no matching entry exists in datafile.passengersList[]. ' +
@@ -1438,7 +1438,7 @@ function parseScenarioData(jsonData) {
         const _ffWantId  = scenario.requestedFulfillmentOptionsListId;
         const _ffFound   = _ffLists.some(function (ff) { return ff && ff.id === _ffWantId; });
         if (!_ffFound) {
-          const _availIds = _ffLists.map(function (ff) { return ff && ff.id; }).filter(function (id) { return id != null; });
+          const _availIds = _ffLists.map(function (ff) { return ff?.id; }).filter(function (id) { return id != null; });
           validationLogger(
             '[ERROR] Scenario "' + scenario.code + '" references requestedFulfillmentOptionsListId=' +
             JSON.stringify(_ffWantId) + ' but no matching entry exists in datafile.requestedFulfillmentOptionsList[]. ' +
@@ -1481,7 +1481,7 @@ function parseScenarioData(jsonData) {
   }
 
   if (foundCorrectDataSet === false) {
-    const _availCodes = (jsonData.scenarios || []).map(function (s) { return s && s.code; }).filter(Boolean);
+    const _availCodes = (jsonData.scenarios || []).map(function (s) { return s?.code; }).filter(Boolean);
     validationLogger('[ERROR] ⛔ Scenario "' + scenarioCode + '" not found in the data file\'s scenarios[]. ' +
       'Available code(s): [' + _availCodes.slice(0, 20).join(', ') + (_availCodes.length > 20 ? ', …' : '') + ']. ' +
       'Fix in the wizard: open Test Config and check the scenario list / scenariosToRun selection.');
@@ -1812,7 +1812,7 @@ function featureNotDeclaredWarning(scenario, field) {
 // (returnOffsetDays + optional returnTime, returnModel, returnFulfillments).
 // These are authoring data only — never echoed into the OSDM offerSearchCriteria.
 function returnOptsFromScenario(scenario) {
-  const c = (scenario && scenario.offerSearchCriteria) || {};
+  const c = (scenario?.offerSearchCriteria) || {};
   return { offsetDays: c.returnOffsetDays, time: c.returnTime, model: c.returnModel, fulfillments: c.returnFulfillments };
 }
 

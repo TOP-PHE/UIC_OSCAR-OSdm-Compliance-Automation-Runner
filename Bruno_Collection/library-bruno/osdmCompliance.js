@@ -722,7 +722,7 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
     /OPERATION_NOT_PERMITTED|NOT_IMPLEMENTED|NOT_SUPPORTED|UNSUPPORTED/i.test(_problemCode);
   const _bareNotSupportedStatus = [403, 404, 405, 500].includes(statusCode);
   if (statusCode === 501 || _saysUnsupported || _bareNotSupportedStatus) {
-    const _title = _problem && _problem.title ? ` ("${_problem.title}")` : '';
+    const _title = _problem?.title ? ` ("${_problem.title}")` : '';
     const _via = _saysUnsupported
       ? `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`
       : (statusCode === 501 ? 'HTTP 501 Not Implemented' : `HTTP ${statusCode}`);
@@ -758,9 +758,9 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
 // checks); false otherwise (caller returns).
 // Out-of-version endpoints are logged as skipped — no pass/fail registered.
 function handleSystemInfoStatus(statusCode, endpoint, ctx) {
-  const bruTest = ctx && ctx.bruTest;
-  const validationLogger = ctx && ctx.validationLogger;
-  const cls = classifySystemInfoStatus(statusCode, endpoint, ctx && ctx.body);
+  const bruTest = ctx?.bruTest;
+  const validationLogger = ctx?.validationLogger;
+  const cls = classifySystemInfoStatus(statusCode, endpoint, ctx?.body);
   if (cls.log && validationLogger) validationLogger(cls.log);
   if (cls.outcome === 'ok') {
     if (bruTest) bruTest(cls.name, () => { expect(statusCode).to.eql(200); });
@@ -819,5 +819,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

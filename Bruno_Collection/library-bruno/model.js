@@ -346,5 +346,5 @@ module.exports = exported;
 try {
   Object.assign(globalThis, exported);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

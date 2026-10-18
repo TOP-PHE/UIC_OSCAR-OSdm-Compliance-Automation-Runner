@@ -113,7 +113,7 @@ function checkWarningsAndProblems(jsonData) {
   try {
     const _fmt = (p) => {
       const parts = ["code", "type", "title", "status", "detail"]
-        .filter((k) => p && p[k] != null && p[k] !== "")
+        .filter((k) => p?.[k] != null && p[k] !== "")
         .map((k) => `${k}=${JSON.stringify(p[k])}`);
       return parts.length ? parts.join(", ") : JSON.stringify(p);
     };
@@ -125,7 +125,7 @@ function checkWarningsAndProblems(jsonData) {
     });
     problems.forEach((p, i) => {
       const ptr = Array.isArray(p.pointers) && p.pointers.length > 0
-        ? ` — pointer(s): ${p.pointers.map((x) => `${(x && x.code) || "?"} @ ${(x && x.requestPointer) || "?"}`).join("; ")}`
+        ? ` — pointer(s): ${p.pointers.map((x) => `${(x?.code) || "?"} @ ${(x?.requestPointer) || "?"}`).join("; ")}`
         : "";
       validationLogger(`[ERROR] ⛔ Response envelope problem ${i + 1}/${problems.length}: ${_fmt(p)}${ptr}`);
     });
@@ -223,12 +223,12 @@ function ensureAuthorizationOr403() {
     // Attempt to copy headers if possible
     let resolvedHeaders = {};
     try {
-      const headersObj = req.getHeaders && req.getHeaders();
+      const headersObj = req.getHeaders?.();
       // Try common shapes: getAll() or entries()
       if (headersObj && typeof headersObj.getAll === 'function') {
         const arr = headersObj.getAll();
         arr.forEach(h => {
-          if (h && h.key) resolvedHeaders[h.key] = resolveVars(h.value);
+          if (h?.key) resolvedHeaders[h.key] = resolveVars(h.value);
         });
       } else if (headersObj && typeof headersObj.entries === 'function') {
         for (const { key, value } of headersObj.entries()) {
@@ -237,13 +237,13 @@ function ensureAuthorizationOr403() {
       }
     } catch (e) {
       // #357: validationLogger so the [DEBUG] diagnostic obeys loggingType.
-      validationLogger('[DEBUG] [offers] preflight header extraction failed, continuing without headers: ' + (e && e.message));
+      validationLogger('[DEBUG] [offers] preflight header extraction failed, continuing without headers: ' + (e?.message));
     }
 
     // Best-effort body resolve (may be empty in pre-request)
     let resolvedBody = null;
     try {
-      const rawBody = req.getBody && req.getBody();
+      const rawBody = req.getBody?.();
       const rawStr = rawBody && typeof rawBody.toString === 'function' ? rawBody.toString() : null;
       if (rawStr) {
         const replaced = resolveVars(rawStr);
@@ -255,7 +255,7 @@ function ensureAuthorizationOr403() {
       }
     } catch (e) {
       // #357: validationLogger so the [DEBUG] diagnostic obeys loggingType.
-      validationLogger('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e && e.message));
+      validationLogger('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e?.message));
     }
 
     // Preflight call using bru.sendRequest
@@ -407,7 +407,7 @@ function postOfferResponse(jsonData) {
       const _resParts = Array.isArray(selectedOffer.reservationOfferParts)
         ? selectedOffer.reservationOfferParts : [];
       const _matchPart = _resParts.find(function (p) { return p && p.id === _resId; });
-      if (_matchPart && _matchPart.validUntil) {
+      if (_matchPart?.validUntil) {
         bru.setEnvVar('addReservationOfferValidUntil', String(_matchPart.validUntil));
         bru.setEnvVar('addReservationOfferValidUntilSource',
           `selectedOffer.reservationOfferParts[id=${_resId}].validUntil`);
@@ -434,7 +434,7 @@ function postOfferResponse(jsonData) {
 const FLEX_ORDER = ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'];
 
 function deriveOfferFlexibilityFromProducts(offer) {
-  const flits = ((offer && offer.products) || []).map(p => p && p.flexibility).filter(Boolean);
+  const flits = ((offer?.products) || []).map(p => p?.flexibility).filter(Boolean);
   let result;
   flits.forEach(f => {
     const rank = FLEX_ORDER.indexOf(f);
@@ -449,7 +449,7 @@ function deriveOfferFlexibilityFromProducts(offer) {
 // products (#223 — providers that omit offerSummary). Returns undefined if
 // neither is available.
 function offerFlexibility(offer) {
-  return (offer && offer.offerSummary && offer.offerSummary.overallFlexibility)
+  return (offer?.offerSummary?.overallFlexibility)
     || deriveOfferFlexibilityFromProducts(offer);
 }
 
@@ -479,7 +479,7 @@ function captureExpiredOfferDeadline(selectedOffer) {
   _partLists.forEach(function (pt) {
     const parts = Array.isArray(selectedOffer[pt]) ? selectedOffer[pt] : [];
     parts.forEach(function (p, i) {
-      if (p && p.validUntil) {
+      if (p?.validUntil) {
         const t = new Date(p.validUntil).getTime();
         if (!isNaN(t) && t < _earliestMs) {
           _earliestMs  = t;
@@ -546,10 +546,10 @@ function selectAndSetOffer(jsonData) {
     const fam = {};
     let noRes = 0;
     offers.forEach((o) => {
-      const parts = (o && o.reservationOfferParts) || [];
+      const parts = (o?.reservationOfferParts) || [];
       if (parts.length === 0) { noRes++; return; }
-      parts.forEach((p) => ((p && p.availablePlaces) || []).forEach((pl) => {
-        const t = pl && pl.accommodationType;
+      parts.forEach((p) => ((p?.availablePlaces) || []).forEach((pl) => {
+        const t = pl?.accommodationType;
         if (!t) return;
         if (!fam[t]) fam[t] = { offers: new Set(), subs: new Set() };
         fam[t].offers.add(o.offerId);
@@ -560,7 +560,7 @@ function selectAndSetOffer(jsonData) {
       .map((t) => `${t} ×${fam[t].offers.size} offer(s)${fam[t].subs.size ? ` (subtypes: ${[...fam[t].subs].join(", ")})` : ""}`)
       .join("; ");
     console.log(`[INFO] 🧭 Offer set: ${offers.length} offer(s)${famLine ? ` — reservation accommodations: ${famLine}` : ""}${noRes > 0 ? `; ${noRes} offer(s) without reservation parts` : ""}.`);
-  })(jsonData && jsonData.offers);
+  })(jsonData?.offers);
 
   const desiredFlexibility = bru.getEnvVar("desiredFlexibility");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
@@ -644,7 +644,7 @@ function selectAndSetOffer(jsonData) {
   // products (most restrictive wins) instead of dropping every offer. (#223)
   if (desiredFlexibility) {
     validationLogger(`[DEBUG] Applying flexibility filter: ${desiredFlexibility}`);
-    if (!filteredOffers.some(o => o.offerSummary && o.offerSummary.overallFlexibility)) {
+    if (!filteredOffers.some(o => o.offerSummary?.overallFlexibility)) {
       validationLogger(`[DEBUG] No offerSummary.overallFlexibility on these offers — deriving flexibility from offer products (most restrictive leg wins).`);
     }
     filteredOffers = filteredOffers.filter(o => offerFlexibility(o) === desiredFlexibility);
@@ -1063,7 +1063,7 @@ function validateOfferParts(selectedOffer) {
   checkOverallFlexibility(selectedOffer);
 
   // capture coveredTripId if value exists
-  const coveredTripId = selectedOffer.tripCoverage && selectedOffer.tripCoverage.coveredTripId;
+  const coveredTripId = selectedOffer.tripCoverage?.coveredTripId;
   if (coveredTripId !== undefined && coveredTripId !== null) {
     validationLogger(`[DEBUG] Covered Trip ID: ${coveredTripId}`);
     bru.setEnvVar("coveredTripId", coveredTripId);
@@ -1133,7 +1133,7 @@ function validateOfferParts(selectedOffer) {
 
   ['admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts'].forEach(partType => {
     (selectedOffer[partType] || []).forEach((part, pi) => {
-      const ri = part && part.requestedInformation;
+      const ri = part?.requestedInformation;
       if (ri === undefined || ri === null || ri === '') return;
       const out = processRequestedInformation({
         expr: ri,
@@ -1146,7 +1146,7 @@ function validateOfferParts(selectedOffer) {
         log: _riLog,
       });
       // autofeed (provided) and negative probe (probeTargets) both mutate the data.
-      if (out.provided.length || (out.probeTargets && out.probeTargets.length)) {
+      if (out.provided.length || (out.probeTargets?.length)) {
         _riAdditional = out.additional;
         _riChanged = true;
       }
@@ -1448,7 +1448,7 @@ function validateReservations(selectedOffer) {
         });
         const KNOWN_ACCOMMODATION_TYPES = ["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "STORAGE"];
         availablePlaces.forEach((place, pIndex) => {
-          const _t = String((place && place.accommodationType) || "");
+          const _t = String((place?.accommodationType) || "");
           if (_t && !KNOWN_ACCOMMODATION_TYPES.includes(_t.toUpperCase())) {
             validationLogger(`[WARNING] Reservation part ${i + 1} availablePlaces[${pIndex}].accommodationType '${_t}' is outside the OSDM base AccommodationType list [${KNOWN_ACCOMMODATION_TYPES.join(", ")}] — legal for an x-extensible-enum (custom code), but cross-vendor tooling may not understand it.`);
           }
@@ -1693,7 +1693,7 @@ function validateAncillaries(selectedOffer) {
 // placeSelections per the OBB IRT/NJ requirement; per-place tripLegCoverage
 // stays the fallback for providers that only set it there.
 function offerTripCoverage(selectedOffer) {
-  const tc = selectedOffer && selectedOffer.tripCoverage;
+  const tc = selectedOffer?.tripCoverage;
   const arr = Array.isArray(tc) ? tc : (tc ? [tc] : []);
   const out = [];
   arr.forEach(c => {
@@ -1722,10 +1722,10 @@ function assertOfferCoverageIntegrity(selectedOffer, jsonData) {
     validationLogger(`[DEBUG] Offer coverage integrity: ${pairs.length === 0 ? "offer declares no tripCoverage" : "response carries no trips"} → check skipped.`);
     return;
   }
-  const tripIds = new Set(trips.map((t) => t && t.id).filter(Boolean));
+  const tripIds = new Set(trips.map((t) => t?.id).filter(Boolean));
   const legsByTrip = {};
   trips.forEach((t) => {
-    if (t && t.id) legsByTrip[t.id] = new Set((t.legs || []).map((l) => l && l.id).filter(Boolean));
+    if (t?.id) legsByTrip[t.id] = new Set((t.legs || []).map((l) => l?.id).filter(Boolean));
   });
   const issues = [];
   pairs.forEach((pr) => {
@@ -1761,7 +1761,7 @@ function notePlaceSelectionCapabilities(part) {
   const mode = bru.getEnvVar("placeSelectionMode") || "";
   const wantsMap = mode === "SEATMAP_AT_OFFER" || mode === "ADD_TO_BOOKING";
   const graphical = (Array.isArray(part.availablePlacePreferences) ? part.availablePlacePreferences : [])
-    .map((p) => p && p.graphicalReservation).filter(Boolean).map(String);
+    .map((p) => p?.graphicalReservation).filter(Boolean).map(String);
 
   if (flows.length === 0) {
     validationLogger(`[INFO] Reservation part ${part.id}: no supportedPlaceSelectionFlows declared (optional in OSDM)${wantsMap ? ` — the scenario's ${mode} seat-map flow proceeds without a declared capability` : ""}.`);
@@ -1850,7 +1850,7 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
     const _firstPlace = Array.isArray(_firstRes.availablePlaces) ? _firstRes.availablePlaces[0] : null;
     if (_offerCov.length > 0) {
       bru.setEnvVar("tripLegCoverage", JSON.stringify(_offerCov));
-    } else if (_firstPlace && _firstPlace.tripLegCoverage) {
+    } else if (_firstPlace?.tripLegCoverage) {
       bru.setEnvVar("tripLegCoverage", JSON.stringify([_firstPlace.tripLegCoverage]));
     }
     // #371: persist the real accommodation of the selected part when the
@@ -2080,10 +2080,10 @@ function sweepCatalogFlagVsSchedule(offers) {
     let consistent = 0;
     list.forEach((offer) => {
       const parts = []
-        .concat((offer && offer.admissionOfferParts) || [])
-        .concat((offer && offer.reservationOfferParts) || [])
-        .concat((offer && offer.ancillaryOfferParts) || [])
-        .filter((p) => p && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
+        .concat((offer?.admissionOfferParts) || [])
+        .concat((offer?.reservationOfferParts) || [])
+        .concat((offer?.ancillaryOfferParts) || [])
+        .filter((p) => p?.price && typeof p.price.amount === "number" && p.price.amount > 0);
       let hasContradiction = false;
       let hasFree = false;
       let hasConsistentNo = false;
@@ -2114,7 +2114,7 @@ function sweepCatalogFlagVsSchedule(offers) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }
 
 // ── Reduction cards (#597) ───────────────────────────────────────────────────

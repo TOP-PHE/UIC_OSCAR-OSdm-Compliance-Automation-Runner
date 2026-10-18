@@ -40,7 +40,7 @@ function setAuthToken(responseBody) {
       validationLogger("[WARNING] setAuthToken called without response body; skipping");
       return;
     }
-    if (jsonData && jsonData.access_token) {
+    if (jsonData?.access_token) {
       bru.setEnvVar(GV.ACCESS_TOKEN, jsonData.access_token);
       validationLogger("[INFO] Access token set");
     } else {
@@ -114,9 +114,9 @@ function swaggerSchemaValidatorContent() {
 function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseHeaders, responseBody, method, url }) {
   try {
     function resolveRef(ref, rootSchema) {
-      if (!ref || !ref.startsWith('#/')) return null;
+      if (!ref?.startsWith('#/')) return null;
       const path = ref.slice(2).split('/');
-      return path.reduce((obj, key) => obj && obj[key], rootSchema);
+      return path.reduce((obj, key) => obj?.[key], rootSchema);
     }
 
     const baseUrlPattern = /{{\s*api_base\s*}}/g;
@@ -156,7 +156,7 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
     // Request body validation
     if (pathSchema.requestBody?.content?.["application/json"]) {
       let bodySchema = pathSchema.requestBody.content["application/json"].schema;
-      if (bodySchema && bodySchema.$ref) {
+      if (bodySchema?.$ref) {
         bodySchema = resolveRef(bodySchema.$ref, schema);
       }
 

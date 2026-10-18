@@ -40,7 +40,7 @@ let bruRaw, tmpData;
 try {
   bruRaw = JSON.parse(fs.readFileSync(BRU_JSON, 'utf8'));
 } catch (e) {
-  console.error(`[ERROR] [mergeReport] Failed to parse Bruno JSON report "${BRU_JSON}": ${(e && e.message) || e}`);
+  console.error(`[ERROR] [mergeReport] Failed to parse Bruno JSON report "${BRU_JSON}": ${(e?.message) || e}`);
   process.exit(1);
 }
 try {
@@ -48,7 +48,7 @@ try {
     ? JSON.parse(fs.readFileSync(TMP_JSON, 'utf8'))
     : { meta: {}, requests: [] };
 } catch (e) {
-  console.error(`[ERROR] [mergeReport] Failed to parse request/response capture "${TMP_JSON}": ${(e && e.message) || e}`);
+  console.error(`[ERROR] [mergeReport] Failed to parse request/response capture "${TMP_JSON}": ${(e?.message) || e}`);
   process.exit(1);
 }
 
@@ -94,8 +94,8 @@ const bodyLookup = {};
 
 // ─── Helper: match a Bruno result entry to a body entry ──────────────────────
 function findBody(bruEntry) {
-  const method = (bruEntry.request && bruEntry.request.method || '').toUpperCase();
-  const url    = bruEntry.request && bruEntry.request.url || '';
+  const method = (bruEntry.request?.method || '').toUpperCase();
+  const url    = bruEntry.request?.url || '';
   const key    = method + '|' + normUrl(url);
   return bodyLookup[key] || null;
 }
@@ -130,7 +130,7 @@ function getTests(bruEntry) {
 
 // ─── Classify auth vs OSDM ────────────────────────────────────────────────────
 function isAuthRequest(bruEntry) {
-  const url = ((bruEntry.request && bruEntry.request.url) || '').toLowerCase();
+  const url = ((bruEntry.request?.url) || '').toLowerCase();
   const name = (bruEntry.suiteName || bruEntry.filename || '').toLowerCase();
   return /\/(token|login|auth|logon|oauth)/.test(url) || /access.?token/i.test(name);
 }
@@ -186,9 +186,9 @@ function redactHeaders(h) {
 const mergedRequests = bruResults.map((entry, i) => {
   const body     = findBody(entry);
   const tests    = getTests(entry);
-  const status   = (entry.response && entry.response.status) || (body && body.responseStatus) || 0;
-  const method   = (entry.request && entry.request.method)  || (body && body.requestMethod)  || '';
-  const url      = (entry.request && entry.request.url)     || (body && body.requestUrl)      || '';
+  const status   = (entry.response?.status) || (body?.responseStatus) || 0;
+  const method   = (entry.request?.method)  || (body?.requestMethod)  || '';
+  const url      = (entry.request?.url)     || (body?.requestUrl)      || '';
   const isAuth   = isAuthRequest(entry);
 
   // Request body: prefer Bruno's captured data, fall back to our tmp.
@@ -198,9 +198,9 @@ const mergedRequests = bruResults.map((entry, i) => {
   let reqBody = '';
   if (isAuth) {
     reqBody = REDACTED + ' (auth-endpoint request body — typically client_id / client_secret / grant_type)';
-  } else if (entry.request && entry.request.data != null) {
+  } else if (entry.request?.data != null) {
     reqBody = typeof entry.request.data === 'string' ? entry.request.data : JSON.stringify(entry.request.data, null, 2);
-  } else if (body && body.requestBody) {
+  } else if (body?.requestBody) {
     reqBody = body.requestBody;
   }
 
@@ -208,7 +208,7 @@ const mergedRequests = bruResults.map((entry, i) => {
   // values regardless of whether this is an auth request. OSDM endpoints
   // also receive an Authorization: Bearer header on every call.
   const reqHeaders = redactHeaders(
-    (entry.request && entry.request.headers) || {}
+    (entry.request?.headers) || {}
   );
 
   // Response body: prefer Bruno's, fall back to our tmp.
@@ -217,15 +217,15 @@ const mergedRequests = bruResults.map((entry, i) => {
   let resBody = '';
   if (isAuth) {
     resBody = REDACTED + ' (auth-endpoint response body — typically access_token / refresh_token)';
-  } else if (entry.response && entry.response.data != null) {
+  } else if (entry.response?.data != null) {
     resBody = typeof entry.response.data === 'string' ? entry.response.data : JSON.stringify(entry.response.data, null, 2);
-  } else if (body && body.responseBody) {
+  } else if (body?.responseBody) {
     resBody = body.responseBody;
   }
 
   // Response headers — Set-Cookie may carry session credentials.
   const resHeaders = redactHeaders(
-    (entry.response && entry.response.headers) || {}
+    (entry.response?.headers) || {}
   );
 
   // Display name: "FolderName \ RequestName"
@@ -276,7 +276,7 @@ function prettyJson(raw) {
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch (e) {
-    console.log('[WARNING] [mergeReport] prettyJson: JSON-like value failed to parse (' + (e && e.message) + ') — returning raw.');
+    console.log('[WARNING] [mergeReport] prettyJson: JSON-like value failed to parse (' + (e?.message) + ') — returning raw.');
     return String(raw);
   }
 }
@@ -521,7 +521,7 @@ try {
   if (!fs.existsSync(VAL_DIR)) fs.mkdirSync(VAL_DIR, { recursive: true });
   fs.writeFileSync(htmlPath, html, 'utf8');
 } catch (e) {
-  console.error(`[ERROR] [mergeReport] Failed to write report to "${htmlPath}": ${(e && e.message) || e}`);
+  console.error(`[ERROR] [mergeReport] Failed to write report to "${htmlPath}": ${(e?.message) || e}`);
   throw e;
 }
 console.log(`[INFO] [mergeReport] ✅ Report written → ${htmlPath}`);

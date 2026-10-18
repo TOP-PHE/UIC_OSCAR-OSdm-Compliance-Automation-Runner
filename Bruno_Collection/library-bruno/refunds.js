@@ -77,7 +77,7 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
     : [expectedRefundOperationStatus];
   if (_expectedStatuses.includes("PROPOSED")) {
     const _firstRefundOffer = jsonData.refundOffers[0];
-    if (_firstRefundOffer && _firstRefundOffer.validUntil) {
+    if (_firstRefundOffer?.validUntil) {
       bru.setEnvVar("refundOfferValidUntil", String(_firstRefundOffer.validUntil));
       bru.setEnvVar("refundOfferValidUntilSource", "refundOffers[0].validUntil");
       validationLogger(`[INFO] Captured refundOffer validUntil = ${_firstRefundOffer.validUntil}`);
@@ -436,7 +436,7 @@ function validateRefundPermissibility(refundOffer, index) {
   // Gate 1 — nothing permits a refund, yet one was PROPOSED.
   if (analyses.every((a) => !permits(a))) {
     test(`Refund offer[${index}] permissibility — every selected-offer part is effectively non-refundable`, () => {
-      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer && refundOffer.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map((a, k) => `part ${k + 1}: ${a.schedule ? `the declared schedule charges the full price (fee ≥ ${a.priceAmount})` : `flag ${a.flagLabel} with no schedule granting a refund`}`).join("; ")} — and no overrule was sent.`);
+      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer?.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map((a, k) => `part ${k + 1}: ${a.schedule ? `the declared schedule charges the full price (fee ≥ ${a.priceAmount})` : `flag ${a.flagLabel} with no schedule granting a refund`}`).join("; ")} — and no overrule was sent.`);
     });
     return;
   }
@@ -448,7 +448,7 @@ function validateRefundPermissibility(refundOffer, index) {
     return;
   }
   const lockedParts = parts.filter((p, k) => !permits(analyses[k]) && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
-  if (lockedParts.length > 0 && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
+  if (lockedParts.length > 0 && refundOffer?.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
     const _amounts = parts.filter((p) => p.price).map((p) => p.price)
       .concat([refundOffer.refundableAmount])
       .concat(refundOffer.refundFee ? [refundOffer.refundFee] : []);
@@ -475,7 +475,7 @@ function validateRefundPermissibility(refundOffer, index) {
   // Gate 3 (#391) — THE schedule-decode assertion: what the declared schedule
   // says a full refund right now must return, vs what the engine offers.
   const r = expectedRefundForParts(parts, now, "REFUND");
-  if (r.ok && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number"
+  if (r.ok && refundOffer?.refundableAmount && typeof refundOffer.refundableAmount.amount === "number"
       && (!r.currency || !refundOffer.refundableAmount.currency || r.currency === refundOffer.refundableAmount.currency)) {
     if (refundOffer.refundableAmount.amount !== r.expectedRefundable) {
       test(`Refund offer[${index}] schedule decode — refundableAmount matches the declared after-sales schedule (Σ price − active fee)`, () => {
@@ -514,7 +514,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
 
   // #387: permissibility verdict — once, at the refund-offers step (the
   // GET/PATCH re-reads would only duplicate it).
-  if (((typeof req !== "undefined" && req && req.getName && req.getName()) || "") === "10. POST Refund Offers") {
+  if (((typeof req !== "undefined" && req?.getName?.()) || "") === "10. POST Refund Offers") {
     validateRefundPermissibility(refundOffer, index);
     // #781: the refund is in the sale's currency.
     require('./currencies.js').checkAfterSale(`Refund offer[${index}]`, { refundableAmount: refundOffer.refundableAmount, refundFee: refundOffer.refundFee });
@@ -945,7 +945,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
       const _responsePartIds = new Set();
       for (const b of _breakdown) {
         for (const bp of (b.bookingParts || [])) {
-          if (bp && bp.id) _responsePartIds.add(bp.id);
+          if (bp?.id) _responsePartIds.add(bp.id);
         }
       }
       const _outOfScope = [..._responsePartIds].filter((id) => !_requestedPartIds.has(id));
@@ -983,5 +983,5 @@ function validateRefundAppliedOverruleCode(appliedOverruleCode, expectedOverrule
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

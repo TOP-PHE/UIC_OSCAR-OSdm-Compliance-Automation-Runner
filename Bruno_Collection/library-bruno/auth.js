@@ -238,7 +238,7 @@ async function refreshAccessTokenIfNeeded(opts) {
     const status = (resp && (resp.status || resp.statusCode)) || 0;
     var body = null;
     try { body = typeof resp.body === 'string' ? JSON.parse(resp.body) : (resp.body || resp.data || null); } catch (_e) { body = null; }
-    if (status >= 200 && status < 300 && body && body.access_token) {
+    if (status >= 200 && status < 300 && body?.access_token) {
       bru.setEnvVar('access_token', body.access_token);
       if (force) {
         validationLogger(`[INFO] auth: access_token force-refreshed via OSCAR loopback before ${callerLabel}.`);
@@ -246,10 +246,10 @@ async function refreshAccessTokenIfNeeded(opts) {
       // Cache-hit path is deliberately silent — quiet log when nothing changed.
       return true;
     }
-    validationLogger(`[WARNING] auth: refresh-access-token endpoint returned status=${status}${body && body.detail ? ' detail="' + String(body.detail).slice(0, 200) + '"' : ''} — ${callerLabel} will use the original token. If it 401/403s, that's why.`);
+    validationLogger(`[WARNING] auth: refresh-access-token endpoint returned status=${status}${body?.detail ? ' detail="' + String(body.detail).slice(0, 200) + '"' : ''} — ${callerLabel} will use the original token. If it 401/403s, that's why.`);
     return false;
   } catch (err) {
-    const msg = (err && err.message) ? err.message : String(err);
+    const msg = (err?.message) ? err.message : String(err);
     validationLogger(`[WARNING] auth: refresh-access-token request failed (${msg}) — ${callerLabel} will use the original token. If it 401/403s, that's why.`);
     return false;
   }
@@ -261,5 +261,5 @@ module.exports = { handleAccessTokenResponse, checkAuthRejection, refreshAccessT
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

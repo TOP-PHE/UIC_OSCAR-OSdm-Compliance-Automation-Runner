@@ -198,10 +198,10 @@ function normaliseLegSelector(sel) {
 // when no trips[].legs are present — the contract the original code relied on.
 function collectLegIds(booking, allAdmissions) {
   const fromTrips = [];
-  const trips = Array.isArray(booking && booking.trips) ? booking.trips : [];
+  const trips = Array.isArray(booking?.trips) ? booking.trips : [];
   for (const t of trips) {
-    const legs = Array.isArray(t && t.legs) ? t.legs : [];
-    for (const l of legs) { if (l && l.id) fromTrips.push(String(l.id)); }
+    const legs = Array.isArray(t?.legs) ? t.legs : [];
+    for (const l of legs) { if (l?.id) fromTrips.push(String(l.id)); }
   }
   if (fromTrips.length > 0) return { ids: fromTrips, mode: 'trips' };
   // Legacy fallback: each admission = one leg, in offer order.
@@ -214,7 +214,7 @@ function collectLegIds(booking, allAdmissions) {
 // externalRef is what we match against fulfillmentParts).
 function collectPassengers(booking) {
   const out = [];
-  const pax = Array.isArray(booking && booking.passengers) ? booking.passengers : [];
+  const pax = Array.isArray(booking?.passengers) ? booking.passengers : [];
   for (const p of pax) {
     if (!p) continue;
     out.push({ id: p.id || null, externalRef: p.externalRef || null });
@@ -227,7 +227,7 @@ function collectPassengers(booking) {
 function findFulfillmentForPassenger(fulfillments, externalRef) {
   if (!Array.isArray(fulfillments) || fulfillments.length === 0 || !externalRef) return null;
   return fulfillments.find(f => {
-    const parts = Array.isArray(f && f.fulfillmentParts) ? f.fulfillmentParts : [];
+    const parts = Array.isArray(f?.fulfillmentParts) ? f.fulfillmentParts : [];
     return parts.some(fp => fp && String(fp.passengerRef) === String(externalRef));
   }) || null;
 }
@@ -279,10 +279,10 @@ function passengerPartIds(allAdms, passenger) {
 // entry keeps a back-pointer to its bookedOffer for sibling-walk expansion.
 function collectAdmissions(booking) {
   const out = [];
-  const bookedOffers = Array.isArray(booking && booking.bookedOffers) ? booking.bookedOffers : [];
+  const bookedOffers = Array.isArray(booking?.bookedOffers) ? booking.bookedOffers : [];
   for (const bo of bookedOffers) {
-    const adms = Array.isArray(bo && bo.admissions) ? bo.admissions : [];
-    for (const a of adms) { if (a && a.id) out.push({ ...a, _bo: bo }); }
+    const adms = Array.isArray(bo?.admissions) ? bo.admissions : [];
+    for (const a of adms) { if (a?.id) out.push({ ...a, _bo: bo }); }
   }
   return out;
 }
@@ -295,30 +295,30 @@ function expandAdmissionRefs(admission) {
   const out = { reservationIds: [], ancillaryIds: [] };
 
   // Forward refs (Paxone / v3.8).
-  const resRefs = Array.isArray(admission && admission.reservationRefs) ? admission.reservationRefs : [];
+  const resRefs = Array.isArray(admission?.reservationRefs) ? admission.reservationRefs : [];
   for (const r of resRefs) {
-    if (r && r.id) out.reservationIds.push(String(r.id));
+    if (r?.id) out.reservationIds.push(String(r.id));
     else if (typeof r === 'string') out.reservationIds.push(r);
   }
-  const ancRefs = Array.isArray(admission && admission.ancillaryRefs) ? admission.ancillaryRefs : [];
+  const ancRefs = Array.isArray(admission?.ancillaryRefs) ? admission.ancillaryRefs : [];
   for (const a of ancRefs) {
-    if (a && a.id) out.ancillaryIds.push(String(a.id));
+    if (a?.id) out.ancillaryIds.push(String(a.id));
     else if (typeof a === 'string') out.ancillaryIds.push(a);
   }
 
   // Reverse refs (legacy: sibling reservations/ancillaries naming the admission).
-  const bo = admission && admission._bo;
+  const bo = admission?._bo;
   if (bo) {
     const admId = String(admission.id);
     const ress  = Array.isArray(bo.reservations) ? bo.reservations : [];
     for (const r of ress) {
-      if (!r || !r.id) continue;
+      if (!r?.id) continue;
       const link = r.requiredAdmissionKey || r.admissionRef || r.admissionId;
       if (link && String(link) === admId) out.reservationIds.push(String(r.id));
     }
     const ancs = Array.isArray(bo.ancillaries) ? bo.ancillaries : [];
     for (const a of ancs) {
-      if (!a || !a.id) continue;
+      if (!a?.id) continue;
       const link = a.admissionRef || a.admissionId || a.ancillaryFor;
       if (link && String(link) === admId) out.ancillaryIds.push(String(a.id));
     }
@@ -405,7 +405,7 @@ function resolvePartialRefundScope(booking, opts) {
     let scopedAdms = allAdms;
     if (legMode === 'trips') {
       scopedAdms = scopedAdms.filter(a => {
-        const covered = a && a.tripCoverage && Array.isArray(a.tripCoverage.coveredLegIds)
+        const covered = a?.tripCoverage && Array.isArray(a.tripCoverage.coveredLegIds)
           ? a.tripCoverage.coveredLegIds.map(String)
           : [];
         return covered.includes(String(chosenLegId));
@@ -421,7 +421,7 @@ function resolvePartialRefundScope(booking, opts) {
     // just because the field is missing.
     if (chosenIds.size > 0) {
       const filtered = scopedAdms.filter(a => {
-        const owners = Array.isArray(a && a.passengerIds) ? a.passengerIds.map(String) : null;
+        const owners = Array.isArray(a?.passengerIds) ? a.passengerIds.map(String) : null;
         return owners == null /* unknown ownership → keep */ || owners.some((o) => chosenIds.has(o));
       });
       scopedAdms = filtered;
@@ -454,7 +454,7 @@ function resolvePartialRefundScope(booking, opts) {
   }
   const scopeParts = byLeg ? bookingPartIds : passengerPartIds(allAdms, chosenPassenger);
   const { fulfillment: chosenFulfillment, reason: noFulfillment } = fulfillmentForScope(fulfillments, scopeParts, chosenPassenger);
-  if (!chosenFulfillment || !chosenFulfillment.id) {
+  if (!chosenFulfillment?.id) {
     return { armed: true, degraded: true, reason: noFulfillment || 'could not resolve a fulfillment.id for the scope — refusing to scope blindly' };
   }
 
@@ -542,5 +542,5 @@ function wireSpecs(specs) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] partialRefund globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] partialRefund globalThis exposure skipped: ' + (e?.message));
 }

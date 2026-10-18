@@ -140,7 +140,7 @@ function parseExpression(tokens) {
     if (t.t === '(') {
       next();
       const e = parseOr();
-      if (!peek() || peek().t !== ')') throw new Error("Expected ')'");
+      if (peek()?.t !== ')') throw new Error("Expected ')'");
       next();
       return e;
     }
@@ -162,7 +162,7 @@ function parseExpression(tokens) {
   }
   function parseLeaf() {
     const root = next();
-    if (!root || root.t !== 'word') throw new Error('Expected an attribute name');
+    if (root?.t !== 'word') throw new Error('Expected an attribute name');
     const up = root.v.toUpperCase();
     if (up === 'AND' || up === 'OR') throw new Error(`Unexpected operator '${root.v}'`);
     // The purchaser is one object, not a list: `purchaser.detail.contact.email`
@@ -171,10 +171,10 @@ function parseExpression(tokens) {
     const unindexed = rootKind(root.v) === 'purchaser' && peek()?.t === '.';
     const index = unindexed ? 0 : parseIndex(root.v);
     const path = [];
-    while (peek() && peek().t === '.') {
+    while (peek()?.t === '.') {
       next(); // .
       const a = next();
-      if (!a || a.t !== 'word') throw new Error("Expected an attribute name after '.'");
+      if (a?.t !== 'word') throw new Error("Expected an attribute name after '.'");
       path.push(a.v);
     }
     if (path.length === 0) throw new Error('Expected at least one attribute after the index');
@@ -200,7 +200,7 @@ function parseRequestedInformation(expr) {
     const ast = parseExpression(tokens);
     return { ok: true, ast, error: null };
   } catch (e) {
-    return { ok: false, ast: null, error: e && e.message ? e.message : String(e) };
+    return { ok: false, ast: null, error: e?.message ? e.message : String(e) };
   }
 }
 
@@ -315,7 +315,7 @@ function evalNode(node, model) {
     // #258: the purchaser is a SINGLE object (not a collection); the index is
     // immaterial — `purchaser[0]` / `purchaser[ANY]` both mean "the purchaser".
     if (rootKind(node.root) === 'purchaser') {
-      const subject = model && model.purchaser;
+      const subject = model?.purchaser;
       return leafSatisfiedFor(subject, node)
         ? { satisfied: true, unmet: [] }
         : { satisfied: false, unmet: [{ leaf: node, index: node.index }] };
@@ -520,7 +520,7 @@ function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
     while (additional.length <= u.index) additional.push({});
     const entry = additional[u.index];
     if (isSet(entry[updateKey])) return;          // keep tester-provided values
-    const passengerType = (specs[u.index] && specs[u.index].type) || entry.type || null;
+    const passengerType = (specs[u.index]?.type) || entry.type || null;
     const value = sampleValueForField(u.scenarioField, u.index, passengerType);
     if (value === null) return;
     entry[updateKey] = value;
@@ -546,7 +546,7 @@ function applyPurchaserAutoFeed(purchaserAdditional, unmetLeaves, purchaserSpec)
     const updateKey = AUTO_FEED_UPDATE_KEYS[u.scenarioField];
     if (!updateKey) return;               // unmappable (taxId/companyDetails) → can't PATCH
     if (isSet(out[updateKey])) return;    // keep scenario/tester-provided values
-    const type = (purchaserSpec && purchaserSpec.type) || out.type || null;
+    const type = (purchaserSpec?.type) || out.type || null;
     const value = sampleValueForField(u.scenarioField, 0, type);
     if (value === null) return;
     out[updateKey] = value;
@@ -885,5 +885,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

@@ -32,7 +32,7 @@ function parseEnvJson(name, fallback) {
       : undefined;
   } catch (e) {
     // bru.getEnvVar threw (no / broken bru context) — treat the var as unset.
-    console.log('[DEBUG] [envUtils] getEnvVar("' + name + '") threw, treating as unset: ' + (e && e.message));
+    console.log('[DEBUG] [envUtils] getEnvVar("' + name + '") threw, treating as unset: ' + (e?.message));
     raw = undefined;
   }
 
@@ -76,7 +76,7 @@ function parseEnvJson(name, fallback) {
   } catch (e) {
     throw new Error(
       '[ERROR] Scenario variable "' + name + '" is not valid JSON: ' +
-      ((e && e.message) || e) + '. Value begins: ' + String(raw).slice(0, 80)
+      ((e?.message) || e) + '. Value begins: ' + String(raw).slice(0, 80)
     );
   }
 }
@@ -88,5 +88,5 @@ module.exports = { parseEnvJson };
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

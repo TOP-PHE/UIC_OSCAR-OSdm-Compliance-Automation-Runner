@@ -155,7 +155,7 @@ function applyPlaceProbeCorruption(body) {
 function gradePlaceProbeResponse(res) {
   let target = null;
   try { target = JSON.parse(bru.getEnvVar('placeProbeTarget') || 'null'); } catch (_e) { target = null; }
-  if (!target || !target.key) return 'off';
+  if (!target?.key) return 'off';
   bru.setEnvVar('placeProbeTarget', ''); // consume — one grade per probe request
 
   const status = res.getStatus();
@@ -208,11 +208,11 @@ function gradePlaceProbeResponse(res) {
   // and let 02 process this response as the run's booking.
   bru.setEnvVar('__placeProbeIndex', String(target.total));
   const booking = (body && typeof body === 'object') ? body.booking : null;
-  const bookingId = (booking && booking.id) ? booking.id : null;
+  const bookingId = (booking?.id) ? booking.id : null;
   const allocations = [];
-  ((booking && booking.bookedOffers) || []).forEach((bo) => {
-    ((bo && bo.reservations) || []).forEach((rsv) => {
-      if (rsv && rsv.placeAllocation) allocations.push(rsv.placeAllocation);
+  ((booking?.bookedOffers) || []).forEach((bo) => {
+    ((bo?.reservations) || []).forEach((rsv) => {
+      if (rsv?.placeAllocation) allocations.push(rsv.placeAllocation);
     });
   });
 
@@ -271,5 +271,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

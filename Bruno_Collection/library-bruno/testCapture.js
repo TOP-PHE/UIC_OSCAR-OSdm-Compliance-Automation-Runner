@@ -46,7 +46,7 @@ function bruTest(name, fn) {
     if (typeof fn === 'function') fn();
   } catch (e) {
     passed = false;
-    errMsg = (e && e.message) ? e.message : String(e);
+    errMsg = (e?.message) ? e.message : String(e);
   }
 
   // Emit DEBUG / WARNING log via validationLogger (respects loggingType env var)

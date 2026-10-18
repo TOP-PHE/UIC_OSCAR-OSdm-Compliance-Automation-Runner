@@ -112,7 +112,7 @@ async function runExpiredFlowWait(opts) {
   try {
     await refreshAccessTokenIfNeeded({ force: true, callerLabel: scenarioLabel });
   } catch (e) {
-    const msg = (e && e.message) ? e.message : String(e);
+    const msg = (e?.message) ? e.message : String(e);
     validationLogger(`[WARNING] ${scenarioLabel}: token-refresh helper threw (${msg}) — request will use the original (possibly expired) token. If the provider 401/403s, that's why.`);
   }
 }
@@ -492,5 +492,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] expiredFlow globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] expiredFlow globalThis exposure skipped: ' + (e?.message));
 }

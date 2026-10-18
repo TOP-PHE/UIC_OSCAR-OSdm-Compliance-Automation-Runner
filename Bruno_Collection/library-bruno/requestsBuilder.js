@@ -379,12 +379,12 @@ function collectAvailablePlaces(vehicle, count) {
     const acc = [];
     if (Array.isArray(coach.compartments)) {
       coach.compartments.forEach((c) => {
-        if (Array.isArray(c && c.places)) acc.push(...c.places);
-        else if (c && c.place != null) acc.push(c); // compartment IS a place (legacy stub shape)
+        if (Array.isArray(c?.places)) acc.push(...c.places);
+        else if (c?.place != null) acc.push(c); // compartment IS a place (legacy stub shape)
       });
     }
     if (Array.isArray(coach.decks)) {
-      coach.decks.forEach((d) => { if (Array.isArray(d && d.places)) acc.push(...d.places); });
+      coach.decks.forEach((d) => { if (Array.isArray(d?.places)) acc.push(...d.places); });
     }
     return acc;
   };
@@ -446,8 +446,8 @@ function assertPlaceSelectionConsistency() {
   if (!offer || typeof offer !== 'object') return;
 
   const parts = offer.reservationOfferParts || [];
-  const partIds = parts.map(pt => pt && pt.id).filter(Boolean);
-  const advertised = parts.flatMap(pt => (pt && pt.availablePlaces) || []).filter(Boolean);
+  const partIds = parts.map(pt => pt?.id).filter(Boolean);
+  const advertised = parts.flatMap(pt => (pt?.availablePlaces) || []).filter(Boolean);
   // Offer coverage pairs — accepts both the flat {tripId, legId} form and the
   // spec's TripCoverage {coveredTripId, coveredLegIds} form (mirror of
   // offers.js offerTripCoverage, kept local to avoid a module dependency).
@@ -462,21 +462,21 @@ function assertPlaceSelectionConsistency() {
 
   const issues = [];
   ps.forEach((sel, i) => {
-    if (sel && sel.reservationId && partIds.length > 0 && !partIds.includes(sel.reservationId)) {
+    if (sel?.reservationId && partIds.length > 0 && !partIds.includes(sel.reservationId)) {
       issues.push(`placeSelections[${i}].reservationId '${sel.reservationId}' is not a reservationOfferPart of the selected offer (parts: ${partIds.join(', ')})`);
     }
-    ((sel && sel.accommodations) || []).forEach((acc, j) => {
-      if (acc && acc.accommodationType && advertised.length > 0
+    ((sel?.accommodations) || []).forEach((acc, j) => {
+      if (acc?.accommodationType && advertised.length > 0
           && !advertised.some(ap => ap.accommodationType === acc.accommodationType)) {
         issues.push(`placeSelections[${i}].accommodations[${j}].accommodationType '${acc.accommodationType}' is not advertised in the offer's availablePlaces`);
       }
-      if (acc && acc.accommodationSubType && advertised.length > 0
+      if (acc?.accommodationSubType && advertised.length > 0
           && advertised.some(ap => ap.accommodationSubType)
           && !advertised.some(ap => ap.accommodationSubType === acc.accommodationSubType)) {
         issues.push(`placeSelections[${i}].accommodations[${j}].accommodationSubType '${acc.accommodationSubType}' is not advertised in the offer's availablePlaces`);
       }
     });
-    if (sel && sel.tripLegCoverage && coverage.length > 0
+    if (sel?.tripLegCoverage && coverage.length > 0
         && !coverage.some(c => c.tripId === sel.tripLegCoverage.tripId && c.legId === sel.tripLegCoverage.legId)) {
       issues.push(`placeSelections[${i}].tripLegCoverage ${sel.tripLegCoverage.tripId}/${sel.tripLegCoverage.legId} is not within the offer's tripCoverage (${coverage.map(c => c.tripId + '/' + c.legId).join(', ')})`);
     }
@@ -504,18 +504,18 @@ function resolvePlaceSelectionReservationId(selectedAccommodation) {
   const envId = bru.getEnvVar("reservationId");
   const offer = parseEnvJson("offer", null);
   const parts = (offer && Array.isArray(offer.reservationOfferParts)) ? offer.reservationOfferParts : [];
-  const partIds = parts.map(p => p && p.id).filter(Boolean);
+  const partIds = parts.map(p => p?.id).filter(Boolean);
   if (partIds.length === 0) return envId;                  // no selected-offer context — leave as-is
   if (envId && partIds.includes(envId)) return envId;       // already a part of the booked offer — trust it
 
-  const accType = selectedAccommodation && selectedAccommodation.accommodationType;
+  const accType = selectedAccommodation?.accommodationType;
   let pick = null;
   if (accType) {
     pick = parts.find(p => Array.isArray(p.availablePlaces)
       && p.availablePlaces.some(pl => pl && pl.accommodationType === accType)) || null;
   }
-  if (!pick) pick = parts.find(p => p && p.id) || null;
-  const newId = pick && pick.id;
+  if (!pick) pick = parts.find(p => p?.id) || null;
+  const newId = pick?.id;
   if (newId && newId !== envId) {
     validationLogger(`[DEBUG] placeSelection reservationId re-derived from the selected offer: '${envId || "(unset)"}' → '${newId}' (the env value was not a reservationOfferPart of the booked offer).`);
   }
@@ -574,7 +574,7 @@ function accommodationAndPlaceSelection() {
   // mandatory-reservation offers (BERTH included), not just the legacy
   // COUCHETTE hardcode.
   const selectedAccommodation = parseEnvJson("selectedAccommodation", null);
-  const hasSelAcc = !!(selectedAccommodation && selectedAccommodation.accommodationType);
+  const hasSelAcc = !!(selectedAccommodation?.accommodationType);
 
   if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true"
       && accommodationSelection !== "COUCHETTE" && !hasPicks && !hasSelAcc) {
@@ -672,7 +672,7 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
     // Trim to the scoped fulfillment(s) only; preserve order.
     const wanted = new Set(
       _hasSpec
-        ? refundSpecifications.map(s => s && s.fulfillmentId).filter(Boolean).map(String)
+        ? refundSpecifications.map(s => s?.fulfillmentId).filter(Boolean).map(String)
         : String(_scopeOnly).split(",").filter(Boolean)
     );
     const trimmed = Array.isArray(fulfillmentIds)

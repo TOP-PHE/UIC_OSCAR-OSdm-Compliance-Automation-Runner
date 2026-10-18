@@ -38,7 +38,7 @@ function loopbackOrStop(label) {
 // FAILED). Critical steps (offer / booking — nothing downstream is
 // meaningful without them) always hard-stop regardless of the policy.
 function failStepOrContinue(label, nextStep, opts) {
-  const critical = !!(opts && opts.critical);
+  const critical = !!(opts?.critical);
   const policy = String(bru.getEnvVar('stepFailurePolicy') || 'HARD_STOP').toUpperCase();
   if (!critical && policy === 'CONTINUE' && nextStep) {
     console.log(
@@ -86,7 +86,7 @@ function knownDeviationFor(stepLabel, status) {
 function noteKnownDeviation(stepLabel, status, dev) {
   console.log(
     '[WARNING] Known deviation (documented): ' + stepLabel + ' returned HTTP ' + status +
-    ' — ' + (dev && dev.note ? dev.note : 'declared in the provider baseline') +
+    ' — ' + (dev?.note ? dev.note : 'declared in the provider baseline') +
     '. Not counted as a failure; surfaced for visibility.'
   );
   const n = parseInt(bru.getEnvVar('__knownDeviationHits') || '0', 10) + 1;

@@ -119,7 +119,7 @@ function _isAuthRequestUrl(url) {
 // default (INFO) applies.
 function _debugLog(msg) {
   try {
-    const lt = String((typeof bru !== 'undefined' && bru.getEnvVar && bru.getEnvVar('loggingType')) || 'INFO').toUpperCase();
+    const lt = String((typeof bru !== 'undefined' && bru.getEnvVar?.('loggingType')) || 'INFO').toUpperCase();
     if (lt === 'DEBUG' || lt === 'FULL') console.log(msg);
   } catch (_e) { /* no logging context — stay silent like INFO */ }
 }
@@ -206,14 +206,14 @@ function initReport(libraryBase) {
       let prevScenarioCode = null;
       try {
         const data = JSON.parse(fs.readFileSync(tmp, 'utf8'));
-        prevScenarioCode = (data && data.meta && data.meta.scenarioCode) || null;
-      } catch (re) { _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (re && re.message) + ') — treating as a different scenario.'); }
+        prevScenarioCode = (data?.meta?.scenarioCode) || null;
+      } catch (re) { _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (re?.message) + ') — treating as a different scenario.'); }
       let currentScenarioCode = null;
       try {
         if (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function') {
           currentScenarioCode = bru.getEnvVar('scenarioCode') || null;
         }
-      } catch (be) { _debugLog('[DEBUG] [reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
+      } catch (be) { _debugLog('[DEBUG] [reportGenerator] no bru context (' + (be?.message) + ') — falling through to clear previous run data.'); }
 
       if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
         // Log-audit round 2: report-accumulator bookkeeping → DEBUG (the
@@ -435,8 +435,8 @@ function _requestBlock(r, i) {
   const tCount  = tests.length;
   const failRate = tCount > 0 ? fCount / tCount : 0;
   const hasWarningLogs = logs.some(l => {
-    const level = l && l.level ? String(l.level).toLowerCase() : '';
-    const message = l && l.message != null ? String(l.message).toLowerCase() : '';
+    const level = l?.level ? String(l.level).toLowerCase() : '';
+    const message = l?.message != null ? String(l.message).toLowerCase() : '';
     return level === 'warn' || level === 'warning' || message.includes('[warning]');
   });
 
@@ -497,8 +497,8 @@ function _requestBlock(r, i) {
     <div class="panel">
       ${logs.length > 0
         ? `<pre class="code">${_esc(logs.map(l => {
-            const lvl = l && l.level ? String(l.level).toUpperCase() : 'LOG';
-            const msg = l && l.message != null ? String(l.message) : '';
+            const lvl = l?.level ? String(l.level).toUpperCase() : 'LOG';
+            const msg = l?.message != null ? String(l.message) : '';
             return `[${lvl}] ${msg}`;
           }).join('\n'))}</pre>`
         : '<p class="muted">No console logs captured for this request</p>'}
@@ -603,14 +603,14 @@ function _generateHtml(meta, requests) {
   let apiVersion = 'N/A';
   try {
     const versionReq = requests.find(r => 
-      r.requestUrl && r.requestUrl.includes('/versions') &&
+      r.requestUrl?.includes('/versions') &&
       (r.requestName.includes('Version') || r.runType === 'System Information')
     );
     if (versionReq && versionReq.responseStatus >= 200 && versionReq.responseStatus < 300) {
       const respBody = typeof versionReq.responseBody === 'string' 
         ? JSON.parse(versionReq.responseBody) 
         : versionReq.responseBody;
-      if (Array.isArray(respBody) && respBody[0] && respBody[0].version) {
+      if (Array.isArray(respBody) && respBody[0]?.version) {
         apiVersion = respBody[0].version;
       }
     }
