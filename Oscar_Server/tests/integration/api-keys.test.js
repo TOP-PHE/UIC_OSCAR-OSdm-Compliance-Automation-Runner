@@ -32,7 +32,9 @@ const app = express();
 app.use(express.json());
 app.use('/v1/company', require('../../src/api/routes/company-api-keys'));
 app.use('/v1/api', require('../../src/api/routes/api'));
-app.get('/v1/session-only', requireAuth, (req, res) => res.json({ ok: true }));
+// A stand-in for any session route, rate-limited like the real ones.
+const sessionLimiter = require('express-rate-limit')({ windowMs: 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false });
+app.get('/v1/session-only', sessionLimiter, requireAuth, (req, res) => res.json({ ok: true }));
 
 const companyId = crypto.randomUUID();
 const providerId = crypto.randomUUID();
