@@ -111,20 +111,38 @@ const known = path => LIST_PATHS.has(path) || ONE_PATHS.has(path) || NUMBER_PATH
  */
 function questionsOf(answers) {
   const questions = new Map();
+  const questionAt = (path) => {
+    if (!questions.has(path)) questions.set(path, { ticks: [], text: null });
+    return questions.get(path);
+  };
   for (const [tag, value] of Object.entries(answers || {})) {
     if (!tag.startsWith('fw.')) continue;
     const [name, code] = tag.slice(3).split('=');
     if (name.endsWith('.comment')) {
-      const path = name.slice(0, -'.comment'.length);
-      if (!questions.has(path)) questions.set(path, { ticks: [], text: null });
+      questionAt(name.slice(0, -'.comment'.length));
       continue;
     }
     if (!known(name)) throw new Error(`The checklist answers fw.${name}, which the reference framework does not place: add it to referenceConfiguration.js.`);
-    if (!questions.has(name)) questions.set(name, { ticks: [], text: null });
-    const q = questions.get(name);
-    if (code !== undefined) { if (value === true) q.ticks.push(code); } else q.text = String(value).trim();
+    const q = questionAt(name);
+    if (code === undefined) q.text = String(value).trim();
+    else if (value === true) q.ticks.push(code);
   }
   return questions;
+}
+
+// What one answered question puts at its place: { value } or null for nothing.
+function answerAt(path, ticks, text) {
+  if (LIST_PATHS.has(path)) {
+    return { value: path.startsWith('iropsCodes.') ? [...new Set([...IROPS_MANDATORY, ...ticks])] : ticks };
+  }
+  if (ONE_PATHS.has(path)) return ticks.length ? { value: ticks[0] } : null;
+  if (NUMBER_PATHS.has(path) || AGE_RANGE.test(path)) {
+    const n = Number(text);
+    return text !== null && text !== '' && Number.isFinite(n) ? { value: n } : null;
+  }
+  if (path === 'currencies.sold') return { value: (text || '').split(/[\s,]+/).filter(Boolean) };
+  if (path === 'currencies.default') return text ? { value: text } : null;
+  return null;
 }
 
 /** The framework a checklist declares: the defaults, each answered question over them. */
@@ -132,19 +150,8 @@ function frameworkFromChecklist(answers) {
   const framework = defaultFramework();
   for (const [path, { ticks, text }] of questionsOf(answers)) {
     if (!known(path)) continue;   // a comment of a question not asked as such
-    if (LIST_PATHS.has(path)) {
-      const codes = path.startsWith('iropsCodes.') ? [...new Set([...IROPS_MANDATORY, ...ticks])] : ticks;
-      setPath(framework, path, codes);
-    } else if (ONE_PATHS.has(path)) {
-      if (ticks.length) setPath(framework, path, ticks[0]);
-    } else if (NUMBER_PATHS.has(path) || AGE_RANGE.test(path)) {
-      const n = Number(text);
-      if (text !== null && text !== '' && Number.isFinite(n)) setPath(framework, path, n);
-    } else if (path === 'currencies.sold') {
-      setPath(framework, path, (text || '').split(/[\s,]+/).filter(Boolean));
-    } else if (path === 'currencies.default') {
-      if (text) setPath(framework, path, text);
-    }
+    const answer = answerAt(path, ticks, text);
+    if (answer) setPath(framework, path, answer.value);
   }
   framework.placeSelection.seatMap = framework.placeSelection.supportedModes.includes('SEATMAP_AT_OFFER');
   return framework;
