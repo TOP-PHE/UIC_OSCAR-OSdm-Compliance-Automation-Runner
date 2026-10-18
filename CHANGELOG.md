@@ -74,6 +74,9 @@ Issue #852. Simulator 0.37.0. Server and collection unchanged. Adding a reservat
 - **`…/offer-parts` is OSDM 3.7 and later**: alpha answers it 501.
 - Before, alpha answered 501 to `…/reservations`, the path the collection rightly calls below 3.7. Every "add the reservation later" scenario failed at `09. POST Add Reservation to Booking` on alpha (found by the AI analysis of an alpha batch, #823).
 - Ancillaries after the booking (`…/ancillaries`) stay 501.
+
+---
+
 ## [server-1.11.343 / collection-OTST_V2.0.187] — 2026-10-18 · Release 2026.378
 
 Issue #854. The refund receipt wait renews the access token. Server code unchanged.
