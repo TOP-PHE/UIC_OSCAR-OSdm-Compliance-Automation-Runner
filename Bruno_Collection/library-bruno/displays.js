@@ -116,7 +116,7 @@ function validationLogger(message) {
     // stores each stdout line as a separate event; untagged continuation
     // lines of a multi-line message fall back to 'info' there, so a [DEBUG]
     // multi-line dump leaked into the tester's INFO view line by line.
-    if (message.indexOf('\n') !== -1) {
+    if (message.includes('\n')) {
       var _tagMatch = message.match(/\[(DEBUG|INFO|WARN|WARNING|ERROR)\]/);
       if (_tagMatch) {
         var _lineTag = '[' + _tagMatch[1] + '] ';

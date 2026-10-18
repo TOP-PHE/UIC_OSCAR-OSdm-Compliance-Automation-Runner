@@ -93,7 +93,7 @@ function noteKnownDeviation(stepLabel, status, dev) {
   bru.setEnvVar('__knownDeviationHits', String(n));
   const seen = parseEnvJson('__knownDeviationsSeen', []);
   const key = _normStep(stepLabel) + '#' + String(status);
-  if (seen.indexOf(key) === -1) { seen.push(key); bru.setEnvVar('__knownDeviationsSeen', JSON.stringify(seen)); }
+  if (!seen.includes(key)) { seen.push(key); bru.setEnvVar('__knownDeviationsSeen', JSON.stringify(seen)); }
 }
 
 /**
