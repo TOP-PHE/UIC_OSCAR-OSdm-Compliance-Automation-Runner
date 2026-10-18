@@ -236,7 +236,7 @@ async function refreshAccessTokenIfNeeded(opts) {
       );
     });
     const status = (resp && (resp.status || resp.statusCode)) || 0;
-    var body = null;
+    let body = null;
     try { body = typeof resp.body === 'string' ? JSON.parse(resp.body) : (resp.body || resp.data || null); } catch (_e) { body = null; }
     if (status >= 200 && status < 300 && body?.access_token) {
       bru.setEnvVar('access_token', body.access_token);
