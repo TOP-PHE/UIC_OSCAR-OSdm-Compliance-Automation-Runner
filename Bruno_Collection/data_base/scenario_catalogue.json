@@ -358,7 +358,7 @@
       "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
       "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
       "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",
-      "checks": 288,
+      "checks": 289,
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
