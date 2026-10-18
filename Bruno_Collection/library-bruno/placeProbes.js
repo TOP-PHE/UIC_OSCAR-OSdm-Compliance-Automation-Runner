@@ -99,8 +99,8 @@ function placeProbeCurrent() {
     return null;
   }
 
-  let idx = parseInt(bru.getEnvVar('__placeProbeIndex') || '0', 10);
-  if (isNaN(idx) || idx < 0) idx = 0;
+  let idx = Number.parseInt(bru.getEnvVar('__placeProbeIndex') || '0', 10);
+  if (Number.isNaN(idx) || idx < 0) idx = 0;
   if (idx >= probes.length) return null; // sweep complete → clean pass
   return { def: probes[idx], index: idx, total: probes.length };
 }

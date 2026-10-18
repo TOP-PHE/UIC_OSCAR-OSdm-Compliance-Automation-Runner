@@ -359,7 +359,7 @@ function postOfferResponse(jsonData) {
     });
     const createdOnDate = new Date(offer.createdOn);
     test(`offers[${i}].createdOn is a valid ISO datetime (OSDM: Offer.createdOn required)`, () => {
-      expect(isNaN(createdOnDate.getTime()), `createdOn is not a valid date: ${offer.createdOn}`).to.be.false;
+      expect(Number.isNaN(createdOnDate.getTime()), `createdOn is not a valid date: ${offer.createdOn}`).to.be.false;
     });
     test(`offers[${i}].passengerRefs is a non-empty array (OSDM: Offer.passengerRefs minItems:1)`, () => {
       expect(offer.passengerRefs).to.be.an('array').with.lengthOf.at.least(1);
@@ -481,7 +481,7 @@ function captureExpiredOfferDeadline(selectedOffer) {
     parts.forEach(function (p, i) {
       if (p?.validUntil) {
         const t = new Date(p.validUntil).getTime();
-        if (!isNaN(t) && t < _earliestMs) {
+        if (!Number.isNaN(t) && t < _earliestMs) {
           _earliestMs  = t;
           _earliestRaw = p.validUntil;
           _earliestSrc = `selectedOffer.${pt}[${i}].validUntil`;
@@ -491,7 +491,7 @@ function captureExpiredOfferDeadline(selectedOffer) {
   });
   if (selectedOffer.preBookableUntil) {
     const _pbu = new Date(selectedOffer.preBookableUntil).getTime();
-    if (!isNaN(_pbu) && _pbu < _earliestMs) {
+    if (!Number.isNaN(_pbu) && _pbu < _earliestMs) {
       _earliestMs  = _pbu;
       _earliestRaw = selectedOffer.preBookableUntil;
       _earliestSrc = 'selectedOffer.preBookableUntil';
@@ -820,7 +820,7 @@ function validateOfferSummary(selectedOffer) {
     const preBookableDate = new Date(preBookableUntil);
     test(`Offer preBookableUntil is a valid date in the future - preBookableUntil: ${preBookableUntil}`, function () {
       validationLogger(`[DEBUG] preBookableUntil: ${preBookableUntil}`);
-      expect(!isNaN(preBookableDate.getTime()), "preBookableUntil should be a valid ISO date").to.be.true;
+      expect(!Number.isNaN(preBookableDate.getTime()), "preBookableUntil should be a valid ISO date").to.be.true;
       expect(preBookableDate.getTime(), "preBookableUntil should be in the future").to.be.above(Date.now());
     });
   } else {
@@ -856,7 +856,7 @@ function validatePassengers(jsonData) {
       const dob = new Date(p.dateOfBirth);
       test(`Passenger ${i + 1} dateOfBirth is a valid date in the past - dateOfBirth: ${p.dateOfBirth}`, function () {
         validationLogger(`[DEBUG] Passenger ${i + 1} dateOfBirth: ${p.dateOfBirth}`);
-        expect(!isNaN(dob.getTime()), "dateOfBirth should be a valid ISO date").to.be.true;
+        expect(!Number.isNaN(dob.getTime()), "dateOfBirth should be a valid ISO date").to.be.true;
         expect(dob.getTime(), "dateOfBirth should be in the past").to.be.below(Date.now());
       });
     } else {
@@ -910,7 +910,7 @@ function validateTripsAndLegs(jsonData) {
     // A7: startTime must be strictly before endTime (OSDM: Trip.startTime/endTime required)
     const tripStart = new Date(trip.startTime);
     const tripEnd   = new Date(trip.endTime);
-    if (!isNaN(tripStart.getTime()) && !isNaN(tripEnd.getTime())) {
+    if (!Number.isNaN(tripStart.getTime()) && !Number.isNaN(tripEnd.getTime())) {
       test(`Trip ${tripIndex + 1} startTime is before endTime (OSDM: temporal order)`, () => {
         expect(tripStart.getTime()).to.be.below(tripEnd.getTime(),
           `Trip startTime (${trip.startTime}) is not before endTime (${trip.endTime})`);
@@ -1198,7 +1198,7 @@ function validateAdmissions(selectedOffer) {
         const validFrom = new Date(admission.validFrom);
         test(`AdmissionOfferPart ${i + 1} validFrom is a valid date - validFrom: ${admission.validFrom}`, function () {
           validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} validFrom: ${admission.validFrom}`);
-          expect(!isNaN(validFrom.getTime()), "validFrom should be a valid ISO date").to.be.true;
+          expect(!Number.isNaN(validFrom.getTime()), "validFrom should be a valid ISO date").to.be.true;
         });
       }
 
@@ -1315,7 +1315,7 @@ function validateAdmissions(selectedOffer) {
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
-              if (!isNaN(validFromDate.getTime())) {
+              if (!Number.isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
@@ -1326,7 +1326,7 @@ function validateAdmissions(selectedOffer) {
             // Validate validUntil
             if (condition.validUntil) {
               const validUntilDate = new Date(condition.validUntil);
-              if (!isNaN(validUntilDate.getTime())) {
+              if (!Number.isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
@@ -1550,7 +1550,7 @@ function validateReservations(selectedOffer) {
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
-              if (!isNaN(validFromDate.getTime())) {
+              if (!Number.isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
@@ -1561,7 +1561,7 @@ function validateReservations(selectedOffer) {
             // Validate validUntil
             if (condition.validUntil) {
               const validUntilDate = new Date(condition.validUntil);
-              if (!isNaN(validUntilDate.getTime())) {
+              if (!Number.isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
@@ -1639,7 +1639,7 @@ function validateAncillaries(selectedOffer) {
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
-              if (!isNaN(validFromDate.getTime())) {
+              if (!Number.isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
@@ -1650,7 +1650,7 @@ function validateAncillaries(selectedOffer) {
             // Validate validUntil
             if (condition.validUntil) {
               const validUntilDate = new Date(condition.validUntil);
-              if (!isNaN(validUntilDate.getTime())) {
+              if (!Number.isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {

@@ -75,7 +75,7 @@ function alignPassengerIdsToSubmittedOrder(bookingPassengers, submittedRefs) {
 function checkBookingAfterOffer(booking, selectedOffer) {
   const bookingDate = new Date(booking.createdOn);
   const offerDate   = new Date(selectedOffer.createdOn);
-  if (!isNaN(bookingDate.getTime()) && !isNaN(offerDate.getTime())) {
+  if (!Number.isNaN(bookingDate.getTime()) && !Number.isNaN(offerDate.getTime())) {
     test(`booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`, () => {
       validationLogger(`[DEBUG] booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`);
       expect(bookingDate.getTime(), 'the booking is created before the offer it books').to.be.at.least(offerDate.getTime());
@@ -165,7 +165,7 @@ function validatePartDates(part, bookedPart, partType, index) {
     if (part[field] && bookedPart[field]) {
       const partDate       = new Date(part[field]);
       const bookedPartDate = new Date(bookedPart[field]);
-      if (!isNaN(partDate.getTime()) && !isNaN(bookedPartDate.getTime())) {
+      if (!Number.isNaN(partDate.getTime()) && !Number.isNaN(bookedPartDate.getTime())) {
         test(`${partType}[${index}].${field} is present in both offer and booking`, () => {
           expect(part[field]).to.exist;
           expect(bookedPart[field]).to.exist;
@@ -219,7 +219,7 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
   const _condInstant = (v) => {
     if (!v) return null;
     const t = new Date(v).getTime();
-    return isNaN(t) ? String(v) : t;
+    return Number.isNaN(t) ? String(v) : t;
   };
   const _bookedCondPool = bookedConditions.slice();
   let _condReuseWarned = false;
@@ -924,7 +924,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
         for (const p of parts) {
           if (p?.confirmableUntil) {
             const t = new Date(p.confirmableUntil).getTime();
-            if (!isNaN(t)) _partDeadlines.push({ ts: t, raw: p.confirmableUntil, pt });
+            if (!Number.isNaN(t)) _partDeadlines.push({ ts: t, raw: p.confirmableUntil, pt });
           }
         }
       }
@@ -951,7 +951,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     // until just past it before attempting confirmation.
     bru.setEnvVar('bookingConfirmationTimeLimit', String(_confirmDeadline));
     test(`booking confirmation deadline is a valid future datetime — source: ${_confirmSource}`, () => {
-      expect(isNaN(confirmLimit.getTime()), `confirmation deadline is not a valid date`).to.be.false;
+      expect(Number.isNaN(confirmLimit.getTime()), `confirmation deadline is not a valid date`).to.be.false;
       expect(confirmLimit.getTime()).to.be.above(Date.now(),
         `confirmation deadline is already in the past: ${_confirmDeadline}`);
       validationLogger(`[DEBUG] booking confirmation deadline: ${_confirmDeadline} (source: ${_confirmSource})`);
@@ -1324,7 +1324,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
 
     // D4: createdOn must always be a valid ISO datetime (OSDM: Fulfillment.createdOn required)
     const createdOnDate = new Date(fulfillment.createdOn);
-    if (!isNaN(createdOnDate.getTime())) {
+    if (!Number.isNaN(createdOnDate.getTime())) {
       // The provider's clock and OSCAR's are not the same clock: a fulfillment
       // created a few milliseconds "in the future" is not a defect.
       test(`Fulfillment[${idx}] createdOn is a valid datetime at or before now (clock tolerance ${CLOCK_TOLERANCE_MS / 1000} s)`, () => {

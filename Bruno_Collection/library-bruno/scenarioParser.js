@@ -213,7 +213,7 @@ function _errMsg(e) {
 function applyExternalRefFormat(pattern, n) {
   if (pattern == null || pattern === '') return String(n);
   return String(pattern).replace(/%0?(\d*)d/, function (_, width) {
-    const w = parseInt(width || '0', 10);
+    const w = Number.parseInt(width || '0', 10);
     return String(n).padStart(w, '0');
   });
 }
@@ -436,7 +436,7 @@ async function getScenarioData() {
     let _q = [];
     try { _q = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
     catch (_e) { _q = []; }
-    const _i = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+    const _i = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
     const _cur = _q[_i] || {};
     validationLogger(`[INFO] expiredFlow sub-run continuation: scenario "${bru.getEnvVar('scenarioCode') || '?'}" pass ${_i + 1}/${_q.length} — ${_cur.code || '?'} (${_cur.label || '?'}). Skipping full scenario re-init.`);
     return;
@@ -485,7 +485,7 @@ function parseScenarioData(jsonData) {
   // #398: load the provider's known-deviation baseline (root-level).
   setKnownDeviations(jsonData);
 
-  const plusDays = parseInt(bru.getEnvVar("departureDateFromToday"), 10) || 10;
+  const plusDays = Number.parseInt(bru.getEnvVar("departureDateFromToday"), 10) || 10;
   const today = new Date();
   today.setDate(today.getDate() + plusDays);
 
@@ -584,8 +584,8 @@ function parseScenarioData(jsonData) {
   // the normal multi-scenario sequence is not disrupted.
   const _scenarioTarget = (bru.getEnvVar('scenarioTarget') || '').trim();
   if (_scenarioTarget !== '') {
-    const _asNum = parseInt(_scenarioTarget, 10);
-    if (!isNaN(_asNum) && String(_asNum) === _scenarioTarget) {
+    const _asNum = Number.parseInt(_scenarioTarget, 10);
+    if (!Number.isNaN(_asNum) && String(_asNum) === _scenarioTarget) {
       // Numeric index
       if (_asNum < 0 || _asNum >= effectiveList.length) {
         throw new Error(
@@ -609,8 +609,8 @@ function parseScenarioData(jsonData) {
     // scenariosToRunIndex is intentionally left unchanged
   } else {
     // ── Normal sequential mode — read and advance scenariosToRunIndex ───────
-    let idx = parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
-    if (isNaN(idx) || idx < 0) idx = 0;
+    let idx = Number.parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
+    if (Number.isNaN(idx) || idx < 0) idx = 0;
     // If index exceeds list length, all scenarios have been attempted.
     // In a loopback context (__loopback was recently true), stop execution.
     // Otherwise (fresh run or unitary run), wrap to 0 so the run can proceed.
@@ -1209,7 +1209,7 @@ function parseScenarioData(jsonData) {
         const purchaserSpecs = [];
         purchaserList.purchaser.forEach(function (purchaser) {
           const osdmVersion = bru.getEnvVar("osdmVersion");
-          if (parseFloat(osdmVersion) >= 3.4) {
+          if (Number.parseFloat(osdmVersion) >= 3.4) {
             purchaserSpecs.push(new PurchaserContact(
               new DetailContact(
                 purchaser.purchaserFirstName,
@@ -1306,7 +1306,7 @@ function parseScenarioData(jsonData) {
             offerPassengerSpecs.push(offerSpec);
 
             const osdmVersion = bru.getEnvVar("osdmVersion");
-            if (parseFloat(osdmVersion) >= 3.4) {
+            if (Number.parseFloat(osdmVersion) >= 3.4) {
               passengerSpecs.push(new PassengerSpec(
                 passenger.reference,
                 passenger.type,
@@ -1525,7 +1525,7 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
   // TripSearchCriteria must use LocalDateTime (no offset, no trailing Z)
   // for all providers except Bileto.
   const _osdmVersionRaw = bru.getEnvVar("osdmVersion");
-  const _osdmVersionForDatetime = parseFloat(_osdmVersionRaw || "0");
+  const _osdmVersionForDatetime = Number.parseFloat(_osdmVersionRaw || "0");
   let _startDateTime = toLocalDateTime(legDef.startDateTime);
 
   // Bileto exception: keep OffsetDateTime in TripSearchCriteria.
@@ -1613,7 +1613,7 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
     const _params = {};
     ['transferLimit', 'numberOfResults', 'numberOfResultsBefore', 'numberOfResultsAfter'].forEach(k => {
       if (_set(searchCriteria[k])) {
-        const n = parseInt(searchCriteria[k], 10);
+        const n = Number.parseInt(searchCriteria[k], 10);
         if (Number.isInteger(n) && n >= 0) { _params[k] = n; _applied.push(`${k} ${n}`); }
         else validationLogger(`[WARNING] Trip Search Criteria ${k}="${searchCriteria[k]}" is not a non-negative integer — ignored.`);
       }
@@ -1737,7 +1737,7 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
 // Returns { inwardReturnDate } or null (one-way / unparseable).
 function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
   if (offsetDays == null || offsetDays === '') return null;
-  const offset = parseInt(offsetDays, 10);
+  const offset = Number.parseInt(offsetDays, 10);
   if (!Number.isInteger(offset) || offset < 0) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(.*)$/.exec(String(outboundStart || ''));
   if (!m) {

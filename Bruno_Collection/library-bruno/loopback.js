@@ -16,7 +16,7 @@ const { parseEnvJson } = require('./envUtils.js');
 
 function loopbackOrStop(label) {
   const _scList    = parseEnvJson('__scenariosList', []);
-  const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+  const _scNextIdx = Number.parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
 
   if (_scList.length > 0 && _scNextIdx < _scList.length) {
     console.log(
@@ -89,7 +89,7 @@ function noteKnownDeviation(stepLabel, status, dev) {
     ' — ' + (dev?.note ? dev.note : 'declared in the provider baseline') +
     '. Not counted as a failure; surfaced for visibility.'
   );
-  const n = parseInt(bru.getEnvVar('__knownDeviationHits') || '0', 10) + 1;
+  const n = Number.parseInt(bru.getEnvVar('__knownDeviationHits') || '0', 10) + 1;
   bru.setEnvVar('__knownDeviationHits', String(n));
   const seen = parseEnvJson('__knownDeviationsSeen', []);
   const key = _normStep(stepLabel) + '#' + String(status);

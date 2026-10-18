@@ -304,8 +304,8 @@ function buildBookingPurchaserBody() {
     //   firstName / lastName → OMITTED (required in PersonDetail → must reject → FAIL)
     const SWEEP = ["firstName", "lastName", "email", "phoneNumber"];
     bru.setEnvVar("__purchaserSweepTotal", String(SWEEP.length));
-    let idx = parseInt(bru.getEnvVar("__purchaserSweepIndex") || "0", 10);
-    if (isNaN(idx) || idx < 0) idx = 0;
+    let idx = Number.parseInt(bru.getEnvVar("__purchaserSweepIndex") || "0", 10);
+    if (Number.isNaN(idx) || idx < 0) idx = 0;
     if (idx > SWEEP.length - 1) idx = SWEEP.length - 1;
     const field = SWEEP[idx];
 
@@ -355,7 +355,7 @@ function buildBookingPurchaserBody() {
 function collectAvailablePlaces(vehicle, count) {
   const out = [];
   if (!vehicle || typeof vehicle !== "object" || !Array.isArray(vehicle.coaches)) return out;
-  const want = Math.max(1, parseInt(count, 10) || 1);
+  const want = Math.max(1, Number.parseInt(count, 10) || 1);
 
   const isAvailable = (p) => {
     if (!p || typeof p !== "object") return false;

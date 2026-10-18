@@ -124,7 +124,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   const _pbu = new Date(exchangeOffer.preBookableUntil);
   test(`Exchange offer[${index}].preBookableUntil is a valid future datetime (OSDM: required)`, () => {
     expect(exchangeOffer.preBookableUntil, 'preBookableUntil is required').to.be.a('string');
-    expect(isNaN(_pbu.getTime()), `preBookableUntil is not a valid date: ${exchangeOffer.preBookableUntil}`).to.be.false;
+    expect(Number.isNaN(_pbu.getTime()), `preBookableUntil is not a valid date: ${exchangeOffer.preBookableUntil}`).to.be.false;
     expect(_pbu.getTime()).to.be.above(Date.now(),
       `preBookableUntil is in the past: ${exchangeOffer.preBookableUntil}`);
   });

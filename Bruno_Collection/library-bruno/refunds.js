@@ -530,7 +530,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   // Build the Date only from non-null strings so the outer guard genuinely
   // filters out the absent case, and emit an explicit [ERROR] for it.
   const currentDate = new Date();
-  const _toDate = v => (typeof v === 'string' && v.trim() !== '') ? new Date(v) : new Date(NaN);
+  const _toDate = v => (typeof v === 'string' && v.trim() !== '') ? new Date(v) : new Date(Number.NaN);
   const createdOn  = _toDate(refundOffer.createdOn);
   const validFrom  = _toDate(refundOffer.validFrom);
   const validUntil = _toDate(refundOffer.validUntil);
@@ -544,7 +544,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   //   utc:   2026-06-09T05:23:26.087386+00:00
   //   local: 2026-06-09 07:23:26 Europe/Paris  (CEST = UTC+2)
   function _withLocal(utcString, parsedDate) {
-    if (!utcString || !parsedDate || isNaN(parsedDate.getTime())) return utcString || '';
+    if (!utcString || !parsedDate || Number.isNaN(parsedDate.getTime())) return utcString || '';
     try {
       const local = parsedDate.toLocaleString('sv-SE', { timeZone: 'Europe/Paris' });
       return `${utcString} (= ${local} Europe/Paris)`;
@@ -568,7 +568,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
       });
       return false;
     }
-    if (isNaN(parsedDate.getTime())) {
+    if (Number.isNaN(parsedDate.getTime())) {
       test(`Refund offer[${index}] ${fieldName} parses as a datetime`, () => {
         expect.fail(
           `${fieldName} is present but does not parse as a datetime — got: ${JSON.stringify(rawValue)}. ` +
@@ -622,7 +622,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   }
 
   // E1: validFrom must be before or equal to validUntil (OSDM: temporal order required)
-  if (!isNaN(validFrom.getTime()) && !isNaN(validUntil.getTime())) {
+  if (!Number.isNaN(validFrom.getTime()) && !Number.isNaN(validUntil.getTime())) {
     test(`Refund offer[${index}] validFrom is before or equal to validUntil (OSDM: temporal order)`, () => {
       expect(validFrom.getTime()).to.be.at.most(validUntil.getTime(),
         `validFrom (${refundOffer.validFrom}) is after validUntil (${refundOffer.validUntil})`);

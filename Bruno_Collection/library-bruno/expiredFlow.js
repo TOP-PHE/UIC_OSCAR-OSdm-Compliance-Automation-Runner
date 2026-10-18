@@ -59,7 +59,7 @@ function planExpiredFlow(opts) {
   }
   const nowMs   = Date.now();
   const limitMs = new Date(deadlineRaw).getTime();
-  if (isNaN(limitMs)) {
+  if (Number.isNaN(limitMs)) {
     return { armed: false, waitMs: 0, budgetSource: '', reason: `${resourceLabel} deadline '${deadlineRaw}' is not a valid date — skipping the expiry assertion.` };
   }
   const wakeAtMs = limitMs + BUFFER_MS;
@@ -69,7 +69,7 @@ function planExpiredFlow(opts) {
   }
 
   // Budget: per-scenario Max wait → server runHardDeadlineMs → conservative 8 min.
-  const hardDeadlineMs         = parseInt(bru.getEnvVar('runHardDeadlineMs') || '0', 10) || 0;
+  const hardDeadlineMs         = Number.parseInt(bru.getEnvVar('runHardDeadlineMs') || '0', 10) || 0;
   const perScenarioBudgetEndMs = maxWaitMinutes > 0 ? (nowMs + maxWaitMinutes * 60 * 1000) : 0;
   const budgetEndMs            = perScenarioBudgetEndMs || hardDeadlineMs || (nowMs + 480000);
   const budgetSource           = perScenarioBudgetEndMs
@@ -333,7 +333,7 @@ function advanceExpiredFlowQueueOrFinish(opts) {
   let queue = [];
   try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
   catch (_e) { queue = []; }
-  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  const idx = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
 
   if (queue.length === 0 || idx >= queue.length - 1) {
     // Last (or only) timer just ran. Reset the armed-flags so the next
@@ -377,7 +377,7 @@ function nhfTestPrefix() {
   try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
   catch (_e) { queue = []; }
   if (queue.length <= 1) return '';
-  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  const idx = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
   const cur = queue[idx];
   if (!cur) return '';
   const baseCode = String(bru.getEnvVar('scenarioCode') || '').replace(/^NHF_/, '');
@@ -406,13 +406,13 @@ function advanceExpiredFlowQueueAfterSkip() {
   let queue = [];
   try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
   catch (_e) { queue = []; }
-  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  const idx = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
   if (queue.length === 0 || idx >= queue.length) return false;
 
   const cur = queue[idx];
   const armedKey = '__' + String(cur.flag || '').replace(/Test$/, 'Armed');
   const armedVal = String(bru.getEnvVar(armedKey));
-  const skips = parseInt(bru.getEnvVar('__expiredFlowSkipCount') || '0', 10) || 0;
+  const skips = Number.parseInt(bru.getEnvVar('__expiredFlowSkipCount') || '0', 10) || 0;
 
   if (armedVal === 'true') {
     // The (last) sub-run armed and graded — its own expired branch already
