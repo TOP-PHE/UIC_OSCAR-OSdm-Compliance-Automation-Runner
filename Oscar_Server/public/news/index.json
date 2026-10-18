@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-finding-drafts",
+    "date": "October 18, 2026",
+    "tag": "New",
+    "title": "From an AI analysis to a finding draft",
+    "summary": "Each group of an AI analysis can now become a finding draft in Test Findings.",
+    "content": "Under each group of an analysis, Make a finding draft sends it to Test Findings › Suggested from runs, where you accept, edit or reject it. The draft names the analysis and its model. The AI's view of who should act is shown with it, but the category is yours to choose."
+  },
+  {
     "id": "2026-10-18-ai-warning-lines",
     "date": "October 18, 2026",
     "tag": "Fix",

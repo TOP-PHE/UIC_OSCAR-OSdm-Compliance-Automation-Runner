@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.344 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.379
+
+Issue #823 (PR 2). A group of an AI analysis becomes a finding draft. Collection unchanged.
+
+### Added
+- **Make a finding draft**, under each group of an analysis. The group joins Test Findings › 🧩 Suggested from runs (#735), where a Test Manager accepts, edits or rejects it like any suggested finding.
+  - The draft says that it comes from an AI analysis, and names the analysis id, the model and the batches.
+  - The AI's owner (provider, OSCAR, configuration, unclear) is shown in the draft and in its evidence. It is never copied into the category, which stays "Open point".
+  - Title, observed (the AI's cause), step and scenario come from the group (step and scenario only when the group names one); why, next and the lists go into the evidence.
+- **One draft per group** (key `ai:<analysis>:<group>`; a second ask is a 409). The analysis read back lists the drafts made from it, and each group says what became of its draft.
+- Route `POST /v1/company/ai-analysis/history/{id}/groups/{index}/draft`. Same Test Managers as the history; audited.
+- Test Findings says where a draft comes from: "🤖 From an AI analysis (model, date) · the AI names: …" instead of a failure count.
+- User guide § 2.4.
+
+### Default decisions (taken without asking)
+- **Any group can be drafted**, OSCAR's included. In Test Findings, "OSCAR issue" keeps such a draft out of the findings, as for a batch's suggestions.
+- **No failure count** on an AI draft (`occurrences` 0): the analysis stores groups, not the failures behind them.
+
+---
+
 ## [server-1.11.342 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.377
 
 Issue #823 (fix to PR 1). Collection unchanged.

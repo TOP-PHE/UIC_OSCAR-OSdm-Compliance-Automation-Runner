@@ -383,9 +383,15 @@ module.exports = {
     },
     '/v1/company/ai-analysis/history/{id}': {
       get: { tags: ['Company'], summary: 'One AI analysis with its result (#801)', security: [{ bearerAuth: [] }],
-        description: 'The same fields, plus result: { summary, groups: [{ title, cause, owner: provider | oscar | unclear, why, steps, scenarios }], comparison: { fixed, stillFailing, new } }, or { raw } when the answer could not be read.',
+        description: 'The same fields, plus result: { summary, groups: [{ title, cause, owner: provider | oscar | configuration | unclear, why, action, steps, scenarios }], comparison: { fixed, stillFailing, new } }, or { raw } when the answer could not be read; and drafts: { <group index>: { id, state } }, the finding drafts made from its groups (#823).',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'The analysis' }, 404: { description: 'Not one of this company or provider' } } },
+    },
+    '/v1/company/ai-analysis/history/{id}/groups/{index}/draft': {
+      post: { tags: ['Company'], summary: 'A group of an AI analysis as a finding draft (#823)', security: [{ bearerAuth: [] }],
+        description: 'The group joins the suggested findings of Test Findings (#735), where a Test Manager accepts, edits or rejects it. The draft names the analysis and its model; the AI\'s owner is shown in it, and the category stays "open". One draft per group. Answers 201 { suggestion: { id, state, draft } }.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'index', in: 'path', required: true, schema: { type: 'integer', minimum: 0 } }],
+        responses: { 201: { description: 'The draft' }, 403: { description: 'Test Managers only' }, 404: { description: 'No such analysis or group here, or the analysis is not done' }, 409: { description: 'This group already has a draft' } } },
     },
     '/v1/admin/ai-access-requests': {
       get: { tags: ['Admin'], summary: 'Test Managers\' requests for the AI analysis (#801)', security: [{ bearerAuth: [] }],

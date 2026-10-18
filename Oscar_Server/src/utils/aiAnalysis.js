@@ -388,6 +388,53 @@ function readResult(text, { compare = false } = {}) {
   return { ok: true, result };
 }
 
+// ── A group of an analysis as a finding draft (#823 PR 2) ─────────────────────
+
+const OWNER_TEXT = Object.freeze({ provider: 'the provider', oscar: 'OSCAR', configuration: 'the configuration', unclear: 'unclear' });
+
+/** The key of a group's draft in finding_suggestion: one draft per group of an analysis. */
+function draftKeyOf(analysisId, index) {
+  return `ai:${analysisId}:${index}`;
+}
+
+/**
+ * A finding draft (the fields of the #735 suggestions) from group `index` of
+ * a stored analysis. It says that it comes from an AI analysis, which one and
+ * with which model; the AI's owner is shown, never copied into the category,
+ * which stays "open" for the Test Manager to choose. Null when the analysis
+ * has no such group.
+ */
+function draftOfAnalysisGroup(analysis, index) {
+  const group = analysis?.result?.groups?.[index];
+  if (!group || typeof group !== 'object') return null;
+  const owner = OWNERS.includes(group.owner) ? group.owner : 'unclear';
+  const steps = Array.isArray(group.steps) ? group.steps : [];
+  const scenarios = Array.isArray(group.scenarios) ? group.scenarios : [];
+  const batches = (analysis.batches || []).join(' and ');
+  const evidence = [
+    `From an AI analysis (id ${analysis.id}, model ${analysis.model}, ${analysis.createdAt}) of batch${(analysis.batches || []).length > 1 ? 'es' : ''} ${batches}.`,
+    'An AI opinion, to be checked against the runs before it is kept.',
+    `The AI names as the one to act: ${OWNER_TEXT[owner]}.`,
+    group.why ? `Why: ${group.why}` : null,
+    group.action ? `Next (AI): ${group.action}` : null,
+    steps.length ? `Steps: ${steps.join(', ')}` : null,
+    scenarios.length ? `Scenarios: ${scenarios.join(', ')}` : null,
+  ].filter(Boolean).join('\n');
+  return {
+    title: short(group.title, 200) || 'Untitled',
+    step: steps.length === 1 ? steps[0] : null,
+    scenarioCode: scenarios.length === 1 ? scenarios[0] : null,
+    expectedStatus: null,
+    observed: short(group.cause, 2000),
+    interpretation: '',
+    evidence,
+    category: 'open',
+    reason: `From an AI analysis, which names ${OWNER_TEXT[owner]}. The category is yours to choose.`,
+    simulatorHint: null,
+    source: { kind: 'ai_analysis', analysisId: analysis.id, model: analysis.model, createdAt: analysis.createdAt, owner, group: index },
+  };
+}
+
 /**
  * sha256 of exactly what is sent: the instructions and the input, and the
  * model when one is named (#831: the preview confirms the model too). Without
@@ -402,5 +449,5 @@ function inputHash(system, text, model = null) {
 module.exports = {
   LANGUAGES, OWNERS, MAX_INPUT_CHARS, MAX_ANSWER_TOKENS,
   groupsOf, compareGroups, byStep, buildInput, isWarningLine, warningText, warningGroupsOf, warningsByStep, MAX_WARNING_GROUPS, estimateTokens, systemPrompt, readResult, inputHash, frameworkDeclarations,
-  catalogueEntryOf, providerContext,
+  catalogueEntryOf, providerContext, draftKeyOf, draftOfAnalysisGroup,
 };

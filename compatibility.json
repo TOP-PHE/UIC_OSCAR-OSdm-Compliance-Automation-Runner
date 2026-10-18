@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.377",
+  "current_release": "2026.379",
   "releases": [
+    {
+      "release": "2026.379",
+      "date": "2026-10-18",
+      "server": "1.11.344",
+      "collection": "OTST_V2.0.186",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI analysis (#823 PR 2): each group of an analysis can become a draft in Test Findings › Suggested from runs. The draft names the analysis and its model; the AI's owner is shown, the category stays open for the Test Manager."
+      ]
+    },
     {
       "release": "2026.377",
       "date": "2026-10-18",
