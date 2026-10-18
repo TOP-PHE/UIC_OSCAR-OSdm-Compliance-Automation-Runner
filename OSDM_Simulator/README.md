@@ -44,6 +44,16 @@ Every scenario of that data file, what it tests, what the simulator answers
 and what a run must show:
 [scenario catalogue](../Documentation/Server_Operations/OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
 
+## Faults on demand
+
+The simulator can break one kind of answer on request, to check that OSCAR's
+checks catch it: the header `X-Simulator-Faults: code, code` on a request, or
+a token asked with the scope `sim-faults:code,code` for every request made
+with it. Unknown codes are refused. The catalogue, with what OSCAR must report
+for each fault, is `src/osdm/faults.js`; how to use it from OSCAR is in the
+[operations page § 6b](../Documentation/Server_Operations/OSCAR%20-%20OSDM%20Simulator.md#6b-faults-on-demand-833)
+and the [user guide § 9](../Documentation/User_Guides/OSCAR%20-%20Tester%20User%20Guide.md#9-testing-oscar-with-the-osdm-simulator).
+
 ## What it answers
 
 | Request | Answer |
