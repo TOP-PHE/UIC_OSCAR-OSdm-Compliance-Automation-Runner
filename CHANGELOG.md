@@ -125,6 +125,7 @@ Issue #827 part C, release 2026.364. Server and pages only.
 - **A fourth owner, `configuration`**: the Test Framework declares something the provider does not do, the Test Data names a train, date or tariff it does not have, or the scenario should not run on this provider. Shown in purple.
 - **An action per group**: what to do next and who does it, shown as "Next:".
 - **The instructions allow questioning a check**: when OSCAR's request or what a check expects does not follow the OSDM extract (part B), the owner is OSCAR, naming the member or rule from the extract.
+- **The commitment text is version 2.** Its first point now says that one request and its answer, and the provider's checklist answers, are sent too, and that the personal data of purchasers is masked as well as that of passengers. Every approved Test Manager is asked to accept it again on the AI Analysis page, without a new approval; until then their analyses wait.
 - **"Copy as an OSCAR issue"** on a group the model gives to OSCAR: its title, cause, reason, action, steps and scenarios as Markdown, naming the analysis, the model, and that it is an AI opinion to be checked.
 
 Checked:

@@ -20,10 +20,10 @@
 const crypto = require('node:crypto');
 
 const COMMITMENT = Object.freeze({
-  version: 1,
+  version: 2,   // 2 (#827): request and answer samples, the provider's checklist answers
   title: 'AI analysis of test results — what you accept',
   points: Object.freeze([
-    'Data leaves OSCAR. When you run an analysis, the test results of the batches you choose are sent to the AI service configured for your company. This is a service outside OSCAR and outside the UIC: the checks, statuses, error codes, scenario names and findings of the provider whose results you analyse. OSCAR leaves out credentials, tokens, endpoints and passenger personal data, but the results themselves describe how the provider\'s system behaves.',
+    'Data leaves OSCAR. When you run an analysis, the test results of the batches you choose are sent to the AI service configured for your company. This is a service outside OSCAR and outside the UIC: the checks, statuses, error codes, scenario names and findings of the provider whose results you analyse, for the most frequent failures one request OSCAR sent and the answer it received, and the provider\'s answers to the set-up checklist when one is imported. OSCAR masks credentials, tokens, endpoints and the personal data of passengers and purchasers, but the results themselves describe how the provider\'s system behaves.',
     'You must be allowed to send it. You confirm that your company may share these results with that AI service, under its agreements with the providers concerned. That includes any confidentiality agreement covering test results.',
     'The AI service\'s own terms apply. What it keeps, for how long, and whether it trains on your data depends on your contract with it, not on OSCAR. Check those terms before you start.',
     'Costs are yours. Each analysis is billed by the AI service to the account whose key you configure. OSCAR shows an estimate before each analysis, but the bill comes from the AI service.',
