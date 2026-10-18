@@ -95,9 +95,9 @@ function tokenize(s) {
     if (c === '(') { tokens.push({ t: '(' }); i++; continue; }
     if (c === ')') { tokens.push({ t: ')' }); i++; continue; }
     if (c === '.') { tokens.push({ t: '.' }); i++; continue; }
-    if (/[0-9]/.test(c)) {
+    if (/\d/.test(c)) {
       let j = i;
-      while (j < s.length && /[0-9]/.test(s[j])) j++;
+      while (j < s.length && /\d/.test(s[j])) j++;
       tokens.push({ t: 'num', v: s.slice(i, j) });
       i = j;
       continue;
