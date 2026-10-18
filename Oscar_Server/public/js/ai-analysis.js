@@ -22,6 +22,8 @@
  * set-up checklist is imported per company or provider in the analysis card.
  * #831: a list of models, the model chosen per analysis, two analyses side by
  * side, the cost of each and what was spent, a suggested limit and instruction.
+ * #833 PR D: the faults a simulator batch asked for, detected or not, and an
+ * analysis scored against them (`faultReportHtml(r)`, pure).
  */
 
 const NOTE = 'padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.5;margin-bottom:14px;';
@@ -219,8 +221,10 @@ function analysisPanelHtml(targets) {
     <label for="ai-an-model" style="${FIELD}">Model for this analysis</label>
     <select id="ai-an-model" style="${WIDE}"></select>
     <div style="font-size:11px;color:#90a4ae;margin-top:3px">Analyse the same batch with another model to compare the answers: tick two in the list below.</div>
-    <div style="margin-top:12px"><button class="btn" data-ai-action="an-preview">See what will be sent</button></div>
+    <div style="margin-top:12px"><button class="btn" data-ai-action="an-preview">See what will be sent</button>
+      <button class="btn" data-ai-action="an-faults" title="For a batch run on the OSDM simulator with faults asked for (simulatorFaults). Reads the runs only: no AI call.">Faults detected in this batch</button></div>
     <div id="ai-an-preview" style="margin-top:12px"></div>
+    <div id="ai-an-faults" style="margin-top:12px"></div>
     <div id="ai-an-result" style="margin-top:12px"></div>
     <h4 style="margin:18px 0 6px">Earlier analyses</h4>
     <div id="ai-an-history" style="font-size:13px"></div>
@@ -351,7 +355,58 @@ function resultHtml(a) {
   return head + `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">An AI opinion: it can be wrong, and it is not a test result or a finding.</div>
     <p style="font-size:13px;line-height:1.55">${esc(r.summary || '')}</p>${comparisonHtml(r.comparison)}
     ${groups}
-    <div style="font-size:11px;color:#90a4ae;margin-top:8px">Tokens: ${esc(a.tokens?.input ?? '?')} in, ${esc(a.tokens?.output ?? '?')} out · Cost: ${usd(a.cost)}.</div>`;
+    <div style="font-size:11px;color:#90a4ae;margin-top:8px">Tokens: ${esc(a.tokens?.input ?? '?')} in, ${esc(a.tokens?.output ?? '?')} out · Cost: ${usd(a.cost)}.</div>
+    <div style="margin-top:8px"><button class="btn" data-ai-action="an-faults" data-id="${esc(a.id)}" data-batch="${esc((a.batches || []).at(-1) || '')}"
+      title="For a batch run on the OSDM simulator with faults asked for: did OSCAR detect them, and did this analysis explain them?">Score against the simulator's faults</button></div>`;
+}
+
+const FAULT_VERDICT = { explained: '✅ explained', misattributed: '⚠️ another owner', missed: '❌ not in a group' };
+
+// The AI column of one fault: '—' when the analysis did not judge it (OSCAR did not fail it).
+function faultVerdictHtml(v) {
+  if (!v) return '—';
+  const group = v.group ? `<br><span style="font-size:11px;color:#78909c">${esc(v.group.title)} (${esc(v.group.owner)})</span>` : '';
+  return esc(FAULT_VERDICT[v.verdict]) + group;
+}
+
+/**
+ * #833 PR D: the faults a batch asked the simulator for, whether OSCAR
+ * detected each (and where), and with an analysis, whether it explained them.
+ */
+function faultReportHtml(r) {
+  if (!r.faults?.length) {
+    return `<div style="${NOTE}${INFO}">No run of this batch asked the simulator for faults (scenario field "Simulator faults").</div>`;
+  }
+  const s = r.summary;
+  const verdicts = new Map((r.analysis?.judged || []).map(j => [`${j.runId}|${j.code}`, j]));
+  const rows = r.faults.map(f => {
+    let seen = '❌ not detected';
+    if (!f.known) seen = '❓ unknown fault code';
+    else if (f.asExpected) seen = '✅ detected';
+    else if (f.detected) seen = '🟡 partly detected';
+    const where = (f.expectations || []).map(e => {
+      const times = e.found.length ? 'seen ' + e.found.length + '×' : 'not seen';
+      return `${esc(e.level)} at ${esc(e.step)}: “${esc(e.check)}” — ${times}`;
+    }).join('<br>');
+    const v = verdicts.get(`${f.runId}|${f.code}`);
+    let ai = '';
+    if (r.analysis) ai = `<td style="${CELL}">${faultVerdictHtml(v)}</td>`;
+    return `<tr><td style="${CELL}"><code>${esc(f.code)}</code><br><span style="font-size:11px;color:#78909c">${esc(f.scenarioCode)}</span></td>
+      <td style="${CELL}">${seen}</td><td style="${CELL};font-size:12px">${where}</td>${ai}</tr>`;
+  }).join('');
+  let score = '';
+  if (r.analysis) {
+    const a = r.analysis.summary;
+    const rate = a.score == null ? '' : ' (score ' + esc(a.score) + ')';
+    score = ` · AI analysis (${esc(r.analysis.model)}): ${a.explained} of ${a.judged} explained${rate}, ${a.misattributed} given another owner, ${a.missed} in no group`;
+  }
+  const unknown = s.unknown ? ', ' + s.unknown + ' unknown' : '';
+  const aiHead = r.analysis ? '<th style="' + CELL + '">AI analysis</th>' : '';
+  return `<div style="${NOTE}${s.detected === s.injected ? OK : INFO}">OSCAR detected ${s.detected} of ${s.injected} faults asked for (${s.asExpected} with every expected check)${unknown}${score}.</div>
+    <div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">
+    <thead><tr><th style="${CELL}">Fault</th><th style="${CELL}">OSCAR</th><th style="${CELL}">Expected checks</th>${aiHead}</tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <div style="font-size:11px;color:#90a4ae;margin-top:6px">The AI analysis is judged only on the faults OSCAR failed (a warning is not sent to it), by the owner, step and scenario of its groups, not by the wording of the cause.</div>`;
 }
 
 const STATUS_LABEL = { running: 'Running', done: 'Done', failed: 'Failed', unreadable: 'Answer not readable', interrupted: 'Interrupted' };
@@ -689,6 +744,18 @@ async function showAnalysis(id) {
 
 let shownAnalysis = null;
 
+async function showFaults(batch, analysisId) {
+  const box = document.getElementById('ai-an-faults');
+  const id = batch || document.getElementById('ai-an-a').value;
+  if (!id) { box.innerHTML = testResultHtml({ ok: false, error: 'Choose a batch first.' }); return; }
+  box.innerHTML = '⏳ Reading the runs…';
+  const query = '?batch=' + encodeURIComponent(id) + (analysisId ? '&analysis=' + encodeURIComponent(analysisId) : '');
+  const res = await fetch('/v1/company/ai-analysis/fault-detection' + query, { headers: analysisHeaders() });
+  if (!res.ok) { box.innerHTML = testResultHtml({ ok: false, error: await readError(res, 'Could not read the fault detection.') }); return; }
+  box.innerHTML = faultReportHtml(await res.json());
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // #827: the text of an OSCAR issue for a group of the analysis shown, to the clipboard.
 async function copyIssue(n) {
   const g = shownAnalysis?.result?.groups?.[Number(n)];
@@ -729,7 +796,7 @@ document.addEventListener('change', (e) => {
   else if (e.target.closest('#ai-an-a, #ai-an-b, #ai-an-lang, #ai-an-model')) { previewed = null; document.getElementById('ai-an-preview').innerHTML = ''; }
 });
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-side"]');
+  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-side"], [data-ai-action="an-faults"]');
   if (!el) return;
   const act = el.dataset.aiAction;
   let job;
@@ -738,6 +805,7 @@ document.addEventListener('click', (e) => {
   else if (act === 'an-checklist-remove') job = removeChecklist();
   else if (act === 'an-copy-issue') job = copyIssue(el.dataset.group);
   else if (act === 'an-side') job = showSideBySide();
+  else if (act === 'an-faults') job = showFaults(el.dataset.batch, el.dataset.id);
   else job = showAnalysis(el.dataset.id);
   job.catch(err => show(err.message, 'error'));
 });

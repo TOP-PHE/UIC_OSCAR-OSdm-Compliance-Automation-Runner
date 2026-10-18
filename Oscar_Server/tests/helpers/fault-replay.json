@@ -1,0 +1,224 @@
+{
+ "SIM_FAULT_OFFER_PRICE_BELOW_PARTS_38": {
+  "failures": [
+   [
+    "01. POST Get Offer",
+    "Offer minimalPrice >= sum of admission parts price - minimalPrice: 318834, admissions: 318835"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ Offer minimalPrice >= sum of admission parts price - minimalPrice: 318834, admissions: 318835: expected 318834 to be at least 318835"
+  ]
+ },
+ "SIM_FAULT_OFFER_TRIP_UNKNOWN_38": {
+  "failures": [
+   [
+    "01. POST Get Offer",
+    "Selected offer tripCoverage references the response's own trips/legs"
+   ],
+   [
+    "01. POST Get Offer",
+    "selectedOffer.tripCoverage.coveredTripId (SIM-FAULT-NO-SUCH-TRIP) is part of Trip ids"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ Selected offer tripCoverage references the response's own trips/legs: Referential integrity of the offer's tripCoverage is broken — coverage references tripId 'SIM-FAULT-NO-SUCH-TRIP' but the response's trips are [<id>].",
+   "[WARNING] ❌ selectedOffer.tripCoverage.coveredTripId (SIM-FAULT-NO-SUCH-TRIP) is part of Trip ids: expected [ '<id>' ] to include 'SIM-FAULT-NO-SUCH-TRIP'"
+  ]
+ },
+ "SIM_FAULT_BOOKING_CURRENCY_CHANGED_38": {
+  "failures": [
+   [
+    "02. POST Create Booking",
+    "booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: EUR)"
+   ],
+   [
+    "02. POST Create Booking",
+    "provisionalPrice is not below the offer's minimalPrice - provisional: 318835 EUR, minimal: 318835 CZK"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: EUR): Booking currency (EUR) differs from offer currency (CZK): expected 'EUR' to deeply equal 'CZK'",
+   "[WARNING] ❌ provisionalPrice is not below the offer's minimalPrice - provisional: 318835 EUR, minimal: 318835 CZK: provisionalPrice and minimalPrice differ in currency: expected 'EUR' to deeply equal 'CZK'"
+  ]
+ },
+ "SIM_FAULT_BOOKING_PASSENGER_DROPPED_38": {
+  "failures": [
+   [
+    "02. POST Create Booking",
+    "Booking contains exactly the expected number of passengers - expected: 2, actual: 1"
+   ],
+   [
+    "03. PATCH Multi Passenger",
+    "HTTP response status — expected 200, actual: 404"
+   ],
+   [
+    "03. PATCH Multi Passenger",
+    "[OSCAR request] PATCH /bookings/{bookingId}/passengers/{passengerId} conforms to OSDM 3.8.0 Passenger"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ Booking contains exactly the expected number of passengers - expected: 2, actual: 1: Expected exactly 2 passengers, got 1: expected 1 to deeply equal 2",
+   "[WARNING] ❌ [OSCAR request] PATCH /bookings/{bookingId}/passengers/{passengerId} conforms to OSDM 3.8.0 Passenger: OSCAR's own request does not conform to OSDM (an OSCAR issue, not the provider's): (body): missing id"
+  ]
+ },
+ "SIM_FAULT_BOOKING_NOT_PREBOOKED_38": {
+  "failures": [
+   [
+    "02. POST Create Booking",
+    "Status is PREBOOKED for admission[0] - expected: PREBOOKED, actual: CONFIRMED"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ Status is PREBOOKED for admission[0] - expected: PREBOOKED, actual: CONFIRMED: expected [ 'PREBOOKED' ] to include 'CONFIRMED'"
+  ]
+ },
+ "SIM_FAULT_PASSENGER_NAME_ALTERED_38": {
+  "failures": [
+   [
+    "03. PATCH Multi Passenger",
+    "Passenger 0 - Last name is correct (expected: Sample, actual: Sample-X)"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ Passenger 0 - Last name is correct (expected: Sample, actual: Sample-X): expected 'Sample-X' to equal 'Sample'"
+  ]
+ },
+ "SIM_FAULT_FULFILLMENT_WRONG_STATUS_38": {
+  "failures": [
+   [
+    "06. POST Obtaining Fulfillments from Booking",
+    "Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: REFUNDED"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: REFUNDED: expected [ 'FULFILLED', 'CONFIRMED' ] to include 'REFUNDED'"
+  ]
+ },
+ "SIM_FAULT_ANSWER_HTML_38": {
+  "failures": [
+   [
+    "05. GET Booking before Fulfillments",
+    "The answer is a JSON object — got string starting \"<html><head><title>Request Rejected</tit\""
+   ],
+   [
+    "05. GET Booking before Fulfillments",
+    "[OSDM] Content-Type is JSON"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ [OSDM] Content-Type is JSON: Expected a JSON media type (application/json or application/...+json), got: 'text/html; charset=utf-8': expected false to be true"
+  ]
+ },
+ "SIM_FAULT_REFUND_AMOUNT_ABOVE_PAID_38": {
+  "failures": [
+   [
+    "10. POST Refund Offers",
+    "Refund response bounds — refundable(3188350) and fee(0) are non-negative, sum ≤ confirmedPrice(617625), currencies consistent"
+   ],
+   [
+    "10. POST Refund Offers",
+    "Refund response bounds — refundable(2987900) and fee(0) are non-negative, sum ≤ confirmedPrice(617625), currencies consistent"
+   ],
+   [
+    "13. PATCH Refund Offer",
+    "Refund offer[0] confirmed with the amounts it was proposed at - proposed: refundable 2987900, fee 0; confirmed: refundable 298790, fee 0"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] Fulfillment <id>: document <id> covers this fulfillment only — it also holds <id> (a PDF_A4 merged for the booking)",
+   "[WARNING] Fulfillment <id>: document <id> covers this fulfillment only — it also holds <id> (a PDF_A4 merged for the booking)",
+   "[WARNING] ❌ Refund response bounds — refundable(3188350) and fee(0) are non-negative, sum ≤ confirmedPrice(617625), currencies consistent: Provider refunded MORE than was paid: fee(0) + refundable(318835000) = 318835000 > confirmed(61762500): expected 318835000 to be at most 61762500",
+   "[WARNING] ❌ Refund response bounds — refundable(2987900) and fee(0) are non-negative, sum ≤ confirmedPrice(617625), currencies consistent: Provider refunded MORE than was paid: fee(0) + refundable(298790000) = 298790000 > confirmed(61762500): expected 298790000 to be at most 61762500",
+   "[WARNING] ❌ Refund offer[0] confirmed with the amounts it was proposed at - proposed: refundable 2987900, fee 0; confirmed: refundable 298790, fee 0: refundableAmount changed between PROPOSED and CONFIRMED: expected 298790 to deeply equal 2987900"
+  ]
+ },
+ "SIM_FAULT_REFUND_NOT_REFUNDED_38": {
+  "failures": [
+   [
+    "14. GET Booking after Patch Refund",
+    "Fulfillment <id> is REFUNDED (held by the confirmed refund offer) - status: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Booked admission <id> is REFUNDED - status: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Status is REFUNDED for admission[0] - expected: REFUNDED, actual: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Fulfillment[0] status comparison - expected: REFUNDED, actual: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Fulfillment[1] status comparison - expected: REFUNDED, actual: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Fulfillment <id> is REFUNDED (held by the confirmed refund offer) - status: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Fulfillment <id> is REFUNDED (held by the confirmed refund offer) - status: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Booked admission <id> is REFUNDED - status: FULFILLED"
+   ],
+   [
+    "14. GET Booking after Patch Refund",
+    "Booked admission <id> is REFUNDED - status: FULFILLED"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] Fulfillment <id>: document <id> covers this fulfillment only — it also holds <id> (a PDF_A4 merged for the booking)",
+   "[WARNING] Fulfillment <id>: document <id> covers this fulfillment only — it also holds <id> (a PDF_A4 merged for the booking)",
+   "[WARNING] ❌ Fulfillment <id> is REFUNDED (held by the confirmed refund offer) - status: FULFILLED: expected 'FULFILLED' to deeply equal 'REFUNDED'",
+   "[WARNING] ❌ Booked admission <id> is REFUNDED - status: FULFILLED: expected 'FULFILLED' to deeply equal 'REFUNDED'",
+   "[WARNING] ❌ Status is REFUNDED for admission[0] - expected: REFUNDED, actual: FULFILLED: expected [ 'REFUNDED' ] to include 'FULFILLED'",
+   "[WARNING] ❌ Fulfillment[0] status comparison - expected: REFUNDED, actual: FULFILLED: expected [ 'REFUNDED' ] to include 'FULFILLED'",
+   "[WARNING] ❌ Fulfillment[1] status comparison - expected: REFUNDED, actual: FULFILLED: expected [ 'REFUNDED' ] to include 'FULFILLED'",
+   "[WARNING] ❌ Fulfillment <id> is REFUNDED (held by the confirmed refund offer) - status: FULFILLED: expected 'FULFILLED' to deeply equal 'REFUNDED'",
+   "[WARNING] ❌ Fulfillment <id> is REFUNDED (held by the confirmed refund offer) - status: FULFILLED: expected 'FULFILLED' to deeply equal 'REFUNDED'",
+   "[WARNING] ❌ Booked admission <id> is REFUNDED - status: FULFILLED: expected 'FULFILLED' to deeply equal 'REFUNDED'",
+   "[WARNING] ❌ Booked admission <id> is REFUNDED - status: FULFILLED: expected 'FULFILLED' to deeply equal 'REFUNDED'"
+  ]
+ },
+ "SIM_FAULT_ERROR_PROBLEM_WITHOUT_CODE_38": {
+  "failures": [],
+  "warnings": [
+   "[WARNING] Purchaser negative sweep 1/4: OMIT required 'firstName' — expecting the provider to reject.",
+   "[WARNING] Negative requestedInformation [purchaser.firstName]: the refusal names no OSDM problem code (Problem.code) — OSDM announces it as mandatory, and a refusal is told from another by it.",
+   "[WARNING] Purchaser negative sweep 2/4: OMIT required 'lastName' — expecting the provider to reject.",
+   "[WARNING] Negative requestedInformation [purchaser.lastName]: the refusal names no OSDM problem code (Problem.code) — OSDM announces it as mandatory, and a refusal is told from another by it.",
+   "[WARNING] Purchaser negative sweep 3/4: INVALID 'email' = 'not-an-email' — expecting the provider to reject.",
+   "[WARNING] Negative requestedInformation [purchaser.email]: the refusal names no OSDM problem code (Problem.code) — OSDM announces it as mandatory, and a refusal is told from another by it.",
+   "[WARNING] Purchaser negative sweep 4/4: INVALID 'phoneNumber' = 'not-a-phone' — expecting the provider to reject.",
+   "[WARNING] Negative requestedInformation [purchaser.phoneNumber]: the refusal names no OSDM problem code (Problem.code) — OSDM announces it as mandatory, and a refusal is told from another by it."
+  ]
+ },
+ "SIM_FAULT_ERROR_SERVER_ERROR_FOR_REFUSAL_38": {
+  "failures": [
+   [
+    "14. POST Booking Purchaser",
+    "Negative requestedInformation [purchaser.firstName]: provider rejects with a client error (4xx)"
+   ],
+   [
+    "14. POST Booking Purchaser",
+    "Negative requestedInformation [purchaser.lastName]: provider rejects with a client error (4xx)"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] Purchaser negative sweep 1/4: OMIT required 'firstName' — expecting the provider to reject.",
+   "[WARNING] ❌ Negative requestedInformation [purchaser.firstName]: provider rejects with a client error (4xx): expected 4xx, got 500: expected false to be true",
+   "[WARNING] Purchaser negative sweep 2/4: OMIT required 'lastName' — expecting the provider to reject.",
+   "[WARNING] ❌ Negative requestedInformation [purchaser.lastName]: provider rejects with a client error (4xx): expected 4xx, got 500: expected false to be true",
+   "[WARNING] Purchaser negative sweep 3/4: INVALID 'email' = 'not-an-email' — expecting the provider to reject.",
+   "[WARNING] Negative requestedInformation [purchaser.email]: provider rejects with a client error (4xx): expected 4xx, got 500 — OSDM defines this field as an unconstrained string (no format/pattern), so rejecting a malformed value is recommended practice, not a conformance requirement.",
+   "[WARNING] Purchaser negative sweep 4/4: INVALID 'phoneNumber' = 'not-a-phone' — expecting the provider to reject.",
+   "[WARNING] Negative requestedInformation [purchaser.phoneNumber]: provider rejects with a client error (4xx): expected 4xx, got 500 — OSDM defines this field as an unconstrained string (no format/pattern), so rejecting a malformed value is recommended practice, not a conformance requirement."
+  ]
+ }
+}

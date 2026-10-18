@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-fault-detection",
+    "date": "October 18, 2026",
+    "tag": "Improvement",
+    "title": "Fault detection: OSCAR and the AI analysis scored",
+    "summary": "For a batch run on the OSDM simulator with faults asked for, the AI analysis page says which faults OSCAR detected, and which an AI analysis explained.",
+    "content": "On the AI analysis page, \"Faults detected in this batch\" lists, for a batch run on the OSDM simulator with chosen faults, whether OSCAR detected each one and with which checks; nothing is sent to an AI service for that. Under an AI analysis of the same batch, \"Score against the simulator's faults\" says for each fault whether the analysis explained it (as the provider's, at the right step), gave it another owner, or missed it, with a score: analyse the same batch with two models to compare them."
+  },
+  {
     "id": "2026-10-18-simulator-faults",
     "date": "October 18, 2026",
     "tag": "Improvement",
