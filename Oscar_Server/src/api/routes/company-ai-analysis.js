@@ -21,6 +21,8 @@
  *   PUT    /v1/company/ai-analysis/config        — save it; tested first when the
  *                                                  service, address, model or key changes
  *   POST   /v1/company/ai-analysis/config/test   — test the stored or the given one
+ *   POST   /v1/company/ai-analysis/config/models — the models the Anthropic service
+ *                                                  offers, with the stored or the given key (#831)
  *   DELETE /v1/company/ai-analysis/config        — remove it, key included
  *
  * The AI service is configured like the access is asked: per (company or
@@ -46,7 +48,8 @@ const { resolveCompanyScope, auditLog } = require('../helpers/shared');
 const { canUseCompany } = require('../helpers/provider-access');
 const A = require('../../utils/aiAccess');
 const C = require('../../utils/aiConfig');
-const { testConnection } = require('../../services/aiConnector');
+const M = require('../../utils/aiModels');
+const { testConnection, listModels } = require('../../services/aiConnector');
 const { sendAiAccessNotice } = require('../../utils/mailer');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis' });
 
@@ -274,8 +277,8 @@ function storedKey(row) {
   return row?.api_key_enc ? decrypt(row.api_key_enc) : null;
 }
 
-const refuse = (res, status, detail) => res.status(status).json({
-  status, title: status === 422 ? 'Unprocessable Content' : 'Bad Request', detail });
+const TITLES = { 400: 'Bad Request', 404: 'Not Found', 422: 'Unprocessable Content' };
+const refuse = (res, status, detail) => res.status(status).json({ status, title: TITLES[status] || 'Error', detail });
 
 // What a PUT or a test names: { next, key } or the refusal already sent.
 function candidateOf(req, res, stored) {
@@ -299,7 +302,9 @@ router.get('/ai-analysis/config', readLimiter, (req, res) => {
     company: { id: target.id, name: target.name, provider: !!target.parent_id },
     config: C.configView(configOf(target.id, req.user.id)),
     connectors: C.connectorsForPage(),
-    limits: { instruction: C.LIMITS.instruction, minTokenCap: C.LIMITS.minTokenCap },
+    limits: { instruction: C.LIMITS.instruction, minTokenCap: C.LIMITS.minTokenCap, maxPrice: C.LIMITS.maxPrice },
+    models: M.modelsForPage(),
+    suggested: { monthlyTokenCap: M.SUGGESTED_MONTHLY_TOKENS, instruction: M.SUGGESTED_INSTRUCTION },
   });
 });
 
@@ -325,16 +330,17 @@ router.put('/ai-analysis/config', configLimiter, async (req, res) => {
   const keyEnc = next.apiKey ? encrypt(next.apiKey) : (stored?.api_key_enc ?? null);
   const testedAt = test ? new Date().toISOString() : stored.tested_at;
   run(`INSERT INTO ai_config (company_id, user_id, connector, base_url, model, api_key_enc, monthly_token_cap, instruction,
-         tested_at, tested_base_url, tested_model)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         tested_at, tested_base_url, tested_model, price_input, price_output)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (company_id, user_id) DO UPDATE SET
          connector = excluded.connector, base_url = excluded.base_url, model = excluded.model,
          api_key_enc = excluded.api_key_enc, monthly_token_cap = excluded.monthly_token_cap,
          instruction = excluded.instruction, tested_at = excluded.tested_at,
          tested_base_url = excluded.tested_base_url, tested_model = excluded.tested_model,
+         price_input = excluded.price_input, price_output = excluded.price_output,
          updated_at = datetime('now')`,
   [target.id, req.user.id, next.connector, next.baseUrl, next.model, keyEnc, next.monthlyTokenCap, next.instruction,
-    testedAt, next.baseUrl, next.model]);
+    testedAt, next.baseUrl, next.model, next.priceInput, next.priceOutput]);
   const fields = C.changedFields(stored, next);
   auditLog(req.user.id, target.id, req.user.email,
     `ai_config_saved:${next.connector}${fields.length ? ':' + fields.join(',') : ''}${test ? ':tested' : ''}`);
@@ -370,6 +376,36 @@ router.post('/ai-analysis/config/test', testLimiter, async (req, res) => {
   }
   auditLog(req.user.id, target.id, req.user.email, `ai_config_tested:${config.connector}:${test.ok ? 'ok' : 'failed'}`);
   return res.json({ test: testView(test) });
+});
+
+// ── POST /ai-analysis/config/models (#831) ───────────────────────────────────
+// No body: the stored service. A body { connector, baseUrl, apiKey? }: that
+// one, the stored key going only where it was typed for (keyRefusal).
+function modelsSource(req, res, stored) {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  if (b.connector === undefined) {
+    if (stored) return { connector: stored.connector, baseUrl: stored.base_url, apiKey: storedKey(stored) };
+    refuse(res, 404, 'No AI service is configured here yet: give its kind, address and key.');
+    return null;
+  }
+  if (b.connector !== 'anthropic') { refuse(res, 400, 'Only an Anthropic service gives its list of models: type the model.'); return null; }
+  const urlProblem = C.baseUrlRefusal(b.baseUrl);
+  if (urlProblem) { refuse(res, 400, urlProblem); return null; }
+  const typed = typeof b.apiKey === 'string' ? b.apiKey.trim() : '';
+  const next = { connector: b.connector, baseUrl: b.baseUrl.trim(), apiKey: typed || undefined };
+  const keyProblem = C.keyRefusal(stored, next);
+  if (keyProblem) { refuse(res, 400, keyProblem); return null; }
+  return { connector: next.connector, baseUrl: next.baseUrl, apiKey: typed || storedKey(stored) };
+}
+
+router.post('/ai-analysis/config/models', testLimiter, async (req, res) => {
+  const target = configScope(req, res);
+  if (!target) return;
+  const config = modelsSource(req, res, configOf(target.id, req.user.id));
+  if (!config) return;
+  const listed = await listModels(config);
+  if (!listed.ok) return res.status(502).json({ status: 502, title: 'Bad Gateway', detail: listed.error, upstreamStatus: listed.status ?? null });
+  return res.json({ models: listed.models });
 });
 
 // ── DELETE /ai-analysis/config ───────────────────────────────────────────────

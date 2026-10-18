@@ -22,6 +22,7 @@
 /* global AbortSignal */  // Node 22 global
 const { usableUrlRefusal } = require('../utils/urlPolicy');
 const C = require('../utils/aiConfig');
+const M = require('../utils/aiModels');
 const log = require('../utils/logger').child({ module: 'ai-connector' });
 
 const TIMEOUT_MS = 30000;
@@ -63,25 +64,19 @@ function parseJson(text) {
   try { return JSON.parse(text); } catch { return null; }
 }
 
-/**
- * Send one request to the model. `config` is { connector, baseUrl, model,
- * apiKey }, `request` a C.messageRequest(). Resolves { ok: true, answer,
- * text, stopReason, model, usage, ms } or { ok: false, error, status? };
- * never rejects. `purpose` names the call in the log line.
- */
-async function callModel(config, request, { timeoutMs = TIMEOUT_MS, purpose = 'call' } = {}) {
-  const refusal = await usableUrlRefusal(request.url, 'AI service address');
+// One guarded exchange with the service: the address checked, no redirect
+// followed, the answer capped, a time limit. { ok: true, status, json, text,
+// ms } for a 2xx, else { ok: false, error, status? }.
+async function exchange(config, url, init, { timeoutMs, purpose }) {
+  const refusal = await usableUrlRefusal(url, 'AI service address');
   if (refusal) return { ok: false, error: refusal };
 
   const started = Date.now();
-  const where = { connector: config.connector, host: hostOf(request.url), purpose };
+  const where = { connector: config.connector, host: hostOf(url), purpose };
   let res;
   let text;
   try {
-    res = await fetch(request.url, {
-      method: 'POST', headers: request.headers, body: JSON.stringify(request.body),
-      redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
-    });
+    res = await fetch(url, { ...init, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
     text = await readCapped(res, MAX_ANSWER_BYTES);
   } catch (err) {
     const error = failureOf(err, timeoutMs);
@@ -97,12 +92,39 @@ async function callModel(config, request, { timeoutMs = TIMEOUT_MS, purpose = 'c
   }
   const json = parseJson(text);
   if (!res.ok) return { ok: false, status: res.status, error: C.describeError(res.status, json, text, config.apiKey) };
-  const answer = C.readAnswer(config.connector, json);
+  return { ok: true, status: res.status, json, text, ms };
+}
+
+/**
+ * Send one request to the model. `config` is { connector, baseUrl, model,
+ * apiKey }, `request` a C.messageRequest(). Resolves { ok: true, answer,
+ * text, stopReason, model, usage, ms } or { ok: false, error, status? };
+ * never rejects. `purpose` names the call in the log line.
+ */
+async function callModel(config, request, { timeoutMs = TIMEOUT_MS, purpose = 'call' } = {}) {
+  const got = await exchange(config, request.url,
+    { method: 'POST', headers: request.headers, body: JSON.stringify(request.body) }, { timeoutMs, purpose });
+  if (!got.ok) return got;
+  const answer = C.readAnswer(config.connector, got.json);
   if (!answer) {
-    return { ok: false, status: res.status,
+    return { ok: false, status: got.status,
       error: 'The AI service answered, but not in the shape this kind of service gives. Check the kind of service and the address.' };
   }
-  return { ok: true, ...answer, ms };
+  return { ok: true, ...answer, ms: got.ms };
+}
+
+/**
+ * The models an Anthropic service offers (#831): { ok: true, models } with
+ * aiModels.modelsFromService() entries, or { ok: false, error }. Never rejects.
+ */
+async function listModels(config, { timeoutMs = 15000 } = {}) {
+  if (config.connector !== 'anthropic') return { ok: false, error: 'Only an Anthropic service gives its list of models.' };
+  const request = C.modelsRequest(config);
+  const got = await exchange(config, request.url, { method: 'GET', headers: request.headers }, { timeoutMs, purpose: 'models' });
+  if (!got.ok) return got;
+  const models = M.modelsFromService(got.json);
+  if (!models) return { ok: false, status: got.status, error: 'The AI service answered, but not with a list of models.' };
+  return { ok: true, models };
 }
 
 /** The connection test: { ok, answer, … } as callModel gives it. */
@@ -110,4 +132,4 @@ function testConnection(config, options = {}) {
   return callModel(config, C.testRequest(config), { ...options, purpose: 'test' });
 }
 
-module.exports = { callModel, testConnection, TIMEOUT_MS, MAX_ANSWER_BYTES };
+module.exports = { callModel, listModels, testConnection, TIMEOUT_MS, MAX_ANSWER_BYTES };

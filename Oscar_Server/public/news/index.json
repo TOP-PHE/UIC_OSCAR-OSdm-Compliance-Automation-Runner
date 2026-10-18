@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-models-cost",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "AI Analysis: choose the model, see the cost",
+    "summary": "Choose the model from a list, per analysis if you like, compare two answers side by side, and see what each analysis cost and what was spent.",
+    "content": "The AI service form now lists the current Anthropic models with their prices, and can ask the service for its own list. Each analysis can use another model than the configured one: analyse the same batch with two models, tick both in the list of earlier analyses, and see their answers side by side (a letter marks analyses sent the same input). The preview gives an estimated cost, each analysis its cost at the model's list price, and a new section shows what was spent today, this month, per month and per model. The form also suggests a monthly token limit and an instruction. Test Managers only."
+  },
+  {
     "id": "2026-10-18-ai-question-test",
     "date": "October 18, 2026",
     "tag": "Feature",

@@ -200,7 +200,7 @@ describe('#801 PR 3 running an analysis', () => {
     expect(row.result_enc).not.toContain('Purchaser refused');
     const events = all('SELECT event_type FROM auth_events WHERE company_id = ? AND event_type LIKE ?', [companyId, 'ai_analysis%']).map(e => e.event_type);
     expect(events).toContain(`ai_analysis_started:${res.body.id}:compare:anthropic:claude-opus-5-5`);
-    expect(events).toContain(`ai_analysis_done:${res.body.id}:in=1200:out=300`);
+    expect(events).toContain(`ai_analysis_done:${res.body.id}:in=1200:out=300:usd=0.0108`);
     expect(events.join(' ')).not.toContain(KEY);
   });
 
@@ -282,5 +282,60 @@ describe('#827 PR C the masked sample', () => {
     expect(group.sample.request.passengerSpecifications[0]).toEqual({ externalRef: 'p1', type: 'ADULT', detail: { firstName: '<masked>', lastName: '<masked>' }, dateOfBirth: '<masked>' });
     expect(group.sample.response.problems[0]).toEqual({ code: 'urn:uic:problem:MISSING_INFORMATION', title: '<masked>', detail: '<masked>' });
     for (const secret of ['Marie', 'Curie', 'Pierre', 'pierre@', '1990-02-03', 'tok-123', 'secret-host']) expect(res.body.input).not.toContain(secret);
+  });
+});
+
+describe('#831 the model per analysis, its cost, and what was spent', () => {
+  test('another model: in the preview, its hash and its price; the same input shares the content hash', async () => {
+    const own = await preview(['batch-1']);
+    const other = await preview(['batch-1'], tmId, { model: 'claude-sonnet-5-5' });
+    expect(other.body).toMatchObject({ model: 'claude-sonnet-5-5', configuredModel: 'claude-opus-5-5', price: { input: 2, output: 10, source: 'list' } });
+    expect(other.body.hash).not.toBe(own.body.hash);
+    expect(other.body.contentHash).toBe(own.body.contentHash);
+    expect(other.body.estimatedCost.input).toBeCloseTo(other.body.estimatedTokens * 2 / 1e6, 6);
+    expect(other.body.estimatedCost.atMost).toBeGreaterThan(other.body.estimatedCost.input);
+    expect((await preview(['batch-1'], tmId, { model: 'claude opus 5.5' })).status).toBe(400);
+  });
+
+  test('a run must confirm the model of its preview, and goes to that model; its cost is stored', async () => {
+    const p = await preview(['batch-1'], tmId, { model: 'claude-sonnet-5-5' });
+    expect((await start(['batch-1'], p.body.hash)).status).toBe(409);   // the configured model is not the one confirmed
+    const res = await start(['batch-1'], p.body.hash, { model: 'claude-sonnet-5-5' });
+    expect(res.status).toBe(202);
+    const done = await waitFor(res.body.id);
+    expect(calls[0].body.model).toBe('claude-sonnet-5-5');
+    expect(done.body).toMatchObject({ model: 'claude-sonnet-5-5', cost: 0.0054, contentHash: p.body.contentHash });   // 1200 × 2 + 300 × 10
+    expect(get('SELECT cost_usd FROM ai_analysis WHERE id = ?', [res.body.id]).cost_usd).toBe(0.0054);
+  });
+
+  test('a model OSCAR has no price for takes the Test Manager\'s, else has none', async () => {
+    let p = await preview(['batch-1'], tmId, { model: 'my-model' });
+    expect(p.body.price).toBeNull();
+    expect(p.body.estimatedCost).toBeNull();
+    run('UPDATE ai_config SET price_input = 1, price_output = 2 WHERE company_id = ? AND user_id = ?', [companyId, tmId]);
+    try {
+      p = await preview(['batch-1'], tmId, { model: 'my-model' });
+      expect(p.body.price).toEqual({ input: 1, output: 2, source: 'custom' });
+      const done = await waitFor((await start(['batch-1'], p.body.hash, { model: 'my-model' })).body.id);
+      expect(done.body.cost).toBe(0.0018);
+    } finally {
+      run('UPDATE ai_config SET price_input = NULL, price_output = NULL WHERE company_id = ? AND user_id = ?', [companyId, tmId]);
+    }
+  });
+
+  test('what was spent: every Test Manager\'s analyses here, today, this month, per model', async () => {
+    const res = await request(app).get(`${BASE}/spend`).set('Authorization', tm(tm2Id));
+    expect(res.status).toBe(200);
+    const history = (await request(app).get(`${BASE}/history`).set('Authorization', tm())).body.analyses
+      .filter(a => a.tokens.input !== null);
+    expect(res.body.currency).toBe('USD');
+    expect(res.body.month.analyses).toBe(history.length);
+    expect(res.body.today.analyses).toBe(history.length);
+    expect(res.body.month.cost).toBeCloseTo(history.reduce((t, a) => t + (a.cost || 0), 0), 6);
+    expect(res.body.models.map(m => m.model)).toEqual(expect.arrayContaining(['claude-opus-5-5', 'claude-sonnet-5-5', 'my-model']));
+    expect(res.body.mine).toEqual({ cap: null, used: 0 });
+    expect((await request(app).get(`${BASE}/spend`).set('Authorization', token('company_user', testerId))).status).toBe(403);
+    const provider = await request(app).get(`${BASE}/spend`).set('Authorization', tm()).set('X-Provider-Id', providerId);
+    expect(provider.body.month.analyses).toBe(0);
   });
 });

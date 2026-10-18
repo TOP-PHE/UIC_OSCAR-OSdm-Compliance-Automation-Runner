@@ -31,7 +31,7 @@ describe('#801 PR 2 checkConfig', () => {
     const { value, refusal } = C.checkConfig(good({ apiKey: '  sk-test-1234 ', monthlyTokenCap: '', instruction: '  ' }));
     expect(refusal).toBeUndefined();
     expect(value).toEqual({ connector: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-opus-5-5',
-      apiKey: 'sk-test-1234', monthlyTokenCap: null, instruction: null });
+      apiKey: 'sk-test-1234', monthlyTokenCap: null, instruction: null, priceInput: null, priceOutput: null });
   });
 
   test('a long run of trailing slashes is trimmed', () => {
@@ -157,7 +157,7 @@ describe('#801 PR 2 the page section', () => {
   };
   const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
-  vm.runInContext(`${consts}\n${['connectorOptionsHtml', 'testedHtml', 'serviceHtml', 'testResultHtml'].map(lift).join('\n')}
+  vm.runInContext(`${consts}\n${['connectorOptionsHtml', 'priceText', 'modelOptionsHtml', 'testedHtml', 'serviceHtml', 'testResultHtml'].map(lift).join('\n')}
     this.serviceHtml = serviceHtml; this.testResultHtml = testResultHtml;`, ctx);
   const answer = (config) => ({ config, connectors: C.connectorsForPage(), limits: { instruction: 2000, minTokenCap: 1000 } });
   const target = { id: 'p1', name: 'Beta <b>', provider: true };
@@ -169,7 +169,7 @@ describe('#801 PR 2 the page section', () => {
     expect(html).toContain('value="https://api.anthropic.com"');
     expect(html).toContain('Not configured yet');
     expect(html).not.toContain('data-ai-action="remove"');
-    for (const f of ['connector', 'baseUrl', 'model', 'apiKey', 'cap', 'instruction']) {
+    for (const f of ['connector', 'baseUrl', 'model', 'apiKey', 'cap', 'instruction', 'priceIn', 'priceOut']) {
       expect(html).toContain(`<label for="ai-${f}-3"`);
       expect(html).toContain(`id="ai-${f}-3"`);
     }

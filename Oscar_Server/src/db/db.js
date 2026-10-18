@@ -808,6 +808,16 @@ const MIGRATIONS = [
         imported_at    TEXT NOT NULL DEFAULT (datetime('now'))
       )`);
   }},
+  { version: 36, name: 'ai-model-cost', up: () => {
+      // #831 - the cost of each AI analysis (US dollars, at the model's list
+      // price when it ended), the hash of its input without the model (two
+      // models asked the same thing share it), and the Test Manager's price
+      // per million tokens for a model OSCAR has no price for.
+      _safeAlter('ALTER TABLE ai_analysis ADD COLUMN cost_usd REAL');
+      _safeAlter('ALTER TABLE ai_analysis ADD COLUMN content_hash TEXT');
+      _safeAlter('ALTER TABLE ai_config ADD COLUMN price_input REAL');
+      _safeAlter('ALTER TABLE ai_config ADD COLUMN price_output REAL');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

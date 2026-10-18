@@ -18,6 +18,14 @@
  *                                                 confirmed: starts the analysis (202)
  *   GET  /v1/company/ai-analysis/history        — the analyses of this company or provider
  *   GET  /v1/company/ai-analysis/history/:id    — one, with its result
+ *   GET  /v1/company/ai-analysis/spend          — what the analyses cost: today, this
+ *                                                 month, per month and per model (#831)
+ *
+ * #831: the model may be chosen per analysis (`model`, the configured one by
+ * default), so that one batch can be read by two models and the answers
+ * compared; it is part of the hash the run confirms. Each analysis stores its
+ * cost at the model's list price (aiModels.js), or at the price the Test
+ * Manager entered for a model OSCAR does not know.
  *
  * The company or provider is the request's (X-Provider-Id), as everywhere.
  * Running one needs the Test Manager's approved access and their configured
@@ -49,6 +57,7 @@ const { scopeForTestManager, configScope, configOf, storedKey } = require('./com
 const { checklistOf } = require('./company-ai-checklist');
 const CL = require('../../utils/checklistAnswers');
 const MK = require('../../utils/aiMask');
+const M = require('../../utils/aiModels');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis-results' });
 
 const router = express.Router();
@@ -147,7 +156,19 @@ function chosenBatches(companyId, body) {
 
 const languageOf = (body) => (AN.LANGUAGES.includes(body?.language) ? body.language : 'English');
 
+// The model of this analysis: the one asked (#831), else the configured one.
+function modelFor(body, stored) {
+  if (body?.model === undefined || body.model === null || body.model === '') return { value: stored?.model || null };
+  return C.checkModel(body.model);
+}
+
+// The Test Manager's price for a model OSCAR has no price for.
+const customOf = (stored) => M.customPrice(stored?.price_input ?? null, stored?.price_output ?? null);
+
 async function buildFor(target, user, body) {
+  const stored = configOf(target.id, user.id);
+  const model = modelFor(body, stored);
+  if (model.refusal) return { refusal: [400, model.refusal] };
   const chosen = chosenBatches(target.id, body);
   if (chosen.refusal) return chosen;
   const batches = chosen.batches.map((b) => {
@@ -158,10 +179,10 @@ async function buildFor(target, user, body) {
   const framework = frameworkOf(target.id);
   const built = AN.buildInput({ batches, framework, findings, scenarios: await scenariosOf(target.id),
     catalogue: catalogueEntries(), checklist: checklistContext(target.id), sampleOf: sampleReader(target.id) });
-  const stored = configOf(target.id, user.id);
   const system = AN.systemPrompt({ language: languageOf(body), instruction: stored?.instruction || null, compare: batches.length === 2,
     osdmVersion: framework?.osdmVersion || null });
-  return { batches, built, system, hash: AN.inputHash(system, built.text), stored };
+  return { batches, built, system, model: model.value, hash: AN.inputHash(system, built.text, model.value),
+    contentHash: AN.inputHash(system, built.text), stored, price: M.priceOf(model.value, customOf(stored)) };
 }
 
 // Tokens this Test Manager's analyses used this month, for this company or provider.
@@ -191,14 +212,17 @@ router.post('/ai-analysis/preview', readLimiter, async (req, res) => {
   if (plan.refusal) return refuse(res, ...plan.refusal);
   if (!plan.stored) return refuse(res, 409, 'Configure the AI service of this company or provider first.');
   const { built } = plan;
+  const estimatedTokens = AN.estimateTokens(plan.system) + built.estimatedTokens;
   res.json({
     batches: plan.batches.map(({ records, truncated, ...b }) => ({ ...b, failedChecks: records.length, truncated })),
     mode: plan.batches.length === 2 ? 'compare' : 'one',
-    connector: plan.stored.connector, model: plan.stored.model,
+    connector: plan.stored.connector, model: plan.model, configuredModel: plan.stored.model,
+    price: plan.price, estimatedCost: M.estimateOf(plan.price, estimatedTokens, AN.MAX_ANSWER_TOKENS),
+    contentHash: plan.contentHash,
     instructions: plan.system,
     input: built.text,
     chars: built.chars + plan.system.length,
-    estimatedTokens: AN.estimateTokens(plan.system) + built.estimatedTokens,
+    estimatedTokens,
     summarisedByStep: built.summarisedByStep,
     tooLarge: built.tooLarge,
     counts: built.counts,
@@ -210,12 +234,12 @@ router.post('/ai-analysis/preview', readLimiter, async (req, res) => {
 // ── POST /ai-analysis/run ────────────────────────────────────────────────────
 
 function finish(id, fields) {
-  run(`UPDATE ai_analysis SET status = ?, input_tokens = ?, output_tokens = ?, result_enc = ?, error = ?, finished_at = datetime('now')
-        WHERE id = ?`, [fields.status, fields.input ?? null, fields.output ?? null, fields.result ? colEncrypt(JSON.stringify(fields.result)) : null,
-    fields.error ?? null, id]);
+  run(`UPDATE ai_analysis SET status = ?, input_tokens = ?, output_tokens = ?, cost_usd = ?, result_enc = ?, error = ?, finished_at = datetime('now')
+        WHERE id = ?`, [fields.status, fields.input ?? null, fields.output ?? null, fields.cost ?? null,
+    fields.result ? colEncrypt(JSON.stringify(fields.result)) : null, fields.error ?? null, id]);
 }
 
-async function carryOut(id, config, request, compare, audit) {
+async function carryOut(id, config, request, { compare, price }, audit) {
   try {
     const answer = await callModel(config, request, { timeoutMs: ANALYSIS_TIMEOUT_MS, purpose: 'analysis' });
     if (!answer.ok) {
@@ -225,12 +249,14 @@ async function carryOut(id, config, request, compare, audit) {
     }
     const read = AN.readResult(answer.text, { compare });
     const tokens = { input: answer.usage?.input, output: answer.usage?.output };
+    tokens.cost = M.costOf(price, tokens);
     if (read.ok) {
       finish(id, { status: 'done', ...tokens, result: read.result });
     } else {
       finish(id, { status: 'unreadable', ...tokens, error: read.reason, result: { raw: String(answer.text).slice(0, 20000) } });
     }
-    audit(`ai_analysis_${read.ok ? 'done' : 'unreadable'}:${id}:in=${tokens.input ?? '?'}:out=${tokens.output ?? '?'}`);
+    audit(`ai_analysis_${read.ok ? 'done' : 'unreadable'}:${id}:in=${tokens.input ?? '?'}:out=${tokens.output ?? '?'}`
+      + (tokens.cost === null ? '' : `:usd=${tokens.cost}`));
   } catch (err) {
     log.error({ err: err.message, id }, 'AI analysis failed unexpectedly');
     finish(id, { status: 'failed', error: 'The analysis failed on the OSCAR server.' });
@@ -260,17 +286,18 @@ router.post('/ai-analysis/run', runLimiter, async (req, res) => {
 
   const id = randomUUID();
   const compare = plan.batches.length === 2;
-  run(`INSERT INTO ai_analysis (id, company_id, user_id, mode, batch_a, batch_b, language, connector, model, input_hash, input_chars, summarised)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  run(`INSERT INTO ai_analysis (id, company_id, user_id, mode, batch_a, batch_b, language, connector, model, input_hash, content_hash,
+         input_chars, summarised)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   [id, target.id, req.user.id, compare ? 'compare' : 'one', plan.batches[0].batchId, compare ? plan.batches[1].batchId : null,
-    languageOf(req.body), stored.connector, stored.model, plan.hash, plan.built.chars, plan.built.summarisedByStep ? 1 : 0]);
+    languageOf(req.body), stored.connector, plan.model, plan.hash, plan.contentHash, plan.built.chars, plan.built.summarisedByStep ? 1 : 0]);
   const audit = (event) => auditLog(req.user.id, target.id, req.user.email, event);
-  audit(`ai_analysis_started:${id}:${compare ? 'compare' : 'one'}:${stored.connector}:${stored.model}`);
+  audit(`ai_analysis_started:${id}:${compare ? 'compare' : 'one'}:${stored.connector}:${plan.model}`);
 
-  const config = { connector: stored.connector, baseUrl: stored.base_url, model: stored.model, apiKey: storedKey(stored) };
+  const config = { connector: stored.connector, baseUrl: stored.base_url, model: plan.model, apiKey: storedKey(stored) };
   const request = C.messageRequest(config, { system: plan.system, user: plan.built.text, maxTokens: AN.MAX_ANSWER_TOKENS });
   // Runs after the answer. carryOut catches its own errors; the catch here only logs.
-  carryOut(id, config, request, compare, audit).catch((err) => log.error({ err: err.message, id }, 'AI analysis: unexpected rejection'));
+  carryOut(id, config, request, { compare, price: plan.price }, audit).catch((err) => log.error({ err: err.message, id }, 'AI analysis: unexpected rejection'));
   res.status(202).json({ id, status: 'running' });
 });
 
@@ -281,6 +308,12 @@ function statusOf(row) {
   return row.status;
 }
 
+// The stored cost, else (an analysis from before #831) the list price now.
+function costView(row) {
+  if (Number.isFinite(row.cost_usd)) return row.cost_usd;
+  return M.costOf(M.priceOf(row.model), { input: row.input_tokens, output: row.output_tokens });
+}
+
 function rowView(row) {
   const user = get('SELECT email FROM users WHERE id = ?', [row.user_id]);
   return {
@@ -288,6 +321,7 @@ function rowView(row) {
     connector: row.connector, model: row.model, status: statusOf(row), by: user?.email || null,
     inputChars: row.input_chars, summarisedByStep: !!row.summarised, inputHash: row.input_hash,
     tokens: { input: row.input_tokens, output: row.output_tokens }, error: row.error || null,
+    cost: costView(row), contentHash: row.content_hash || null,
     createdAt: row.created_at, finishedAt: row.finished_at,
   };
 }
@@ -309,6 +343,18 @@ router.get('/ai-analysis/history/:id', readLimiter, (req, res) => {
     try { result = JSON.parse(colDecrypt(row.result_enc)); } catch { result = null; }
   }
   res.json({ ...rowView(row), result });
+});
+
+// ── GET /ai-analysis/spend (#831) ────────────────────────────────────────────
+// Every Test Manager's analyses of this company or provider, like the history;
+// `mine` is the reader's own use this month, against their limit.
+router.get('/ai-analysis/spend', readLimiter, (req, res) => {
+  const company = scopeForTestManager(req, res);
+  if (!company) return;
+  const rows = all(`SELECT created_at, model, input_tokens, output_tokens, cost_usd FROM ai_analysis
+                     WHERE company_id = ? AND created_at >= datetime('now', 'start of month', '-11 months')`, [req.companyId]);
+  const stored = configOf(req.companyId, req.user.id);
+  res.json({ currency: 'USD', ...M.spendOf(rows, new Date()), mine: monthly(stored, req.companyId, req.user.id) });
 });
 
 module.exports = router;

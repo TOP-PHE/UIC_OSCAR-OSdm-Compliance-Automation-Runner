@@ -58,6 +58,11 @@ function defaultReply(req, body) {
     }
     return { status: 200, json: { model: body.model, stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }], usage: { input_tokens: 21, output_tokens: 1 } } };
   }
+  if (req.method === 'GET' && req.url === '/v1/models?limit=100') {
+    if (req.headers['x-api-key'] !== KEY) return { status: 401, json: { type: 'error', error: { message: 'invalid x-api-key' } } };
+    return { status: 200, json: { data: [{ id: 'claude-opus-5-5', display_name: 'Claude Opus 5.5', type: 'model' },
+      { id: 'claude-new-9', display_name: 'Claude New <9>', type: 'model' }, { id: 'bad id', type: 'model' }], has_more: false } };
+  }
   if (req.url === '/v1/chat/completions') {
     return { status: 200, json: { model: body.model, choices: [{ message: { content: 'OK' }, finish_reason: 'stop' }], usage: { prompt_tokens: 19, completion_tokens: 1 } } };
   }
@@ -158,7 +163,7 @@ describe('#801 PR 2 saving is testing first', () => {
     expect(read.body.config).toMatchObject({ connector: 'anthropic', baseUrl: base, model: 'claude-opus-5-5', hasKey: true, instruction: 'Be short.' });
     expect(JSON.stringify(read.body)).not.toContain(KEY);
     const events = all('SELECT event_type FROM auth_events WHERE company_id = ?', [companyId]).map(e => e.event_type);
-    expect(events).toContain('ai_config_saved:anthropic:connector,baseUrl,model,apiKey,monthlyTokenCap,instruction:tested');
+    expect(events).toContain('ai_config_saved:anthropic:connector,baseUrl,model,apiKey,monthlyTokenCap,instruction,prices:tested');
     expect(events.join(' ')).not.toContain(KEY);
   });
 
@@ -271,5 +276,49 @@ describe('#801 PR 2 the connector gives up', () => {
     const gone = await testConnection({ connector: 'anthropic', baseUrl: 'http://127.0.0.1:1', model: 'm', apiKey: KEY });
     expect(gone.ok).toBe(false);
     expect(gone.error).toContain('could not be reached');
+  });
+});
+
+describe('#831 the list of models, prices and suggestions', () => {
+  const models = (body, provider = '') => request(app).post(`${CONFIG}/models`).set('Authorization', tm()).set('X-Provider-Id', provider).send(body);
+
+  test('the page gets OSCAR\'s list of models with prices, the suggested limit and instruction', async () => {
+    const res = await request(app).get(CONFIG).set('Authorization', tm());
+    expect(res.body.models[0]).toMatchObject({ id: 'claude-opus-5-5', input: 4, output: 20 });
+    expect(res.body.suggested.monthlyTokenCap).toBe(2000000);
+    expect(res.body.suggested.instruction).toContain('OSDM member');
+    expect(res.body.limits.maxPrice).toBe(1000);
+  });
+
+  test('the stored service lists its models with the stored key; unknown ones have no price, bad ids are left out', async () => {
+    const res = await models({});
+    expect(res.status).toBe(200);
+    expect(res.body.models).toEqual([
+      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', input: 4, output: 20, note: expect.any(String), above: null },
+      { id: 'claude-new-9', label: 'Claude New <9>', input: null, output: null, note: null, above: null }]);
+    expect(calls[0]).toMatchObject({ method: 'GET', url: '/v1/models?limit=100' });
+    expect(calls[0].headers['x-api-key']).toBe(KEY);
+    expect(calls[0].headers['anthropic-version']).toBe('2023-06-01');
+  });
+
+  test('a typed service: the stored key never goes to another host; a typed key does; a refusal is a 502', async () => {
+    expect((await models({ connector: 'anthropic', baseUrl: other })).body.detail).toContain('Type the key again');
+    expect(calls).toHaveLength(0);
+    expect((await models({ connector: 'anthropic', baseUrl: other, apiKey: KEY })).status).toBe(200);
+    const refused = await models({ connector: 'anthropic', baseUrl: base, apiKey: 'sk-wrong-1' });
+    expect(refused.status).toBe(502);
+    expect(refused.body.detail).toContain('HTTP 401');
+    expect((await models({ connector: 'openai_compatible', baseUrl: base })).status).toBe(400);
+    expect((await models({}, provider2Id)).status).toBe(404);
+  });
+
+  test('a price for a model OSCAR does not know is saved, both or neither', async () => {
+    const same = { apiKey: '', model: stored().model };   // nothing to test again
+    expect((await put(anthropic({ ...same, priceInput: 3 }))).body.detail).toContain('both prices');
+    const res = await put(anthropic({ ...same, priceInput: '3', priceOutput: 15.5 }));
+    expect(res.status).toBe(200);
+    expect(res.body.config).toMatchObject({ priceInput: 3, priceOutput: 15.5 });
+    expect(stored()).toMatchObject({ price_input: 3, price_output: 15.5 });
+    expect(calls).toHaveLength(0);
   });
 });

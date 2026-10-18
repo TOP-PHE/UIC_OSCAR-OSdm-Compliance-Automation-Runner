@@ -296,9 +296,15 @@ function readResult(text, { compare = false } = {}) {
   return { ok: true, result };
 }
 
-/** sha256 of exactly what is sent: the instructions and the input. */
-function inputHash(system, text) {
-  return crypto.createHash('sha256').update(system, 'utf8').update('\n\n', 'utf8').update(text, 'utf8').digest('hex');
+/**
+ * sha256 of exactly what is sent: the instructions and the input, and the
+ * model when one is named (#831: the preview confirms the model too). Without
+ * a model it is the content alone, the same for two models asked the same.
+ */
+function inputHash(system, text, model = null) {
+  const hash = crypto.createHash('sha256').update(system, 'utf8').update('\n\n', 'utf8').update(text, 'utf8');
+  if (model) hash.update('\n\nmodel: ', 'utf8').update(String(model), 'utf8');
+  return hash.digest('hex');
 }
 
 module.exports = {
