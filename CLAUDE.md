@@ -1403,7 +1403,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `refundReceiptMaxWaitMinutes` is set. 06b and 14b are only ever reached by a
   script, and the run filter skips them otherwise. The wait has no on/off flag:
   its `EXPIRED_FLOW_TIMERS` entry has `flag: null`. The scripts decode base64 by
-  hand, because Bruno's sandbox need not give them a `Buffer`.
+  hand, because Bruno's sandbox need not give them a `Buffer`. **14b renews
+  the access token before each read** (#854, OTST_V2.0.187:
+  `refreshAccessTokenIfNeeded()`, not forced): beta's tokens last 120 s and
+  the wait outlived them (401). A new wait in the collection needs the same.
   `Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md` lists
   every scenario of the simulator's data file with its expected warnings.
   `datafile.test.js` fails when the two disagree, so a new scenario needs its

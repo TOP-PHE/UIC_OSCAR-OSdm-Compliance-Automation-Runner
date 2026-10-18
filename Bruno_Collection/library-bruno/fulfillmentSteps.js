@@ -20,13 +20,15 @@ http://www.apache.org/licenses/LICENSE-2.0
  *        scenario waits for a receipt that is not there yet.
  *   14b  GET /bookings/{id} every 15 seconds until the receipt is there or
  *        the scenario's wait is over (waitBeforeReceiptPoll /
- *        checkRefundReceiptPoll).
+ *        checkRefundReceiptPoll). The access token is renewed before each
+ *        read (#854): a provider's token may not outlast the wait.
  */
 
 const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 const { parseEnvJson } = require('./envUtils.js');
 const fd = require('./fulfillmentDocuments.js');
+const { refreshAccessTokenIfNeeded } = require('./auth.js');
 
 const READ_STEP = '06b. GET Fulfillment';
 const AFTER_READS = '07. GET Booking after Fulfillments';
@@ -149,11 +151,17 @@ function armRefundReceiptWait(booking) {
   return true;
 }
 
-/** 14b's before-request: wait before reading the booking again. */
+/**
+ * 14b's before-request: wait before reading the booking again, then renew
+ * the access token if it is near its end (#854). Not forced: OSCAR's cache
+ * keeps a safety margin and fetches a token only when needed. A failed
+ * renewal logs a WARNING and the read goes with the token it has.
+ */
 async function waitBeforeReceiptPoll() {
   const deadline = Number(bru.getEnvVar('__refundReceiptDeadline')) || 0;
   const waitMs = Math.max(0, Math.min(POLL_EVERY_MS, deadline - Date.now()));
   if (waitMs > 0) await new Promise((resolve) => { setTimeout(resolve, waitMs); });
+  await refreshAccessTokenIfNeeded({ callerLabel: RECEIPT_STEP });
 }
 
 /**

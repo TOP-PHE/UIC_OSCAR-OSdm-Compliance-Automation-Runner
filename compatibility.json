@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.376",
+  "current_release": "2026.378",
   "releases": [
+    {
+      "release": "2026.378",
+      "date": "2026-10-18",
+      "server": "1.11.343",
+      "collection": "OTST_V2.0.187",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Refund receipt wait (#854): 14b renews the access token before each read, so a provider whose tokens do not outlast the wait (the simulator's beta: 120 s) no longer answers 401."
+      ]
+    },
     {
       "release": "2026.376",
       "date": "2026-10-18",

@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.343 / collection-OTST_V2.0.187] — 2026-10-18 · Release 2026.378
+
+Issue #854. The refund receipt wait renews the access token. Server code unchanged.
+
+### Fixed
+- **`14b. GET Booking Refund Receipt` renews the access token before each read.** The step reads the booking every 15 s for up to `refundReceiptMaxWaitMinutes`, and nothing renewed the token during that wait. On the simulator's `beta`, whose tokens last 120 s, both receipt scenarios stopped at 14b with 401 after the refund had gone through (found by the AI analysis of a beta batch, #823).
+  - `waitBeforeReceiptPoll()` (`fulfillmentSteps.js`) now calls `refreshAccessTokenIfNeeded()` after its pause.
+  - The call is not forced: OSCAR's token cache keeps a 60 s safety margin and fetches a new token only when needed.
+  - A failed renewal logs a WARNING and the read goes with the token it has, as after the expired-booking wait (06).
+  - A standalone run (no OSCAR) is unchanged: the renewal needs OSCAR's loopback route and is skipped silently without it.
+
+---
+
 ## [server-1.11.341 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.376
 
 Issue #823 (PR 1). The AI analysis sees the warnings, and what each scenario is written for. Collection unchanged.
