@@ -373,9 +373,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     with the failures; too large → warnings by step first, then failures.
     `scenariosOf(id, framework)` annotates the data file, so
     `scenarios[]` carries `osdmVersion` and `notDeclaredInTestFramework`.
-    That run also showed a simulator gap: alpha (3.6) serves only
-    `…/booked-offers/{id}/offer-parts`, which is 3.7+; 3.6 has only
-    `…/reservations` (the collection picks by version).
+    That run also showed a simulator gap, closed by simulator 0.37.0 (#852):
+    `…/booked-offers/{id}/reservations` (`addReservations()`, every version,
+    the only form in 3.6) next to `…/offer-parts` (3.7 and later only; the
+    collection picks by version).
     **#823 PR 2 (1.11.344): finding drafts.** `POST /ai-analysis/history/:id/
     groups/:index/draft` puts a group in `finding_suggestion` (#735) under
     key `ai:<analysis>:<index>` (`draftKeyOf()`; one per group, 409 after):

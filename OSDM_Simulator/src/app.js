@@ -24,7 +24,7 @@ const crypto = require('node:crypto');
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
 const { buildOfferCollection, productsOf } = require('./osdm/offers');
-const { createBooking, confirmBooking, releaseIfExpired, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer } = require('./osdm/bookings');
+const { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
 const { preferenceAvailability } = require('./osdm/reservations');
@@ -33,7 +33,7 @@ const { buildTripCollection } = require('./osdm/trips');
 const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
 const exchanges = require('./osdm/exchanges');
 const persons = require('./osdm/persons');
-const { shapeAnswer } = require('./osdm/versionShapes');
+const { shapeAnswer, rank: osdmRank } = require('./osdm/versionShapes');
 const faults = require('./osdm/faults');
 const variants = require('./osdm/variants');
 const { version: VERSION } = require('../package.json');
@@ -340,13 +340,18 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return NO_CONTENT;
   }
 
-  // POST /bookings/{id}/booked-offers/{bookedOfferId}/offer-parts (#601); the
-  // other booked-offer resources are not provided.
+  // POST /bookings/{id}/booked-offers/{bookedOfferId}/offer-parts (#601, OSDM
+  // 3.7 and later) and …/reservations (#852, every version: the only form in
+  // 3.6), for a provider that sells reservations; ancillaries are not provided.
   async function bookedOfferRoute(req, provider, scope, bookingId, bookedOfferId, more) {
-    if (bookedOfferId === undefined || more.length !== 1 || more[0] !== 'offer-parts') throw notProvided();
+    const resource = more.length === 1 ? more[0] : null;
+    let add = null;
+    if (resource === 'offer-parts' && osdmRank(provider.osdmVersion) >= osdmRank('3.7')) add = addOfferParts;
+    if (resource === 'reservations' && provider.reservations) add = addReservations;
+    if (bookedOfferId === undefined || !add) throw notProvided();
     requireMethod(req, 'POST');
     const booking = bookingOf(scope, bookingId);
-    return addOfferParts(booking, bookedOfferId, await bodyOf(req), (offerId) => store.get('offer', scope, offerId), provider);
+    return add(booking, bookedOfferId, await bodyOf(req), (offerId) => store.get('offer', scope, offerId), provider);
   }
 
   // DELETE /bookings/{id} (#776): a booking not confirmed may be deleted; a confirmed one is refunded instead.
