@@ -37,8 +37,7 @@
  *   contradiction: 'FLAG_NO_SCHEDULE_REFUNDABLE'|'FLAG_YES_ZERO_WINDOW'|'FLAG_WC_NO_SCHEDULE'|null
  * }}
  */
-function effectiveRefundability(part, atMs, action) {
-  action = action || 'REFUND';
+function effectiveRefundability(part, atMs, action = 'REFUND') {
   const flag = part ? (action === 'EXCHANGE' ? part.exchangeable : part.refundable) : undefined;
   const out = {
     effective: 'FLAG',

@@ -481,8 +481,7 @@ function validateCoachDeckLayout(body, endpoint) {
 // (needs an OFFER + RESERVATION context), so vehicleAvailability may be absent —
 // that is reported as a check, not crashed. This is a bespoke validator (not
 // validateOsdmResource) because the resource is nested under vehicleAvailability.
-function validatePlaceAvailability(body, endpoint) {
-  const ep = endpoint || '/availabilities/place-map';
+function validatePlaceAvailability(body, ep = '/availabilities/place-map') {
   const checks = [];
 
   const isObj = isType(body, 'object');
@@ -542,8 +541,7 @@ function validatePlaceAvailability(body, endpoint) {
 // updated bookedOffers, so we assert envelope hygiene + that bookedOffers (when
 // present) is a non-empty array. `endpoint` lets the check names reflect the
 // resolved resource (offer-parts vs reservations).
-function validateBookedOfferPartResponse(body, endpoint) {
-  const ep = endpoint || '/bookings/{id}/booked-offers/{id}/offer-parts';
+function validateBookedOfferPartResponse(body, ep = '/bookings/{id}/booked-offers/{id}/offer-parts') {
   const checks = [];
 
   const isObj = isType(body, 'object');
@@ -587,8 +585,7 @@ function validateBookedOfferPartResponse(body, endpoint) {
 // requires a non-empty string "id" (AbstractOfferPart) and a string "type"
 // (AncillaryType — an x-extensible-enum, so type-checked, not value-checked);
 // "category" is an optional string. Pass the parsed Offer object.
-function validateAncillaryOfferParts(offer, endpoint) {
-  const ep = endpoint || '/offers';
+function validateAncillaryOfferParts(offer, ep = '/offers') {
   const checks = [];
   const parts = offer && typeof offer === 'object' ? offer.ancillaryOfferParts : undefined;
   if (parts == null) return checks; // no ancillary parts → nothing to assert
