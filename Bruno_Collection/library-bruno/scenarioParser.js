@@ -82,7 +82,7 @@ function resolveSalesFlowActions(salesFlowActions) {
   const src = (salesFlowActions && typeof salesFlowActions === 'object') ? salesFlowActions : {};
   const out = {};
   Object.keys(defaults).forEach(function (k) {
-    out[k] = Object.prototype.hasOwnProperty.call(src, k) ? (src[k] === true) : defaults[k];
+    out[k] = Object.hasOwn(src, k) ? (src[k] === true) : defaults[k];
   });
   return out;
 }
@@ -213,7 +213,7 @@ function _errMsg(e) {
 function applyExternalRefFormat(pattern, n) {
   if (pattern == null || pattern === '') return String(n);
   return String(pattern).replace(/%0?(\d*)d/, function (_, width) {
-    const w = parseInt(width || '0', 10);
+    const w = Number.parseInt(width || '0', 10);
     return String(n).padStart(w, '0');
   });
 }
@@ -265,7 +265,7 @@ function toLocalDateTime(raw) {
 // UI-generated data files always include both, so they are unaffected.
 function subTripDate(value, replacement, fieldLabel, ctx) {
   if (typeof value !== 'string') {
-    throw new Error(
+    throw new TypeError(
       `Data file error: ${ctx} is missing a valid '${fieldLabel}' ` +
       `(got ${value === undefined ? 'undefined' : JSON.stringify(value)}). ` +
       `Each trip requirement needs both a startDatetime and an endDatetime. ` +
@@ -395,7 +395,7 @@ function setKnownDeviations(jsonData) {
   if (list.length > 0) {
     validationLogger('[INFO] Known-deviation baseline: ' + list.length +
       ' documented provider deviation(s) loaded — ' +
-      list.map(function (d) { return (d && d.step) + '→' + (d && d.expectedStatus); }).join(', ') +
+      list.map(function (d) { return (d?.step) + '→' + (d?.expectedStatus); }).join(', ') +
       '. A matching response is reported as a documented deviation, not a failure.');
   }
 }
@@ -436,7 +436,7 @@ async function getScenarioData() {
     let _q = [];
     try { _q = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
     catch (_e) { _q = []; }
-    const _i = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+    const _i = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
     const _cur = _q[_i] || {};
     validationLogger(`[INFO] expiredFlow sub-run continuation: scenario "${bru.getEnvVar('scenarioCode') || '?'}" pass ${_i + 1}/${_q.length} — ${_cur.code || '?'} (${_cur.label || '?'}). Skipping full scenario re-init.`);
     return;
@@ -478,6 +478,10 @@ async function getScenarioData() {
   }
 }
 
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
 // Function to parse scenario data from JSON
 function parseScenarioData(jsonData) {
   // Apply root-level systemInfoParameters as env vars (e.g. masterDataLayoutId)
@@ -485,13 +489,9 @@ function parseScenarioData(jsonData) {
   // #398: load the provider's known-deviation baseline (root-level).
   setKnownDeviations(jsonData);
 
-  const plusDays = parseInt(bru.getEnvVar("departureDateFromToday"), 10) || 10;
+  const plusDays = Number.parseInt(bru.getEnvVar("departureDateFromToday"), 10) || 10;
   const today = new Date();
   today.setDate(today.getDate() + plusDays);
-
-  function pad(n) {
-    return String(n).padStart(2, '0');
-  }
 
   const nextWeekdayString = today.getFullYear() + "-" +
     pad(today.getMonth() + 1) + "-" +
@@ -584,8 +584,8 @@ function parseScenarioData(jsonData) {
   // the normal multi-scenario sequence is not disrupted.
   const _scenarioTarget = (bru.getEnvVar('scenarioTarget') || '').trim();
   if (_scenarioTarget !== '') {
-    const _asNum = parseInt(_scenarioTarget, 10);
-    if (!isNaN(_asNum) && String(_asNum) === _scenarioTarget) {
+    const _asNum = Number.parseInt(_scenarioTarget, 10);
+    if (!Number.isNaN(_asNum) && String(_asNum) === _scenarioTarget) {
       // Numeric index
       if (_asNum < 0 || _asNum >= effectiveList.length) {
         throw new Error(
@@ -609,8 +609,8 @@ function parseScenarioData(jsonData) {
     // scenariosToRunIndex is intentionally left unchanged
   } else {
     // ── Normal sequential mode — read and advance scenariosToRunIndex ───────
-    let idx = parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
-    if (isNaN(idx) || idx < 0) idx = 0;
+    let idx = Number.parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
+    if (Number.isNaN(idx) || idx < 0) idx = 0;
     // If index exceeds list length, all scenarios have been attempted.
     // In a loopback context (__loopback was recently true), stop execution.
     // Otherwise (fresh run or unitary run), wrap to 0 so the run can proceed.
@@ -870,13 +870,15 @@ function parseScenarioData(jsonData) {
                         ["true", "on", "yes"].includes(String(scenario.partialRefundByPax).toLowerCase()));
       bru.setEnvVar("partialRefundByLeg", _prByLeg ? "true" : "false");
       bru.setEnvVar("partialRefundByPax", _prByPax ? "true" : "false");
+      const _legDefault = _prByLeg ? "first" : "";  // default to first when armed
+      const _paxDefault = _prByPax ? "first" : "";
       bru.setEnvVar("partialRefundLegSelection",
         ["", "null", null, undefined].includes(scenario.partialRefundLegSelection)
-          ? (_prByLeg ? "first" : "")  // default to first when armed
+          ? _legDefault
           : String(scenario.partialRefundLegSelection));
       bru.setEnvVar("partialRefundPaxSelection",
         ["", "null", null, undefined].includes(scenario.partialRefundPaxSelection)
-          ? (_prByPax ? "first" : "")
+          ? _paxDefault
           : String(scenario.partialRefundPaxSelection));
       // #595: the refund of one whole fulfillment (first, last, outbound,
       // inbound), for providers that refund per fulfillment only.
@@ -909,7 +911,8 @@ function parseScenarioData(jsonData) {
           const _paxCount = Array.isArray(_passengersList?.passengers)
             ? _passengersList.passengers.length : 0;
           if (_paxCount < 2) {
-            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
+            const _listState = _passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`;
+            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_listState} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
           }
         }
         // Per-leg with SPECIFICATION trip can be statically validated.
@@ -917,7 +920,7 @@ function parseScenarioData(jsonData) {
         if (_prByLeg) {
           const _tripReq = jsonData.tripRequirements?.find(
             (tr) => tr && tr.id === scenario.tripRequirementId);
-          if (_tripReq && _tripReq.tripType === "SPECIFICATION") {
+          if (_tripReq?.tripType === "SPECIFICATION") {
             const _legCount = Array.isArray(_tripReq.legs) ? _tripReq.legs.length : 0;
             if (_legCount < 2) {
               validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByLeg is on but the SPECIFICATION trip has ${_legCount} leg(s) — per-leg partial refund cannot fire. Either turn partialRefundByLeg off, or use a multi-leg trip.`);
@@ -979,7 +982,7 @@ function parseScenarioData(jsonData) {
       } catch (_e) {
         // With the path fixed, a throw here is a genuine feature failure:
         // armed expiry timers would not run their extra passes.
-        validationLogger(`[ERROR] expiredFlow queue build failed: ${_e && _e.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
+        validationLogger(`[ERROR] expiredFlow queue build failed: ${_e?.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
       }
 
       // Trip requirements — verify the scenario's reference resolves BEFORE
@@ -996,7 +999,7 @@ function parseScenarioData(jsonData) {
       const _tripWantId  = scenario.tripRequirementId;
       const _tripFound   = _tripList.some(function (tr) { return tr && tr.id === _tripWantId; });
       if (!_tripFound) {
-        const _availIds = _tripList.map(function (tr) { return tr && tr.id; }).filter(function (id) { return id != null; });
+        const _availIds = _tripList.map(function (tr) { return tr?.id; }).filter(function (id) { return id != null; });
         validationLogger(
           '[ERROR] Scenario "' + scenario.code + '" references tripRequirementId=' +
           JSON.stringify(_tripWantId) + ' but no matching entry exists in datafile.tripRequirements[]. ' +
@@ -1189,7 +1192,7 @@ function parseScenarioData(jsonData) {
             validationLogger(
               '[ERROR] Scenario "' + scenario.code + '": building TripType=' +
               tripRequirement.tripType + ' criteria for ' + _trCtx +
-              ' threw: ' + (_branchErr && _branchErr.message ? _branchErr.message : String(_branchErr)) +
+              ' threw: ' + (_branchErr?.message ? _branchErr.message : String(_branchErr)) +
               '. offerTripSearchCriteria / offerTripSpecifications stays unset and the request body cannot be built. ' +
               'Fix in the wizard: open Test Data → Trip Requirements, open this entry and verify the trip data is complete and dates parse correctly.'
             );
@@ -1209,7 +1212,7 @@ function parseScenarioData(jsonData) {
         const purchaserSpecs = [];
         purchaserList.purchaser.forEach(function (purchaser) {
           const osdmVersion = bru.getEnvVar("osdmVersion");
-          if (parseFloat(osdmVersion) >= 3.4) {
+          if (Number.parseFloat(osdmVersion) >= 3.4) {
             purchaserSpecs.push(new PurchaserContact(
               new DetailContact(
                 purchaser.purchaserFirstName,
@@ -1245,7 +1248,7 @@ function parseScenarioData(jsonData) {
       const _paxWantId   = scenario.passengersListId;
       const _paxFound    = _paxLists.some(function (pl) { return pl && pl.id === _paxWantId; });
       if (!_paxFound) {
-        const _availIds = _paxLists.map(function (pl) { return pl && pl.id; }).filter(function (id) { return id != null; });
+        const _availIds = _paxLists.map(function (pl) { return pl?.id; }).filter(function (id) { return id != null; });
         validationLogger(
           '[ERROR] Scenario "' + scenario.code + '" references passengersListId=' +
           JSON.stringify(_paxWantId) + ' but no matching entry exists in datafile.passengersList[]. ' +
@@ -1306,7 +1309,7 @@ function parseScenarioData(jsonData) {
             offerPassengerSpecs.push(offerSpec);
 
             const osdmVersion = bru.getEnvVar("osdmVersion");
-            if (parseFloat(osdmVersion) >= 3.4) {
+            if (Number.parseFloat(osdmVersion) >= 3.4) {
               passengerSpecs.push(new PassengerSpec(
                 passenger.reference,
                 passenger.type,
@@ -1438,7 +1441,7 @@ function parseScenarioData(jsonData) {
         const _ffWantId  = scenario.requestedFulfillmentOptionsListId;
         const _ffFound   = _ffLists.some(function (ff) { return ff && ff.id === _ffWantId; });
         if (!_ffFound) {
-          const _availIds = _ffLists.map(function (ff) { return ff && ff.id; }).filter(function (id) { return id != null; });
+          const _availIds = _ffLists.map(function (ff) { return ff?.id; }).filter(function (id) { return id != null; });
           validationLogger(
             '[ERROR] Scenario "' + scenario.code + '" references requestedFulfillmentOptionsListId=' +
             JSON.stringify(_ffWantId) + ' but no matching entry exists in datafile.requestedFulfillmentOptionsList[]. ' +
@@ -1481,7 +1484,7 @@ function parseScenarioData(jsonData) {
   }
 
   if (foundCorrectDataSet === false) {
-    const _availCodes = (jsonData.scenarios || []).map(function (s) { return s && s.code; }).filter(Boolean);
+    const _availCodes = (jsonData.scenarios || []).map(function (s) { return s?.code; }).filter(Boolean);
     validationLogger('[ERROR] ⛔ Scenario "' + scenarioCode + '" not found in the data file\'s scenarios[]. ' +
       'Available code(s): [' + _availCodes.slice(0, 20).join(', ') + (_availCodes.length > 20 ? ', …' : '') + ']. ' +
       'Fix in the wizard: open Test Config and check the scenario list / scenariosToRun selection.');
@@ -1525,7 +1528,7 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
   // TripSearchCriteria must use LocalDateTime (no offset, no trailing Z)
   // for all providers except Bileto.
   const _osdmVersionRaw = bru.getEnvVar("osdmVersion");
-  const _osdmVersionForDatetime = parseFloat(_osdmVersionRaw || "0");
+  const _osdmVersionForDatetime = Number.parseFloat(_osdmVersionRaw || "0");
   let _startDateTime = toLocalDateTime(legDef.startDateTime);
 
   // Bileto exception: keep OffsetDateTime in TripSearchCriteria.
@@ -1613,7 +1616,7 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
     const _params = {};
     ['transferLimit', 'numberOfResults', 'numberOfResultsBefore', 'numberOfResultsAfter'].forEach(k => {
       if (_set(searchCriteria[k])) {
-        const n = parseInt(searchCriteria[k], 10);
+        const n = Number.parseInt(searchCriteria[k], 10);
         if (Number.isInteger(n) && n >= 0) { _params[k] = n; _applied.push(`${k} ${n}`); }
         else validationLogger(`[WARNING] Trip Search Criteria ${k}="${searchCriteria[k]}" is not a non-negative integer — ignored.`);
       }
@@ -1737,7 +1740,7 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
 // Returns { inwardReturnDate } or null (one-way / unparseable).
 function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
   if (offsetDays == null || offsetDays === '') return null;
-  const offset = parseInt(offsetDays, 10);
+  const offset = Number.parseInt(offsetDays, 10);
   if (!Number.isInteger(offset) || offset < 0) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(.*)$/.exec(String(outboundStart || ''));
   if (!m) {
@@ -1812,7 +1815,7 @@ function featureNotDeclaredWarning(scenario, field) {
 // (returnOffsetDays + optional returnTime, returnModel, returnFulfillments).
 // These are authoring data only — never echoed into the OSDM offerSearchCriteria.
 function returnOptsFromScenario(scenario) {
-  const c = (scenario && scenario.offerSearchCriteria) || {};
+  const c = (scenario?.offerSearchCriteria) || {};
   return { offsetDays: c.returnOffsetDays, time: c.returnTime, model: c.returnModel, fulfillments: c.returnFulfillments };
 }
 

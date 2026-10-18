@@ -33,6 +33,13 @@ http://www.apache.org/licenses/LICENSE-2.0
 // System-Information status classifier below.
 const { getComplianceVersion, endpointMinVersion, isEndpointApplicable } = require('./osdmVersion.js');
 
+// The JSON type of a value, as a message names it: null and array apart.
+function jsonTypeOf(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
 // ── Primitive JSON-Schema-style type check ──────────────────────────────
 function isType(value, type) {
   switch (type) {
@@ -90,7 +97,7 @@ function validateApiVersions(body) {
   checks.push({
     name: 'GET /versions → response is an array<ApiVersion>',
     ok: isArr,
-    message: isArr ? '' : `Expected a JSON array of ApiVersion objects, got ${body === null ? 'null' : typeof body}`,
+    message: isArr ? '' : `Expected a JSON array of ApiVersion objects, got ${jsonTypeOf(body)}`,
   });
   if (!isArr) return checks;
 
@@ -162,7 +169,7 @@ function validateOsdmCollection(body, spec) {
     checks.push({
       name: `GET ${ep} → response is an array<${spec.itemLabel}>`,
       ok: isArr,
-      message: isArr ? '' : `Expected a JSON array, got ${body === null ? 'null' : typeof body}`,
+      message: isArr ? '' : `Expected a JSON array, got ${jsonTypeOf(body)}`,
     });
     if (!isArr) return checks;
     items = body;
@@ -171,7 +178,7 @@ function validateOsdmCollection(body, spec) {
     checks.push({
       name: `GET ${ep} → response is a collection object`,
       ok: isObj,
-      message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+      message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
     });
     if (!isObj) return checks;
 
@@ -180,7 +187,7 @@ function validateOsdmCollection(body, spec) {
     checks.push({
       name: `GET ${ep} → "${spec.payloadKey}" is an array<${spec.itemLabel}>`,
       ok: isArr,
-      message: isArr ? '' : `Property "${spec.payloadKey}" should be an array, got ${arr === undefined ? 'undefined' : typeof arr}`,
+      message: isArr ? '' : `Property "${spec.payloadKey}" should be an array, got ${typeof arr}`,
     });
     if (!isArr) return checks;
     items = arr;
@@ -210,9 +217,10 @@ function validateOsdmCollection(body, spec) {
       // sample so the tester can open a concrete example.
       let message = '';
       if (bad.length > 0) {
+        const more = bad.length > 10 ? `, … +${bad.length - 10} more` : '';
         const where = bad.length === items.length
           ? `ALL ${items.length} ${spec.itemLabel} entries`
-          : `${bad.length} of ${items.length} ${spec.itemLabel} entries (index ${bad.slice(0, 10).join(', ')}${bad.length > 10 ? `, … +${bad.length - 10} more` : ''})`;
+          : `${bad.length} of ${items.length} ${spec.itemLabel} entries (index ${bad.slice(0, 10).join(', ')}${more})`;
         message = `${describe(field, type)} on ${where}.`;
       }
       checks.push({ name: label(field, type), ok: bad.length === 0, message });
@@ -292,7 +300,7 @@ function validateProductTags(body) {
   checks.push({
     name: `GET ${ep} → response is a ProductTagsResponse object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -319,8 +327,8 @@ function validateProductTags(body) {
       if (!isType(n, 'object') || !isType(n.tag, 'string')) badTag.push(i);
       if (!isType(n, 'object') || !isType(n.description, 'object')) badDesc.push(i);
     });
-    checks.push({ name: `GET ${ep} → every productTagName has required "tag" (string)`, ok: badTag.length === 0, message: badTag.length === 0 ? '' : `index ${badTag.join(', ')}` });
-    checks.push({ name: `GET ${ep} → every productTagName has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
+    checks.push({ name: `GET ${ep} → every productTagName has required "tag" (string)`, ok: badTag.length === 0, message: badTag.length === 0 ? '' : `index ${badTag.join(', ')}` },
+      { name: `GET ${ep} → every productTagName has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
   }
 
   if (groupsArr) {
@@ -330,8 +338,8 @@ function validateProductTags(body) {
       if (!isType(g, 'object') || !isType(g.code, 'string')) badCode.push(i);
       if (!isType(g, 'object') || !isType(g.description, 'object')) badDesc.push(i);
     });
-    checks.push({ name: `GET ${ep} → every productTagGroup has required "code" (string)`, ok: badCode.length === 0, message: badCode.length === 0 ? '' : `index ${badCode.join(', ')}` });
-    checks.push({ name: `GET ${ep} → every productTagGroup has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
+    checks.push({ name: `GET ${ep} → every productTagGroup has required "code" (string)`, ok: badCode.length === 0, message: badCode.length === 0 ? '' : `index ${badCode.join(', ')}` },
+      { name: `GET ${ep} → every productTagGroup has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
   }
 
   return checks;
@@ -351,7 +359,7 @@ function validateOsdmResource(body, spec) {
   checks.push({
     name: `GET ${ep} → response is a resource object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -481,15 +489,14 @@ function validateCoachDeckLayout(body, endpoint) {
 // (needs an OFFER + RESERVATION context), so vehicleAvailability may be absent —
 // that is reported as a check, not crashed. This is a bespoke validator (not
 // validateOsdmResource) because the resource is nested under vehicleAvailability.
-function validatePlaceAvailability(body, endpoint) {
-  const ep = endpoint || '/availabilities/place-map';
+function validatePlaceAvailability(body, ep = '/availabilities/place-map') {
   const checks = [];
 
   const isObj = isType(body, 'object');
   checks.push({
     name: `GET ${ep} → response is a PlaceAvailabilityResponse object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -542,15 +549,14 @@ function validatePlaceAvailability(body, endpoint) {
 // updated bookedOffers, so we assert envelope hygiene + that bookedOffers (when
 // present) is a non-empty array. `endpoint` lets the check names reflect the
 // resolved resource (offer-parts vs reservations).
-function validateBookedOfferPartResponse(body, endpoint) {
-  const ep = endpoint || '/bookings/{id}/booked-offers/{id}/offer-parts';
+function validateBookedOfferPartResponse(body, ep = '/bookings/{id}/booked-offers/{id}/offer-parts') {
   const checks = [];
 
   const isObj = isType(body, 'object');
   checks.push({
     name: `POST ${ep} → response is a BookedOfferPartResponse object`,
     ok: isObj,
-    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    message: isObj ? '' : `Expected an object envelope, got ${jsonTypeOf(body)}`,
   });
   if (!isObj) return checks;
 
@@ -587,8 +593,7 @@ function validateBookedOfferPartResponse(body, endpoint) {
 // requires a non-empty string "id" (AbstractOfferPart) and a string "type"
 // (AncillaryType — an x-extensible-enum, so type-checked, not value-checked);
 // "category" is an optional string. Pass the parsed Offer object.
-function validateAncillaryOfferParts(offer, endpoint) {
-  const ep = endpoint || '/offers';
+function validateAncillaryOfferParts(offer, ep = '/offers') {
   const checks = [];
   const parts = offer && typeof offer === 'object' ? offer.ancillaryOfferParts : undefined;
   if (parts == null) return checks; // no ancillary parts → nothing to assert
@@ -612,13 +617,11 @@ function validateAncillaryOfferParts(offer, endpoint) {
     name: `${ep} → every AncillaryOfferPart has required "id" (non-empty string)`,
     ok: badId.length === 0,
     message: badId.length === 0 ? '' : `AncillaryOfferParts with missing/invalid "id": index ${badId.join(', ')}`,
-  });
-  checks.push({
+  }, {
     name: `${ep} → every AncillaryOfferPart has required "type" (AncillaryType string)`,
     ok: badType.length === 0,
     message: badType.length === 0 ? '' : `AncillaryOfferParts with missing/invalid "type": index ${badType.join(', ')}`,
-  });
-  checks.push({
+  }, {
     name: `${ep} → AncillaryOfferPart "category" (when present) is a string`,
     ok: badCategory.length === 0,
     message: badCategory.length === 0 ? '' : `AncillaryOfferParts with non-string "category": index ${badCategory.join(', ')}`,
@@ -722,10 +725,10 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
     /OPERATION_NOT_PERMITTED|NOT_IMPLEMENTED|NOT_SUPPORTED|UNSUPPORTED/i.test(_problemCode);
   const _bareNotSupportedStatus = [403, 404, 405, 500].includes(statusCode);
   if (statusCode === 501 || _saysUnsupported || _bareNotSupportedStatus) {
-    const _title = _problem && _problem.title ? ` ("${_problem.title}")` : '';
-    const _via = _saysUnsupported
-      ? `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`
-      : (statusCode === 501 ? 'HTTP 501 Not Implemented' : `HTTP ${statusCode}`);
+    const _title = _problem?.title ? ` ("${_problem.title}")` : '';
+    let _via = `HTTP ${statusCode}`;
+    if (_saysUnsupported) _via = `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`;
+    else if (statusCode === 501) _via = 'HTTP 501 Not Implemented';
     // A clean, unambiguous signal (501, 404, or a confirming Problem body)
     // is INFO — the provider told us clearly. A bare 403/405/500 with no
     // confirming body is a WARNING — accepted as "not supported" per this
@@ -758,9 +761,9 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
 // checks); false otherwise (caller returns).
 // Out-of-version endpoints are logged as skipped — no pass/fail registered.
 function handleSystemInfoStatus(statusCode, endpoint, ctx) {
-  const bruTest = ctx && ctx.bruTest;
-  const validationLogger = ctx && ctx.validationLogger;
-  const cls = classifySystemInfoStatus(statusCode, endpoint, ctx && ctx.body);
+  const bruTest = ctx?.bruTest;
+  const validationLogger = ctx?.validationLogger;
+  const cls = classifySystemInfoStatus(statusCode, endpoint, ctx?.body);
   if (cls.log && validationLogger) validationLogger(cls.log);
   if (cls.outcome === 'ok') {
     if (bruTest) bruTest(cls.name, () => { expect(statusCode).to.eql(200); });
@@ -819,5 +822,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

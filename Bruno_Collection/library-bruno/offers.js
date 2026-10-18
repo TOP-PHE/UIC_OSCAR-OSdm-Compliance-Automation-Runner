@@ -113,7 +113,7 @@ function checkWarningsAndProblems(jsonData) {
   try {
     const _fmt = (p) => {
       const parts = ["code", "type", "title", "status", "detail"]
-        .filter((k) => p && p[k] != null && p[k] !== "")
+        .filter((k) => p?.[k] != null && p[k] !== "")
         .map((k) => `${k}=${JSON.stringify(p[k])}`);
       return parts.length ? parts.join(", ") : JSON.stringify(p);
     };
@@ -124,8 +124,9 @@ function checkWarningsAndProblems(jsonData) {
       validationLogger(`[WARNING] ⚠️ Response envelope warning ${i + 1}/${warnings.length}: ${_fmt(w)}`);
     });
     problems.forEach((p, i) => {
+      const pointerText = (x) => `${(x?.code) || "?"} @ ${(x?.requestPointer) || "?"}`;
       const ptr = Array.isArray(p.pointers) && p.pointers.length > 0
-        ? ` — pointer(s): ${p.pointers.map((x) => `${(x && x.code) || "?"} @ ${(x && x.requestPointer) || "?"}`).join("; ")}`
+        ? ` — pointer(s): ${p.pointers.map(pointerText).join("; ")}`
         : "";
       validationLogger(`[ERROR] ⛔ Response envelope problem ${i + 1}/${problems.length}: ${_fmt(p)}${ptr}`);
     });
@@ -186,6 +187,14 @@ function postOfferResponsePreRequest() {
   // Swagger capture and header logging are intentionally omitted/disabled here as in original (commented-out).
 }
 
+function resolveVars(str) {
+  if (!str) return str;
+  return String(str).replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
+    const v = bru.getEnvVar(varName);
+    return v == null ? '' : String(v);
+  });
+}
+
 function ensureAuthorizationOr403() {
   // Log-audit round 2: this helper PREFLIGHTS the offer request — it sends
   // the same POST /offers once via bru.sendRequest purely to surface auth
@@ -206,14 +215,6 @@ function ensureAuthorizationOr403() {
   }
   validationLogger("[DEBUG] ➤ ensureAuthorizationOr403 — preflighting POST /offers to surface auth problems early");
 
-  function resolveVars(str) {
-    if (!str) return str;
-    return String(str).replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
-      const v = bru.getEnvVar(varName);
-      return v == null ? '' : String(v);
-    });
-  }
-
   try {
     const urlStr = (typeof req !== 'undefined' && req.getUrl) ? String(req.getUrl()) : '';
     const method = (typeof req !== 'undefined' && req.getMethod) ? req.getMethod() : 'GET';
@@ -223,12 +224,12 @@ function ensureAuthorizationOr403() {
     // Attempt to copy headers if possible
     let resolvedHeaders = {};
     try {
-      const headersObj = req.getHeaders && req.getHeaders();
+      const headersObj = req.getHeaders?.();
       // Try common shapes: getAll() or entries()
       if (headersObj && typeof headersObj.getAll === 'function') {
         const arr = headersObj.getAll();
         arr.forEach(h => {
-          if (h && h.key) resolvedHeaders[h.key] = resolveVars(h.value);
+          if (h?.key) resolvedHeaders[h.key] = resolveVars(h.value);
         });
       } else if (headersObj && typeof headersObj.entries === 'function') {
         for (const { key, value } of headersObj.entries()) {
@@ -237,13 +238,13 @@ function ensureAuthorizationOr403() {
       }
     } catch (e) {
       // #357: validationLogger so the [DEBUG] diagnostic obeys loggingType.
-      validationLogger('[DEBUG] [offers] preflight header extraction failed, continuing without headers: ' + (e && e.message));
+      validationLogger('[DEBUG] [offers] preflight header extraction failed, continuing without headers: ' + (e?.message));
     }
 
     // Best-effort body resolve (may be empty in pre-request)
     let resolvedBody = null;
     try {
-      const rawBody = req.getBody && req.getBody();
+      const rawBody = req.getBody?.();
       const rawStr = rawBody && typeof rawBody.toString === 'function' ? rawBody.toString() : null;
       if (rawStr) {
         const replaced = resolveVars(rawStr);
@@ -255,7 +256,7 @@ function ensureAuthorizationOr403() {
       }
     } catch (e) {
       // #357: validationLogger so the [DEBUG] diagnostic obeys loggingType.
-      validationLogger('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e && e.message));
+      validationLogger('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e?.message));
     }
 
     // Preflight call using bru.sendRequest
@@ -264,9 +265,8 @@ function ensureAuthorizationOr403() {
     }
     // bru.sendRequest expects headers as array of {key, value} objects (Postman/Bruno format)
     const headersArray = Object.entries(resolvedHeaders).map(([key, value]) => ({ key, value }));
-    const bodyStr = resolvedBody
-      ? (typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody))
-      : undefined;
+    let bodyStr;
+    if (resolvedBody) bodyStr = typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody);
     bru.sendRequest({
       url: resolvedUrl,
       method: method,
@@ -359,7 +359,7 @@ function postOfferResponse(jsonData) {
     });
     const createdOnDate = new Date(offer.createdOn);
     test(`offers[${i}].createdOn is a valid ISO datetime (OSDM: Offer.createdOn required)`, () => {
-      expect(isNaN(createdOnDate.getTime()), `createdOn is not a valid date: ${offer.createdOn}`).to.be.false;
+      expect(Number.isNaN(createdOnDate.getTime()), `createdOn is not a valid date: ${offer.createdOn}`).to.be.false;
     });
     test(`offers[${i}].passengerRefs is a non-empty array (OSDM: Offer.passengerRefs minItems:1)`, () => {
       expect(offer.passengerRefs).to.be.an('array').with.lengthOf.at.least(1);
@@ -407,7 +407,7 @@ function postOfferResponse(jsonData) {
       const _resParts = Array.isArray(selectedOffer.reservationOfferParts)
         ? selectedOffer.reservationOfferParts : [];
       const _matchPart = _resParts.find(function (p) { return p && p.id === _resId; });
-      if (_matchPart && _matchPart.validUntil) {
+      if (_matchPart?.validUntil) {
         bru.setEnvVar('addReservationOfferValidUntil', String(_matchPart.validUntil));
         bru.setEnvVar('addReservationOfferValidUntilSource',
           `selectedOffer.reservationOfferParts[id=${_resId}].validUntil`);
@@ -434,7 +434,7 @@ function postOfferResponse(jsonData) {
 const FLEX_ORDER = ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'];
 
 function deriveOfferFlexibilityFromProducts(offer) {
-  const flits = ((offer && offer.products) || []).map(p => p && p.flexibility).filter(Boolean);
+  const flits = ((offer?.products) || []).map(p => p?.flexibility).filter(Boolean);
   let result;
   flits.forEach(f => {
     const rank = FLEX_ORDER.indexOf(f);
@@ -449,7 +449,7 @@ function deriveOfferFlexibilityFromProducts(offer) {
 // products (#223 — providers that omit offerSummary). Returns undefined if
 // neither is available.
 function offerFlexibility(offer) {
-  return (offer && offer.offerSummary && offer.offerSummary.overallFlexibility)
+  return (offer?.offerSummary?.overallFlexibility)
     || deriveOfferFlexibilityFromProducts(offer);
 }
 
@@ -479,9 +479,9 @@ function captureExpiredOfferDeadline(selectedOffer) {
   _partLists.forEach(function (pt) {
     const parts = Array.isArray(selectedOffer[pt]) ? selectedOffer[pt] : [];
     parts.forEach(function (p, i) {
-      if (p && p.validUntil) {
+      if (p?.validUntil) {
         const t = new Date(p.validUntil).getTime();
-        if (!isNaN(t) && t < _earliestMs) {
+        if (!Number.isNaN(t) && t < _earliestMs) {
           _earliestMs  = t;
           _earliestRaw = p.validUntil;
           _earliestSrc = `selectedOffer.${pt}[${i}].validUntil`;
@@ -491,7 +491,7 @@ function captureExpiredOfferDeadline(selectedOffer) {
   });
   if (selectedOffer.preBookableUntil) {
     const _pbu = new Date(selectedOffer.preBookableUntil).getTime();
-    if (!isNaN(_pbu) && _pbu < _earliestMs) {
+    if (!Number.isNaN(_pbu) && _pbu < _earliestMs) {
       _earliestMs  = _pbu;
       _earliestRaw = selectedOffer.preBookableUntil;
       _earliestSrc = 'selectedOffer.preBookableUntil';
@@ -535,6 +535,29 @@ function searchTripOffers(body, { log = false } = {}) {
   return offers;
 }
 
+function validateSelectedOfferAdmission(selOffer, scenarioTypeStr, overallFlexibility) {
+  if (!selOffer?.admissionOfferParts) return;
+
+  // Do nothing if not FULL_FLEXIBLE or SEMI_FLEXIBLE
+  if (overallFlexibility !== "FULL_FLEXIBLE" && overallFlexibility !== "SEMI_FLEXIBLE") {
+    validationLogger(`[DEBUG] overallFlexibility is '${overallFlexibility}' - skipping admissionOfferParts validation`);
+    return;
+  }
+
+  function validateField(field, type) {
+    // #387: context only — the scenario-vs-offer verdict row is OWNED by
+    // ensureYesWhenRefundOrExchangeSelected. This used to be the FIRST of
+    // THREE rows registered for the same root cause (a REFUND/EXCHANGE
+    // scenario on a part that does not permit it).
+    const parts = selOffer.admissionOfferParts;
+    const allYes = parts.every(p => p[field] === "YES");
+    validationLogger(`[DEBUG] Selected offer admission ${type} flags (FULL/SEMI_FLEXIBLE context): [${parts.map(p => p[field]).join(", ")}]${allYes ? "" : " — not all YES; see the scenario-vs-offer verdict row."}`);
+  }
+
+  if (scenarioTypeStr?.includes("EXCHANGE")) validateField("exchangeable", "exchangeable");
+  if (scenarioTypeStr?.includes("REFUND")) validateField("refundable", "refundable");
+}
+
 function selectAndSetOffer(jsonData) {
   validationLogger("[DEBUG] ➤ selectAndSetOffer");
 
@@ -546,21 +569,24 @@ function selectAndSetOffer(jsonData) {
     const fam = {};
     let noRes = 0;
     offers.forEach((o) => {
-      const parts = (o && o.reservationOfferParts) || [];
+      const parts = (o?.reservationOfferParts) || [];
       if (parts.length === 0) { noRes++; return; }
-      parts.forEach((p) => ((p && p.availablePlaces) || []).forEach((pl) => {
-        const t = pl && pl.accommodationType;
+      parts.forEach((p) => ((p?.availablePlaces) || []).forEach((pl) => {
+        const t = pl?.accommodationType;
         if (!t) return;
         if (!fam[t]) fam[t] = { offers: new Set(), subs: new Set() };
         fam[t].offers.add(o.offerId);
         if (pl.accommodationSubType) fam[t].subs.add(pl.accommodationSubType);
       }));
     });
+    const subtypesOf = (t) => (fam[t].subs.size ? ` (subtypes: ${[...fam[t].subs].join(", ")})` : "");
     const famLine = Object.keys(fam)
-      .map((t) => `${t} ×${fam[t].offers.size} offer(s)${fam[t].subs.size ? ` (subtypes: ${[...fam[t].subs].join(", ")})` : ""}`)
+      .map((t) => `${t} ×${fam[t].offers.size} offer(s)${subtypesOf(t)}`)
       .join("; ");
-    console.log(`[INFO] 🧭 Offer set: ${offers.length} offer(s)${famLine ? ` — reservation accommodations: ${famLine}` : ""}${noRes > 0 ? `; ${noRes} offer(s) without reservation parts` : ""}.`);
-  })(jsonData && jsonData.offers);
+    const famNote = famLine ? ` — reservation accommodations: ${famLine}` : "";
+    const noResNote = noRes > 0 ? `; ${noRes} offer(s) without reservation parts` : "";
+    console.log(`[INFO] 🧭 Offer set: ${offers.length} offer(s)${famNote}${noResNote}.`);
+  })(jsonData?.offers);
 
   const desiredFlexibility = bru.getEnvVar("desiredFlexibility");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
@@ -644,7 +670,7 @@ function selectAndSetOffer(jsonData) {
   // products (most restrictive wins) instead of dropping every offer. (#223)
   if (desiredFlexibility) {
     validationLogger(`[DEBUG] Applying flexibility filter: ${desiredFlexibility}`);
-    if (!filteredOffers.some(o => o.offerSummary && o.offerSummary.overallFlexibility)) {
+    if (!filteredOffers.some(o => o.offerSummary?.overallFlexibility)) {
       validationLogger(`[DEBUG] No offerSummary.overallFlexibility on these offers — deriving flexibility from offer products (most restrictive leg wins).`);
     }
     filteredOffers = filteredOffers.filter(o => offerFlexibility(o) === desiredFlexibility);
@@ -706,28 +732,6 @@ function selectAndSetOffer(jsonData) {
     });
   }
 
-  function validateSelectedOfferAdmission(selOffer, scenarioTypeStr, overallFlexibility) {
-    if (!selOffer?.admissionOfferParts) return;
-
-    // Do nothing if not FULL_FLEXIBLE or SEMI_FLEXIBLE
-    if (overallFlexibility !== "FULL_FLEXIBLE" && overallFlexibility !== "SEMI_FLEXIBLE") {
-      validationLogger(`[DEBUG] overallFlexibility is '${overallFlexibility}' - skipping admissionOfferParts validation`);
-      return;
-    }
-
-    function validateField(field, type) {
-      // #387: context only — the scenario-vs-offer verdict row is OWNED by
-      // ensureYesWhenRefundOrExchangeSelected. This used to be the FIRST of
-      // THREE rows registered for the same root cause (a REFUND/EXCHANGE
-      // scenario on a part that does not permit it).
-      const parts = selOffer.admissionOfferParts;
-      const allYes = parts.every(p => p[field] === "YES");
-      validationLogger(`[DEBUG] Selected offer admission ${type} flags (FULL/SEMI_FLEXIBLE context): [${parts.map(p => p[field]).join(", ")}]${allYes ? "" : " — not all YES; see the scenario-vs-offer verdict row."}`);
-    }
-
-    if (scenarioTypeStr?.includes("EXCHANGE")) validateField("exchangeable", "exchangeable");
-    if (scenarioTypeStr?.includes("REFUND")) validateField("refundable", "refundable");
-  }
   validateSelectedOfferAdmission(selectedOffer, scenarioType, selectedOffer.offerSummary?.overallFlexibility);
 
   return selectedOffer;
@@ -820,7 +824,7 @@ function validateOfferSummary(selectedOffer) {
     const preBookableDate = new Date(preBookableUntil);
     test(`Offer preBookableUntil is a valid date in the future - preBookableUntil: ${preBookableUntil}`, function () {
       validationLogger(`[DEBUG] preBookableUntil: ${preBookableUntil}`);
-      expect(!isNaN(preBookableDate.getTime()), "preBookableUntil should be a valid ISO date").to.be.true;
+      expect(!Number.isNaN(preBookableDate.getTime()), "preBookableUntil should be a valid ISO date").to.be.true;
       expect(preBookableDate.getTime(), "preBookableUntil should be in the future").to.be.above(Date.now());
     });
   } else {
@@ -856,7 +860,7 @@ function validatePassengers(jsonData) {
       const dob = new Date(p.dateOfBirth);
       test(`Passenger ${i + 1} dateOfBirth is a valid date in the past - dateOfBirth: ${p.dateOfBirth}`, function () {
         validationLogger(`[DEBUG] Passenger ${i + 1} dateOfBirth: ${p.dateOfBirth}`);
-        expect(!isNaN(dob.getTime()), "dateOfBirth should be a valid ISO date").to.be.true;
+        expect(!Number.isNaN(dob.getTime()), "dateOfBirth should be a valid ISO date").to.be.true;
         expect(dob.getTime(), "dateOfBirth should be in the past").to.be.below(Date.now());
       });
     } else {
@@ -910,7 +914,7 @@ function validateTripsAndLegs(jsonData) {
     // A7: startTime must be strictly before endTime (OSDM: Trip.startTime/endTime required)
     const tripStart = new Date(trip.startTime);
     const tripEnd   = new Date(trip.endTime);
-    if (!isNaN(tripStart.getTime()) && !isNaN(tripEnd.getTime())) {
+    if (!Number.isNaN(tripStart.getTime()) && !Number.isNaN(tripEnd.getTime())) {
       test(`Trip ${tripIndex + 1} startTime is before endTime (OSDM: temporal order)`, () => {
         expect(tripStart.getTime()).to.be.below(tripEnd.getTime(),
           `Trip startTime (${trip.startTime}) is not before endTime (${trip.endTime})`);
@@ -1063,7 +1067,7 @@ function validateOfferParts(selectedOffer) {
   checkOverallFlexibility(selectedOffer);
 
   // capture coveredTripId if value exists
-  const coveredTripId = selectedOffer.tripCoverage && selectedOffer.tripCoverage.coveredTripId;
+  const coveredTripId = selectedOffer.tripCoverage?.coveredTripId;
   if (coveredTripId !== undefined && coveredTripId !== null) {
     validationLogger(`[DEBUG] Covered Trip ID: ${coveredTripId}`);
     bru.setEnvVar("coveredTripId", coveredTripId);
@@ -1133,7 +1137,7 @@ function validateOfferParts(selectedOffer) {
 
   ['admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts'].forEach(partType => {
     (selectedOffer[partType] || []).forEach((part, pi) => {
-      const ri = part && part.requestedInformation;
+      const ri = part?.requestedInformation;
       if (ri === undefined || ri === null || ri === '') return;
       const out = processRequestedInformation({
         expr: ri,
@@ -1146,7 +1150,7 @@ function validateOfferParts(selectedOffer) {
         log: _riLog,
       });
       // autofeed (provided) and negative probe (probeTargets) both mutate the data.
-      if (out.provided.length || (out.probeTargets && out.probeTargets.length)) {
+      if (out.provided.length || (out.probeTargets?.length)) {
         _riAdditional = out.additional;
         _riChanged = true;
       }
@@ -1198,7 +1202,7 @@ function validateAdmissions(selectedOffer) {
         const validFrom = new Date(admission.validFrom);
         test(`AdmissionOfferPart ${i + 1} validFrom is a valid date - validFrom: ${admission.validFrom}`, function () {
           validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} validFrom: ${admission.validFrom}`);
-          expect(!isNaN(validFrom.getTime()), "validFrom should be a valid ISO date").to.be.true;
+          expect(!Number.isNaN(validFrom.getTime()), "validFrom should be a valid ISO date").to.be.true;
         });
       }
 
@@ -1315,7 +1319,7 @@ function validateAdmissions(selectedOffer) {
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
-              if (!isNaN(validFromDate.getTime())) {
+              if (!Number.isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
@@ -1326,7 +1330,7 @@ function validateAdmissions(selectedOffer) {
             // Validate validUntil
             if (condition.validUntil) {
               const validUntilDate = new Date(condition.validUntil);
-              if (!isNaN(validUntilDate.getTime())) {
+              if (!Number.isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
@@ -1448,7 +1452,7 @@ function validateReservations(selectedOffer) {
         });
         const KNOWN_ACCOMMODATION_TYPES = ["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "STORAGE"];
         availablePlaces.forEach((place, pIndex) => {
-          const _t = String((place && place.accommodationType) || "");
+          const _t = String((place?.accommodationType) || "");
           if (_t && !KNOWN_ACCOMMODATION_TYPES.includes(_t.toUpperCase())) {
             validationLogger(`[WARNING] Reservation part ${i + 1} availablePlaces[${pIndex}].accommodationType '${_t}' is outside the OSDM base AccommodationType list [${KNOWN_ACCOMMODATION_TYPES.join(", ")}] — legal for an x-extensible-enum (custom code), but cross-vendor tooling may not understand it.`);
           }
@@ -1550,7 +1554,7 @@ function validateReservations(selectedOffer) {
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
-              if (!isNaN(validFromDate.getTime())) {
+              if (!Number.isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
@@ -1561,7 +1565,7 @@ function validateReservations(selectedOffer) {
             // Validate validUntil
             if (condition.validUntil) {
               const validUntilDate = new Date(condition.validUntil);
-              if (!isNaN(validUntilDate.getTime())) {
+              if (!Number.isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
@@ -1639,7 +1643,7 @@ function validateAncillaries(selectedOffer) {
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
-              if (!isNaN(validFromDate.getTime())) {
+              if (!Number.isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
@@ -1650,7 +1654,7 @@ function validateAncillaries(selectedOffer) {
             // Validate validUntil
             if (condition.validUntil) {
               const validUntilDate = new Date(condition.validUntil);
-              if (!isNaN(validUntilDate.getTime())) {
+              if (!Number.isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
                 validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
@@ -1687,14 +1691,20 @@ function validateAncillaries(selectedOffer) {
   }
 }
 
+// A value as a list: itself when it is one, [] when absent, else a list of it.
+function asList(value) {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
+}
+
 // Function to extract all tripId and legId from tripLegCoverage for a given accommodationType
 // #371: coverage the OFFER declares (tripCoverage, object or array) -
 // normalized to [{tripId, legId}]. The authoritative source for booking
 // placeSelections per the OBB IRT/NJ requirement; per-place tripLegCoverage
 // stays the fallback for providers that only set it there.
 function offerTripCoverage(selectedOffer) {
-  const tc = selectedOffer && selectedOffer.tripCoverage;
-  const arr = Array.isArray(tc) ? tc : (tc ? [tc] : []);
+  const tc = selectedOffer?.tripCoverage;
+  const arr = asList(tc);
   const out = [];
   arr.forEach(c => {
     if (!c) return;
@@ -1722,10 +1732,10 @@ function assertOfferCoverageIntegrity(selectedOffer, jsonData) {
     validationLogger(`[DEBUG] Offer coverage integrity: ${pairs.length === 0 ? "offer declares no tripCoverage" : "response carries no trips"} → check skipped.`);
     return;
   }
-  const tripIds = new Set(trips.map((t) => t && t.id).filter(Boolean));
+  const tripIds = new Set(trips.map((t) => t?.id).filter(Boolean));
   const legsByTrip = {};
   trips.forEach((t) => {
-    if (t && t.id) legsByTrip[t.id] = new Set((t.legs || []).map((l) => l && l.id).filter(Boolean));
+    if (t?.id) legsByTrip[t.id] = new Set((t.legs || []).map((l) => l?.id).filter(Boolean));
   });
   const issues = [];
   pairs.forEach((pr) => {
@@ -1753,21 +1763,23 @@ function assertOfferCoverageIntegrity(selectedOffer, jsonData) {
 // undeclared) capability without cross-referencing the payloads.
 function notePlaceSelectionCapabilities(part) {
   if (!part || typeof part !== "object") return;
-  const KNOWN_FLOWS = [
+  const KNOWN_FLOWS = new Set([
     "MANUAL_PLACE_SELECTION_WITH_FEE", "MANUAL_PLACE_SELECTION_WITHOUT_FEE",
     "AUTOMATIC_PLACE_SELECTION", "AUTOMATIC_PLACE_SELECTION_NEARBY", "AUTOMATIC_PLACE_SELECTION_PREFERENCES",
-  ];
+  ]);
   const flows = Array.isArray(part.supportedPlaceSelectionFlows) ? part.supportedPlaceSelectionFlows.filter(Boolean).map(String) : [];
   const mode = bru.getEnvVar("placeSelectionMode") || "";
   const wantsMap = mode === "SEATMAP_AT_OFFER" || mode === "ADD_TO_BOOKING";
   const graphical = (Array.isArray(part.availablePlacePreferences) ? part.availablePlacePreferences : [])
-    .map((p) => p && p.graphicalReservation).filter(Boolean).map(String);
+    .map((p) => p?.graphicalReservation).filter(Boolean).map(String);
 
   if (flows.length === 0) {
-    validationLogger(`[INFO] Reservation part ${part.id}: no supportedPlaceSelectionFlows declared (optional in OSDM)${wantsMap ? ` — the scenario's ${mode} seat-map flow proceeds without a declared capability` : ""}.`);
+    const mapNote = wantsMap ? ` — the scenario's ${mode} seat-map flow proceeds without a declared capability` : "";
+    validationLogger(`[INFO] Reservation part ${part.id}: no supportedPlaceSelectionFlows declared (optional in OSDM)${mapNote}.`);
   } else {
-    validationLogger(`[INFO] Reservation part ${part.id} declares place-selection flows: ${flows.join(", ")}${graphical.length ? `; graphicalReservation: ${[...new Set(graphical)].join(", ")}` : ""}.`);
-    const unknown = flows.filter((f) => !KNOWN_FLOWS.includes(f.toUpperCase()));
+    const graphicalNote = graphical.length ? `; graphicalReservation: ${[...new Set(graphical)].join(", ")}` : "";
+    validationLogger(`[INFO] Reservation part ${part.id} declares place-selection flows: ${flows.join(", ")}${graphicalNote}.`);
+    const unknown = flows.filter((f) => !KNOWN_FLOWS.has(f.toUpperCase()));
     if (unknown.length > 0) {
       validationLogger(`[WARNING] Reservation part ${part.id}: place-selection flow value(s) [${unknown.join(", ")}] are outside the OSDM base PlaceSelectionFlow list — legal (x-extensible-enum), noted for cross-vendor readers.`);
     }
@@ -1850,7 +1862,7 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
     const _firstPlace = Array.isArray(_firstRes.availablePlaces) ? _firstRes.availablePlaces[0] : null;
     if (_offerCov.length > 0) {
       bru.setEnvVar("tripLegCoverage", JSON.stringify(_offerCov));
-    } else if (_firstPlace && _firstPlace.tripLegCoverage) {
+    } else if (_firstPlace?.tripLegCoverage) {
       bru.setEnvVar("tripLegCoverage", JSON.stringify([_firstPlace.tripLegCoverage]));
     }
     // #371: persist the real accommodation of the selected part when the
@@ -2079,11 +2091,12 @@ function sweepCatalogFlagVsSchedule(offers) {
     let freeWindowed = 0;
     let consistent = 0;
     list.forEach((offer) => {
-      const parts = []
-        .concat((offer && offer.admissionOfferParts) || [])
-        .concat((offer && offer.reservationOfferParts) || [])
-        .concat((offer && offer.ancillaryOfferParts) || [])
-        .filter((p) => p && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
+      const parts = [
+        offer?.admissionOfferParts || [],
+        offer?.reservationOfferParts || [],
+        offer?.ancillaryOfferParts || [],
+      ].flat()
+        .filter((p) => p?.price && typeof p.price.amount === "number" && p.price.amount > 0);
       let hasContradiction = false;
       let hasFree = false;
       let hasConsistentNo = false;
@@ -2105,7 +2118,8 @@ function sweepCatalogFlagVsSchedule(offers) {
       }
     });
     if (contradicting > 0) {
-      validationLogger(`[WARNING] Catalog sweep (${action}): ${contradicting} of ${list.length} offers declare ${field}=NO on a value-bearing part while their own ${action} schedule charges less than the price${freeWindowed > 0 ? ` (${freeWindowed} even with a FREE window)` : ""} — per the spec enum these are WITH_CONDITION; ${consistent} offer(s) are consistent (every ${action} window charges the full price). Distributors filtering on the flag would hide ${action.toLowerCase()}able products.`);
+      const freeNote = freeWindowed > 0 ? ` (${freeWindowed} even with a FREE window)` : "";
+      validationLogger(`[WARNING] Catalog sweep (${action}): ${contradicting} of ${list.length} offers declare ${field}=NO on a value-bearing part while their own ${action} schedule charges less than the price${freeNote} — per the spec enum these are WITH_CONDITION; ${consistent} offer(s) are consistent (every ${action} window charges the full price). Distributors filtering on the flag would hide ${action.toLowerCase()}able products.`);
     }
   });
 }
@@ -2114,7 +2128,7 @@ function sweepCatalogFlagVsSchedule(offers) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }
 
 // ── Reduction cards (#597) ───────────────────────────────────────────────────

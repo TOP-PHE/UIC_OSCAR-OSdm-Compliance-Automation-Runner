@@ -16,7 +16,7 @@ const { parseEnvJson } = require('./envUtils.js');
 
 function loopbackOrStop(label) {
   const _scList    = parseEnvJson('__scenariosList', []);
-  const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+  const _scNextIdx = Number.parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
 
   if (_scList.length > 0 && _scNextIdx < _scList.length) {
     console.log(
@@ -38,7 +38,7 @@ function loopbackOrStop(label) {
 // FAILED). Critical steps (offer / booking — nothing downstream is
 // meaningful without them) always hard-stop regardless of the policy.
 function failStepOrContinue(label, nextStep, opts) {
-  const critical = !!(opts && opts.critical);
+  const critical = !!(opts?.critical);
   const policy = String(bru.getEnvVar('stepFailurePolicy') || 'HARD_STOP').toUpperCase();
   if (!critical && policy === 'CONTINUE' && nextStep) {
     console.log(
@@ -86,14 +86,14 @@ function knownDeviationFor(stepLabel, status) {
 function noteKnownDeviation(stepLabel, status, dev) {
   console.log(
     '[WARNING] Known deviation (documented): ' + stepLabel + ' returned HTTP ' + status +
-    ' — ' + (dev && dev.note ? dev.note : 'declared in the provider baseline') +
+    ' — ' + (dev?.note ? dev.note : 'declared in the provider baseline') +
     '. Not counted as a failure; surfaced for visibility.'
   );
-  const n = parseInt(bru.getEnvVar('__knownDeviationHits') || '0', 10) + 1;
+  const n = Number.parseInt(bru.getEnvVar('__knownDeviationHits') || '0', 10) + 1;
   bru.setEnvVar('__knownDeviationHits', String(n));
   const seen = parseEnvJson('__knownDeviationsSeen', []);
   const key = _normStep(stepLabel) + '#' + String(status);
-  if (seen.indexOf(key) === -1) { seen.push(key); bru.setEnvVar('__knownDeviationsSeen', JSON.stringify(seen)); }
+  if (!seen.includes(key)) { seen.push(key); bru.setEnvVar('__knownDeviationsSeen', JSON.stringify(seen)); }
 }
 
 /**

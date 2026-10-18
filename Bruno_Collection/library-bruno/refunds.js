@@ -77,7 +77,7 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
     : [expectedRefundOperationStatus];
   if (_expectedStatuses.includes("PROPOSED")) {
     const _firstRefundOffer = jsonData.refundOffers[0];
-    if (_firstRefundOffer && _firstRefundOffer.validUntil) {
+    if (_firstRefundOffer?.validUntil) {
       bru.setEnvVar("refundOfferValidUntil", String(_firstRefundOffer.validUntil));
       bru.setEnvVar("refundOfferValidUntilSource", "refundOffers[0].validUntil");
       validationLogger(`[INFO] Captured refundOffer validUntil = ${_firstRefundOffer.validUntil}`);
@@ -410,10 +410,11 @@ function validateRefundPermissibility(refundOffer, index) {
     validationLogger("[DEBUG] Refund permissibility check skipped — no selected offer in the environment.");
     return;
   }
-  const parts = []
-    .concat(Array.isArray(offer.admissionOfferParts) ? offer.admissionOfferParts : [])
-    .concat(Array.isArray(offer.reservationOfferParts) ? offer.reservationOfferParts : [])
-    .concat(Array.isArray(offer.ancillaryOfferParts) ? offer.ancillaryOfferParts : [])
+  const parts = [
+    Array.isArray(offer.admissionOfferParts) ? offer.admissionOfferParts : [],
+    Array.isArray(offer.reservationOfferParts) ? offer.reservationOfferParts : [],
+    Array.isArray(offer.ancillaryOfferParts) ? offer.ancillaryOfferParts : [],
+  ].flat()
     .filter(Boolean);
   if (parts.length === 0) {
     validationLogger("[DEBUG] Refund permissibility check skipped — the selected offer carries no parts.");
@@ -435,8 +436,12 @@ function validateRefundPermissibility(refundOffer, index) {
 
   // Gate 1 — nothing permits a refund, yet one was PROPOSED.
   if (analyses.every((a) => !permits(a))) {
+    const lockReason = (a) => (a.schedule
+      ? `the declared schedule charges the full price (fee ≥ ${a.priceAmount})`
+      : `flag ${a.flagLabel} with no schedule granting a refund`);
+    const partReason = (a, k) => `part ${k + 1}: ${lockReason(a)}`;
     test(`Refund offer[${index}] permissibility — every selected-offer part is effectively non-refundable`, () => {
-      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer && refundOffer.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map((a, k) => `part ${k + 1}: ${a.schedule ? `the declared schedule charges the full price (fee ≥ ${a.priceAmount})` : `flag ${a.flagLabel} with no schedule granting a refund`}`).join("; ")} — and no overrule was sent.`);
+      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer?.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map((a, k) => partReason(a, k)).join("; ")} — and no overrule was sent.`);
     });
     return;
   }
@@ -448,7 +453,7 @@ function validateRefundPermissibility(refundOffer, index) {
     return;
   }
   const lockedParts = parts.filter((p, k) => !permits(analyses[k]) && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
-  if (lockedParts.length > 0 && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
+  if (lockedParts.length > 0 && refundOffer?.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
     const _amounts = parts.filter((p) => p.price).map((p) => p.price)
       .concat([refundOffer.refundableAmount])
       .concat(refundOffer.refundFee ? [refundOffer.refundFee] : []);
@@ -463,8 +468,9 @@ function validateRefundPermissibility(refundOffer, index) {
       const _refunded = refundOffer.refundableAmount.amount
         + ((refundOffer.refundFee && typeof refundOffer.refundFee.amount === "number") ? refundOffer.refundFee.amount : 0);
       if (_refunded > _permitted) {
+        const lockedPrice = (p) => `${p.price.amount} ${p.price.currency || ""}`;
         test(`Refund offer[${index}] permissibility — refunded value stays within the parts that effectively permit a refund`, () => {
-          throw new Error(`The refund returns ${_refunded} ${_currencies[0] || ""} (refundable + fee) but the parts effectively permitting a refund carry only ${_permitted} — the difference comes from part(s) whose own declarations lock the value (${lockedParts.map((p) => `${p.price.amount} ${p.price.currency || ""}`).join(", ")}) and no overrule was sent.`);
+          throw new Error(`The refund returns ${_refunded} ${_currencies[0] || ""} (refundable + fee) but the parts effectively permitting a refund carry only ${_permitted} — the difference comes from part(s) whose own declarations lock the value (${lockedParts.map(lockedPrice).join(", ")}) and no overrule was sent.`);
         });
         return;
       }
@@ -475,7 +481,7 @@ function validateRefundPermissibility(refundOffer, index) {
   // Gate 3 (#391) — THE schedule-decode assertion: what the declared schedule
   // says a full refund right now must return, vs what the engine offers.
   const r = expectedRefundForParts(parts, now, "REFUND");
-  if (r.ok && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number"
+  if (r.ok && refundOffer?.refundableAmount && typeof refundOffer.refundableAmount.amount === "number"
       && (!r.currency || !refundOffer.refundableAmount.currency || r.currency === refundOffer.refundableAmount.currency)) {
     if (refundOffer.refundableAmount.amount !== r.expectedRefundable) {
       test(`Refund offer[${index}] schedule decode — refundableAmount matches the declared after-sales schedule (Σ price − active fee)`, () => {
@@ -514,7 +520,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
 
   // #387: permissibility verdict — once, at the refund-offers step (the
   // GET/PATCH re-reads would only duplicate it).
-  if (((typeof req !== "undefined" && req && req.getName && req.getName()) || "") === "10. POST Refund Offers") {
+  if (((typeof req !== "undefined" && req?.getName?.()) || "") === "10. POST Refund Offers") {
     validateRefundPermissibility(refundOffer, index);
     // #781: the refund is in the sale's currency.
     require('./currencies.js').checkAfterSale(`Refund offer[${index}]`, { refundableAmount: refundOffer.refundableAmount, refundFee: refundOffer.refundFee });
@@ -530,7 +536,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   // Build the Date only from non-null strings so the outer guard genuinely
   // filters out the absent case, and emit an explicit [ERROR] for it.
   const currentDate = new Date();
-  const _toDate = v => (typeof v === 'string' && v.trim() !== '') ? new Date(v) : new Date(NaN);
+  const _toDate = v => (typeof v === 'string' && v.trim() !== '') ? new Date(v) : new Date(Number.NaN);
   const createdOn  = _toDate(refundOffer.createdOn);
   const validFrom  = _toDate(refundOffer.validFrom);
   const validUntil = _toDate(refundOffer.validUntil);
@@ -544,7 +550,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   //   utc:   2026-06-09T05:23:26.087386+00:00
   //   local: 2026-06-09 07:23:26 Europe/Paris  (CEST = UTC+2)
   function _withLocal(utcString, parsedDate) {
-    if (!utcString || !parsedDate || isNaN(parsedDate.getTime())) return utcString || '';
+    if (!utcString || !parsedDate || Number.isNaN(parsedDate.getTime())) return utcString || '';
     try {
       const local = parsedDate.toLocaleString('sv-SE', { timeZone: 'Europe/Paris' });
       return `${utcString} (= ${local} Europe/Paris)`;
@@ -568,7 +574,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
       });
       return false;
     }
-    if (isNaN(parsedDate.getTime())) {
+    if (Number.isNaN(parsedDate.getTime())) {
       test(`Refund offer[${index}] ${fieldName} parses as a datetime`, () => {
         expect.fail(
           `${fieldName} is present but does not parse as a datetime — got: ${JSON.stringify(rawValue)}. ` +
@@ -622,7 +628,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   }
 
   // E1: validFrom must be before or equal to validUntil (OSDM: temporal order required)
-  if (!isNaN(validFrom.getTime()) && !isNaN(validUntil.getTime())) {
+  if (!Number.isNaN(validFrom.getTime()) && !Number.isNaN(validUntil.getTime())) {
     test(`Refund offer[${index}] validFrom is before or equal to validUntil (OSDM: temporal order)`, () => {
       expect(validFrom.getTime()).to.be.at.most(validUntil.getTime(),
         `validFrom (${refundOffer.validFrom}) is after validUntil (${refundOffer.validUntil})`);
@@ -694,9 +700,9 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     refundFeeLabel = 'missing';
   } else {
     const amt = refundOffer.refundFee.amount;
-    const retention = (amt === 0) ? ' (= no carrier retention)'
-                    : (typeof amt === 'number') ? ' (= kept by carrier per OSDM)'
-                    : '';
+    let retention = '';
+    if (amt === 0) retention = ' (= no carrier retention)';
+    else if (typeof amt === 'number') retention = ' (= kept by carrier per OSDM)';
     refundFeeLabel = `${_priceShape(refundOffer.refundFee)}${retention}`;
   }
   test(`Refund offer[${index}] refundFee Price structure is well-formed — ${refundFeeLabel}`, () => {
@@ -945,7 +951,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
       const _responsePartIds = new Set();
       for (const b of _breakdown) {
         for (const bp of (b.bookingParts || [])) {
-          if (bp && bp.id) _responsePartIds.add(bp.id);
+          if (bp?.id) _responsePartIds.add(bp.id);
         }
       }
       const _outOfScope = [..._responsePartIds].filter((id) => !_requestedPartIds.has(id));
@@ -971,8 +977,9 @@ function validateRefundAppliedOverruleCode(appliedOverruleCode, expectedOverrule
   // null`) on the omitter. Treat both as equivalent: the OSDM contract says
   // the field is optional and absent / null are semantically the same.
   const normalisedApplied = (appliedOverruleCode === undefined) ? null : appliedOverruleCode;
+  const actualCode = appliedOverruleCode === undefined ? 'undefined → treated as null' : JSON.stringify(appliedOverruleCode);
   const title = expectedOverruleCode === null
-    ? `AppliedOverruleCode is null as expected (actual: ${appliedOverruleCode === undefined ? 'undefined → treated as null' : JSON.stringify(appliedOverruleCode)})`
+    ? `AppliedOverruleCode is null as expected (actual: ${actualCode})`
     : `AppliedOverruleCode matches expected — expected: ${expectedOverruleCode}, actual: ${JSON.stringify(appliedOverruleCode)}`;
   test(title, () => {
     expect(normalisedApplied).to.equal(expectedOverruleCode);
@@ -983,5 +990,5 @@ function validateRefundAppliedOverruleCode(appliedOverruleCode, expectedOverrule
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

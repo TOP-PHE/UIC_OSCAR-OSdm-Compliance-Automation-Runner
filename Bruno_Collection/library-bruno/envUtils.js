@@ -32,7 +32,7 @@ function parseEnvJson(name, fallback) {
       : undefined;
   } catch (e) {
     // bru.getEnvVar threw (no / broken bru context) — treat the var as unset.
-    console.log('[DEBUG] [envUtils] getEnvVar("' + name + '") threw, treating as unset: ' + (e && e.message));
+    console.log('[DEBUG] [envUtils] getEnvVar("' + name + '") threw, treating as unset: ' + (e?.message));
     raw = undefined;
   }
 
@@ -51,7 +51,7 @@ function parseEnvJson(name, fallback) {
       try { _tt = (typeof bru !== 'undefined' && bru.getEnvVar('TripType')) || ''; } catch (_e) { _tt = ''; }
       hint = ' Upstream resolver: scenarioParser.osdmTripSearchCriteria() / osdmTripSpecification(). TripType currently="' +
         (_tt || '(unset)') + '". When this variable is empty the cause is almost always ' +
-        'an unresolved scenario.tripRequirementId — look for "Scenario \\"...\\" references tripRequirementId=... but no matching entry exists" in the run log above. Fix: open the Test Data → Trip Requirements section in the wizard and link the scenario to a defined entry.';
+        String.raw`an unresolved scenario.tripRequirementId — look for "Scenario \"...\" references tripRequirementId=... but no matching entry exists" in the run log above. Fix: open the Test Data → Trip Requirements section in the wizard and link the scenario to a defined entry.`;
     } else if (name === 'offerPassengerSpecifications') {
       hint = ' Upstream resolver: scenarioParser passengers block. Cause is almost always an unresolved scenario.passengersListId — look for the matching [ERROR] line about passengersList above. Fix: open Test Data → Passengers in the wizard.';
     } else if (name === 'offerSearchCriteria') {
@@ -76,7 +76,7 @@ function parseEnvJson(name, fallback) {
   } catch (e) {
     throw new Error(
       '[ERROR] Scenario variable "' + name + '" is not valid JSON: ' +
-      ((e && e.message) || e) + '. Value begins: ' + String(raw).slice(0, 80)
+      ((e?.message) || e) + '. Value begins: ' + String(raw).slice(0, 80)
     );
   }
 }
@@ -88,5 +88,5 @@ module.exports = { parseEnvJson };
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

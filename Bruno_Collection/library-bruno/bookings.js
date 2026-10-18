@@ -53,7 +53,7 @@ function alignPassengerIdsToSubmittedOrder(bookingPassengers, submittedRefs) {
   const bookingOrderIds = [];
   const refToId = Object.create(null);
   (Array.isArray(bookingPassengers) ? bookingPassengers : []).forEach((p) => {
-    if (p && p.id) {
+    if (p?.id) {
       bookingOrderIds.push(p.id);
       if (p.externalRef != null && p.externalRef !== '') {
         refToId[String(p.externalRef)] = p.id;
@@ -75,7 +75,7 @@ function alignPassengerIdsToSubmittedOrder(bookingPassengers, submittedRefs) {
 function checkBookingAfterOffer(booking, selectedOffer) {
   const bookingDate = new Date(booking.createdOn);
   const offerDate   = new Date(selectedOffer.createdOn);
-  if (!isNaN(bookingDate.getTime()) && !isNaN(offerDate.getTime())) {
+  if (!Number.isNaN(bookingDate.getTime()) && !Number.isNaN(offerDate.getTime())) {
     test(`booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`, () => {
       validationLogger(`[DEBUG] booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`);
       expect(bookingDate.getTime(), 'the booking is created before the offer it books').to.be.at.least(offerDate.getTime());
@@ -165,7 +165,7 @@ function validatePartDates(part, bookedPart, partType, index) {
     if (part[field] && bookedPart[field]) {
       const partDate       = new Date(part[field]);
       const bookedPartDate = new Date(bookedPart[field]);
-      if (!isNaN(partDate.getTime()) && !isNaN(bookedPartDate.getTime())) {
+      if (!Number.isNaN(partDate.getTime()) && !Number.isNaN(bookedPartDate.getTime())) {
         test(`${partType}[${index}].${field} is present in both offer and booking`, () => {
           expect(part[field]).to.exist;
           expect(bookedPart[field]).to.exist;
@@ -198,7 +198,7 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
   // compared with the offer's below. (Before #650 this was one failure per
   // part, after #337 had already cut the cascade of per-condition failures.)
   const _offerConditionTypes = offerConditions
-    .map(c => c && c.condition).filter(Boolean);
+    .map(c => c?.condition).filter(Boolean);
   if (!Array.isArray(bookedConditions) || bookedConditions.length === 0) {
     validationLogger(`[WARNING] ${partType}[${index}] afterSaleConditions not given in the booking (optional in OSDM); the offer had ${offerConditions.length} (${_offerConditionTypes.join(', ') || '?'}). Not compared.`);
     return;
@@ -219,7 +219,7 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
   const _condInstant = (v) => {
     if (!v) return null;
     const t = new Date(v).getTime();
-    return isNaN(t) ? String(v) : t;
+    return Number.isNaN(t) ? String(v) : t;
   };
   const _bookedCondPool = bookedConditions.slice();
   let _condReuseWarned = false;
@@ -244,7 +244,10 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
     }
     test(`${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} exists in booking`, () => {
       expect(bookedCondition, `Condition '${condType}' not found in booking`).to.exist;
-      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking (paired by ${_pairKind === 'window' ? 'validity window' : _pairKind === 'order' ? 'type+order' : 'type re-use'})`);
+      let _pairedBy = 'type re-use';
+      if (_pairKind === 'window') _pairedBy = 'validity window';
+      else if (_pairKind === 'order') _pairedBy = 'type+order';
+      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking (paired by ${_pairedBy})`);
     });
     if (!bookedCondition) return;
     if (_pairKind === 'order' && (condition.validFrom || condition.validUntil || bookedCondition.validFrom || bookedCondition.validUntil)) {
@@ -284,7 +287,7 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
         );
       });
       const scenarioType = bru.getEnvVar("scenarioType");
-      if (scenarioType && scenarioType.includes(condType)) {
+      if (scenarioType?.includes(condType)) {
         bru.setEnvVar(`afterSaleCondition_${condType}_amount`,   condition.afterSaleFee.amount);
         bru.setEnvVar(`afterSaleCondition_${condType}_currency`, condition.afterSaleFee.currency);
         bru.setEnvVar(`afterSaleCondition_${condType}_scale`,    condition.afterSaleFee.scale);
@@ -304,7 +307,7 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
 // change → a NEW finding, registered normally. Keys live in
 // __bookingFindingKeys (reset per scenario via the parser delete-list).
 function isCreateBookingStep() {
-  try { return ((req && req.getName && req.getName()) || "") === "02. POST Create Booking"; } catch (_e) { return false; }
+  try { return ((req?.getName?.()) || "") === "02. POST Create Booking"; } catch (_e) { return false; }
 }
 function recordFindingOnce(key, registerFailingTest, rereadNote) {
   let seen = [];
@@ -353,14 +356,14 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
   const _bookedPtPool = Array.isArray(bookedPart.appliedPassengerTypes) ? bookedPart.appliedPassengerTypes.slice() : [];
   const _bookedPtAll  = Array.isArray(bookedPart.appliedPassengerTypes) ? bookedPart.appliedPassengerTypes : [];
   let _ptReuseWarned = false;
-  const _distinctBookedRefs = new Set(_bookedPtAll.map(pt => pt && pt.passengerRef).filter(Boolean));
+  const _distinctBookedRefs = new Set(_bookedPtAll.map(pt => pt?.passengerRef).filter(Boolean));
   if (_bookedPtAll.length > 1 && _distinctBookedRefs.size < _bookedPtAll.length) {
     validationLogger(`[WARNING] ${partType}[${index}] appliedPassengerTypes: only ${_distinctBookedRefs.size} distinct passengerRef(s) across ${_bookedPtAll.length} booking entries — passengers share references, so per-passenger entitlements cannot be told apart.`);
   }
   part.appliedPassengerTypes.forEach((passengerType, ptIndex) => {
     validationLogger(`[DEBUG] Validating ${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type}`);
     let _matchKind = 'ref';
-    let _poolIdx = _bookedPtPool.findIndex(pt => pt && pt.passengerRef != null && pt.passengerRef === passengerType.passengerRef);
+    let _poolIdx = _bookedPtPool.findIndex(pt => pt?.passengerRef != null && pt.passengerRef === passengerType.passengerRef);
     if (_poolIdx === -1) {
       _matchKind = 'type';
       _poolIdx = _bookedPtPool.findIndex(pt => pt && pt.type === passengerType.type);
@@ -672,11 +675,12 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   let selAcc = null;
   try { const raw = bru.getEnvVar("selectedAccommodation"); selAcc = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { selAcc = null; }
   const reservationId = bru.getEnvVar("reservationId");
+  const offeredSubType = selAcc?.accommodationSubType ? '/' + selAcc.accommodationSubType : '';
   const offeredLabel = selAcc
-    ? `${selAcc.accommodationType}${selAcc.accommodationSubType ? '/' + selAcc.accommodationSubType : ''}`
+    ? `${selAcc.accommodationType}${offeredSubType}`
     : String(requested);
 
-  const bookedRes = (bookedOffers || []).flatMap(b => (b && b.reservations) || []).filter(Boolean);
+  const bookedRes = (bookedOffers || []).flatMap(b => (b?.reservations) || []).filter(Boolean);
   // #396: locate the booked reservation by id; if the provider didn't echo it,
   // fall back to the requested accommodation type, and only then to the first
   // reservation — warning when that last fallback is ambiguous (>1 reservation).
@@ -684,7 +688,7 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   // reservation, which can green-light the wrong compartment in a multi-
   // reservation booking.
   let target = bookedRes.find(r => r.id === reservationId) || null;
-  if (!target && selAcc && selAcc.accommodationType) {
+  if (!target && selAcc?.accommodationType) {
     const _want = String(selAcc.accommodationType).toUpperCase();
     target = bookedRes.find(r => r.placeAllocation
       && String(r.placeAllocation.accommodationType || '').toUpperCase() === _want) || null;
@@ -692,7 +696,7 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   if (!target) {
     target = bookedRes[0] || null;
     if (target && bookedRes.length > 1) {
-      validationLogger(`[WARNING] 🎯 Accommodation goal: the booked reservation could not be located by id (${reservationId || 'n/a'}) or by accommodation type (${selAcc && selAcc.accommodationType ? selAcc.accommodationType : 'n/a'}) among ${bookedRes.length} reservations — validating against the first; the 🎯 verdict may target the wrong reservation part.`);
+      validationLogger(`[WARNING] 🎯 Accommodation goal: the booked reservation could not be located by id (${reservationId || 'n/a'}) or by accommodation type (${selAcc?.accommodationType ? selAcc.accommodationType : 'n/a'}) among ${bookedRes.length} reservations — validating against the first; the 🎯 verdict may target the wrong reservation part.`);
     }
   }
 
@@ -713,7 +717,7 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
       throw new Error(`Requested ${requested} but the booking allocated '${got || '(none)'}' — the provider changed the accommodation family.`);
     }
   });
-  if (selAcc && selAcc.accommodationSubType && alloc.accommodationSubType) {
+  if (selAcc?.accommodationSubType && alloc.accommodationSubType) {
     test(`🎯 placeAllocation.accommodationSubType matches the offered compartment (${selAcc.accommodationSubType})`, () => {
       if (String(alloc.accommodationSubType) !== String(selAcc.accommodationSubType)) {
         throw new Error(`The offer advertised ${selAcc.accommodationSubType}, the booking allocated ${alloc.accommodationSubType} — the allocation does not match the selected compartment.`);
@@ -740,8 +744,8 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   const _resPlaces = Array.isArray(alloc.reservedPlaces) ? alloc.reservedPlaces : [];
   const _placeLabel = (p) => {
     if (!p || typeof p !== 'object') return '?';
-    const _coach = p.coachNumber != null ? p.coachNumber : (p.coach != null ? p.coach : null);
-    const _num   = p.placeNumber != null ? p.placeNumber : (p.number != null ? p.number : (p.place != null ? p.place : null));
+    const _coach = p.coachNumber ?? p.coach ?? null;
+    const _num   = p.placeNumber ?? p.number ?? p.place ?? null;
     if (_coach != null && _num != null) return `coach ${_coach} place ${_num}`;
     if (_num != null) return `place ${_num}`;
     return JSON.stringify(p).slice(0, 40);
@@ -784,8 +788,9 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   // placeProperties, so this only runs (and only WARNS, never fails) when
   // both sides actually carry a value to compare.
   if (selAcc && Array.isArray(selAcc.placeProperties) && selAcc.placeProperties.length > 0) {
-    const _bookedProps = Array.isArray(alloc.placeProperties) ? alloc.placeProperties
-      : (Array.isArray(_resPlaces[0]?.placeProperties) ? _resPlaces[0].placeProperties : null);
+    let _bookedProps = null;
+    if (Array.isArray(alloc.placeProperties)) _bookedProps = alloc.placeProperties;
+    else if (Array.isArray(_resPlaces[0]?.placeProperties)) _bookedProps = _resPlaces[0].placeProperties;
     if (Array.isArray(_bookedProps)) {
       const _requestedSet = selAcc.placeProperties;
       const _matches = _requestedSet.some(p => _bookedProps.includes(p));
@@ -874,12 +879,13 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // externalRef OSCAR sent (and the provider echoes back); fall back to booking
   // order when refs are unavailable so unaffected providers behave exactly as before.
   (booking.passengers || []).forEach((passenger, i) => {
-    if (!passenger || !passenger.id) validationLogger(`[WARNING] Passenger at index ${i} has no ID.`);
+    if (!passenger?.id) validationLogger(`[WARNING] Passenger at index ${i} has no ID.`);
   });
   let _submittedRefs = [];
   try {
     const _raw = bru.getEnvVar("bookingPassengerReferences");
-    _submittedRefs = _raw ? (Array.isArray(_raw) ? _raw : JSON.parse(_raw)) : [];
+    if (Array.isArray(_raw)) _submittedRefs = _raw;
+    else if (_raw) _submittedRefs = JSON.parse(_raw);
   } catch { _submittedRefs = []; }
   const _align = alignPassengerIdsToSubmittedOrder(booking.passengers, _submittedRefs);
   const passengerIdList = _align.ids;
@@ -910,9 +916,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // Each fallback emits a `[WARNING]` documenting the vendor deviation so the
   // tester can see in the report which shape was used.
   let _confirmDeadline = booking.confirmationTimeLimit || booking.confirmableUntil || null;
-  let _confirmSource   = booking.confirmationTimeLimit
-    ? 'booking.confirmationTimeLimit (OSDM-standard)'
-    : (booking.confirmableUntil ? 'booking.confirmableUntil (vendor extension at booking level)' : null);
+  let _confirmSource   = null;
+  if (booking.confirmationTimeLimit) _confirmSource = 'booking.confirmationTimeLimit (OSDM-standard)';
+  else if (booking.confirmableUntil) _confirmSource = 'booking.confirmableUntil (vendor extension at booking level)';
 
   // Fallback 3 — dig into bookingParts and pick the earliest confirmableUntil.
   if (!_confirmDeadline) {
@@ -922,9 +928,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       for (const pt of ['admissions', 'reservations', 'ancillaries']) {
         const parts = Array.isArray(bo[pt]) ? bo[pt] : [];
         for (const p of parts) {
-          if (p && p.confirmableUntil) {
+          if (p?.confirmableUntil) {
             const t = new Date(p.confirmableUntil).getTime();
-            if (!isNaN(t)) _partDeadlines.push({ ts: t, raw: p.confirmableUntil, pt });
+            if (!Number.isNaN(t)) _partDeadlines.push({ ts: t, raw: p.confirmableUntil, pt });
           }
         }
       }
@@ -951,7 +957,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     // until just past it before attempting confirmation.
     bru.setEnvVar('bookingConfirmationTimeLimit', String(_confirmDeadline));
     test(`booking confirmation deadline is a valid future datetime — source: ${_confirmSource}`, () => {
-      expect(isNaN(confirmLimit.getTime()), `confirmation deadline is not a valid date`).to.be.false;
+      expect(Number.isNaN(confirmLimit.getTime()), `confirmation deadline is not a valid date`).to.be.false;
       expect(confirmLimit.getTime()).to.be.above(Date.now(),
         `confirmation deadline is already in the past: ${_confirmDeadline}`);
       validationLogger(`[DEBUG] booking confirmation deadline: ${_confirmDeadline} (source: ${_confirmSource})`);
@@ -1012,22 +1018,22 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       assert: (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; }),
       log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
     });
-    if (out.provided.length || (out.probeTargets && out.probeTargets.length)) {
+    if (out.provided.length || (out.probeTargets?.length)) {
       bru.setEnvVar('passengerAdditionalData', JSON.stringify(out.additional));
       if (String(bru.getEnvVar('skipPatchPassengerRequest')) === 'true') {
         bru.setEnvVar('skipPatchPassengerRequest', 'false');
       }
     }
-    if (out.probeTargets && out.probeTargets.length) {
+    if (out.probeTargets?.length) {
       const _existing = _read('requestedInfoProbeTargets');
       bru.setEnvVar('requestedInfoProbeTargets', JSON.stringify(_existing.concat(out.probeTargets)));
     }
     // Persist the purchaser channel for the Booking Purchaser step (#258/#203).
-    if ((out.purchaserProvided && out.purchaserProvided.length)
-        || (out.purchaserProbeTargets && out.purchaserProbeTargets.length)) {
+    if ((out.purchaserProvided?.length)
+        || (out.purchaserProbeTargets?.length)) {
       bru.setEnvVar('purchaserAdditionalData', JSON.stringify(out.purchaserAdditional || {}));
     }
-    if (out.purchaserProbeTargets && out.purchaserProbeTargets.length) {
+    if (out.purchaserProbeTargets?.length) {
       bru.setEnvVar('requestedInfoPurchaserProbeTargets', JSON.stringify(out.purchaserProbeTargets));
     }
 
@@ -1324,7 +1330,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
 
     // D4: createdOn must always be a valid ISO datetime (OSDM: Fulfillment.createdOn required)
     const createdOnDate = new Date(fulfillment.createdOn);
-    if (!isNaN(createdOnDate.getTime())) {
+    if (!Number.isNaN(createdOnDate.getTime())) {
       // The provider's clock and OSCAR's are not the same clock: a fulfillment
       // created a few milliseconds "in the future" is not a defect.
       test(`Fulfillment[${idx}] createdOn is a valid datetime at or before now (clock tolerance ${CLOCK_TOLERANCE_MS / 1000} s)`, () => {
@@ -1464,7 +1470,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       if (_hasSiblingDocs) {
         const _docIds = new Set(
           siblingDocs
-            .filter(d => d != null && d.id != null)
+            .filter(d => d?.id != null)
             .map(d => String(d.id))
         );
         const _unresolved = fulfillment.fulfillmentDocumentRefs.filter(r => !_docIds.has(String(r)));
@@ -1505,5 +1511,5 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

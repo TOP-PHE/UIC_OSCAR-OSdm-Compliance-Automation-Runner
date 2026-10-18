@@ -59,7 +59,7 @@ function planExpiredFlow(opts) {
   }
   const nowMs   = Date.now();
   const limitMs = new Date(deadlineRaw).getTime();
-  if (isNaN(limitMs)) {
+  if (Number.isNaN(limitMs)) {
     return { armed: false, waitMs: 0, budgetSource: '', reason: `${resourceLabel} deadline '${deadlineRaw}' is not a valid date — skipping the expiry assertion.` };
   }
   const wakeAtMs = limitMs + BUFFER_MS;
@@ -69,12 +69,12 @@ function planExpiredFlow(opts) {
   }
 
   // Budget: per-scenario Max wait → server runHardDeadlineMs → conservative 8 min.
-  const hardDeadlineMs         = parseInt(bru.getEnvVar('runHardDeadlineMs') || '0', 10) || 0;
+  const hardDeadlineMs         = Number.parseInt(bru.getEnvVar('runHardDeadlineMs') || '0', 10) || 0;
   const perScenarioBudgetEndMs = maxWaitMinutes > 0 ? (nowMs + maxWaitMinutes * 60 * 1000) : 0;
   const budgetEndMs            = perScenarioBudgetEndMs || hardDeadlineMs || (nowMs + 480000);
-  const budgetSource           = perScenarioBudgetEndMs
-    ? `scenario maxWaitMinutes=${maxWaitMinutes}`
-    : (hardDeadlineMs ? 'server RUN_TIMEOUT_MS' : 'conservative 8-min fallback');
+  let budgetSource             = 'conservative 8-min fallback';
+  if (perScenarioBudgetEndMs) budgetSource = `scenario maxWaitMinutes=${maxWaitMinutes}`;
+  else if (hardDeadlineMs) budgetSource = 'server RUN_TIMEOUT_MS';
 
   if ((wakeAtMs + POST_MARGIN_MS) > budgetEndMs) {
     const needS   = Math.ceil((wakeAtMs + POST_MARGIN_MS - nowMs) / 1000);
@@ -102,17 +102,18 @@ async function runExpiredFlowWait(opts) {
   const scenarioLabel = String(opts.scenarioLabel || 'expired-flow test');
   const deadlineRaw   = opts.deadlineRaw;
 
+  const deadlineNote = deadlineRaw ? ` (${deadlineRaw})` : '';
   if (plan.waitMs > 0) {
-    validationLogger(`[INFO] ${scenarioLabel}: waiting ~${Math.ceil(plan.waitMs/1000)}s until just past the deadline${deadlineRaw ? ` (${deadlineRaw})` : ''} before firing the request... (budget source: ${plan.budgetSource})`);
+    validationLogger(`[INFO] ${scenarioLabel}: waiting ~${Math.ceil(plan.waitMs/1000)}s until just past the deadline${deadlineNote} before firing the request... (budget source: ${plan.budgetSource})`);
     await new Promise(function (r) { setTimeout(r, plan.waitMs); });
     validationLogger(`[INFO] ${scenarioLabel}: wait complete — refreshing access token before firing the request.`);
   } else {
-    validationLogger(`[INFO] ${scenarioLabel}: deadline already passed${deadlineRaw ? ` (${deadlineRaw})` : ''} — firing request now, expecting rejection.`);
+    validationLogger(`[INFO] ${scenarioLabel}: deadline already passed${deadlineNote} — firing request now, expecting rejection.`);
   }
   try {
     await refreshAccessTokenIfNeeded({ force: true, callerLabel: scenarioLabel });
   } catch (e) {
-    const msg = (e && e.message) ? e.message : String(e);
+    const msg = (e?.message) ? e.message : String(e);
     validationLogger(`[WARNING] ${scenarioLabel}: token-refresh helper threw (${msg}) — request will use the original (possibly expired) token. If the provider 401/403s, that's why.`);
   }
 }
@@ -333,7 +334,7 @@ function advanceExpiredFlowQueueOrFinish(opts) {
   let queue = [];
   try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
   catch (_e) { queue = []; }
-  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  const idx = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
 
   if (queue.length === 0 || idx >= queue.length - 1) {
     // Last (or only) timer just ran. Reset the armed-flags so the next
@@ -377,7 +378,7 @@ function nhfTestPrefix() {
   try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
   catch (_e) { queue = []; }
   if (queue.length <= 1) return '';
-  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  const idx = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
   const cur = queue[idx];
   if (!cur) return '';
   const baseCode = String(bru.getEnvVar('scenarioCode') || '').replace(/^NHF_/, '');
@@ -406,13 +407,13 @@ function advanceExpiredFlowQueueAfterSkip() {
   let queue = [];
   try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
   catch (_e) { queue = []; }
-  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  const idx = Number.parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
   if (queue.length === 0 || idx >= queue.length) return false;
 
   const cur = queue[idx];
   const armedKey = '__' + String(cur.flag || '').replace(/Test$/, 'Armed');
   const armedVal = String(bru.getEnvVar(armedKey));
-  const skips = parseInt(bru.getEnvVar('__expiredFlowSkipCount') || '0', 10) || 0;
+  const skips = Number.parseInt(bru.getEnvVar('__expiredFlowSkipCount') || '0', 10) || 0;
 
   if (armedVal === 'true') {
     // The (last) sub-run armed and graded — its own expired branch already
@@ -492,5 +493,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] expiredFlow globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] expiredFlow globalThis exposure skipped: ' + (e?.message));
 }

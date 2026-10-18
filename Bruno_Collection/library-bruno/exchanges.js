@@ -53,7 +53,7 @@ function postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus) {
   // `preBookableUntil` for the same semantic. The env-var name mirrors the
   // spec literal so the deviation stays discoverable.
   const _firstExchangeOffer = jsonData.exchangeOffers[0];
-  if (_firstExchangeOffer && _firstExchangeOffer.preBookableUntil) {
+  if (_firstExchangeOffer?.preBookableUntil) {
     bru.setEnvVar("exchangeOfferPreBookableUntil", String(_firstExchangeOffer.preBookableUntil));
     bru.setEnvVar("exchangeOfferPreBookableUntilSource", "exchangeOffers[0].preBookableUntil");
     validationLogger(`[INFO] Captured exchangeOffer preBookableUntil = ${_firstExchangeOffer.preBookableUntil}`);
@@ -124,7 +124,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   const _pbu = new Date(exchangeOffer.preBookableUntil);
   test(`Exchange offer[${index}].preBookableUntil is a valid future datetime (OSDM: required)`, () => {
     expect(exchangeOffer.preBookableUntil, 'preBookableUntil is required').to.be.a('string');
-    expect(isNaN(_pbu.getTime()), `preBookableUntil is not a valid date: ${exchangeOffer.preBookableUntil}`).to.be.false;
+    expect(Number.isNaN(_pbu.getTime()), `preBookableUntil is not a valid date: ${exchangeOffer.preBookableUntil}`).to.be.false;
     expect(_pbu.getTime()).to.be.above(Date.now(),
       `preBookableUntil is in the past: ${exchangeOffer.preBookableUntil}`);
   });
@@ -216,7 +216,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
       ...(exchangeOffer.admissionOfferParts || []).map(part => part.id),
       ...(exchangeOffer.reservationOfferParts || []).map(part => part.id),
       ...(exchangeOffer.ancillaryOfferParts || []).map(part => part.id)
-    ].filter(id => id);
+    ].filter(Boolean);
 
     admissionReservationAncillaryBookingPartsIds.push(...allPartIds);
     bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", admissionReservationAncillaryBookingPartsIds);
@@ -245,7 +245,7 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
   // the ACTIVE window's fee per value-bearing part, and the check is DECODE-SAFE
   // (hard-asserts only when every value-bearing part has a decodable active
   // EXCHANGE schedule and one currency; otherwise INFO + skip, no false fail).
-  const exchangeFee = exchangeOffer && exchangeOffer.exchangeFee;
+  const exchangeFee = exchangeOffer?.exchangeFee;
   if (!exchangeFee || typeof exchangeFee.amount !== 'number') {
     validationLogger("[DEBUG] Exchange offer carries no numeric exchangeFee \u2014 nothing to verify against the schedule.");
     return;
@@ -261,10 +261,11 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
   }
 
   const { expectedRefundForParts } = require("./afterSalesRules.js");
-  const parts = []
-    .concat(exchangeOffer.admissionOfferParts || [])
-    .concat(exchangeOffer.reservationOfferParts || [])
-    .concat(exchangeOffer.ancillaryOfferParts || []);
+  const parts = [
+    exchangeOffer.admissionOfferParts || [],
+    exchangeOffer.reservationOfferParts || [],
+    exchangeOffer.ancillaryOfferParts || [],
+  ].flat();
 
   // expectedRefundForParts threads the action through effectiveRefundability;
   // its .expectedFee is the sum of the active-window fee over value-bearing parts
@@ -363,5 +364,5 @@ function checkBookingAroundExchange(jsonData, stage) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

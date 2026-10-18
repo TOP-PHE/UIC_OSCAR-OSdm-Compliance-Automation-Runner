@@ -95,9 +95,9 @@ function tokenize(s) {
     if (c === '(') { tokens.push({ t: '(' }); i++; continue; }
     if (c === ')') { tokens.push({ t: ')' }); i++; continue; }
     if (c === '.') { tokens.push({ t: '.' }); i++; continue; }
-    if (/[0-9]/.test(c)) {
+    if (/\d/.test(c)) {
       let j = i;
-      while (j < s.length && /[0-9]/.test(s[j])) j++;
+      while (j < s.length && /\d/.test(s[j])) j++;
       tokens.push({ t: 'num', v: s.slice(i, j) });
       i = j;
       continue;
@@ -140,7 +140,7 @@ function parseExpression(tokens) {
     if (t.t === '(') {
       next();
       const e = parseOr();
-      if (!peek() || peek().t !== ')') throw new Error("Expected ')'");
+      if (peek()?.t !== ')') throw new Error("Expected ')'");
       next();
       return e;
     }
@@ -162,7 +162,7 @@ function parseExpression(tokens) {
   }
   function parseLeaf() {
     const root = next();
-    if (!root || root.t !== 'word') throw new Error('Expected an attribute name');
+    if (root?.t !== 'word') throw new Error('Expected an attribute name');
     const up = root.v.toUpperCase();
     if (up === 'AND' || up === 'OR') throw new Error(`Unexpected operator '${root.v}'`);
     // The purchaser is one object, not a list: `purchaser.detail.contact.email`
@@ -171,10 +171,10 @@ function parseExpression(tokens) {
     const unindexed = rootKind(root.v) === 'purchaser' && peek()?.t === '.';
     const index = unindexed ? 0 : parseIndex(root.v);
     const path = [];
-    while (peek() && peek().t === '.') {
+    while (peek()?.t === '.') {
       next(); // .
       const a = next();
-      if (!a || a.t !== 'word') throw new Error("Expected an attribute name after '.'");
+      if (a?.t !== 'word') throw new Error("Expected an attribute name after '.'");
       path.push(a.v);
     }
     if (path.length === 0) throw new Error('Expected at least one attribute after the index');
@@ -200,7 +200,7 @@ function parseRequestedInformation(expr) {
     const ast = parseExpression(tokens);
     return { ok: true, ast, error: null };
   } catch (e) {
-    return { ok: false, ast: null, error: e && e.message ? e.message : String(e) };
+    return { ok: false, ast: null, error: e?.message ? e.message : String(e) };
   }
 }
 
@@ -315,7 +315,7 @@ function evalNode(node, model) {
     // #258: the purchaser is a SINGLE object (not a collection); the index is
     // immaterial — `purchaser[0]` / `purchaser[ANY]` both mean "the purchaser".
     if (rootKind(node.root) === 'purchaser') {
-      const subject = model && model.purchaser;
+      const subject = model?.purchaser;
       return leafSatisfiedFor(subject, node)
         ? { satisfied: true, unmet: [] }
         : { satisfied: false, unmet: [{ leaf: node, index: node.index }] };
@@ -449,6 +449,17 @@ const KNOWN_LAST_SEGMENTS = new Set(Object.keys(SCENARIO_FIELDS));
  * @param {number} [passengerCount] number of passengers in the request (for index range)
  * @returns {{ indexErrors:Array, unknownPaths:string[] }}
  */
+// How a check message names an out-of-range index and an unmet attribute.
+/** @returns {string} */
+function indexErrorText(e) {
+  return `[${e.index}] >= ${e.passengerCount}`;
+}
+
+/** @returns {string} */
+function unmetText(u) {
+  return `${u.scenarioField}@${u.passengerRef}`;
+}
+
 function staticIssues(ast, passengerCount) {
   const leaves = ast ? collectLeaves(ast) : [];
   const indexErrors = [];
@@ -510,7 +521,7 @@ function sampleValueForField(scenarioField, index, passengerType) {
  * @returns {{ additional:Array, provided:Array }}
  */
 function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
-  const additional = Array.isArray(additionalArr) ? additionalArr.map((x) => Object.assign({}, x)) : [];
+  const additional = Array.isArray(additionalArr) ? additionalArr.map((x) => ({ ...x })) : [];
   const specs = Array.isArray(specsArr) ? specsArr : [];
   const provided = [];
   (unmetLeaves || []).forEach((u) => {
@@ -520,7 +531,7 @@ function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
     while (additional.length <= u.index) additional.push({});
     const entry = additional[u.index];
     if (isSet(entry[updateKey])) return;          // keep tester-provided values
-    const passengerType = (specs[u.index] && specs[u.index].type) || entry.type || null;
+    const passengerType = (specs[u.index]?.type) || entry.type || null;
     const value = sampleValueForField(u.scenarioField, u.index, passengerType);
     if (value === null) return;
     entry[updateKey] = value;
@@ -540,13 +551,13 @@ function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
  */
 function applyPurchaserAutoFeed(purchaserAdditional, unmetLeaves, purchaserSpec) {
   const out = (purchaserAdditional && typeof purchaserAdditional === 'object')
-    ? Object.assign({}, purchaserAdditional) : {};
+    ? { ...purchaserAdditional } : {};
   const provided = [];
   (unmetLeaves || []).forEach((u) => {
     const updateKey = AUTO_FEED_UPDATE_KEYS[u.scenarioField];
     if (!updateKey) return;               // unmappable (taxId/companyDetails) → can't PATCH
     if (isSet(out[updateKey])) return;    // keep scenario/tester-provided values
-    const type = (purchaserSpec && purchaserSpec.type) || out.type || null;
+    const type = (purchaserSpec?.type) || out.type || null;
     const value = sampleValueForField(u.scenarioField, 0, type);
     if (value === null) return;
     out[updateKey] = value;
@@ -605,9 +616,9 @@ function processRequestedInformation(o) {
   // Only 'omit'/'invalid' are negative probes; anything else (inline/deferred/
   // undefined) means "satisfy it" → autofeed.
   const purMode = (o.purchaserMode === 'omit' || o.purchaserMode === 'invalid') ? o.purchaserMode : 'autofeed';
-  let additional = Array.isArray(o.additional) ? o.additional.map((x) => Object.assign({}, x)) : [];
+  let additional = Array.isArray(o.additional) ? o.additional.map((x) => ({ ...x })) : [];
   let purchaserAdditional = (o.purchaserAdditional && typeof o.purchaserAdditional === 'object')
-    ? Object.assign({}, o.purchaserAdditional) : {};
+    ? { ...o.purchaserAdditional } : {};
   const purchaserSpec = o.purchaserSpec || null;
 
   const provided = [];
@@ -633,7 +644,7 @@ function processRequestedInformation(o) {
   const issues = staticIssues(s.ast, passengerCount);
   assert(`${tag}.requestedInformation passenger indices are in range`,
     issues.indexErrors.length === 0,
-    `out-of-range index(es): ${issues.indexErrors.map((e) => `[${e.index}] >= ${e.passengerCount}`).join(', ')}`);
+    `out-of-range index(es): ${issues.indexErrors.map((e) => indexErrorText(e)).join(', ')}`);
   if (issues.unknownPaths.length) {
     log('WARNING', `${tag}.requestedInformation references attribute(s) OSCAR does not recognise: ${[...new Set(issues.unknownPaths)].join(', ')}`);
   }
@@ -682,7 +693,7 @@ function processRequestedInformation(o) {
         const mappableRemaining = unmet.filter((u) => u.scenarioField);
         assert(`${tag}.requestedInformation is satisfiable from OSCAR scenario fields (auto-fed)`,
           mappableRemaining.length === 0,
-          `still unmet after auto-feed: ${mappableRemaining.map((u) => `${u.scenarioField}@${u.passengerRef}`).join(', ')}`);
+          `still unmet after auto-feed: ${mappableRemaining.map(unmetText).join(', ')}`);
         unmet.filter((u) => !u.scenarioField).forEach((u) => {
           log('WARNING', `${tag}: cannot auto-provide '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR) — booking/confirmation may be rejected.`);
         });
@@ -848,11 +859,12 @@ function validateProblemResponse(o) {
     const fields = [...new Set(tgs.map((t) => t.scenarioField).filter(Boolean))];
     const blob = isObj ? JSON.stringify(body).toLowerCase() : '';
     const hasPointers = isObj && Array.isArray(body.pointers) && body.pointers.length > 0;
-    const namesField = fields.length > 0 && fields.some((f) => blob.includes(f.toLowerCase()));
+    const namesField = fields.some((f) => blob.includes(f.toLowerCase()));
     if (hasPointers || namesField) {
       log('INFO', `${pfx}: error identifies the offending field.`);
     } else {
-      log('WARNING', `${pfx}: error does not clearly identify the offending field${fields.length ? ` (${fields.join('/')})` : ''} via Problem.pointers — recommended per RFC 9457.`);
+      const fieldsNote = fields.length ? ` (${fields.join('/')})` : '';
+      log('WARNING', `${pfx}: error does not clearly identify the offending field${fieldsNote} via Problem.pointers — recommended per RFC 9457.`);
     }
   } else {
     log(soft ? 'INFO' : 'WARNING',
@@ -885,5 +897,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

@@ -249,8 +249,9 @@ var AlightSpecification = class {
 };
 
 var StopPlaceRef = class {
+  objectType = "StopPlaceRef";
+
   constructor(stopPlaceRef) {
-    this.objectType = "StopPlaceRef";
     this.stopPlaceRef = stopPlaceRef;
   }
 };
@@ -346,5 +347,5 @@ module.exports = exported;
 try {
   Object.assign(globalThis, exported);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

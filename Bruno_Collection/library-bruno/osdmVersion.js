@@ -136,7 +136,7 @@ const ENDPOINT_MIN_VERSION = {
 };
 
 function endpointMinVersion(endpoint) {
-  return Object.prototype.hasOwnProperty.call(ENDPOINT_MIN_VERSION, endpoint)
+  return Object.hasOwn(ENDPOINT_MIN_VERSION, endpoint)
     ? ENDPOINT_MIN_VERSION[endpoint]
     : null;
 }
@@ -168,5 +168,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

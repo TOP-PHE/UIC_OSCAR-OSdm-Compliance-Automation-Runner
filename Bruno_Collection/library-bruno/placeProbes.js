@@ -99,8 +99,8 @@ function placeProbeCurrent() {
     return null;
   }
 
-  let idx = parseInt(bru.getEnvVar('__placeProbeIndex') || '0', 10);
-  if (isNaN(idx) || idx < 0) idx = 0;
+  let idx = Number.parseInt(bru.getEnvVar('__placeProbeIndex') || '0', 10);
+  if (Number.isNaN(idx) || idx < 0) idx = 0;
   if (idx >= probes.length) return null; // sweep complete → clean pass
   return { def: probes[idx], index: idx, total: probes.length };
 }
@@ -155,7 +155,7 @@ function applyPlaceProbeCorruption(body) {
 function gradePlaceProbeResponse(res) {
   let target = null;
   try { target = JSON.parse(bru.getEnvVar('placeProbeTarget') || 'null'); } catch (_e) { target = null; }
-  if (!target || !target.key) return 'off';
+  if (!target?.key) return 'off';
   bru.setEnvVar('placeProbeTarget', ''); // consume — one grade per probe request
 
   const status = res.getStatus();
@@ -208,11 +208,12 @@ function gradePlaceProbeResponse(res) {
   // and let 02 process this response as the run's booking.
   bru.setEnvVar('__placeProbeIndex', String(target.total));
   const booking = (body && typeof body === 'object') ? body.booking : null;
-  const bookingId = (booking && booking.id) ? booking.id : null;
+  const bookingId = (booking?.id) ? booking.id : null;
+  const bookingNote = bookingId ? ` (${bookingId})` : '';
   const allocations = [];
-  ((booking && booking.bookedOffers) || []).forEach((bo) => {
-    ((bo && bo.reservations) || []).forEach((rsv) => {
-      if (rsv && rsv.placeAllocation) allocations.push(rsv.placeAllocation);
+  ((booking?.bookedOffers) || []).forEach((bo) => {
+    ((bo?.reservations) || []).forEach((rsv) => {
+      if (rsv?.placeAllocation) allocations.push(rsv.placeAllocation);
     });
   });
 
@@ -224,7 +225,7 @@ function gradePlaceProbeResponse(res) {
         + `${a.accommodationType || '?'}/${a.accommodationSubType || '?'} — spec-valid, but the customer never stated the compartment. Vendor-capability note.`);
     } else {
       test(`${probeName}: a reservation booking with NO compartment stated and NO allocation made must not be accepted`, () => {
-        throw new Error(`HTTP ${status} accepted the booking${bookingId ? ` (${bookingId})` : ''} without placeSelections AND the booked reservation `
+        throw new Error(`HTTP ${status} accepted the booking${bookingNote} without placeSelections AND the booked reservation `
           + 'carries no placeAllocation — the booking is ambiguous: nobody knows which compartment/place was sold.');
       });
     }
@@ -247,13 +248,13 @@ function gradePlaceProbeResponse(res) {
     }
   } else if (target.key === 'wrongReservationId') {
     test(`${probeName}: a placeSelection whose reservationId exists in no offer part must be rejected`, () => {
-      throw new Error(`HTTP ${status} accepted the booking${bookingId ? ` (${bookingId})` : ''} although placeSelections[0].reservationId='${FAKE_RESERVATION_ID}' `
+      throw new Error(`HTTP ${status} accepted the booking${bookingNote} although placeSelections[0].reservationId='${FAKE_RESERVATION_ID}' `
         + 'matches NO reservation offer part of the selected offer — referential-integrity violation.');
     });
   }
 
   validationLogger(`[WARNING] 🧪 Place-selection probe sweep STOPPED at probe ${target.index + 1}/${target.total} — the corrupted request was `
-    + `accepted and created a real booking${bookingId ? ` (${bookingId})` : ''}. Remaining probes are skipped; the run continues with this booking.`);
+    + `accepted and created a real booking${bookingNote}. Remaining probes are skipped; the run continues with this booking.`);
   return 'accepted-continue';
 }
 
@@ -271,5 +272,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

@@ -42,7 +42,7 @@ module.exports = {
 // Returns a NEW object and never mutates the input; only the two PAXONE-required
 // keys are filled — any criteria the scenario DID set are preserved untouched.
 function withPaxoneOfferSearchCriteriaDefaults(osc) {
-  const out = (osc && typeof osc === 'object' && !Array.isArray(osc)) ? Object.assign({}, osc) : {};
+  const out = (osc && typeof osc === 'object' && !Array.isArray(osc)) ? { ...osc } : {};
   if (out.currency == null || out.currency === '') {
     out.currency = bru.getEnvVar('offerSearchCriteriaCurrency') || 'EUR';
   }
@@ -223,8 +223,7 @@ function buildBookingRequest() {
       offers.push({ offerId: inboundOfferId, passengerRefs });
       validationLogger(`[INFO] 🔁 Return booking (separate) — inbound only (${inboundOfferId}).`);
     } else {
-      offers.push(outboundOffer);
-      offers.push({ offerId: inboundOfferId, passengerRefs });
+      offers.push(outboundOffer, { offerId: inboundOfferId, passengerRefs });
       validationLogger(`[INFO] 🔁 Return booking (combined) — outbound (${outboundOfferId}) + inbound (${inboundOfferId}).`);
     }
   } else {
@@ -304,8 +303,8 @@ function buildBookingPurchaserBody() {
     //   firstName / lastName → OMITTED (required in PersonDetail → must reject → FAIL)
     const SWEEP = ["firstName", "lastName", "email", "phoneNumber"];
     bru.setEnvVar("__purchaserSweepTotal", String(SWEEP.length));
-    let idx = parseInt(bru.getEnvVar("__purchaserSweepIndex") || "0", 10);
-    if (isNaN(idx) || idx < 0) idx = 0;
+    let idx = Number.parseInt(bru.getEnvVar("__purchaserSweepIndex") || "0", 10);
+    if (Number.isNaN(idx) || idx < 0) idx = 0;
     if (idx > SWEEP.length - 1) idx = SWEEP.length - 1;
     const field = SWEEP[idx];
 
@@ -355,7 +354,7 @@ function buildBookingPurchaserBody() {
 function collectAvailablePlaces(vehicle, count) {
   const out = [];
   if (!vehicle || typeof vehicle !== "object" || !Array.isArray(vehicle.coaches)) return out;
-  const want = Math.max(1, parseInt(count, 10) || 1);
+  const want = Math.max(1, Number.parseInt(count, 10) || 1);
 
   const isAvailable = (p) => {
     if (!p || typeof p !== "object") return false;
@@ -379,12 +378,12 @@ function collectAvailablePlaces(vehicle, count) {
     const acc = [];
     if (Array.isArray(coach.compartments)) {
       coach.compartments.forEach((c) => {
-        if (Array.isArray(c && c.places)) acc.push(...c.places);
-        else if (c && c.place != null) acc.push(c); // compartment IS a place (legacy stub shape)
+        if (Array.isArray(c?.places)) acc.push(...c.places);
+        else if (c?.place != null) acc.push(c); // compartment IS a place (legacy stub shape)
       });
     }
     if (Array.isArray(coach.decks)) {
-      coach.decks.forEach((d) => { if (Array.isArray(d && d.places)) acc.push(...d.places); });
+      coach.decks.forEach((d) => { if (Array.isArray(d?.places)) acc.push(...d.places); });
     }
     return acc;
   };
@@ -396,8 +395,7 @@ function collectAvailablePlaces(vehicle, count) {
     // is kept only as a fallback for non-spec vendors. Reading the wrong field
     // produced an undefined coachNumber → the booking's SelectedPlace was missing
     // its required coachNumber and the vendor rejected it (#188).
-    const cn = (coach.number != null) ? coach.number
-             : (coach.coachNumber != null ? coach.coachNumber : null);
+    const cn = coach.number ?? coach.coachNumber ?? null;
     const places = placesOf(coach);
     for (let pi = 0; pi < places.length && out.length < want; pi++) {
       const p = places[pi];
@@ -424,7 +422,7 @@ function placesForPassengers(picked, passengerRefs) {
   // SINGULAR. Emitting "passengerRefs" (plural array) — or numeric coach/place —
   // makes the vendor reject the booking with 400 "Invalid request content".
   return refs.map((ref, i) => {
-    const pk = picked[i] || picked[picked.length - 1];
+    const pk = picked[i] || picked.at(-1);
     return {
       coachNumber: String(pk.coachNumber),
       placeNumber: String(pk.placeNumber),
@@ -446,13 +444,15 @@ function assertPlaceSelectionConsistency() {
   if (!offer || typeof offer !== 'object') return;
 
   const parts = offer.reservationOfferParts || [];
-  const partIds = parts.map(pt => pt && pt.id).filter(Boolean);
-  const advertised = parts.flatMap(pt => (pt && pt.availablePlaces) || []).filter(Boolean);
+  const partIds = parts.map(pt => pt?.id).filter(Boolean);
+  const advertised = parts.flatMap(pt => (pt?.availablePlaces) || []).filter(Boolean);
   // Offer coverage pairs — accepts both the flat {tripId, legId} form and the
   // spec's TripCoverage {coveredTripId, coveredLegIds} form (mirror of
   // offers.js offerTripCoverage, kept local to avoid a module dependency).
   const covRaw = offer.tripCoverage;
-  const covArr = Array.isArray(covRaw) ? covRaw : (covRaw ? [covRaw] : []);
+  let covArr = [];
+  if (Array.isArray(covRaw)) covArr = covRaw;
+  else if (covRaw) covArr = [covRaw];
   const coverage = [];
   covArr.forEach(c => {
     if (!c) return;
@@ -462,21 +462,21 @@ function assertPlaceSelectionConsistency() {
 
   const issues = [];
   ps.forEach((sel, i) => {
-    if (sel && sel.reservationId && partIds.length > 0 && !partIds.includes(sel.reservationId)) {
+    if (sel?.reservationId && partIds.length > 0 && !partIds.includes(sel.reservationId)) {
       issues.push(`placeSelections[${i}].reservationId '${sel.reservationId}' is not a reservationOfferPart of the selected offer (parts: ${partIds.join(', ')})`);
     }
-    ((sel && sel.accommodations) || []).forEach((acc, j) => {
-      if (acc && acc.accommodationType && advertised.length > 0
+    ((sel?.accommodations) || []).forEach((acc, j) => {
+      if (acc?.accommodationType && advertised.length > 0
           && !advertised.some(ap => ap.accommodationType === acc.accommodationType)) {
         issues.push(`placeSelections[${i}].accommodations[${j}].accommodationType '${acc.accommodationType}' is not advertised in the offer's availablePlaces`);
       }
-      if (acc && acc.accommodationSubType && advertised.length > 0
+      if (acc?.accommodationSubType
           && advertised.some(ap => ap.accommodationSubType)
           && !advertised.some(ap => ap.accommodationSubType === acc.accommodationSubType)) {
         issues.push(`placeSelections[${i}].accommodations[${j}].accommodationSubType '${acc.accommodationSubType}' is not advertised in the offer's availablePlaces`);
       }
     });
-    if (sel && sel.tripLegCoverage && coverage.length > 0
+    if (sel?.tripLegCoverage && coverage.length > 0
         && !coverage.some(c => c.tripId === sel.tripLegCoverage.tripId && c.legId === sel.tripLegCoverage.legId)) {
       issues.push(`placeSelections[${i}].tripLegCoverage ${sel.tripLegCoverage.tripId}/${sel.tripLegCoverage.legId} is not within the offer's tripCoverage (${coverage.map(c => c.tripId + '/' + c.legId).join(', ')})`);
     }
@@ -504,18 +504,18 @@ function resolvePlaceSelectionReservationId(selectedAccommodation) {
   const envId = bru.getEnvVar("reservationId");
   const offer = parseEnvJson("offer", null);
   const parts = (offer && Array.isArray(offer.reservationOfferParts)) ? offer.reservationOfferParts : [];
-  const partIds = parts.map(p => p && p.id).filter(Boolean);
+  const partIds = parts.map(p => p?.id).filter(Boolean);
   if (partIds.length === 0) return envId;                  // no selected-offer context — leave as-is
   if (envId && partIds.includes(envId)) return envId;       // already a part of the booked offer — trust it
 
-  const accType = selectedAccommodation && selectedAccommodation.accommodationType;
+  const accType = selectedAccommodation?.accommodationType;
   let pick = null;
   if (accType) {
     pick = parts.find(p => Array.isArray(p.availablePlaces)
       && p.availablePlaces.some(pl => pl && pl.accommodationType === accType)) || null;
   }
-  if (!pick) pick = parts.find(p => p && p.id) || null;
-  const newId = pick && pick.id;
+  if (!pick) pick = parts.find(p => p?.id) || null;
+  const newId = pick?.id;
   if (newId && newId !== envId) {
     validationLogger(`[DEBUG] placeSelection reservationId re-derived from the selected offer: '${envId || "(unset)"}' → '${newId}' (the env value was not a reservationOfferPart of the booked offer).`);
   }
@@ -574,7 +574,7 @@ function accommodationAndPlaceSelection() {
   // mandatory-reservation offers (BERTH included), not just the legacy
   // COUCHETTE hardcode.
   const selectedAccommodation = parseEnvJson("selectedAccommodation", null);
-  const hasSelAcc = !!(selectedAccommodation && selectedAccommodation.accommodationType);
+  const hasSelAcc = !!(selectedAccommodation?.accommodationType);
 
   if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true"
       && accommodationSelection !== "COUCHETTE" && !hasPicks && !hasSelAcc) {
@@ -598,9 +598,9 @@ function accommodationAndPlaceSelection() {
     // its real type/subType (e.g. COUCHETTE / COUCHETTE_COMFORT_4). #211:
     // selectedAccommodation may also carry a real placeProperties value
     // (e.g. gender-segregation MEN/LADIES/MIXED) harvested from the offer's
-    // availablePlaces in offers.js — Object.assign below carries it through
+    // availablePlaces in offers.js — the spread below carries it through
     // as-is; nothing here is fabricated.
-    placeSelection.accommodations = [Object.assign({ passengerRefs }, selectedAccommodation)];
+    placeSelection.accommodations = [{ passengerRefs, ...selectedAccommodation }];
   } else if (accommodationSelection === "COUCHETTE") {
     // Legacy fallback for providers whose offers carry no availablePlaces
     // accommodation detail (historical vendor-specific shape).
@@ -672,7 +672,7 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
     // Trim to the scoped fulfillment(s) only; preserve order.
     const wanted = new Set(
       _hasSpec
-        ? refundSpecifications.map(s => s && s.fulfillmentId).filter(Boolean).map(String)
+        ? refundSpecifications.map(s => s?.fulfillmentId).filter(Boolean).map(String)
         : String(_scopeOnly).split(",").filter(Boolean)
     );
     const trimmed = Array.isArray(fulfillmentIds)

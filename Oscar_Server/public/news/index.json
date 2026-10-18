@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-sonar-library",
+    "date": "October 18, 2026",
+    "tag": "Quality",
+    "title": "A tidier test library",
+    "summary": "The collection's shared scripts were cleaned up rule by rule. Runs check and report exactly what they did before.",
+    "content": "377 code-quality findings were cleared in the Bruno library. Nothing a run checks, logs or reports changed: the whole simulator data file was run before and after, and the report pages were compared."
+  },
+  {
     "id": "2026-10-18-ai-finding-drafts",
     "date": "October 18, 2026",
     "tag": "New",

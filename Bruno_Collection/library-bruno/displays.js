@@ -116,7 +116,7 @@ function validationLogger(message) {
     // stores each stdout line as a separate event; untagged continuation
     // lines of a multi-line message fall back to 'info' there, so a [DEBUG]
     // multi-line dump leaked into the tester's INFO view line by line.
-    if (message.indexOf('\n') !== -1) {
+    if (message.includes('\n')) {
       var _tagMatch = message.match(/\[(DEBUG|INFO|WARN|WARNING|ERROR)\]/);
       if (_tagMatch) {
         var _lineTag = '[' + _tagMatch[1] + '] ';
@@ -142,14 +142,14 @@ function validationLogger(message) {
       existing.push({ level: level, message: message });
       bru.setVar('__rptLogs', JSON.stringify(existing));
     } catch (e) {
-      console.log('[DEBUG] [displays] addReportLog skipped: ' + (e && e.message));
+      console.log('[DEBUG] [displays] addReportLog skipped: ' + (e?.message));
     }
   }
 }
 
 function displayOfferResponse(response) {
   try {
-    if (!response || !response.offers || response.offers.length === 0) {
+    if (!response?.offers || response.offers.length === 0) {
       validationLogger("[FULL] Error: No offers found in the response.");
       return;
     }
@@ -497,5 +497,5 @@ function displayFulFilledBooking(response) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e?.message));
 }

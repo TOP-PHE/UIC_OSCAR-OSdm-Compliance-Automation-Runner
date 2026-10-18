@@ -1071,9 +1071,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   server code, is #524 (v1.11.199, merged). PR 2, the "possible defect"
   findings in the UI and the Bruno library, is #525 (v1.11.202 /
   OTST_V2.0.101). PR 3, `public/js/scenarios.js`, is #526 (v1.11.204): 340 of
-  that file's 373 findings. PR 4, the HTML pages, is #527 (v1.11.206). The
+  that file's 373 findings. PR 4, the HTML pages, is #527 (v1.11.206). PR 5,
+  the Bruno library, is #528 (1.11.345 / OTST_V2.0.188): 377 of 426. The
   gate only judges new code, so none of this blocks a release. What they
-  established, for #528 (the Bruno library), which is the one left:
+  established:
+  - **#528's method, for a library rewrite:** plan rewrites from the AST
+    (espree, in `Oscar_Server/node_modules`), not from text. Offsets in
+    Sonar's `textRange` count UTF-16 units: a line with an emoji shifts a
+    Python index. Read every `a && a.b` → `a?.b` whose value is kept or
+    passed on: `null` becomes `undefined`, and `a?.b()` throws where `a` is
+    `''`. Bruno's sandbox has no `structuredClone` (its globals are listed in
+    `@usebruno/js/src/sandbox/node-vm/constants.js`), so S7784 stays. The
+    simulator replay (`record before` from a `git archive` copy of `main`,
+    so the branch can be edited while it runs) is the check for the
+    library. The two HTML report writers have no tests: run old and new
+    on the replay's `runs/*.json` and on random variants of a
+    `.report_tmp.json`, strip the footer's clock, then break each rewritten
+    line to prove the comparison sees it. In `sed`, `&` in the replacement
+    is the match: that garbled the first harness.
   - **The findings are public.** No token is needed:
     `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&branch=main&resolved=false&ps=500`
     (add `&pullRequest=N` instead of `branch` for a PR). Each issue carries an

@@ -62,6 +62,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.345 / collection-OTST_V2.0.188] — 2026-10-18 · Release 2026.380
+
+Issue #528, the last part of the Sonar clean-up (#523). `Bruno_Collection/library-bruno` rewritten rule by rule, with no change in what a run checks or reports. Server unchanged but for the version.
+
+### Changed
+- **377 code smells cleared in the Bruno library**, one rule per commit:
+  - S6582: optional chaining (187);
+  - S7773: `Number.isNaN` / `parseInt` / `parseFloat` / `NaN` (53);
+  - S3358: nested ternaries (50);
+  - S4624: nested template literals (24);
+  - 22 smaller rules (63): endsWith, object spread, one push, default parameters, `flat()`, `String.raw`, `includes()`, `at()`, `\d`, `Object.hasOwn`, a Set, `let`, `TypeError`, `for…of`, `Boolean`, a class field, catch names, and three nested functions moved to module scope.
+- **How it was checked:**
+  - Every `a && a.b` whose value is kept or passed on, not only tested, was read. `null` becoming `undefined` there changes no verdict.
+  - Every `isNaN` argument is already a number.
+  - The renames were undone in old and new text, and the two compared equal.
+  - The simulator replay (131 scenarios) gave the same checks and verdicts before and after.
+  - The two HTML report writers (`reportGenerator`, `mergeReport`), which have no unit tests, were run old against new on the replay's runs and on random variants of a recorded report, with the same pages. Each rewritten line was then broken in turn to show the comparison sees it.
+  - The 4,063 server and library tests pass.
+- One message changes: a trip date that is not text now throws a `TypeError`, not an `Error`. The text is the same.
+
+### Left open on purpose
+- **S7784**, `structuredClone()`: Bruno's sandbox does not provide it (`node-vm/constants.js` of `@usebruno/js` lists the globals it passes in).
+- **S7781 ×8**: the HTML encoders keep `replace(/x/g)`. CodeQL stops recognising an encoder written with `replaceAll` (see #526).
+- **S7772 ×4**: `require('fs')` / `require('path')`, left by the issue.
+- **S3776 ×47 and S107 ×2**: function complexity and parameter count. These are structural and not part of this clean-up.
+
+---
+
 ## [server-1.11.344 / collection-OTST_V2.0.187] — 2026-10-18 · Release 2026.379
 
 Issue #823 (PR 2). A group of an AI analysis becomes a finding draft. Collection unchanged.
