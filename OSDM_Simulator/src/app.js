@@ -34,6 +34,7 @@ const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/document
 const exchanges = require('./osdm/exchanges');
 const persons = require('./osdm/persons');
 const { shapeAnswer } = require('./osdm/versionShapes');
+const faults = require('./osdm/faults');
 const variants = require('./osdm/variants');
 const { version: VERSION } = require('../package.json');
 
@@ -145,8 +146,17 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       oauthError(res, 400, 'unsupported_grant_type', 'Only client_credentials is supported.');
       return 400;
     }
+    // #833: a scope "sim-faults:a,b" makes every request of the token faulty.
+    let tokenFaults;
+    try {
+      tokenFaults = faults.scopeFaults(params.scope);
+    } catch (error) {
+      if (!(error instanceof faults.FaultRefusal)) throw error;
+      oauthError(res, 400, 'invalid_scope', error.message);
+      return 400;
+    }
     sendJson(res, 200, {
-      access_token: tokens.issue(provider.key, id, provider.tokenLifetimeSeconds),
+      access_token: tokens.issue(provider.key, id, provider.tokenLifetimeSeconds, tokenFaults),
       token_type: 'Bearer',
       expires_in: provider.tokenLifetimeSeconds,
     }, { Pragma: 'no-cache' });
@@ -162,7 +172,17 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       throw new HttpError(401, 'UNAUTHORIZED', 'Authentication required',
         'A valid access token issued for this provider is required.', { 'WWW-Authenticate': 'Bearer' });
     }
-    return claims.clientId;
+    return claims;
+  }
+
+  // #833: the faults a request is answered with, from its header and its token.
+  function faultsOf(req, claims) {
+    try {
+      return faults.requestedFaults(req.headers[faults.HEADER], claims.faults);
+    } catch (error) {
+      if (error instanceof faults.FaultRefusal) throw new HttpError(400, 'UNKNOWN_FAULT', 'Unknown simulator fault', error.message);
+      throw error;
+    }
   }
 
   const bodyOf = async (req) => parseJsonObject(await readBody(req, limits.bodyBytes));
@@ -456,15 +476,28 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (segments.length === 3 && segments[1] === 'oauth' && segments[2] === 'token') {
       return tokenEndpoint(req, res, provider, seen);
     }
-    seen.client = authenticate(req, provider);
+    const claims = authenticate(req, provider);
+    seen.client = claims.clientId;
+    seen.faults = faultsOf(req, claims);
     const answer = await osdmRoute(req, provider, seen.client, segments.slice(1));
     if (answer === NO_CONTENT) {
       res.writeHead(204, BASE_HEADERS);
       res.end();
       return 204;
     }
-    // #833: built in OSDM 3.8 shapes, sent in those of the provider's version.
-    sendJson(res, 200, shapeAnswer(answer, provider.osdmVersion));
+    // #833: built in OSDM 3.8 shapes, sent in those of the provider's version,
+    // then with the faults the request asks for.
+    const route = { method: req.method, segments: segments.slice(1) };
+    const shaped = shapeAnswer(answer, provider.osdmVersion);
+    // A fault changes a copy: never the stored booking or offer.
+    const sent = seen.faults.length ? faults.faultyAnswer(seen.faults, route, structuredClone(shaped)) : { body: shaped };
+    if (sent.raw) {
+      const text = Buffer.from(sent.raw.text, 'utf8');
+      res.writeHead(200, { ...BASE_HEADERS, 'Content-Type': sent.raw.contentType, 'Content-Length': text.length });
+      res.end(text);
+      return 200;
+    }
+    sendJson(res, 200, sent.body);
     return 200;
   }
 
@@ -483,11 +516,12 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       if (res.headersSent) {
         res.destroy();
       } else if (error instanceof HttpError) {
-        sendProblem(res, error.status, error.code, error.title, error.detail, headers, error.extra);
+        const p = faults.faultyProblem(seen.faults || [], { status: error.status, code: error.code, title: error.title, detail: error.detail });
+        sendProblem(res, p.status, p.code, p.title, p.detail, headers, error.extra);
       } else {
         sendProblem(res, 500, 'INTERNAL_ERROR', 'Internal error', undefined, headers);
       }
-      status = error instanceof HttpError ? error.status : 500;
+      status = res.headersSent ? res.statusCode : (error instanceof HttpError ? error.status : 500);
       if (!(error instanceof HttpError)) failure = error;
     }
     // The path without its query string; never a header, never a body.
