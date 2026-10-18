@@ -82,7 +82,7 @@ function resolveSalesFlowActions(salesFlowActions) {
   const src = (salesFlowActions && typeof salesFlowActions === 'object') ? salesFlowActions : {};
   const out = {};
   Object.keys(defaults).forEach(function (k) {
-    out[k] = Object.prototype.hasOwnProperty.call(src, k) ? (src[k] === true) : defaults[k];
+    out[k] = Object.hasOwn(src, k) ? (src[k] === true) : defaults[k];
   });
   return out;
 }

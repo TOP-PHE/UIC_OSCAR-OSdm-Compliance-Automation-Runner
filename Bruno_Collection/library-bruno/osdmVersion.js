@@ -136,7 +136,7 @@ const ENDPOINT_MIN_VERSION = {
 };
 
 function endpointMinVersion(endpoint) {
-  return Object.prototype.hasOwnProperty.call(ENDPOINT_MIN_VERSION, endpoint)
+  return Object.hasOwn(ENDPOINT_MIN_VERSION, endpoint)
     ? ENDPOINT_MIN_VERSION[endpoint]
     : null;
 }
