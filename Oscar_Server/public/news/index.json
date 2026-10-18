@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-api-keys",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "API keys for reading results",
+    "summary": "Test Managers can make read-only API keys for their company or provider, on the new API Keys page.",
+    "content": "On the new API Keys page, a Test Manager makes a key for the company or provider chosen in Working on, sees its keys and revokes them. A key can only read, is shown once, and stops when it expires or is revoked. The routes that read runs and results with a key come in the next release."
+  },
+  {
     "id": "2026-10-18-sonar-vulnerabilities",
     "date": "October 18, 2026",
     "tag": "Security",

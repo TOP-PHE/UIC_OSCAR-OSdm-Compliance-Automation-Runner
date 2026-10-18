@@ -82,6 +82,7 @@ module.exports = {
   components: {
     securitySchemes: {
       bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      apiKeyAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'oscar_<prefix>_<secret>', description: 'A read-only API key (#503), on the /v1/api routes only.' },
     },
     schemas: { Error: errorSchema, User: userSchema, Run: runSchema },
   },
@@ -92,6 +93,7 @@ module.exports = {
     { name: 'Reports', description: 'Run comparison and diff' },
     { name: 'Admin',   description: 'Administrator-only — users, companies, server config, activity' },
     { name: 'Health',  description: 'Liveness/readiness probes' },
+    { name: 'API',     description: 'Read-only, by API key (#503)' },
   ],
   paths: {
     '/health': {
@@ -392,6 +394,25 @@ module.exports = {
       post: { tags: ['Company'], summary: 'Take the chosen parts of a full configuration (#810)', security: [{ bearerAuth: [] }],
         description: 'Multipart: the file in the field "configuration", and the fields scenarios = replace | keep, framework = replace | keep, testData = add | replace | keep. add adds the trains and journeys whose data is not already there; replace removes the trains and journeys first. Journeys name the trains\' new ids. A replaced data file is kept as the previous file. Every part is checked before anything is written; if the database step fails, the data file is put back.',
         responses: { 200: { description: '{ imported, choices, scenarios, framework, testData: { mode, removed, trains_added, journeys_added, already_there, unresolved_legs } }' }, 400: { description: 'Not a configuration, a choice missing, or a part refused (schema problems, template, OSDM version)' }, 403: { description: 'Test Managers only' }, 413: { description: 'Larger than 5 MB' } } },
+    },
+    '/v1/company/api-keys': {
+      get: { tags: ['Company'], summary: 'The read-only API keys of the company or provider (#503)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers only, for the company or provider the request names (X-Provider-Id). { company: { id, name }, max_days, default_days, keys: [{ id, name, hint, scopes, created_by, created_at, expires_at, last_used_at, revoked_at, revoked_by, state: active | expired | revoked }] }. Never the key or its hash.',
+        responses: { 200: { description: 'The keys' }, 403: { description: 'Test Managers only' } } },
+      post: { tags: ['Company'], summary: 'Make a read-only API key (#503)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers only. Body: { name (1-80 characters), expires_in_days (1-365, default 90) }. The answer carries `key`, shown this once; OSCAR keeps only its sha256. The key reads the runs of this company or provider, on /v1/api only.',
+        responses: { 201: { description: 'The key, with `key`' }, 400: { description: 'No name, or a lifetime outside 1-365 days' }, 403: { description: 'Test Managers only' } } },
+    },
+    '/v1/company/api-keys/{id}': {
+      delete: { tags: ['Company'], summary: 'Revoke an API key (#503)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers only. Effective at once. Revoking a revoked key changes nothing.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'The key, revoked' }, 403: { description: 'Test Managers only' }, 404: { description: 'Not a key of this company or provider' } } },
+    },
+    '/v1/api/key': {
+      get: { tags: ['API'], summary: 'The API key making the request: name, company, scopes, expiry (#503)', security: [{ apiKeyAuth: [] }],
+        description: 'Authorization: Bearer <key> only (never a cookie or a URL parameter). Any refusal is the same 401. Every other route outside /v1/api refuses a key.',
+        responses: { 200: { description: '{ name, hint, company: { id, name }, scopes, created_at, expires_at }' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 429: { description: 'Too many requests' } } },
     },
     '/v1/company/reference': {
       get: { tags: ['Company'], summary: 'Which reference configuration of the repository the company or provider follows, and whether it is up to date (#838)', security: [{ bearerAuth: [] }],

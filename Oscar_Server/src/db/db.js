@@ -826,6 +826,26 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE companies ADD COLUMN reference_version TEXT');
       _safeAlter('ALTER TABLE companies ADD COLUMN reference_applied_at TEXT');
   }},
+  { version: 38, name: 'api-keys', up: () => {
+      // #503 - read-only API keys, one company or provider each, made by a
+      // Test Manager. Only the sha256 of the secret is kept; the prefix finds
+      // the row and is shown on the page. A key dies with its creator.
+      db.exec(`CREATE TABLE IF NOT EXISTS api_key (
+        id            TEXT PRIMARY KEY,
+        company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        created_by    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name          TEXT NOT NULL,
+        prefix        TEXT NOT NULL UNIQUE,
+        secret_hash   TEXT NOT NULL,
+        scopes        TEXT NOT NULL,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at    TEXT NOT NULL,
+        last_used_at  TEXT,
+        revoked_at    TEXT,
+        revoked_by    TEXT REFERENCES users(id) ON DELETE SET NULL
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_api_key_company ON api_key(company_id, created_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

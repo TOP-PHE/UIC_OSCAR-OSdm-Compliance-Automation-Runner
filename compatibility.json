@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.371",
+  "current_release": "2026.372",
   "releases": [
+    {
+      "release": "2026.372",
+      "date": "2026-10-18",
+      "server": "1.11.337",
+      "collection": "OTST_V2.0.186",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server (#503 PR 1): read-only API keys. A Test Manager makes, lists and revokes the keys of the company or provider chosen in Working on (API Keys page); a key is shown once, only its sha256 is stored, and it works under /v1/api only, in the Authorization header only. Migration 38."
+      ]
+    },
     {
       "release": "2026.371",
       "date": "2026-10-18",

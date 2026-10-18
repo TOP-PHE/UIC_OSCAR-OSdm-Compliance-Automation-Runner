@@ -30,6 +30,8 @@
  *                      |                             | the company's test_manager)
  *   administrator      | n/a (platform company)      | NO — admin role no longer reads
  *                      |                             | test data (issue #60 strict mode)
+ *   api_key (#503)     | Only the key's company or   | No
+ *                      | provider, not its children  |
  *
  * The strict admin posture is the v1.10.0 change. Before this release
  * administrators had blanket read access; now their role is operations +
@@ -62,6 +64,14 @@ function canUserSeeRun(runId, user) {
   // their own or a provider of it (#540) — the rule enforceTenant uses.
   if (user.role === 'tester' || user.role === 'company_user' || user.role === 'test_manager') {
     return canUseCompany(user, run.company_id) ? run : null;
+  }
+
+  // API key (#503): the runs of the one company or provider the key was made
+  // for, never its providers. requireApiKey has checked that the key's
+  // creator may still use that company.
+  if (user.role === 'api_key') {
+    const keyCompany = user.keyCompanyId;
+    return typeof keyCompany === 'string' && keyCompany !== '' && run.company_id === keyCompany ? run : null;
   }
 
   // Certifier: only sees runs the test_manager has explicitly shared.
