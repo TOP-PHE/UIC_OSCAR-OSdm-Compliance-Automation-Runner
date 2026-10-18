@@ -249,8 +249,9 @@ var AlightSpecification = class {
 };
 
 var StopPlaceRef = class {
+  objectType = "StopPlaceRef";
+
   constructor(stopPlaceRef) {
-    this.objectType = "StopPlaceRef";
     this.stopPlaceRef = stopPlaceRef;
   }
 };
