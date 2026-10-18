@@ -231,7 +231,7 @@ const mergedRequests = bruResults.map((entry, i) => {
   // Display name: "FolderName \ RequestName"
   const suite = (entry.suiteName || '').trim();
   const file  = (entry.filename  || '').replace(/\.yml$|\.bru$/i, '').trim();
-  const displayName = suite ? `${suite} \\ ${file}` : file;
+  const displayName = suite ? String.raw`${suite} \ ${file}` : file;
 
   return {
     index:        i + 1,

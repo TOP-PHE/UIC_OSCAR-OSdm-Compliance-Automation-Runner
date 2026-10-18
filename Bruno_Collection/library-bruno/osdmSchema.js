@@ -122,7 +122,7 @@ function validateSchema(component, items, opts) {
     const groups = {};
     allIssues.forEach((iss) => {
       const key = String(iss)
-        .replace(new RegExp('^' + component + '\\[\\d+\\]\\.?'), '')  // strip Component[N]. prefix
+        .replace(new RegExp('^' + component + String.raw`\[\d+\]\.?`), '')  // strip Component[N]. prefix
         .replace(/\[\d+\]/g, '[]');                                    // normalise nested indexes
       groups[key] = (groups[key] || 0) + 1;
     });
