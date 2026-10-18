@@ -322,6 +322,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Markdown (`issueText()`, page only). The commitment text went to
     version 2 with it: what is sent changed, so every Test Manager accepts
     again (no new approval).
+    **#831 (1.11.330): models, cost, spend.** `utils/aiModels.js` (pure)
+    holds the Anthropic models and their list prices ($/M tokens; Haiku 5.5's
+    second rate above 100K input), `costOf()`, `spendOf()` and the suggested
+    limit and instruction. Change prices there only; a stored
+    `ai_analysis.cost_usd` is never recomputed, older rows are priced at
+    today's list. A model not listed takes the Test Manager's
+    `ai_config.price_input`/`price_output`, else has no price. The analysis
+    may name its `model` (`modelFor()`): the preview's `hash` includes it,
+    `contentHash` (stored as `content_hash`) does not, which is how the
+    history tells analyses sent the same input. `POST /config/models` asks
+    the service's `GET /v1/models` through the same guarded `exchange()` as
+    `callModel()` (`aiConnector.js`), the stored key under `keyRefusal()`.
+    Migration 36.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

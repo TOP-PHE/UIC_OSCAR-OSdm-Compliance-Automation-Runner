@@ -330,6 +330,16 @@ module.exports = {
         description: 'One small request ("reply with the single word OK"). Body: empty to test the stored service, or the same fields as PUT. Answer: { test: { ok, answer, stopReason, model, usage: { input, output }, ms } | { ok: false, error, status } }.',
         responses: { 200: { description: 'The test result' }, 400: { description: 'A field refused' }, 403: { description: 'Test Managers only, with approved access' }, 404: { description: 'Nothing configured, and nothing given' } } },
     },
+    '/v1/company/ai-analysis/config/models': {
+      post: { tags: ['Company'], summary: 'The models an Anthropic AI service offers (#831)', security: [{ bearerAuth: [] }],
+        description: 'Body: empty for the stored service, or { connector: anthropic, baseUrl, apiKey? }; a stored key only goes to the host it was typed for. Asks the service\'s GET /v1/models. Answer: { models: [{ id, label, input, output, note, above }] }, prices in US dollars per million tokens when OSCAR knows them, else null.',
+        responses: { 200: { description: 'The models' }, 400: { description: 'Not an Anthropic service, or a field refused' }, 403: { description: 'Test Managers only, with approved access' }, 404: { description: 'Nothing configured, and nothing given' }, 502: { description: 'The service refused or did not answer' } } },
+    },
+    '/v1/company/ai-analysis/spend': {
+      get: { tags: ['Company'], summary: 'What the AI analyses of the request\'s company or provider cost (#831)', security: [{ bearerAuth: [] }],
+        description: 'Every Test Manager\'s analyses, at the model\'s list price in US dollars (or the price entered for a model OSCAR does not know). { currency, today, month, months: [{ month, … }], models: [{ model, … }], mine: { cap, used } }, each with { analyses, tokens, cost, unpriced }.',
+        responses: { 200: { description: 'Spend' }, 403: { description: 'Test Managers only' } } },
+    },
     '/v1/company/ai-analysis/batches': {
       get: { tags: ['Company'], summary: 'The batches an AI analysis can read, for the request\'s company or provider (#801)', security: [{ bearerAuth: [] }],
         description: 'Test Managers with approved access only. { batches: [{ batchId, runs, finishedRuns, started, finished }], languages }.',
@@ -337,17 +347,17 @@ module.exports = {
     },
     '/v1/company/ai-analysis/preview': {
       post: { tags: ['Company'], summary: 'Exactly what an AI analysis would send, its size and estimated tokens (#801)', security: [{ bearerAuth: [] }],
-        description: 'Body: { batches: [id] | [id, id], language }. Two batches are compared, the earlier first. Sends nothing. Answer: { mode, batches, model, instructions, input, chars, estimatedTokens, summarisedByStep, tooLarge, counts, monthly: { cap, used }, hash }. The input holds the failed checks with the run\'s values replaced, the scenario codes and descriptions, the Test Framework\'s declarations and the findings (title, category, step); never a token, credential, endpoint, response body or passenger detail.',
+        description: 'Body: { batches: [id] | [id, id], language, model? } (#831: model, the configured one by default; price, estimatedCost { input, atMost }, configuredModel and contentHash in the answer). Two batches are compared, the earlier first. Sends nothing. Answer: { mode, batches, model, instructions, input, chars, estimatedTokens, summarisedByStep, tooLarge, counts, monthly: { cap, used }, hash }. The input holds the failed checks with the run\'s values replaced, the scenario codes and descriptions, the Test Framework\'s declarations and the findings (title, category, step); never a token, credential, endpoint, response body or passenger detail.',
         responses: { 200: { description: 'The preview' }, 400: { description: 'No batch, or the same one twice' }, 403: { description: 'Test Managers only, with approved access' }, 404: { description: 'No such batch here' }, 409: { description: 'No AI service configured here' } } },
     },
     '/v1/company/ai-analysis/run': {
       post: { tags: ['Company'], summary: 'Send what the preview showed and analyse it (#801)', security: [{ bearerAuth: [] }],
-        description: 'Body: the preview\'s { batches, language } and its { hash }. Answers 202 { id, status: running }; read the result with GET /history/{id}. Refused when what would be sent changed since the preview, when the monthly token limit would be passed, or when another of the Test Manager\'s analyses is running.',
+        description: 'Body: the preview\'s { batches, language, model } and its { hash }. Answers 202 { id, status: running }; read the result with GET /history/{id}. Refused when what would be sent changed since the preview, when the monthly token limit would be passed, or when another of the Test Manager\'s analyses is running.',
         responses: { 202: { description: 'Started' }, 403: { description: 'Test Managers only, with approved access' }, 409: { description: 'Changed since the preview, monthly limit, another analysis running, or no AI service' }, 422: { description: 'Too large to send' } } },
     },
     '/v1/company/ai-analysis/history': {
       get: { tags: ['Company'], summary: 'The AI analyses of the request\'s company or provider (#801)', security: [{ bearerAuth: [] }],
-        description: 'Every Test Manager who may use the company or provider. { analyses: [{ id, mode, batches, language, connector, model, status, by, inputChars, summarisedByStep, inputHash, tokens, error, createdAt, finishedAt }] }, the 50 latest. status: running | done | unreadable | failed | interrupted.',
+        description: 'Every Test Manager who may use the company or provider. { analyses: [{ id, mode, batches, language, connector, model, status, by, inputChars, summarisedByStep, inputHash, contentHash, tokens, cost, error, createdAt, finishedAt }] } (cost in US dollars, #831), the 50 latest. status: running | done | unreadable | failed | interrupted.',
         responses: { 200: { description: 'Analyses' }, 403: { description: 'Test Managers only' } } },
     },
     '/v1/company/ai-analysis/history/{id}': {

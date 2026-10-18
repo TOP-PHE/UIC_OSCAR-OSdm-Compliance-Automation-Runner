@@ -126,14 +126,15 @@ describe('#801 PR 3 the page', () => {
   };
   const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
-  const names = ['analysisPanelHtml', 'batchLabel', 'batchOptionsHtml', 'previewHtml', 'listHtml', 'groupRowHtml', 'comparisonHtml', 'resultHtml', 'historyHtml'];
+  const names = ['analysisPanelHtml', 'batchLabel', 'batchOptionsHtml', 'usd', 'estimateText', 'previewHtml', 'listHtml', 'groupRowHtml', 'comparisonHtml',
+    'resultHtml', 'inputLetters', 'historyHtml', 'sideBySideHtml', 'spendRow', 'spendHtml', 'priceText', 'analysisModelOptionsHtml'];
   vm.runInContext(`${consts}\n${names.map(lift).join('\n')}\n${names.map(n => `this.${n} = ${n};`).join('\n')}`, ctx);
 
   test('the panel lists the configured targets, escaped, with labelled fields', () => {
     const html = ctx.analysisPanelHtml([{ id: 'own', name: 'Acme <b>', provider: false }, { id: 'p1', name: 'Beta', provider: true }]);
     expect(html).toContain('Acme &lt;b&gt;');
     expect(html).toContain('<option value="p1" data-provider="1">');
-    for (const id of ['ai-an-target', 'ai-an-a', 'ai-an-b', 'ai-an-lang']) expect(html).toContain(`<label for="${id}"`);
+    for (const id of ['ai-an-target', 'ai-an-a', 'ai-an-b', 'ai-an-lang', 'ai-an-model']) expect(html).toContain(`<label for="${id}"`);
     expect(ctx.analysisPanelHtml([])).toBe('');
   });
 
@@ -161,7 +162,11 @@ describe('#801 PR 3 the page', () => {
     expect(html).toContain('<strong>T &lt;b&gt;</strong>');
     expect(html).toContain('>OSCAR</span>');
     expect(html).toContain('Steps: 02<br>Scenarios: S1');
-    expect(html).toContain('Tokens: 10 in, 5 out.');
+    expect(html).toContain('Tokens: 10 in, 5 out · Cost: —.');
+    expect(ctx.resultHtml({ status: 'done', createdAt: 't', model: 'm', mode: 'one', tokens: {}, cost: 0.0108, result: { summary: 's' } })).toContain('Cost: $0.01.');
+    expect(ctx.usd(0.004)).toBe('$0.0040');
+    expect(ctx.usd(0)).toBe('$0');
+    expect(ctx.usd(null)).toBe('—');
   });
 
   test('running, failed, interrupted and unreadable answers say so', () => {
@@ -180,10 +185,12 @@ describe('#801 PR 3 the page', () => {
   });
 
   test('every analysis request names the company or provider of the card', () => {
-    for (const url of ['/v1/company/ai-analysis/batches', '/v1/company/ai-analysis/history', '/v1/company/ai-analysis/preview', '/v1/company/ai-analysis/run']) {
+    for (const url of ['/v1/company/ai-analysis/batches', '/v1/company/ai-analysis/history', '/v1/company/ai-analysis/preview', '/v1/company/ai-analysis/run',
+      '/v1/company/ai-analysis/spend']) {
       const line = lines.find(l => l.includes(`fetch('${url}'`));
       expect(line).toContain('analysisHeaders(');
     }
+    expect(lines.filter(l => l.includes("fetch('/v1/company/ai-analysis/config', { headers: analysisHeaders() })"))).toHaveLength(1);
   });
 });
 

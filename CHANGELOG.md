@@ -112,6 +112,19 @@ installed simulator updates when this version reaches `main`.
 
 ---
 
+## [server-1.11.330 / collection-OTST_V2.0.183] — 2026-10-18 · Release 2026.365
+
+### AI Analysis: models, cost and spend (#831)
+
+- **A list of models.** For an Anthropic service the AI service form offers OSCAR's list of current models, each with its list price ($/million tokens in and out), Claude Opus 5.5 first. "Refresh the list from the service" asks the service (`GET /v1/models`, `POST /v1/company/ai-analysis/config/models`) with the stored key, or the typed one; a stored key only goes to the host it was typed for. The model field stays free text, and is the only way for an OpenAI-compatible service.
+- **The model per analysis.** The analysis card chooses the model, the configured one by default. It is part of the hash the run confirms. Two analyses ticked in the history are shown side by side; analyses sent the same input (same instructions and results, any model) share a letter. `ai_analysis.content_hash` holds that hash.
+- **Cost.** Each analysis stores its cost in US dollars (`ai_analysis.cost_usd`): tokens × the model's list price (`utils/aiModels.js`; Claude Haiku 5.5 at its second rate above 100K input tokens), or the price per million tokens the Test Manager entered for a model OSCAR does not know (`ai_config.price_input` / `price_output`). The preview gives the estimate; the result and the history give the cost. Older analyses are priced at today's list price.
+- **Spend** (`GET /v1/company/ai-analysis/spend`): every Test Manager's analyses of the company or provider, today, this month, per month (12) and per model this month, plus the reader's own tokens against their limit.
+- **Suggestions**: a monthly limit of 2,000,000 tokens (about 30 large analyses), and an instruction to insert.
+- Migration 36 (`ai-model-cost`).
+
+---
+
 ## [server-1.11.329] / [collection-OTST_V2.0.183] — 2026-10-18
 
 Issue #827 part C, release 2026.364. Server and pages only.

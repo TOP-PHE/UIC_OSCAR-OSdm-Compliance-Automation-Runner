@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.364",
+  "current_release": "2026.365",
   "releases": [
+    {
+      "release": "2026.365",
+      "date": "2026-10-18",
+      "server": "1.11.330",
+      "collection": "OTST_V2.0.183",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "AI Analysis (#831): a list of Anthropic models with their list prices, refreshed from the service on demand; the model chosen per analysis (part of the confirmed preview) and two analyses shown side by side, marked when they were sent the same input; the cost of each analysis stored at the model's list price (or the Test Manager's price for a model OSCAR does not know), and what was spent per day, month and model; a suggested monthly token limit and instruction. Migration 36. Collection unchanged."
+      ]
+    },
     {
       "release": "2026.364",
       "date": "2026-10-18",

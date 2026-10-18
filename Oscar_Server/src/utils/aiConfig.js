@@ -35,7 +35,7 @@ const CONNECTORS = Object.freeze({
 
 const LIMITS = Object.freeze({
   baseUrl: 500, model: 200, apiKey: 500, instruction: 2000,
-  minTokenCap: 1000, maxTokenCap: 10_000_000_000,
+  minTokenCap: 1000, maxTokenCap: 10_000_000_000, maxPrice: 1000,
 });
 
 // Model names seen across services: "claude-opus-5-5", "gpt-4o",
@@ -103,6 +103,16 @@ function checkCap(raw) {
   return { value: n };
 }
 
+// A price per million tokens (#831): a number from 0 to LIMITS.maxPrice, or empty.
+function checkPrice(raw, which) {
+  if (isEmpty(raw)) return { value: null };
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0 || n > LIMITS.maxPrice) {
+    return { refusal: `The ${which} price is a number of US dollars per million tokens, from 0 to ${LIMITS.maxPrice}, or empty.` };
+  }
+  return { value: n };
+}
+
 function checkInstruction(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (typeof raw !== 'string') return { refusal: 'The instruction is text.' };
@@ -124,12 +134,17 @@ function checkConfig(body) {
   if (urlRefusal) return { refusal: urlRefusal };
 
   const fields = { model: checkModel(b.model), apiKey: checkKey(b.apiKey),
-    monthlyTokenCap: checkCap(b.monthlyTokenCap), instruction: checkInstruction(b.instruction) };
+    monthlyTokenCap: checkCap(b.monthlyTokenCap), instruction: checkInstruction(b.instruction),
+    priceInput: checkPrice(b.priceInput, 'input'), priceOutput: checkPrice(b.priceOutput, 'output') };
   const refused = Object.values(fields).find(f => f.refusal);
   if (refused) return { refusal: refused.refusal };
+  if ((fields.priceInput.value === null) !== (fields.priceOutput.value === null)) {
+    return { refusal: 'Give both prices, input and output, or neither.' };
+  }
 
   const value = { connector, baseUrl: trimSlashes(b.baseUrl.trim()), model: fields.model.value,
-    monthlyTokenCap: fields.monthlyTokenCap.value, instruction: fields.instruction.value };
+    monthlyTokenCap: fields.monthlyTokenCap.value, instruction: fields.instruction.value,
+    priceInput: fields.priceInput.value, priceOutput: fields.priceOutput.value };
   if (fields.apiKey.value) value.apiKey = fields.apiKey.value;
   return { value };
 }
@@ -187,6 +202,18 @@ function messageRequest({ connector, baseUrl, model, apiKey }, { system = null, 
   const messages = system ? [{ role: 'system', content: system }] : [];
   messages.push({ role: 'user', content: user });
   return { url: `${trimSlashes(baseUrl)}/chat/completions`, headers, body: { model, messages } };
+}
+
+/**
+ * Anthropic's list of models (#831): { url, headers }, a GET. The address
+ * may be given with or without its "/v1", like the Messages endpoint.
+ */
+function modelsRequest({ baseUrl, apiKey }) {
+  const base = trimSlashes(baseUrl);
+  return {
+    url: (base.endsWith('/v1') ? base : `${base}/v1`) + '/models?limit=100',
+    headers: { 'anthropic-version': ANTHROPIC_VERSION, 'x-api-key': apiKey || '' },
+  };
 }
 
 /** The connection test: one small question, one word asked back. */
@@ -258,6 +285,8 @@ function configView(row) {
     hasKey: !!row.api_key_enc,
     monthlyTokenCap: row.monthly_token_cap ?? null,
     instruction: row.instruction || '',
+    priceInput: row.price_input ?? null,
+    priceOutput: row.price_output ?? null,
     testedAt: row.tested_at || null,
     updatedAt: row.updated_at || null,
   };
@@ -265,10 +294,11 @@ function configView(row) {
 
 /** The fields a save changes, by name (for the audit log; never a value). */
 function changedFields(stored, next) {
-  if (!stored) return ['connector', 'baseUrl', 'model', ...(next.apiKey ? ['apiKey'] : []), 'monthlyTokenCap', 'instruction'];
+  if (!stored) return ['connector', 'baseUrl', 'model', ...(next.apiKey ? ['apiKey'] : []), 'monthlyTokenCap', 'instruction', 'prices'];
   const pairs = [['connector', stored.connector, next.connector], ['baseUrl', stored.base_url, next.baseUrl],
     ['model', stored.model, next.model], ['monthlyTokenCap', stored.monthly_token_cap ?? null, next.monthlyTokenCap],
-    ['instruction', stored.instruction || null, next.instruction]];
+    ['instruction', stored.instruction || null, next.instruction],
+    ['prices', `${stored.price_input ?? ''}/${stored.price_output ?? ''}`, `${next.priceInput ?? ''}/${next.priceOutput ?? ''}`]];
   const names = pairs.filter(([, a, b]) => a !== b).map(([n]) => n);
   if (next.apiKey) names.push('apiKey');
   return names;
@@ -276,6 +306,6 @@ function changedFields(stored, next) {
 
 module.exports = {
   CONNECTORS, LIMITS, TEST_PROMPT, TEST_MAX_TOKENS, ANTHROPIC_VERSION,
-  connectorsForPage, checkConfig, keyRefusal, needsTest, messageRequest, testRequest, readAnswer, describeError,
+  connectorsForPage, checkConfig, checkModel, baseUrlRefusal, modelsRequest, keyRefusal, needsTest, messageRequest, testRequest, readAnswer, describeError,
   maskKey, configView, changedFields, anthropicEndpoint,
 };

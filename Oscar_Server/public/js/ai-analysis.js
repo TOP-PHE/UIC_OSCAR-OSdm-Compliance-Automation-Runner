@@ -20,6 +20,8 @@
  * later release. `accessHtml(data)`, `serviceHtml(...)` and `checklistHtml(c)`
  * are pure (lifted by the page test); the rest is wiring. #827: the provider's
  * set-up checklist is imported per company or provider in the analysis card.
+ * #831: a list of models, the model chosen per analysis, two analyses side by
+ * side, the cost of each and what was spent, a suggested limit and instruction.
  */
 
 const NOTE = 'padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.5;margin-bottom:14px;';
@@ -109,6 +111,20 @@ function connectorOptionsHtml(connectors, chosen) {
   return connectors.map(c => `<option value="${esc(c.id)}"${c.id === chosen ? ' selected' : ''}>${esc(c.label)}</option>`).join('');
 }
 
+// "$4 / $20 per million tokens", or nothing when OSCAR has no price.
+function priceText(m) {
+  if (m.input === null || m.input === undefined) return '';
+  return ` — $${m.input} / $${m.output} per million tokens in / out`;
+}
+
+/** The models to choose from (#831), the stored one selected; one not in the list is added, marked. */
+function modelOptionsHtml(models, chosen) {
+  const known = models.some(m => m.id === chosen);
+  const own = chosen && !known ? `<option value="${esc(chosen)}" selected>${esc(chosen)} (not in the list)</option>` : '';
+  const options = models.map(m => `<option value="${esc(m.id)}"${m.id === chosen ? ' selected' : ''}>${esc(m.label)} (${esc(m.id)})${esc(priceText(m))}${m.note ? ' — ' + esc(m.note) : ''}</option>`).join('');
+  return own + options + '<option value="">Another model: type its id below</option>';
+}
+
 function testedHtml(config) {
   if (!config) return '<span style="color:#78909c">Not configured yet.</span>';
   const when = config.testedAt ? `last tested ${esc(config.testedAt)}` : 'not tested';
@@ -125,6 +141,7 @@ function serviceHtml(target, answer, n) {
   const connector = config?.connector || connectors[0]?.id || '';
   const defaults = connectors.find(c => c.id === connector) || {};
   const id = (f) => `ai-${f}-${n}`;
+  const suggestedCap = answer.suggested?.monthlyTokenCap ?? 2000000;
   const keyHint = config?.hasKey ? 'A key is stored. Leave empty to keep it.' : 'The key of your account with this service.';
   const removeButton = config
     ? '<button class="btn" data-ai-action="remove">Remove</button>'
@@ -137,14 +154,27 @@ function serviceHtml(target, answer, n) {
     <label for="${id('baseUrl')}" style="${FIELD}">Address (https)</label>
     <input id="${id('baseUrl')}" data-f="baseUrl" style="${WIDE}" type="url" value="${esc(config?.baseUrl || defaults.defaultBaseUrl || '')}" autocomplete="off">
     <label for="${id('model')}" style="${FIELD}">Model</label>
-    <input id="${id('model')}" data-f="model" style="${WIDE}" type="text" value="${esc(config?.model || '')}" placeholder="claude-opus-5-5, gpt-4o, mistral-large-latest…" autocomplete="off">
+    <div data-f="modelList" style="${connector === 'anthropic' ? '' : 'display:none'}">
+      <select data-f="modelPick" data-ai-action="model-pick" aria-label="Choose a model" style="${WIDE}">${modelOptionsHtml(answer.models || [], config?.model || '')}</select>
+      <button class="btn" data-ai-action="models" style="margin-top:6px">Refresh the list from the service</button>
+    </div>
+    <input id="${id('model')}" data-f="model" style="${WIDE};margin-top:6px" type="text" value="${esc(config?.model || (connector === 'anthropic' ? answer.models?.[0]?.id || '' : ''))}" placeholder="claude-opus-5-5, gpt-4o, mistral-large-latest…" autocomplete="off">
+    <div style="font-size:11px;color:#90a4ae;margin-top:3px">The id of the model, without spaces. Each analysis can still choose another one.</div>
     <label for="${id('apiKey')}" style="${FIELD}">Key</label>
     <input id="${id('apiKey')}" data-f="apiKey" style="${WIDE}" type="password" value="" placeholder="${esc(keyHint)}" autocomplete="new-password">
     <div style="font-size:11px;color:#90a4ae;margin-top:3px">Never shown again once saved. Changing the service or its host asks for it again.</div>
     <label for="${id('cap')}" style="${FIELD}">Monthly token limit (optional)</label>
-    <input id="${id('cap')}" data-f="monthlyTokenCap" style="${WIDE}" type="number" min="${esc(answer.limits?.minTokenCap ?? 1000)}" step="1" value="${esc(config?.monthlyTokenCap ?? '')}">
+    <input id="${id('cap')}" data-f="monthlyTokenCap" style="${WIDE}" type="number" min="${esc(answer.limits?.minTokenCap ?? 1000)}" step="1" value="${esc(config?.monthlyTokenCap ?? '')}" placeholder="${esc(suggestedCap)}">
+    <div style="font-size:11px;color:#90a4ae;margin-top:3px">Suggested: ${esc(Number(suggestedCap).toLocaleString('en'))} tokens, about 30 analyses of a large batch
+      (one takes up to about 66,000). Counted for you, on this company or provider.</div>
     <label for="${id('instruction')}" style="${FIELD}">Your own instruction, added to OSCAR's (optional)</label>
     <textarea id="${id('instruction')}" data-f="instruction" style="${WIDE}" rows="3" maxlength="${esc(answer.limits?.instruction ?? 2000)}">${esc(config?.instruction || '')}</textarea>
+    <div><button class="btn" data-ai-action="suggest-instruction" style="margin-top:4px">Insert the suggested instruction</button></div>
+    <template data-f="suggestedInstruction">${esc(answer.suggested?.instruction || '')}</template>
+    <label for="${id('priceIn')}" style="${FIELD}">Price per million input tokens, US$ (only for a model OSCAR has no price for)</label>
+    <input id="${id('priceIn')}" data-f="priceInput" style="${WIDE}" type="number" min="0" step="any" value="${esc(config?.priceInput ?? '')}">
+    <label for="${id('priceOut')}" style="${FIELD}">Price per million output tokens, US$</label>
+    <input id="${id('priceOut')}" data-f="priceOutput" style="${WIDE}" type="number" min="0" step="any" value="${esc(config?.priceOutput ?? '')}">
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn" data-ai-action="test">Test the connection</button>
       <button class="btn btn-primary" data-ai-action="save">Save</button>${removeButton}
@@ -186,11 +216,17 @@ function analysisPanelHtml(targets) {
     <select id="ai-an-b" style="${WIDE}"></select>
     <label for="ai-an-lang" style="${FIELD}">Language of the answer</label>
     <select id="ai-an-lang" style="${WIDE}"></select>
+    <label for="ai-an-model" style="${FIELD}">Model for this analysis</label>
+    <select id="ai-an-model" style="${WIDE}"></select>
+    <div style="font-size:11px;color:#90a4ae;margin-top:3px">Analyse the same batch with another model to compare the answers: tick two in the list below.</div>
     <div style="margin-top:12px"><button class="btn" data-ai-action="an-preview">See what will be sent</button></div>
     <div id="ai-an-preview" style="margin-top:12px"></div>
     <div id="ai-an-result" style="margin-top:12px"></div>
     <h4 style="margin:18px 0 6px">Earlier analyses</h4>
     <div id="ai-an-history" style="font-size:13px"></div>
+    <div id="ai-an-compare" style="margin-top:12px"></div>
+    <h4 style="margin:18px 0 6px">Spent on AI analysis</h4>
+    <div id="ai-an-spend" style="font-size:13px"></div>
   </div>`;
 }
 
@@ -224,6 +260,20 @@ function batchOptionsHtml(batches, withNone) {
   return none + batches.map(b => `<option value="${esc(b.batchId)}">${batchLabel(b)}</option>`).join('');
 }
 
+/** An amount in US dollars: cents, or more digits below one cent; a dash when unknown. */
+function usd(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
+  if (n === 0) return '$0';
+  return n < 0.01 ? '$' + n.toFixed(4) : '$' + n.toFixed(2);
+}
+
+// The preview's cost, at the model's list price (#831).
+function estimateText(p) {
+  if (!p.estimatedCost) return 'OSCAR has no price for this model: its cost is not counted.';
+  const own = p.price?.source === 'custom' ? 'your price' : 'list price';
+  return `Estimated cost (${own}): about <strong>${usd(p.estimatedCost.input)}</strong> for what is sent, at most ${usd(p.estimatedCost.atMost)} with the answer.`;
+}
+
 /** What will be sent, its size and cost, and the button that sends it. */
 function previewHtml(p) {
   const cap = p.monthly?.cap !== null && p.monthly?.cap !== undefined
@@ -238,7 +288,7 @@ function previewHtml(p) {
   const send = p.tooLarge
     ? `<div style="${NOTE}background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;">Too large to send, even summarised by step.</div>`
     : `<button class="btn btn-primary" data-ai-action="an-run">Send to ${esc(p.model)} and analyse</button>`;
-  return `<div style="${NOTE}${INFO}">${counts}<br>About <strong>${esc(p.estimatedTokens)}</strong> tokens (${esc(p.chars)} characters) to ${esc(p.model)}, plus the answer. ${cap}</div>
+  return `<div style="${NOTE}${INFO}">${counts}<br>About <strong>${esc(p.estimatedTokens)}</strong> tokens (${esc(p.chars)} characters) to ${esc(p.model)}, plus the answer. ${cap}<br>${estimateText(p)}</div>
     ${summarised}${truncated}
     <details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:13px">Exactly what will be sent</summary>
       <div style="font-size:12px;color:#546e7a;margin:8px 0 4px">Instructions</div>
@@ -301,21 +351,71 @@ function resultHtml(a) {
   return head + `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">An AI opinion: it can be wrong, and it is not a test result or a finding.</div>
     <p style="font-size:13px;line-height:1.55">${esc(r.summary || '')}</p>${comparisonHtml(r.comparison)}
     ${groups}
-    <div style="font-size:11px;color:#90a4ae;margin-top:8px">Tokens: ${esc(a.tokens?.input ?? '?')} in, ${esc(a.tokens?.output ?? '?')} out.</div>`;
+    <div style="font-size:11px;color:#90a4ae;margin-top:8px">Tokens: ${esc(a.tokens?.input ?? '?')} in, ${esc(a.tokens?.output ?? '?')} out · Cost: ${usd(a.cost)}.</div>`;
 }
 
 const STATUS_LABEL = { running: 'Running', done: 'Done', failed: 'Failed', unreadable: 'Answer not readable', interrupted: 'Interrupted' };
 
+// Analyses sent the same input share a letter (#831): A, B… by first seen.
+function inputLetters(list) {
+  const letters = new Map();
+  for (const a of list) {
+    if (a.contentHash && list.filter(x => x.contentHash === a.contentHash).length > 1 && !letters.has(a.contentHash)) {
+      letters.set(a.contentHash, String.fromCodePoint(65 + (letters.size % 26)));
+    }
+  }
+  return letters;
+}
+
 /** The earlier analyses of a company or provider. */
 function historyHtml(list) {
   if (!list.length) return '<span style="color:#90a4ae">None yet.</span>';
-  const rows = list.map(a => `<tr><td style="${CELL}">${esc(a.createdAt)}</td><td style="${CELL}">${esc(a.by || '')}</td>
-    <td style="${CELL}">${a.mode === 'compare' ? 'Compare' : 'One batch'}</td><td style="${CELL}">${esc(a.model)}</td>
-    <td style="${CELL}">${esc(STATUS_LABEL[a.status] || a.status)}</td>
-    <td style="${CELL}"><button class="btn" data-ai-action="an-show" data-id="${esc(a.id)}">Show</button></td></tr>`).join('');
+  const letters = inputLetters(list);
+  const rows = list.map(a => {
+    const same = letters.get(a.contentHash);
+    const input = same ? `<span title="Same input as the other analyses marked ${same}" style="font-size:11px;padding:1px 6px;border-radius:8px;background:#e8eaf6;color:#283593">${same}</span>` : '';
+    return `<tr><td style="${CELL}"><input type="checkbox" data-ai-action="an-pick" value="${esc(a.id)}" aria-label="Compare this analysis" style="width:auto"></td>
+    <td style="${CELL}">${esc(a.createdAt)}</td><td style="${CELL}">${esc(a.by || '')}</td>
+    <td style="${CELL}">${a.mode === 'compare' ? 'Compare' : 'One batch'}</td><td style="${CELL}">${esc(a.model)}</td><td style="${CELL}">${input}</td>
+    <td style="${CELL}">${esc(STATUS_LABEL[a.status] || a.status)}</td><td style="${CELL}">${usd(a.cost)}</td>
+    <td style="${CELL}"><button class="btn" data-ai-action="an-show" data-id="${esc(a.id)}">Show</button></td></tr>`;
+  }).join('');
   return `<div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">
-    <thead><tr><th style="${CELL}">When</th><th style="${CELL}">By</th><th style="${CELL}">What</th><th style="${CELL}">Model</th><th style="${CELL}">Status</th><th style="${CELL}"></th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
+    <thead><tr><th style="${CELL}"></th><th style="${CELL}">When</th><th style="${CELL}">By</th><th style="${CELL}">What</th><th style="${CELL}">Model</th><th style="${CELL}">Input</th><th style="${CELL}">Status</th><th style="${CELL}">Cost</th><th style="${CELL}"></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <div style="margin-top:8px"><button class="btn" data-ai-action="an-side">Show the two ticked side by side</button>
+    <span style="font-size:11px;color:#90a4ae">Analyses with the same letter were sent the same input.</span></div>`;
+}
+
+/** Two analyses side by side (#831), saying whether they were sent the same input. */
+function sideBySideHtml(a, b) {
+  const same = a.contentHash && a.contentHash === b.contentHash;
+  const note = same
+    ? `<div style="${NOTE}${OK}">Both were sent the same input: the differences are the models' (${esc(a.model)}, ${esc(b.model)}).</div>`
+    : `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">The inputs differ (other batches, results, findings or settings): compare with care.</div>`;
+  const column = (x) => `<div style="flex:1 1 380px;min-width:0;border:1px solid #eceff1;border-radius:6px;padding:10px"><h4 style="margin:0 0 6px">${esc(x.model)}</h4>${resultHtml(x)}</div>`;
+  return note + `<div style="display:flex;gap:12px;flex-wrap:wrap">${column(a)}${column(b)}</div>`;
+}
+
+function spendRow(label, s) {
+  const unpriced = s.unpriced ? ` (${esc(s.unpriced)} without a price)` : '';
+  return `<tr><td style="${CELL}">${esc(label)}</td><td style="${CELL}">${esc(s.analyses)}</td><td style="${CELL}">${esc(Number(s.tokens).toLocaleString('en'))}</td><td style="${CELL}">${usd(s.cost)}${unpriced}</td></tr>`;
+}
+
+/** What the analyses of this company or provider cost (#831), at list prices. */
+function spendHtml(s) {
+  const head = `<thead><tr><th style="${CELL}"></th><th style="${CELL}">Analyses</th><th style="${CELL}">Tokens</th><th style="${CELL}">Cost</th></tr></thead>`;
+  const table = (rows) => `<div class="table-wrap"><table style="border-collapse:collapse;font-size:13px">${head}<tbody>${rows}</tbody></table></div>`;
+  const mine = s.mine?.cap === null || s.mine?.cap === undefined
+    ? `Your use this month: ${esc(Number(s.mine?.used ?? 0).toLocaleString('en'))} tokens (no limit set).`
+    : `Your use this month: ${esc(Number(s.mine.used).toLocaleString('en'))} of your ${esc(Number(s.mine.cap).toLocaleString('en'))} tokens.`;
+  const months = (s.months || []).map(m => spendRow(m.month, m)).join('');
+  const models = (s.models || []).map(m => spendRow(m.model, m)).join('');
+  return `<div style="font-size:12px;color:#78909c;margin-bottom:6px">Every Test Manager's analyses here, at the model's list price in US dollars
+    (or the price entered for a model OSCAR does not know). An estimate: the AI service's invoice is what counts. ${mine}</div>
+    ${table(spendRow('Today', s.today) + spendRow('This month', s.month))}
+    ${months ? '<div style="font-size:12px;color:#546e7a;margin:10px 0 4px">Per month</div>' + table(months) : ''}
+    ${models ? '<div style="font-size:12px;color:#546e7a;margin:10px 0 4px">This month, per model</div>' + table(models) : ''}`;
 }
 
 let current = null;
@@ -369,7 +469,8 @@ async function load() {
 function fieldsOf(section) {
   const value = (f) => section.querySelector(`[data-f="${f}"]`).value;
   return { connector: value('connector'), baseUrl: value('baseUrl'), model: value('model'), apiKey: value('apiKey'),
-    monthlyTokenCap: value('monthlyTokenCap'), instruction: value('instruction') };
+    monthlyTokenCap: value('monthlyTokenCap'), instruction: value('instruction'),
+    priceInput: value('priceInput'), priceOutput: value('priceOutput') };
 }
 
 function showResult(section, html) {
@@ -402,11 +503,40 @@ async function serviceAction(section, action) {
 }
 
 // A new kind of service starts from its usual address, unless one was typed.
+// The list of models is Anthropic's only (#831).
 function connectorChanged(section) {
   const chosen = (current?.connectorsShown || []).find(c => c.id === section.querySelector('[data-f="connector"]').value);
   const address = section.querySelector('[data-f="baseUrl"]');
   const defaults = (current?.connectorsShown || []).map(c => c.defaultBaseUrl);
   if (chosen && (address.value === '' || defaults.includes(address.value))) address.value = chosen.defaultBaseUrl;
+  section.querySelector('[data-f="modelList"]').style.display = chosen?.id === 'anthropic' ? '' : 'none';
+}
+
+// A model chosen in the list goes into the field; "another model" leaves the field to type in.
+function modelPicked(section) {
+  const picked = section.querySelector('[data-f="modelPick"]').value;
+  const field = section.querySelector('[data-f="model"]');
+  if (picked) field.value = picked;
+  else field.focus();
+}
+
+// The models the service offers now, with the stored or the typed key (#831).
+async function refreshModels(section) {
+  const f = fieldsOf(section);
+  showResult(section, '⏳ Asking the service for its models…');
+  const res = await fetch('/v1/company/ai-analysis/config/models', inTarget(section, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ connector: f.connector, baseUrl: f.baseUrl, apiKey: f.apiKey }) }));
+  if (!res.ok) { showResult(section, testResultHtml({ ok: false, error: await readError(res, 'The list of models could not be read.') })); return; }
+  const { models } = await res.json();
+  section.querySelector('[data-f="modelPick"]').innerHTML = modelOptionsHtml(models, f.model);
+  showResult(section, `<div style="${NOTE}${OK}">${esc(models.length)} model(s) offered by the service. Prices are OSCAR's list; a model without one shows none.</div>`);
+}
+
+function insertSuggestedInstruction(section) {
+  const text = section.querySelector('[data-f="suggestedInstruction"]').content.textContent;
+  const box = section.querySelector('[data-f="instruction"]');
+  if (box.value.trim() && !confirm('Replace your instruction with the suggested one?')) return;
+  box.value = text;
 }
 
 function ticked() {
@@ -449,8 +579,45 @@ async function loadAnalysisTarget() {
   document.getElementById('ai-an-a').innerHTML = batchOptionsHtml(data.batches || [], false);
   document.getElementById('ai-an-b').innerHTML = batchOptionsHtml(data.batches || [], true);
   document.getElementById('ai-an-lang').innerHTML = (data.languages || ['English']).map(l => `<option>${esc(l)}</option>`).join('');
+  document.getElementById('ai-an-compare').innerHTML = '';
+  await loadModels();
   await loadChecklist();
   await loadHistory();
+  await loadSpend();
+}
+
+/** The models an analysis may use (#831): the configured one first, then the list for Anthropic. */
+function analysisModelOptionsHtml(answer) {
+  const configured = answer?.config?.model || '';
+  const listed = answer?.config?.connector === 'anthropic' ? (answer.models || []).filter(m => m.id !== configured) : [];
+  const first = configured ? `<option value="${esc(configured)}" selected>${esc(configured)} (configured)</option>` : '';
+  return first + listed.map(m => `<option value="${esc(m.id)}">${esc(m.label)} (${esc(m.id)})${esc(priceText(m))}</option>`).join('');
+}
+
+async function loadModels() {
+  const res = await fetch('/v1/company/ai-analysis/config', { headers: analysisHeaders() });
+  document.getElementById('ai-an-model').innerHTML = res.ok ? analysisModelOptionsHtml(await res.json()) : '';
+}
+
+async function loadSpend() {
+  const res = await fetch('/v1/company/ai-analysis/spend', { headers: analysisHeaders() });
+  const el = document.getElementById('ai-an-spend');
+  el.innerHTML = res.ok ? spendHtml(await res.json()) : esc(await readError(res, 'Could not read what was spent.'));
+}
+
+// The two analyses ticked in the history, side by side (#831).
+async function showSideBySide() {
+  const ids = [...document.querySelectorAll('[data-ai-action="an-pick"]:checked')].map(el => el.value);
+  const box = document.getElementById('ai-an-compare');
+  if (ids.length !== 2) { show('Tick two analyses to show them side by side.', 'error'); return; }
+  const read = async (id) => {
+    const res = await fetch('/v1/company/ai-analysis/history/' + encodeURIComponent(id), { headers: analysisHeaders() });
+    if (!res.ok) throw new Error(await readError(res, 'Could not read the analysis.'));
+    return res.json();
+  };
+  const [a, b] = await Promise.all(ids.map(read));
+  box.innerHTML = sideBySideHtml(a, b);
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function loadChecklist() {
@@ -495,7 +662,7 @@ function analysisChoice() {
   const a = document.getElementById('ai-an-a').value;
   const b = document.getElementById('ai-an-b').value;
   // The comparison reads the batch chosen first as the earlier one; the server orders them by date.
-  return { batches: b ? [a, b] : [a], language: document.getElementById('ai-an-lang').value };
+  return { batches: b ? [a, b] : [a], language: document.getElementById('ai-an-lang').value, model: document.getElementById('ai-an-model').value };
 }
 
 async function previewAnalysis() {
@@ -545,6 +712,7 @@ async function runAnalysis() {
   previewed = null;
   await followAnalysis(id, 120);
   await loadHistory();
+  await loadSpend();
 }
 
 // Show a running analysis every 3 s until it ends, at most `left` more times.
@@ -558,10 +726,10 @@ async function followAnalysis(id, left) {
 document.addEventListener('change', (e) => {
   if (e.target.closest('[data-ai-action="an-target"]')) loadAnalysisTarget().catch(err => show(err.message, 'error'));
   else if (e.target.closest('[data-ai-action="an-checklist-file"]')) importChecklist(e.target).catch(err => show(err.message, 'error'));
-  else if (e.target.closest('#ai-an-a, #ai-an-b, #ai-an-lang')) { previewed = null; document.getElementById('ai-an-preview').innerHTML = ''; }
+  else if (e.target.closest('#ai-an-a, #ai-an-b, #ai-an-lang, #ai-an-model')) { previewed = null; document.getElementById('ai-an-preview').innerHTML = ''; }
 });
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"]');
+  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-side"]');
   if (!el) return;
   const act = el.dataset.aiAction;
   let job;
@@ -569,6 +737,7 @@ document.addEventListener('click', (e) => {
   else if (act === 'an-run') job = runAnalysis();
   else if (act === 'an-checklist-remove') job = removeChecklist();
   else if (act === 'an-copy-issue') job = copyIssue(el.dataset.group);
+  else if (act === 'an-side') job = showSideBySide();
   else job = showAnalysis(el.dataset.id);
   job.catch(err => show(err.message, 'error'));
 });
@@ -577,6 +746,8 @@ document.addEventListener('change', (e) => {
   if (e.target.closest('[data-ai-action="accept"], [data-ai-action="target"]')) updateButton();
   const kind = e.target.closest('[data-ai-action="connector"]');
   if (kind) connectorChanged(kind.closest('[data-ai-target]'));
+  const pick = e.target.closest('[data-ai-action="model-pick"]');
+  if (pick) modelPicked(pick.closest('[data-ai-target]'));
 });
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-ai-action="request"]');
@@ -586,6 +757,13 @@ document.addEventListener('click', (e) => {
     const section = service.closest('[data-ai-target]');
     serviceAction(section, service.dataset.aiAction).catch(err => showResult(section, testResultHtml({ ok: false, error: err.message })));
   }
+  const models = e.target.closest('[data-ai-action="models"]');
+  if (models) {
+    const section = models.closest('[data-ai-target]');
+    refreshModels(section).catch(err => showResult(section, testResultHtml({ ok: false, error: err.message })));
+  }
+  const suggest = e.target.closest('[data-ai-action="suggest-instruction"]');
+  if (suggest) insertSuggestedInstruction(suggest.closest('[data-ai-target]'));
 });
 
 if (typeof window !== 'undefined' && document.getElementById('ai-root')) {
