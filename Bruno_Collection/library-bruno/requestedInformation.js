@@ -510,7 +510,7 @@ function sampleValueForField(scenarioField, index, passengerType) {
  * @returns {{ additional:Array, provided:Array }}
  */
 function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
-  const additional = Array.isArray(additionalArr) ? additionalArr.map((x) => Object.assign({}, x)) : [];
+  const additional = Array.isArray(additionalArr) ? additionalArr.map((x) => ({ ...x })) : [];
   const specs = Array.isArray(specsArr) ? specsArr : [];
   const provided = [];
   (unmetLeaves || []).forEach((u) => {
@@ -540,7 +540,7 @@ function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
  */
 function applyPurchaserAutoFeed(purchaserAdditional, unmetLeaves, purchaserSpec) {
   const out = (purchaserAdditional && typeof purchaserAdditional === 'object')
-    ? Object.assign({}, purchaserAdditional) : {};
+    ? { ...purchaserAdditional } : {};
   const provided = [];
   (unmetLeaves || []).forEach((u) => {
     const updateKey = AUTO_FEED_UPDATE_KEYS[u.scenarioField];
@@ -605,9 +605,9 @@ function processRequestedInformation(o) {
   // Only 'omit'/'invalid' are negative probes; anything else (inline/deferred/
   // undefined) means "satisfy it" → autofeed.
   const purMode = (o.purchaserMode === 'omit' || o.purchaserMode === 'invalid') ? o.purchaserMode : 'autofeed';
-  let additional = Array.isArray(o.additional) ? o.additional.map((x) => Object.assign({}, x)) : [];
+  let additional = Array.isArray(o.additional) ? o.additional.map((x) => ({ ...x })) : [];
   let purchaserAdditional = (o.purchaserAdditional && typeof o.purchaserAdditional === 'object')
-    ? Object.assign({}, o.purchaserAdditional) : {};
+    ? { ...o.purchaserAdditional } : {};
   const purchaserSpec = o.purchaserSpec || null;
 
   const provided = [];

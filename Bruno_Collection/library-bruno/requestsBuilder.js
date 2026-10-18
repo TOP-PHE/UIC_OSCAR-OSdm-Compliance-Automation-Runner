@@ -42,7 +42,7 @@ module.exports = {
 // Returns a NEW object and never mutates the input; only the two PAXONE-required
 // keys are filled — any criteria the scenario DID set are preserved untouched.
 function withPaxoneOfferSearchCriteriaDefaults(osc) {
-  const out = (osc && typeof osc === 'object' && !Array.isArray(osc)) ? Object.assign({}, osc) : {};
+  const out = (osc && typeof osc === 'object' && !Array.isArray(osc)) ? { ...osc } : {};
   if (out.currency == null || out.currency === '') {
     out.currency = bru.getEnvVar('offerSearchCriteriaCurrency') || 'EUR';
   }
@@ -598,9 +598,9 @@ function accommodationAndPlaceSelection() {
     // its real type/subType (e.g. COUCHETTE / COUCHETTE_COMFORT_4). #211:
     // selectedAccommodation may also carry a real placeProperties value
     // (e.g. gender-segregation MEN/LADIES/MIXED) harvested from the offer's
-    // availablePlaces in offers.js — Object.assign below carries it through
+    // availablePlaces in offers.js — the spread below carries it through
     // as-is; nothing here is fabricated.
-    placeSelection.accommodations = [Object.assign({ passengerRefs }, selectedAccommodation)];
+    placeSelection.accommodations = [{ passengerRefs, ...selectedAccommodation }];
   } else if (accommodationSelection === "COUCHETTE") {
     // Legacy fallback for providers whose offers carry no availablePlaces
     // accommodation detail (historical vendor-specific shape).
