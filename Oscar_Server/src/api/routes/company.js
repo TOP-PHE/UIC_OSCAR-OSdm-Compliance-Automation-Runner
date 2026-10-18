@@ -870,8 +870,8 @@ function referenceState(companyId) {
     linked: row.reference_name || null,
     applied_version: row.reference_version || null,
     applied_at: row.reference_applied_at || null,
-    current_version: loaded ? loaded.version : null,
-    up_to_date: !!(loaded && row.reference_version === loaded.version),
+    current_version: loaded?.version ?? null,
+    up_to_date: Boolean(row.reference_version) && row.reference_version === loaded?.version,
     missing: !!(row.reference_name && !loaded),
   };
 }
