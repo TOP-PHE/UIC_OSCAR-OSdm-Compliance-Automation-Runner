@@ -265,7 +265,7 @@ function toLocalDateTime(raw) {
 // UI-generated data files always include both, so they are unaffected.
 function subTripDate(value, replacement, fieldLabel, ctx) {
   if (typeof value !== 'string') {
-    throw new Error(
+    throw new TypeError(
       `Data file error: ${ctx} is missing a valid '${fieldLabel}' ` +
       `(got ${value === undefined ? 'undefined' : JSON.stringify(value)}). ` +
       `Each trip requirement needs both a startDatetime and an endDatetime. ` +
