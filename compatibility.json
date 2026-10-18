@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.367",
+  "current_release": "2026.368",
   "releases": [
+    {
+      "release": "2026.368",
+      "date": "2026-10-18",
+      "server": "1.11.333",
+      "collection": "OTST_V2.0.185",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server (#833 PR D): fault detection report. For a batch run on the OSDM simulator with faults asked for, which faults OSCAR detected and where, and, for an AI analysis of that batch, which it explained (provider group at the right step), gave another owner or missed: a score to compare models. AI analysis page; GET /v1/company/ai-analysis/fault-detection. Collection unchanged."
+      ]
+    },
     {
       "release": "2026.367",
       "date": "2026-10-18",

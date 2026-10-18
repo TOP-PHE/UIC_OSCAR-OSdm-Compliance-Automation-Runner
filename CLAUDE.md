@@ -1879,7 +1879,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (now a WARNING in `validateProblemResponse()`), and an HTML answer to a
     booking read crashed the step's script ("Post-Response Script Error"):
     every GET Booking step now starts with `jsonObjectOrStop()`
-    (`loopback.js`), one failed check and the scenario stops. The data file
+    (`loopback.js`), one failed check and the scenario stops.
+    **PR D (1.11.333): the detection report.** `utils/faultDetection.js`
+    (pure): `detect()` matches each (run, fault) of a batch with the
+    catalogue's `expect` (FAIL = a failed check of that step whose text holds
+    the check; WARNING = a `[WARNING]` line of the run's log, decrypted from
+    `run_events`, or a failure), `scoreAnalysis()` reads an AI analysis on the
+    faults OSCAR *failed* only (warnings are never sent to it): explained =
+    a provider group naming an expected step and the scenario (or none),
+    misattributed = another owner, missed = no group. Owner, step and
+    scenario only, never the cause's wording. `simulator-faults.json` is
+    **generated** (`scripts/generate-simulator-faults.js`) from the
+    simulator's `faults.js`, which is not deployed; a test fails until the
+    two agree. Route `GET /ai-analysis/fault-detection?batch=&analysis=`
+    (Test Manager, no model called); page buttons in the AI analysis card.
+    `tests/helpers/fault-replay.json` is the replay's failures and warnings of
+    the 12 SIM_FAULT scenarios: re-extract it when a fault's checks move. The data file
     holds each sale scenario once per version (`_36`, `_37`, `_38`), and
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;
