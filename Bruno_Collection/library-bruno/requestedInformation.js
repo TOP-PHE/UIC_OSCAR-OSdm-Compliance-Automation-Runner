@@ -449,6 +449,15 @@ const KNOWN_LAST_SEGMENTS = new Set(Object.keys(SCENARIO_FIELDS));
  * @param {number} [passengerCount] number of passengers in the request (for index range)
  * @returns {{ indexErrors:Array, unknownPaths:string[] }}
  */
+// How a check message names an out-of-range index and an unmet attribute.
+function indexErrorText(e) {
+  return `[${e.index}] >= ${e.passengerCount}`;
+}
+
+function unmetText(u) {
+  return `${u.scenarioField}@${u.passengerRef}`;
+}
+
 function staticIssues(ast, passengerCount) {
   const leaves = ast ? collectLeaves(ast) : [];
   const indexErrors = [];
@@ -633,7 +642,7 @@ function processRequestedInformation(o) {
   const issues = staticIssues(s.ast, passengerCount);
   assert(`${tag}.requestedInformation passenger indices are in range`,
     issues.indexErrors.length === 0,
-    `out-of-range index(es): ${issues.indexErrors.map((e) => `[${e.index}] >= ${e.passengerCount}`).join(', ')}`);
+    `out-of-range index(es): ${issues.indexErrors.map(indexErrorText).join(', ')}`);
   if (issues.unknownPaths.length) {
     log('WARNING', `${tag}.requestedInformation references attribute(s) OSCAR does not recognise: ${[...new Set(issues.unknownPaths)].join(', ')}`);
   }
@@ -682,7 +691,7 @@ function processRequestedInformation(o) {
         const mappableRemaining = unmet.filter((u) => u.scenarioField);
         assert(`${tag}.requestedInformation is satisfiable from OSCAR scenario fields (auto-fed)`,
           mappableRemaining.length === 0,
-          `still unmet after auto-feed: ${mappableRemaining.map((u) => `${u.scenarioField}@${u.passengerRef}`).join(', ')}`);
+          `still unmet after auto-feed: ${mappableRemaining.map(unmetText).join(', ')}`);
         unmet.filter((u) => !u.scenarioField).forEach((u) => {
           log('WARNING', `${tag}: cannot auto-provide '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR) — booking/confirmation may be rejected.`);
         });
@@ -852,7 +861,8 @@ function validateProblemResponse(o) {
     if (hasPointers || namesField) {
       log('INFO', `${pfx}: error identifies the offending field.`);
     } else {
-      log('WARNING', `${pfx}: error does not clearly identify the offending field${fields.length ? ` (${fields.join('/')})` : ''} via Problem.pointers — recommended per RFC 9457.`);
+      const fieldsNote = fields.length ? ` (${fields.join('/')})` : '';
+      log('WARNING', `${pfx}: error does not clearly identify the offending field${fieldsNote} via Problem.pointers — recommended per RFC 9457.`);
     }
   } else {
     log(soft ? 'INFO' : 'WARNING',

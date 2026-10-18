@@ -911,7 +911,8 @@ function parseScenarioData(jsonData) {
           const _paxCount = Array.isArray(_passengersList?.passengers)
             ? _passengersList.passengers.length : 0;
           if (_paxCount < 2) {
-            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
+            const _listState = _passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`;
+            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_listState} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
           }
         }
         // Per-leg with SPECIFICATION trip can be statically validated.

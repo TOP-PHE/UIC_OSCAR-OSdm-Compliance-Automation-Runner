@@ -102,12 +102,13 @@ async function runExpiredFlowWait(opts) {
   const scenarioLabel = String(opts.scenarioLabel || 'expired-flow test');
   const deadlineRaw   = opts.deadlineRaw;
 
+  const deadlineNote = deadlineRaw ? ` (${deadlineRaw})` : '';
   if (plan.waitMs > 0) {
-    validationLogger(`[INFO] ${scenarioLabel}: waiting ~${Math.ceil(plan.waitMs/1000)}s until just past the deadline${deadlineRaw ? ` (${deadlineRaw})` : ''} before firing the request... (budget source: ${plan.budgetSource})`);
+    validationLogger(`[INFO] ${scenarioLabel}: waiting ~${Math.ceil(plan.waitMs/1000)}s until just past the deadline${deadlineNote} before firing the request... (budget source: ${plan.budgetSource})`);
     await new Promise(function (r) { setTimeout(r, plan.waitMs); });
     validationLogger(`[INFO] ${scenarioLabel}: wait complete — refreshing access token before firing the request.`);
   } else {
-    validationLogger(`[INFO] ${scenarioLabel}: deadline already passed${deadlineRaw ? ` (${deadlineRaw})` : ''} — firing request now, expecting rejection.`);
+    validationLogger(`[INFO] ${scenarioLabel}: deadline already passed${deadlineNote} — firing request now, expecting rejection.`);
   }
   try {
     await refreshAccessTokenIfNeeded({ force: true, callerLabel: scenarioLabel });

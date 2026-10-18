@@ -209,6 +209,7 @@ function gradePlaceProbeResponse(res) {
   bru.setEnvVar('__placeProbeIndex', String(target.total));
   const booking = (body && typeof body === 'object') ? body.booking : null;
   const bookingId = (booking?.id) ? booking.id : null;
+  const bookingNote = bookingId ? ` (${bookingId})` : '';
   const allocations = [];
   ((booking?.bookedOffers) || []).forEach((bo) => {
     ((bo?.reservations) || []).forEach((rsv) => {
@@ -224,7 +225,7 @@ function gradePlaceProbeResponse(res) {
         + `${a.accommodationType || '?'}/${a.accommodationSubType || '?'} — spec-valid, but the customer never stated the compartment. Vendor-capability note.`);
     } else {
       test(`${probeName}: a reservation booking with NO compartment stated and NO allocation made must not be accepted`, () => {
-        throw new Error(`HTTP ${status} accepted the booking${bookingId ? ` (${bookingId})` : ''} without placeSelections AND the booked reservation `
+        throw new Error(`HTTP ${status} accepted the booking${bookingNote} without placeSelections AND the booked reservation `
           + 'carries no placeAllocation — the booking is ambiguous: nobody knows which compartment/place was sold.');
       });
     }
@@ -247,13 +248,13 @@ function gradePlaceProbeResponse(res) {
     }
   } else if (target.key === 'wrongReservationId') {
     test(`${probeName}: a placeSelection whose reservationId exists in no offer part must be rejected`, () => {
-      throw new Error(`HTTP ${status} accepted the booking${bookingId ? ` (${bookingId})` : ''} although placeSelections[0].reservationId='${FAKE_RESERVATION_ID}' `
+      throw new Error(`HTTP ${status} accepted the booking${bookingNote} although placeSelections[0].reservationId='${FAKE_RESERVATION_ID}' `
         + 'matches NO reservation offer part of the selected offer — referential-integrity violation.');
     });
   }
 
   validationLogger(`[WARNING] 🧪 Place-selection probe sweep STOPPED at probe ${target.index + 1}/${target.total} — the corrupted request was `
-    + `accepted and created a real booking${bookingId ? ` (${bookingId})` : ''}. Remaining probes are skipped; the run continues with this booking.`);
+    + `accepted and created a real booking${bookingNote}. Remaining probes are skipped; the run continues with this booking.`);
   return 'accepted-continue';
 }
 

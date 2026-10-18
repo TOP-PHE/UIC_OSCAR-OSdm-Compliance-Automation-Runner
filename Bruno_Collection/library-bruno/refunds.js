@@ -436,8 +436,12 @@ function validateRefundPermissibility(refundOffer, index) {
 
   // Gate 1 — nothing permits a refund, yet one was PROPOSED.
   if (analyses.every((a) => !permits(a))) {
+    const lockReason = (a) => (a.schedule
+      ? `the declared schedule charges the full price (fee ≥ ${a.priceAmount})`
+      : `flag ${a.flagLabel} with no schedule granting a refund`);
+    const partReason = (a, k) => `part ${k + 1}: ${lockReason(a)}`;
     test(`Refund offer[${index}] permissibility — every selected-offer part is effectively non-refundable`, () => {
-      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer?.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map((a, k) => `part ${k + 1}: ${a.schedule ? `the declared schedule charges the full price (fee ≥ ${a.priceAmount})` : `flag ${a.flagLabel} with no schedule granting a refund`}`).join("; ")} — and no overrule was sent.`);
+      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer?.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map(partReason).join("; ")} — and no overrule was sent.`);
     });
     return;
   }
@@ -464,8 +468,9 @@ function validateRefundPermissibility(refundOffer, index) {
       const _refunded = refundOffer.refundableAmount.amount
         + ((refundOffer.refundFee && typeof refundOffer.refundFee.amount === "number") ? refundOffer.refundFee.amount : 0);
       if (_refunded > _permitted) {
+        const lockedPrice = (p) => `${p.price.amount} ${p.price.currency || ""}`;
         test(`Refund offer[${index}] permissibility — refunded value stays within the parts that effectively permit a refund`, () => {
-          throw new Error(`The refund returns ${_refunded} ${_currencies[0] || ""} (refundable + fee) but the parts effectively permitting a refund carry only ${_permitted} — the difference comes from part(s) whose own declarations lock the value (${lockedParts.map((p) => `${p.price.amount} ${p.price.currency || ""}`).join(", ")}) and no overrule was sent.`);
+          throw new Error(`The refund returns ${_refunded} ${_currencies[0] || ""} (refundable + fee) but the parts effectively permitting a refund carry only ${_permitted} — the difference comes from part(s) whose own declarations lock the value (${lockedParts.map(lockedPrice).join(", ")}) and no overrule was sent.`);
         });
         return;
       }

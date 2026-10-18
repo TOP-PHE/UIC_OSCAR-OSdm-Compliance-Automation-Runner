@@ -124,8 +124,9 @@ function checkWarningsAndProblems(jsonData) {
       validationLogger(`[WARNING] ⚠️ Response envelope warning ${i + 1}/${warnings.length}: ${_fmt(w)}`);
     });
     problems.forEach((p, i) => {
+      const pointerText = (x) => `${(x?.code) || "?"} @ ${(x?.requestPointer) || "?"}`;
       const ptr = Array.isArray(p.pointers) && p.pointers.length > 0
-        ? ` — pointer(s): ${p.pointers.map((x) => `${(x?.code) || "?"} @ ${(x?.requestPointer) || "?"}`).join("; ")}`
+        ? ` — pointer(s): ${p.pointers.map(pointerText).join("; ")}`
         : "";
       validationLogger(`[ERROR] ⛔ Response envelope problem ${i + 1}/${problems.length}: ${_fmt(p)}${ptr}`);
     });
@@ -578,10 +579,13 @@ function selectAndSetOffer(jsonData) {
         if (pl.accommodationSubType) fam[t].subs.add(pl.accommodationSubType);
       }));
     });
+    const subtypesOf = (t) => (fam[t].subs.size ? ` (subtypes: ${[...fam[t].subs].join(", ")})` : "");
     const famLine = Object.keys(fam)
-      .map((t) => `${t} ×${fam[t].offers.size} offer(s)${fam[t].subs.size ? ` (subtypes: ${[...fam[t].subs].join(", ")})` : ""}`)
+      .map((t) => `${t} ×${fam[t].offers.size} offer(s)${subtypesOf(t)}`)
       .join("; ");
-    console.log(`[INFO] 🧭 Offer set: ${offers.length} offer(s)${famLine ? ` — reservation accommodations: ${famLine}` : ""}${noRes > 0 ? `; ${noRes} offer(s) without reservation parts` : ""}.`);
+    const famNote = famLine ? ` — reservation accommodations: ${famLine}` : "";
+    const noResNote = noRes > 0 ? `; ${noRes} offer(s) without reservation parts` : "";
+    console.log(`[INFO] 🧭 Offer set: ${offers.length} offer(s)${famNote}${noResNote}.`);
   })(jsonData?.offers);
 
   const desiredFlexibility = bru.getEnvVar("desiredFlexibility");
@@ -1770,9 +1774,11 @@ function notePlaceSelectionCapabilities(part) {
     .map((p) => p?.graphicalReservation).filter(Boolean).map(String);
 
   if (flows.length === 0) {
-    validationLogger(`[INFO] Reservation part ${part.id}: no supportedPlaceSelectionFlows declared (optional in OSDM)${wantsMap ? ` — the scenario's ${mode} seat-map flow proceeds without a declared capability` : ""}.`);
+    const mapNote = wantsMap ? ` — the scenario's ${mode} seat-map flow proceeds without a declared capability` : "";
+    validationLogger(`[INFO] Reservation part ${part.id}: no supportedPlaceSelectionFlows declared (optional in OSDM)${mapNote}.`);
   } else {
-    validationLogger(`[INFO] Reservation part ${part.id} declares place-selection flows: ${flows.join(", ")}${graphical.length ? `; graphicalReservation: ${[...new Set(graphical)].join(", ")}` : ""}.`);
+    const graphicalNote = graphical.length ? `; graphicalReservation: ${[...new Set(graphical)].join(", ")}` : "";
+    validationLogger(`[INFO] Reservation part ${part.id} declares place-selection flows: ${flows.join(", ")}${graphicalNote}.`);
     const unknown = flows.filter((f) => !KNOWN_FLOWS.has(f.toUpperCase()));
     if (unknown.length > 0) {
       validationLogger(`[WARNING] Reservation part ${part.id}: place-selection flow value(s) [${unknown.join(", ")}] are outside the OSDM base PlaceSelectionFlow list — legal (x-extensible-enum), noted for cross-vendor readers.`);
@@ -2112,7 +2118,8 @@ function sweepCatalogFlagVsSchedule(offers) {
       }
     });
     if (contradicting > 0) {
-      validationLogger(`[WARNING] Catalog sweep (${action}): ${contradicting} of ${list.length} offers declare ${field}=NO on a value-bearing part while their own ${action} schedule charges less than the price${freeWindowed > 0 ? ` (${freeWindowed} even with a FREE window)` : ""} — per the spec enum these are WITH_CONDITION; ${consistent} offer(s) are consistent (every ${action} window charges the full price). Distributors filtering on the flag would hide ${action.toLowerCase()}able products.`);
+      const freeNote = freeWindowed > 0 ? ` (${freeWindowed} even with a FREE window)` : "";
+      validationLogger(`[WARNING] Catalog sweep (${action}): ${contradicting} of ${list.length} offers declare ${field}=NO on a value-bearing part while their own ${action} schedule charges less than the price${freeNote} — per the spec enum these are WITH_CONDITION; ${consistent} offer(s) are consistent (every ${action} window charges the full price). Distributors filtering on the flag would hide ${action.toLowerCase()}able products.`);
     }
   });
 }
