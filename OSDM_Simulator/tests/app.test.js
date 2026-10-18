@@ -305,11 +305,12 @@ const inboundRequest = (returnSearchParameters) => offerRequest({
   },
 });
 
+// #833: on beta, OSDM 3.6 (alpha) has no outboundTripIds nor inboundTripCoverage.
 test('return, both directions: offers cover the outbound and the inbound trip; two tickets', async () => {
-  const token = await tokenFor(sim.base, 'alpha', alphaOne);
-  const outbound = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body;
+  const token = await tokenFor(sim.base, 'beta', betaOne);
+  const outbound = (await call(sim.base, token, 'POST', '/beta/offers', offerRequest())).body;
   const outboundTrip = outbound.trips[0];
-  const res = await call(sim.base, token, 'POST', '/alpha/offers', inboundRequest({ outboundTripIds: [outboundTrip.id] }));
+  const res = await call(sim.base, token, 'POST', '/beta/offers', inboundRequest({ outboundTripIds: [outboundTrip.id] }));
   assert.equal(res.status, 200);
   const { trips, offers } = res.body;
   assert.deepEqual(trips.map((t) => t.direction), ['OUT_BOUND', 'IN_BOUND']);
@@ -324,14 +325,14 @@ test('return, both directions: offers cover the outbound and the inbound trip; t
   }
   // A return price: less than the two single journeys bought apart.
   const single = (list, flex) => list.offers.find((o) => o.offerSummary.overallFlexibility === flex).offerSummary.minimalPrice.amount;
-  const inboundAlone = (await call(sim.base, token, 'POST', '/alpha/offers', inboundRequest(undefined))).body;
+  const inboundAlone = (await call(sim.base, token, 'POST', '/beta/offers', inboundRequest(undefined))).body;
   assert.ok(single(res.body, 'FULL_FLEXIBLE') < single(outbound, 'FULL_FLEXIBLE') + single(inboundAlone, 'FULL_FLEXIBLE'));
 
   const offer = offers[0];
-  const created = (await call(sim.base, token, 'POST', '/alpha/bookings', bookingRequest(offer))).body.booking;
+  const created = (await call(sim.base, token, 'POST', '/beta/bookings', bookingRequest(offer))).body.booking;
   assert.deepEqual(created.trips.map((t) => t.id), trips.map((t) => t.id));
   assert.equal(created.bookedOffers[0].inboundTripCoverage.coveredTripId, trips[1].id);
-  const issued = (await call(sim.base, token, 'POST', `/alpha/bookings/${created.id}/fulfillments`, {})).body.fulfillments;
+  const issued = (await call(sim.base, token, 'POST', `/beta/bookings/${created.id}/fulfillments`, {})).body.fulfillments;
   assert.equal(issued.length, 2, 'one ticket per direction');
   const admissions = created.bookedOffers[0].admissions;
   assert.deepEqual(issued.map((f) => f.bookingParts.map((p) => p.id)), [[admissions[0].id], [admissions[1].id]]);

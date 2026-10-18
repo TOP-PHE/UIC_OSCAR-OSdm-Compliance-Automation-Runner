@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.365",
+  "current_release": "2026.366",
   "releases": [
+    {
+      "release": "2026.366",
+      "date": "2026-10-18",
+      "server": "1.11.331",
+      "collection": "OTST_V2.0.184",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Simulator 0.35.0 (#833): alpha and beta answer in the shapes of OSDM 3.6 and 3.7 (documents held by each fulfilment, no 3.7/3.8 members), and eight answers that broke the OSDM schema on every provider are fixed; the simulator's tests check every answer against the response schema of the provider's version. Collection: Problem.pointers read as OSDM ProblemPointer objects. Replay: no check changed from pass to fail."
+      ]
+    },
     {
       "release": "2026.365",
       "date": "2026-10-18",

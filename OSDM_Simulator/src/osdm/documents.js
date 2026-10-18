@@ -53,13 +53,15 @@ function mediaOf(booking, provider) {
   return listOf(provider.documents).filter((medium) => asked.has(medium) && MEDIA[medium]);
 }
 
-const documentOf = (provider, medium, summary) => ({
+// #833: a FulfillmentDocument has no summary in OSDM; a ticket of one
+// fulfilment names its control number (3.8).
+const documentOf = (provider, medium, controlNumber) => ({
   id: `${provider.idPrefix}-DOC-${randomId()}`,
   medium,
   type: 'TICKET',
   format: MEDIA[medium].format,
   content: MEDIA[medium].content,
-  summary,
+  ...(controlNumber ? { controlNumber } : {}),
 });
 
 /** On confirmation: the booking's documents, and each fulfilment's references to them. */
@@ -67,12 +69,12 @@ function issueDocuments(booking, provider) {
   const documents = [];
   for (const medium of mediaOf(booking, provider)) {
     if (MEDIA[medium].perBooking) {
-      const merged = documentOf(provider, medium, `All tickets of booking ${booking.bookingCode}`);
+      const merged = documentOf(provider, medium);
       documents.push(merged);
       for (const fulfillment of booking.fulfillments) fulfillment.fulfillmentDocumentRefs = [...listOf(fulfillment.fulfillmentDocumentRefs), merged.id];
     } else {
       for (const fulfillment of booking.fulfillments) {
-        const own = documentOf(provider, medium, `Ticket ${fulfillment.controlNumber}`);
+        const own = documentOf(provider, medium, fulfillment.controlNumber);
         documents.push(own);
         fulfillment.fulfillmentDocumentRefs = [...listOf(fulfillment.fulfillmentDocumentRefs), own.id];
       }
@@ -119,7 +121,6 @@ function showRefundReceipt(booking, provider, nowMs) {
     type: 'INFORMATION',
     format: 'application/pdf',
     content: PDF_CONTENT,
-    summary: `Refund receipt, booking ${booking.bookingCode}`,
   }];
 }
 

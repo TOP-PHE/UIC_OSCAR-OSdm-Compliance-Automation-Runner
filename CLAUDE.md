@@ -1849,7 +1849,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     three files. Tests of a provider without a function use `plain`
     (`tests/fixtures/providers/`, loaded by `tests/helpers.js` only, never
     shipped). Only a COMBINED return is not run on alpha: OSDM 3.6 has no
-    `outboundTripIds`. Only `/versions` differs; the answers have the 3.8 shapes on all three. The data file
+    `outboundTripIds`. **Since #833 (0.35.0) each answers in its own
+    version's shapes** (`src/osdm/versionShapes.js`, applied at send time:
+    the routes still build 3.8; below 3.8 documents are held by each
+    fulfilment, below 3.7 `inboundTripCoverage` & co. go). **Every answer a
+    simulator test receives is checked against the OSDM response schema of
+    the provider's version** (`tests/osdm-conformance.js`, from `call()`):
+    a new member or answer that OSDM does not have fails a test. The schemas
+    are generated (`Oscar_Server/scripts/generate-osdm-response-schemas.js`
+    → `tests/fixtures/osdm-response-schemas.json`, 3.8 pinned); remove a member
+    by name in `versionShapes.js` only when the earlier version has it in no
+    schema. `Problem.pointers` are ProblemPointer objects; the collection
+    reads both forms (`pointerText()`). Restarting a local simulator: check
+    the new process did start (EADDRINUSE) before recording a replay. The data file
     holds each sale scenario once per version (`_36`, `_37`, `_38`), and
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;

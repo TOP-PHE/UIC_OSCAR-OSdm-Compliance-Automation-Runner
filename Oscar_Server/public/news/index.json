@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-simulator-versions",
+    "date": "October 18, 2026",
+    "tag": "Improvement",
+    "title": "OSDM Simulator: each provider answers in its own version",
+    "summary": "The simulator's alpha and beta now answer in OSDM 3.6 and 3.7 shapes, and every answer is checked against the OSDM specification.",
+    "content": "Until now the three simulated providers reported different OSDM versions but all answered in 3.8 shapes. alpha now answers as an OSDM 3.6 provider and beta as a 3.7 one (for example, documents are held by each fulfilment below 3.8). Eight answers that did not follow the specification on any provider are fixed, and the simulator's tests now check every answer against the response schema of the provider's version. OSCAR also reads the pointers of OSDM error answers correctly. No check of the simulator's scenarios changed from pass to fail."
+  },
+  {
     "id": "2026-10-18-ai-models-cost",
     "date": "October 18, 2026",
     "tag": "Feature",

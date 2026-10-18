@@ -33,7 +33,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+?\d[\d ()-]{5,19}$/;
 
 const refused = (field, pointer, detail) => new HttpError(400, 'INVALID_PERSON_DATA', 'Person data not valid',
-  `${field}: ${detail}`, {}, { pointers: [pointer] });
+  `${field}: ${detail}`, {}, { pointers: [{ requestPointer: pointer }] });
 
 function isDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

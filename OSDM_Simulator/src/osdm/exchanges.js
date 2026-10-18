@@ -96,7 +96,7 @@ function overruleCodeOf(body, provider) {
   return code;
 }
 
-const fulfillmentRef = (booking, f) => ({ id: f.id, status: f.status, bookingRef: booking.id, bookingParts: f.bookingParts });
+const fulfillmentRef = (booking, f) => ({ id: f.id, status: f.status, bookingRef: booking.id, createdOn: f.createdOn, bookingParts: f.bookingParts });
 
 function exchangeOfferFrom(booking, entry, given, overruleCode, provider) {
   const { offer } = entry;
@@ -177,7 +177,6 @@ function createExchangeOperation(booking, body, provider, nowMs) {
   const operation = {
     id: `${provider.idPrefix}-EXO-${randomId()}`,
     status: 'PREBOOKED',
-    createdOn: new Date(nowMs).toISOString(),
     exchangeOffers: [kept.exchangeOffer],
   };
   state.operations.set(operation.id, { operation, kept });
@@ -243,7 +242,6 @@ function confirmExchange(booking, pending, provider, nowMs, bookOffer) {
   const givenAmount = givenParts.reduce((total, p) => total + p.price.amount, 0);
   booking.confirmedPrice = price(kept0 - givenAmount + offer.exchangePrice.amount + offer.exchangeFee.amount, currencyOf(booking, provider));
   operation.status = 'CONFIRMED';
-  operation.confirmedOn = confirmedOn;
   return booking.fulfillments;
 }
 

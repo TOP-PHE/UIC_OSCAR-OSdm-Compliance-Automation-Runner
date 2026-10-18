@@ -15,6 +15,7 @@ const { loadProviders, loadClients } = require('../src/config');
 const { createTokenService } = require('../src/tokens');
 const { createStore } = require('../src/store');
 const { createApp } = require('../src/app');
+const { responseIssues } = require('./osdm-conformance');
 
 const PROVIDERS_DIR = path.join(__dirname, '..', 'providers');
 // A provider with none of the optional functions, for the tests of a provider
@@ -97,12 +98,19 @@ async function startSimulator({ limits = {}, store: givenStore } = {}) {
   });
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  // A test that fails before closing its simulator must not hold the test
+  // file open for ever (#833): the server and its connections do not keep
+  // the process alive.
+  server.unref();
+  server.on('connection', (socket) => socket.unref());
   return {
     base: `http://127.0.0.1:${server.address().port}`,
     clock,
     logs,
     store,
-    close: () => new Promise((resolve) => server.close(resolve)),
+    // Open keep-alive connections would hold the close (and the test file)
+    // for ever after a failed test (#833).
+    close: () => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }),
   };
 }
 
@@ -117,13 +125,32 @@ async function tokenFor(base, provider, client) {
   return (await res.json()).access_token;
 }
 
+// #833: every answer a test receives is checked against the OSDM response
+// schema of the provider's version, so each test of a flow is also a test
+// that the simulator answers in that version's shapes. The version is the
+// provider's own (the first segment of the path).
+const VERSION_OF = new Map([...loadAllProviders()].map(([key, p]) => [key, p.osdmVersion]));
+
+function checkConformance(method, url, status, body) {
+  if (body === undefined) return;
+  const provider = String(url).split('/').filter(Boolean)[0];
+  const version = VERSION_OF.get(provider);
+  if (!version) return;
+  const issues = responseIssues(version, method, url, status, body);
+  if (issues?.length) {
+    throw new Error(`${method} ${url} → ${status}: not an OSDM ${version} answer:\n  ${issues.slice(0, 15).join('\n  ')}`);
+  }
+}
+
 async function call(base, token, method, url, body) {
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json;version=3.8.0';
   const res = await fetch(base + url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
-  return { status: res.status, headers: res.headers, body: text ? JSON.parse(text) : undefined };
+  const parsed = text ? JSON.parse(text) : undefined;
+  checkConformance(method, url, res.status, parsed);
+  return { status: res.status, headers: res.headers, body: parsed };
 }
 
 const offerRequest = (overrides = {}) => ({
@@ -147,4 +174,4 @@ const bookingRequest = (offer) => ({
   purchaser: { detail: { firstName: 'Paula', lastName: 'Purchaser', contact: { email: 'paula.purchaser@example.org', phoneNumber: '+33199000010' } } },
 });
 
-module.exports = { PROVIDERS_DIR, PLAIN_DIR, SECRETS, REAL_SECRETS, loadAllProviders, tempDir, writeClientsFile, startSimulator, basic, tokenFor, call, offerRequest, bookingRequest };
+module.exports = { checkConformance, PROVIDERS_DIR, PLAIN_DIR, SECRETS, REAL_SECRETS, loadAllProviders, tempDir, writeClientsFile, startSimulator, basic, tokenFor, call, offerRequest, bookingRequest };

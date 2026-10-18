@@ -99,7 +99,7 @@ function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs, s
     validFrom: new Date(nowMs).toISOString(),
     validUntil: new Date(nowMs + lifetimeOf(booking, REFUND_OFFER_LIFETIME_MS)).toISOString(),
     status: 'PROPOSED',
-    fulfillments: [{ id: fulfillment.id, status: fulfillment.status, bookingRef: booking.id, bookingParts: fulfillment.bookingParts }],
+    fulfillments: [{ id: fulfillment.id, status: fulfillment.status, bookingRef: booking.id, createdOn: fulfillment.createdOn, bookingParts: fulfillment.bookingParts }],
     refundFee: price(sum('fee'), currencyOf(booking, provider)),
     // #611: one cent off its breakdown in the wrong-refund-amount variant.
     refundableAmount: price(sum('refundable') + (variants.has(booking, 'wrong-refund-amount') ? 1 : 0), currencyOf(booking, provider)),

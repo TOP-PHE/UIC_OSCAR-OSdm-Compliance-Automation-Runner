@@ -36,7 +36,8 @@ function reductionCardCollection(provider) {
       issuer: provider.carrier.ref,
       name: nameOf(card),
       cardIdRequired: false,
-      reductionsGranted: [{ carrier: provider.carrier.ref, description: `${card.percent} % off the fare` }],
+      // #833: a description is a Text.
+      reductionsGranted: [{ carrier: provider.carrier.ref, description: { id: `${card.code}-REDUCTION`, text: `${card.percent} % off the fare` } }],
     })),
   };
 }
