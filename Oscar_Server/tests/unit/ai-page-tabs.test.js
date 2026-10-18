@@ -52,7 +52,7 @@ describe('#848 the tabs', () => {
 
   test('the page opens on the tab the address names, else Analysis when a service exists, else Connection', () => {
     expect(source).toContain("await showTab(tabFromHash() || ((current.configured || []).length ? 'analysis' : 'connection'));");
-    expect(lift('tabFromHash')).toContain('TAB_IDS.includes(asked)');
+    expect(lift('tabFromHash')).toContain('TAB_IDS.has(asked)');
   });
 });
 

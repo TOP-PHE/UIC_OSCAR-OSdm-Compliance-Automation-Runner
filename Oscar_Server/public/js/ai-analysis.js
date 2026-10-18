@@ -224,8 +224,9 @@ function setupHtml(setup) {
       <input type="radio" name="ai-mode" value="${value}" data-ai-action="mode"${setup.mode === value ? ' checked' : ''} style="width:auto;margin-top:3px">
       <span><strong>${title}</strong><br><span style="color:#546e7a">${text}</span></span></label>`;
   const unused = (setup.services || []).filter(x => !x.inUse);
+  const keptNames = unused.map(x => esc(x.company.name) + ' (' + esc(x.model) + ')').join(', ');
   const kept = unused.length
-    ? `<div style="font-size:12px;color:#78909c;margin-top:8px">Kept but not used with this choice: ${unused.map(x => `${esc(x.company.name)} (${esc(x.model)})`).join(', ')}.</div>`
+    ? `<div style="font-size:12px;color:#78909c;margin-top:8px">Kept but not used with this choice: ${keptNames}.</div>`
     : '';
   return `<div class="card" style="padding:16px 20px">
     <h3 style="margin:0 0 4px">How the AI service is used</h3>
@@ -250,13 +251,14 @@ function serviceCellHtml(t) {
 
 /** The usage status (#848): per company or provider, its access, AI service, analyses and cost; then the totals. */
 function overviewHtml(o) {
+  const costCell = (t) => esc(usd(t.cost)) + (t.unpriced ? ' (' + esc(t.unpriced) + ' without a price)' : '');
   const rows = (o.targets || []).map(t => `<tr><td style="${CELL}">${esc(t.name)}<br><span style="font-size:11px;color:#78909c">${t.provider ? 'Provider' : 'Company'}</span></td>
     <td style="${CELL}">${esc(ACCESS_LABEL[t.access] || t.access)}</td><td style="${CELL}">${serviceCellHtml(t)}</td>
     <td style="${CELL}">${esc(t.analyses)}</td><td style="${CELL}">${esc(Number(t.tokens).toLocaleString('en'))}</td>
-    <td style="${CELL}">${usd(t.cost)}${t.unpriced ? ` (${esc(t.unpriced)} without a price)` : ''}</td></tr>`).join('');
+    <td style="${CELL}">${costCell(t)}</td></tr>`).join('');
   const s = o.totals || {};
   const total = `<tr style="font-weight:600"><td style="${CELL}">Total</td><td style="${CELL}"></td><td style="${CELL}"></td>
-    <td style="${CELL}">${esc(s.analyses ?? 0)}</td><td style="${CELL}">${esc(Number(s.tokens ?? 0).toLocaleString('en'))}</td><td style="${CELL}">${usd(s.cost ?? 0)}</td></tr>`;
+    <td style="${CELL}">${esc(s.analyses ?? 0)}</td><td style="${CELL}">${esc(Number(s.tokens ?? 0).toLocaleString('en'))}</td><td style="${CELL}">${esc(usd(s.cost ?? 0))}</td></tr>`;
   const mode = o.mode === 'per_provider' ? 'one AI service per provider' : 'one AI service for all';
   return `<div class="card" style="padding:16px 20px">
     <h3 style="margin:0 0 4px">AI services and use</h3>
@@ -613,13 +615,13 @@ async function servicesHtml(targets) {
   return serviceSections(approved, answers).map(x => serviceHtml(x.target, x.answer, x.n)).join('');
 }
 
-const TAB_IDS = TABS.map(([id]) => id);
+const TAB_IDS = new Set(TABS.map(([id]) => id));
 let setup = null;
 
 // The tab the address names (#connection, #status, #analysis), else null.
 function tabFromHash() {
   const asked = (window.location.hash || '').slice(1);
-  return TAB_IDS.includes(asked) ? asked : null;
+  return TAB_IDS.has(asked) ? asked : null;
 }
 
 async function readSetup() {
