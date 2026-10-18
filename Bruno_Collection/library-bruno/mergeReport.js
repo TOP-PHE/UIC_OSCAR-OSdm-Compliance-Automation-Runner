@@ -26,7 +26,7 @@ const TMP_JSON   = path.join(VAL_DIR, '.report_tmp.json');
 // ─── Args ─────────────────────────────────────────────────────────────────────
 const rawEnvArg  = process.argv[2] || 'Unknown';
 const envName    = rawEnvArg.replace(/^OTST_/i, '').replace(/_Env$/i, '');
-const dateStr    = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+const dateStr    = new Date().toISOString().slice(0, 10).replaceAll('-', '');
 const htmlPath   = path.join(VAL_DIR, `${dateStr}_${envName}_Report.html`);
 
 // ─── Load data ────────────────────────────────────────────────────────────────
