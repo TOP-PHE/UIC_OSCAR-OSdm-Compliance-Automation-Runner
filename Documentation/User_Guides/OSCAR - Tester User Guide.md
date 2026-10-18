@@ -203,9 +203,25 @@ chosen in **Working on**.
 - **When it stops**: when it expires, when a Test Manager revokes it (at once),
   or when the Test Manager who made it is no longer a Test Manager of the
   company.
-- In this release a key can only describe itself (`GET /v1/api/key`); the
-  routes reading runs and results come next. Their description is in the
-  API documentation (`/v1/docs`).
+- **What it reads** (since 1.11.338), all `GET`, described in the API
+  documentation (`/v1/docs`, tag *API*):
+
+  | Route | Answer |
+  |---|---|
+  | `/v1/api/key` | the key itself: name, company, scopes, expiry |
+  | `/v1/api/runs` | the runs, newest first; `limit` (1–200), `offset`, `status`, `batch_id`, `scenario_code` |
+  | `/v1/api/runs/{id}` | one run: status, times, scenario, batch, check counts |
+  | `/v1/api/runs/{id}/assertions` | its checks, by step; `result=failed` or `passed` |
+  | `/v1/api/batches/{batchId}` | the runs of one batch, with counts by status |
+  | `/v1/api/queue` | the runs waiting or running, in order |
+
+  A key does not read request or response bodies, logs, report files, the
+  provider's endpoint or who started a run. A deleted run, or one of another
+  company or provider, answers 404 like a run that does not exist.
+
+  ```bash
+  curl -H "Authorization: Bearer $OSCAR_KEY" https://<oscar>/v1/api/runs?status=FAILED
+  ```
 
 ## 3. Provider setup — Framework, Test data & Discovery
 

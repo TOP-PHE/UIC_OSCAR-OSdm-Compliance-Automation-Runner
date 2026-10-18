@@ -414,6 +414,41 @@ module.exports = {
         description: 'Authorization: Bearer <key> only (never a cookie or a URL parameter). Any refusal is the same 401. Every other route outside /v1/api refuses a key.',
         responses: { 200: { description: '{ name, hint, company: { id, name }, scopes, created_at, expires_at }' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 429: { description: 'Too many requests' } } },
     },
+    '/v1/api/runs': {
+      get: { tags: ['API'], summary: 'The runs of the key\'s company or provider, newest first (#503)', security: [{ apiKeyAuth: [] }],
+        description: 'Only the runs of the company or provider the key was made for (not its providers), never a deleted one. Each run: { id, status, scenario_code, batch_id, queued_at, started_at, completed_at, exit_code, checks: { total, passed, failed } }. No body, log, URL, endpoint or person is answered.',
+        parameters: [
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'] } },
+          { name: 'batch_id', in: 'query', schema: { type: 'string', maxLength: 200 } },
+          { name: 'scenario_code', in: 'query', schema: { type: 'string', maxLength: 200 } },
+        ],
+        responses: { 200: { description: '{ total, limit, offset, runs: [run] }' }, 400: { description: 'A parameter that is not one of the values above' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 429: { description: 'Too many requests' } } },
+    },
+    '/v1/api/runs/{id}': {
+      get: { tags: ['API'], summary: 'One run and its check counts (#503)', security: [{ apiKeyAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'The run, as in the list' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 404: { description: 'No such run, or not one of the key\'s company' } } },
+    },
+    '/v1/api/runs/{id}/assertions': {
+      get: { tags: ['API'], summary: 'The checks of a run: suites, requests, checks (#503)', security: [{ apiKeyAuth: [] }],
+        description: '{ run, suites: [{ scenario, name, duration_ms, checks, requests: [{ name, method, http_status, result, capability, duration_ms, checks, assertions: [{ name, type, passed, category, domain, offer_part, severity, error, expected, actual }] }] }] }. No request or response body, header or URL.',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'result', in: 'query', schema: { type: 'string', enum: ['passed', 'failed'] }, description: 'Only the checks that passed, or failed' },
+        ],
+        responses: { 200: { description: 'The checks' }, 400: { description: 'result is not passed or failed' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 404: { description: 'No such run, or not one of the key\'s company' } } },
+    },
+    '/v1/api/batches/{batchId}': {
+      get: { tags: ['API'], summary: 'The runs of one batch, with counts by status (#503)', security: [{ apiKeyAuth: [] }],
+        parameters: [{ name: 'batchId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: '{ batch_id, total, queued, running, completed, failed, cancelled, runs: [run] }' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 404: { description: 'No such batch in the key\'s company' } } },
+    },
+    '/v1/api/queue': {
+      get: { tags: ['API'], summary: 'The queued and running runs of the key\'s company or provider (#503)', security: [{ apiKeyAuth: [] }],
+        responses: { 200: { description: '{ running, queued, runs: [{ id, status, scenario_code, batch_id, position, queued_at, started_at }] }' }, 401: { description: 'Missing, invalid, expired or revoked key' } } },
+    },
     '/v1/company/reference': {
       get: { tags: ['Company'], summary: 'Which reference configuration of the repository the company or provider follows, and whether it is up to date (#838)', security: [{ bearerAuth: [] }],
         description: '{ available: [{ name, provider, osdmVersion }], linked, applied_version, applied_at, current_version, up_to_date, missing }. The references are read from the collection on the server, never from GitHub.',

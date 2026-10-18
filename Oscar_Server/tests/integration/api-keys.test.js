@@ -190,7 +190,7 @@ describe('using a key', () => {
   });
 
   test('a key opens nothing the API does not list: other paths and other methods are 404', async () => {
-    expect((await asKey(key, '/v1/api/runs')).status).toBe(404);
+    expect((await asKey(key, '/v1/api/runs/x/logs')).status).toBe(404);
     expect((await request(app).post('/v1/api/key').set('Authorization', `Bearer ${key}`)).status).toBe(404);
     expect((await request(app).delete('/v1/api/key').set('Authorization', `Bearer ${key}`)).status).toBe(404);
     // Unauthenticated, the same paths are a 401: nothing is told before the key.

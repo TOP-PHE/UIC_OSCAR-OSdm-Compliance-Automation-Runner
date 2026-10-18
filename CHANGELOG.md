@@ -62,6 +62,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.338 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.373
+
+Issue #503 (PR 2). The routes that read runs and results with an API key. Collection unchanged.
+
+### Added
+- **`GET /v1/api/runs`**: the runs of the key's company or provider, newest first, with their check counts. Parameters `limit` (1–200, 50 by default), `offset`, `status` (QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED), `batch_id`, `scenario_code`; any other value, or a repeated parameter, is a 400.
+- **`GET /v1/api/runs/{id}`**: one run: id, status, scenario code, batch, queued / started / completed times, exit code, checks `{ total, passed, failed }`.
+- **`GET /v1/api/runs/{id}/assertions`**: its checks by suite and request (name, method, HTTP status, result, capability, each check with its category, domain, severity, error, expected and actual value); `result=failed` or `passed` narrows them.
+- **`GET /v1/api/batches/{batchId}`**: the runs of one batch, with counts by status.
+- **`GET /v1/api/queue`**: the queued and running runs, in order, with their place in the queue.
+- OpenAPI first (tag *API*), user guide § 2.3.
+
+### Security
+- Every run answered goes through `canUserSeeRun()`: the key's own company or provider only, never its providers or another company. A deleted run, one its company asked to delete, or one an administrator flagged is the same 404 as a run that does not exist.
+- Answers are built field by field, never from a database row: no request or response body, header, URL, log, report file, endpoint, authentication mode, run error text or person (who started a run). The logs, requests, artifacts and report routes stay closed to a key (404).
+
+### Default decisions (taken without asking)
+- **Check results include the error, expected and actual values**, as the Test Config page shows them; they are what a CI job needs to say why a run failed. Request URLs are left out (they can hold booking references), as in the AI analysis.
+- **The run's `error_message` is left out**: it is the runner's text and can quote a provider's answer.
+- **Runs flagged by an administrator are hidden too**, though a tester's own list shows them flagged.
+
+---
+
 ## [server-1.11.337 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.372
 
 Issue #503 (PR 1). Read-only API keys, so a program can read a company's run results. This release makes and checks the keys; the routes reading runs and results come in PR 2.

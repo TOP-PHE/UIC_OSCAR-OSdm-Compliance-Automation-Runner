@@ -451,9 +451,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `canUseCompany()` the key's company. The principal is `{ role: 'api_key',
   keyCompanyId }`: `canUserSeeRun()` gives it that one company's runs, not its
   providers' (`keyCompanyId`, not `companyId`, which the provider-access guard
-  counts). Two rate limits: by address before the key, then per key. PR 2 adds
-  the run/result routes, OpenAPI first; every run they return goes through
-  `canUserSeeRun()`. Bodies and logs wait for a `bodies:read` scope.
+  counts). Two rate limits: by address before the key, then per key.
+  **PR 2 (1.11.338): the read routes** `runs`, `runs/:id`,
+  `runs/:id/assertions`, `batches/:batchId`, `queue` (OpenAPI tag *API*).
+  Every run goes through `visibleRun()` = `canUserSeeRun()` and not
+  deleted / asked to delete / flagged (all three a 404, like none). Answers
+  are built field by field (`runView()`), never from a row: no body, header,
+  URL, log, endpoint, `error_message` or person. A query parameter that is
+  not one plain value of its list is a 400 (Express 5 gives an array for a
+  repeated one). Bodies and logs wait for a `bodies:read` scope.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

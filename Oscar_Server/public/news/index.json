@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-api-read-routes",
+    "date": "October 18, 2026",
+    "tag": "Feature",
+    "title": "Reading results with an API key",
+    "summary": "An API key now reads the runs, their checks, a batch and the queue of its company or provider.",
+    "content": "A program holding an API key can now list the runs of its company or provider, read one run and its checks, follow a batch and see the queue, under /v1/api (described in the API documentation, tag API). It reads statuses and check results only: never request or response bodies, logs or who started a run. See the user guide, section 2.3."
+  },
+  {
     "id": "2026-10-18-api-keys",
     "date": "October 18, 2026",
     "tag": "Feature",
