@@ -20,6 +20,7 @@ on:
       - 'Oscar_Server/**'
       - 'OSCAR_Deploy/**'
       - 'OSDM_Simulator/**'
+      - 'OSCAR_MCP/**'
       - 'compatibility.json'
       - '.github/workflows/ci-server.yml'
   pull_request:
@@ -78,6 +79,15 @@ jobs:
 
       - name: OSDM simulator — tests
         working-directory: OSDM_Simulator
+        run: npm test
+
+      # The OSCAR MCP server (#503) has no dependency either: same treatment.
+      - name: OSCAR MCP server — lint
+        working-directory: OSCAR_MCP
+        run: node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
+
+      - name: OSCAR MCP server — tests
+        working-directory: OSCAR_MCP
         run: npm test
 
   docker-build:
