@@ -145,20 +145,23 @@ function splitTag(tag) {
  * so of the `fw.*` answers only the comments are. Capped at MAX_CONTEXT_CHARS;
  * `cut` says how many answers were left out.
  */
-function contextOf(answers) {
+// The answers told, by name: ticked codes as one list, text cut to 600.
+function toldByName(answers) {
   const byName = new Map();
   for (const [tag, value] of Object.entries(keptAnswers(answers))) {
     const [name, code] = splitTag(tag);
-    if (name.startsWith('fw.') && !name.endsWith('.comment')) continue;
-    if (code !== null) {
-      if (value !== true) continue;
-      const list = byName.get(name);
-      if (Array.isArray(list)) list.push(code);
-      else byName.set(name, [code]);
-    } else if (typeof value === 'string') {
+    const told = !name.startsWith('fw.') || name.endsWith('.comment');
+    if (told && code !== null && value === true) {
+      byName.set(name, [...(byName.get(name) || []), code]);
+    } else if (told && code === null && typeof value === 'string') {
       byName.set(name, value.length > 600 ? value.slice(0, 600) + '…' : value);
     }
   }
+  return byName;
+}
+
+function contextOf(answers) {
+  const byName = toldByName(answers);
   const out = {};
   let chars = 2;
   let cut = 0;
