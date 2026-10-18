@@ -332,6 +332,22 @@ function addOfferParts(booking, bookedOfferId, body, findOffer, provider) {
   return { bookedOffers: [bookedOffer] };
 }
 
+/**
+ * POST …/booked-offers/{id}/reservations (#852): OSDM's
+ * BookedOfferReservationRequest, the only form in 3.6 and still in 3.7 and
+ * 3.8. It names one reservation offer (reservationOfferId) with the
+ * passengers and their place selections; the selections are added as by
+ * offer-parts.
+ */
+function addReservations(booking, bookedOfferId, body, findOffer, provider) {
+  if (typeof body.reservationOfferId !== 'string' || !body.reservationOfferId) throw bad('reservationOfferId must name the reservation offer to add');
+  if (!Array.isArray(body.passengerRefs) || body.passengerRefs.length === 0) throw bad('passengerRefs must name the passengers');
+  if (Array.isArray(body.placeSelections) && !body.placeSelections.some((s) => s?.reservationId === body.reservationOfferId)) {
+    throw bad('placeSelections must hold the reservation named by reservationOfferId');
+  }
+  return addOfferParts(booking, bookedOfferId, { offerId: body.offerId, placeSelections: body.placeSelections }, findOffer, provider);
+}
+
 function findPassenger(booking, passengerId) {
   const passenger = booking.passengers.find((p) => p.id === passengerId);
   if (!passenger) throw new HttpError(404, 'PASSENGER_NOT_FOUND', 'Passenger not found');
@@ -382,4 +398,4 @@ function exchangedBookedOffer(booking, entry, nowMs) {
   return bookedOffer;
 }
 
-module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf, currencyOf };
+module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf, currencyOf };

@@ -103,4 +103,4 @@ function shapeAnswer(body, version) {
   return out;
 }
 
-module.exports = { shapeAnswer, ABSENT_BELOW };
+module.exports = { shapeAnswer, ABSENT_BELOW, rank };

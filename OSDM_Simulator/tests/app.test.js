@@ -167,10 +167,12 @@ test('OSDM resources the simulator does not provide answer 501 with a Problem', 
   // Not provided anywhere.
   for (const [key, client] of REAL) {
     const token = await tokenFor(sim.base, key, client);
-    for (const path of ['/places', '/coach-deck-layouts', '/coach-layouts', '/bookings/any/reimbursements', '/bookings/any/booked-offers/x/reservations']) {
+    for (const path of ['/places', '/coach-deck-layouts', '/coach-layouts', '/bookings/any/reimbursements', '/bookings/any/booked-offers/x/ancillaries']) {
       await notProvided(token, `/${key}${path}`);
     }
   }
+  // offer-parts is OSDM 3.7 and later (#852): not on alpha, which answers in 3.6.
+  await notProvided(await tokenFor(sim.base, 'alpha', alphaOne), '/alpha/bookings/any/booked-offers/x/offer-parts');
   // Without the functions that provide them (#824: plain), products and trips collection too.
   const token = await tokenFor(sim.base, 'plain', plainOne);
   for (const path of ['/places', '/products', '/products/abc', '/coach-deck-layouts', '/coach-layouts', '/trips-collection',
@@ -846,9 +848,9 @@ const reservationTrip = () => {
   return request;
 };
 
-async function reservableOffer() {
-  const token = await tokenFor(sim.base, 'gamma', gammaOne);
-  const { offers, trips } = (await call(sim.base, token, 'POST', '/gamma/offers', reservationTrip())).body;
+async function reservableOffer(provider = 'gamma', client = gammaOne) {
+  const token = await tokenFor(sim.base, provider, client);
+  const { offers, trips } = (await call(sim.base, token, 'POST', `/${provider}/offers`, reservationTrip())).body;
   return { token, offer: offers[0], trip: trips[0] };
 }
 
@@ -893,6 +895,29 @@ test('reservations: a selection naming another reservation, or the wrong leg, is
   assert.match(res2.body.detail, /not the trip and leg/);
 });
 
+test('reservations: OSDM 3.6 adds them with …/reservations, naming the reservation offer (#852)', async () => {
+  const { token, offer, trip } = await reservableOffer('alpha', alphaOne);
+  const booking = (await call(sim.base, token, 'POST', '/alpha/bookings', bookingRequest(offer))).body.booking;
+  const url = `/alpha/bookings/${booking.id}/booked-offers/${offer.offerId}/reservations`;
+  const optional = offer.reservationOfferParts[1];
+  const body = { offerId: offer.offerId, reservationOfferId: optional.id, passengerRefs: ['P1', 'P2'],
+    placeSelections: [{ reservationId: optional.id, tripLegCoverage: { tripId: trip.id, legId: trip.legs[1].id } }] };
+  for (const [wrong, detail] of [
+    [{ ...body, reservationOfferId: undefined }, /reservationOfferId/],
+    [{ ...body, passengerRefs: [] }, /passengerRefs/],
+    [{ ...body, reservationOfferId: offer.reservationOfferParts[0].id }, /reservation named by reservationOfferId/],
+  ]) {
+    const refused = await call(sim.base, token, 'POST', url, wrong);
+    assert.equal(refused.status, 400);
+    assert.match(refused.body.detail, detail);
+  }
+  const added = await call(sim.base, token, 'POST', url, body);
+  assert.equal(added.status, 200);
+  assert.deepEqual(added.body.bookedOffers[0].reservations.map((r) => r.id), [offer.reservationOfferParts[0].id, optional.id]);
+  assert.equal((await call(sim.base, token, 'POST', url, body)).status, 409, 'not twice');
+  assert.equal((await call(sim.base, token, 'POST', `/alpha/bookings/${booking.id}/booked-offers/${offer.offerId}/offer-parts`, body)).status, 501, 'offer-parts is 3.7');
+});
+
 test('reservations: added to a pre-booked booking with offer-parts, once, then on the ticket; not after confirmation', async () => {
   const { token, offer, trip } = await reservableOffer();
   const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
@@ -906,7 +931,8 @@ test('reservations: added to a pre-booked booking with offer-parts, once, then o
   assert.equal((await call(sim.base, token, 'POST', url, { ...body, placeSelections: [] })).status, 400);
   assert.equal((await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/booked-offers/nope/offer-parts`, body)).status, 404);
   assert.equal((await call(sim.base, token, 'GET', url)).status, 405);
-  assert.equal((await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/booked-offers/${offer.offerId}/reservations`, body)).status, 501);
+  // …/reservations (#852) takes its own request, which names the reservation offer.
+  assert.equal((await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/booked-offers/${offer.offerId}/reservations`, body)).status, 400);
   const fulfillments = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
   assert.equal(fulfillments[0].bookingParts.length, 4, 'two admissions and two reservations on the ticket');
   const after = (await call(sim.base, token, 'GET', `/gamma/bookings/${booking.id}`)).body.booking;

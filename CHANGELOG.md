@@ -62,6 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.37.0] — 2026-10-18
+
+Issue #852. Simulator 0.37.0. Server and collection unchanged. Adding a reservation after the booking works on `alpha` (OSDM 3.6).
+
+### Simulator 0.37.0
+- **`POST …/booked-offers/{id}/reservations`** (OSDM's `BookedOfferReservationRequest`) adds the reservations its `placeSelections` name, as `…/offer-parts` does.
+  - It is the only form in OSDM 3.6, and is still defined in 3.7 and 3.8, so every provider that sells reservations serves it.
+  - `reservationOfferId` and `passengerRefs` are required, and the reservation named must be among the `placeSelections` (400 otherwise).
+  - The answer is a `BookedOfferReservationResponse` (`bookedOffers`), checked against each version's schema by the tests.
+- **`…/offer-parts` is OSDM 3.7 and later**: alpha answers it 501.
+- Before, alpha answered 501 to `…/reservations`, the path the collection rightly calls below 3.7. Every "add the reservation later" scenario failed at `09. POST Add Reservation to Booking` on alpha (found by the AI analysis of an alpha batch, #823).
+- Ancillaries after the booking (`…/ancillaries`) stay 501.
+
+---
+
 ## [server-1.11.341 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.376
 
 Issue #823 (PR 1). The AI analysis sees the warnings, and what each scenario is written for. Collection unchanged.
