@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-ai-warnings",
+    "date": "October 18, 2026",
+    "tag": "Improvement",
+    "title": "The AI analysis sees the warnings",
+    "summary": "The AI analysis now receives the warnings of the runs, apart from the failures, and the OSDM version of each scenario.",
+    "content": "A warning is not a failure, and the AI is told so: the warnings help it explain the failures. Each scenario also tells its OSDM version and what the Test Framework does not declare of it, so a scenario written for another version than the provider's is read as a configuration matter first. The user guide (§ 2.4) now says what is sent and what is not, how to read the answer, and how the history and the monthly limit work."
+  },
+  {
     "id": "2026-10-18-ai-page-tabs",
     "date": "October 18, 2026",
     "tag": "Improvement",

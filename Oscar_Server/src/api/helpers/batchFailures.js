@@ -10,14 +10,15 @@
 /**
  * batchFailures.js — a batch's failed checks and the list of a company's
  * batches, as the finding suggestions (#735) and the AI analysis (#801) read
- * them. The caller has chosen the company (req.companyId): every query is
- * held to it.
+ * them, and the warnings the AI analysis sends too (#823). The caller has
+ * chosen the company (req.companyId): every query is held to it.
  */
 
 const { all, colDecrypt } = require('../../db/db');
 const S = require('../../utils/findingSuggestions');
 
 const MAX_FAILURES = 5000;
+const MAX_WARNING_EVENTS = 20000;
 const FINISHED = new Set(['COMPLETED', 'FAILED']);
 
 /**
@@ -56,6 +57,33 @@ function failuresOfBatch(companyId, batchId) {
   });
 }
 
+/**
+ * The [WARNING] lines the runs of a finished batch logged (#823), oldest
+ * first: { runId, scenarioCode, step, message }, the step being the request
+ * the line was logged under. At most MAX_WARNING_EVENTS log rows are read;
+ * `truncated` says when that limit was met.
+ */
+function warningsOfBatch(companyId, batchId) {
+  const rows = all(
+    `SELECT e.run_id, e.request_name, e.message, r.scenario_code
+       FROM run_events e
+       JOIN runs r ON r.id = e.run_id
+      WHERE r.company_id = ? AND r.batch_id = ? AND r.status IN (?, ?) AND e.level = 'warn'
+      ORDER BY r.queued_at ASC, e.id ASC
+      LIMIT ?`,
+    [companyId, batchId, ...FINISHED, MAX_WARNING_EVENTS]
+  );
+  const warnings = [];
+  for (const row of rows) {
+    let text = '';
+    try { text = colDecrypt(row.message) || ''; } catch { text = ''; }
+    for (const line of String(text).split('\n')) {
+      if (line.includes('[WARNING]')) warnings.push({ runId: row.run_id, scenarioCode: row.scenario_code || null, step: row.request_name || null, message: line.trim() });
+    }
+  }
+  return { warnings, truncated: rows.length >= MAX_WARNING_EVENTS };
+}
+
 /** The company's 30 latest batches: { batchId, runs, finishedRuns, started, finished }. */
 function batchesOf(companyId) {
   return all(
@@ -75,4 +103,4 @@ function runsOfBatch(companyId, batchId) {
   return all('SELECT id, scenario_code, status FROM runs WHERE company_id = ? AND batch_id = ?', [companyId, batchId]);
 }
 
-module.exports = { failuresOfBatch, batchesOf, runsOfBatch, MAX_FAILURES, FINISHED };
+module.exports = { failuresOfBatch, warningsOfBatch, batchesOf, runsOfBatch, MAX_FAILURES, MAX_WARNING_EVENTS, FINISHED };

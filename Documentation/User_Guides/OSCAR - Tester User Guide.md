@@ -265,6 +265,48 @@ configuration. The menu **AI Analysis** has three tabs (since 1.11.340).
    two to show them side by side. An analysis is an AI opinion, not a test
    result.
 
+**What is sent, and what is not.** The preview shows the instructions and the
+input exactly as they will leave OSCAR; nothing else is sent.
+
+- Sent:
+  - the failed checks, grouped by step, check text, HTTP status and OSDM
+    problem code;
+  - apart from them, the warnings the runs logged, grouped the same way
+    (since 1.11.341). A warning is not a failure, and the AI is told so;
+  - each scenario concerned: its description, its OSDM version, what the
+    Test Framework does not declare of it, and what the reference scenario
+    it was copied from tests;
+  - the Test Framework, the findings (title, category, step, scenario), the
+    provider's checklist answers and an extract of the OSDM specification;
+  - for the 15 most failing groups, one request and answer, masked.
+- In every text, the values a run met are replaced: `N` for a number,
+  `<id>`, `<instant>`, `"…"` for a quoted value.
+- Never sent: a token, a credential, the provider's address, a request's
+  headers or URL, a name, birth date, contact, address, card or identity
+  document of a passenger or purchaser.
+
+When the input is too large (about 50,000 tokens), the warnings are summarised
+by step first, then the failures too; the preview says which.
+
+**Reading the answer.** It names groups of failures by probable cause. Each
+says who should act:
+- **Provider**: its answer does not follow OSDM, or a function is missing;
+- **OSCAR**: its request or its check is wrong. **Copy as an OSCAR issue**
+  gives the text of an issue to open;
+- **Configuration**: the Test Framework, the Test Data or the scenarios run
+  do not fit the provider. A scenario written for another OSDM version than
+  the provider declares is one of these;
+- **Unclear**.
+
+Check each group against the run before acting on it.
+
+**History and limits.** Every analysis is kept with its model, tokens and
+estimated cost. Any Test Manager of the company sees them, even without
+access. Two analyses of the same input with different models can be compared
+side by side. Your monthly token limit (Connection tab) refuses an analysis
+of yours that would go past it; with one AI service for all, it counts your
+analyses of the company and of all its providers together.
+
 ## 3. Provider setup — Framework, Test data & Discovery
 
 Everything in this section is the **provider setup** a `test_manager` does
@@ -1300,7 +1342,7 @@ error and never as "OSCAR detected nothing".
    two scores to compare.
 
 A fault that OSCAR reports only as a WARNING is shown as detected but is not
-scored: the AI analysis is only sent failed checks.
+scored: the AI analysis sees the warnings, but is scored on the failures only.
 
 
 ## Glossary

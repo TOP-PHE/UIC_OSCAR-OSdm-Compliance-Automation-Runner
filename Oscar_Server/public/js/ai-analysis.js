@@ -374,14 +374,19 @@ function previewHtml(p) {
   const counts = p.mode === 'compare'
     ? `${esc(p.counts.fixed)} problem(s) fixed, ${esc(p.counts.stillFailing)} still failing, ${esc(p.counts.new)} new, as OSCAR counts them.`
     : `${esc(p.counts.groups)} group(s) of failed checks.`;
-  const summarised = p.summarisedByStep
-    ? `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">Too large to send check by check: the failures are summarised by step.</div>` : '';
-  const truncated = (p.batches || []).some(b => b.truncated)
-    ? `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">A batch has more failed checks than OSCAR reads; only the first ones are sent.</div>` : '';
+  const warned = ` ${esc(p.counts.warningGroups ?? 0)} group(s) of warnings${p.mode === 'compare' ? ' in the later batch' : ''}, sent apart: a warning is not a failure.`;
+  let summarised = '';
+  if (p.summarisedByStep) {
+    summarised = `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">Too large to send check by check: the failures and the warnings are summarised by step.</div>`;
+  } else if (p.warningsSummarisedByStep) {
+    summarised = `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">Too large to send every warning: the warnings are summarised by step, the failures are sent one by one.</div>`;
+  }
+  const truncated = (p.batches || []).some(b => b.truncated || b.warningsTruncated)
+    ? `<div style="${NOTE}background:#fff8e1;color:#7a4f01;border:1px solid #ffe082;">A batch has more failed checks or log lines than OSCAR reads; only the first ones are sent.</div>` : '';
   const send = p.tooLarge
     ? `<div style="${NOTE}background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;">Too large to send, even summarised by step.</div>`
     : `<button class="btn btn-primary" data-ai-action="an-run">Send to ${esc(p.model)} and analyse</button>`;
-  return `<div style="${NOTE}${INFO}">${counts}<br>About <strong>${esc(p.estimatedTokens)}</strong> tokens (${esc(p.chars)} characters) to ${esc(p.model)}, plus the answer. ${cap}<br>${estimateText(p)}</div>
+  return `<div style="${NOTE}${INFO}">${counts}${warned}<br>About <strong>${esc(p.estimatedTokens)}</strong> tokens (${esc(p.chars)} characters) to ${esc(p.model)}, plus the answer. ${cap}<br>${estimateText(p)}</div>
     ${summarised}${truncated}
     <details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:13px">Exactly what will be sent</summary>
       <div style="font-size:12px;color:#546e7a;margin:8px 0 4px">Instructions</div>

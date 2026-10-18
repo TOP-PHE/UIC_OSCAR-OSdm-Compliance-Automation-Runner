@@ -14,9 +14,11 @@
  * What is sent, and only that: the failed checks of one batch, or of two
  * batches compared, grouped as the finding suggestions group them (#735:
  * step, check text with the run's values replaced, HTTP status, problem
- * code); the scenario codes and descriptions they concern; the Test
- * Framework's declarations; the company's findings (title, category, step,
- * scenario). Never a token, a credential, the endpoint, a response body or a
+ * code); the [WARNING] lines of the runs' logs, grouped by step and text
+ * the same way and sent apart from the failures (#823); the scenario codes
+ * they concern with their description, OSDM version and what the Test
+ * Framework does not declare; the Test Framework's declarations; the
+ * company's findings (title, category, step, scenario). Never a token, a credential, the endpoint, a response body or a
  * passenger's name or contact: a check's text and its error go through
  * checkText(), which replaces quoted values, ids, instants and numbers.
  *
@@ -38,6 +40,7 @@ const MAX_SCENARIOS_PER_GROUP = 20;
 const MAX_TEXT = 300;
 const MAX_ANSWER_TOKENS = 16_000;
 const MAX_SAMPLES = 15;
+const MAX_WARNING_GROUPS = 300;
 
 const short = (text, max = MAX_TEXT) => {
   const t = String(text ?? '').replaceAll(/\s+/g, ' ').trim();
@@ -66,6 +69,56 @@ function groupsOf(records, osdmVersion = null) {
     }))
     .sort((a, b) => b.failures - a.failures);
 }
+
+/**
+ * The text of a [WARNING] log line as grouped (#823): the tag and the marks
+ * the collection puts before it left out, the run's values replaced.
+ */
+function warningText(line) {
+  const all = String(line ?? '');
+  const at = all.indexOf('[WARNING]');
+  const t = (at < 0 ? all : all.slice(at + '[WARNING]'.length)).replace(/^[\s\u2190-\u2BFF\uFE0F\u{1F300}-\u{1FAFF}]+/u, '');
+  return S.checkText(t);
+}
+
+/**
+ * A batch's warning lines ({ runId, scenarioCode, step, message }) as compact
+ * groups, the most frequent first, at most MAX_WARNING_GROUPS. A warning is
+ * not a failure: the collection logs it for what OSDM allows but is worth
+ * knowing (an optional member left out, a value outside an extensible list,
+ * a feature the Test Framework does not declare…).
+ */
+function warningGroupsOf(records) {
+  const shaped = (records || []).map((r) => ({ runId: r.runId, scenarioCode: r.scenarioCode, step: r.step || '', check: warningText(r.message), status: null }));
+  return S.groupFailures(shaped)
+    .map((g) => ({
+      key: g.key,
+      step: g.step ? short(g.step, 120) : null,
+      warning: short(g.check),
+      count: g.count,
+      scenarios: g.scenarios.slice(0, MAX_SCENARIOS_PER_GROUP),
+      moreScenarios: Math.max(0, g.scenarios.length - MAX_SCENARIOS_PER_GROUP),
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, MAX_WARNING_GROUPS);
+}
+
+/** Warning groups summarised by step, when they do not fit. */
+function warningsByStep(groups) {
+  const steps = new Map();
+  for (const g of groups) {
+    const key = g.step || '';
+    if (!steps.has(key)) steps.set(key, { step: g.step, warnings: 0, distinctWarnings: 0, examples: [], scenarios: [] });
+    const s = steps.get(key);
+    s.warnings += g.count;
+    s.distinctWarnings += 1;
+    if (s.examples.length < 3) s.examples.push(short(g.warning, 160));
+    for (const code of g.scenarios) if (s.scenarios.length < 10 && !s.scenarios.includes(code)) s.scenarios.push(code);
+  }
+  return [...steps.values()].sort((a, b) => b.warnings - a.warnings);
+}
+
+const shownWarnings = (groups, summarise) => (summarise ? warningsByStep(groups) : groups.map(({ key: _key, ...g }) => g));
 
 /** Fixed, still failing and new, by group key: `earlier` and `later` are groupsOf() lists. */
 function compareGroups(earlier, later) {
@@ -143,14 +196,24 @@ function catalogueEntryOf(code, entries) {
   return best;
 }
 
-/** The scenarios the groups name, with the data file's description and the catalogue's purpose. */
+/**
+ * The scenarios the groups name, with the data file's description, the OSDM
+ * version the scenario names, what the Test Framework does not declare of it
+ * (#823: the golden rule's warnings, `__featureNotDeclaredWarnings` of the
+ * annotated data file) and the catalogue's purpose.
+ */
 function scenariosNamed(groups, scenarios, catalogue) {
   const named = new Set();
   for (const g of groups) for (const code of g.scenarios) named.add(code);
   const byCode = new Map((scenarios || []).filter((s) => s?.code).map((s) => [s.code, s]));
   return [...named].sort((a, b) => a.localeCompare(b)).map((code) => {
     const entry = catalogueEntryOf(code, catalogue);
-    const out = { code, description: byCode.has(code) ? short(byCode.get(code).description, 200) : null };
+    const scenario = byCode.get(code);
+    const out = { code, description: scenario ? short(scenario.description, 200) : null };
+    if (typeof scenario?.osdmVersion === 'string' && scenario.osdmVersion.trim()) out.osdmVersion = short(scenario.osdmVersion, 20);
+    const notDeclared = Array.isArray(scenario?.__featureNotDeclaredWarnings)
+      ? scenario.__featureNotDeclaredWarnings.filter((w) => typeof w === 'string').slice(0, 20).map((w) => short(w, 80)) : [];
+    if (notDeclared.length) out.notDeclaredInTestFramework = notDeclared;
     if (entry?.purpose) out.purpose = short(entry.purpose, 400);
     return out;
   });
@@ -169,18 +232,24 @@ function providerContext({ osdmVersion, checklist }) {
 }
 
 function batchHeader(b) {
-  return { batchId: b.batchId, runs: b.runs, finishedRuns: b.finishedRuns, failedChecks: b.records.length, truncated: !!b.truncated };
+  return { batchId: b.batchId, runs: b.runs, finishedRuns: b.finishedRuns, failedChecks: b.records.length, truncated: !!b.truncated,
+    warnings: (b.warnings || []).length, warningsTruncated: !!b.warningsTruncated };
 }
 
 /**
  * Build what is sent. `batches` is one or two { batchId, runs, finishedRuns,
- * records, truncated } (two: the earlier first). Returns { input, text,
- * chars, estimatedTokens, summarisedByStep, counts }.
+ * records, truncated, warnings, warningsTruncated } (two: the earlier first;
+ * `warnings` are warningGroupsOf() records). Returns { input, text, chars,
+ * estimatedTokens, summarisedByStep, warningsSummarisedByStep, counts }.
+ *
+ * When the input is too large, the warnings are summarised by step first,
+ * then the failures too.
  */
 function buildInput({ batches, framework, findings, scenarios, catalogue, checklist, sampleOf }) {
   const compare = batches.length === 2;
   const reference = OR.versionFor(framework?.osdmVersion);
   const groups = batches.map((b) => groupsOf(b.records, reference?.version));
+  const warnings = batches.map((b) => warningGroupsOf(b.warnings));
   const all = groups.flat();
   // The operations the failures concern, the most failing first (#827 PR B).
   const failuresByOperation = new Map();
@@ -188,36 +257,43 @@ function buildInput({ batches, framework, findings, scenarios, catalogue, checkl
   const operations = [...failuresByOperation.entries()].sort((a, b) => b[1] - a[1]).map(([op]) => op);
   const samples = samplesFor(all, sampleOf);
 
-  const make = (summarise) => {
+  const make = (summarise, summariseWarnings) => {
     const input = {
       mode: compare ? 'compare' : 'one',
       batches: batches.map(batchHeader),
       provider: providerContext({ osdmVersion: framework?.osdmVersion, checklist }),
       testFramework: frameworkDeclarations(framework),
       findings: (findings || []).map(findingAsSent),
-      scenarios: scenariosNamed(all, scenarios, catalogue),
+      scenarios: scenariosNamed([...all, ...warnings.flat()], scenarios, catalogue),
       osdmReference: OR.referencesFor(operations, framework?.osdmVersion),
       summarisedByStep: summarise,
+      warningsSummarisedByStep: summariseWarnings,
     };
     if (compare) {
       const c = compareGroups(groups[0], groups[1]);
       input.comparison = { fixed: shown(c.fixed, summarise, samples), stillFailing: shown(c.stillFailing, summarise, samples), new: shown(c.new, summarise, samples) };
+      const w = compareGroups(warnings[0], warnings[1]);
+      input.warningComparison = { gone: shownWarnings(w.fixed, summariseWarnings), stillWarned: shownWarnings(w.stillFailing, summariseWarnings), new: shownWarnings(w.new, summariseWarnings) };
     } else {
       input.failures = shown(groups[0], summarise, samples);
+      input.warnings = shownWarnings(warnings[0], summariseWarnings);
     }
     return input;
   };
 
-  let input = make(false);
+  let input = make(false, false);
   let text = JSON.stringify(input);
-  if (text.length > MAX_INPUT_CHARS) {
-    input = make(true);
+  for (const [summarise, summariseWarnings] of [[false, true], [true, true]]) {
+    if (text.length <= MAX_INPUT_CHARS) break;
+    input = make(summarise, summariseWarnings);
     text = JSON.stringify(input);
   }
   const counts = compare
-    ? { fixed: input.comparison.fixed.length, stillFailing: input.comparison.stillFailing.length, new: input.comparison.new.length }
-    : { groups: input.failures.length };
-  return { input, text, chars: text.length, estimatedTokens: estimateTokens(text), summarisedByStep: input.summarisedByStep, counts, tooLarge: text.length > MAX_INPUT_CHARS };
+    ? { fixed: input.comparison.fixed.length, stillFailing: input.comparison.stillFailing.length, new: input.comparison.new.length,
+      warningGroups: warnings[1].length }
+    : { groups: input.failures.length, warningGroups: warnings[0].length };
+  return { input, text, chars: text.length, estimatedTokens: estimateTokens(text), summarisedByStep: input.summarisedByStep,
+    warningsSummarisedByStep: input.warningsSummarisedByStep, counts, tooLarge: text.length > MAX_INPUT_CHARS };
 }
 
 /** A rough token count: four characters a token, the usual rule for English and JSON. */
@@ -243,6 +319,10 @@ function systemPrompt({ language = 'English', instruction = null, compare = fals
   const lines = [
     'You read the results of OSCAR, a conformance test runner for OSDM (the UIC Open Sales and Distribution Model, a rail ticketing API).',
     'OSCAR runs scenarios (a sale, a refund, an exchange…) against a provider\'s OSDM API and checks each answer. The input lists the checks that failed, grouped by step, check text, HTTP status and OSDM problem code. Values a run met are replaced: N for a number, <id>, <instant>, "…" for a quoted value.',
+    compare
+      ? 'warningComparison lists the warnings the runs logged, apart from the failures and sorted the same way (gone, stillWarned, new). A warning is not a failure and never makes a scenario fail: it is something OSDM allows but worth knowing (an optional member left out, a value outside an extensible list, a feature the Test Framework does not declare). Use the warnings to explain failures; never report a warning as a failure.'
+      : 'warnings lists the warnings the runs logged, grouped by step and text, apart from the failures. A warning is not a failure and never makes a scenario fail: it is something OSDM allows but worth knowing (an optional member left out, a value outside an extensible list, a feature the Test Framework does not declare). Use the warnings to explain failures; never report a warning as a failure.',
+    'scenarios[] gives each scenario its own OSDM version (osdmVersion) and what the Test Framework does not declare of it (notDeclaredInTestFramework). A scenario written for another OSDM version than the provider declares, or arming a feature the Test Framework does not declare, should not be run on this provider as it is: its failures are the configuration\'s first, even when the request it sends does not fit the declared version.',
     'A failure can be the provider\'s (its answer does not follow OSDM, or a function is missing), OSCAR\'s (its request or its check is wrong), the configuration\'s (the Test Framework declares something the provider does not do, the Test Data names a train, date or tariff the provider does not have, or the scenario should not be run on this provider), or unclear. The Test Framework says what the provider declares it supports; the findings are what people already recorded.',
     'You may question a check itself: when the request OSCAR sent, or what the check expects, does not follow the OSDM extract, the owner is oscar; say which member or rule, quoting the extract. Each group\'s sample, when given, is the request OSCAR sent and the answer it received for one failure of the group, personal and connection data shown as <masked>, addresses of the web as <url>, long lists cut.',
     version
@@ -309,6 +389,6 @@ function inputHash(system, text, model = null) {
 
 module.exports = {
   LANGUAGES, OWNERS, MAX_INPUT_CHARS, MAX_ANSWER_TOKENS,
-  groupsOf, compareGroups, byStep, buildInput, estimateTokens, systemPrompt, readResult, inputHash, frameworkDeclarations,
+  groupsOf, compareGroups, byStep, buildInput, warningText, warningGroupsOf, warningsByStep, MAX_WARNING_GROUPS, estimateTokens, systemPrompt, readResult, inputHash, frameworkDeclarations,
   catalogueEntryOf, providerContext,
 };
