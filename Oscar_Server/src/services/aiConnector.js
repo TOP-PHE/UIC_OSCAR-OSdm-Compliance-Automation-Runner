@@ -65,18 +65,23 @@ function parseJson(text) {
 }
 
 // One guarded exchange with the service: the address checked, no redirect
-// followed, the answer capped, a time limit. { ok: true, status, json, text,
-// ms } for a 2xx, else { ok: false, error, status? }.
-async function exchange(config, url, init, { timeoutMs, purpose }) {
-  const refusal = await usableUrlRefusal(url, 'AI service address');
+// followed, the answer capped, a time limit. `request` is { url, headers,
+// body? }: a body is sent as a POST, none as a GET. { ok: true, status, json,
+// text, ms } for a 2xx, else { ok: false, error, status? }.
+async function exchange(config, request, { timeoutMs, purpose }) {
+  const refusal = await usableUrlRefusal(request.url, 'AI service address');
   if (refusal) return { ok: false, error: refusal };
 
   const started = Date.now();
-  const where = { connector: config.connector, host: hostOf(url), purpose };
+  const where = { connector: config.connector, host: hostOf(request.url), purpose };
+  const send = request.body === undefined ? { method: 'GET' } : { method: 'POST', body: JSON.stringify(request.body) };
   let res;
   let text;
   try {
-    res = await fetch(url, { ...init, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+    res = await fetch(request.url, {
+      ...send, headers: request.headers,
+      redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
+    });
     text = await readCapped(res, MAX_ANSWER_BYTES);
   } catch (err) {
     const error = failureOf(err, timeoutMs);
@@ -102,8 +107,7 @@ async function exchange(config, url, init, { timeoutMs, purpose }) {
  * never rejects. `purpose` names the call in the log line.
  */
 async function callModel(config, request, { timeoutMs = TIMEOUT_MS, purpose = 'call' } = {}) {
-  const got = await exchange(config, request.url,
-    { method: 'POST', headers: request.headers, body: JSON.stringify(request.body) }, { timeoutMs, purpose });
+  const got = await exchange(config, request, { timeoutMs, purpose });
   if (!got.ok) return got;
   const answer = C.readAnswer(config.connector, got.json);
   if (!answer) {
@@ -119,8 +123,7 @@ async function callModel(config, request, { timeoutMs = TIMEOUT_MS, purpose = 'c
  */
 async function listModels(config, { timeoutMs = 15000 } = {}) {
   if (config.connector !== 'anthropic') return { ok: false, error: 'Only an Anthropic service gives its list of models.' };
-  const request = C.modelsRequest(config);
-  const got = await exchange(config, request.url, { method: 'GET', headers: request.headers }, { timeoutMs, purpose: 'models' });
+  const got = await exchange(config, C.modelsRequest(config), { timeoutMs, purpose: 'models' });
   if (!got.ok) return got;
   const models = M.modelsFromService(got.json);
   if (!models) return { ok: false, status: got.status, error: 'The AI service answered, but not with a list of models.' };
