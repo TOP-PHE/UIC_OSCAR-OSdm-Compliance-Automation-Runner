@@ -1753,10 +1753,10 @@ function assertOfferCoverageIntegrity(selectedOffer, jsonData) {
 // undeclared) capability without cross-referencing the payloads.
 function notePlaceSelectionCapabilities(part) {
   if (!part || typeof part !== "object") return;
-  const KNOWN_FLOWS = [
+  const KNOWN_FLOWS = new Set([
     "MANUAL_PLACE_SELECTION_WITH_FEE", "MANUAL_PLACE_SELECTION_WITHOUT_FEE",
     "AUTOMATIC_PLACE_SELECTION", "AUTOMATIC_PLACE_SELECTION_NEARBY", "AUTOMATIC_PLACE_SELECTION_PREFERENCES",
-  ];
+  ]);
   const flows = Array.isArray(part.supportedPlaceSelectionFlows) ? part.supportedPlaceSelectionFlows.filter(Boolean).map(String) : [];
   const mode = bru.getEnvVar("placeSelectionMode") || "";
   const wantsMap = mode === "SEATMAP_AT_OFFER" || mode === "ADD_TO_BOOKING";
@@ -1767,7 +1767,7 @@ function notePlaceSelectionCapabilities(part) {
     validationLogger(`[INFO] Reservation part ${part.id}: no supportedPlaceSelectionFlows declared (optional in OSDM)${wantsMap ? ` — the scenario's ${mode} seat-map flow proceeds without a declared capability` : ""}.`);
   } else {
     validationLogger(`[INFO] Reservation part ${part.id} declares place-selection flows: ${flows.join(", ")}${graphical.length ? `; graphicalReservation: ${[...new Set(graphical)].join(", ")}` : ""}.`);
-    const unknown = flows.filter((f) => !KNOWN_FLOWS.includes(f.toUpperCase()));
+    const unknown = flows.filter((f) => !KNOWN_FLOWS.has(f.toUpperCase()));
     if (unknown.length > 0) {
       validationLogger(`[WARNING] Reservation part ${part.id}: place-selection flow value(s) [${unknown.join(", ")}] are outside the OSDM base PlaceSelectionFlow list — legal (x-extensible-enum), noted for cross-vendor readers.`);
     }
