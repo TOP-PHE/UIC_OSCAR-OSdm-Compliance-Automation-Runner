@@ -582,9 +582,11 @@ app.use('/v1/company',         require('./api/routes/company-scenario-copy'));
 app.use('/v1/company',         require('./api/routes/company-ai-analysis'));
 app.use('/v1/company',         require('./api/routes/company-ai-analysis-results'));
 app.use('/v1/company',         require('./api/routes/company-ai-checklist'));
+app.use('/v1/company',         require('./api/routes/company-api-keys'));
 app.use('/v1/runs',            require('./api/routes/runs'));
 app.use('/v1/reports',         require('./api/routes/reports'));
 app.use('/v1/admin',           require('./api/routes/admin'));
+app.use('/v1/api',             require('./api/routes/api'));   // read-only, by API key (#503)
 
 // ── OpenAPI / Swagger UI ──────────────────────────────────────────────────────
 // Interactive API explorer at /v1/docs, raw spec at /v1/openapi.json.

@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.337 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.372
+
+Issue #503 (PR 1). Read-only API keys, so a program can read a company's run results. This release makes and checks the keys; the routes reading runs and results come in PR 2.
+
+### Added
+- **API Keys page** (menu **API Keys**, Test Managers only), for the company or provider chosen in *Working on*: make a key (name, 30 days to 1 year, 90 by default), see the keys (name, hint `oscar_<prefix>_…`, state, who made it, expiry, last use), revoke one.
+- **A key is shown once.** It is `oscar_<prefix>_<secret>`; OSCAR stores only the sha256 of the secret. The `oscar_` start lets secret scanners find a published key.
+- **`/v1/api`**, the read-only API: `GET /v1/api/key` describes the key making the request. The key goes in `Authorization: Bearer <key>` only (never a cookie or the address); every refusal is the same 401. Every other OSCAR route refuses a key and says where it goes; anything `/v1/api` does not list is a 404.
+- A key stops when it expires, when it is revoked (at once), or when the Test Manager who made it is no longer an active Test Manager of the company.
+- Run visibility: `canUserSeeRun()` gives a key the runs of its own company or provider, never of its providers.
+- Two rate limits: by address before the key is checked, then per key. Creation and revocation are audited.
+- Routes `GET`/`POST /v1/company/api-keys`, `DELETE /v1/company/api-keys/{id}`, `GET /v1/api/key` (OpenAPI). Migration 38 (`api_key`). User guide § 2.3.
+
+### Default decisions (taken without asking)
+- **One year at most**, 90 days by default; **no key for certifiers**; **no bodies or logs** in the first read routes (a `bodies:read` scope later). Agreed in #503.
+- **Any Test Manager of the company may revoke any of its keys**, not only the one who made it.
+- **`last_used_at` is written at most once a minute per key**, to keep reads from writing on every call.
+
+---
+
 ## [server-1.11.336 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.371
 
 Issue #841. The two vulnerabilities Sonar still listed on `main`.

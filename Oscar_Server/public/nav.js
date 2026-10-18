@@ -306,6 +306,8 @@
         items.push({ href: '/providers.html', label: 'Providers', page: 'providers' });
         // #801: the page says whether the company has it and where the Test Manager stands.
         items.push({ href: '/ai-analysis.html', label: 'AI Analysis', page: 'ai-analysis' });
+        // #503: read-only API keys of the company or provider chosen in "Working on".
+        items.push({ href: '/api-keys.html', label: 'API Keys', page: 'api-keys' });
       }
     }
 

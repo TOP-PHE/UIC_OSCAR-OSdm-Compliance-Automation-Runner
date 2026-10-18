@@ -20,6 +20,7 @@
 
 const jwt = require('jsonwebtoken');
 const { get } = require('../../db/db');
+const { looksLikeKey } = require('../../utils/apiKeys');
 
 const ROLE_MAP = {
   admin: 'company_user',
@@ -75,6 +76,10 @@ function requireAuth(req, res, next) {
 
   if (!token) {
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Missing Bearer token.' });
+  }
+  // An API key (#503) opens the read routes under /v1/api only.
+  if (!cookieToken && looksLikeKey(bearerToken)) {
+    return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'An API key is accepted on the /v1/api routes only.' });
   }
 
   try {

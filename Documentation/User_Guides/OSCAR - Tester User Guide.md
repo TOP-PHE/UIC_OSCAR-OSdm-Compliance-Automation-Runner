@@ -14,6 +14,7 @@
 2. [One‑time setup](#2-one-time-setup)
    - 2.1 Several providers in one company (distributors)
    - 2.2 Downloading and uploading the data file
+   - 2.3 API keys (Test Managers)
 3. [Provider setup — Framework, Test data & Discovery](#3-provider-setup--framework-test-data--discovery)
    - 3.1 Test Framework (capabilities) · 3.2 Train sets · 3.3 Journeys · 3.4 Timetable Discovery
 4. [Authoring a scenario](#4-authoring-a-scenario)
@@ -181,6 +182,29 @@ and an import of the same file:
   file** removes both.
 
 ---
+
+### 2.3 API keys (Test Managers)
+
+Since 1.11.337 (#503), a program can read run results with an API key: a
+dashboard, a script, a CI job. The **API Keys** page (menu **API Keys**, Test
+Managers only) makes, lists and revokes them, for the company or provider
+chosen in **Working on**.
+
+- **Making a key**: give it a name and a lifetime (30, 90 or 180 days, or 1
+  year). The key is shown **once**, in a yellow box: copy it then. OSCAR keeps
+  only a fingerprint of it; nobody can show it again. A lost key is revoked and
+  replaced.
+- **What it can do**: read only, the runs of that one company or provider
+  (not of its providers), on the routes under `/v1/api` only. Every other OSCAR
+  route refuses it.
+- **How to send it**: in the header `Authorization: Bearer <key>`. A key in a
+  cookie or in the address is not read.
+- **When it stops**: when it expires, when a Test Manager revokes it (at once),
+  or when the Test Manager who made it is no longer a Test Manager of the
+  company.
+- In this release a key can only describe itself (`GET /v1/api/key`); the
+  routes reading runs and results come next. Their description is in the
+  API documentation (`/v1/docs`).
 
 ## 3. Provider setup — Framework, Test data & Discovery
 

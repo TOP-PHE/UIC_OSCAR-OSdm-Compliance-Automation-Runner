@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<!--
+Copyright [2026] [International Union of Railways (UIC)]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR — API Keys</title>
+<link rel="stylesheet" href="/css/oscar-page.css">
+<style>
+.container{max-width:960px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;color:#78909c;text-transform:uppercase;letter-spacing:.4px;padding:8px 6px;border-bottom:2px solid #eceff1}
+td{padding:9px 6px;border-bottom:1px solid #f1f3f4;vertical-align:middle}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-danger{background:#c62828;color:#fff}
+.btn-danger:hover{background:#8e0000}
+.muted{font-size:12px;color:#90a4ae}
+.empty{padding:18px;text-align:center;color:#90a4ae;font-size:13px}
+.state{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase}
+.key-box{display:flex;gap:10px;align-items:center;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px;margin:10px 0}
+.key-box code{flex:1;font-family:Consolas,monospace;font-size:13px;word-break:break-all;color:#37474f}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="/uic-logo.png" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="/osdm-logo.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'api-keys');</script>
+</header>
+
+<div class="container">
+  <h2>🔑 API Keys <span class="muted" id="keys-target"></span></h2>
+  <div id="msg" class="msg"></div>
+
+  <div class="card">
+    <h3>What an API key is</h3>
+    <p class="muted" style="font-size:13px;color:#546e7a;line-height:1.6">
+      An API key lets a program read the run results of the company or provider chosen in
+      <strong>Working on</strong>: a dashboard, a script, a CI job. It can only read, it sees the
+      runs of that one company or provider, and it works on the <code>/v1/api</code> routes only.
+      It stops when it expires, when it is revoked, or when the Test Manager who made it is no
+      longer one.
+    </p>
+  </div>
+
+  <div class="card" id="create-card">
+    <h3>Make a key</h3>
+    <div class="row">
+      <div class="field">
+        <label for="key-name">Name</label>
+        <input type="text" id="key-name" maxlength="80" placeholder="e.g. Nightly CI">
+      </div>
+      <div class="field">
+        <label for="key-days">Expires after</label>
+        <select id="key-days">
+          <option value="30">30 days</option>
+          <option value="90" selected>90 days</option>
+          <option value="180">180 days</option>
+          <option value="365">1 year</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" data-action="create">➕ Make a key</button>
+    <div id="new-key" style="display:none;margin-top:14px"></div>
+  </div>
+
+  <div class="card">
+    <h3>Keys</h3>
+    <div id="keys-list"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<script src="/js/api-keys.js"></script>
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+</body>
+</html>

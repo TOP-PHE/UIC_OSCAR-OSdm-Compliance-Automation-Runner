@@ -438,6 +438,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   *routing* decisions (which query shape to run), never for *authorisation*.
   Note that `canUserSeeRun` returns `SELECT *`, so project the row before
   returning it or the response silently widens.
+- **Read-only API keys (#503, PR 1 = 1.11.337).** A Test Manager makes a key
+  for the company or provider of the request (`company-api-keys.js`,
+  `api_key` migration 38; `utils/apiKeys.js` pure). `oscar_<8 hex>_<43
+  base64url>`: the prefix finds the row, only the sha256 of the secret is
+  stored, the key is answered once by the POST. **A key works under `/v1/api`
+  only**: `requireAuth` refuses any `oscar_` bearer with a pointer there, and
+  `routes/api.js` ends in its own 404 so a key never reaches another router or
+  the page fallback. `requireApiKey` (`middleware/apiKey.js`) reads the
+  Authorization header only, answers one 401 for every refusal, and checks at
+  each call: not revoked, not expired, creator an active `test_manager` who
+  `canUseCompany()` the key's company. The principal is `{ role: 'api_key',
+  keyCompanyId }`: `canUserSeeRun()` gives it that one company's runs, not its
+  providers' (`keyCompanyId`, not `companyId`, which the provider-access guard
+  counts). Two rate limits: by address before the key, then per key. PR 2 adds
+  the run/result routes, OpenAPI first; every run they return goes through
+  `canUserSeeRun()`. Bodies and logs wait for a `bodies:read` scope.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that
