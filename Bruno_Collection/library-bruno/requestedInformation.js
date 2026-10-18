@@ -450,10 +450,12 @@ const KNOWN_LAST_SEGMENTS = new Set(Object.keys(SCENARIO_FIELDS));
  * @returns {{ indexErrors:Array, unknownPaths:string[] }}
  */
 // How a check message names an out-of-range index and an unmet attribute.
+/** @returns {string} */
 function indexErrorText(e) {
   return `[${e.index}] >= ${e.passengerCount}`;
 }
 
+/** @returns {string} */
 function unmetText(u) {
   return `${u.scenarioField}@${u.passengerRef}`;
 }
@@ -642,7 +644,7 @@ function processRequestedInformation(o) {
   const issues = staticIssues(s.ast, passengerCount);
   assert(`${tag}.requestedInformation passenger indices are in range`,
     issues.indexErrors.length === 0,
-    `out-of-range index(es): ${issues.indexErrors.map(indexErrorText).join(', ')}`);
+    `out-of-range index(es): ${issues.indexErrors.map((e) => indexErrorText(e)).join(', ')}`);
   if (issues.unknownPaths.length) {
     log('WARNING', `${tag}.requestedInformation references attribute(s) OSCAR does not recognise: ${[...new Set(issues.unknownPaths)].join(', ')}`);
   }

@@ -592,8 +592,8 @@ function _generateHtml(meta, requests) {
   else if (osdmFailed === 0) overallText = '✅ All OSDM assertions passed';
 
   // Derive unique run types present in this run (preserving display order)
-   const _runTypeOrder = ['System Information', 'Common Requests', 'Refund', 'Exchange'];
-   const _runTypeIcons = { 'System Information': '⚙️', 'Common Requests': '🚂', 'Refund': '💰', 'Exchange': '🔄' };
+  const _runTypeOrder = ['System Information', 'Common Requests', 'Refund', 'Exchange'];
+  const _runTypeIcons = { 'System Information': '⚙️', 'Common Requests': '🚂', 'Refund': '💰', 'Exchange': '🔄' };
   const byRunType = {};
   osdmReqs.forEach(r => {
     const rt = r.runType || _deriveRunType(r.requestUrl);

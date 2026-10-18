@@ -441,7 +441,7 @@ function validateRefundPermissibility(refundOffer, index) {
       : `flag ${a.flagLabel} with no schedule granting a refund`);
     const partReason = (a, k) => `part ${k + 1}: ${lockReason(a)}`;
     test(`Refund offer[${index}] permissibility — every selected-offer part is effectively non-refundable`, () => {
-      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer?.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map(partReason).join("; ")} — and no overrule was sent.`);
+      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer?.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer?.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map((a, k) => partReason(a, k)).join("; ")} — and no overrule was sent.`);
     });
     return;
   }
