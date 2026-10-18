@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.336 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.371
+
+Issue #841. The two vulnerabilities Sonar still listed on `main`.
+
+### Changed
+- **Report Builder**: a log block without an id gets its page id from `crypto.getRandomValues()`, not `Math.random()` (Sonar S2245). The id only ties the block to its toggle button; nothing else changes.
+- `ui-scripts.test.js` fails when any page or page script calls `Math.random(`, the rule already applied to `scenarios.js` (#542) and the Bruno library (#758).
+
+### Left as it is, on purpose
+- `alertmanagerConfig.js`'s default reload address `http://alertmanager:9093/-/reload` (Sonar S5332): a container on the deployment's internal Docker network, which serves http and never leaves the host; `ALERTMANAGER_RELOAD_URL` overrides it. Marked *Accepted* in Sonar with this reason, with the maintainer's agreement.
+
+---
+
 ## [server-1.11.335 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.370
 
 Issue #838 (PR 2). A company that tests the OSDM simulator follows the repository's reference configuration of its provider, and is updated from it in one click.
