@@ -112,6 +112,23 @@ installed simulator updates when this version reaches `main`.
 
 ---
 
+## [server-1.11.328] / [collection-OTST_V2.0.183] — 2026-10-18
+
+Issue #827 part B, release 2026.363. Server only.
+
+### Added
+- **The AI analysis quotes the OSDM specification of the version the provider declares.**
+  - Each group of failures names its **OSDM operation** (`POST /offers`, `PATCH /bookings/{bookingId}/passengers/{passengerId}`…), found from its sample request's method and URL: the operation whose path ends the URL's path, whatever the provider's base path. The URL itself is never sent.
+  - The input carries **`osdmReference`**: for those operations, the most failing first (12 at most), the operation's summary, its request and success response schemas, and the schemas they name, two levels down, level by level across the operations so that each gets its own request and response first. Each schema in a few words: its first sentence, its required members, each member's type (a schema, a list, a closed enum with its values, an extensible one with its examples). Member descriptions are left out. About 30,000 characters at most; what is left out is counted.
+  - **Versions 3.4 to 3.8** are in OSCAR. A provider declaring another version gets the nearest one, and the input says it is not exact; none declared gets the latest.
+  - The instructions tell the model to quote the extract when it says what OSDM requires or allows.
+- `src/utils/osdm-references.json` is **generated** by `scripts/generate-osdm-references.js` from the OSDM specification files (the repository's 3.8, the others from the OSDM repository's gh-pages). Never hand-edited; a test pins its 3.8 to the repository's file.
+
+Checked:
+- `osdm-references.test.js`: the generated 3.8 equals what the script makes of the repository's file; a 3.6 extract has no `outboundTripIds` and the 3.8 one has; a schema in a few words (required, nullable, lists, closed and extensible enums, extension, alternatives); the version chosen (exact, nearest, latest); the operation of a request (base path, encoded segments, another method, an unknown path, no URL); the extract's levels, operation limit and size bound; the analysis input naming each group's operation and carrying the extract, never the URL.
+
+---
+
 ## [server-1.11.327] / [collection-OTST_V2.0.183] — 2026-10-18
 
 Issue #827 part A, release 2026.362. Server and pages only.
