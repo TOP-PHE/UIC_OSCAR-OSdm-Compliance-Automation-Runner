@@ -75,6 +75,15 @@ Issue #854. The refund receipt wait renews the access token. Server code unchang
 
 ---
 
+## [server-1.11.342 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.377
+
+Issue #823 (fix to PR 1). Collection unchanged.
+
+### Fixed
+- **The AI analysis sent pieces of debug lines as warnings.** The runner stores at level `warn` any log line that names `[WARNING]`, and 1.11.341 took every such line. A `[DEBUG]` line that says "… that test will skip with a [WARNING] too." was therefore sent as a warning reading "too.", and the first analysis of `gamma` reported several warnings it could not read. A line is a warning now only when its first level tag is `[WARNING]` (`isWarningLine()`). The fault detection report reads the run logs the same way.
+
+---
+
 ## [server-1.11.341 / collection-OTST_V2.0.186] — 2026-10-18 · Release 2026.376
 
 Issue #823 (PR 1). The AI analysis sees the warnings, and what each scenario is written for. Collection unchanged.
