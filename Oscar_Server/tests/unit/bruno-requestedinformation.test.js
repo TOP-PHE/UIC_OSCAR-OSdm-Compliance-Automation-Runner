@@ -478,6 +478,17 @@ describe('validateProblemResponse', () => {
     expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(false);
   });
 
+  test('#833: a refusal without a problem code is a WARNING, never a failure; one with a code says nothing', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({ status: 400, body: { title: 'Bad Request', detail: 'no' }, targets: [], assert: m.assert, log: m.log, label: 'x' });
+    expect(m.asserts.every((a) => a.ok)).toBe(true);
+    expect(m.logs.filter((l) => /names no OSDM problem code/.test(l.msg))).toEqual([{ lvl: 'WARNING',
+      msg: 'Negative requestedInformation [x]: the refusal names no OSDM problem code (Problem.code) — OSDM announces it as mandatory, and a refusal is told from another by it.' }]);
+    const coded = mockSinks();
+    ri.validateProblemResponse({ status: 400, body: { title: 'Bad', code: 'urn:uic:problem:INVALID' }, targets: [], assert: coded.assert, log: coded.log });
+    expect(coded.logs.some((l) => /names no OSDM problem code/.test(l.msg))).toBe(false);
+  });
+
   test('N3 accepts a Problem.pointers array as field identification', () => {
     const m = mockSinks();
     ri.validateProblemResponse({

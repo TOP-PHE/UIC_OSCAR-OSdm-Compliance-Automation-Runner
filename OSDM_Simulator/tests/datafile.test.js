@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_CURRENCY_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE', 'SIM_SALE_NAMED_', 'SIM_SALE_NEARBY_', 'SIM_OFFER_PROBE_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_CURRENCY_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE', 'SIM_SALE_NAMED_', 'SIM_SALE_NEARBY_', 'SIM_OFFER_PROBE_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -83,9 +83,10 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
     assert.deepEqual(sales, expected, version);
   }
   const gamma = providers.find((p) => p.key === 'gamma');
-  // The deliberately wrong scenarios (#611) fail on purpose: not in the run list.
+  // The deliberately wrong scenarios (#611) and the injected faults (#833)
+  // fail on purpose: not in the run list.
   assert.deepEqual(datafile.scenariosToRun, datafile.scenarios
-    .filter((s) => s.osdmVersion === gamma.osdmVersion && !s.code.startsWith('SIM_WRONG_')).map((s) => s.code));
+    .filter((s) => s.osdmVersion === gamma.osdmVersion && !s.code.startsWith('SIM_WRONG_') && !s.code.startsWith('SIM_FAULT_')).map((s) => s.code));
 });
 
 test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {
@@ -137,7 +138,7 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // refund confirms two refund offers and a partial one refunds one ticket.
   // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
   const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH'
-    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_'].some((prefix) => s.code.startsWith(prefix))
+    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_'].some((prefix) => s.code.startsWith(prefix))
     && !BY_SCOPE.has(s.code));
   // Some providers sell a return only as one offer: the SIM_REFUND_COMBINED_ ones refund that.
   // #781: SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38 is the full refund of a return sold in EUR.
@@ -249,7 +250,9 @@ test('the variants and the deliberately wrong answers: each named by a passenger
 test('the requested information and purchaser scenarios: the probe each one runs, and its trip (#611)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const riTrip = datafile.tripRequirements.find((t) => t.trip?.origin === gamma.personChecks.requestedInformationFrom);
+  // The error faults (#833) borrow the purchaser probe to be refused: below.
   const runs = Object.fromEntries(datafile.scenarios
+    .filter((s) => !s.code.startsWith('SIM_FAULT_'))
     .filter((s) => s.requestedInformationProbe || s.bookingPurchaserMode || s.tripRequirementId === riTrip.id)
     .map((s) => [s.code, [s.requestedInformationProbe || null, s.bookingPurchaserMode || null, s.tripRequirementId === riTrip.id]]));
   assert.deepEqual(runs, {
@@ -559,4 +562,16 @@ test('the named place scenarios: the only ones on gamma\'s place map stop place,
   // #776: the reference place of the AUTO scenarios comes from a first booking.
   assert.deepEqual(datafile.scenarios.filter((s) => s.referencePlace === 'AUTO').map((s) => s.code),
     ['SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38', 'SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38', 'SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38']);
+});
+
+test('the fault scenarios: one per fault of the catalogue, out of the run list (#833)', () => {
+  const { catalogue } = require('../src/osdm/faults');
+  const faulty = datafile.scenarios.filter((s) => s.simulatorFaults != null);
+  assert.ok(faulty.every((s) => s.code.startsWith('SIM_FAULT_') && s.osdmVersion === '3.8.0'));
+  assert.deepEqual(faulty.map((s) => s.simulatorFaults).sort(), catalogue().map((f) => [f.code]).sort());
+  for (const scenario of faulty) {
+    const code = `SIM_FAULT_${scenario.simulatorFaults[0].replace('.', '_').replaceAll('-', '_').toUpperCase()}_38`;
+    assert.equal(scenario.code, code);
+    assert.ok(!datafile.scenariosToRun.includes(scenario.code), scenario.code);
+  }
 });

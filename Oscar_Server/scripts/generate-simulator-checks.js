@@ -18,12 +18,15 @@ http://www.apache.org/licenses/LICENSE-2.0
  * Reads OSDM_Simulator/replay/after.json (and after.about.json); both paths
  * are fixed. A check is keyed as findingSuggestions keys a failure: the step
  * as the known-deviation engine reads it, and the check text with the run's
- * values left out. The SIM_WRONG_* scenarios fail on purpose and are left out.
+ * values left out. The SIM_WRONG_* and SIM_FAULT_* (#833) scenarios fail on
+ * purpose and are left out.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { hintKey } = require('../src/utils/findingSuggestions');
+
+const failsOnPurpose = (code) => code.startsWith('SIM_WRONG_') || code.startsWith('SIM_FAULT_');
 
 const REPO = path.resolve(__dirname, '..', '..');
 const RECORDING = path.join(REPO, 'OSDM_Simulator', 'replay', 'after.json');
@@ -34,7 +37,7 @@ const OUT = path.join(__dirname, '..', 'src', 'utils', 'simulator-checks.json');
 function tableOf(recording) {
   const counts = new Map();
   for (const [code, record] of Object.entries(recording)) {
-    if (code.startsWith('SIM_WRONG_')) continue;
+    if (failsOnPurpose(code)) continue;
     for (const [step, check, result] of record.list || []) {
       const key = hintKey(step, check);
       const c = counts.get(key) || [0, 0];
@@ -51,7 +54,7 @@ function main() {
   const recording = JSON.parse(fs.readFileSync(RECORDING, 'utf8'));
   const about = fs.existsSync(ABOUT) ? JSON.parse(fs.readFileSync(ABOUT, 'utf8')) : {};
   const checks = tableOf(recording);
-  const out = { about: { ...about, scenarios: Object.keys(recording).filter((c) => !c.startsWith('SIM_WRONG_')).length }, checks };
+  const out = { about: { ...about, scenarios: Object.keys(recording).filter((c) => !failsOnPurpose(c)).length }, checks };
   fs.writeFileSync(OUT, `${JSON.stringify(out, null, 1)}\n`);
   console.log(`${OUT}: ${Object.keys(checks).length} checks from ${out.about.scenarios} scenarios`);
 }

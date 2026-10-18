@@ -838,6 +838,12 @@ function validateProblemResponse(o) {
     const hasMessage = isObj && (isSet(body.title) || isSet(body.detail) || isSet(body.code));
     grade(`${pfx}${lbl}: error body is an RFC-9457 Problem (title/detail/code present)`,
       !!hasMessage, 'response body did not contain title/detail/code');
+    // #833: Problem.code is optional in OSDM 3.x ("will be made mandatory"),
+    // but it is what tells one refusal from another: a refusal without it is
+    // a WARNING. Found by the simulator fault error.problem-without-code.
+    if (isObj && !isSet(body.code)) {
+      log('WARNING', `${pfx}${lbl}: the refusal names no OSDM problem code (Problem.code) — OSDM announces it as mandatory, and a refusal is told from another by it.`);
+    }
     // N3 — should identify the offending field (always WARN; Problem.pointers optional @3.1).
     const fields = [...new Set(tgs.map((t) => t.scenarioField).filter(Boolean))];
     const blob = isObj ? JSON.stringify(body).toLowerCase() : '';

@@ -103,6 +103,7 @@ runtime:
             loopbackOrStop("GET Booking after Fulfillments (JSON parse)");
             return;
         }
+        if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking after Fulfillments")) return;
         // #250: this is the GET /bookings AFTER POST /fulfillments — require the
         // booking to embed the generated fulfillments (5th arg = requireFulfillments).
         postCreateBookingResponse(

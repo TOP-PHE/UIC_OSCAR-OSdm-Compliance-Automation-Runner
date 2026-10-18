@@ -50,6 +50,7 @@ runtime:
             loopbackOrStop("GET Booking after Patch Refund (JSON parse)");
             return;
         }
+        if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking after Patch Refund")) return;
         if (!jsonData.booking) {
             test("booking exists in response (required for downstream steps)", () => {
                 throw new Error("⛔ booking missing in GET response — cannot proceed");

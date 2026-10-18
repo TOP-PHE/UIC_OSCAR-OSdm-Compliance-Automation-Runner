@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-18-simulator-faults",
+    "date": "October 18, 2026",
+    "tag": "Improvement",
+    "title": "Simulator faults: proving that OSCAR detects errors",
+    "summary": "A scenario can ask the OSDM simulator for chosen errors, and twelve scenarios check that OSCAR reports each one.",
+    "content": "The OSDM simulator can now answer with chosen errors: an offer cheaper than its parts, a booking in another currency, a lost passenger, a refund larger than the price, an HTML page instead of a booking, and more. A scenario names them in its new \"Simulator faults\" field (Test Config); the simulator's data file has one scenario per fault, and OSCAR detects all twelve. The exercise also showed two gaps, now closed: a refusal without its OSDM problem code is reported as a warning, and a booking read answered with a web page fails one clear check instead of stopping the step's script."
+  },
+  {
     "id": "2026-10-18-simulator-versions",
     "date": "October 18, 2026",
     "tag": "Improvement",

@@ -52,6 +52,7 @@ runtime:
             loopbackOrStop("GET Booking after Fulfillment (Exchange DEL, JSON parse)");
             return;
         }
+        if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking after Fulfillment")) return;
         // #649: the parts sold first against the original offer, the exchange's own parts for their status.
         require(bru.getEnvVar("library_base") + "exchanges.js").checkBookingAroundExchange(jsonData, "withdrawn");
 

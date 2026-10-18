@@ -96,4 +96,24 @@ function noteKnownDeviation(stepLabel, status, dev) {
   if (seen.indexOf(key) === -1) { seen.push(key); bru.setEnvVar('__knownDeviationsSeen', JSON.stringify(seen)); }
 }
 
-module.exports = { loopbackOrStop, failStepOrContinue, knownDeviationFor, noteKnownDeviation };
+/**
+ * #833: a step that reads a booking stops, by name, on an answer that is not
+ * a JSON object (a gateway's HTML page, found with the simulator fault
+ * answer.html). Before, the step's own script crashed on it and the report
+ * said only "Post-Response Script Error". Returns true when the body is an
+ * object; otherwise records the failed check, stops the scenario, returns false.
+ */
+function jsonObjectOrStop(body, label) {
+  if (body !== null && typeof body === 'object' && !Array.isArray(body)) return true;
+  let kind = typeof body;
+  if (body === null || body === undefined) kind = 'nothing';
+  else if (Array.isArray(body)) kind = 'a list';
+  const start = typeof body === 'string' ? ` starting "${body.slice(0, 40).replaceAll(/\s+/g, ' ')}"` : '';
+  test(`The answer is a JSON object — got ${kind}${start}`, () => {
+    throw new Error(`${label}: the answer is not a JSON object (${kind}). See the Content-Type check and the HTTP traffic.`);
+  });
+  loopbackOrStop(`${label} (not JSON)`);
+  return false;
+}
+
+module.exports = { loopbackOrStop, failStepOrContinue, knownDeviationFor, noteKnownDeviation, jsonObjectOrStop };

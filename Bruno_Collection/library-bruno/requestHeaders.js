@@ -35,4 +35,31 @@ function requestorHeader(requestor) {
   return isUnset(requestor) ? {} : { Requestor: String(requestor) };
 }
 
-module.exports = { dropUnsetRequestor, requestorHeader };
+// #833: the simulator's fault codes ("offer.price-below-parts"): nothing else
+// reaches the header, so a template or a line break never does.
+// Any word of safe characters goes out: the simulator refuses a code it does
+// not know (400 UNKNOWN_FAULT), so a typing mistake shows instead of being dropped.
+const FAULT_CODE = /^[A-Za-z0-9._-]{1,60}$/;
+const MAX_FAULTS = 20;
+
+/**
+ * The X-Simulator-Faults value of a scenario's simulatorFaults (#833): a
+ * list or "a, b", its codes joined by commas; '' when none.
+ */
+function simulatorFaultsValue(raw) {
+  const list = Array.isArray(raw) ? raw : String(raw ?? '').split(/[\s,]+/);
+  return [...new Set(list.map((c) => String(c).trim()).filter((c) => FAULT_CODE.test(c)))].slice(0, MAX_FAULTS).join(',');
+}
+
+/**
+ * Put the scenario's faults on the request, for the OSDM simulator (#833 PR C):
+ * the run variable `simulatorFaults`, set by the scenario parser. Returns the
+ * value sent, or '' when the scenario names none (no header then).
+ */
+function applySimulatorFaults(req, value) {
+  const faults = simulatorFaultsValue(value);
+  if (faults && req && typeof req.setHeader === 'function') req.setHeader('X-Simulator-Faults', faults);
+  return faults;
+}
+
+module.exports = { dropUnsetRequestor, requestorHeader, simulatorFaultsValue, applySimulatorFaults };

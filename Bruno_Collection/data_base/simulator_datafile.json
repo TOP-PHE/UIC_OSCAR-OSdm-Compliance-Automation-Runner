@@ -4214,6 +4214,452 @@
         "offerMode": null,
         "requestedOfferParts": []
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_OFFER_PRICE_BELOW_PARTS_38",
+      "description": "Simulated provider, fault offer.price-below-parts (#833): each offer costs one unit less than its admissions. Copy of SIM_SALE_SEARCH_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "offer.price-below-parts"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_OFFER_TRIP_UNKNOWN_38",
+      "description": "Simulated provider, fault offer.trip-unknown (#833): each offer covers a trip the answer does not have. Copy of SIM_SALE_SEARCH_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "offer.trip-unknown"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_BOOKING_CURRENCY_CHANGED_38",
+      "description": "Simulated provider, fault booking.currency-changed (#833): the new booking is priced in another currency than the offer. Copy of SIM_SALE_SEARCH_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "booking.currency-changed"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_BOOKING_PASSENGER_DROPPED_38",
+      "description": "Simulated provider, fault booking.passenger-dropped (#833): the new booking loses its second passenger. Copy of SIM_SALE_SEARCH_2ADT_SAVER_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 2,
+      "passengersListId": 2,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "booking.passenger-dropped"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_BOOKING_NOT_PREBOOKED_38",
+      "description": "Simulated provider, fault booking.not-prebooked (#833): the new booking says its admissions are CONFIRMED. Copy of SIM_SALE_SEARCH_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "booking.not-prebooked"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_PASSENGER_NAME_ALTERED_38",
+      "description": "Simulated provider, fault passenger.name-altered (#833): the passenger update answers another last name. Copy of SIM_SALE_SEARCH_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "passenger.name-altered"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_FULFILLMENT_WRONG_STATUS_38",
+      "description": "Simulated provider, fault fulfillment.wrong-status (#833): the confirmation gives fulfilments that say REFUNDED. Copy of SIM_SALE_SEARCH_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "fulfillment.wrong-status"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_ANSWER_HTML_38",
+      "description": "Simulated provider, fault answer.html (#833): a booking read is answered with an HTML page. Copy of SIM_SALE_SEARCH_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "answer.html"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_REFUND_AMOUNT_ABOVE_PAID_38",
+      "description": "Simulated provider, fault refund.amount-above-paid (#833): the refund offers give back ten times their amount. Copy of SIM_REFUND_RETURN_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "returnOffsetDays": 2,
+        "returnTime": "17:00",
+        "returnModel": "SEPARATE",
+        "returnFulfillments": "PER_DIRECTION"
+      },
+      "partialRefundByFulfillment": "off",
+      "partialRefundFulfillmentSelection": "first",
+      "simulatorFaults": [
+        "refund.amount-above-paid"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_REFUND_NOT_REFUNDED_38",
+      "description": "Simulated provider, fault refund.not-refunded (#833): the booking read after the refund shows its tickets FULFILLED. Copy of SIM_REFUND_RETURN_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "returnOffsetDays": 2,
+        "returnTime": "17:00",
+        "returnModel": "SEPARATE",
+        "returnFulfillments": "PER_DIRECTION"
+      },
+      "partialRefundByFulfillment": "off",
+      "partialRefundFulfillmentSelection": "first",
+      "simulatorFaults": [
+        "refund.not-refunded"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_ERROR_PROBLEM_WITHOUT_CODE_38",
+      "description": "Simulated provider, fault error.problem-without-code (#833): every refusal leaves out its problem code. Copy of SIM_NHF_PURCHASER_INVALID_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "bookingPurchaserMode": "invalid",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "error.problem-without-code"
+      ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FAULT_ERROR_SERVER_ERROR_FOR_REFUSAL_38",
+      "description": "Simulated provider, fault error.server-error-for-refusal (#833): every refusal comes as HTTP 500. Copy of SIM_NHF_PURCHASER_INVALID_1ADT_38; OSCAR must report it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "bookingPurchaserMode": "invalid",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "simulatorFaults": [
+        "error.server-error-for-refusal"
+      ]
     }
   ],
   "offerSearchCriteriaList": [
