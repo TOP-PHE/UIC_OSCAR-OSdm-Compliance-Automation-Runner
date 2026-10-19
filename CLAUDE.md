@@ -2201,11 +2201,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `public/osdm-logo.png` (the maintainer's files; the originals are in the
   private repository), the content security policy's `imgSrc` is `'self'` and
   `data:` only, and `page-images.test.js` fails on a page loading an image
-  from another site. A new page copies the banner of an existing one, so
-  `Oscar_Server/public/*.html` is left out of Sonar's copy-paste detection
-  (`sonar.cpd.exclusions`): any line changed in the shared banner counted as
-  duplicated new code and failed the gate. #807 shares the banner and styles
-  and then removes that line.
+  from another site. **Since #807 (1.11.352) the banner is one script and one
+  stylesheet**: a page's `<header class="uic-banner">` starts with
+  `<script src="/js/banner.js"></script>` (it puts the logos in front of
+  itself, element by element; `nav.js` still draws the menu bar after it),
+  and `css/oscar-banner.css` is the page's first stylesheet. No page or other
+  stylesheet repeats a banner rule or a logo: `shared-banner.test.js`. A new
+  page copies that header, not the logos. The pages are measured by Sonar's
+  copy-paste detection again.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image** — a `refresh-collection.yml`
   workflow `git pull`s the VPS on every push to `main`.
