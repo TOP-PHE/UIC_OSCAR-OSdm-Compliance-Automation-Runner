@@ -130,6 +130,11 @@ function overruleCodeOf(body, provider) {
  */
 function createRefundOffers(booking, body, provider, nowMs) {
   if (booking.fulfillments.length === 0) throw conflict('the booking is not confirmed: it has no fulfillment to refund');
+  // #883: a provider seen refunding one fulfillment per request.
+  if (variants.has(booking, 'one-fulfillment-per-refund-request') && Array.isArray(body.fulfillmentIds) && body.fulfillmentIds.length > 1) {
+    throw new HttpError(501, 'VALUE_NOT_SUPPORTED', "Only one value is expected for the 'fulfillmentIds' parameter",
+      'Ask one refund offer per fulfillment.');
+  }
   refuseScopedRefund(body, booking);
   const overruleCode = overruleCodeOf(body, provider);
   const specs = Array.isArray(body.refundSpecifications) ? body.refundSpecifications : [];

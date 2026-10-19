@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.394",
+  "current_release": "2026.395",
   "releases": [
+    {
+      "release": "2026.395",
+      "date": "2026-10-19",
+      "server": "1.11.360",
+      "collection": "OTST_V2.0.195",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Step 10 asks one refund offer per fulfillment, with a WARNING, when the provider refuses a request naming several (#883). Simulator 0.41.0: variant one-fulfillment-per-refund-request."
+      ]
+    },
     {
       "release": "2026.394",
       "date": "2026-10-19",

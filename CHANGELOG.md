@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.360 / collection-OTST_V2.0.195] — 2026-10-19 · Release 2026.395
+
+Issue #883, from a real provider's catalogue run. Simulator 0.41.0.
+
+### Simulator 0.41.0
+- **Variant `one-fulfillment-per-refund-request`** (last name `Simvariant-One-Fulfillment-Per-Refund-Request`): a refund offer request naming more than one fulfillment is refused with 501 `VALUE_NOT_SUPPORTED`, as that provider does; one fulfillment at a time is answered as before. Every provider that has variants; no other booking changes.
+
+### Fixed
+- **Step 10 asks one refund offer per fulfillment when the provider refuses a list.** OSDM's `RefundOfferRequest.fulfillmentIds` takes several ids, but a real provider refuses more than one ("Only one value (single-element array) is expected for the 'fulfillmentIds' parameter"), so a booking with one ticket per direction could not be refunded: four reference scenarios stopped at step 10 (`OTST_REFUND_RETURN_COMBINED_FULL_1ADT`, `…_INBOUND_1ADT`, `OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT`, `OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT`). Now, when a request naming several fulfillments is refused (4xx or 501) by a Problem naming `fulfillmentIds`, step 10 says so in one WARNING, asks one refund offer per fulfillment from its own script (the same body with one id and that fulfillment's refund specifications; one check per request), and goes on with all the refund offers together, each confirmed in turn at 13 as before (`library-bruno/refundPerFulfillment.js`). Any other refusal is graded as before.
+- **Simulator scenario `SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38`**: the full refund of a combined return with that variant, 597 checks, none failed (`SIM_REFUND_COMBINED_RETURN_1ADT_38` gives 595: the two requests one per ticket are the difference). The twelve other refund scenarios replayed give the same checks as before.
+
+---
+
 ## [server-1.11.359 / collection-OTST_V2.0.194] — 2026-10-19 · Release 2026.394
 
 Issue #881, from an AI analysis of a batch on the simulated provider delta.
@@ -77,7 +90,7 @@ Issue #881, from an AI analysis of a batch on the simulated provider delta.
 Issue #780 (PR C, the last of the remaining work). A probe asks on purpose for an offer search option value the Test Framework leaves out. No simulator change.
 
 ### Added
-- **Reference scenario `OTST_OFFER_OPTION_NOT_DECLARED`** (`probe` `OFFER_OPTION_NOT_DECLARED`): at copy time it asks for the first value an explicit list of the Test Framework leaves out, in the order travel class, service class, offer part, flexibility, product tag (`undeclaredOptionValue()`; the offer mode is not asked, OTST_V2.0.193ECTIVE needs a group). Not copiable when no list leaves a value out. 70 checks on the simulator.
+- **Reference scenario `OTST_OFFER_OPTION_NOT_DECLARED`** (`probe` `OFFER_OPTION_NOT_DECLARED`): at copy time it asks for the first value an explicit list of the Test Framework leaves out, in the order travel class, service class, offer part, flexibility, product tag (`undeclaredOptionValue()`; the offer mode is not asked, COLLECTIVE needs a group). Not copiable when no list leaves a value out. 70 checks on the simulator.
 - **The probe at step 01** (`offerOptionExpectRejection`, `library-bruno/optionNotDeclared.js`), graded as the currency probe (#781): a refusal is graded as one (501 = not supported, a WARNING); no offer, or the member said ignored (PARAMETER_NOT_SUPPORTED), pass; offers keeping to the value fail (the provider takes it, so the framework should declare it); offers not keeping to it with nothing said pass with a WARNING. The scenario ends after the offer. A scenario so armed gets no `offerOption:` warning.
 - **Simulator scenarios**: `SIM_OFFER_PROBE_NOT_DECLARED_38` (service class BEST, which gamma does not sell: no offer, no failed check) and `SIM_WRONG_OFFER_PROBE_NOT_DECLARED_SOLD_38` (first class, which gamma sells: one failed check on purpose).
 

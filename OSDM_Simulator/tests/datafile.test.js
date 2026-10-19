@@ -218,6 +218,7 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38: ['ignores-place-preferences'],
     SIM_VARIANT_IGNORES_REFERENCE_1ADT_38: ['ignores-reference-place'],
     SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38: ['refuses-bare-place-selection'],
+    SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38: ['one-fulfillment-per-refund-request'],
     SIM_WRONG_OFFER_PRICE_38: [],
     SIM_WRONG_BOOKING_PRICE_38: ['wrong-booking-price'],
     SIM_WRONG_FULFILLMENT_STATUS_38: ['wrong-fulfillment-status'],
