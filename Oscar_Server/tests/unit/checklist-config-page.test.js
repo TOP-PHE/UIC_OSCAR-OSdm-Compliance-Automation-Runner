@@ -137,10 +137,12 @@ describe('#862 the wiring', () => {
 });
 
 describe('#862 an import id read from an answer', () => {
-  test('only a positive integer goes into a request address', () => {
-    expect(P.checklistIdOf(7)).toBe(7);
-    expect(P.checklistIdOf('12')).toBe(12);
-    for (const v of ['../admin', '1/discard', '1?x=1', 0, -3, 1.5, null, undefined, '', 'abc', Number.MAX_SAFE_INTEGER + 2]) {
+  // #868: import ids are UUIDs (crypto.randomUUID); a check for a number refused every one.
+  test('only a UUID goes into a request address', () => {
+    const id = '3f2b8c1e-9a4d-4e7b-8c2a-1d5e6f7a8b9c';
+    expect(P.checklistIdOf(id)).toBe(id);
+    expect(P.checklistIdOf(id.toUpperCase())).toBe(id);
+    for (const v of ['../admin', `${id}/discard`, `${id}?x=1`, 7, '12', 0, null, undefined, '', 'abc']) {
       expect(P.checklistIdOf(v)).toBeNull();
     }
   });

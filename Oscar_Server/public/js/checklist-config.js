@@ -164,10 +164,12 @@ function checklistPreviewHtml(p) {
   return `<div style="margin-top:10px;padding:10px;border-radius:6px;background:#fff;border:1px solid #cfd8dc;color:#263238">${parts.join('')}</div>`;
 }
 
-// An import id from an answer: a positive integer, else null.
+// An import id from an answer: a UUID (the server makes them with
+// crypto.randomUUID), else null. Only that goes into a request address.
+const CHECKLIST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function checklistIdOf(value) {
-  const id = Number(value);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
+  const text = typeof value === 'string' ? value : '';
+  return CHECKLIST_ID.test(text) ? text.toLowerCase() : null;
 }
 
 (function () {
