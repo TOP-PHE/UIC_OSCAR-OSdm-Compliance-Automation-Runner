@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.396",
+  "current_release": "2026.397",
   "releases": [
+    {
+      "release": "2026.397",
+      "date": "2026-10-19",
+      "server": "1.11.362",
+      "collection": "OTST_V2.0.197",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Framework: reduction cards the provider accepts, read from checklist question A3.7; reference scenarios OTST_SALE_REDUCTION_CARD_1ADT and _2ADT copied with the first declared card (#887 PR 1)."
+      ]
+    },
     {
       "release": "2026.396",
       "date": "2026-10-19",

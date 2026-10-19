@@ -139,8 +139,9 @@ describe('#748 — the catalogue follows the declared forms', () => {
       const at = codes.indexOf(code);
       expect(codes.slice(at, at + 3)).toEqual([code, `${code}_SPEC`, `${code}_TRIPID`]);
       expect(entries[at]).not.toHaveProperty('tripAs');
-      expect(entries[at + 1]).toMatchObject({ variantOf: code, tripAs: 'SPECIFICATION', missing: [] });
-      expect(entries[at + 2]).toMatchObject({ variantOf: code, tripAs: 'TRIP_IDS', missing: [] });
+      // A twin lacks what its entry lacks (#887: a card), and nothing more.
+      expect(entries[at + 1]).toMatchObject({ variantOf: code, tripAs: 'SPECIFICATION', missing: entries[at].missing });
+      expect(entries[at + 2]).toMatchObject({ variantOf: code, tripAs: 'TRIP_IDS', missing: entries[at].missing });
       expect(entries[at + 1].purpose).toMatch(/Offers asked by trip specification\.$/);
       expect(entries[at + 2].purpose).toMatch(/Offers asked by trip id, from POST \/trips-collection\.$/);
       expect(entries[at + 2].needs).toEqual(entries[at].needs);

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-reduction-card-scenarios",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Reduction card scenarios for every provider",
+    "summary": "Declare the reduction cards a provider accepts, and copy two new reference scenarios that sell with one.",
+    "content": "Under Passenger Types, list the provider's cards (code, issuer, name), or import its filled checklist. The reference scenarios OTST_SALE_REDUCTION_CARD_1ADT and _2ADT then copy with the first card listed."
+  },
+  {
     "id": "2026-10-19-main-passenger-update",
     "date": "October 19, 2026",
     "tag": "New",

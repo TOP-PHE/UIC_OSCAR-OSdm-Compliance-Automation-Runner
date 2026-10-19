@@ -52,7 +52,9 @@ describe('the catalogue file', () => {
 
   test('has no provider-specific or deliberately wrong scenario, and waits long enough on a real provider', () => {
     for (const e of catalogue.entries) {
-      expect(e.source).not.toMatch(/^SIM_(WRONG|VARIANT|SALE_CARD|SALE_PRODUCT|GROUP)_/);
+      // #887: a card scenario is generic once its card comes from the Test Framework.
+      if (e.limit === 'REDUCTION_CARDS') expect(e.source).toMatch(/^SIM_SALE_CARD_/);
+      else expect(e.source).not.toMatch(/^SIM_(WRONG|VARIANT|SALE_CARD|SALE_PRODUCT|GROUP)_/);
       if (e.code.startsWith('NHF_EXPIRED_')) expect(Object.values(e.set)).toEqual([40]);
     }
   });

@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.362 / collection-OTST_V2.0.197] — 2026-10-19 · Release 2026.397
+
+Issue #887 (PR 1 of 3: reduction cards), from the ČD coverage review of #592. No simulator change.
+
+### Added
+- **Test Framework › Passenger Types › Reduction cards the provider accepts**: a list of cards, each with its code (as sent in an offer request), issuer and name (`reductionCards`, `utils/reductionCards.js`; absent = none declared).
+- **A checklist import fills it** from question A3.7 (#862): NO gives none, YES the rows of the card table (`data.card.<n>.code` / `.issuer` / `.name`). The checklist's annex row says so; the public and simulator checklists and the reference configurations are regenerated (the simulator's three cards are now in each reference framework).
+- **Two reference scenarios** (catalogue `limit` `REDUCTION_CARDS`), copied with the first declared card, code and issuer, on the passenger holding one, in a passenger list of the copy's own; not copiable without a declared card ("a reduction card the provider accepts"):
+  - `OTST_SALE_REDUCTION_CARD_1ADT` (source `SIM_SALE_CARD_25_1ADT_38`, 261 checks): the offer names the card and costs less than without it;
+  - `OTST_SALE_REDUCTION_CARD_2ADT` (source `SIM_SALE_CARD_50_2ADT_38`, 321 checks): two adults, only the card holder pays less.
+  A one-way search, they get their trip-specification and trip-id twins too. Copied with the simulator's reference framework and run on the simulator, they give the same checks as their sources (trip-id twin: 268), none failed.
+
+### Not in this release
+- Named products and group tariffs (PRs 2 and 3 of #887): the checklist does not ask a provider's product codes yet.
+- A warning for a scenario of your own whose card the framework does not declare.
+
+---
+
 ## [server-1.11.361 / collection-OTST_V2.0.196] — 2026-10-19 · Release 2026.396
 
 Issue #885, from a real provider's catalogue run. No simulator change.

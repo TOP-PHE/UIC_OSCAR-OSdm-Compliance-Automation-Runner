@@ -185,7 +185,24 @@
       "MANUAL_PLACE_SELECTION_WITHOUT_FEE",
       "MANUAL_PLACE_SELECTION_WITH_FEE"
     ],
-    "mandatoryReservationForm": "PLACE_SELECTION"
+    "mandatoryReservationForm": "PLACE_SELECTION",
+    "reductionCards": [
+      {
+        "code": "SIM_CARD_25",
+        "issuer": "urn:x_osdm_simulator:carrier:delta",
+        "name": "Simulator card 25 (25 % off)"
+      },
+      {
+        "code": "SIM_CARD_50",
+        "issuer": "urn:x_osdm_simulator:carrier:delta",
+        "name": "Simulator card 50 (50 % off)"
+      },
+      {
+        "code": "SIM_STUDENT",
+        "issuer": "urn:x_osdm_simulator:carrier:delta",
+        "name": "Simulator student card (30 % off)"
+      }
+    ]
   },
   "testResources": [
     {

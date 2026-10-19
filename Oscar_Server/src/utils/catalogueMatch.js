@@ -26,6 +26,7 @@
  */
 
 const { ageRangesOf } = require('./scenarioCatalogue');
+const { declaredCards, passengersWithCard } = require('./reductionCards');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -85,6 +86,8 @@ function saleFlexibility(own, framework) {
   return FLEXIBILITIES.find((f) => declared.includes(f)) || declared[0];
 }
 
+const CARDS_TO_CHECK = 'the passengers\' reduction cards must be ones the provider accepts';
+
 // What a reference scenario needs that OSCAR cannot see in the Test Data.
 function needsToCheck(needs) {
   const out = [];
@@ -93,7 +96,7 @@ function needsToCheck(needs) {
   }
   if (arr(needs.legClasses).length) out.push(`each leg must be sold in its class: ${needs.legClasses.join(', ')}`);
   if (needs.requestedInformation) out.push('the provider must ask for passenger details on the chosen trip');
-  if (needs.reductionCards) out.push('the passengers\' reduction cards must be ones the provider accepts');
+  if (needs.reductionCards) out.push(CARDS_TO_CHECK);
   return out;
 }
 
@@ -327,7 +330,7 @@ function withCurrencies(datafile, entries) {
 }
 
 // What a limit entry takes from the framework: #699 its passenger count, #704
-// its departure day, #705 its passengers' ages. Nothing when the framework
+// its departure day, #705 its passengers' ages, #887 its reduction card. Nothing when the framework
 // does not declare it (the entry then cannot be copied).
 function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
   if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
@@ -336,6 +339,14 @@ function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
   } else if (limit === 'AGE_RANGES') {
     const declared = ageRangesOf(fw);
     if (declared) ownList(agedPassengers(source?.passengers, declared, toCheck));
+  } else if (limit === 'REDUCTION_CARDS') {
+    // #887: the provider's own card, declared: nothing left to check about it.
+    const [card] = declaredCards(fw);
+    if (card) {
+      ownList(passengersWithCard(source?.passengers, card));
+      const i = toCheck.indexOf(CARDS_TO_CHECK);
+      if (i >= 0) toCheck.splice(i, 1);
+    }
   } else if (limit) {
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
