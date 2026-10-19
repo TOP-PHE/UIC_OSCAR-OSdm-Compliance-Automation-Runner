@@ -14,8 +14,10 @@ http://www.apache.org/licenses/LICENSE-2.0
  *
  * Input: the OSDM specification files, named OSDM-online-api-v<X>.0.yml, in
  * the folder OSDM_SPEC_DIR (default: Documentation/Test_Coverage/OSDM_reference,
- * which holds 3.8). The others come from
+ * which holds 3.8 and 3.9). The others come from
  *   https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM/gh-pages/specification/v<X>/OSDM-online-api-v<X>.0.yml
+ * (3.9 is published there as OSDM-online-api-v3.9.0.bundled.yml; the
+ * repository keeps it under the plain name, #858).
  *
  *   OSDM_SPEC_DIR=/tmp/osdm node scripts/generate-osdm-request-schemas.js
  *
@@ -36,7 +38,7 @@ const REPO = path.resolve(__dirname, '..', '..');
 const SPEC_DIR = process.env.OSDM_SPEC_DIR
   || path.join(REPO, 'Documentation', 'Test_Coverage', 'OSDM_reference');
 const OUT = path.join(REPO, 'Bruno_Collection', 'library-bruno', 'osdmRequestSchemas.js');
-const VERSIONS = ['3.4', '3.5', '3.6', '3.7', '3.8'];
+const VERSIONS = ['3.4', '3.5', '3.6', '3.7', '3.8', '3.9'];
 
 // The endpoints OSCAR sends a body to (request files and scripts alike).
 const OPERATIONS = [

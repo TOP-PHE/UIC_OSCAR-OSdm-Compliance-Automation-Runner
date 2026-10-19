@@ -21,10 +21,12 @@ const AN = require('../../src/utils/aiAnalysis');
 const generated = require('../../src/utils/osdm-references.json');
 
 describe('#827 the generated file', () => {
-  test('it holds OSDM 3.4 to 3.8, and its 3.8 is the repository\'s 3.8 specification', () => {
-    expect(Object.keys(generated.versions)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0']);
-    const spec = yaml.load(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Test_Coverage', 'OSDM_reference', 'OSDM-online-api-v3.8.0.yml'), 'utf8'));
-    expect(generated.versions['3.8.0']).toEqual(G.versionOf(spec));
+  test('it holds OSDM 3.4 to 3.9, and its 3.8 and 3.9 are the repository\'s specifications', () => {
+    expect(Object.keys(generated.versions)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0', '3.9.0']);
+    for (const v of ['3.8.0', '3.9.0']) {
+      const spec = yaml.load(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Test_Coverage', 'OSDM_reference', `OSDM-online-api-v${v}.yml`), 'utf8'));
+      expect(generated.versions[v]).toEqual(G.versionOf(spec));
+    }
   });
 
   test('a version without outboundTripIds does not get it from a later one', () => {
@@ -55,9 +57,10 @@ describe('#827 the version quoted', () => {
     expect(R.versionFor('3.8')).toEqual({ version: '3.8.0', exact: true });
     expect(R.versionFor('3.6.0')).toEqual({ version: '3.6.0', exact: true });
     expect(R.versionFor('3.0.5')).toEqual({ version: '3.4.0', exact: false });
-    expect(R.versionFor('3.9')).toEqual({ version: '3.8.0', exact: false });
-    expect(R.versionFor(null)).toEqual({ version: '3.8.0', exact: false });
-    expect(R.versionFor('three')).toEqual({ version: '3.8.0', exact: false });
+    expect(R.versionFor('3.9')).toEqual({ version: '3.9.0', exact: true });
+    expect(R.versionFor('3.10')).toEqual({ version: '3.9.0', exact: false });
+    expect(R.versionFor(null)).toEqual({ version: '3.9.0', exact: false });
+    expect(R.versionFor('three')).toEqual({ version: '3.9.0', exact: false });
     expect(R.versionFor('3.5', ['3.4.0', '3.6.0'])).toEqual({ version: '3.4.0', exact: false });
   });
 });
