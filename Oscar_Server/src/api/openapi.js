@@ -387,6 +387,12 @@ module.exports = {
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'The analysis' }, 404: { description: 'Not one of this company or provider' } } },
     },
+    '/v1/company/ai-analysis/history/{id}/download': {
+      get: { tags: ['Company'], summary: 'An AI analysis\'s groups with the failing requests of each, as one Markdown file (#867)', security: [{ bearerAuth: [] }],
+        description: 'The readers of GET /history/{id}. `oscar-analysis-<date>-<company>.md`: per group (in the analysis\'s order) its owner, title, explanation, evidence, next step, steps and scenarios, then the failing requests of the analysed batches at those steps and scenarios: the first of each run and step, at most 3 a group, the others counted. Each request gives its method, the path and query of its address, its body, the HTTP status and the body received, as stored (not masked). Never written: headers, the endpoint\'s host, credentials in the query or in a body member named like one. A body is cut at 20 KB, the file at 4 MB, each saying where.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'The Markdown file', content: { 'text/markdown': { schema: { type: 'string' } } } }, 403: { description: 'Test Managers only' }, 404: { description: 'Not one of this company or provider' }, 409: { description: 'The analysis has no result' } } },
+    },
     '/v1/company/ai-analysis/history/{id}/groups/{index}/draft': {
       post: { tags: ['Company'], summary: 'A group of an AI analysis as a finding draft (#823)', security: [{ bearerAuth: [] }],
         description: 'The group joins the suggested findings of Test Findings (#735), where a Test Manager accepts, edits or rejects it. The draft names the analysis and its model; the AI\'s owner is shown in it, and the category stays "open". One draft per group. Answers 201 { suggestion: { id, state, draft } }.',

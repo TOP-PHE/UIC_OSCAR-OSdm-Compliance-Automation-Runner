@@ -18,6 +18,8 @@
  *                                                 confirmed: starts the analysis (202)
  *   GET  /v1/company/ai-analysis/history        — the analyses of this company or provider
  *   GET  /v1/company/ai-analysis/history/:id    — one, with its result and the finding drafts made from it
+ *   GET  /v1/company/ai-analysis/history/:id/download — its groups and their failing
+ *                                                 requests, as one Markdown file (#867)
  *   POST /v1/company/ai-analysis/history/:id/groups/:index/draft — a group as a finding draft (#823)
  *   GET  /v1/company/ai-analysis/spend          — what the analyses cost: today, this
  *                                                 month, per month and per model (#831)
@@ -49,7 +51,7 @@ const { requireAuth }   = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
 const { toApiFinding } = require('../helpers/findings');
-const { failuresOfBatch, warningsOfBatch, batchesOf, runsOfBatch, MAX_FAILURES } = require('../helpers/batchFailures');
+const { failuresOfBatch, warningsOfBatch, batchesOf, runsOfBatch, MAX_FAILURES, FINISHED } = require('../helpers/batchFailures');
 const { decryptFromFileAsync } = require('../../utils/at-rest');
 const C = require('../../utils/aiConfig');
 const AN = require('../../utils/aiAnalysis');
@@ -60,6 +62,7 @@ const CL = require('../../utils/checklistAnswers');
 const MK = require('../../utils/aiMask');
 const M = require('../../utils/aiModels');
 const FD = require('../../utils/faultDetection');
+const DL = require('../../utils/aiAnalysisDownload');
 const { annotateDatafile } = require('../../utils/frameworkGating');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis-results' });
 
@@ -69,6 +72,11 @@ router.use(requireAuth, enforceTenant);
 const readLimiter = rateLimit({
   windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false,
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests in a short window — please wait a moment.' },
+});
+// A download decrypts every body it writes (#867).
+const downloadLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many downloads in a short window — please wait a moment.' },
 });
 // Each analysis is billed to the company's account.
 const runLimiter = rateLimit({
@@ -373,6 +381,72 @@ router.get('/ai-analysis/history/:id', readLimiter, (req, res) => {
   const analysis = storedAnalysis(req);
   if (!analysis) return refuse(res, 404, 'No analysis with that id here.');
   res.json({ ...analysis, drafts: draftsOf(req.companyId, analysis.id) });
+});
+
+// ── GET /ai-analysis/history/:id/download (#867) ─────────────────────────────
+// The analysis's groups as one Markdown file, each with the failing requests
+// of its batches that belong to it (utils/aiAnalysisDownload.js), for the
+// provider or for reading outside OSCAR. The same readers as the history.
+// The bodies are the company's own test data and are not masked; the headers
+// are never read, and the endpoint's host is left out.
+
+const MAX_DOWNLOAD_ROWS = 5000;
+
+// The failing requests of the analysis's batches, without their bodies, each
+// with the text of its failed checks.
+function failingRequestsOf(companyId, batchIds) {
+  if (!batchIds.length) return [];
+  const rows = all(
+    `SELECT rq.id AS request_id, rq.request_name, rq.http_method, rq.http_url, rq.http_status,
+            r.id AS run_id, r.batch_id, r.scenario_code, s.scenario_name
+       FROM run_requests rq
+       JOIN runs       r ON r.id = rq.run_id
+       JOIN run_suites s ON s.id = rq.suite_id
+      WHERE r.company_id = ? AND rq.company_id = ? AND r.batch_id IN (${batchIds.map(() => '?').join(', ')}) AND r.status IN (?, ?)
+        AND EXISTS (SELECT 1 FROM run_assertions a WHERE a.request_id = rq.id AND a.passed = 0)
+      ORDER BY r.queued_at ASC, rq.id ASC
+      LIMIT ?`,
+    [companyId, companyId, ...batchIds, ...FINISHED, MAX_DOWNLOAD_ROWS]
+  );
+  return rows.map((r) => ({
+    requestId: r.request_id, runId: r.run_id, batchId: r.batch_id, scenarioCode: r.scenario_code || r.scenario_name || null,
+    step: r.request_name, method: r.http_method || null, url: r.http_url || null, status: r.http_status,
+  }));
+}
+
+function failedChecksOf(requestId) {
+  return all('SELECT assertion_name FROM run_assertions WHERE request_id = ? AND passed = 0 ORDER BY id ASC LIMIT 20', [requestId])
+    .map((a) => a.assertion_name);
+}
+
+// The bodies of one stored request of the company, as stored. Never its headers.
+function bodiesReader(companyId) {
+  const decrypted = (v) => { try { return v ? colDecrypt(v) : null; } catch { return null; } };
+  return (requestId) => {
+    const row = get('SELECT request_body, response_body FROM run_requests WHERE id = ? AND company_id = ?', [requestId, companyId]);
+    return row ? { request: decrypted(row.request_body), response: decrypted(row.response_body) } : null;
+  };
+}
+
+router.get('/ai-analysis/history/:id/download', downloadLimiter, (req, res) => {
+  const company = scopeForTestManager(req, res);
+  if (!company) return;
+  const analysis = storedAnalysis(req);
+  if (!analysis) return refuse(res, 404, 'No analysis with that id here.');
+  if (analysis.status !== 'done' || !Array.isArray(analysis.result?.groups)) {
+    return refuse(res, 409, 'This analysis has no result to download.');
+  }
+  const target = get('SELECT name, slug, api_base FROM companies WHERE id = ?', [req.companyId]);
+  const rows = failingRequestsOf(req.companyId, analysis.batches);
+  const hosts = DL.hostsOf([target?.api_base, ...rows.map((r) => r.url)]);
+  const now = new Date().toISOString();
+  const file = DL.buildMarkdown({ analysis, company: target?.name || '', rows, hosts, now,
+    bodyOf: bodiesReader(req.companyId), checksOf: failedChecksOf });
+  auditLog(req.user.id, req.companyId, req.user.email, `ai_analysis_downloaded:${analysis.id}`);
+  res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${DL.fileNameOf(now, target?.slug || target?.name)}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(file.text);
 });
 
 // ── POST /ai-analysis/history/:id/groups/:index/draft (#823 PR 2) ────────────

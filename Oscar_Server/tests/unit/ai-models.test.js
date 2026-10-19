@@ -110,10 +110,10 @@ describe('#831 the page', () => {
     const end = lines.findIndex((l, i) => i > start && l === '}');
     return lines.slice(start, end + 1).join('\n');
   };
-  const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL) =/.test(l)).join('\n');
+  const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL|ANALYSIS_ID) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
   const names = ['connectorOptionsHtml', 'priceText', 'modelOptionsHtml', 'testedHtml', 'serviceHtml', 'usd', 'estimateText', 'listHtml',
-    'groupRowHtml', 'comparisonHtml', 'resultHtml', 'inputLetters', 'historyHtml', 'sideBySideHtml', 'spendRow', 'spendHtml', 'analysisModelOptionsHtml'];
+    'groupRowHtml', 'comparisonHtml', 'resultHtml', 'analysisIdOf', 'downloadButtonHtml', 'inputLetters', 'historyHtml', 'sideBySideHtml', 'spendRow', 'spendHtml', 'analysisModelOptionsHtml'];
   vm.runInContext(`${consts}\n${names.map(lift).join('\n')}\n${names.map(n => `this.${n} = ${n};`).join('\n')}`, ctx);
   const answer = (config) => ({ config, connectors: C.connectorsForPage(), limits: { instruction: 2000, minTokenCap: 1000 },
     models: M.modelsForPage(), suggested: { monthlyTokenCap: M.SUGGESTED_MONTHLY_TOKENS, instruction: 'Be <short>.' } });

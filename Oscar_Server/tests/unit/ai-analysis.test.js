@@ -124,10 +124,10 @@ describe('#801 PR 3 the page', () => {
     const end = lines.findIndex((l, i) => i > start && l === '}');
     return lines.slice(start, end + 1).join('\n');
   };
-  const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL|DRAFT_STATE) =/.test(l)).join('\n');
+  const consts = lines.filter((l) => /^const (NOTE|INFO|OK|CELL|FIELD|WIDE|OWNER_LABEL|OWNER_STYLE|STATUS_LABEL|DRAFT_STATE|ANALYSIS_ID) =/.test(l)).join('\n');
   const ctx = vm.createContext({ esc });
   const names = ['analysisTabHtml', 'batchLabel', 'batchOptionsHtml', 'usd', 'estimateText', 'previewHtml', 'listHtml', 'draftButtonHtml', 'groupRowHtml', 'comparisonHtml',
-    'resultHtml', 'inputLetters', 'historyHtml', 'sideBySideHtml', 'spendRow', 'spendHtml', 'priceText', 'analysisModelOptionsHtml'];
+    'resultHtml', 'analysisIdOf', 'downloadButtonHtml', 'inputLetters', 'historyHtml', 'sideBySideHtml', 'spendRow', 'spendHtml', 'priceText', 'analysisModelOptionsHtml'];
   vm.runInContext(`${consts}\n${names.map(lift).join('\n')}\n${names.map(n => `this.${n} = ${n};`).join('\n')}`, ctx);
 
   test('the analysis tab lists the configured targets after a choose line, escaped, with labelled fields; later steps hidden', () => {

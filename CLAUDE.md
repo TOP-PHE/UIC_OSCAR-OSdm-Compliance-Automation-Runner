@@ -384,6 +384,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the AI's owner in `source.owner` and the evidence, and keeps `category`
     `open`, never the owner. `GET /history/:id` returns `drafts` by group
     index; Test Findings shows the origin (`draftOrigin()` in `findings.js`).
+    **#867: the download.** `GET /ai-analysis/history/:id/download` (the
+    history's readers, a done analysis, else 409) writes the groups and,
+    for each, the failing requests of its batches at the steps and
+    scenarios it names (`utils/aiAnalysisDownload.js`, pure): the first of
+    each run and step, 3 a group, the later batch first, the rest counted.
+    Bodies as stored, **not masked** (the company's test data; the page
+    says so). Never in the file: headers (not even read), the endpoint's
+    host (out of the URL, `<host>` in bodies), credentials in the query or
+    in a body member named like one (`isConnectionName()`). The JSON walk
+    is a loop. Fences are longer than any backtick run of the body. Body
+    20 KB, file 4 MB. The page puts only a UUID (`analysisIdOf()`) in the
+    button and the address.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
