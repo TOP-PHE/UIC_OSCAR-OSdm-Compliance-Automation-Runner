@@ -1421,7 +1421,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`fulfillmentForScope()`, #610, OTST_V2.0.120): the only one, else the one
   whose `bookingParts` list them, else the passenger's. Parts in several
   fulfillments, or none shown, degrade to a full refund: never fall back to
-  `fulfillments[0]`.
+  `fulfillments[0]`. **A provider may take one fulfillment per refund offer
+  request** (#883, 1.11.360): a refusal (4xx or 501) of several whose Problem
+  names `fulfillmentIds` makes step 10 warn once and ask one per fulfillment
+  from its script (`askOnePerFulfillment()`, `refundPerFulfillment.js`), the
+  answers graded as one; `requestRefundOffersBodyData` keeps the whole list,
+  which `_proposedScope()` reads as what was asked. Simulator variant
+  `one-fulfillment-per-refund-request`. The release script replaces
+  `{COLL}`, not `COLL` (it once turned "COLLECTIVE" into a version).
 - **An overrule code is a technical cancellation: everything back, no fee**
   (#596, 1.11.227 / OTST_V2.0.111). One refund offer is compared with
   `confirmedPrice` in `validateRefundableAmount`; several (one per

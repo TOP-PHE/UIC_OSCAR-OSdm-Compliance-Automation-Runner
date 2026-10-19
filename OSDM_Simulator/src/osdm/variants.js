@@ -29,6 +29,9 @@
  *   refuses-bare-place-selection a placeSelection asking nothing (no places,
  *                           compartments, reference place or accommodations)
  *                           is refused with 400 (#793): send none instead
+ *   one-fulfillment-per-refund-request a refund offer request naming more
+ *                           than one fulfillment is refused with 501
+ *                           VALUE_NOT_SUPPORTED (#883): ask one at a time
  *   wrong-booking-price     provisionalPrice one cent off the sum of its parts
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
@@ -41,7 +44,7 @@
 
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
-  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection',
+  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount',
 ]);
 

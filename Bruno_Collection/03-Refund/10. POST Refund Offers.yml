@@ -258,14 +258,26 @@ runtime:
           return;
         }
 
+        // #883: a provider that takes one fulfillment per request refuses a
+        // list; the refund offers are then asked one fulfillment at a time,
+        // and their answers graded below as one.
+        let _status = res.getStatus();
+        let _perFulfillment = null;
+        {
+          let _answer;
+          try { _answer = res.getBody(); } catch (_e) { _answer = null; }
+          _perFulfillment = await require(bru.getEnvVar("library_base") + "refundPerFulfillment.js").askOnePerFulfillment(_status, _answer);
+          if (_perFulfillment) _status = _perFulfillment.status;
+        }
+
         // Validate HTTP response status
-        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
+        test(`HTTP response status — expected 200, actual: ${_status}`, () => {
+            if (_status !== 200) throw new Error("HTTP " + _status + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
-        if (res.getStatus() !== 200) {
-          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
+        if (_status !== 200) {
+          test(`HTTP response status — expected 200, actual: ${_status}`, () => {
+            throw new Error(`[ERROR] Wrong response status: ${_status}`);
           });
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
           loopbackOrStop("POST Refund Offers");
@@ -275,7 +287,7 @@ runtime:
         // Parse JSON safely
         let jsonData;
         try {
-            jsonData = res.getBody();
+            jsonData = _perFulfillment ? _perFulfillment.body : res.getBody();
         } catch (e) {
             validationLogger("Failed to parse JSON response");
             test("JSON parsing should succeed", () => {

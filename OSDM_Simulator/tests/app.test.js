@@ -422,6 +422,27 @@ test('refund: one refund offer per fulfillment named, holding all its parts', as
   assert.equal((await call(sim.base, token, 'GET', `${base}/refund-offers`)).body.refundOffers.length, 2);
 });
 
+test('refund: variant one-fulfillment-per-refund-request refuses a list with 501, takes one at a time (#883)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const outbound = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body;
+  const both = (await call(sim.base, token, 'POST', '/gamma/offers', inboundRequest({ outboundTripIds: [outbound.trips[0].id] }))).body;
+  const request = bookingRequest(both.offers.find((o) => o.offerSummary.overallFlexibility === 'FULL_FLEXIBLE'));
+  request.passengerSpecifications[0].detail.lastName = 'Simvariant-One-Fulfillment-Per-Refund-Request';
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+  const base = `/gamma/bookings/${booking.id}`;
+  const fulfillments = (await call(sim.base, token, 'POST', `${base}/fulfillments`, {})).body.fulfillments;
+  assert.equal(fulfillments.length, 2);
+  const refused = await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) });
+  assert.equal(refused.status, 501);
+  assert.equal(refused.body.code, 'VALUE_NOT_SUPPORTED');
+  assert.match(refused.body.title, /'fulfillmentIds'/);
+  for (const f of fulfillments) {
+    const one = await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [f.id] });
+    assert.equal(one.status, 200);
+    assert.deepEqual(one.body.refundOffers.map((o) => o.fulfillments[0].id), [f.id]);
+  }
+});
+
 test('refund: confirming one offer refunds that direction only; the other keeps its status', async () => {
   const { token, fulfillments, base } = await confirmedReturn();
   const [first, second] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;

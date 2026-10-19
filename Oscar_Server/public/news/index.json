@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-refund-one-per-fulfillment",
+    "date": "October 19, 2026",
+    "tag": "Fix",
+    "title": "Refunds work with providers that take one ticket per request",
+    "summary": "When a provider refuses a refund request naming several tickets, OSCAR now asks for each ticket in turn.",
+    "content": "The refund goes on as usual, and the run log has a warning saying the provider only takes one ticket per refund request."
+  },
+  {
     "id": "2026-10-19-missing-passenger",
     "date": "October 19, 2026",
     "tag": "Fix",
