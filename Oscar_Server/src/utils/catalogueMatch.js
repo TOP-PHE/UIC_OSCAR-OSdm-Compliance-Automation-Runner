@@ -335,8 +335,7 @@ function withCurrencies(datafile, entries) {
 // copied).
 function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
   if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
-    const horizon = salesHorizonOf(fw);
-    if (horizon) scenario.departureDaysFromToday = limit === 'OVER_SALES_HORIZON' ? horizon + 1 : horizon;
+    applyHorizonLimit(limit, scenario, fw);
   } else if (limit === 'AGE_RANGES') {
     const declared = ageRangesOf(fw);
     if (declared) ownList(agedPassengers(source?.passengers, declared, toCheck));
@@ -346,6 +345,12 @@ function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
   }
+}
+
+// #704: the last day of the sales horizon, or the day after.
+function applyHorizonLimit(limit, scenario, fw) {
+  const horizon = salesHorizonOf(fw);
+  if (horizon) scenario.departureDaysFromToday = limit === 'OVER_SALES_HORIZON' ? horizon + 1 : horizon;
 }
 
 // #887: the card holder takes the provider's own card, declared: nothing is
