@@ -47,19 +47,10 @@
    [
     "02. POST Create Booking",
     "Booking contains exactly the expected number of passengers - expected: 2, actual: 1"
-   ],
-   [
-    "03. PATCH Multi Passenger",
-    "HTTP response status — expected 200, actual: 404"
-   ],
-   [
-    "03. PATCH Multi Passenger",
-    "[OSCAR request] PATCH /bookings/{bookingId}/passengers/{passengerId} conforms to OSDM 3.8.0 Passenger"
    ]
   ],
   "warnings": [
-   "[WARNING] ❌ Booking contains exactly the expected number of passengers - expected: 2, actual: 1: Expected exactly 2 passengers, got 1: expected 1 to deeply equal 2",
-   "[WARNING] ❌ [OSCAR request] PATCH /bookings/{bookingId}/passengers/{passengerId} conforms to OSDM 3.8.0 Passenger: OSCAR's own request does not conform to OSDM (an OSCAR issue, not the provider's): (body): missing id"
+   "[WARNING] ❌ Booking contains exactly the expected number of passengers - expected: 2, actual: 1: Expected exactly 2 passengers, got 1: expected 1 to deeply equal 2"
   ]
  },
  "SIM_FAULT_BOOKING_NOT_PREBOOKED_38": {

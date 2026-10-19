@@ -2098,6 +2098,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     booking read crashed the step's script ("Post-Response Script Error"):
     every GET Booking step now starts with `jsonObjectOrStop()`
     (`loopback.js`), one failed check and the scenario stops.
+    **#881 (1.11.359)**: a booking lacking a passenger leaves no id at its
+    index; 03 and 04 now go through `choosePassenger()`
+    (`passengerSteps.js`), one WARNING per passenger left out, the step
+    skipped when none is left. They used to send `…/passengers/undefined`.
     **PR D (1.11.333): the detection report.** `utils/faultDetection.js`
     (pure): `detect()` matches each (run, fault) of a batch with the
     catalogue's `expect` (FAIL = a failed check of that step whose text holds

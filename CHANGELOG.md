@@ -62,6 +62,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.359 / collection-OTST_V2.0.194] — 2026-10-19 · Release 2026.394
+
+Issue #881, from an AI analysis of a batch on the simulated provider delta.
+
+### Fixed
+- **Steps 03 (PATCH passenger) and 04 (GET passenger) leave out a passenger the booking lacks.** Before, a booking answer without one of the passengers sent left no id at that index, and the steps sent `…/passengers/undefined` with a body without `id`: OSCAR's own request check failed, the provider answered 404, and the scenario stopped. Now each such passenger gets one WARNING ("not in the booking: its update / read-back is not tested"), the steps go on with the passengers the booking holds (`library-bruno/passengerSteps.js`), and a step with none left is skipped. Step 02 already fails the missing passenger.
+- `SIM_FAULT_BOOKING_PASSENGER_DROPPED_38` now fails one check (the passenger count at 02) instead of three, and the sale goes on to its end (271 checks instead of 174). The other two-passenger scenarios give the same checks as before.
+
+---
+
 ## [server-1.11.358 / collection-OTST_V2.0.193] — 2026-10-19 · Release 2026.393
 
 Issue #780 (PR C, the last of the remaining work). A probe asks on purpose for an offer search option value the Test Framework leaves out. No simulator change.

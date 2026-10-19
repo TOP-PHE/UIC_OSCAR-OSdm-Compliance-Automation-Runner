@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.393",
+  "current_release": "2026.394",
   "releases": [
+    {
+      "release": "2026.394",
+      "date": "2026-10-19",
+      "server": "1.11.359",
+      "collection": "OTST_V2.0.194",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Steps 03 and 04 leave out a passenger the booking lacks, with a WARNING, instead of sending a request without id (#881)."
+      ]
+    },
     {
       "release": "2026.393",
       "date": "2026-10-19",

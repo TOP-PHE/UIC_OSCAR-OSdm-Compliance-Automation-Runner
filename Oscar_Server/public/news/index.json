@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-missing-passenger",
+    "date": "October 19, 2026",
+    "tag": "Fix",
+    "title": "A passenger missing from a booking no longer stops the scenario",
+    "summary": "When a provider's booking lacks a passenger, OSCAR reports it once and carries on with the others.",
+    "content": "The passenger update and read-back steps now leave that passenger out with a warning, instead of sending a request without an id."
+  },
+  {
     "id": "2026-10-19-undeclared-option-probe",
     "date": "October 19, 2026",
     "tag": "New",
