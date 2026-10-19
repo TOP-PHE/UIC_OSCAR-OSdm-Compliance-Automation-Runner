@@ -211,7 +211,8 @@ function finishTrip(legs, externalRef, provider) {
   return trip;
 }
 
-// A search: one direct trip, leaving when asked. Its length and its train
+// A search: one direct trip, leaving when asked (through its first via, two
+// legs: #780 PR B). Its length and its train
 // number come from the two places, so they do not change between two calls.
 // `departure` (#602) is another departure of the same line, that many steps
 // from the one asked for, `shiftMs` later: it has a train number of its own.
@@ -237,7 +238,34 @@ function tripFromSearch(criteria, provider, { departure = 0, shiftMs = 0 } = {})
   const vehicleNumber = departure === 0 && typeof askedNumber === 'string' && askedNumber.length > 0 && askedNumber.length <= 20
     ? askedNumber
     : String(1000 + (((seed.readUInt16BE(2) + 37 * departure) % 9000) + 9000) % 9000);
-  return finishTrip([buildLeg({ from, to, start, end, vehicleNumber }, provider)], undefined, provider);
+  const via = viaOf(criteria);
+  if (!via) return finishTrip([buildLeg({ from, to, start, end, vehicleNumber }, provider)], undefined, provider);
+  // #780 PR B: a search through a via changes there, after its dwell time.
+  const half = Math.round(lengthMs / 2 / 60000) * 60000;
+  const arrive = { ms: start.ms + half, offset: start.offset };
+  const leave = { ms: arrive.ms + via.dwellMs, offset: start.offset };
+  const last = { ms: end.ms + via.dwellMs, offset: end.offset };
+  if (criteria.departureTime === undefined) {
+    // Arrival basis: the trip still arrives when asked, it leaves earlier.
+    for (const t of [start, arrive, leave]) t.ms -= via.dwellMs;
+    last.ms = end.ms;
+  }
+  const second = String((Number(vehicleNumber) || 1000) + 1);
+  return finishTrip([
+    buildLeg({ from, to: via.place, start, end: arrive, vehicleNumber }, provider),
+    buildLeg({ from: via.place, to, start: leave, end: last, vehicleNumber: second }, provider),
+  ], undefined, provider);
+}
+
+// #780 PR B: the first via of a search, with its dwell time (ISO minutes or
+// hours; 10 minutes when none is given). null without a via.
+function viaOf(criteria) {
+  const first = Array.isArray(criteria.vias) ? criteria.vias[0] : undefined;
+  if (!first?.viaPlace) return null;
+  const place = stopPlace(first.viaPlace, 'tripSearchCriteria.vias[0].viaPlace');
+  const m = /^PT(?:(\d{1,2})H)?(?:(\d{1,3})M)?$/.exec(typeof first.dwellTime === 'string' ? first.dwellTime : '');
+  const minutes = m && (m[1] || m[2]) ? Number(m[1] || 0) * 60 + Number(m[2] || 0) : 10;
+  return { place, dwellMs: minutes * 60000 };
 }
 
 // A specified trip: the legs of the request, served by this provider.

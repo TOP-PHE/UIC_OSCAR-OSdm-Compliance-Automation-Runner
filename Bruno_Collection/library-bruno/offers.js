@@ -2198,7 +2198,11 @@ function checkOfferSearchCriteria(jsonData) {
   const { ignoredParameters } = require('./ignoredParameters.js');
   const { checkOfferCriteria } = require('./offerCriteria.js');
   const probe = String(bru.getEnvVar("offerSearchProbe")) === "true";
-  checkOfferCriteria(criteria, jsonData, ignoredParameters(jsonData)).forEach((c) => {
+  // #780 PR B: the trips keep to the trip search parameters sent.
+  const { checkTripParameters } = require('./tripParameters.js');
+  const tripCriteria = parseEnvJson("offerTripSearchCriteria", null);
+  const ignored = ignoredParameters(jsonData);
+  [...checkOfferCriteria(criteria, jsonData, ignored), ...checkTripParameters(tripCriteria, jsonData, ignored)].forEach((c) => {
     if (probe) {
       if (!c.ok && c.level !== 'warn') validationLogger(`[INFO] ${c.name} — ${c.message}`);
       test(c.name, () => { if (!c.ok && c.level === 'warn') throw new Error(c.message); });

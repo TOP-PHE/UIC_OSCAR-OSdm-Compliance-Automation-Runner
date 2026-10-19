@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-trip-search-parameters",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Trip search parameters in the Test Framework",
+    "summary": "Declare which trip search parameters your provider takes: vias, places to avoid, transfer limit, number of results and more.",
+    "content": "A scenario using an undeclared parameter gets a warning, and every run checks that the trips keep to the transfer limit, vias, places to avoid and number of results it sent."
+  },
+  {
     "id": "2026-10-19-product-tags",
     "date": "October 19, 2026",
     "tag": "New",

@@ -757,6 +757,16 @@
       }
     },
     {
+      "code": "OTST_TRIP_TRANSFER_LIMIT_0",
+      "source": "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38",
+      "purpose": "Trip search probe: direct trips only and one result asked (parameters.transferLimit 0, numberOfResults 1); a trip with a transfer, more trips than asked, or the provider ignoring either, fails. The scenario ends after the offer.",
+      "checks": 119,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
       "code": "OTST_SALE_CURRENCY",
       "source": "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38",
       "purpose": "Sale in each currency the Test Framework declares, then a full refund: offers, booking and refund offers all in the currency asked.",

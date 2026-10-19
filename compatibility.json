@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.391",
+  "current_release": "2026.392",
   "releases": [
+    {
+      "release": "2026.392",
+      "date": "2026-10-19",
+      "server": "1.11.357",
+      "collection": "OTST_V2.0.192",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Trip search parameters (#780 PR B, simulator 0.40.0): declared in the Test Framework, warned when not declared, the trips checked after 01 (transfer limit, vias, places to avoid, number of results), reference probe OTST_TRIP_TRANSFER_LIMIT_0."
+      ]
+    },
     {
       "release": "2026.391",
       "date": "2026-10-19",

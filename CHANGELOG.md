@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.357 / collection-OTST_V2.0.192] — 2026-10-19 · Release 2026.392
+
+Issue #780 (PR B of the remaining work). Simulator 0.40.0. The Test Framework declares the trip search parameters a provider takes, and every run checks the trips against those it sent.
+
+### Simulator 0.40.0
+- **A search through a via** (`tripSearchCriteria.vias`, the first one) gives one trip in two legs, changing there after its `dwellTime` (ISO minutes or hours; 10 minutes when none), the second train numbered one more. Arrival basis: the trip still arrives when asked. Every provider; a search without a via gives the same direct trip as before.
+
+### Added
+- **Test Framework › Trip search parameters**: arrival time, vias, places to avoid, transfer limit, number of results, ignore real-time data, train filter (`tripSearchParameters`, `utils/tripSearchParameters.js`). Absent = every one, as for the other lists. The values themselves stay per trip, in Test Config's Trip Search Criteria.
+  - A scenario whose trip sends one not declared gets the warning `tripParameter:<NAME>`, worded by the collection.
+  - A reference scenario needing one is not copied ("trip search by …").
+- **After 01, the trips are checked** (`library-bruno/tripParameters.js`): each keeps to the transfer limit, passes each via, avoids the places asked (a change or an intermediate stop there counts), and there are no more trips than `numberOfResults`. None keeping to it is a WARNING, some not INFO, the member said ignored a WARNING; in an offer search probe each is a test.
+- **Reference probe `OTST_TRIP_TRANSFER_LIMIT_0`**: direct trips only and one result asked (`transferLimit` 0, `numberOfResults` 1), 119 checks on the simulator. A copy onto a Test Data train keeps the trip's search criteria.
+- **Simulator scenarios**: `SIM_TRIP_PROBE_VIA_38`, `SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38`, `SIM_TRIP_PROBE_NOT_VIA_38` (no failed check) and `SIM_WRONG_TRIP_PROBE_VIA_TRANSFER_LIMIT_38` (one failed check on purpose: a via honoured against a transfer limit of 0), on trips 20–23.
+- **The set-up checklist asks it** (A4.17); the public and simulator checklists and the reference configurations are regenerated. The simulator declares every parameter.
+
+### Not in this release
+- The arrival time, real-time data and the train filter are declared but not checked here (the train filter has its own check, #722).
+- A probe sending a value the framework does not declare: PR C of #780.
+
+---
+
 ## [server-1.11.356 / collection-OTST_V2.0.191] — 2026-10-19 · Release 2026.391
 
 Issue #780 (PR A of the remaining work). Simulator 0.39.0. The Test Framework declares the product tags and the product selections a provider takes in an offer request.
