@@ -245,6 +245,21 @@ router.get('/checklists/:id/preview', limiter, guard, async (req, res) => {
   res.json(shownPreview(row, await previewFor(req.checklistCompany, row, mode, choice)));
 });
 
+// What the apply's answer says of the reference scenarios: copied, or why not.
+async function scenarioOutcomeOf(req, companyId, choice, planned) {
+  if (choice !== 'copy' || !planned.copy?.length) return { choice, copied: [] };
+  try {
+    return { choice, ...(await copyReferenceScenarios(req, companyId)) };
+  } catch (err) {
+    if (!(err instanceof Refusal)) log.error({ err, companyId }, 'checklist apply: reference scenarios not copied');
+    const reason = err instanceof Refusal ? ` ${err.message}` : '';
+    return {
+      choice, copied: [],
+      error: `The reference scenarios were not copied.${reason} The Test Framework and the Test Data are applied: copy the scenarios with Copy scenarios.`,
+    };
+  }
+}
+
 router.post('/checklists/:id/apply', limiter, guard, async (req, res) => {
   const companyId = req.checklistCompany;
   const row = importOf(companyId, req.params.id);
@@ -284,19 +299,7 @@ router.post('/checklists/:id/apply', limiter, guard, async (req, res) => {
     return problem(res, 500, 'Internal Server Error', 'The checklist could not be applied. Nothing was changed.');
   }
   auditLog(req.user.id, companyId, req.user.email, `checklist_applied:${row.id}`);
-  let scenarioOutcome = { choice, copied: [] };
-  if (choice === 'copy' && computed.preview.scenarios.copy?.length) {
-    try {
-      scenarioOutcome = { choice, ...(await copyReferenceScenarios(req, companyId)) };
-    } catch (err) {
-      if (!(err instanceof Refusal)) log.error({ err, companyId }, 'checklist apply: reference scenarios not copied');
-      const reason = err instanceof Refusal ? ` ${err.message}` : '';
-      scenarioOutcome = {
-        choice, copied: [],
-        error: `The reference scenarios were not copied.${reason} The Test Framework and the Test Data are applied: copy the scenarios with Copy scenarios.`,
-      };
-    }
-  }
+  const scenarioOutcome = await scenarioOutcomeOf(req, companyId, choice, computed.preview.scenarios);
   res.json({
     applied: true, import: view(importOf(companyId, row.id)),
     framework: { changes: computed.preview.framework.changes.length }, testData: testDataOutcome, scenarios: scenarioOutcome,
