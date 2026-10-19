@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.347 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.382
+
+Issue #865. A journey the provider does not offer is replaced, in one step, by every trip it offers. Collection unchanged.
+
+### Changed
+- **Test Data › Journeys › 🔎 Probe**, on a saved journey:
+  - offered as defined: the probe says there is nothing to change;
+  - not offered, other trips offered: one button, **🔁 Replace this journey with the N trip(s) offered**, after a confirmation. Each trip becomes a journey, its legs are stored as train services, and the old journey is removed. Train sets are never removed;
+  - nothing offered: the probe says there is nothing to replace it with.
+  The per-trip **➕ Use this trip** buttons stay under Find journeys results, which are not saved.
+- Route `POST /v1/company/test-resources/{id}/replace-journey` (Test Managers): 1 to 10 trips, each checked before anything is written, then all kept and the old journey removed in one transaction. A kept journey that is the old one itself is not removed.
+
+### Fixed
+- **A train number written with a slash** (`382/382`) is compared number by number: the probe reported "train 382/382, not 382/382".
+
+### Default decisions (taken without asking)
+- **The journey is replaced by every trip offered**, not by the closest one (maintainer's choice).
+- **Train sets stay**, even those only the old journey used: other journeys or scenarios may name them.
+
+---
+
 ## [server-1.11.346 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.381
 
 Issue #862 (PR 1). A provider's filled set-up checklist sets up its Test Framework and Test Data, each import kept with its date and every change validated. Collection unchanged.

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.381",
+  "current_release": "2026.382",
   "releases": [
+    {
+      "release": "2026.382",
+      "date": "2026-10-19",
+      "server": "1.11.347",
+      "collection": "OTST_V2.0.188",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Journey probe (#865): a saved journey the provider does not offer is replaced, after one confirmation, by a journey per trip offered (POST /v1/company/test-resources/{id}/replace-journey). Train numbers with a slash compare number by number."
+      ]
+    },
     {
       "release": "2026.381",
       "date": "2026-10-19",

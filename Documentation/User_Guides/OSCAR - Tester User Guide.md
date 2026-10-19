@@ -409,6 +409,16 @@ Journey** (or **🗐 Duplicate**), and a scenario can then **Apply a Journey** t
 fill **all** its legs at once instead of typing each leg. Ideal for testing
 multi‑leg / connection offers consistently.
 
+**🔎 Probe** asks the provider whether it offers a saved journey (trip search
+on the next 3 days its trains run; nothing is changed). When the provider
+offers it as defined, the probe says so. When it does not, but offers other
+trips between the same stop places, one button **🔁 Replace this journey with
+the N trip(s) offered** replaces the journey by one journey per trip offered,
+after a confirmation: their trains are added to (or merged into) the train
+sets, and the old journey is removed. Train sets are never removed. Under
+**Find journeys** results, which are not saved yet, each trip keeps its own
+**➕ Use this trip** button.
+
 ### 3.4 Timetable Discovery
 
 Don't know which trains a sandbox actually runs? Use **🔍 Discover timetable**

@@ -28,9 +28,10 @@ const { esc } = require('../../public/js/esc.js');
 const PROBE_OUTCOMES = vm.runInNewContext(`(${/const PROBE_OUTCOMES = (\{[\s\S]*?\n\});/.exec(source)[1]})`);
 const journeyProbeDayHtml = loadFunction('journeyProbeDayHtml', { esc, PROBE_OUTCOMES });
 const offeredTripHtml = loadFunction('offeredTripHtml', { esc });
-const render = loadFunction('journeyProbeHtml', { esc, journeyProbeDayHtml, offeredTripHtml });
+const probeOffersAsDefined = loadFunction('probeOffersAsDefined');
+const render = loadFunction('journeyProbeHtml', { esc, journeyProbeDayHtml, offeredTripHtml, probeOffersAsDefined });
 
-test('each day and its differences, then the trips offered once with their keep buttons; provider text escaped', () => {
+test('each day and its differences, then the trips offered once; provider text escaped', () => {
   const html = render({ summary: 'Offered on 1 of 2 day(s) searched.', days: [
     { date: '2026-10-20', via: 'trips-collection', trips: 1, outcome: 'found', differences: [] },
     { date: '2026-10-21', via: 'offers', trips: 2, outcome: 'differences', differences: ['leg 2 is train <b>X</b>, not 9'] },
@@ -47,9 +48,30 @@ test('each day and its differences, then the trips offered once with their keep 
   expect(html).toContain('2026-10-22: no answer');
   expect(html).toContain('offers, HTTP 500');
   expect(html).not.toMatch(/<b>X|<i>C|<s>/);
-  expect(html.match(/data-action="probe-keep-trip"/g)).toHaveLength(2);
-  expect(html).toContain('data-key="j&quot;3" data-idx="1"');
   expect(html.match(/\(as defined\)/g)).toHaveLength(1);
+  // #865: a saved journey offered as defined on one day: nothing to keep or replace.
+  expect(html).not.toContain('data-action="probe-keep-trip"');
+  expect(html).not.toContain('data-action="probe-replace-journey"');
+  expect(html).toContain('The journey is offered as defined: nothing to change.');
+});
+
+test('#865: a saved journey not offered as defined gets one button replacing it with every trip offered', () => {
+  const result = { summary: 's', days: [{ date: '2026-10-20', via: 'offers', trips: 2, outcome: 'differences', differences: ['x'] }],
+    offeredTrips: [{ text: 'A → B', days: ['TUE'], asDefined: false, legs: [] }, { text: 'A → C', days: ['TUE'], asDefined: false, legs: [] }] };
+  const html = render(result, 'j"3');
+  expect(html).not.toContain('data-action="probe-keep-trip"');
+  expect(html.match(/data-action="probe-replace-journey"/g)).toHaveLength(1);
+  expect(html).toContain('data-key="j&quot;3"');
+  expect(html).toContain('Replace this journey with the 2 trip(s) offered');
+  expect(render({ ...result, offeredTrips: [] }, 'j0')).toContain('The provider offers no trip to replace it with.');
+});
+
+test('#815: a result of Find journeys keeps its trips one by one', () => {
+  const html = render({ summary: 's', days: [], offeredTrips: [{ text: 'A → B', days: ['TUE'], legs: [] }, { text: 'A → C', days: ['TUE'], legs: [] }] }, 'f2');
+  expect(html.match(/data-action="probe-keep-trip"/g)).toHaveLength(2);
+  expect(html).toContain('data-key="f2" data-idx="1"');
+  expect(html).not.toContain('probe-replace-journey');
+  expect(html).toContain('Nothing is changed in Test Data until you use a trip.');
 });
 
 test('no trip offered: no list', () => {
