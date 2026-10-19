@@ -29,7 +29,8 @@ function source(name) {
   return LINES.slice(start, end + 1).join('\n');
 }
 const consts = LINES.filter(l => /^const CHECKLIST_[A-Z_]+ = /.test(l)).join('\n');
-const names = ['checklistValueText', 'checklistImportLine', 'checklistBoxHtml', 'checklistTable', 'checklistList', 'checklistPreviewHtml'];
+// Every top-level helper of the page: they call one another.
+const names = LINES.map(l => /^function (checklist\w+)\(/.exec(l)).filter(Boolean).map(m => m[1]);
 const ctx = vm.createContext({ esc });
 vm.runInContext(`${consts}\n${names.map(source).join('\n')}\nthis.api = { ${names.join(', ')} };`, ctx);
 const P = ctx.api;
@@ -132,5 +133,20 @@ describe('#862 the wiring', () => {
     const html = fs.readFileSync(path.resolve(__dirname, '../../public/scenarios.html'), 'utf8');
     expect(html.indexOf('<div id="checklist-config"></div>')).toBeGreaterThan(html.indexOf('<div id="reference-config"></div>'));
     expect(html).toContain('<script src="/js/checklist-config.js"></script>');
+  });
+});
+
+describe('#862 an import id read from an answer', () => {
+  test('only a positive integer goes into a request address', () => {
+    expect(P.checklistIdOf(7)).toBe(7);
+    expect(P.checklistIdOf('12')).toBe(12);
+    for (const v of ['../admin', '1/discard', '1?x=1', 0, -3, 1.5, null, undefined, '', 'abc', Number.MAX_SAFE_INTEGER + 2]) {
+      expect(P.checklistIdOf(v)).toBeNull();
+    }
+  });
+
+  test('every request to an import uses it', () => {
+    expect(SOURCE).not.toMatch(/checklists\/\$\{encodeURIComponent/);
+    expect(SOURCE.match(/checklistIdOf\(/g).length).toBeGreaterThanOrEqual(4);
   });
 });

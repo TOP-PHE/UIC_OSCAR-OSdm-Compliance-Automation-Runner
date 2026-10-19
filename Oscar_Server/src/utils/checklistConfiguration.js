@@ -110,7 +110,7 @@ function timeAt(text, station, atMs) {
 function productOf(text) {
   const t = textOf(text);
   const urns = t.match(/urn:[^\s,;]+/g) || [];
-  const operatorAt = /operator\s*:?\s*(urn:[^\s,;]+)/i.exec(t);
+  const operatorAt = /operator\s*(?::\s*)?(urn:[^\s,;]+)/i.exec(t);
   const isOperator = u => /:(rics|carrier|operator)s?:/i.test(u);
   const operatorCode = operatorAt ? operatorAt[1] : (urns.find(isOperator) || '');
   const productCategoryRef = urns.find(u => u !== operatorCode && /(sbc|product-?category)/i.test(u))
@@ -151,28 +151,55 @@ function rowsOf(answers, prefix, cols) {
  * (configurationBundle.planTestData), as for a full configuration (#810).
  */
 function testDataOfChecklist(answers, { atMs = Date.now() } = {}) {
-  const trains = [];
-  const skipped = [];
-  const routeKey = (o, d) => `${o}|${d}`;
-  const byRoute = new Map();
+  const ctx = { answers, atMs, trains: [], skipped: [], byRoute: new Map() };
+  trainsOfServiceSheets(ctx);
+  const journeys = journeysOfCombinations(ctx);
+  const { trains, skipped } = ctx;
+  const resources = [...trains, ...journeys.map((j, i) => ({ id: trains.length + i + 1, ...j }))];
+  // A time whose station has no known zone keeps no offset: the collection
+  // moves only an offset its zone uses (#772), so one guessed here would be an
+  // hour off half the year.
+  const noOffset = trains.filter(t => t.data.services.some(sv => /^\d{2}:\d{2}:\d{2}$/.test(sv.departureTime))).length;
+  const notes = noOffset ? [`${noOffset} train set(s) keep local times without a UTC offset: their stations have no 7-digit UIC code with a known country.`] : [];
+  return { resources, skipped, notes };
+}
 
-  const serviceIndex = (train, service) => {
-    const same = train.data.services.findIndex(s => s.vehicleNumber === service.vehicleNumber && s.departureTime === service.departureTime);
-    if (same >= 0) return same;
-    train.data.services.push(service);
-    return train.data.services.length - 1;
+const routeKey = (o, d) => `${o}|${d}`;
+
+// The index of a service in a train set, added when it is not there yet.
+function serviceIndexIn(train, service) {
+  const same = train.data.services.findIndex(s => s.vehicleNumber === service.vehicleNumber && s.departureTime === service.departureTime);
+  if (same >= 0) return same;
+  train.data.services.push(service);
+  return train.data.services.length - 1;
+}
+
+function emptyTrainData(originURN, destinationURN) {
+  return {
+    originURN, destinationURN, operatorCode: '', productCategoryRef: '', productCategoryName: '', productCategoryShortName: '',
+    daysOfWeek: [], services: [], ticketTypes: [], travelClasses: [], serviceClasses: [], accommodations: [], ancillaries: [],
   };
+}
 
+function missingStationText(n, row, originURN, destinationURN) {
+  const missing = [];
+  if (!originURN) missing.push('for its origin');
+  if (!destinationURN) missing.push('for its destination');
+  return `Service sheet ${n}, service ${row.row}: no station code ${missing.join(' and ')}.`;
+}
+
+// One train set per service sheet and route, with the sheet's services.
+function trainsOfServiceSheets(ctx) {
+  const { answers, atMs, trains, skipped, byRoute } = ctx;
   for (const n of sheetsOf(answers)) {
     const s = `svc${n}`;
     const product = productOf(answers[`${s}.product`]);
-    const ticket = ticksOf(answers, `${s}.ticketType`).filter(t => TICKET_TYPES.includes(t));
-    const days = ticksOf(answers, `${s}.daysOfWeek`).filter(d => DAYS.includes(d));
+    const kind = product.productCategoryName || ticksOf(answers, `${s}.mode`)[0] || 'service';
     for (const row of rowsOf(answers, `${s}.service`, ['origin', 'destination', 'departure', 'arrival', 'number'])) {
       const originURN = stationOf(row.origin);
       const destinationURN = stationOf(row.destination);
       if (!originURN || !destinationURN) {
-        skipped.push(`Service sheet ${n}, service ${row.row}: no station code${!originURN ? ' for its origin' : ''}${!originURN && !destinationURN ? ' and' : ''}${!destinationURN ? ' for its destination' : ''}.`);
+        skipped.push(missingStationText(n, row, originURN, destinationURN));
         continue;
       }
       const key = `${n}|${routeKey(originURN, destinationURN)}`;
@@ -181,83 +208,84 @@ function testDataOfChecklist(answers, { atMs = Date.now() } = {}) {
         train = {
           id: trains.length + 1,
           resource_type: 'TRAIN',
-          label: `Sheet ${n}: ${product.productCategoryName || ticksOf(answers, `${s}.mode`)[0] || 'service'} ${stationLabel(originURN)}–${stationLabel(destinationURN)}`,
+          label: `Sheet ${n}: ${kind} ${stationLabel(originURN)}–${stationLabel(destinationURN)}`,
           data: {
-            originURN, destinationURN, ...product, productCategoryShortName: '',
-            daysOfWeek: days,
-            services: [],
-            ticketTypes: ticket,
+            ...emptyTrainData(originURN, destinationURN),
+            ...product,
+            daysOfWeek: ticksOf(answers, `${s}.daysOfWeek`).filter(d => DAYS.includes(d)),
+            ticketTypes: ticksOf(answers, `${s}.ticketType`).filter(t => TICKET_TYPES.includes(t)),
             travelClasses: ticksOf(answers, `${s}.travelClasses`),
             serviceClasses: ticksOf(answers, `${s}.serviceClasses`),
             accommodations: ticksOf(answers, `${s}.accommodations`),
-            ancillaries: [],
           },
         };
         trains.push(train);
         byRoute.set(key, train);
         if (!byRoute.has(routeKey(originURN, destinationURN))) byRoute.set(routeKey(originURN, destinationURN), train);
       }
-      serviceIndex(train, {
+      serviceIndexIn(train, {
         vehicleNumber: row.number || '',
         departureTime: timeAt(row.departure, originURN, atMs),
         arrivalTime: timeAt(row.arrival, destinationURN, atMs),
       });
     }
   }
+}
 
+// The legs of one journey table, or null when a leg names no station code.
+function legsOfCombination(ctx, code, rows) {
+  const { atMs, trains, byRoute } = ctx;
+  const legs = [];
+  for (const row of rows) {
+    const originURN = stationOf(row.from);
+    const destinationURN = stationOf(row.to);
+    if (!originURN || !destinationURN) return null;
+    let train = byRoute.get(routeKey(originURN, destinationURN));
+    if (!train) {
+      const data = emptyTrainData(originURN, destinationURN);
+      if (TICKET_TYPES.includes(row.ticketType)) data.ticketTypes = [row.ticketType];
+      train = {
+        id: trains.length + 1,
+        resource_type: 'TRAIN',
+        label: `Journey ${code}, leg ${row.row}: ${stationLabel(originURN)}–${stationLabel(destinationURN)}`,
+        data,
+      };
+      trains.push(train);
+      byRoute.set(routeKey(originURN, destinationURN), train);
+    }
+    legs.push({
+      trainResourceId: train.id,
+      serviceIndex: serviceIndexIn(train, {
+        vehicleNumber: row.train || '',
+        departureTime: timeAt(row.departs, originURN, atMs),
+        arrivalTime: timeAt(row.arrives, destinationURN, atMs),
+      }),
+    });
+  }
+  return legs;
+}
+
+// One journey per combination sold whose table gives two legs or more.
+function journeysOfCombinations(ctx) {
+  const { answers, trains, skipped } = ctx;
   const journeys = [];
   const combos = [...new Set(Object.keys(answers)
-    .map(t => /^jrn\.([A-Za-z0-9_]+)\.sold=(.+)$/.exec(t))
+    .map(t => /^jrn\.(\w+)\.sold=(.+)$/.exec(t))
     .filter(m => m && answers[m[0]] === true && m[2] !== 'NO')
     .map(m => m[1]))].sort((a, b) => a.localeCompare(b));
   for (const code of combos) {
     const rows = rowsOf(answers, `jrn.${code}.leg`, ['from', 'to', 'departs', 'arrives', 'train', 'ticketType'])
       .filter(r => r.from || r.to || r.departs || r.train);
-    const legs = [];
-    let broken = false;
-    for (const row of rows) {
-      const originURN = stationOf(row.from);
-      const destinationURN = stationOf(row.to);
-      if (!originURN || !destinationURN) { broken = true; break; }
-      let train = byRoute.get(routeKey(originURN, destinationURN));
-      if (!train) {
-        const ticket = TICKET_TYPES.includes(row.ticketType) ? [row.ticketType] : [];
-        train = {
-          id: trains.length + 1,
-          resource_type: 'TRAIN',
-          label: `Journey ${code}, leg ${row.row}: ${stationLabel(originURN)}–${stationLabel(destinationURN)}`,
-          data: {
-            originURN, destinationURN, operatorCode: '', productCategoryRef: '', productCategoryName: '', productCategoryShortName: '',
-            daysOfWeek: [], services: [], ticketTypes: ticket, travelClasses: [], serviceClasses: [], accommodations: [], ancillaries: [],
-          },
-        };
-        trains.push(train);
-        byRoute.set(routeKey(originURN, destinationURN), train);
-      }
-      legs.push({
-        trainResourceId: train.id,
-        serviceIndex: serviceIndex(train, {
-          vehicleNumber: row.train || '',
-          departureTime: timeAt(row.departs, originURN, atMs),
-          arrivalTime: timeAt(row.arrives, destinationURN, atMs),
-        }),
-      });
-    }
-    if (broken || legs.length < 2) {
-      skipped.push(`Journey ${code}: ${broken ? 'a leg has no station code' : 'fewer than two legs given'}.`);
+    const legs = legsOfCombination(ctx, code, rows);
+    if (!legs || legs.length < 2) {
+      skipped.push(`Journey ${code}: ${legs ? 'fewer than two legs given' : 'a leg has no station code'}.`);
       continue;
     }
     const first = trains.find(t => t.id === legs[0].trainResourceId).data;
     const last = trains.find(t => t.id === legs.at(-1).trainResourceId).data;
     journeys.push({ resource_type: 'JOURNEY', label: `Journey ${code}: ${stationLabel(first.originURN)}–${stationLabel(last.destinationURN)}, ${legs.length} legs`, data: { legs } });
   }
-  const resources = [...trains, ...journeys.map((j, i) => ({ id: trains.length + i + 1, ...j }))];
-  // A time whose station has no known zone keeps no offset: the collection
-  // moves only an offset its zone uses (#772), so one guessed here would be an
-  // hour off half the year.
-  const noOffset = trains.filter(t => t.data.services.some(sv => /^\d{2}:\d{2}:\d{2}$/.test(sv.departureTime))).length;
-  const notes = noOffset ? [`${noOffset} train set(s) keep local times without a UTC offset: their stations have no 7-digit UIC code with a known country.`] : [];
-  return { resources, skipped, notes };
+  return journeys;
 }
 
 // ── The changes ─────────────────────────────────────────────────────────────
