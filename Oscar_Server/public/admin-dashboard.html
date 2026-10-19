@@ -150,11 +150,17 @@ function drSize(bytes) {
   if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
   return (bytes / 1073741824).toFixed(2) + ' GB';
 }
+// The result of the last backup: its text and the class that colours it.
+function drResult(ok) {
+  if (ok === true) return ['OK', 'ok'];
+  if (ok === false) return ['Failed', 'bad'];
+  return ['—', ''];
+}
 function drItems(st) {
-  var ok = st.last_backup_ok;
+  var result = drResult(st.last_backup_ok);
   return [
     ['Last backup', drWhen(st.last_backup_at), ''],
-    ['Result', ok === true ? 'OK' : ok === false ? 'Failed' : '—', ok === true ? 'ok' : ok === false ? 'bad' : ''],
+    ['Result', result[0], result[1]],
     ['Size', drSize(st.last_backup_size_bytes), ''],
     ['Last success', drWhen(st.last_success_at), ''],
     ['Last failure', drWhen(st.last_failure_at), st.last_failure_at ? 'bad' : ''],
