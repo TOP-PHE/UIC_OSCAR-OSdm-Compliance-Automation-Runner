@@ -429,8 +429,10 @@ function datafileScenarioWarnings(sc, framework, datafile) {
   // #766: a place chosen in a way the framework does not declare.
   const flow = placeSelectionFlowOf(sc);
   if (!placeSelectionFlowDeclared(framework, flow)) warnings.push(`placeSelectionBy:${flow}`);
-  // #780: an offer search option value the framework does not declare.
-  for (const [key, values] of Object.entries(offerSearchOptionsOf(sc, datafile))) {
+  // #780: an offer search option value the framework does not declare,
+  // unless that is the point of the scenario (the PR C probe).
+  const optionProbe = isArmedValue(sc.offerOptionExpectRejection);
+  for (const [key, values] of Object.entries(optionProbe ? {} : offerSearchOptionsOf(sc, datafile))) {
     for (const value of values) if (!offerSearchOptionDeclared(framework, key, value)) warnings.push(`offerOption:${key}=${value}`);
   }
   // #781: a currency the framework does not declare, unless that is the

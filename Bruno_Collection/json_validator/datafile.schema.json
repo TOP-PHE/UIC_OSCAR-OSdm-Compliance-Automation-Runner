@@ -328,6 +328,11 @@
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },
+          "offerOptionExpectRejection": {
+            "description": "Negative test (#780 PR C). When on, the offer search criteria ask for an option value the Test Framework does not declare: POST /offers may refuse it, give no offer or say it ignored it (PARAMETER_NOT_SUPPORTED); offers keeping to the value fail, offers not keeping to it with nothing said pass with a warning. The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "departureExpectRejection": {
             "description": "Negative test (#704). When on, the departure date (departureDaysFromToday) is one the provider must not sell, in the past or beyond its sales horizon: POST /offers must refuse it with a 4xx RFC-9457 Problem, or give no offer. The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

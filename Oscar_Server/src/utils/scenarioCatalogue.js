@@ -78,7 +78,9 @@ const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES'];
 // #781: entries that come once per declared currency (CURRENCIES), in the
 // default one with none asked (DEFAULT_CURRENCY), and in one not declared
 // (CURRENCY_NOT_SOLD).
-const PROBES = ['OFFER_OPTIONS', 'OFFER_COMBINATIONS', 'CURRENCIES', 'DEFAULT_CURRENCY', 'CURRENCY_NOT_SOLD'];
+// #780 PR C: an entry (`probe` "OFFER_OPTION_NOT_DECLARED") that asks for the
+// first option value an explicit list of the framework leaves out.
+const PROBES = ['OFFER_OPTIONS', 'OFFER_COMBINATIONS', 'CURRENCIES', 'DEFAULT_CURRENCY', 'CURRENCY_NOT_SOLD', 'OFFER_OPTION_NOT_DECLARED'];
 const OFFER_OPTION_PROBES = [
   { key: 'offerModes', field: 'offerMode', values: ['INDIVIDUAL'], code: 'OFFER_MODE', member: 'offerMode' },
   { key: 'requestedOfferParts', field: 'requestedOfferParts', values: ['ADMISSION', 'RESERVATION', 'ANCILLARY'], code: 'OFFER_PARTS', member: 'requestedOfferParts' },
@@ -434,6 +436,7 @@ function catalogueFor(catalogue, simulator, framework) {
     if (entry.probe === 'OFFER_OPTIONS') return offerOptionProbes(entry, fw);
     if (entry.probe === 'OFFER_COMBINATIONS') return offerCombinationProbes(entry, fw);
     if (CURRENCY_PROBES.has(entry.probe)) return currencyProbes(entry, fw);
+    if (entry.probe === 'OFFER_OPTION_NOT_DECLARED') return [optionNotDeclaredProbe(entry, fw)];
     if (!forms || !entry.requirements.offerRequest.convertible) return [entry];
     const variants = OFFER_REQUEST_FORMS.filter((form) => forms.includes(form))
       .map((form) => (form === 'SEARCH' ? entry : asForm(entry, form, framework)));
@@ -456,6 +459,36 @@ function declaredOptionValues(fw) {
     const declared = probe.key === 'flexibilities' ? fw.offerCriteria?.flexibilities : options[probe.key];
     return probe.values.filter((v) => arr(declared).includes(v)).map((value) => ({ ...probe, value }));
   });
+}
+
+/**
+ * #780 PR C: the first option value worth a probe that an explicit list of
+ * the framework leaves out (a key absent declares every value, so it leaves
+ * nothing out). The offer mode is not asked: COLLECTIVE needs a group.
+ */
+function undeclaredOptionValue(fw) {
+  const options = isObj(fw.offerSearchOptions) ? fw.offerSearchOptions : {};
+  for (const probe of OFFER_OPTION_PROBES) {
+    if (probe.key === 'offerModes') continue;
+    const declared = probe.key === 'flexibilities' ? fw.offerCriteria?.flexibilities : options[probe.key];
+    if (!Array.isArray(declared)) continue;
+    const value = probe.values.find((v) => !declared.includes(v));
+    if (value) return { ...probe, value };
+  }
+  return null;
+}
+
+// #780 PR C: the probe entry asking for that value (`optionOf`, `notDeclared`),
+// or itself, not copiable, when the framework leaves nothing out.
+function optionNotDeclaredProbe(entry, fw) {
+  const o = undeclaredOptionValue(fw);
+  if (!o) return { ...entry, missing: [...entry.missing, 'an offer search option whose list leaves a value out (Offer search options, Tariff Flexibility)'] };
+  return {
+    ...entry,
+    optionOf: { key: o.key, field: o.field, value: o.value },
+    notDeclared: true,
+    purpose: `${entry.purpose} Value asked: offerSearchCriteria.${o.member} ${o.value}.`,
+  };
 }
 
 // #780: the probe entry as one twin per declared value (`optionOf`), or as
@@ -583,5 +616,5 @@ function baseEntries(catalogue, simulator, framework) {
 module.exports = {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
   dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, ageRangesOf, NEEDS_KEYS, LIMITS,
-  OFFER_OPTION_PROBES, declaredOptionValues,
+  OFFER_OPTION_PROBES, declaredOptionValues, undeclaredOptionValue,
 };

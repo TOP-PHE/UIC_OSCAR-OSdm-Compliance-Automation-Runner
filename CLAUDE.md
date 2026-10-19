@@ -230,7 +230,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     a two-leg trip. **The simulator alpha checklist sits just under the AI
     context's 20k characters** (`contextOf()`, #827): a longer `fw.*`
     comment there cuts service sheets and fails `ai-checklist.test.js`
-    (`cut`). PR C (a probe with an undeclared value) is next.
+    (`cut`).
+    **PR C (1.11.358): the undeclared option probe.** Catalogue entry
+    `OTST_OFFER_OPTION_NOT_DECLARED` (`probe` `OFFER_OPTION_NOT_DECLARED`,
+    `undeclaredOptionValue()`: the first value an explicit list leaves out,
+    never the offer mode) becomes itself with `optionOf` + `notDeclared`;
+    `withOfferOptions()` arms `offerOptionExpectRejection` instead of
+    `offerSearchProbe`. Step 01 grades it before the status check
+    (`checkUndeclaredOption()`, `library-bruno/optionNotDeclared.js`) as the
+    currency probe: refusal / none / ignored pass, kept FAIL, silent WARNING.
+    An armed scenario gets no `offerOption:` warning. #780 is done.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`

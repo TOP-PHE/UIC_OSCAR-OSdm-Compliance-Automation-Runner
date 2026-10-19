@@ -272,14 +272,17 @@ function withOfferOptions(datafile, entries) {
   const probes = arr(entries).filter((e) => e.optionOf || e.optionsOf);
   if (!probes.length) return datafile;
   const scenarios = arr(datafile.scenarios).flatMap((sc) => {
-    const twins = isObj(sc) ? probes.filter((e) => e.variantOf === sc.code) : [];
+    // #780 PR C: the not-declared probe is its own entry, not a twin.
+    const twins = isObj(sc) ? probes.filter((e) => e.variantOf === sc.code || (e.notDeclared && e.code === sc.code)) : [];
     if (!twins.length) return [sc];
     return twins.map((e) => {
       const criteria = { serviceClass: [], travelClass: [], flexibilities: [], offerMode: null, requestedOfferParts: [] };
-      const twin = { ...structuredClone(sc), code: e.code, description: e.purpose, offerSearchCriteria: criteria, offerSearchProbe: 'on' };
+      const twin = { ...structuredClone(sc), code: e.code, description: e.purpose, offerSearchCriteria: criteria };
+      if (e.notDeclared) twin.offerOptionExpectRejection = 'on';
+      else twin.offerSearchProbe = 'on';
       for (const { field, value } of e.optionsOf || [e.optionOf]) {
         criteria[field] = field === 'offerMode' ? value : [value];
-        if (field === 'flexibilities') twin.desiredFlexibility = value;
+        if (field === 'flexibilities' && !e.notDeclared) twin.desiredFlexibility = value;
       }
       return twin;
     });
