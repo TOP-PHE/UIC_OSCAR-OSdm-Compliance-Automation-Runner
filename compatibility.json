@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.383",
+  "current_release": "2026.384",
   "releases": [
+    {
+      "release": "2026.384",
+      "date": "2026-10-19",
+      "server": "1.11.349",
+      "collection": "OTST_V2.0.188",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Provider checklist (#862 PR 2): applying it also copies the catalogue's reference scenarios its Test Framework allows (copy them / do not copy), placed on the Test Data, in no run list."
+      ]
+    },
     {
       "release": "2026.383",
       "date": "2026-10-19",

@@ -371,7 +371,22 @@ function previewHash(preview) {
     framework: preview.proposedFramework,
     testData: preview.testData,
     incoming: preview.incomingTestData,
+    // #862 PR 2: the reference scenarios copied, when the route adds them.
+    scenarios: preview.scenarios || null,
   })).digest('hex');
+}
+
+/**
+ * The trains and journeys a company holds once `incoming` is applied in
+ * `mode`: those kept, then those created, under the ids planTestData gives
+ * (`new-1`, `new-2`…; journeys' legs point at them).
+ */
+function testDataAfter(existing, incoming, mode) {
+  let n = 0;
+  const plan = planTestData(existing, incoming, mode, () => `new-${++n}`);
+  const kinds = new Set(['TRAIN', 'JOURNEY']);
+  const kept = mode === 'replace' ? [] : (existing || []).filter(r => kinds.has(r.resource_type));
+  return [...kept, ...plan.create];
 }
 
 /**
@@ -399,5 +414,5 @@ function previewOf({ importId, answers, previous, current, existing, mode, atMs 
 module.exports = {
   PT_MODES, SHARED_MODES,
   frameworkOfChecklist, testDataOfChecklist, stationOf, timeAt, productOf,
-  answerChanges, frameworkChanges, testDataChanges, previewOf, previewHash,
+  answerChanges, frameworkChanges, testDataChanges, testDataAfter, previewOf, previewHash,
 };

@@ -62,6 +62,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.349 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.384
+
+Issue #862 (PR 2). Applying a provider's checklist also copies the reference scenarios its Test Framework allows. Collection unchanged.
+
+### Added
+- **Test Config › 📋 Provider checklist › Reference scenarios.** The preview lists the catalogue's reference scenarios that the new Test Framework declares everything for. With **copy them** (the default), applying copies them into the data file as **Copy scenarios** would:
+  - adapted to the framework (#681);
+  - each trip on the first train set, or on a journey of as many legs;
+  - the Test Manager's own, not shared, in no run list.
+- The preview also lists:
+  - what is left to complete in each scenario;
+  - the scenarios not copied, and why: not declared, no journey of as many legs, or no train set;
+  - those already in the data file (by code), which are left alone, so the next checklist copies only the new ones.
+- **do not copy** applies the framework and the Test Data only. The choice is part of the preview's hash.
+- **The copy runs after the framework and the Test Data are written, under the data file lock.** If it fails, they stay applied, and the answer says the scenarios were not copied and can be copied with Copy scenarios.
+- Routes: `scenarios=copy|none` on `GET …/checklists/{id}/preview` and in the body of `POST …/apply`. The answer's `scenarios` gives `copied` and the copy report.
+- User guide § 3.0.
+
+### Changed
+- What Copy scenarios reads (the catalogue, a data file, the Test Data choices) moved to `api/helpers/catalogueSource.js`, shared with the checklist. Copy scenarios behaves the same.
+
+### Default decisions (taken without asking)
+- **Copied by default.** The preview lists every scenario before the confirmation.
+- **The copies follow Copy scenarios' rules:** owned by the Test Manager, not shared, and in no run list.
+- **A scenario whose code is already in the data file is not copied again**, even when the catalogue's version changed: it may have been edited.
+
+### Checked
+- On the three simulators' and the seven real providers' checklists, the plan and the copy go through without error, offline: 20 to 133 scenarios copied, a few left out for want of a journey of as many legs.
+
+---
+
 ## [server-1.11.348 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.383
 
 Issue #868. Collection unchanged.

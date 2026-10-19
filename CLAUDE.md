@@ -903,8 +903,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   collection's table pinned by `checklist-configuration.test.js`), only for
   7-digit codes as the collection does. `storeFramework` / `storeTestData`
   live in `api/helpers/configurationStore.js` now (shared with #810/#838).
-  The apply also writes `provider_checklist`. PR 2 adds the catalogue's
-  scenarios. **Ids in OSCAR are UUIDs** (`crypto.randomUUID()`): a page that
+  The apply also writes `provider_checklist`. **PR 2 (1.11.349): the
+  catalogue's scenarios.** `utils/checklistScenarios.js` (pure)
+  `scenarioPlan()`: the entries the new framework declares everything for
+  (`catalogueFor`, `missing` empty), not already in the data file by code,
+  adapted (`adaptCatalogueDatafile`) and placed by `suggestTrip()`; a trip
+  of several legs with no journey of as many legs, or no train at all, leaves
+  its scenario out (`noJourney`, `noTestData`). The preview plans on the Test
+  Data *after* the apply (`testDataAfter()`, ids `new-N`), and its hash covers
+  the plan and the choice (`scenarios=copy|none`, default copy). The apply
+  plans again on the stored rows and copies with `applyCopy()` under
+  `withDatafileLock`, after the framework/Test Data transaction: a failed
+  copy leaves them applied and answers `scenarios.error`. The reading half of
+  Copy scenarios (catalogue, data file, `testDataChoices`) is
+  `api/helpers/catalogueSource.js`, shared by both routes. **Ids in OSCAR are UUIDs** (`crypto.randomUUID()`): a page that
   validates an id read from an answer before putting it in a request address
   (Sonar's taint rules S8476/S5696) checks for a UUID (`checklistIdOf()`,
   `resourceIdOf()`), never `Number()`. #864 and #866 shipped a number check

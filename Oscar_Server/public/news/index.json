@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-checklist-scenarios",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "A provider's checklist brings its reference scenarios",
+    "summary": "Applying a provider's checklist now also copies the reference scenarios its Test Framework allows, placed on its Test Data.",
+    "content": "Test Config › Provider checklist lists the reference scenarios the new framework allows, what is left to complete and those not copied with the reason. Choose copy them or do not copy before applying. The copies are yours and in no run list; those already in the data file are left alone."
+  },
+  {
     "id": "2026-10-19-uuid-buttons",
     "date": "October 19, 2026",
     "tag": "Fix",

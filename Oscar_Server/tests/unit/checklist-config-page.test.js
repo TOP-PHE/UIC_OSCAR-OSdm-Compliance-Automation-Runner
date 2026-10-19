@@ -126,7 +126,7 @@ describe('#862 the wiring', () => {
   test('Test Managers only, through the page\'s fetch (which names the provider)', () => {
     expect(SOURCE).toContain("if (user.role !== 'test_manager') return;");
     expect(SOURCE).not.toMatch(/innerHTML\s*=\s*[^;]*\$\{(?!.*esc)/);
-    expect(SOURCE).toContain('JSON.stringify({ hash: current.hash, testData: mode })');
+    expect(SOURCE).toContain('JSON.stringify({ hash: current.hash, testData: mode, scenarios: choice })');
   });
 
   test('the box is on Test Config, after the reference', () => {
@@ -150,5 +150,44 @@ describe('#862 an import id read from an answer', () => {
   test('every request to an import uses it', () => {
     expect(SOURCE).not.toMatch(/checklists\/\$\{encodeURIComponent/);
     expect(SOURCE.match(/checklistIdOf\(/g).length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('#862 PR 2 the reference scenarios', () => {
+  const scenarios = {
+    choice: 'copy',
+    copy: [{ code: 'OTST_SALE_ONE_WAY_1ADT', purpose: 'A one-way <sale>', toComplete: ['the overrule code'] }, { code: 'OTST_B', purpose: 'B', toComplete: [] }],
+    alreadyThere: ['OTST_C'],
+    notDeclared: [{ code: 'OTST_EXCHANGE_1ADT', missing: ['sales flow EXCHANGE_FULL'] }],
+    noJourney: [{ code: 'OTST_TWO_LEGS', legs: [2] }],
+    noTestData: [],
+  };
+
+  test('copied by default: the list, escaped, with what is left to complete; what is not copied and why', () => {
+    const html = P.checklistPreviewHtml({ ...preview, scenarios });
+    expect(html).toContain('<strong>Reference scenarios</strong>');
+    expect(html).toContain('id="checklist-sc-copy" name="checklist-sc" value="copy" data-checklist-action="scenarios" checked');
+    expect(html).toContain('<label for="checklist-sc-none">do not copy</label>');
+    expect(html).toContain('Copied (2)');
+    expect(html).toContain('OTST_SALE_ONE_WAY_1ADT — A one-way &lt;sale&gt; (to complete: the overrule code)');
+    expect(html).not.toContain('<sale>');
+    expect(html).toContain('Already in the data file, left as they are: 1.');
+    expect(html).toContain('OTST_EXCHANGE_1ADT needs sales flow EXCHANGE_FULL');
+    expect(html).toContain('OTST_TWO_LEGS: no journey of 2 legs');
+  });
+
+  test('"do not copy" says how many could be; unavailable says why', () => {
+    const html = P.checklistScenariosHtml({ ...scenarios, choice: 'none' });
+    expect(html).toContain('value="none" data-checklist-action="scenarios" checked');
+    expect(html).toContain('2 could be copied; none will be.');
+    expect(html).not.toContain('Copied (');
+    expect(P.checklistScenariosHtml({ choice: 'copy', unavailable: 'The scenario catalogue cannot be read <here>.' }))
+      .toContain('The scenario catalogue cannot be read &lt;here&gt;.');
+    expect(P.checklistScenariosHtml(undefined)).toBe('');
+  });
+
+  test('the choice goes with every preview and with the apply', () => {
+    expect(SOURCE).toContain('preview?testData=${testData}&scenarios=${scenarios}');
+    expect(SOURCE).toContain("const scenarios = choice === 'none' ? 'none' : 'copy';");
   });
 });
