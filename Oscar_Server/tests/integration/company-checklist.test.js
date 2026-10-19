@@ -26,6 +26,14 @@ const request = require('supertest');
 const { run, get, all, colDecrypt } = require('../../src/db/db');
 const { storeFramework, frameworkConfigOf } = require('../../src/api/helpers/configurationStore');
 const { buildZip } = require('../../src/utils/zip');
+const { readDatafile } = require('../../src/api/helpers/catalogueSource');
+
+// #862 PR 2: the real write, which one test makes fail once.
+jest.mock('../../src/utils/datafileWrite', () => {
+  const real = jest.requireActual('../../src/utils/datafileWrite');
+  return { ...real, writeDatafile: jest.fn(real.writeDatafile) };
+});
+const datafileWrite = require('../../src/utils/datafileWrite');
 
 const app = express();
 app.use(express.json());
@@ -202,5 +210,101 @@ describe('#862 discarding and the list', () => {
     expect(res.body.imports.every(i => i.importedAt && i.fileName)).toBe(true);
     expect((await call('get', BASE, { provider: '' })).body.imports).toEqual([]);
     expect((await call('get', `${BASE}/${res.body.imports[0].id}/preview`, { provider: '' })).status).toBe(404);
+  });
+});
+
+describe('#862 PR 2 the reference scenarios come with the checklist', () => {
+  const p2 = uuidv4();
+  const p3 = uuidv4();
+  const p4 = uuidv4();
+  const email = `test_manager-${tmId.slice(0, 4)}@cl-cfg.com`;
+  beforeAll(() => {
+    for (const [id, slug] of [[p2, 'cl-cfg-p2'], [p3, 'cl-cfg-p3'], [p4, 'cl-cfg-p4']]) {
+      run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, ?, ?, ?)`, [id, slug, slug, companyId]);
+    }
+  });
+  const codes = df => (df?.scenarios || []).map(s => s.code);
+  let first;
+
+  test('the preview lists the scenarios the new framework allows, copied by default', async () => {
+    first = (await upload(ALPHA, { provider: p2 })).body;
+    const sc = first.scenarios;
+    expect(sc.choice).toBe('copy');
+    expect(sc.copy.length).toBeGreaterThan(50);
+    expect(sc.copy[0]).toEqual(expect.objectContaining({ code: expect.any(String), purpose: expect.any(String) }));
+    expect(sc.alreadyThere).toEqual([]);
+    expect(Array.isArray(sc.notDeclared)).toBe(true);
+    expect(sc.noTestData).toEqual([]);
+    expect(sc.source).toBeUndefined();
+    expect(sc.tripMap).toBeUndefined();
+  });
+
+  test('"none" is another preview, with its own hash; any other value is refused', async () => {
+    const none = await call('get', `${BASE}/${first.import.id}/preview?scenarios=none`, { provider: p2 });
+    expect(none.status).toBe(200);
+    expect(none.body.scenarios.choice).toBe('none');
+    expect(none.body.hash).not.toBe(first.hash);
+    expect((await call('get', `${BASE}/${first.import.id}/preview?scenarios=all`, { provider: p2 })).status).toBe(400);
+    const bad = await call('post', `${BASE}/${first.import.id}/apply`, { provider: p2, body: { hash: first.hash, scenarios: 'all' } });
+    expect(bad.status).toBe(400);
+    // The hash of one choice does not apply the other.
+    expect((await call('post', `${BASE}/${first.import.id}/apply`, { provider: p2, body: { hash: first.hash, scenarios: 'none' } })).status).toBe(409);
+  });
+
+  test('applied: the scenarios shown are copied, the Test Manager\'s, in no run list, on the Test Data', async () => {
+    const res = await call('post', `${BASE}/${first.import.id}/apply`, { provider: p2, body: { hash: first.hash } });
+    expect(res.status).toBe(200);
+    expect(res.body.scenarios.choice).toBe('copy');
+    expect(res.body.scenarios.error).toBeUndefined();
+    expect(res.body.scenarios.copied.map(c => c.from).sort()).toEqual(first.scenarios.copy.map(c => c.code).sort());
+    expect(res.body.scenarios.report).toBeTruthy();
+    const df = await readDatafile(p2);
+    expect(codes(df).sort()).toEqual(first.scenarios.copy.map(c => c.code).sort());
+    expect(df.scenariosToRun).toEqual([]);
+    const framework = frameworkConfigOf(p2);
+    const trains = all("SELECT id FROM test_resources WHERE company_id = ? AND resource_type = 'TRAIN'", [p2]).map(r => r.id);
+    expect(trains.length).toBeGreaterThan(0);
+    for (const sc of df.scenarios) {
+      expect(sc.created_by).toBe(email);
+      expect(sc.shared).toBe(false);
+      expect(sc.osdmVersion).toBe(String(framework.osdmVersion));
+      expect(df.tripRequirements.some(t => t.id === sc.tripRequirementId)).toBe(true);
+    }
+  });
+
+  test('the next checklist leaves the scenarios already there alone and copies only the new ones', async () => {
+    const before = codes(await readDatafile(p2));
+    const second = (await upload(GAMMA, { provider: p2 })).body;
+    expect(second.scenarios.alreadyThere.length).toBeGreaterThan(0);
+    for (const c of second.scenarios.copy) expect(before).not.toContain(c.code);
+    for (const c of second.scenarios.alreadyThere) expect(before).toContain(c);
+    const res = await call('post', `${BASE}/${second.import.id}/apply`, { provider: p2, body: { hash: second.hash } });
+    expect(res.status).toBe(200);
+    const after = codes(await readDatafile(p2));
+    expect(after.length).toBe(before.length + second.scenarios.copy.length);
+    expect(new Set(after).size).toBe(after.length);
+  });
+
+  test('"none": the framework and the Test Data are applied, no data file is written', async () => {
+    const imp = (await upload(ALPHA, { provider: p3 })).body;
+    const none = (await call('get', `${BASE}/${imp.import.id}/preview?scenarios=none`, { provider: p3 })).body;
+    const res = await call('post', `${BASE}/${imp.import.id}/apply`, { provider: p3, body: { hash: none.hash, scenarios: 'none' } });
+    expect(res.status).toBe(200);
+    expect(res.body.scenarios).toEqual({ choice: 'none', copied: [] });
+    expect(frameworkConfigOf(p3)).toBeTruthy();
+    expect(get('SELECT datafile_path FROM companies WHERE id = ?', [p3]).datafile_path).toBeNull();
+  });
+
+  test('a failed write leaves the framework and the Test Data applied, and says the scenarios were not copied', async () => {
+    const imp = (await upload(ALPHA, { provider: p4 })).body;
+    datafileWrite.writeDatafile.mockRejectedValueOnce(new Error('disk full'));
+    const res = await call('post', `${BASE}/${imp.import.id}/apply`, { provider: p4, body: { hash: imp.hash } });
+    expect(res.status).toBe(200);
+    expect(res.body.applied).toBe(true);
+    expect(res.body.scenarios.copied).toEqual([]);
+    expect(res.body.scenarios.error).toMatch(/not copied.*copy the scenarios with Copy scenarios/);
+    expect(res.body.scenarios.error).not.toMatch(/disk full/);
+    expect(frameworkConfigOf(p4)).toBeTruthy();
+    expect(get("SELECT status FROM checklist_import WHERE id = ?", [imp.import.id]).status).toBe('applied');
   });
 });

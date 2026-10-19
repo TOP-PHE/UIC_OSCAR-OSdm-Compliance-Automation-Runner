@@ -27,8 +27,6 @@
  */
 
 const express   = require('express');
-const fs        = require('node:fs');
-const path      = require('node:path');
 const rateLimit = require('express-rate-limit');
 const { get, all, colDecrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
@@ -39,11 +37,10 @@ const { viewForTester } = require('../../utils/datafileOwnership');
 const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
 const { withDatafileLock } = require('../../utils/datafileLock');
 const { writeDatafile } = require('../../utils/datafileWrite');
-const { decryptFromFileAsync } = require('../../utils/at-rest');
 const { planCopy, applyCopy } = require('../../utils/scenarioCopy');
 const { catalogueDatafile, catalogueFor } = require('../../utils/scenarioCatalogue');
 const { adaptCatalogueDatafile, suggestTrip, journeysMissing } = require('../../utils/catalogueMatch');
-const TripApply = require('../../../public/js/trip-apply');
+const { Refusal, readDatafile, readCatalogue, testDataChoices } = require('../helpers/catalogueSource');
 const { copyReport } = require('../../../public/js/copy-report');
 const { getRunSelection } = require('../../utils/runSelections');
 const log = require('../../utils/logger').child({ module: 'scenario-copy' });
@@ -66,41 +63,6 @@ const CATALOGUE = 'catalogue';
 const CATALOGUE_NAME = 'Scenario catalogue';
 
 const REFUSAL_TITLES = { 404: 'Not Found', 503: 'Service Unavailable' };
-
-class Refusal extends Error {
-  constructor(status, detail) { super(detail); this.status = status; }
-}
-
-// A company's datafile as an object; null when it has none. Throws a Refusal
-// when it exists but cannot be read: copying from or into it would guess.
-async function readDatafile(companyId) {
-  const row = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
-  if (!row?.datafile_path || !fs.existsSync(row.datafile_path)) return null;
-  try {
-    const df = JSON.parse((await decryptFromFileAsync(row.datafile_path)).toString('utf8'));
-    if (df && typeof df === 'object' && !Array.isArray(df)) return df;
-  } catch (err) {
-    log.error({ err, companyId }, 'scenario copy: data file unreadable');
-  }
-  throw new Refusal(409, 'A data file involved in the copy cannot be read. Ask your Test Manager to check it.');
-}
-
-// #612: a file of the collection the runs use (COLLECTION_PATH), else the
-// repository's copy, as the data file schema is read.
-function collectionJson(...parts) {
-  const candidates = [
-    path.join(path.resolve(process.env.COLLECTION_PATH || '/collection'), ...parts),
-    path.resolve(__dirname, '../../../../Bruno_Collection', ...parts),
-  ];
-  for (const file of candidates) {
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* the next copy */ }
-  }
-  throw new Refusal(503, 'The scenario catalogue cannot be read on this server.');
-}
-
-function readCatalogue() {
-  return { catalogue: collectionJson('data_base', 'scenario_catalogue.json'), simulator: collectionJson('data_base', 'simulator_datafile.json') };
-}
 
 function readFramework(companyId) {
   const row = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
@@ -163,21 +125,6 @@ async function copyContext(req, res) {
     res.status(err.status).json({ status: err.status, title: REFUSAL_TITLES[err.status] || 'Conflict', detail: err.message });
     return null;
   }
-}
-
-// The target's trains and journeys, as the person choosing sees them.
-function testDataChoices(resources) {
-  const trains = resources.filter(r => r.resource_type === 'TRAIN').map(r => {
-    const d = TripApply.normalizeTrainData(r.data);
-    return {
-      id: r.id, label: r.label, origin: d.originURN || '', destination: d.destinationURN || '',
-      services: d.services.map((s, index) => ({ index, vehicleNumber: s.vehicleNumber, departureTime: s.departureTime, arrivalTime: s.arrivalTime })),
-    };
-  });
-  const journeys = resources.filter(r => r.resource_type === 'JOURNEY').map(r => ({
-    id: r.id, label: r.label, legs: TripApply.journeyToTripLegs(r, resources).length,
-  }));
-  return { trains, journeys };
 }
 
 // #681: whether the run list of this user, once the copy is written, is

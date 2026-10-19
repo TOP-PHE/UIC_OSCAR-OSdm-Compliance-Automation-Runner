@@ -147,6 +147,51 @@ function checklistTestDataHtml(td, p) {
   return html.join('');
 }
 
+function checklistScenarioLine(c) {
+  const toComplete = Array.isArray(c.toComplete) && c.toComplete.length ? ' (to complete: ' + c.toComplete.join('; ') + ')' : '';
+  return c.code + ' — ' + (c.purpose || '') + toComplete;
+}
+
+function checklistScenarioChoiceHtml(copy) {
+  return `<span style="margin-left:8px;font-size:12px">
+      <input type="radio" id="checklist-sc-copy" name="checklist-sc" value="copy" data-checklist-action="scenarios"${copy ? ' checked' : ''}> <label for="checklist-sc-copy">copy them</label>
+      <input type="radio" id="checklist-sc-none" name="checklist-sc" value="none" data-checklist-action="scenarios"${copy ? '' : ' checked'} style="margin-left:8px"> <label for="checklist-sc-none">do not copy</label>
+    </span>`;
+}
+
+// #862 PR 2: the reference scenarios of the catalogue the new framework allows.
+function checklistScenariosHtml(sc) {
+  if (!sc) return '';
+  const head = '<div style="margin-top:8px"><strong>Reference scenarios</strong>';
+  if (sc.unavailable) return head + ': ' + esc(sc.unavailable) + '</div>';
+  const copy = sc.choice !== 'none';
+  const list = Array.isArray(sc.copy) ? sc.copy : [];
+  const html = [head + checklistScenarioChoiceHtml(copy) + '</div>'];
+  if (!list.length) {
+    html.push('<div style="font-size:12px">None to copy.</div>');
+  } else if (copy) {
+    const items = checklistList(list.map(checklistScenarioLine));
+    html.push(`<details style="font-size:12px"><summary style="cursor:pointer">Copied (${checklistCount(list)}): each trip on the first train set, or a journey of as many legs, as Copy scenarios proposes. The copies are yours and in no run list.</summary>${items}</details>`);
+  } else {
+    html.push(`<div style="font-size:12px">${checklistCount(list)} could be copied; none will be.</div>`);
+  }
+  const there = Array.isArray(sc.alreadyThere) ? sc.alreadyThere : [];
+  if (there.length) html.push(`<div style="font-size:12px">Already in the data file, left as they are: ${checklistCount(there)}.</div>`);
+  const notDeclared = Array.isArray(sc.notDeclared) ? sc.notDeclared : [];
+  if (notDeclared.length) {
+    const items = checklistList(notDeclared.map(n => n.code + ' needs ' + (Array.isArray(n.missing) ? n.missing.join(', ') : '')));
+    html.push(`<details style="font-size:12px;color:#7a4f01"><summary style="cursor:pointer">Not copied, the Test Framework does not declare what they need (${checklistCount(notDeclared)})</summary>${items}</details>`);
+  }
+  const noJourney = Array.isArray(sc.noJourney) ? sc.noJourney : [];
+  if (noJourney.length) {
+    const items = checklistList(noJourney.map(n => n.code + ': no journey of ' + (Array.isArray(n.legs) ? n.legs.join(' or ') : '') + ' legs'));
+    html.push(`<details style="font-size:12px;color:#7a4f01"><summary style="cursor:pointer">Not copied, no journey of as many legs in the Test Data (${checklistCount(noJourney)})</summary>${items}</details>`);
+  }
+  const noTestData = Array.isArray(sc.noTestData) ? sc.noTestData : [];
+  if (noTestData.length) html.push(`<div style="font-size:12px;color:#7a4f01">Not copied, no train set in the Test Data: ${checklistCount(noTestData)}.</div>`);
+  return html.join('');
+}
+
 /** What applying a checklist would change, with the buttons to decide. */
 function checklistPreviewHtml(p) {
   if (!p?.import) return '';
@@ -155,6 +200,7 @@ function checklistPreviewHtml(p) {
     checklistAnswersHtml(p.answerChanges),
     checklistFrameworkHtml(p.framework || {}),
     checklistTestDataHtml(p.testData || {}, p),
+    checklistScenariosHtml(p.scenarios),
   ];
   if (p.import.status === 'waiting') {
     parts.push(`<div style="margin-top:10px;display:flex;gap:8px">
@@ -197,14 +243,15 @@ function checklistIdOf(value) {
     const { imports } = await res.json();
     box.innerHTML = checklistBoxHtml(imports);
     const waiting = (imports || []).find(i => i.status === 'waiting');
-    if (waiting) await loadPreview(waiting.id, 'add');
+    if (waiting) await loadPreview(waiting.id, 'add', 'copy');
   }
 
-  async function loadPreview(value, mode) {
+  async function loadPreview(value, mode, choice) {
     const id = checklistIdOf(value);
     if (id === null) return;
     const testData = mode === 'replace' ? 'replace' : 'add';
-    const res = await fetch(`/v1/company/checklists/${id}/preview?testData=${testData}`);
+    const scenarios = choice === 'none' ? 'none' : 'copy';
+    const res = await fetch(`/v1/company/checklists/${id}/preview?testData=${testData}&scenarios=${scenarios}`);
     if (!res.ok) { oscarToast(await detailOf(res, 'The preview could not be made.'), 'error'); return; }
     showPreview(await res.json());
   }
@@ -222,12 +269,15 @@ function checklistIdOf(value) {
   async function apply() {
     if (!current) return;
     const mode = current.testData?.mode || 'add';
+    const choice = current.scenarios?.choice === 'none' ? 'none' : 'copy';
     const removing = mode === 'replace' ? '\n\nThe trains and journeys now in the Test Data are removed first.' : '';
-    if (!confirm(`Apply this checklist to the Test Framework and the Test Data, as shown?${removing}\n\nThe scenarios, the endpoint and the credentials are not changed.`)) return;
+    const copying = choice === 'copy' ? checklistCount(current.scenarios?.copy) : 0;
+    const scenariosLine = copying ? `\n\n${copying} reference scenario(s) are copied into the data file, in no run list.` : '\n\nNo scenario is copied.';
+    if (!confirm(`Apply this checklist to the Test Framework and the Test Data, as shown?${removing}${scenariosLine}\n\nThe endpoint and the credentials are not changed.`)) return;
     const id = checklistIdOf(current.import.id);
     if (id === null) return;
     const res = await fetch(`/v1/company/checklists/${id}/apply`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash: current.hash, testData: mode }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash: current.hash, testData: mode, scenarios: choice }),
     });
     if (res.status === 409) {
       const body = await res.json().catch(() => ({}));
@@ -236,7 +286,14 @@ function checklistIdOf(value) {
       return;
     }
     if (!res.ok) { oscarToast(await detailOf(res, 'The checklist could not be applied.'), 'error'); return; }
-    oscarToastAfterNav('The checklist is applied to the Test Framework and the Test Data.', 'success');
+    const outcome = (await res.json().catch(() => ({}))).scenarios || {};
+    if (outcome.error) {
+      oscarToastAfterNav(`The checklist is applied to the Test Framework and the Test Data. ${outcome.error}`, 'error');
+    } else {
+      const copied = checklistCount(outcome.copied);
+      const scenariosText = copied ? ` ${copied} reference scenario(s) copied.` : '';
+      oscarToastAfterNav(`The checklist is applied to the Test Framework and the Test Data.${scenariosText}`, 'success');
+    }
     window.location.reload();
   }
 
@@ -255,7 +312,9 @@ function checklistIdOf(value) {
     const input = e.target.closest('[data-checklist-action="import"]');
     if (input?.files?.[0]) importFile(input.files[0]).catch(report);
     const mode = e.target.closest('[data-checklist-action="mode"]');
-    if (mode && current) loadPreview(current.import.id, mode.value).catch(report);
+    if (mode && current) loadPreview(current.import.id, mode.value, current.scenarios?.choice).catch(report);
+    const scenarios = e.target.closest('[data-checklist-action="scenarios"]');
+    if (scenarios && current) loadPreview(current.import.id, current.testData?.mode, scenarios.value).catch(report);
   });
   box.addEventListener('click', (e) => {
     if (e.target.closest('[data-checklist-action="apply"]')) apply().catch(report);

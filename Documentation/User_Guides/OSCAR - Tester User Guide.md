@@ -354,7 +354,17 @@ for the simulator. Choose the provider in **Working on**, then in
   it, and whether it was applied or discarded. OSCAR keeps the answers,
   encrypted, never the API and contact answers, and not the file itself.
   The checklist applied is also the one the AI analysis is told about (§2.4).
-- The scenarios, the endpoint and the credentials are not changed.
+- **Reference scenarios** (since 1.11.349). The preview also lists the
+  reference scenarios of the catalogue that the new Test Framework declares
+  everything for. With **copy them** (the default), applying copies them into
+  the data file as **Copy scenarios** would: each trip on the first train set,
+  or on a journey of as many legs. The copies are yours, not shared, and in
+  no run list: tick them to run them. The list says what is left to complete
+  in a scenario, and which scenarios are not copied and why (not declared, no
+  journey of as many legs, no train set). A scenario whose code the data file
+  already holds is left as it is, so the next checklist copies only the new
+  ones. **do not copy** applies the framework and the Test Data only.
+- The endpoint and the credentials are not changed.
 
 ### 3.1 Test Framework (capabilities)
 
