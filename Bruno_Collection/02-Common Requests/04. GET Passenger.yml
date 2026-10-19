@@ -23,9 +23,20 @@ runtime:
         require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         const totalPassengers = bru.getEnvVar("offerPassengerNumber") || 0;
-        const currentIndex    = bru.getEnvVar("currentPassengerIndex") || 0;
+        let currentIndex      = bru.getEnvVar("currentPassengerIndex") || 0;
 
         if (currentIndex >= totalPassengers) return;
+
+        // #881: a passenger the booking does not hold has no id: leave it out
+        // (one WARNING) rather than read …/passengers/undefined.
+        currentIndex = require(bru.getEnvVar("library_base") + "passengerSteps.js").choosePassenger("read", currentIndex);
+        if (currentIndex < 0) {
+            // None left: the run goes on to 05, the next request.
+            // skipRequest() must be the last bru call: it clears the bru context.
+            bru.runner.skipRequest();
+            return;
+        }
+        bru.setEnvVar("currentPassengerIndex", currentIndex);
 
         const passengerIdList            = bru.getEnvVar("passengerIdList");
         const passengerAdditionalData    = JSON.parse(bru.getEnvVar("passengerAdditionalData") || "[]");
@@ -146,7 +157,9 @@ runtime:
 
         patchMultiPassengerResponse(jsonData, currentIndex);
 
-        currentIndex++;
+        // #881: the next passenger the booking holds (-1 when none is left).
+        currentIndex = require(bru.getEnvVar("library_base") + "passengerSteps.js").choosePassenger("read", currentIndex + 1);
+        if (currentIndex < 0) currentIndex = totalPassengers;
         bru.setEnvVar("currentPassengerIndex", currentIndex);
 
         if (currentIndex < totalPassengers) {
