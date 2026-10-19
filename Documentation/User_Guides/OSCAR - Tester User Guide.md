@@ -1336,15 +1336,16 @@ that OSCAR sees them. Its installation is in
 [OSCAR - OSDM Simulator](../Server_Operations/OSCAR%20-%20OSDM%20Simulator.md);
 this section is how a Test Manager uses it.
 
-### 9.1 The three simulated providers
+### 9.1 The simulated providers
 
 | Provider | OSDM version | Endpoint |
 |---|---|---|
 | `alpha` | 3.6.0 | `https://<simulator-host>/alpha` |
 | `beta` | 3.7.0 | `https://<simulator-host>/beta` |
 | `gamma` | 3.8.0 | `https://<simulator-host>/gamma` |
+| `delta` | 3.9.0 | `https://<simulator-host>/delta` |
 
-All three offer the same functions; each answers in the shapes of its own
+All of them offer the same functions; each answers in the shapes of its own
 OSDM version. Ask your OSCAR administrator for the simulator's address and
 for a client id and secret per tester (the simulator keeps them in its
 `clients.json`).

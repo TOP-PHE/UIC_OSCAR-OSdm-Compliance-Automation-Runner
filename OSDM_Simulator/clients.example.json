@@ -10,5 +10,9 @@
   "gamma": [
     { "client_id": "gamma.tstmgr01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" },
     { "client_id": "gamma.tst01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
+  ],
+  "delta": [
+    { "client_id": "delta.tstmgr01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" },
+    { "client_id": "delta.tst01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
   ]
 }

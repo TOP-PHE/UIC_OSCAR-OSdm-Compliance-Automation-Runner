@@ -10,7 +10,7 @@ http://www.apache.org/licenses/LICENSE-2.0
 /**
  * Generates Bruno_Collection/data_base/reference/simulator-<provider>.json
  * (#838): the reference configuration of each simulated provider (alpha,
- * beta, gamma), which companies testing the simulator are updated from.
+ * beta, gamma, delta), which companies testing the simulator are updated from.
  *
  *   cd Oscar_Server && node scripts/generate-reference-configurations.js
  *

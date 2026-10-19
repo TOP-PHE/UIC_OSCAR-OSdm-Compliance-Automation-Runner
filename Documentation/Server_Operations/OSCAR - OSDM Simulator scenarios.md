@@ -14,7 +14,7 @@ row in the same change as the scenario.
 
 - **Provider.** The suffix of the code names the OSDM version and so the
   provider to run it against: `_36` → `alpha` (3.6.0), `_37` → `beta`
-  (3.7.0), `_38` → `gamma` (3.8.0). Since #824 every function is on all three (a COMBINED return excepted on `alpha`: OSDM 3.6 has no `outboundTripIds`).
+  (3.7.0), `_38` → `gamma` (3.8.0), `_39` → `delta` (3.9.0, #858). Since #824 every function is on all of them (a COMBINED return excepted on `alpha`: OSDM 3.6 has no `outboundTripIds`).
   Run a scenario against another provider and it tests something else, or
   fails.
 - **Expected result.** Every scenario passes with **no failed check**. A
@@ -77,6 +77,23 @@ defines from 3.7.
 | `SIM_RETURN_COMBINED_1ADT_37` | A return in one offer: the inbound request names the outbound trip (`outboundTripIds`); the offer chosen covers both trips and is booked alone. | Offers covering both trips at a return price; one booking, one ticket per direction. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_RETURN_1ADT_37` | As `SIM_REFUND_RETURN_1ADT_36`, in 3.7. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_INBOUND_1ADT_37` | As `SIM_REFUND_INBOUND_1ADT_36`, in 3.7. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
+
+## delta — OSDM 3.9.0
+
+The same scenarios as `beta` (#858). OSDM 3.9 changed no request or answer
+schema OSCAR sends or reads; its one change is that the search date-times are
+`format: date-time` (with an offset), which OSCAR does not send yet: the
+OSDM working group is asked first. `delta` accepts both forms, as `gamma`
+does.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_SALE_SEARCH_1ADT_39` | As `SIM_SALE_SEARCH_1ADT_36`, in 3.9. | As on `alpha`, in PLN. | No failed check. |
+| `SIM_SALE_SEARCH_2ADT_SAVER_39` | As `SIM_SALE_SEARCH_2ADT_SAVER_36`, in 3.9. | As on `alpha`, in PLN. | No failed check. |
+| `SIM_RETURN_SEPARATE_1ADT_39` | As `SIM_RETURN_SEPARATE_1ADT_37`, in 3.9. | As on `alpha`, in PLN. | No failed check; the two merged-PDF warnings. |
+| `SIM_RETURN_COMBINED_1ADT_39` | As `SIM_RETURN_COMBINED_1ADT_37`, in 3.9. | As on `beta`, in PLN. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_RETURN_1ADT_39` | As `SIM_REFUND_RETURN_1ADT_36`, in 3.9. | As on `alpha`, in PLN. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_INBOUND_1ADT_39` | As `SIM_REFUND_INBOUND_1ADT_36`, in 3.9. | As on `alpha`, in PLN. | No failed check; the two merged-PDF warnings. |
 
 ## gamma — OSDM 3.8.0
 

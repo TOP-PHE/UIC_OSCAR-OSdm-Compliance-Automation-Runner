@@ -53,7 +53,7 @@ test('started with a clients file, it listens where told and serves a token', as
     body: 'grant_type=client_credentials',
   });
   assert.equal(res.status, 200);
-  assert.match(lines[0], /listening on 127\.0\.0\.1:\d+, providers: alpha, beta, gamma$/);
+  assert.match(lines[0], /listening on 127\.0\.0\.1:\d+, providers: alpha, beta, delta, gamma$/);
   assert.ok(lines[0].startsWith(`OSDM simulator ${require('../package.json').version} listening`), lines[0]);
   const tokenLine = lines.find((line) => line.includes('/alpha/oauth/token'));
   assert.match(tokenLine, /POST \/alpha\/oauth\/token 200 \d+ms provider=alpha client=alpha-one$/);
@@ -168,15 +168,15 @@ test('a clients file is written with random secrets the simulator accepts, and i
   const file = path.join(tempDir(), 'clients.json');
   const created = makeClients.writeClientsFile(file, providers, { managers: 3, testers: 3 });
   const written = JSON.parse(fs.readFileSync(file, 'utf8'));
-  assert.deepEqual(Object.keys(written), ['alpha', 'beta', 'gamma']);
-  for (const key of ['alpha', 'beta', 'gamma']) {
+  assert.deepEqual(Object.keys(written), ['alpha', 'beta', 'delta', 'gamma']);
+  for (const key of ['alpha', 'beta', 'delta', 'gamma']) {
     const ids = written[key].map((c) => c.client_id);
     assert.deepEqual(ids, [`${key}.tstmgr01`, `${key}.tstmgr02`, `${key}.tstmgr03`, `${key}.tst01`, `${key}.tst02`, `${key}.tst03`]);
     assert.deepEqual(created[key], ids);
   }
   const secrets = Object.values(written).flat().map((c) => c.client_secret);
-  assert.equal(secrets.length, 18);
-  assert.equal(new Set(secrets).size, 18);
+  assert.equal(secrets.length, 24);
+  assert.equal(new Set(secrets).size, 24);
   for (const secret of secrets) assert.match(secret, /^[0-9a-f]{64}$/);
   const loaded = loadClients(file, providers);
   assert.deepEqual([...loaded.get('beta').keys()], written.beta.map((c) => c.client_id));

@@ -10,19 +10,20 @@ This page is about installing it and pointing a company at it.
 
 ## 1. What you get
 
-One server that plays three providers, told apart by the first part of the path:
+One server that plays four providers, told apart by the first part of the path:
 
 | Provider | Endpoint to give OSCAR | Currency | OSDM version | Token lifetime |
 |---|---|---|---|---|
 | `alpha` | `https://<simulator-host>/alpha` | EUR | 3.6.0 | 1 hour |
 | `beta` | `https://<simulator-host>/beta` | CHF | 3.7.0 | 2 minutes |
 | `gamma` | `https://<simulator-host>/gamma` | CZK | 3.8.0 | 15 minutes |
+| `delta` | `https://<simulator-host>/delta` | PLN | 3.9.0 | 30 minutes |
 
 Each provider answers in the shapes of its own version (#833): `alpha` gives
-OSDM 3.6 answers, `beta` 3.7, `gamma` 3.8. Below 3.8, for example, a
+OSDM 3.6 answers, `beta` 3.7, `gamma` 3.8, `delta` 3.9 (#858; 3.9 changed no answer schema, so `delta` answers as `gamma` does). Below 3.8, for example, a
 fulfilment holds its documents instead of naming them, and below 3.7 an
 offer has no `inboundTripCoverage`. The simulator's tests check every answer
-against the OSDM response schema of the provider's version. Since #824 the three providers offer the same functions (exchange,
+against the OSDM response schema of the provider's version. Since #824 the providers offer the same functions (exchange,
 reservations and place selection, products and reduction cards, trip ids,
 documents, idempotency, the checks behind the negative tests…), so every
 reference scenario of the catalogue can be copied for and run on any of them.
@@ -242,7 +243,7 @@ The same data file runs without OSCAR too, with Bruno on a PC: see
 [Run standalone](../../Bruno_Collection/README.md#run-standalone) in the
 collection's README.
 
-The data file works unchanged on the three providers. A scenario of another
+The data file works unchanged on every provider. A scenario of another
 version also runs, with a warning from the version check: the scenario asks for
 one version and the provider reports another.
 

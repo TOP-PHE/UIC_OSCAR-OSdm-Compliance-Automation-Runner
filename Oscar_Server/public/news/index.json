@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-simulator-delta",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "A fourth simulated provider on OSDM 3.9",
+    "summary": "The OSDM simulator has a provider delta on OSDM 3.9.0 (PLN), with its scenarios, checklist and reference configuration.",
+    "content": "delta has every function of the other simulated providers. Link a company to the reference simulator-delta in Test Config to set it up in one step."
+  },
+  {
     "id": "2026-10-19-osdm-39-spec",
     "date": "October 19, 2026",
     "tag": "Improvement",
