@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-undeclared-option-probe",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "A probe for what the provider does not take",
+    "summary": "A reference scenario now asks for an offer search option your Test Framework leaves out, and checks that the provider refuses it or says it ignored it.",
+    "content": "If every offer keeps to the value, the provider takes it after all: the probe fails and tells you to declare it in the Test Framework."
+  },
+  {
     "id": "2026-10-19-trip-search-parameters",
     "date": "October 19, 2026",
     "tag": "New",

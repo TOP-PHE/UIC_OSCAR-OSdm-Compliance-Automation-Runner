@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.392",
+  "current_release": "2026.393",
   "releases": [
+    {
+      "release": "2026.393",
+      "date": "2026-10-19",
+      "server": "1.11.358",
+      "collection": "OTST_V2.0.193",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Undeclared option probe (#780 PR C): reference scenario OTST_OFFER_OPTION_NOT_DECLARED asks for the first offer search option value the Test Framework's lists leave out; a refusal, no offer or PARAMETER_NOT_SUPPORTED pass, offers keeping to the value fail."
+      ]
+    },
     {
       "release": "2026.392",
       "date": "2026-10-19",

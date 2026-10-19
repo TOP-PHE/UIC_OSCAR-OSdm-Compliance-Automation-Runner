@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.358 / collection-OTST_V2.0.193] — 2026-10-19 · Release 2026.393
+
+Issue #780 (PR C, the last of the remaining work). A probe asks on purpose for an offer search option value the Test Framework leaves out. No simulator change.
+
+### Added
+- **Reference scenario `OTST_OFFER_OPTION_NOT_DECLARED`** (`probe` `OFFER_OPTION_NOT_DECLARED`): at copy time it asks for the first value an explicit list of the Test Framework leaves out, in the order travel class, service class, offer part, flexibility, product tag (`undeclaredOptionValue()`; the offer mode is not asked, OTST_V2.0.193ECTIVE needs a group). Not copiable when no list leaves a value out. 70 checks on the simulator.
+- **The probe at step 01** (`offerOptionExpectRejection`, `library-bruno/optionNotDeclared.js`), graded as the currency probe (#781): a refusal is graded as one (501 = not supported, a WARNING); no offer, or the member said ignored (PARAMETER_NOT_SUPPORTED), pass; offers keeping to the value fail (the provider takes it, so the framework should declare it); offers not keeping to it with nothing said pass with a WARNING. The scenario ends after the offer. A scenario so armed gets no `offerOption:` warning.
+- **Simulator scenarios**: `SIM_OFFER_PROBE_NOT_DECLARED_38` (service class BEST, which gamma does not sell: no offer, no failed check) and `SIM_WRONG_OFFER_PROBE_NOT_DECLARED_SOLD_38` (first class, which gamma sells: one failed check on purpose).
+
+### Not in this release
+- Nothing more is planned under #780: product tags and selections (1.11.356), trip search parameters (1.11.357) and this probe close it.
+
+---
+
 ## [server-1.11.357 / collection-OTST_V2.0.192] — 2026-10-19 · Release 2026.392
 
 Issue #780 (PR B of the remaining work). Simulator 0.40.0. The Test Framework declares the trip search parameters a provider takes, and every run checks the trips against those it sent.

@@ -247,7 +247,7 @@ describe('#780 part 2: the catalogue makes one probe per declared value', () => 
   const catalogue = JSON.parse(fs.readFileSync(path.join(DATA, 'scenario_catalogue.json'), 'utf8'));
   const simulator = JSON.parse(fs.readFileSync(path.join(DATA, 'simulator_datafile.json'), 'utf8'));
   const FW = { salesFlows: ['SALE'], passengerTypes: ['ADULT'] };
-  const probes = (fw) => catalogueFor(catalogue, simulator, fw).filter((e) => e.code.startsWith('OTST_OFFER_') && !e.code.startsWith('OTST_OFFER_COMBO') && e.code !== 'OTST_OFFER_OPTION_COMBINATIONS');
+  const probes = (fw) => catalogueFor(catalogue, simulator, fw).filter((e) => e.code.startsWith('OTST_OFFER_') && !e.code.startsWith('OTST_OFFER_COMBO') && e.code !== 'OTST_OFFER_OPTION_COMBINATIONS' && e.code !== 'OTST_OFFER_OPTION_NOT_DECLARED');
 
   test('the values worth a probe: declared lists only, without ALL, FARE_*, ANY_CLASS or COLLECTIVE', () => {
     expect(declaredOptionValues({}).map((o) => o.value)).toEqual([]);

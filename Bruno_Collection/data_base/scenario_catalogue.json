@@ -767,6 +767,17 @@
       }
     },
     {
+      "code": "OTST_OFFER_OPTION_NOT_DECLARED",
+      "source": "SIM_OFFER_PROBE_NOT_DECLARED_38",
+      "purpose": "Undeclared option probe: offers asked with an offer search option value the Test Framework's lists leave out (the first of travel class, service class, offer part, flexibility, product tag); a refusal, no offer, or the provider saying it ignored it pass, offers keeping to the value fail (the framework should declare it). The scenario ends after the offer.",
+      "checks": 70,
+      "probe": "OFFER_OPTION_NOT_DECLARED",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
       "code": "OTST_SALE_CURRENCY",
       "source": "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38",
       "purpose": "Sale in each currency the Test Framework declares, then a full refund: offers, booking and refund offers all in the currency asked.",
