@@ -62,6 +62,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.355 / collection-OTST_V2.0.190] — 2026-10-19 · Release 2026.390
+
+Issue #858 (the plan's PRs 3 and 4, one PR because the simulator's tests read the data file). Simulator 0.38.0. A fourth simulated provider, `delta`, on OSDM 3.9.0, with its scenarios, checklist and reference configuration.
+
+### Simulator 0.38.0
+- **`delta`**: OSDM 3.9.0, PLN (EUR when asked), identifiers `DELTA-…`, carrier `urn:x_osdm_simulator:carrier:delta`, UTC+01:00, 30-minute tokens.
+  - It has every function of gamma, with the same values (the #824 rule; `config.test.js` pins it).
+  - It answers in the 3.8 shapes, as 3.9 changed no answer schema.
+- `clients.example.json`, the replay (`_39` → delta) and the tests know delta.
+- **On the simulator host**, `clients.json` gets no delta client by itself: an existing file is never replaced. Add delta's clients by hand (section 7 of *OSCAR - OSDM Simulator*). Until then delta answers 401.
+
+### Added
+- **Six `_39` scenarios** in `simulator_datafile.json`: the same small set as beta's (sale, two-adult saver, separate and combined return, full refund, inbound refund).
+  - Run with `bru` on delta, each gives the same number of checks as its `_37` twin (234, 294, 314, 356, 527 and 455), with no failure.
+  - Each has its row in *OSCAR - OSDM Simulator scenarios*.
+- **The set-up checklist offers OSDM 3.9** (question A1.2). The public checklist and the four simulator checklists are regenerated; delta's is new.
+- **The reference configuration `simulator-delta`** (#838), generated from delta's checklist, its profile and the data file. Its run list is the six `_39` scenarios. Test Config's reference box lists it.
+- Documents: the simulator page, *What is tested* (provider table) and the Tester User Guide (§9.1).
+
+### Not in this release
+- Sending the search date-times with an offset from 3.9 (#858, PR 2 of the plan). It waits for the OSDM working group's answer, because the specification contradicts itself: the format says UTC offset, the description says local time.
+
+---
+
 ## [server-1.11.354 / collection-OTST_V2.0.189] — 2026-10-19 · Release 2026.389
 
 Issue #858 (the plan's PR 1). OSCAR knows the OSDM 3.9.0 specification.

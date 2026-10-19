@@ -20,7 +20,7 @@
  */
 
 // The provider of a scenario: its code ends in its OSDM version.
-const PROVIDER_OF_VERSION = { 36: 'alpha', 37: 'beta', 38: 'gamma' };
+const PROVIDER_OF_VERSION = { 36: 'alpha', 37: 'beta', 38: 'gamma', 39: 'delta' };
 
 function providerOf(code) {
   const match = /_(\d{2})$/.exec(String(code));
@@ -30,7 +30,7 @@ function providerOf(code) {
 // Each pattern stands for a value that differs between two runs.
 const VOLATILE = [
   [/\b[A-Z]{2,12}-[A-Z]{2,4}-[0-9a-f]{12,32}\b/g, '<id>'],
-  [/\b(?:alpha|beta|gamma)\.[a-z0-9.]+\b/g, '<client>'],
+  [/\b(?:alpha|beta|gamma|delta)\.[a-z0-9.]+\b/g, '<client>'],
   [/\b[A-Z]{2,12}[0-9A-F]{6}\b/g, '<code>'],
   [/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}[\d:.]*(?:Z|[+-]\d{2}:\d{2})?/g, '<instant>'],
   [/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d{3})?\b/g, '<instant>'],

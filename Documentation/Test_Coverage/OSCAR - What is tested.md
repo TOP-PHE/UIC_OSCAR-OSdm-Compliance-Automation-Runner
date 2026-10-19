@@ -57,38 +57,38 @@ them.
   the company's Test Framework does not declare is greyed out and cannot be
   copied (the golden rule).
 
-## 2. The simulator: three providers
+## 2. The simulator: four providers
 
 The simulator is a stub OSDM provider. It builds a trip from the request
 (no timetable: the same request gives the same trip and prices) and answers
 in the shapes of each provider's own OSDM version (#833: before, every
-provider answered in 3.8 shapes). Since #824 the three providers offer the
-same functions; they differ by their OSDM version, their currency, their
+provider answered in 3.8 shapes). Since #824 the providers offer the
+same functions (`delta`, OSDM 3.9, since #858); they differ by their OSDM version, their currency, their
 identifiers and their token lifetime:
 
-| | `alpha` | `beta` | `gamma` |
-|---|---|---|---|
-| OSDM version reported | 3.6.0 | 3.7.0 | 3.8.0 |
-| Currency | EUR, and CHF when asked | CHF, and EUR when asked | CZK, and EUR when asked |
-| Identifiers | `ALPHA-…` | `BETA-…` | `GAMMA-…` |
-| Token lifetime | one hour | two minutes (a long run renews its token) | 15 minutes |
-| Offers, booking, passengers, purchaser, confirmation, refund | yes | yes | yes |
-| Return in two offers (`outwardOfferIds`) | yes | yes | yes |
-| Return in one offer (`outboundTripIds`) | — (not in OSDM 3.6) | yes | yes |
-| Overrule codes on a refund: four codes, any other refused | yes | yes | yes |
-| Named products, group products, reduction cards | yes | yes | yes |
-| Two-leg trips with a second-class-only train, upgrade parts | yes | yes | yes |
-| Mandatory and optional seat reservations, place preferences, place map | yes | yes | yes |
-| `POST /trips-collection` and offers by trip id | yes | yes | yes |
-| Fulfilment documents, `GET /fulfillments/{id}`, refund receipt | yes | yes | yes |
-| `Idempotency-Key` | yes | yes | yes |
-| Exchange | yes | yes | yes |
-| Expiry after 60 s for trips from station 0000099 | yes | yes | yes |
-| Response variants, deliberately wrong answers | yes | yes | yes |
-| Requested information and passenger data checks, sales horizon, age tariffs | yes | yes | yes |
+| | `alpha` | `beta` | `gamma` | `delta` |
+|---|---|---|---|---|
+| OSDM version reported | 3.6.0 | 3.7.0 | 3.8.0 | 3.9.0 |
+| Currency | EUR, and CHF when asked | CHF, and EUR when asked | CZK, and EUR when asked | PLN, and EUR when asked |
+| Identifiers | `ALPHA-…` | `BETA-…` | `GAMMA-…` | `DELTA-…` |
+| Token lifetime | one hour | two minutes (a long run renews its token) | 15 minutes | 30 minutes |
+| Offers, booking, passengers, purchaser, confirmation, refund | yes | yes | yes | yes |
+| Return in two offers (`outwardOfferIds`) | yes | yes | yes | yes |
+| Return in one offer (`outboundTripIds`) | — (not in OSDM 3.6) | yes | yes | yes |
+| Overrule codes on a refund: four codes, any other refused | yes | yes | yes | yes |
+| Named products, group products, reduction cards | yes | yes | yes | yes |
+| Two-leg trips with a second-class-only train, upgrade parts | yes | yes | yes | yes |
+| Mandatory and optional seat reservations, place preferences, place map | yes | yes | yes | yes |
+| `POST /trips-collection` and offers by trip id | yes | yes | yes | yes |
+| Fulfilment documents, `GET /fulfillments/{id}`, refund receipt | yes | yes | yes | yes |
+| `Idempotency-Key` | yes | yes | yes | yes |
+| Exchange | yes | yes | yes | yes |
+| Expiry after 60 s for trips from station 0000099 | yes | yes | yes | yes |
+| Response variants, deliberately wrong answers | yes | yes | yes | yes |
+| Requested information and passenger data checks, sales horizon, age tariffs | yes | yes | yes | yes |
 
-Every new function goes to all three providers: a test of the simulator
-(`config.test.js`) fails when `alpha` or `beta` lacks a setting `gamma` has.
+Every new function goes to every provider: a test of the simulator
+(`config.test.js`) fails when `alpha`, `beta` or `delta` lacks a setting `gamma` has.
 Every reference scenario of the catalogue can therefore be copied for, and
 run on, each of them; the one exception is a return in one offer on `alpha`,
 which OSDM 3.6 does not have. The "not implemented by this provider" path (a

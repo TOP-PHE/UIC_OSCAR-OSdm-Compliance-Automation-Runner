@@ -2016,7 +2016,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Test Manager, then `PATCH /v1/company`, `PATCH /v1/me/credentials`,
     `PUT /v1/company/datafile/json`, `POST /v1/runs`.
   - **One OSDM version per provider** (#614): `alpha` 3.6.0, `beta` 3.7.0,
-    `gamma` 3.8.0. **OSCAR knows OSDM 3.9.0** (#858, 1.11.354): the repository's
+    `gamma` 3.8.0, `delta` 3.9.0 (#858, 1.11.355 / simulator 0.38.0: PLN,
+    30-minute tokens, beta's six sale scenarios as `_39`, reference
+    `simulator-delta`; the checklist's A1.2 offers 3.9, from the generator in
+    the private repository: a new version there regenerates the public
+    checklist and the four simulator ones, then
+    `generate-reference-configurations.js`). **OSCAR knows OSDM 3.9.0** (#858, 1.11.354): the repository's
     3.9 file is gh-pages' `…v3.9.0.bundled.yml` renamed, and the three
     generators (request, response, references) produce 3.9 from it. 3.9
     changed no schema OSCAR sends or reads (the generated 3.9 sets equal

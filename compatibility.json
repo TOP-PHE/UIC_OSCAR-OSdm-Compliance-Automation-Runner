@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.389",
+  "current_release": "2026.390",
   "releases": [
+    {
+      "release": "2026.390",
+      "date": "2026-10-19",
+      "server": "1.11.355",
+      "collection": "OTST_V2.0.190",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Simulator delta on OSDM 3.9.0 (#858 PR 2, simulator 0.38.0): six _39 scenarios, the checklist offers 3.9, reference configuration simulator-delta."
+      ]
+    },
     {
       "release": "2026.389",
       "date": "2026-10-19",

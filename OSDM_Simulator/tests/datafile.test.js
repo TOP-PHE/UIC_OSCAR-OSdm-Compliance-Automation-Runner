@@ -78,7 +78,8 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_CURRENCY_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE', 'SIM_SALE_NAMED_', 'SIM_SALE_NEARBY_', 'SIM_OFFER_PROBE_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
-    if (version === '3.7.0') expected = everyVersion;
+    // delta (3.9, #858) runs beta's small set: 3.9 changed no schema OSCAR sends or reads.
+    if (version === '3.7.0' || version === '3.9.0') expected = everyVersion;
     if (version === '3.6.0') expected = everyVersion.filter((s) => s !== combined);
     assert.deepEqual(sales, expected, version);
   }
@@ -95,7 +96,7 @@ test('the return scenarios name a model their version defines, and expect a tick
   // A card or a product on a return, the card and product tests.
   const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null && s.scenarioType === 'SALE'
     && !['SIM_GROUP_', 'SIM_SALE_DOCUMENTS_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_'].some((prefix) => s.code.startsWith(prefix)));
-  assert.equal(returns.length, 5);
+  assert.equal(returns.length, 7);
   for (const scenario of returns) {
     const model = scenario.offerSearchCriteria.returnModel;
     assert.ok(scenario.code.startsWith(`SIM_RETURN_${model}_`), scenario.code);
@@ -142,7 +143,7 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
     && !BY_SCOPE.has(s.code));
   // Some providers sell a return only as one offer: the SIM_REFUND_COMBINED_ ones refund that.
   // #781: SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38 is the full refund of a return sold in EUR.
-  assert.equal(refunds.length, 17);
+  assert.equal(refunds.length, 19);
   for (const scenario of refunds) {
     assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
     assert.equal(scenario.offerSearchCriteria.returnModel === 'COMBINED', scenario.code.startsWith('SIM_REFUND_COMBINED_'), scenario.code);

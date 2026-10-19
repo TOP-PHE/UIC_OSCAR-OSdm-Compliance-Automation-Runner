@@ -134,7 +134,7 @@ test('no token, a made-up token or a token past its lifetime is refused', async 
 
 test('an unknown provider is a 404, with or without a token', async () => {
   const token = await tokenFor(sim.base, 'alpha', alphaOne);
-  for (const url of ['/delta/versions', '/delta/oauth/token', '/', '/alpha-/versions']) {
+  for (const url of ['/epsilon/versions', '/epsilon/oauth/token', '/', '/alpha-/versions']) {
     assert.equal((await call(sim.base, token, 'GET', url)).status, 404, url);
   }
 });

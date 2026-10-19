@@ -37,7 +37,7 @@ const { CONFIGURATION_KEY, CONFIGURATION_FORMAT } = require('./configurationBund
 
 const REFERENCE_KEY = '__oscarReference';
 const REFERENCE_FORMAT = 1;
-const PROVIDERS = Object.freeze(['alpha', 'beta', 'gamma']);
+const PROVIDERS = Object.freeze(['alpha', 'beta', 'gamma', 'delta']);
 const DATAFILE_NAME = 'simulator_datafile.json';
 const referenceName = provider => `simulator-${provider}`;
 

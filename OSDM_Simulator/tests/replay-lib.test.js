@@ -17,7 +17,8 @@ test('the provider of a scenario is the one of its version', () => {
   assert.equal(providerOf('SIM_SALE_SEARCH_1ADT_36'), 'alpha');
   assert.equal(providerOf('SIM_RETURN_COMBINED_1ADT_37'), 'beta');
   assert.equal(providerOf('SIM_EXCHANGE_1ADT_38'), 'gamma');
-  assert.equal(providerOf('SIM_X_39'), null);
+  assert.equal(providerOf('SIM_SALE_SEARCH_1ADT_39'), 'delta');
+  assert.equal(providerOf('SIM_X_40'), null);
   assert.equal(providerOf('SIM_X'), null);
 });
 
