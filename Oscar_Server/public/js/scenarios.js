@@ -3836,6 +3836,13 @@ function changeOfferCombination(action, el) {
 const FW_STEP_FLAGS = { 'fw-passenger-update': 'passengerUpdate', 'fw-purchaser-after-booking': 'purchaserAfterBooking' };
 
 function changePassengerUpdate(action, el) {
+  // #885: only the main passenger can be updated (absent = every passenger).
+  if (action === 'fw-passenger-update-main') {
+    if (el.checked) wizData.framework.passengerUpdateScope = 'MAIN';
+    else delete wizData.framework.passengerUpdateScope;
+    saveFrameworkDebounced();
+    return true;
+  }
   const key = Object.hasOwn(FW_STEP_FLAGS, action) ? FW_STEP_FLAGS[action] : null;
   if (!key) return false;
   if (el.checked) delete wizData.framework[key];
@@ -4677,6 +4684,11 @@ function renderWizardStep1() {
           The provider lets a booked passenger be updated (PATCH /bookings/{id}/passengers/{id})
         </label>
         <div style="font-size:11px;color:#90a4ae;margin-top:4px;line-height:1.5">Off: no scenario updates its passengers when it runs (step 03 is skipped, with a warning), and the copies of the catalogue do not either.</div>
+        <label class="fw-subsection-label" for="fw-passenger-update-main" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;margin-top:8px">
+          <input type="checkbox" id="fw-passenger-update-main" data-action="fw-passenger-update-main" ${fw.passengerUpdateScope === 'MAIN' ? 'checked' : ''}>
+          Only the first (main) passenger can be updated
+        </label>
+        <div style="font-size:11px;color:#90a4ae;margin-top:4px;line-height:1.5">On: every scenario updates the main passenger only when it runs (one that asks for every passenger is warned), and the copies of the catalogue do the same. Some providers refuse the others with 400 BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE.</div>
       </div>
       <div class="fw-subsection">
         <label class="fw-subsection-label" for="fw-purchaser-after-booking" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0">

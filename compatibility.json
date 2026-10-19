@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.395",
+  "current_release": "2026.396",
   "releases": [
+    {
+      "release": "2026.396",
+      "date": "2026-10-19",
+      "server": "1.11.361",
+      "collection": "OTST_V2.0.196",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Framework: \"Only the first (main) passenger can be updated\" (passengerUpdateScope MAIN), applied to the run's copy and the catalogue copies, and read from checklist question A3.5 (#885)."
+      ]
+    },
     {
       "release": "2026.395",
       "date": "2026-10-19",

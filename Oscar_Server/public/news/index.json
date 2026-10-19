@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-main-passenger-update",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Providers that let only the main passenger be updated",
+    "summary": "The Test Framework can now say that only the first passenger of a booking can be updated.",
+    "content": "Under Passenger Types, tick \"Only the first (main) passenger can be updated\": every scenario then updates that passenger only. Importing a provider's filled checklist sets it from question A3.5."
+  },
+  {
     "id": "2026-10-19-refund-one-per-fulfillment",
     "date": "October 19, 2026",
     "tag": "Fix",

@@ -1886,7 +1886,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   scenario at 03 and nothing after the booking was tested. Its twin
   `purchaserAfterBooking: false` (same section) refuses the catalogue's
   late-purchaser entry (`missingFor()`) and warns `bookingPurchaserMode:
-  deferred`. **A trip specification leg without an operator code is sent
+  deferred`. **Only the main passenger** (#885, 1.11.361):
+  `passengerUpdateScope: 'MAIN'` (absent = every one; ignored when
+  `passengerUpdate` is false, `mainPassengerOnly()`) makes the run's copy and
+  the catalogue copies set the scenario's `passengerUpdateScope` MAIN; a
+  scenario naming ALL itself is warned `passengerUpdateScope`. Checklist A3.5
+  stays a `data.*` tag: `frameworkFromChecklist()` reads it apart
+  (`withPassengerUpdateScope()`), MAIN / NONE / ALL, no tick = unchanged.
+  **A trip specification leg without an operator code is sent
   without `carriers`** (OSDM requires a `ref`; `[{}]` was refused as a whole
   request), with a failed check and an `[ERROR]` only then, so other runs
   keep their check counts; the simulator's specification trips name gamma's
