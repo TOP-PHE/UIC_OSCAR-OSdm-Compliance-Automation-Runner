@@ -62,6 +62,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.346 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.381
+
+Issue #862 (PR 1). A provider's filled set-up checklist sets up its Test Framework and Test Data, each import kept with its date and every change validated. Collection unchanged.
+
+### Added
+- **Test Config › 📋 Provider checklist** (Test Managers, per company or provider):
+  - import a filled checklist (.docx);
+  - read what applying it would change;
+  - apply it after a confirmation, or discard it.
+- **Every import is kept with its date** (migration 40, `checklist_import`): the answers encrypted (never the API and contact answers, as for #827), the file name, sha256, who imported it, and whether it was applied or discarded. The file itself is not kept.
+- **An import changes nothing.** The preview is set against the checklist applied before, else the one imported for the AI analysis. It shows:
+  - the answers that changed, question by question;
+  - the Test Framework values that change (now / after);
+  - the trains and journeys added, already there, or removed (replace);
+  - what could not be built from the checklist.
+- **Applying needs the preview's hash.** If the Test Framework or the Test Data changed since, the answer is 409 with the new preview, and nothing is changed. The framework and the Test Data are written in one transaction, and the checklist becomes the one the AI analysis is told about.
+- **Framework:** the current one, with each answered question placed over it by the rules of the simulator's references (#838). What the checklist does not ask keeps its value. Other modes and another OSDM version are placed; anything else OSCAR cannot declare is listed.
+- **Test Data:**
+  - a train set per route of each service sheet: stations, services, days, ticket type, classes, accommodations, product category and operator;
+  - a journey per combination of Part C that is sold, on those trains;
+  - station codes of 7 or 8 digits;
+  - times with the UTC offset of the station's country (the collection's table, pinned by a test).
+- Routes `GET/POST /v1/company/checklists`, `GET …/{id}/preview`, `POST …/{id}/apply`, `POST …/{id}/discard`.
+- User guide § 3.0.
+
+### Default decisions (taken without asking)
+- **The file is not kept**, only its answers: it holds the contact details and API answers OSCAR never stores. The sha256 names the exact file.
+- **One checklist waits at a time.** A new import sets aside the one waiting.
+- **Test Data are added by default.** "Replace them" removes the trains and journeys first, shown in the preview.
+- **Times of a station without a 7-digit UIC code keep no offset**, as the collection only moves an offset its zone uses (#772). The preview says how many.
+
+---
+
 ## [server-1.11.345 / collection-OTST_V2.0.188] — 2026-10-18 · Release 2026.380
 
 Issue #528, the last part of the Sonar clean-up (#523). `Bruno_Collection/library-bruno` rewritten rule by rule, with no change in what a run checks or reports. Server unchanged but for the version.

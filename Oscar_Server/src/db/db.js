@@ -865,6 +865,28 @@ const MIGRATIONS = [
                  FROM ai_config a JOIN companies c ON c.id = a.company_id
                 WHERE c.parent_id IS NOT NULL`);
   }},
+  { version: 40, name: 'checklist-import', up: () => {
+      // #862 - every provider checklist imported in Test Config, kept with
+      // its date: its answers (encrypted; never the api.* and meta.* ones),
+      // the file's name and sha256, and what became of it. An import changes
+      // nothing until a Test Manager applies it; applying writes the Test
+      // Framework and the Test Data, and makes it the provider_checklist the
+      // AI analysis is told about.
+      db.exec(`CREATE TABLE IF NOT EXISTS checklist_import (
+        id            TEXT PRIMARY KEY,
+        company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        answers_enc   TEXT NOT NULL,
+        answer_count  INTEGER NOT NULL,
+        file_name     TEXT,
+        file_sha256   TEXT NOT NULL,
+        imported_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
+        imported_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        status        TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'applied', 'discarded')),
+        decided_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
+        decided_at    TEXT
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_checklist_import_company ON checklist_import(company_id, imported_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

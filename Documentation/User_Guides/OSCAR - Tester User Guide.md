@@ -322,6 +322,40 @@ supports, and the **trains/journeys** to test against. Scenarios (§4) are then
 authored *on top of* this. Plain testers (`company_user`) consume this setup —
 the train/journey/discovery edit controls are hidden from them.
 
+### 3.0 Starting from the provider's checklist (since 1.11.346)
+
+When the provider has filled in the set-up checklist (`OSCAR_Test_Config_Checklist.docx`),
+OSCAR can set up the Test Framework and the Test Data from it, as it does
+for the simulator. Choose the provider in **Working on**, then in
+**Test Config → 📋 Provider checklist** pick the filled `.docx`.
+
+- **Importing changes nothing.** The box shows what applying the checklist
+  would change:
+  - the answers that changed since the checklist applied before, question by
+    question;
+  - each Test Framework setting that would change (now / after);
+  - the trains and journeys the Test Data would gain, those already there,
+    and, if you choose **replace them**, those removed.
+- **Apply these changes** asks for a confirmation, then writes exactly what
+  was shown. If someone changed the Test Framework or the Test Data in the
+  meantime, OSCAR shows the new preview instead and changes nothing.
+  **Discard this checklist** sets it aside.
+- **What comes from where:**
+  - Part A (the `fw.` answers) gives the Test Framework. Settings the
+    checklist does not ask, such as random combinations, keep their value.
+    Answers OSCAR cannot declare (another ancillary, a ferry) are listed for
+    you to handle by hand.
+  - Each service sheet of Part B gives a train set per route, with its
+    services, days, ticket type, classes and accommodations.
+  - Each journey sold in Part C gives a journey on those trains.
+  - Times get the UTC offset of the station's country. A station without a
+    7-digit UIC code keeps its local time, and the box says so.
+- **Every import is kept with its date** (list *Imports kept*): who imported
+  it, and whether it was applied or discarded. OSCAR keeps the answers,
+  encrypted, never the API and contact answers, and not the file itself.
+  The checklist applied is also the one the AI analysis is told about (§2.4).
+- The scenarios, the endpoint and the credentials are not changed.
+
 ### 3.1 Test Framework (capabilities)
 
 The framework tells OSCAR **what the vendor can do**. It does **not** run

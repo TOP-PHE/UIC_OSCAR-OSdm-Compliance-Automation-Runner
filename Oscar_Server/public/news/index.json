@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-provider-checklist",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Set up a provider from its checklist",
+    "summary": "Import a provider's filled checklist in Test Config: OSCAR shows what it would change in the Test Framework and the Test Data, and applies it when you confirm.",
+    "content": "Test Config › Provider checklist takes the filled .docx. Nothing changes on import: you see the answers changed since the last checklist, the framework settings that change and the trains and journeys added, then apply or discard. Every import is kept with its date."
+  },
+  {
     "id": "2026-10-18-sonar-library",
     "date": "October 18, 2026",
     "tag": "Quality",
