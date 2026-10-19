@@ -189,7 +189,12 @@ describe('the host scripts write it', () => {
 
 describe('the Admin Dashboard panel', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'admin-dashboard.html'), 'utf8');
-  const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('#572'));
+  // The page's inline script that draws the panel: the text between the
+  // opening tag before the #572 marker and the closing tag after it.
+  const marker = html.indexOf('// #572');
+  const open = '<script>';
+  const start = html.lastIndexOf(open, marker) + open.length;
+  const script = marker < 0 ? undefined : html.slice(start, html.indexOf('</' + 'script>', marker));
 
   test('it writes text only, and offers nothing but reading', () => {
     expect(script).toBeDefined();

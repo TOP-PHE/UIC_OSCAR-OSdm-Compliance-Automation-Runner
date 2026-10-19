@@ -61,13 +61,18 @@ function viewOf(raw, now = new Date()) {
 
 /** Read the file: { state: 'none' } when there is none yet. */
 function readBackupStatus({ file = statusPath(), now = new Date() } = {}) {
-  let stat;
-  try { stat = fs.statSync(file); } catch { return { state: 'none' }; }
-  if (!stat.isFile() || stat.size > MAX_BYTES) return { state: 'unreadable' };
+  // One open file, checked and read through the same descriptor, so what is
+  // read is what was checked (the scripts replace the file by a rename).
+  let fd;
+  try { fd = fs.openSync(file, 'r'); } catch { return { state: 'none' }; }
   try {
-    return viewOf(JSON.parse(fs.readFileSync(file, 'utf8')), now);
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > MAX_BYTES) return { state: 'unreadable' };
+    return viewOf(JSON.parse(fs.readFileSync(fd, 'utf8')), now);
   } catch {
     return { state: 'unreadable' };
+  } finally {
+    fs.closeSync(fd);
   }
 }
 
