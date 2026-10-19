@@ -166,7 +166,8 @@ function makeDistinct(p, n) {
  * #704: a sales-horizon entry departs on the horizon's last day, or the day after.
  * #705: the age entry gets a passenger list of its own, on the edges of the
  * framework's age ranges. #709: with `passengerUpdate: false` in the framework,
- * no scenario updates its passengers. #748: an entry sent as a trip
+ * no scenario updates its passengers; #885: with `passengerUpdateScope:
+ * 'MAIN'`, the main passenger only. #748: an entry sent as a trip
  * specification (`tripAs`) gets a trip of its own, of one leg; #759: one
  * sent by trip id keeps its search trip and asks by `offersByTripIds`.
  */
@@ -200,6 +201,9 @@ function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
     if (fw.passengerUpdate === false && isObj(scenario.salesFlowActions)) {
       scenario.salesFlowActions = { ...scenario.salesFlowActions, patchPassengers: false };
     }
+    // #885: one that updates only the main passenger, that one.
+    const steps = require('./undeclaredSteps');
+    if (steps.mainPassengerOnly(fw) && steps.updatesPassengers(scenario)) scenario.passengerUpdateScope = 'MAIN';
     notes[sc.code] = { toComplete, toCheck };
     return scenario;
   });

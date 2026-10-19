@@ -1810,6 +1810,9 @@ function featureNotDeclaredWarning(scenario, field) {
   if (field === 'passengerUpdate') {
     return `[WARNING] Scenario "${scenario.code}" updates its passengers, but the Test Framework says the provider does not (Passenger Types). Step 03 is skipped in this run. Turn the passenger update off on the scenario to silence this warning.`;
   }
+  if (field === 'passengerUpdateScope') {
+    return `[WARNING] Scenario "${scenario.code}" updates every passenger, but the Test Framework says the provider lets only the main passenger be updated (Passenger Types). Step 03 updates the main passenger only in this run. Set the scenario's Passengers updated to MAIN to silence this warning.`;
+  }
   if (field === 'purchaserAfterBooking') {
     return `[WARNING] Scenario "${scenario.code}" writes its purchaser after the booking (bookingPurchaserMode deferred), but the Test Framework says the provider does not take it (Passenger Types). The run will proceed; the provider may refuse POST /bookings/{id}/purchaser.`;
   }

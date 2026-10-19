@@ -62,6 +62,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.361 / collection-OTST_V2.0.196] — 2026-10-19 · Release 2026.396
+
+Issue #885, from a real provider's catalogue run. No simulator change.
+
+### Added
+- **Test Framework › Passenger Types › "Only the first (main) passenger can be updated"** (`passengerUpdateScope: 'MAIN'`; absent = every passenger, as before). A real provider refuses an update of any other passenger (400 `BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE`), and nine reference scenarios with two passengers failed at step 03.
+  - **The run's copy** updates the main passenger only, in every scenario that updates its passengers (`withoutUndeclaredPassengerUpdate()`, `utils/undeclaredSteps.js`, as #809 does for no update at all). A scenario that asks for every passenger itself is warned (`passengerUpdateScope`) and runs with the main one.
+  - **The catalogue's copies** get `passengerUpdateScope: MAIN` too (`adaptCatalogueDatafile()`).
+  - **A checklist import reads question A3.5** (`data.passengerUpdateScope`, #862) into the framework: MAIN sets the box, NONE turns the passenger update off, ALL clears both. Before, the answer was read nowhere. The checklist's annex row says so; the public and simulator checklists are regenerated (annex text only; the reference configurations do not change).
+
+---
+
 ## [server-1.11.360 / collection-OTST_V2.0.195] — 2026-10-19 · Release 2026.395
 
 Issue #883, from a real provider's catalogue run. Simulator 0.41.0.

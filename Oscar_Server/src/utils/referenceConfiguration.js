@@ -162,7 +162,24 @@ function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) 
   }
   const modes = framework.placeSelection?.supportedModes;
   if (Array.isArray(modes)) framework.placeSelection.seatMap = modes.includes('SEATMAP_AT_OFFER');
+  withPassengerUpdateScope(framework, answers);
   return framework;
+}
+
+/**
+ * #885: question A3.5 (`data.passengerUpdateScope`, one tick) says which
+ * booked passengers can be updated. MAIN = the main one only
+ * (`passengerUpdateScope`), NONE = none (`passengerUpdate: false`), ALL =
+ * every one, which is what neither key says. No tick leaves the framework as
+ * it is.
+ */
+function withPassengerUpdateScope(framework, answers) {
+  const ticked = ['ALL', 'MAIN', 'NONE'].find((code) => answers?.[`data.passengerUpdateScope=${code}`] === true);
+  if (!ticked) return;
+  delete framework.passengerUpdate;
+  delete framework.passengerUpdateScope;
+  if (ticked === 'MAIN') framework.passengerUpdateScope = 'MAIN';
+  if (ticked === 'NONE') framework.passengerUpdate = false;
 }
 
 // ── Test Data ────────────────────────────────────────────────────────────────
