@@ -85,6 +85,10 @@ const OFFER_OPTION_PROBES = [
   { key: 'travelClasses', field: 'travelClass', values: ['FIRST', 'SECOND'], code: 'TRAVEL_CLASS', member: 'travelClasses' },
   { key: 'serviceClassTypes', field: 'serviceClass', values: ['BEST', 'HIGH', 'STANDARD', 'BASIC'], code: 'SERVICE_CLASS', member: 'serviceClassTypes' },
   { key: 'flexibilities', field: 'flexibilities', values: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'], code: 'FLEXIBILITY', member: 'flexibilities' },
+  // #780 PR A: the tags a one-way sale can hold (passes, multi-ride, cards and
+  // lost-ticket products are not sold on a trip). Not combined: the
+  // combinations drawn before it came stay the same for a seed.
+  { key: 'productTags', field: 'productTags', values: ['ADMISSION_POINT2POINT', 'UPGRADE_POINT2POINT', 'RESERVATION', 'SPLIT_RESERVATION', 'ANCILLARY_SERVICE', 'ANCILLARY_ITEM'], code: 'PRODUCT_TAG', member: 'productTags', combine: false },
 ];
 // The keys of `needs` (#681), in the order dataNeedsOf() writes them.
 const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
@@ -470,7 +474,7 @@ function offerCombinationProbes(entry, fw) {
   const settings = combinationSettings(fw);
   if (!settings) return [{ ...entry, missing: [...entry.missing, 'the number of random combinations and their seed (Offer search options)'] }];
   const values = declaredOptionValues(fw);
-  const options = OFFER_OPTION_PROBES.map((p) => ({
+  const options = OFFER_OPTION_PROBES.filter((p) => p.combine !== false).map((p) => ({
     key: p.key, values: values.filter((v) => v.key === p.key).map((v) => v.value),
     ...(p.key === 'travelClasses' || p.key === 'serviceClassTypes' ? { group: 'class' } : {}),
   }));

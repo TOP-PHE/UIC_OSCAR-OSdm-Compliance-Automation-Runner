@@ -249,6 +249,8 @@ Each asks for offers with one option of the offer search criteria alone (`offerS
 | `SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38` | `requestedOfferParts` `ADMISSION`. | The usual offers: admissions, with their reservation where the train has one. | No failed check. |
 | `SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38` | `offerMode` `INDIVIDUAL`. | Individual offers. | No failed check. |
 | `SIM_OFFER_PROBE_COMBINATION_38` | Three options together (#780 part 3): `travelClasses` `FIRST`, `offerMode` `INDIVIDUAL`, `requestedOfferParts` `ADMISSION`; the source of the catalogue's random combinations. | First-class individual offers. | No failed check. |
+| `SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38` | `productTags` `ADMISSION_POINT2POINT` (#780 PR A). | The usual offers, each product tagged by its type (`productTags`). | No failed check. |
+| `SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38` | `productSelections` with `productTag` `ADMISSION_POINT2POINT`. | The offers holding a product of that tag: all of them. | No failed check. |
 
 ### Currencies (#781)
 
@@ -347,6 +349,7 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 | `SIM_WRONG_NAMED_PLACE_38` | Variant `gives-other-place` (passenger list 24) on trip 16, a free seat named (#766). Deliberately wrong. | The booking gives the next seat instead of the one named. | One failed check at 07: the booked reservation does not give the place named. |
 | `SIM_WRONG_OFFER_PROBE_IGNORED_38` | Offer search probe (#780), first class asked from station `0000090` (`variants.ignoresOfferOptionsFrom`, trip 19). | The offer search criteria are ignored: second class only. | One failed check at 01: no offer keeps to the travel class asked. |
 | `SIM_WRONG_OFFER_PROBE_RESERVATION_ONLY_38` | Offer search probe (#780), reservations only asked (`requestedOfferParts` `RESERVATION`). | Gamma sells nothing without an admission: the usual offers, and a `PARAMETER_NOT_SUPPORTED` problem naming `offerSearchCriteria.requestedOfferParts`. | One failed check at 01: the provider says it ignored the option. |
+| `SIM_WRONG_OFFER_PROBE_PRODUCT_TAG_PASS_38` | Offer search probe (#780 PR A), passes asked (`productTags` `ADMISSION_PASS`). | Gamma sells no pass: the usual offers, and a `PARAMETER_NOT_SUPPORTED` problem naming `offerSearchCriteria.productTags`. | One failed check at 01: the provider says it ignored the option. |
 | `SIM_WRONG_CURRENCY_DEFAULT_38` | No currency asked; the scenario expects EUR as the default (`expectedCurrency`). Deliberately wrong. | Offers in gamma's default, CZK. | One failed check at 01: the offers are not in the currency expected. |
 
 ### Injected faults (#833)

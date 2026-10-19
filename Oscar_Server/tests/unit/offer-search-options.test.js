@@ -169,7 +169,7 @@ describe('server: the framework declares the options', () => {
 
   test('the values a scenario sends, by framework key', () => {
     expect(offerSearchOptionsOf({ offerSearchCriteria: { offerMode: 'COLLECTIVE', requestedOfferParts: ['ADMISSION', 'ADMISSION', ''], travelClass: ['FIRST'], serviceClass: null } }, {})).toEqual({
-      offerModes: ['COLLECTIVE'], requestedOfferParts: ['ADMISSION'], travelClasses: ['FIRST'], serviceClassTypes: [],
+      offerModes: ['COLLECTIVE'], requestedOfferParts: ['ADMISSION'], travelClasses: ['FIRST'], serviceClassTypes: [], productTags: [], productSelections: [],
     });
   });
 
@@ -230,7 +230,7 @@ describe('the Test Framework page', () => {
     const esc = (v) => String(v);
     const html = lift('offerSearchOptionsPanelHtml', { FW_OFFER_SEARCH_OPTIONS, fwOfferSearchOptionDeclared: declared, esc, offerCombinationsHtml: () => '', currenciesHtml: () => '' })({ offerSearchOptions: { offerModes: ['INDIVIDUAL'] } });
     expect(html).toContain('data-key="offerModes" data-val="INDIVIDUAL"');
-    expect((html.match(/class="pill selected"/g) || []).length).toBe(1 + 8 + 3 + 5);
+    expect((html.match(/class="pill selected"/g) || []).length).toBe(1 + 8 + 3 + 5 + 13 + 2);
     expect(page).toContain('${offerSearchOptionsPanelHtml(fw)}');
     expect(page).toContain("case 'fw-offer-search-option':");
   });
@@ -461,5 +461,56 @@ describe('#780 part 3: the Test Framework page', () => {
     expect(page).toContain("if (action !== 'fw-offer-combinations') return false;");
     expect(page).toContain('|| changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;');
     expect(page).toContain("case 'fw-offer-combinations-new-seed': {");
+  });
+});
+
+// ── #780 PR A: product tags and product selections ──────────────────────────
+
+describe('#780 PR A: product tags and product selections', () => {
+  test('the framework: tags from the OSDM list, selections by code or by tag; a scenario\'s selections read as their forms', () => {
+    expect(OFFER_SEARCH_OPTIONS.productTags.values).toEqual(expect.arrayContaining(['ADMISSION_POINT2POINT', 'RESERVATION', 'SPLIT_RESERVATION', 'TICKET_LOST']));
+    expect(OFFER_SEARCH_OPTIONS.productTags.values).toHaveLength(13);
+    expect(OFFER_SEARCH_OPTIONS.productSelections.values).toEqual(['PRODUCT_CODE', 'PRODUCT_TAG']);
+    const sc = { offerSearchCriteria: { productTags: ['RESERVATION', ' '], productSelections: [{ productCode: 'P1' }, { productTag: 'RESERVATION' }, { productCode: 'P2' }, {}, null, 'x'] } };
+    expect(offerSearchOptionsOf(sc, {})).toMatchObject({ productTags: ['RESERVATION'], productSelections: ['PRODUCT_CODE', 'PRODUCT_TAG'] });
+    expect(offerSearchOptionsOf({ offerSearchCriteria: { productSelections: 'PRODUCT_CODE' } }, {}).productSelections).toEqual([]);
+  });
+
+  test('the run\'s data file warns for a tag or a selection form not declared', () => {
+    const df = { scenarios: [{ code: 'A', offerSearchCriteria: { productTags: ['RESERVATION', 'ADMISSION_PASS'], productSelections: [{ productCode: 'P1' }] } }] };
+    annotateDatafile(df, { offerSearchOptions: { productTags: ['RESERVATION'], productSelections: ['PRODUCT_TAG'] } });
+    expect(df.scenarios[0].__featureNotDeclaredWarnings).toEqual(['offerOption:productTags=ADMISSION_PASS', 'offerOption:productSelections=PRODUCT_CODE']);
+  });
+
+  test('the collection: one check per selection, kept by code, type or tag; none a warning; ignored a warning', () => {
+    const offers = { offers: [offer('O1', { type: 'ADMISSION_POINT2POINT' }), offer('O2', { type: 'ADMISSION', tags: ['SPECIAL'] })] };
+    offers.offers[0].products[0].code = 'P1';
+    const checks = checkOfferCriteria({ productSelections: [{ productCode: 'P1', numberOfItems: 1 }, { productTag: 'SPECIAL' }, { productTag: 'ADMISSION_POINT2POINT' }, { productCode: 'NOPE' }, {}] }, offers);
+    expect(checks.map((c) => [c.name, c.ok, c.level])).toEqual([
+      ['Offer request: an offer holds the product selected (product code P1)', true, 'warn'],
+      ['Offer request: an offer holds the product selected (product tag SPECIAL)', true, 'warn'],
+      ['Offer request: an offer holds the product selected (product tag ADMISSION_POINT2POINT)', true, 'warn'],
+      ['Offer request: an offer holds the product selected (product code NOPE)', false, 'warn'],
+    ]);
+    expect(checks[3].message).toBe('none of the 2 offer(s) holds it');
+    const ignored = checkOfferCriteria({ productSelections: [{ productCode: 'P1' }] }, offers, ['productselections']);
+    expect(ignored[0]).toMatchObject({ ok: false, level: 'warn' });
+    expect(ignored[0].message).toMatch(/PARAMETER_NOT_SUPPORTED/);
+    expect(checkOfferCriteria({ productSelections: [{ productCode: 'P1' }] }, { offers: [] })).toEqual([]);
+  });
+
+  test('the catalogue probes each declared tag a trip can hold, never in a combination', () => {
+    const DATA = path.join(LIB, '..', 'data_base');
+    const catalogue = JSON.parse(fs.readFileSync(path.join(DATA, 'scenario_catalogue.json'), 'utf8'));
+    const simulator = JSON.parse(fs.readFileSync(path.join(DATA, 'simulator_datafile.json'), 'utf8'));
+    const fw = { salesFlows: ['SALE'], passengerTypes: ['ADULT'], offerSearchOptions: { productTags: ['ADMISSION_PASS', 'RESERVATION', 'ADMISSION_POINT2POINT'] } };
+    expect(declaredOptionValues(fw).map((o) => o.value)).toEqual(['ADMISSION_POINT2POINT', 'RESERVATION']);
+    const entries = catalogueFor(catalogue, simulator, fw);
+    expect(entries.filter((e) => e.variantOf === 'OTST_OFFER_OPTION_PROBE').map((e) => e.code)).toEqual(['OTST_OFFER_PRODUCT_TAG_ADMISSION_POINT2POINT', 'OTST_OFFER_PRODUCT_TAG_RESERVATION']);
+    const { datafile } = adaptCatalogueDatafile(catalogueDatafile(catalogue, simulator), entries, fw);
+    expect(datafile.scenarios.find((s) => s.code === 'OTST_OFFER_PRODUCT_TAG_RESERVATION').offerSearchCriteria.productTags).toEqual(['RESERVATION']);
+    // Tags alone give nothing to combine.
+    const combos = catalogueFor(catalogue, simulator, { ...fw, offerSearchOptions: { ...fw.offerSearchOptions, travelClasses: ['FIRST'] }, offerCombinations: { count: 3, seed: 7 } });
+    expect(combos.find((e) => e.code === 'OTST_OFFER_OPTION_COMBINATIONS').missing.join()).toMatch(/two offer search options/);
   });
 });

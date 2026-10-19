@@ -13,7 +13,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { buildOfferCollection } = require('../src/osdm/offers');
-const { PROVIDERS_DIR, loadAllProviders, offerRequest } = require('./helpers');
+const { PROVIDERS_DIR, SECRETS, loadAllProviders, offerRequest, startSimulator, tokenFor, call } = require('./helpers');
 
 const providers = loadAllProviders();
 const gamma = providers.get('gamma');
@@ -73,4 +73,61 @@ test('the variant stop place is optional in a provider profile, and must be text
   assert.equal(checkProvider('gamma', withVariants({ wrongOffersFrom: 'x' })).variants.ignoresOfferOptionsFrom, undefined);
   assert.equal(checkProvider('gamma', withVariants({ wrongOffersFrom: 'x', ignoresOfferOptionsFrom: 'y' })).variants.ignoresOfferOptionsFrom, 'y');
   assert.throws(() => checkProvider('gamma', withVariants({ wrongOffersFrom: 'x', ignoresOfferOptionsFrom: 3 })), /variants/);
+});
+
+// #780 PR A: product tags and product selections.
+const productsOf = (response) => response.offers.flatMap((o) => o.products);
+const types = (response) => [...new Set(productsOf(response).map((p) => p.type))].sort();
+
+test('product tags: offers holding a product of the tag, each product tagged; nothing tagged without the member', () => {
+  const plainAnswer = answer(undefined);
+  assert.ok(productsOf(plainAnswer).every((p) => p.productTags === undefined));
+  const admissions = answer({ productTags: ['ADMISSION_POINT2POINT'] });
+  assert.equal(admissions.offers.length, plainAnswer.offers.length);
+  assert.equal(admissions.problems, undefined);
+  for (const p of productsOf(admissions)) {
+    if (p.type === 'ADMISSION') assert.deepEqual(p.productTags, ['ADMISSION_POINT2POINT']);
+  }
+  // No upgrade on this trip: no offer.
+  assert.equal(answer({ productTags: ['UPGRADE_POINT2POINT'] }).offers.length, 0);
+  // Only tags it does not sell: offers as without it, and the member ignored.
+  const pass = answer({ productTags: ['ADMISSION_PASS'] });
+  assert.equal(pass.offers.length, plainAnswer.offers.length);
+  assert.deepEqual(pass.problems.map((p) => p.pointers[0].requestPointer), ['/offerSearchCriteria/productTags']);
+  assert.deepEqual(types(pass), types(plainAnswer));
+});
+
+test('product selections: by product code, by tag, or ignored when neither is sold', () => {
+  const plainAnswer = answer(undefined);
+  const code = plainAnswer.offers[0].products[0].code;
+  const byCode = answer({ productSelections: [{ productCode: code, numberOfItems: 1 }] });
+  assert.ok(byCode.offers.length > 0 && byCode.offers.length < plainAnswer.offers.length);
+  assert.ok(byCode.offers.every((o) => o.products.some((p) => p.code === code)));
+  assert.equal(byCode.problems, undefined);
+  assert.equal(answer({ productSelections: [{ productTag: 'ADMISSION_POINT2POINT' }] }).offers.length, plainAnswer.offers.length);
+  const unknown = answer({ productSelections: [{ productCode: 'NOPE' }] });
+  assert.equal(unknown.offers.length, plainAnswer.offers.length);
+  assert.deepEqual(unknown.problems.map((p) => p.pointers[0].requestPointer), ['/offerSearchCriteria/productSelections']);
+});
+
+test('product tags and selections are read on every provider, and not from the ignoring stop place', () => {
+  for (const key of ['alpha', 'beta', 'gamma', 'delta']) {
+    assert.equal(answer({ productTags: ['UPGRADE_POINT2POINT'] }, { provider: providers.get(key) }).offers.length, 0, key);
+  }
+  const from = gamma.variants.ignoresOfferOptionsFrom;
+  assert.ok(answer({ productTags: ['UPGRADE_POINT2POINT'] }, { from }).offers.length > 0);
+});
+
+test('an answer with tagged products conforms to each provider\'s OSDM version', async () => {
+  const sim = await startSimulator();
+  try {
+    for (const key of ['alpha', 'beta', 'gamma', 'delta']) {
+      const token = await tokenFor(sim.base, key, SECRETS[key][0]);
+      const res = await call(sim.base, token, 'POST', `/${key}/offers`, offerRequest({ offerSearchCriteria: { productTags: ['ADMISSION_POINT2POINT'], productSelections: [{ productTag: 'RESERVATION' }] } }));
+      assert.equal(res.status, 200, key);
+      assert.ok(res.body.offers.flatMap((o) => o.products).some((p) => Array.isArray(p.productTags)), key);
+    }
+  } finally {
+    await sim.close();
+  }
 });

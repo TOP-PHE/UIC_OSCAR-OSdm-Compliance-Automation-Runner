@@ -347,6 +347,8 @@ const FW_OFFER_SEARCH_OPTIONS = [
   ['requestedOfferParts', 'Offer parts (requestedOfferParts)', ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL']],
   ['travelClasses', 'Travel classes (travelClasses)', ['FIRST', 'SECOND', 'ANY_CLASS']],
   ['serviceClassTypes', 'Service classes (serviceClassTypes)', ['BEST', 'HIGH', 'STANDARD', 'BASIC', 'ANY_CLASS']],
+  ['productTags', 'Product tags (productTags)', ['ADMISSION_POINT2POINT', 'ADMISSION_MULTI_RIDE', 'ADMISSION_PASS', 'UPGRADE_POINT2POINT', 'UPGRADE_MULTI_RIDE', 'UPGRADE_PASS', 'RESERVATION', 'SPLIT_RESERVATION', 'ANCILLARY_SERVICE', 'ANCILLARY_ITEM', 'REDUCTION_CARD', 'CARD_LOST', 'TICKET_LOST']],
+  ['productSelections', 'Product selections by (productSelections)', ['PRODUCT_CODE', 'PRODUCT_TAG']],
 ];
 
 // #780: no list declared for an option means every value.
@@ -3560,7 +3562,7 @@ function buildOfferSection(idx, sc) {
     <div class="param-grid" style="padding:8px 14px 4px">
       <div class="param-field">
         <span class="param-label">Product Tags <span class="param-hint">(optional) — comma-separated tag list</span></span>
-        <input class="param-input" type="text" value="${esc((criteria.productTags||[]).join(', '))}" placeholder="e.g. SEAT_ONLY, SLEEPER"
+        <input class="param-input" type="text" value="${esc((criteria.productTags||[]).join(', '))}" placeholder="e.g. RESERVATION, ADMISSION_POINT2POINT"
           data-action="set-offer-tags" data-idx="${esc(idx)}">
       </div>
       <div class="param-field">

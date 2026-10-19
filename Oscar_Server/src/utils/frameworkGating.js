@@ -94,11 +94,31 @@ const PLACE_SELECTION_TEXT = Object.freeze({
 // per OSDM OfferSearchCriteria member, the values it supports. A key absent =
 // every value (frameworks from before 1.11.306); [] = none. `field` is the
 // member of a scenario's offerSearchCriteria that holds it.
+const PRODUCT_TAGS = Object.freeze(['ADMISSION_POINT2POINT', 'ADMISSION_MULTI_RIDE', 'ADMISSION_PASS', 'UPGRADE_POINT2POINT',
+  'UPGRADE_MULTI_RIDE', 'UPGRADE_PASS', 'RESERVATION', 'SPLIT_RESERVATION', 'ANCILLARY_SERVICE', 'ANCILLARY_ITEM',
+  'REDUCTION_CARD', 'CARD_LOST', 'TICKET_LOST']);
+
+// #780 PR A: the forms of a scenario's productSelections entries.
+function selectionForms(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  const forms = [];
+  for (const s of list) {
+    if (typeof s?.productCode === 'string' && s.productCode.trim() !== '') forms.push('PRODUCT_CODE');
+    else if (typeof s?.productTag === 'string' && s.productTag.trim() !== '') forms.push('PRODUCT_TAG');
+  }
+  return forms;
+}
+
 const OFFER_SEARCH_OPTIONS = Object.freeze({
   offerModes: { member: 'offerMode', field: 'offerMode', values: ['INDIVIDUAL', 'COLLECTIVE'] },
   requestedOfferParts: { member: 'requestedOfferParts', field: 'requestedOfferParts', values: ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL'] },
   travelClasses: { member: 'travelClasses', field: 'travelClass', values: ['FIRST', 'SECOND', 'ANY_CLASS'] },
   serviceClassTypes: { member: 'serviceClassTypes', field: 'serviceClass', values: ['BEST', 'HIGH', 'STANDARD', 'BASIC', 'ANY_CLASS'] },
+  // #780 PR A: the OSDM ProductTag list (extensible: a tag outside it is not
+  // declarable, and warns as not declared only when a list is declared).
+  productTags: { member: 'productTags', field: 'productTags', values: PRODUCT_TAGS },
+  // How products are selected: an entry naming a productCode, or a productTag.
+  productSelections: { member: 'productSelections', field: 'productSelections', values: ['PRODUCT_CODE', 'PRODUCT_TAG'], valuesOf: selectionForms },
 });
 
 module.exports = {
@@ -246,9 +266,10 @@ function scenarioOfferCriteria(scenario, datafile) {
 function offerSearchOptionsOf(scenario, datafile) {
   const criteria = scenarioOfferCriteria(scenario, datafile) || {};
   const out = {};
-  for (const [key, { field }] of Object.entries(OFFER_SEARCH_OPTIONS)) {
+  for (const [key, { field, valuesOf }] of Object.entries(OFFER_SEARCH_OPTIONS)) {
     const raw = criteria[field];
-    const list = Array.isArray(raw) ? raw : [raw];
+    let list = Array.isArray(raw) ? raw : [raw];
+    if (valuesOf) list = valuesOf(raw);
     out[key] = [...new Set(list.filter((v) => typeof v === 'string' && v.trim() !== '').map((v) => v.trim()))];
   }
   return out;
