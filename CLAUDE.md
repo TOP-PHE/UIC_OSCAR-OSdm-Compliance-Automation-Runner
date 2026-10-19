@@ -207,6 +207,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     same seed, the same combinations. Two or more options, one value each,
     never travel and service class together (`group`). A new seed comes from
     `crypto.getRandomValues`, never `Math.random`.
+    **PR A of the rest (1.11.356): product tags and selections.**
+    `offerSearchOptions.productTags` (OSDM's 13 ProductTag values) and
+    `productSelections` (`PRODUCT_CODE` / `PRODUCT_TAG`: an option's
+    `valuesOf` reads a scenario's entries as their forms). After 01, one
+    check per selection (`selectionChecks()` in `offerCriteria.js`). Probes
+    `OTST_OFFER_PRODUCT_TAG_<TAG>` for the tags a trip can hold; tags have
+    `combine: false`, so a seed draws the same combinations as before.
+    Simulator 0.39.0 (`productSelection.js`): tags by product type, written
+    only in answers to such a request; nothing sold for what was asked =
+    the usual offers + PARAMETER_NOT_SUPPORTED. `requiresPlaceSelection` is
+    not OSDM (#766 covers it). PRs B (trip search parameters) and C (a probe
+    with an undeclared value) are next.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`

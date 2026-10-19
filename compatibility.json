@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.390",
+  "current_release": "2026.391",
   "releases": [
+    {
+      "release": "2026.391",
+      "date": "2026-10-19",
+      "server": "1.11.356",
+      "collection": "OTST_V2.0.191",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Offer search options, product tags and product selections (#780 PR A, simulator 0.39.0): declared in the Test Framework, warned when not declared, checked after 01, probed one tag at a time by the catalogue."
+      ]
+    },
     {
       "release": "2026.390",
       "date": "2026-10-19",

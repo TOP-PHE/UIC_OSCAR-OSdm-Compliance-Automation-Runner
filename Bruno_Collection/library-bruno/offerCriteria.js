@@ -10,7 +10,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  * offerCriteria.js — do the offers keep to the offerSearchCriteria asked? (#780)
  *
  * One check per option the request carried: offerMode, requestedOfferParts,
- * flexibilities, travelClasses, serviceClassTypes, productTags. None is a
+ * flexibilities, travelClasses, serviceClassTypes, productTags, and one per
+ * productSelections entry. None is a
  * failure: OSDM says of the classes that "the classes returned might be
  * different from the requested classes", and requires no provider to filter
  * on the other options either. No offer keeping to the option is a WARNING
@@ -134,7 +135,38 @@ function checkOfferCriteria(criteria, response, ignored = []) {
       message: `${off.length} of ${offers.length} offer(s) do not (${shown}${off.length > 3 ? '; …' : ''})`,
     });
   }
-  return checks;
+  return checks.concat(selectionChecks(criteria, offers, ignored));
+}
+
+// #780 PR A: one productSelections entry as text, null when it names nothing.
+function selectionOf(s) {
+  const code = typeof s?.productCode === 'string' ? s.productCode.trim() : '';
+  if (code) return { code, text: `product code ${code}` };
+  const tag = typeof s?.productTag === 'string' ? s.productTag.trim() : '';
+  return tag ? { tag, text: `product tag ${tag}` } : null;
+}
+
+const holdsSelection = (offer, sel) => (Array.isArray(offer?.products) ? offer.products.filter(Boolean) : []).some((p) => (sel.code
+  ? p.code === sel.code
+  : p.type === sel.tag || asList(p.productTags).includes(sel.tag)));
+
+/**
+ * #780 PR A: productSelections asks for products to be offered. One check per
+ * selection: some offer holds the product (by its code, or a product of the
+ * tag). None is a WARNING, as for the other options; the member said ignored
+ * is a WARNING too.
+ */
+function selectionChecks(criteria, offers, ignored) {
+  const list = Array.isArray(criteria?.productSelections) ? criteria.productSelections : [];
+  const selections = list.map(selectionOf).filter(Boolean);
+  return selections.map((sel) => {
+    const name = `Offer request: an offer holds the product selected (${sel.text})`;
+    if (ignored.includes('productselections')) {
+      return { name, ok: false, level: 'warn', message: 'the provider says it ignored offerSearchCriteria.productSelections (PARAMETER_NOT_SUPPORTED): not supported' };
+    }
+    const ok = offers.some((offer) => holdsSelection(offer, sel));
+    return { name, ok, level: 'warn', message: ok ? '' : `none of the ${offers.length} offer(s) holds it` };
+  });
 }
 
 module.exports = { PART_LISTS, askedOptions, admissionProducts, checkOfferCriteria };

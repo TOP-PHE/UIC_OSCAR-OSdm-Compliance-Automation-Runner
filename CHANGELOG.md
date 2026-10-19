@@ -62,6 +62,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.356 / collection-OTST_V2.0.191] — 2026-10-19 · Release 2026.391
+
+Issue #780 (PR A of the remaining work). Simulator 0.39.0. The Test Framework declares the product tags and the product selections a provider takes in an offer request.
+
+### Simulator 0.39.0
+- **Offers asked by product tag or product code** (`offerSearchCriteria.productTags`, `productSelections`), on every provider. Products are tagged by type: admissions `ADMISSION_POINT2POINT`, first-class upgrades `UPGRADE_POINT2POINT`, seat reservations `RESERVATION`; the offers holding a product asked are kept.
+  - The tags are written on the products of such an answer only, so no other answer changes.
+  - Asked only for what it does not sell (another tag, an unknown code), it gives the usual offers and a `PARAMETER_NOT_SUPPORTED` problem naming the member, as for `requestedOfferParts`.
+
+### Added
+- **Test Framework › Offer search options: Product tags** (the 13 tags of OSDM's ProductTag list) **and Product selections by** (`PRODUCT_CODE`, `PRODUCT_TAG`). Absent = every value, as for the other options.
+  - A scenario sending a tag, or selecting a product in a way, not declared gets the warning `offerOption:productTags=<tag>` / `offerOption:productSelections=<form>`.
+- **After 01, one check per product selected**: an offer holds it (by its code, or a product of the tag, by type or `productTags`). None is a WARNING; the member said ignored is a WARNING too; in an offer search probe both fail. The product tags were already checked (#780 PR 1).
+- **Catalogue probes `OTST_OFFER_PRODUCT_TAG_<TAG>`**, one per tag declared that a trip can hold (point-to-point admission and upgrade, reservation, split reservation, ancillary service and item). Product tags are never drawn in a random combination: the combinations a seed gave before stay the same.
+- **Simulator scenarios**: `SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38` and `SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38` (118 checks, none failed, as the other probes), and `SIM_WRONG_OFFER_PROBE_PRODUCT_TAG_PASS_38` (one failed check on purpose: the tag is ignored).
+- **The set-up checklist asks both** (A4.15, A4.16); the public and simulator checklists and the reference configurations are regenerated. The simulator declares `ADMISSION_POINT2POINT` and both selection forms.
+
+### Changed
+- The scenario editor's product-tags field suggests OSDM tags (`RESERVATION, ADMISSION_POINT2POINT`) instead of `SEAT_ONLY, SLEEPER`, which are not ProductTag values.
+
+### Not in this release
+- The trip search parameters (filters, number of results, transfers) and a probe sending an undeclared value: PRs B and C of #780.
+- `requiresPlaceSelection` is not an OSDM member; seat choices are declared by the place selection flows (#766).
+
+---
+
 ## [server-1.11.355 / collection-OTST_V2.0.190] — 2026-10-19 · Release 2026.390
 
 Issue #858 (the plan's PRs 3 and 4, one PR because the simulator's tests read the data file). Simulator 0.38.0. A fourth simulated provider, `delta`, on OSDM 3.9.0, with its scenarios, checklist and reference configuration.

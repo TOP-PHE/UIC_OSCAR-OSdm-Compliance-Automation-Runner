@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-product-tags",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Product tags and product selections in the Test Framework",
+    "summary": "Declare which product tags and which ways of selecting a product your provider takes in an offer request.",
+    "content": "A scenario sending an undeclared tag gets a warning, every run checks that an offer holds each product selected, and the reference scenarios can probe each declared tag."
+  },
+  {
     "id": "2026-10-19-simulator-delta",
     "date": "October 19, 2026",
     "tag": "New",

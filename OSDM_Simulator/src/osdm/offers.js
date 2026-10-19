@@ -42,6 +42,7 @@ const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType } = require('./reductionCards');
 const { reservationsOfDirection, reservationProductOf } = require('./reservations');
+const { selectProducts } = require('./productSelection');
 const persons = require('./persons');
 const ticketing = require('./ticketing');
 const { horizonProblem } = require('./salesHorizon');
@@ -744,12 +745,15 @@ function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const pairs = outboundTrips.length > 0
     ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
     : trips.map((trip) => ({ trip }));
-  const { offers, remembered } = offersOfPairs(beyondHorizon ? [] : pairs, {
+  const built = offersOfPairs(beyondHorizon ? [] : pairs, {
     classes, flexibilities, collective, passengers, refusals, fulfillmentOptions, provider, nowMs, shortLivedMs,
   });
-  applyStopPlaceVariants(trips, provider, offers, remembered);
+  const { remembered } = built;
+  applyStopPlaceVariants(trips, provider, built.offers, remembered);
+  // #780: offers asked by product tag or product code.
+  const { offers, problems: productProblems } = selectProducts(criteria, built.offers);
   const allTrips = [...outboundTrips, ...trips];
-  const problems = problemsOf(passengers, offers, collective, refusals);
+  const problems = [...problemsOf(passengers, built.offers, collective, refusals), ...productProblems];
   const partsIgnored = offerPartsIgnored(criteria);
   if (partsIgnored) problems.push(partsIgnored);
   if (beyondHorizon) problems.push(beyondHorizon);

@@ -226,6 +226,7 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_NAMED_PLACE_38: ['gives-other-place'],
     SIM_WRONG_OFFER_PROBE_IGNORED_38: [],
     SIM_WRONG_OFFER_PROBE_RESERVATION_ONLY_38: [],
+    SIM_WRONG_OFFER_PROBE_PRODUCT_TAG_PASS_38: [],
     SIM_WRONG_CURRENCY_DEFAULT_38: [],
   };
   const found = Object.fromEntries(datafile.scenarios

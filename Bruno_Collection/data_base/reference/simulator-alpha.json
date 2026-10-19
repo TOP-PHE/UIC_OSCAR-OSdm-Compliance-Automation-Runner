@@ -154,6 +154,13 @@
       "serviceClassTypes": [
         "HIGH",
         "STANDARD"
+      ],
+      "productTags": [
+        "ADMISSION_POINT2POINT"
+      ],
+      "productSelections": [
+        "PRODUCT_CODE",
+        "PRODUCT_TAG"
       ]
     },
     "partialRefundScopes": [
