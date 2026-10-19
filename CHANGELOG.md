@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.350 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.385
+
+Issue #867. Collection unchanged.
+
+### Added
+- **AI analysis › ⬇ Download the findings with requests and responses**, under a finished analysis. It downloads one Markdown file, `oscar-analysis-<date>-<company>.md`, to hand to the provider or read outside OSCAR. For each group, as the page shows it (owner, explanation, evidence, next step, steps and scenarios), the file lists the failing requests of its batches at the steps and scenarios it names:
+  - scenario, step, batch, run and failed checks;
+  - the request: method, path and query, and the body sent;
+  - the response: HTTP status and the body received.
+- **Which requests:** the first of each run and step, at most 3 per group, with the rest counted. When two batches are compared, the later one comes first.
+- **Never in the file:**
+  - headers;
+  - the endpoint's host, written `<host>`, in bodies too;
+  - credentials in the query or in a body member named like one (token, secret, password, requestor, API key…), written `<removed>`.
+- **Bodies are not masked otherwise:** they are the company's own test data, and the page says so next to the button. A body is cut at 20 KB and the file at 4 MB, saying where.
+- Route `GET /v1/company/ai-analysis/history/{id}/download`, for the same readers as the history. It has its own rate limiter (20 a minute) and writes the audit line `ai_analysis_downloaded:<id>`. An analysis that is not finished answers 409.
+- User guide § 2.4.
+
+---
+
 ## [server-1.11.349 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.384
 
 Issue #862 (PR 2). Applying a provider's checklist also copies the reference scenarios its Test Framework allows. Collection unchanged.
