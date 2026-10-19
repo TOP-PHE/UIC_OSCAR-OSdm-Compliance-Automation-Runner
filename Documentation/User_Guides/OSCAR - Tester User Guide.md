@@ -81,6 +81,15 @@ Do these once before your first run.
    tester of the company: only a **Test Manager** can change it. As a tester
    you see it read‑only, and saving the page saves your own credentials only.
    If the address is wrong, ask your Test Manager to correct it.
+   **🔌 Test my credentials for <name>** (next to the Save button, #872)
+   checks what is saved, before any run: OSCAR gets a token the way a run
+   does, then asks the provider's `GET /versions` with it. The result shows
+   under the button: whether a token was obtained (and how long it lives), or
+   why not (a missing field, the token endpoint's HTTP status); whether the
+   provider accepted the token, refused it (401/403) or does not offer
+   `/versions` (404/405/501, the token was not refused); and the OSDM versions
+   it lists next to your Test Framework's. Unsaved changes are saved first, if
+   you agree. The token itself is never shown. Ten tests a minute.
 4. **Pick the environment / sandbox** for the run (e.g. Bileto, Sqills,
    Benerail, …). The collection auto‑selects the matching access‑token request
    for that sandbox.

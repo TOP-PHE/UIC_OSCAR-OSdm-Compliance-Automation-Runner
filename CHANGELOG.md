@@ -62,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.351 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.386
+
+Issue #872. Collection unchanged.
+
+### Added
+- **API Config › 🔌 Test my credentials for <name>**, in each section (the company and each provider). It tests what is saved, so with unsaved changes the page asks to save first. The result shows in the section. Two steps:
+  1. **A token** is asked as a run asks it (`forceRefresh`). The result gives the mode, the profile and the token's lifetime, never the token. A failure gives the resolver's reason (a missing field, the token endpoint's HTTP status), with every saved secret masked.
+  2. **One `GET {api_base}/versions`** is sent with the headers a run sends. 2xx means the token is accepted, and the result lists the provider's OSDM versions next to the Test Framework's. 401/403 means the provider refuses the token. 404/405/501 means the token is not refused but `/versions` is not offered. Anything else, or no answer, is shown with its kind only.
+- Route `POST /v1/me/credentials/test` (X-Provider-Id), for members who keep credentials; administrators and certifiers are refused.
+  - 10 tests a minute per user, and an audit line `credentials_tested:<outcome>`.
+  - The address goes through the URL policy: no redirects followed, a 15 s timeout, the answer read up to 64 KB.
+  - It writes nothing but the token cache, as a run does.
+- User guide (API Config).
+
+---
+
 ## [server-1.11.350 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.385
 
 Issue #867. Collection unchanged.

@@ -616,6 +616,45 @@ module.exports = {
         },
       },
     },
+    '/v1/me/credentials/test': {
+      post: {
+        tags: ['Company'],
+        summary: 'Test my saved credentials for the company or provider of the request (#872)',
+        description: 'Testers and Test Managers; administrators and certifiers get 403. The company or provider is named by X-Provider-Id (none or empty = the own company; one not allowed = 404). Two steps, on what is saved: a token by the path a run takes, forced fresh (the token cache is written as a run writes it, nothing else), then one GET {api_base}/versions with the token and the headers a run sends (Requestor, subscription key, dedicated headers), redirect not followed, 15 s, answer read up to 64 KB. The answer never holds the token or a secret. Ten tests a minute per user. Audited as credentials_tested:<outcome>.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'X-Provider-Id', in: 'header', required: false, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'The test ran; what it found is in the body, whatever the outcome', content: { 'application/json': { schema: {
+            type: 'object',
+            properties: {
+              token: { type: 'object', properties: {
+                ok: { type: 'boolean' },
+                mode: { type: 'string', enum: ['bearer', 'oauth2'] },
+                profile: { type: 'string', nullable: true, description: 'The OAuth profile; null for a bearer token' },
+                expiresInSeconds: { type: 'integer', description: 'When known: the token endpoint\'s expires_in, or the exp of a bearer JWT (negative = expired)' },
+                error: { type: 'string', description: 'The resolver\'s message (missing fields, the token endpoint\'s HTTP status), secrets masked' },
+              } },
+              api: { type: 'object', properties: {
+                ok: { type: 'boolean', description: 'The token was not refused' },
+                outcome: { type: 'string', enum: ['accepted', 'token_refused', 'not_offered', 'redirect', 'unexpected', 'no_answer', 'url_refused', 'no_endpoint', 'not_tried'] },
+                status: { type: 'integer', description: 'The HTTP status of GET /versions' },
+                versions: { type: 'array', items: { type: 'string' }, description: 'The OSDM versions listed (2xx only)' },
+                versionsReadable: { type: 'boolean', description: 'false when a 2xx answer is not a list of ApiVersion' },
+                frameworkVersion: { type: 'string', description: 'The Test Framework\'s osdmVersion' },
+                frameworkVersionListed: { type: 'boolean' },
+                error: { type: 'string', description: 'Why no answer: the kind of failure, or the address policy\'s refusal' },
+              } },
+              outcome: { type: 'string', description: 'token_failed, else api.outcome' },
+              summary: { type: 'string' },
+            },
+          } } } },
+          401: { description: 'Not signed in' },
+          403: { description: 'Administrators and certifiers' },
+          404: { description: 'A provider the user may not use' },
+          429: { description: 'More than ten tests a minute' },
+        },
+      },
+    },
     '/v1/company/places/refresh': {
       post: {
         tags: ['Company'],

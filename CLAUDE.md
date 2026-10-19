@@ -666,6 +666,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **A provider's name is text, never markup**: `textContent` in the section,
     `esc()` in the summary table. Checked in a browser with a provider named
     `Alpha <b>&`.
+  - **Test my credentials** (#872): `POST /v1/me/credentials/test`
+    (`me-credentials.js`, members only, 10 a minute per user) tests what is
+    *saved* for `req.companyId`: `resolveAccessToken(…, { forceRefresh: true
+    })`, then one `GET {api_base}/versions` with the run's headers
+    (`services/credentialTest.js`: `urlPolicy`, `redirect: 'manual'`, 15 s,
+    64 KB). `utils/credentialTestOutcome.js` (pure) classifies the answer and
+    cleans the resolver's message: cut at ` Body: ` (two adapters quote the
+    token answer, which may hold a token under another name) and every saved
+    secret masked. The token never leaves the service; it writes only the
+    token cache, as a run does. Audit `credentials_tested:<outcome>`. The
+    page saves unsaved edits first (asked), and draws the result with
+    `textContent` only (`showTestResult()`).
 - **Providers: one company, several OSDM systems** (#540, PR 1 = v1.11.216;
   PR 2 the UI, PR 3 scenario copy with trip re-mapping). A provider is a child
   company (`companies.parent_id`) and reuses every per-company table by its own

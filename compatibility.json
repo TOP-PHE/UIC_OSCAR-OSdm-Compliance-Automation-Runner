@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.385",
+  "current_release": "2026.386",
   "releases": [
+    {
+      "release": "2026.386",
+      "date": "2026-10-19",
+      "server": "1.11.351",
+      "collection": "OTST_V2.0.188",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "API Config (#872): Test my credentials gets a token as a run does and tries it with GET /versions on the provider; the result says what failed, with no secret."
+      ]
+    },
     {
       "release": "2026.385",
       "date": "2026-10-19",

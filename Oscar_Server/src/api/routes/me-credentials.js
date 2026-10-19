@@ -16,16 +16,20 @@
  *
  * GET   /v1/me/credentials  — sanitised profile (no secret values)
  * PATCH /v1/me/credentials  — update credentials, encrypt secrets, clear cache
+ * POST  /v1/me/credentials/test — test the saved credentials: a token, then
+ *                                 GET {api_base}/versions with it (#872)
  */
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 const { encrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
 const { credentialsFor, setCredentials } = require('../../utils/testerCredentials');
 const { isValidProfile, PROFILES } = require('../../worker/auth-profiles');
-const { auditLog } = require('../helpers/shared');
+const { auditLog, denyAdminAndCertifier } = require('../helpers/shared');
+const { testCredentials } = require('../../services/credentialTest');
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
 
 const router = express.Router();
@@ -156,6 +160,30 @@ router.patch('/', (req, res) => {
   auditLog(req.user.id, companyId, req.user.email, `me_credential_update:${changedFields.join(',')}`);
 
   return res.json(safeUserCreds(credentialsFor(req.user.id, companyId)));
+});
+
+// ── POST /v1/me/credentials/test (#872) ──────────────────────────────────────
+// Tests what is saved here, for the company or provider of the request: a
+// token by the path a run takes (forced fresh, so the token cache is written
+// as a run writes it, and nothing else is), then one GET {api_base}/versions.
+// The answer never holds the token. A member who keeps credentials here only:
+// administrators and certifiers run nothing against a provider.
+// Ten a minute per user: each test calls the token endpoint and the provider.
+const credentialsTestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req, res) => `credentials-test:${req.user?.id || ipKeyGenerator(req, res)}`,
+  message: { status: 429, title: 'Too Many Requests', detail: 'At most 10 credential tests a minute. Wait a moment and try again.' }
+});
+
+router.post('/test', credentialsTestLimiter, async (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
+  const companyId = req.companyId;
+  const result = await testCredentials(req.user.id, companyId);
+  auditLog(req.user.id, companyId, req.user.email, `credentials_tested:${result.outcome}`);
+  return res.json(result);
 });
 
 module.exports = router;
