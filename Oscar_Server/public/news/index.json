@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-ai-analysis-download",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Download an AI analysis with its requests and responses",
+    "summary": "A finished AI analysis can be downloaded as one Markdown file: each finding with the failing requests and responses behind it.",
+    "content": "AI analysis › Download the findings with requests and responses. Each group lists the first failing requests of its steps and scenarios, with the bodies sent and received. Headers, the provider's host and credentials are left out; the rest is your test data as stored."
+  },
+  {
     "id": "2026-10-19-checklist-scenarios",
     "date": "October 19, 2026",
     "tag": "New",

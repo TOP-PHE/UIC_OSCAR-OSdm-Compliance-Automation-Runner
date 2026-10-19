@@ -307,6 +307,17 @@ AI's call (provider, OSCAR, configuration, unclear) is shown with it, but the
 category stays "Open point" for you to choose. A group gives one draft; the
 group then says what became of it.
 
+**⬇ Download the findings with requests and responses** (under the
+analysis) saves one Markdown file, `oscar-analysis-<date>-<company>.md`: each
+group as the page shows it, then the failing requests of the batch that belong
+to it (scenario, step, method and address, the body sent, the HTTP status and
+the body received). At most 3 requests a group, the first of each run and
+step; the file says how many were left out. Hand it to the provider, or read
+it outside OSCAR. The bodies are as stored, **not masked**: they are your
+company's test data, passengers' names included. Headers, the provider's host
+and credentials are never in the file. A body is cut at 20 KB, the file at
+4 MB, and the file says where.
+
 **History and limits.** Every analysis is kept with its model, tokens and
 estimated cost. Any Test Manager of the company sees them, even without
 access. Two analyses of the same input with different models can be compared

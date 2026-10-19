@@ -29,6 +29,8 @@
  * with `setupHtml`, the service forms), Usage status (`overviewHtml`, then the
  * spend of one company or provider), Analysis (`analysisTabHtml`), asked step
  * by step: target, batch, checklist (keep or import, `checklistHtml`), send.
+ * #867: an analysis's groups with their failing requests, downloaded as one
+ * Markdown file (`downloadButtonHtml`, `downloadAnalysis`).
  */
 
 const NOTE = 'padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.5;margin-bottom:14px;';
@@ -461,7 +463,24 @@ function resultHtml(a) {
     ${groups}
     <div style="font-size:11px;color:#90a4ae;margin-top:8px">Tokens: ${esc(a.tokens?.input ?? '?')} in, ${esc(a.tokens?.output ?? '?')} out · Cost: ${usd(a.cost)}.</div>
     <div style="margin-top:8px"><button class="btn" data-ai-action="an-faults" data-id="${esc(a.id)}" data-batch="${esc((a.batches || []).at(-1) || '')}"
-      title="For a batch run on the OSDM simulator with faults asked for: did OSCAR detect them, and did this analysis explain them?">Score against the simulator's faults</button></div>`;
+      title="For a batch run on the OSDM simulator with faults asked for: did OSCAR detect them, and did this analysis explain them?">Score against the simulator's faults</button>
+      ${downloadButtonHtml(a)}</div>`;
+}
+
+// #867: an analysis's id as the server gives it (a UUID), else null: only such an id goes into a page or an address.
+const ANALYSIS_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function analysisIdOf(value) {
+  const id = String(value ?? '');
+  return ANALYSIS_ID.test(id) ? id.toLowerCase() : null;
+}
+
+// #867: the groups with the request and response of each failure, as a Markdown file.
+function downloadButtonHtml(a) {
+  const id = analysisIdOf(a?.id);
+  if (!id) return '';
+  return `<button class="btn" data-ai-action="an-download" data-id="${esc(id)}"
+      title="One Markdown file: each group with the failing requests of the batch that belong to it, to hand to the provider or read outside OSCAR.">⬇ Download the findings with requests and responses</button>
+    <div style="font-size:11px;color:#78909c;margin-top:4px">The file holds the request and response bodies as stored, not masked: the company's own test data, passengers' names included. Headers, the provider's host and credentials are left out.</div>`;
 }
 
 const FAULT_VERDICT = { explained: '✅ explained', misattributed: '⚠️ another owner', missed: '❌ not in a group' };
@@ -986,6 +1005,27 @@ async function copyIssue(n) {
   }
 }
 
+// #867: the server names the file; only a plain name is kept.
+function downloadName(contentDisposition) {
+  const m = /filename="([\w.-]+)"/.exec(contentDisposition || '');
+  return m ? m[1] : 'oscar-analysis.md';
+}
+
+// #867: fetched rather than linked, so that X-Provider-Id follows; saved as a Blob.
+async function downloadAnalysis(value) {
+  const id = analysisIdOf(value);
+  if (!id) return;
+  const res = await fetch('/v1/company/ai-analysis/history/' + encodeURIComponent(id) + '/download', { headers: analysisHeaders() });
+  if (!res.ok) { show(await readError(res, 'The file could not be made.'), 'error'); return; }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = downloadName(res.headers.get('Content-Disposition'));
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // #823: a group of the analysis shown becomes a finding draft; the analysis is drawn again.
 async function makeDraft(n) {
   if (!shownAnalysis) return;
@@ -1032,7 +1072,7 @@ document.addEventListener('click', (e) => {
   if (tab) showTab(tab.dataset.aiTab).catch(err => show(err.message, 'error'));
 });
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-draft"], [data-ai-action="an-side"], [data-ai-action="an-faults"]');
+  const el = e.target.closest('[data-ai-action="an-preview"], [data-ai-action="an-run"], [data-ai-action="an-show"], [data-ai-action="an-checklist-remove"], [data-ai-action="an-copy-issue"], [data-ai-action="an-draft"], [data-ai-action="an-side"], [data-ai-action="an-faults"], [data-ai-action="an-download"]');
   if (!el) return;
   const act = el.dataset.aiAction;
   let job;
@@ -1043,6 +1083,7 @@ document.addEventListener('click', (e) => {
   else if (act === 'an-draft') job = makeDraft(el.dataset.group);
   else if (act === 'an-side') job = showSideBySide();
   else if (act === 'an-faults') job = showFaults(el.dataset.batch, el.dataset.id);
+  else if (act === 'an-download') job = downloadAnalysis(el.dataset.id);
   else job = showAnalysis(el.dataset.id);
   job.catch(err => show(err.message, 'error'));
 });
