@@ -62,6 +62,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.353 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.388
+
+Issue #572. Collection unchanged.
+
+### Added
+- **Admin Dashboard › 🛟 Disaster recovery**, for administrators, read only. It shows:
+  - the last backup (date, size, result) and the last success and failure;
+  - the frequency, the next run, the retention and the archives present;
+  - the last restore drill.
+
+  It warns when the last backup failed, the next run is in the past, more archives are present than the retention keeps, or no drill is recorded. Built with text only.
+- `GET /v1/admin/backup-status` (administrators, 30 reads a minute per address). It reads `data/backup-status.json` next to the database and answers only the members it knows, each checked for its type (`utils/backupStatus.js`). With no file it answers `state: none`. **No route creates, schedules or downloads a backup**, and a test pins that `/backup-status` is the admin router's only backup path, with GET as its only method.
+- `OSCAR_Deploy/scripts/oscar-backup-status.sh` writes that file:
+  - `backup-ok`, `backup-failed`, `schedule`, `drill [YYYY-MM-DD]` and `show`;
+  - metadata only: dates, a size, counts and the frequency read from the systemd timer. No path, file name, host or secret;
+  - written atomically, mode 644.
+- `oscar-backup.sh` records every run, ok or failed, from its exit trap, and still fails when the backup fails. `oscar-backup-schedule.sh` records the frequency and the next run.
+- Runbook: *OSCAR - Disaster Recovery*, "The status on the Admin Dashboard".
+- Tests:
+  - the reader;
+  - the route (roles, no file, unknown members dropped, no write route);
+  - the status script;
+  - `oscar-backup.sh` run with stub `sqlite3`, `gpg` and `docker`, on success and on failure;
+  - the panel's drawing.
+
+---
+
 ## [server-1.11.352 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.387
 
 Issue #807. Collection unchanged.

@@ -32,6 +32,16 @@ h1{color:#0090D4;font-size:24px;margin-bottom:8px}
 .card-cta{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:#0090D4;font-size:13px;margin-top:auto}
 .card.disabled .card-cta{color:#90a4ae}
 .notice{background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:14px 18px;margin-bottom:24px;font-size:13px;color:#bf360c;display:none}
+.dr{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:22px;margin-top:24px;border-top:4px solid #2e7d32}
+.dr h2{font-size:16px;font-weight:800;color:#1a2e40;margin-bottom:6px}
+.dr-note{font-size:12px;color:#78909c;line-height:1.5;margin-bottom:14px}
+.dr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.dr-item{background:#f5f7f9;border-radius:8px;padding:10px 12px}
+.dr-label{font-size:11px;font-weight:700;color:#78909c;text-transform:uppercase;letter-spacing:.4px}
+.dr-value{font-size:14px;font-weight:700;color:#1a2e40;margin-top:4px}
+.dr-value.ok{color:#2e7d32}
+.dr-value.bad{color:#c62828}
+.dr-warnings{margin-top:14px;padding-left:18px;font-size:13px;color:#bf360c;line-height:1.6}
 .site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
 </style>
 </head>
@@ -89,6 +99,16 @@ h1{color:#0090D4;font-size:24px;margin-bottom:8px}
     </a>
 
   </div>
+
+  <section class="dr" id="dr-panel" hidden>
+    <h2>🛟 Disaster recovery</h2>
+    <p class="dr-note">
+      What the host's backup scripts last recorded. Read only: backups are made,
+      scheduled and copied off the server on the host, never from OSCAR
+      (see <em>OSCAR - Disaster Recovery</em> in the operations documentation).
+    </p>
+    <div id="dr-body"><p class="dr-note">Loading…</p></div>
+  </section>
 </div>
 
 <footer class="site-footer">
@@ -106,6 +126,102 @@ h1{color:#0090D4;font-size:24px;margin-bottom:8px}
       document.getElementById('non-admin-notice').style.display = 'block';
     }
   } catch (_e) { /* ignore */ }
+})();
+</script>
+<script>
+// #572: the disaster-recovery status, read only. Built with textContent: no
+// value of the status file is ever written as markup.
+var DR_FREQUENCIES = { daily: 'Daily (02:30)', weekly: 'Weekly (Monday 02:30)', monthly: 'Monthly (the 1st, 02:30)', custom: 'Custom timer', 'on-demand': 'On demand (no timer)' };
+var DR_WARNINGS = {
+  last_backup_failed: 'The last backup failed. Check the host log (journalctl -u oscar-backup).',
+  next_run_past: 'The next run is in the past: the timer may be stopped.',
+  more_archives_than_kept: 'More archives are present than the retention keeps.',
+  no_restore_drill: 'No restore drill is recorded. Record one with oscar-backup-status.sh drill after a drill.'
+};
+function drWhen(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+}
+function drSize(bytes) {
+  if (typeof bytes !== 'number') return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+// The result of the last backup: its text and the class that colours it.
+function drResult(ok) {
+  if (ok === true) return ['OK', 'ok'];
+  if (ok === false) return ['Failed', 'bad'];
+  return ['—', ''];
+}
+function drItems(st) {
+  var result = drResult(st.last_backup_ok);
+  return [
+    ['Last backup', drWhen(st.last_backup_at), ''],
+    ['Result', result[0], result[1]],
+    ['Size', drSize(st.last_backup_size_bytes), ''],
+    ['Last success', drWhen(st.last_success_at), ''],
+    ['Last failure', drWhen(st.last_failure_at), st.last_failure_at ? 'bad' : ''],
+    ['Frequency', DR_FREQUENCIES[st.frequency] || '—', ''],
+    ['Next run', drWhen(st.next_run), ''],
+    ['Retention', typeof st.retention_keep === 'number' ? 'keeps ' + st.retention_keep : '—', ''],
+    ['Archives present', typeof st.archives_present === 'number' ? String(st.archives_present) : '—', ''],
+    ['Last restore drill', drWhen(st.last_restore_drill_at), ''],
+    ['Recorded', drWhen(st.updated_at), '']
+  ];
+}
+function drText(tag, cls, text) {
+  var el = document.createElement(tag);
+  if (cls) el.className = cls;
+  el.textContent = text;
+  return el;
+}
+function drRender(body, st) {
+  body.replaceChildren();
+  if (!st || st.state === 'none') {
+    body.appendChild(drText('p', 'dr-note', 'No backup recorded yet. Install the schedule on the host (oscar-backup-schedule.sh) or run oscar-backup.sh once.'));
+    return;
+  }
+  if (st.state !== 'reported') {
+    body.appendChild(drText('p', 'dr-note', 'The status file on the host cannot be read. Run oscar-backup-status.sh show on the host.'));
+    return;
+  }
+  var grid = document.createElement('div');
+  grid.className = 'dr-grid';
+  drItems(st).forEach(function (item) {
+    var box = document.createElement('div');
+    box.className = 'dr-item';
+    box.appendChild(drText('div', 'dr-label', item[0]));
+    box.appendChild(drText('div', 'dr-value' + (item[2] ? ' ' + item[2] : ''), item[1]));
+    grid.appendChild(box);
+  });
+  body.appendChild(grid);
+  var warnings = (st.warnings || []).filter(function (w) { return DR_WARNINGS[w]; });
+  if (warnings.length) {
+    var list = document.createElement('ul');
+    list.className = 'dr-warnings';
+    warnings.forEach(function (w) { list.appendChild(drText('li', '', DR_WARNINGS[w])); });
+    body.appendChild(list);
+  }
+}
+(function () {
+  var user = {};
+  try { user = JSON.parse(localStorage.getItem('oscar_user') || '{}') || {}; } catch (_e) { user = {}; }
+  if (user.role !== 'administrator') return;
+  var panel = document.getElementById('dr-panel');
+  var body = document.getElementById('dr-body');
+  panel.hidden = false;
+  fetch('/v1/admin/backup-status')
+    .then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(function (st) { drRender(body, st); })
+    .catch(function (e) {
+      body.replaceChildren(drText('p', 'dr-note', 'The status could not be loaded (' + e.message + ').'));
+    });
 })();
 </script>
 </body>

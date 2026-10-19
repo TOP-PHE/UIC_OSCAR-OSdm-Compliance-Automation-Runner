@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.387",
+  "current_release": "2026.388",
   "releases": [
+    {
+      "release": "2026.388",
+      "date": "2026-10-19",
+      "server": "1.11.353",
+      "collection": "OTST_V2.0.188",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Admin Dashboard (#572): read-only disaster-recovery status from data/backup-status.json, written by the host backup scripts (metadata only)."
+      ]
+    },
     {
       "release": "2026.387",
       "date": "2026-10-19",

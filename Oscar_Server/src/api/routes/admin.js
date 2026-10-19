@@ -19,6 +19,7 @@
  * GET    /v1/admin/activity              — server activity metrics
  * GET    /v1/admin/ai-access-requests    — Test Managers' requests for the AI analysis (#801)
  * POST   /v1/admin/ai-access-requests/:id/approve|refuse|revoke
+ * GET    /v1/admin/backup-status         — disaster-recovery status, read only (#572)
  */
 
 const express = require('express');
@@ -32,6 +33,7 @@ const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
 const { sendTestEmail, sendAiAccessNotice, isSmtpConfigured } = require('../../utils/mailer');
 const AiAccess = require('../../utils/aiAccess');
+const { readBackupStatus } = require('../../utils/backupStatus');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
 const router = express.Router();
@@ -460,6 +462,20 @@ router.get('/activity', (req, res) => {
     auth_events_range: useRange ? { from: fromParam, to: toParam } : null
   });
 });
+
+// ── Disaster recovery status (#572) ──────────────────────────────────────────
+// Read only: what the host's backup scripts wrote in data/backup-status.json.
+// No route here creates, schedules or downloads a backup (#572: the archive
+// holds the encryption key and every tenant's data).
+// It reads a file, so it has a limit of its own (30 a minute per address).
+const backupStatusLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many status reads. Wait a minute.' }
+});
+router.get('/backup-status', backupStatusLimiter, (req, res) => res.json(readBackupStatus()));
 
 // ── Company management ────────────────────────────────────────────────────────
 

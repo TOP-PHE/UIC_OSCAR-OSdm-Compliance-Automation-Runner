@@ -2209,6 +2209,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   stylesheet repeats a banner rule or a logo: `shared-banner.test.js`. A new
   page copies that header, not the logos. The pages are measured by Sonar's
   copy-paste detection again.
+- **The disaster-recovery status is read only** (#572, 1.11.353). The host
+  scripts write `data/backup-status.json` through
+  `OSCAR_Deploy/scripts/oscar-backup-status.sh` (`backup-ok`, `backup-failed`
+  from `oscar-backup.sh`'s exit trap, `schedule` from
+  `oscar-backup-schedule.sh`, `drill` by hand): dates, a size, counts and the
+  frequency, never a path, name or secret. `GET /v1/admin/backup-status`
+  (`utils/backupStatus.js`) answers only the members it knows, each checked;
+  the Admin Dashboard draws it with text only. **Never add a route that
+  creates, schedules or downloads a backup**: the archive holds
+  `ENCRYPTION_KEY` and every tenant's data (#572), and
+  `admin-backup-status.test.js` fails on any other backup path or method.
+  `backup-status.test.js` runs `oscar-backup.sh` with stub `sqlite3`, `gpg`
+  and `docker` in `PATH`.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image** — a `refresh-collection.yml`
   workflow `git pull`s the VPS on every push to `main`.

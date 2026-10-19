@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-dr-status",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Backup status on the Admin Dashboard",
+    "summary": "Administrators see the last backup, its result, the frequency, the next run, the retention and the last restore drill, read only.",
+    "content": "The host's backup scripts record their runs; OSCAR only shows them. Making, scheduling or downloading a backup stays a host operation."
+  },
+  {
     "id": "2026-10-19-shared-banner",
     "date": "October 19, 2026",
     "tag": "Improvement",
