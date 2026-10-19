@@ -35,16 +35,16 @@ const BEARER = 'stored-bearer-token-9876543210';
 
 // ── The stub provider ────────────────────────────────────────────────────────
 const calls = [];
-let tokenReply = null;   // (req, body) => { status, json?, text? }
-let apiReply = null;     // (req) => { status, json?, text?, headers? }
+let tokenReply = null;   // () => { status, json?, text? }
+let apiReply = null;     // () => { status, json?, text?, headers? }
 const stub = http.createServer((req, res) => {
   let raw = '';
   req.on('data', (c) => { raw += c; });
   req.on('end', () => {
     calls.push({ method: req.method, url: req.url, headers: req.headers, body: raw });
     let r;
-    if (req.url === '/token') r = tokenReply ? tokenReply(req, raw) : defaultToken(req);
-    else if (req.url === '/osdm/versions') r = apiReply ? apiReply(req) : defaultApi(req);
+    if (req.url === '/token') r = tokenReply ? tokenReply() : defaultToken(req);
+    else if (req.url === '/osdm/versions') r = apiReply ? apiReply() : defaultApi(req);
     else r = { status: 404, json: { title: 'no such route' } };
     res.writeHead(r.status, { 'content-type': 'application/json', ...(r.headers || {}) });
     res.end(r.text ?? JSON.stringify(r.json));
