@@ -70,7 +70,7 @@ function pathOf(url) {
   const unprefixed = text.startsWith('{{') && text.includes('}}') ? text.slice(text.indexOf('}}') + 2) : text;
   let parsed;
   try {
-    parsed = new URL(unprefixed, 'http://oscar.invalid');
+    parsed = new URL(unprefixed, 'https://oscar.invalid');
   } catch {
     return '<an address that cannot be read>';
   }
@@ -234,7 +234,7 @@ function requestSection(number, r, bodies, failed, hosts) {
     `- Batch ${inlineCode(r.batchId)}, run ${inlineCode(r.runId)}`,
     ...(checks.length ? ['- Failed checks:', ...checks, ...more] : []),
     '',
-    `**Request:** ${inlineCode(`${method} ${address}`)}`,
+    '**Request:** ' + inlineCode(method + ' ' + address),
     '',
     bodyBlock('Request body', request),
     '',
