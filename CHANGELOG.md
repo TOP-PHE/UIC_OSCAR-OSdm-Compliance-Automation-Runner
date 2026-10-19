@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.354 / collection-OTST_V2.0.189] — 2026-10-19 · Release 2026.389
+
+Issue #858 (the plan's PR 1). OSCAR knows the OSDM 3.9.0 specification.
+
+### Added
+- **The OSDM 3.9.0 specification** in `Documentation/Test_Coverage/OSDM_reference/OSDM-online-api-v3.9.0.yml`. It is published on the OSDM gh-pages branch as `…v3.9.0.bundled.yml` and kept here under the plain name.
+- **3.9 in the three generated files**, regenerated from the 3.4–3.9 files:
+  - the collection's request schemas (`osdmRequestSchemas.js`, OSCAR's own request check, #736);
+  - the simulator's response schemas (`osdm-response-schemas.json`, #833);
+  - the AI analysis's specification extracts (`osdm-references.json`, #827).
+
+  In each file, 3.4 to 3.8 are unchanged, byte for byte.
+- A scenario on 3.9 is checked against 3.9 and no longer falls back to 3.8. The AI analysis of a 3.9 provider quotes 3.9 as an exact match.
+
+### What 3.9 changes
+- No operation, schema, enum or deprecation changed since 3.8.1, the repository's 3.8 file. The 3.9 request and response schemas are identical to 3.8's, and a test pins that.
+- The one change is that the search date-times (`departureTime`, `arrivalTime`, `inboundDate`, `inwardReturnDate`) are `format: date-time`, which requires a UTC offset. OSCAR still sends them without one: the OSDM working group is asked first (#858, the plan's PR 2).
+
+---
+
 ## [server-1.11.353 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.388
 
 Issue #572. Collection unchanged.

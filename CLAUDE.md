@@ -2016,7 +2016,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Test Manager, then `PATCH /v1/company`, `PATCH /v1/me/credentials`,
     `PUT /v1/company/datafile/json`, `POST /v1/runs`.
   - **One OSDM version per provider** (#614): `alpha` 3.6.0, `beta` 3.7.0,
-    `gamma` 3.8.0. **Since #824 (0.34.0) the three have the same
+    `gamma` 3.8.0. **OSCAR knows OSDM 3.9.0** (#858, 1.11.354): the repository's
+    3.9 file is gh-pages' `…v3.9.0.bundled.yml` renamed, and the three
+    generators (request, response, references) produce 3.9 from it. 3.9
+    changed no schema OSCAR sends or reads (the generated 3.9 sets equal
+    3.8's, a test pins it); its one change is `format: date-time` on the
+    search date-times, which OSCAR still sends without an offset until the
+    OSDM working group answers. **Since #824 (0.34.0) the three have the same
     functions**: alpha and beta hold every optional key of gamma's profile
     with the same values, and a second currency each (alpha EUR + CHF, beta
     CHF + EUR); `tests/config.test.js` pins it, so a new function goes in all

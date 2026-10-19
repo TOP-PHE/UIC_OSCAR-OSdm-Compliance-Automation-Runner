@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-osdm-39-spec",
+    "date": "October 19, 2026",
+    "tag": "Improvement",
+    "title": "OSDM 3.9.0 known to OSCAR",
+    "summary": "A scenario or provider on OSDM 3.9 is now checked against the 3.9 specification, and the AI analysis quotes 3.9.",
+    "content": "OSDM 3.9 changed no request or answer schema OSCAR uses; its one change, an offset on search date-times, is under discussion with the OSDM working group."
+  },
+  {
     "id": "2026-10-19-dr-status",
     "date": "October 19, 2026",
     "tag": "New",

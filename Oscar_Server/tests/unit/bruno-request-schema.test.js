@@ -79,10 +79,15 @@ describe('#736 the operation a request goes to', () => {
 
   test('the version is the highest bundled one not above the target, else the lowest', () => {
     expect(pickVersion('3.8.1')).toBe('3.8.0');
-    expect(pickVersion('3.9.0')).toBe('3.8.0');
+    expect(pickVersion('3.9.0')).toBe('3.9.0');
+    expect(pickVersion('3.9.1')).toBe('3.9.0');
+    expect(pickVersion('3.10.0')).toBe('3.9.0');
     expect(pickVersion('3.6')).toBe('3.6.0');
     expect(pickVersion('3.2.0')).toBe('3.4.0');
-    expect(Object.keys(requestSchemas)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0']);
+    expect(Object.keys(requestSchemas)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0', '3.9.0']);
+    // #858: 3.9 changed no request body OSCAR sends (only date-time formats,
+    // which the generator does not keep).
+    expect(requestSchemas['3.9.0']).toEqual(requestSchemas['3.8.0']);
   });
 
   test('offer-parts exists from 3.7 only', () => {
@@ -266,12 +271,12 @@ describe('#736 the glue the global after-response calls', () => {
 });
 
 describe('#736 the bundled schemas are the generator\'s output', () => {
-  test('the 3.8 set is what the repository\'s OSDM 3.8 file gives', () => {
+  test.each(['3.8.0', '3.9.0'])('the %s set is what the repository\'s OSDM file gives', (v) => {
     const { forVersion } = require('../../scripts/generate-osdm-request-schemas.js');
     const yaml = require('js-yaml');
     const spec = yaml.load(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Test_Coverage',
-      'OSDM_reference', 'OSDM-online-api-v3.8.0.yml'), 'utf8'));
-    expect(forVersion(spec)).toEqual(requestSchemas['3.8.0']);
+      'OSDM_reference', `OSDM-online-api-v${v}.yml`), 'utf8'));
+    expect(forVersion(spec)).toEqual(requestSchemas[v]);
   });
 
   test('every reference resolves, in every version', () => {

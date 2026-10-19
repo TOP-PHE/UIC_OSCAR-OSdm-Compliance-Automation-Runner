@@ -22,10 +22,12 @@ const REPO = path.join(__dirname, '..', '..', '..');
 const generated = JSON.parse(fs.readFileSync(path.join(REPO, 'OSDM_Simulator', 'tests', 'fixtures', 'osdm-response-schemas.json'), 'utf8'));
 
 describe('#833 the simulator\'s response schemas', () => {
-  test('they hold the versions of the simulator\'s providers, and the 3.8 is the repository\'s specification', () => {
-    expect(Object.keys(generated.versions)).toEqual(['3.6.0', '3.7.0', '3.8.0']);
-    const spec = yaml.load(fs.readFileSync(path.join(REPO, 'Documentation', 'Test_Coverage', 'OSDM_reference', 'OSDM-online-api-v3.8.0.yml'), 'utf8'));
-    expect(generated.versions['3.8.0']).toEqual(JSON.parse(JSON.stringify(G.forVersion(spec))));
+  test('they hold the versions of the simulator\'s providers, and the 3.8 and 3.9 are the repository\'s specifications', () => {
+    expect(Object.keys(generated.versions)).toEqual(['3.6.0', '3.7.0', '3.8.0', '3.9.0']);
+    for (const v of ['3.8.0', '3.9.0']) {
+      const spec = yaml.load(fs.readFileSync(path.join(REPO, 'Documentation', 'Test_Coverage', 'OSDM_reference', `OSDM-online-api-v${v}.yml`), 'utf8'));
+      expect(generated.versions[v]).toEqual(JSON.parse(JSON.stringify(G.forVersion(spec))));
+    }
   });
 
   test('every provider of the simulator has a version the file holds', () => {
