@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-shared-banner",
+    "date": "October 19, 2026",
+    "tag": "Improvement",
+    "title": "One banner for every page",
+    "summary": "The banner at the top of every page is now drawn from one shared file instead of 18 copies. It looks the same.",
+    "content": "The UIC logo now links to uic.org on every page; 14 pages had a typo in that link."
+  },
+  {
     "id": "2026-10-19-test-credentials",
     "date": "October 19, 2026",
     "tag": "New",

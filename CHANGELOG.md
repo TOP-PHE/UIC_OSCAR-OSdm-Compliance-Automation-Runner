@@ -62,6 +62,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.352 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.387
+
+Issue #807. Collection unchanged.
+
+### Changed
+- **One banner for every page.** The 18 pages under `public/` each carried a copy of the banner (UIC and OSDM logos) and of its style rules. Now:
+  - `public/js/banner.js` draws the logos: each page's `<header class="uic-banner">` starts with that script, which puts them in front of itself (built element by element, no markup from text). The menu bar below is still drawn by `nav.js`.
+  - `public/css/oscar-banner.css` holds the banner and menu bar rules, linked first by every page. The pages, `oscar-page.css` and `scenarios.css` no longer repeat them.
+  - The sign-in, password and e-mail pages use the same banner markup as the others: their banner looks the same.
+- Checked in Chromium before and after on every page (signed out and as a Test Manager): the 735 banner elements measured have the same position, size and style. Two rules (`gap`, `justify-content`) changed on boxes holding a single logo, where they have no effect.
+- The UIC logo of 14 pages linked to `https://uis.org`, a typo: every page links to `https://uic.org` now.
+- `Oscar_Server/public/*.html` is out of Sonar's copy-paste exclusion again (#806).
+- `tests/unit/shared-banner.test.js`: every page loads `banner.js` first in its header and `oscar-banner.css` as its first stylesheet, holds no logo, and repeats no banner rule; `banner.js` is run on a small DOM.
+
+### Dependencies
+- nodemailer 10.1.1 (#863, merged without a release of its own).
+
+---
+
 ## [server-1.11.351 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.386
 
 Issue #872. Collection unchanged.

@@ -32,17 +32,13 @@ describe('#805 images are served by OSCAR', () => {
     expect(remote).toEqual([]);
   });
 
-  test('the banner logos are files of OSCAR, and every banner uses them', () => {
+  test('the banner logos are files of OSCAR, and the one banner uses them', () => {
     for (const file of ['uic-logo.png', 'osdm-logo.png']) {
       expect(fs.statSync(path.join(PUBLIC, file)).size).toBeGreaterThan(0);
     }
-    const banners = pages.filter((p) => fs.readFileSync(path.join(PUBLIC, p), 'utf8').includes('uic-banner-logo"'));
-    expect(banners.length).toBeGreaterThan(10);
-    for (const page of banners) {
-      const html = fs.readFileSync(path.join(PUBLIC, page), 'utf8');
-      expect(html).toContain('src="/uic-logo.png"');
-      expect(html).toContain('src="/osdm-logo.png"');
-    }
+    // #807: the logos are drawn by js/banner.js, for every page.
+    const { LOGOS } = require('../../public/js/banner.js');
+    expect(LOGOS.map((l) => l.src)).toEqual(['/uic-logo.png', '/osdm-logo.png']);
   });
 
   test('the content security policy allows images from OSCAR only', () => {
