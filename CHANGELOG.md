@@ -73,6 +73,7 @@ Issue #807. Collection unchanged.
   - The sign-in, password and e-mail pages use the same banner markup as the others: their banner looks the same.
 - Checked in Chromium before and after on every page (signed out and as a Test Manager): the 735 banner elements measured have the same position, size and style. Two rules (`gap`, `justify-content`) changed on boxes holding a single logo, where they have no effect.
 - The UIC logo of 14 pages linked to `https://uis.org`, a typo: every page links to `https://uic.org` now.
+- The user's e-mail and company in the menu bar are a darker grey (`#546e7a`, contrast 5.2:1 on the bar instead of 3.2:1), as Sonar asked when the rule moved into the shared stylesheet.
 - `Oscar_Server/public/*.html` is out of Sonar's copy-paste exclusion again (#806).
 - `tests/unit/shared-banner.test.js`: every page loads `banner.js` first in its header and `oscar-banner.css` as its first stylesheet, holds no logo, and repeats no banner rule; `banner.js` is run on a small DOM.
 
