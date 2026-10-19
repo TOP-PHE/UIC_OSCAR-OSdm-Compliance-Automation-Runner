@@ -296,6 +296,11 @@ module.exports = {
       post: { tags: ['Admin'], summary: 'Create user', security: [{ bearerAuth: [] }],
         responses: { 201: { description: 'User created' }, 409: { description: 'Email already used' } } },
     },
+    '/v1/admin/backup-status': {
+      get: { tags: ['Admin'], summary: 'Disaster-recovery status (read only, #572)', security: [{ bearerAuth: [] }],
+        description: 'What the host backup scripts recorded in data/backup-status.json: last backup (date, size, ok), frequency, next run, retention, archives present, last restore drill, and warnings. state is none (no backup recorded yet), unreadable, or reported. No route creates, schedules or downloads a backup.',
+        responses: { 200: { description: 'The status' }, 403: { description: 'Administrators only' }, 429: { description: 'Too many reads' } } },
+    },
     '/v1/admin/config': {
       get: { tags: ['Admin'], summary: 'Get server config + server info', security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Current config and server info' } } },

@@ -38,6 +38,12 @@ TIMER=/etc/systemd/system/oscar-backup.timer
 
 if [ "$(id -u)" -ne 0 ]; then SUDO=sudo; else SUDO=""; fi
 
+# The Admin Dashboard's status (#572): the frequency, retention and next run.
+record_status(){
+  OSCAR_BACKUP_DIR="$OUT_DIR" OSCAR_BACKUP_KEEP="$KEEP" "$SCRIPT_DIR/oscar-backup-status.sh" schedule \
+    || echo "note: the Admin Dashboard status was not written (set OSCAR_DATA_DIR if the container is down)"
+}
+
 case "$FREQ" in
   daily)   CAL="*-*-* 02:30:00" ;;
   weekly)  CAL="Mon *-*-* 02:30:00" ;;
@@ -47,6 +53,7 @@ case "$FREQ" in
     $SUDO rm -f "$UNIT" "$TIMER"
     $SUDO systemctl daemon-reload
     echo "on-demand: timer removed."
+    record_status
     echo "run a backup by hand:  OSCAR_BACKUP_PASSPHRASE_FILE=$PASS_FILE $BACKUP_SH"
     exit 0 ;;
   status)
@@ -87,6 +94,7 @@ EOF
 
 $SUDO systemctl daemon-reload
 $SUDO systemctl enable --now oscar-backup.timer
+record_status
 echo "installed: oscar-backup.timer ($FREQ, OnCalendar='$CAL'), runs as $RUN_USER"
 echo "passphrase: $PASS_FILE | archives: $OUT_DIR | keep: $KEEP"
 echo "NOTE: ensure $PASS_FILE exists (chmod 600) and $RUN_USER can reach Docker."

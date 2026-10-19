@@ -71,6 +71,30 @@ The script discovers the data dir and `.env` from the running container, takes a
 live-safe SQLite snapshot, writes the encrypted archive to `OSCAR_BACKUP_DIR`
 (default `~/oscar-backups`), prunes old ones, and prints the `scp` to pull it.
 
+### The status on the Admin Dashboard (#572)
+
+Each backup (ok or failed) and each change of frequency writes
+`data/backup-status.json` next to the database, through
+`OSCAR_Deploy/scripts/oscar-backup-status.sh`. The **Admin Dashboard** shows it
+to administrators: last backup (date, size, result), last success and failure,
+frequency, next run, retention, archives present, last restore drill, and
+warnings (a failed backup, a next run in the past, more archives than kept, no
+drill recorded).
+
+The file holds metadata only: dates, a size, counts and the frequency. No path,
+file name, host, passphrase or archive content. The panel is read only: OSCAR
+cannot make, schedule or download a backup (the archive holds the encryption
+key and every company's data).
+
+A restore drill happens on another host, so record it on the OSCAR host
+afterwards:
+
+```bash
+/opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup-status.sh drill            # today
+/opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup-status.sh drill 2026-10-15 # a given day
+/opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup-status.sh show             # what the panel reads
+```
+
 ## 6. Restore / DR drill on a second VPS (target: under 5 minutes)
 
 **Provision the drill host once** (fresh VPS):

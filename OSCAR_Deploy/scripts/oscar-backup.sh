@@ -50,6 +50,25 @@ PASS_FILE="${OSCAR_BACKUP_PASSPHRASE_FILE:-}"
 log(){ printf '%s  %s\n' "$(date -Is)" "$*"; command -v logger >/dev/null 2>&1 && logger -t oscar-backup -- "$*" || true; }
 die(){ log "FAIL: $*"; exit 1; }
 
+# The Admin Dashboard's status (#572): metadata only, written at the end, ok or
+# not. A failure to write it never fails the backup.
+STATUS_SH="$(cd "$(dirname "$0")" && pwd)/oscar-backup-status.sh"
+DATA_DIR=""
+ARCHIVE=""
+STAGE=""
+record_status(){
+  local rc="$1" what=backup-failed
+  [ -x "$STATUS_SH" ] || return 0
+  [ "$rc" -eq 0 ] && [ -n "$ARCHIVE" ] && [ -f "$ARCHIVE" ] && what=backup-ok
+  # data/ as found below, else the status script looks for it itself (a run
+  # that failed before finding it is recorded too, when the container is up).
+  if [ -n "$DATA_DIR" ] && [ -d "$DATA_DIR" ]; then export OSCAR_DATA_DIR="$DATA_DIR"; fi
+  OSCAR_BACKUP_DIR="$OUT_DIR" OSCAR_BACKUP_KEEP="$KEEP" "$STATUS_SH" "$what" ${ARCHIVE:+"$ARCHIVE"} >/dev/null 2>&1 \
+    || log "note: the Admin Dashboard status was not written"
+  return 0
+}
+trap 'rc=$?; [ -n "$STAGE" ] && rm -rf "$STAGE"; record_status "$rc"' EXIT
+
 command -v sqlite3 >/dev/null 2>&1 || die "sqlite3 not installed - run: sudo apt-get install -y sqlite3"
 command -v gpg     >/dev/null 2>&1 || die "gpg not installed - run: sudo apt-get install -y gnupg"
 command -v docker  >/dev/null 2>&1 || die "docker not found"
@@ -73,7 +92,6 @@ log ".env     : $ENV_FILE"
 
 TS="$(date +%Y%m%d-%H%M%S)"
 STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$OUT_DIR" "$STAGE/data"
 
 # --- 1) consistent SQLite snapshot (online backup API) -----------------------
