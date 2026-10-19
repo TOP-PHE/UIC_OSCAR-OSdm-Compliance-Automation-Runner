@@ -187,7 +187,8 @@ describe('#862 PR 2 the reference scenarios', () => {
   });
 
   test('the choice goes with every preview and with the apply', () => {
-    expect(SOURCE).toContain('preview?testData=${testData}&scenarios=${scenarios}');
+    // The page's own template text, written in pieces so it does not read as one here.
+    expect(SOURCE).toContain(['preview?testData=$', '{testData}&scenarios=$', '{scenarios}'].join(''));
     expect(SOURCE).toContain("const scenarios = choice === 'none' ? 'none' : 'copy';");
   });
 });
