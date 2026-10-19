@@ -476,6 +476,33 @@ module.exports = {
         description: 'Test Managers only. Body: { name } (simulator-alpha | simulator-beta | simulator-gamma) or { name: null }. Nothing is replaced until the update; another reference forgets the applied version.',
         responses: { 200: { description: 'The new state' }, 400: { description: 'Not one of the references' }, 403: { description: 'Test Managers only' } } },
     },
+    '/v1/company/checklists': {
+      get: { tags: ['Company'], summary: 'The provider checklists imported here, newest first (#862)', security: [{ bearerAuth: [] }],
+        description: 'Test Managers of the company or provider (X-Provider-Id). Each import with its file name, sha256, date, who imported it and what became of it (waiting, applied, discarded). At most 50.',
+        responses: { 200: { description: '{ imports: [{ id, fileName, sha256, answers, importedAt, importedBy, status, decidedAt, decidedBy }] }' }, 403: { description: 'Test Managers only' } } },
+      post: { tags: ['Company'], summary: 'Import a filled provider checklist (#862)', security: [{ bearerAuth: [] }],
+        description: 'Multipart, the .docx in the field "checklist" (5 MB). Changes nothing: the answers are kept encrypted (never api.* or meta.*), the file is not, and an earlier checklist waiting for a decision is discarded. Answers the preview of applying it with testData add.',
+        responses: { 201: { description: 'The preview: { import, previous, answerChanges, framework: { changes, unplaced, created }, testData: { mode, add, remove, alreadyThere, unresolvedLegs }, skipped, notes, hash }' }, 400: { description: 'Not a filled checklist' }, 403: { description: 'Test Managers only' }, 413: { description: 'Over 5 MB' } } },
+    },
+    '/v1/company/checklists/{id}/preview': {
+      get: { tags: ['Company'], summary: 'What applying a provider checklist would change (#862)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'testData', in: 'query', schema: { type: 'string', enum: ['add', 'replace'] } }],
+        description: 'Set against the checklist applied before (else the one imported for the AI analysis): the answers changed, the Test Framework values that change, the Test Data added or removed, and the hash the apply must carry.',
+        responses: { 200: { description: 'The preview' }, 400: { description: 'testData is not add or replace' }, 404: { description: 'No such checklist here' } } },
+    },
+    '/v1/company/checklists/{id}/apply': {
+      post: { tags: ['Company'], summary: 'Apply a provider checklist to the Test Framework and the Test Data (#862)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['hash'], properties: { hash: { type: 'string' }, testData: { type: 'string', enum: ['add', 'replace'] } } } } } },
+        description: 'Only a checklist waiting for a decision, and only with the hash of the preview read: if the Test Framework or the Test Data changed since, 409 with the new preview. Writes both in one transaction and makes the checklist the one the AI analysis is told about. The scenarios, endpoint and credentials are not changed.',
+        responses: { 200: { description: '{ applied, import, framework: { changes }, testData }' }, 400: { description: 'No hash, or testData not add or replace' }, 404: { description: 'No such checklist here' }, 409: { description: 'Not waiting, or changed since the preview' } } },
+    },
+    '/v1/company/checklists/{id}/discard': {
+      post: { tags: ['Company'], summary: 'Set a provider checklist aside (#862)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        description: 'Only a checklist waiting for a decision. It stays in the list of imports.',
+        responses: { 200: { description: '{ import }' }, 404: { description: 'No such checklist here' }, 409: { description: 'Not waiting' } } },
+    },
     '/v1/company/reference/apply': {
       post: { tags: ['Company'], summary: 'Update the configuration from the reference it follows (#838)', security: [{ bearerAuth: [] }],
         description: 'Test Managers only. Replaces the scenarios (the replaced data file is kept as the previous file), the Test Framework and the Test Data trains and journeys with the reference\'s, as a full configuration import with every part replaced. The endpoint and the credentials are not changed.',

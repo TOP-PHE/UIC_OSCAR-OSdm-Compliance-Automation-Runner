@@ -883,6 +883,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   calls `db.transaction` through the module so a test can make it fail. Values
   deeper than `MAX_DEPTH` are refused before anything recursive runs. The
   datafile part is stored re-indented (4 spaces), not as the source's bytes.
+- **A provider's filled checklist sets up its Test Framework and Test Data**
+  (#862, PR 1 = 1.11.346). `checklist_import` (migration 40) keeps every
+  import: answers encrypted (never `api.*` / `meta.*`, as #827), file name,
+  sha256, date, status waiting / applied / discarded; the file is not kept.
+  Routes `company-checklist.js` (`/v1/company/checklists`, Test Manager,
+  X-Provider-Id). **An import changes nothing**: the preview
+  (`utils/checklistConfiguration.js`, pure) is set against the last applied
+  import (else the AI analysis's `provider_checklist`), and the apply must
+  carry its `hash` (`previewHash()`: import id, proposed framework, Test Data
+  plan and rows), 409 with the new preview when anything moved. Framework =
+  the current one with each answered question over it
+  (`frameworkFromChecklist(answers, { base, unplaced })`, the #838 rules;
+  unknown questions go to `unplaced` instead of throwing, which the
+  simulator's generator still does). Test Data: a train per route of each
+  `svc<n>` sheet, a journey per `jrn.<combo>` sold, planned by
+  `planTestData` (add / replace). Station codes of 7 or 8 digits; times get
+  the offset of the station's zone (`utils/stationZones.js`, the
+  collection's table pinned by `checklist-configuration.test.js`), only for
+  7-digit codes as the collection does. `storeFramework` / `storeTestData`
+  live in `api/helpers/configurationStore.js` now (shared with #810/#838).
+  The apply also writes `provider_checklist`. PR 2 adds the catalogue's
+  scenarios.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network

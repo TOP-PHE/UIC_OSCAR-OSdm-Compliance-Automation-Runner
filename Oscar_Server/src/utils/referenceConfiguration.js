@@ -107,9 +107,11 @@ const known = path => LIST_PATHS.has(path) || ONE_PATHS.has(path) || NUMBER_PATH
 /**
  * The checklist's `fw.*` answers ({ tag: true | text }, as answersOfDocx
  * gives them) by question: { path: { ticks: [codes], text } }. Throws on a
- * question this file does not place.
+ * question this file does not place, unless `unplaced` (a Set) is given: a
+ * provider's checklist may answer what OSCAR cannot declare (#862), and the
+ * question's name is then added to it.
  */
-function questionsOf(answers) {
+function questionsOf(answers, unplaced = null) {
   const questions = new Map();
   const questionAt = (path) => {
     if (!questions.has(path)) questions.set(path, { ticks: [], text: null });
@@ -122,6 +124,7 @@ function questionsOf(answers) {
       questionAt(name.slice(0, -'.comment'.length));
       continue;
     }
+    if (!known(name) && unplaced) { unplaced.add(name); continue; }
     if (!known(name)) throw new Error(`The checklist answers fw.${name}, which the reference framework does not place: add it to referenceConfiguration.js.`);
     const q = questionAt(name);
     if (code === undefined) q.text = String(value).trim();
@@ -145,15 +148,20 @@ function answerAt(path, ticks, text) {
   return null;
 }
 
-/** The framework a checklist declares: the defaults, each answered question over them. */
-function frameworkFromChecklist(answers) {
-  const framework = defaultFramework();
-  for (const [path, { ticks, text }] of questionsOf(answers)) {
+/**
+ * The framework a checklist declares: `base` (the defaults when none), each
+ * answered question over it. With `unplaced` (a Set), a question this file
+ * does not place is named there instead of stopping (#862).
+ */
+function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) {
+  const framework = base ? structuredClone(base) : defaultFramework();
+  for (const [path, { ticks, text }] of questionsOf(answers, unplaced)) {
     if (!known(path)) continue;   // a comment of a question not asked as such
     const answer = answerAt(path, ticks, text);
     if (answer) setPath(framework, path, answer.value);
   }
-  framework.placeSelection.seatMap = framework.placeSelection.supportedModes.includes('SEATMAP_AT_OFFER');
+  const modes = framework.placeSelection?.supportedModes;
+  if (Array.isArray(modes)) framework.placeSelection.seatMap = modes.includes('SEATMAP_AT_OFFER');
   return framework;
 }
 
@@ -278,6 +286,6 @@ function configurationOf(reference, datafile, { version, at } = {}) {
 
 module.exports = {
   REFERENCE_KEY, REFERENCE_FORMAT, PROVIDERS, DATAFILE_NAME, IROPS_MANDATORY, ANCILLARY_TYPES,
-  referenceName, defaultFramework, frameworkFromChecklist, testResourcesFromDatafile, runListFor,
+  referenceName, defaultFramework, frameworkFromChecklist, questionsOf, testResourcesFromDatafile, runListFor,
   buildReference, versionOf, configurationOf,
 };

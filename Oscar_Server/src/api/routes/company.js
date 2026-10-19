@@ -49,6 +49,7 @@ const { isOsdmVersion } = require('../../utils/osdmVersion');
 const configurationBundle = require('../../utils/configurationBundle');
 const referenceConfiguration = require('../../utils/referenceConfiguration');
 const referenceStore = require('../../utils/referenceStore');
+const { frameworkConfigOf, testResourcesOf, storeFramework, storeTestData } = require('../helpers/configurationStore');
 const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
@@ -669,26 +670,6 @@ router.get('/datafile/download', datafileReadLimiter, authorizeDatafileWrite(sav
 // the company the request names, in one file (utils/configurationBundle). Taken
 // to another company or provider, the import asks which parts to take. Test
 // Managers only, both ways: the file holds every tester's private scenarios.
-function frameworkConfigOf(companyId) {
-  const row = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
-  if (!row) return null;
-  try {
-    const config = JSON.parse(colDecrypt(row.config));
-    return config && typeof config === 'object' && !Array.isArray(config) ? config : null;
-  } catch {
-    return null;
-  }
-}
-
-function testResourcesOf(companyId) {
-  return all('SELECT id, resource_type, label, data FROM test_resources WHERE company_id = ? ORDER BY created_at ASC, id ASC', [companyId])
-    .map(r => {
-      let data = {};
-      try { data = JSON.parse(colDecrypt(r.data)); } catch { data = {}; }
-      return { id: r.id, resource_type: r.resource_type, label: r.label, data: data && typeof data === 'object' && !Array.isArray(data) ? data : {} };
-    });
-}
-
 router.get('/configuration/download', datafileReadLimiter, authorizeDatafileWrite(uploadPolicy), async (req, res) => {
   const { id: companyId, slug } = req.datafileCompany;
   let plain = null;
@@ -753,33 +734,6 @@ async function applyConfiguration(company, configuration, choices, datafileBytes
     throw err;
   }
   return { outcome };
-}
-
-function storeFramework(companyId, config) {
-  const json = colEncrypt(JSON.stringify(config));
-  const existing = get('SELECT id FROM test_frameworks WHERE company_id = ?', [companyId]);
-  if (existing) {
-    run(`UPDATE test_frameworks SET config = ?, updated_at = datetime('now') WHERE company_id = ?`, [json, companyId]);
-  } else {
-    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)', [crypto.randomUUID(), companyId, json]);
-  }
-}
-
-function storeTestData(companyId, incoming, mode) {
-  const plan = configurationBundle.planTestData(testResourcesOf(companyId), incoming, mode, () => crypto.randomUUID());
-  for (const id of plan.deleteIds) run('DELETE FROM test_resources WHERE id = ? AND company_id = ?', [id, companyId]);
-  for (const r of plan.create) {
-    run('INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, ?, ?, ?)',
-      [r.id, companyId, r.resource_type, r.label, colEncrypt(JSON.stringify(r.data))]);
-  }
-  return {
-    mode,
-    removed: plan.deleteIds.length,
-    trains_added: plan.trainsAdded,
-    journeys_added: plan.journeysAdded,
-    already_there: plan.alreadyThere,
-    unresolved_legs: plan.unresolvedLegs,
-  };
 }
 
 // The data file part goes through the upload's checks: not a marked download,
