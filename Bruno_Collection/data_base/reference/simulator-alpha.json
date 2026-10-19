@@ -163,6 +163,15 @@
         "PRODUCT_TAG"
       ]
     },
+    "tripSearchParameters": [
+      "ARRIVAL_TIME",
+      "VIAS",
+      "NOT_VIAS",
+      "TRANSFER_LIMIT",
+      "NUMBER_OF_RESULTS",
+      "IGNORE_REALTIME_DATA",
+      "TRAIN_FILTER"
+    ],
     "partialRefundScopes": [
       "FULFILLMENT",
       "LEG",

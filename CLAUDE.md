@@ -217,8 +217,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Simulator 0.39.0 (`productSelection.js`): tags by product type, written
     only in answers to such a request; nothing sold for what was asked =
     the usual offers + PARAMETER_NOT_SUPPORTED. `requiresPlaceSelection` is
-    not OSDM (#766 covers it). PRs B (trip search parameters) and C (a probe
-    with an undeclared value) are next.
+    not OSDM (#766 covers it).
+    **PR B (1.11.357): trip search parameters.** `tripSearchParameters` in
+    the framework (`utils/tripSearchParameters.js`: ARRIVAL_TIME, VIAS,
+    NOT_VIAS, TRANSFER_LIMIT, NUMBER_OF_RESULTS, IGNORE_REALTIME_DATA,
+    TRAIN_FILTER), read from a SEARCH trip's `trip.searchCriteria`. Warning
+    `tripParameter:<NAME>`; requirement `tripSearchParameters` and
+    `missingFor()` "trip search by …". After 01 `checkTripParameters()`
+    (`library-bruno/tripParameters.js`, from `offerTripSearchCriteria`)
+    checks transfers, vias, not-vias and the number of trips, graded like the
+    options. Probe `OTST_TRIP_TRANSFER_LIMIT_0`. Simulator 0.40.0: a via makes
+    a two-leg trip. **The simulator alpha checklist sits just under the AI
+    context's 20k characters** (`contextOf()`, #827): a longer `fw.*`
+    comment there cuts service sheets and fails `ai-checklist.test.js`
+    (`cut`). PR C (a probe with an undeclared value) is next.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`

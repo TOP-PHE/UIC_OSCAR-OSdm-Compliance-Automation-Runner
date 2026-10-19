@@ -175,6 +175,8 @@ function requirementsOf(scenario, datafile) {
     placeSelectionFlow: placeSelectionFlowOf(scenario),
     // #809: a purchaser written after the booking (POST /bookings/{id}/purchaser).
     purchaserAfterBooking: require('./undeclaredSteps').purchaserAfterBooking(scenario),
+    // #780 PR B: the trip search parameters its search sends.
+    tripSearchParameters: require('./tripSearchParameters').tripSearchParametersOf(scenario, datafile),
   };
 }
 
@@ -210,8 +212,15 @@ function missingFor(requirements, framework) {
   return [
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
-    ...stepsMissing(requirements, fw),
+    ...stepsMissing(requirements, fw), ...tripParametersMissing(requirements, fw),
   ];
+}
+
+// #780 PR B: the trip search parameters a framework does not take, as sentences.
+function tripParametersMissing(requirements, fw) {
+  const { tripSearchParameterDeclared, TRIP_SEARCH_PARAMETER_TEXT } = require('./tripSearchParameters');
+  return arr(requirements.tripSearchParameters).filter((name) => !tripSearchParameterDeclared(fw, name))
+    .map((name) => `trip search by ${TRIP_SEARCH_PARAMETER_TEXT[name]} (Trip search parameters)`);
 }
 
 // #809: a step the framework says the provider does not offer, as a sentence.

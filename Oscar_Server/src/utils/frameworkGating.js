@@ -440,6 +440,11 @@ function datafileScenarioWarnings(sc, framework, datafile) {
       && !require('./currencies').currencyDeclared(framework, currency)) warnings.push(`currency:${currency}`);
   // #809: a passenger update or a late purchaser the provider does not offer.
   warnings.push(...require('./undeclaredSteps').undeclaredStepWarnings(sc, framework));
+  // #780 PR B: a trip search parameter the framework does not declare.
+  const { tripSearchParametersOf, tripSearchParameterDeclared } = require('./tripSearchParameters');
+  for (const name of tripSearchParametersOf(sc, datafile)) {
+    if (!tripSearchParameterDeclared(framework, name)) warnings.push(`tripParameter:${name}`);
+  }
   return warnings;
 }
 
@@ -448,7 +453,8 @@ function datafileScenarioWarnings(sc, framework, datafile) {
  * undeclared feature gets `__featureNotDeclaredWarnings: [field, ...]`, and
  * one whose offer request form is not declared `offerRequestBy:<form>` (#748),
  * one whose place selection flow is not declared `placeSelectionBy:<flow>` (#766),
- * one per offer search option value not declared `offerOption:<key>=<value>` (#780).
+ * one per offer search option value not declared `offerOption:<key>=<value>` (#780),
+ * one per trip search parameter not declared `tripParameter:<NAME>` (#780 PR B).
  * Removes the field when there are no warnings (avoids stale annotations
  * surviving a framework change).
  *

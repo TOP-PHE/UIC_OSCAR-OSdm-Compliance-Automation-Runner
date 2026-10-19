@@ -470,6 +470,44 @@ function fwToggleOfferSearchOption(el, key, value) {
   el.classList.toggle('selected', !on);
 }
 
+// #780 PR B: the trip search parameters the provider takes. Kept in sync
+// with utils/tripSearchParameters.js (TRIP_SEARCH_PARAMETERS); no list
+// declared means every one.
+const FW_TRIP_SEARCH_PARAMETERS = [
+  ['ARRIVAL_TIME', 'Arrival-time search (arrivalTime)'],
+  ['VIAS', 'Vias (vias)'],
+  ['NOT_VIAS', 'Places to avoid (notVias)'],
+  ['TRANSFER_LIMIT', 'Transfer limit (parameters.transferLimit)'],
+  ['NUMBER_OF_RESULTS', 'Number of results (parameters.numberOfResults…)'],
+  ['IGNORE_REALTIME_DATA', 'Ignore real-time data (parameters.ignoreRealtimeData)'],
+  ['TRAIN_FILTER', 'Train and operator filter (parameters.dataFilter)'],
+];
+
+function fwTripSearchParameterDeclared(fw, name) {
+  const declared = fw?.tripSearchParameters;
+  return !Array.isArray(declared) || declared.includes(name);
+}
+
+function tripSearchParametersHtml(fw) {
+  const pills = FW_TRIP_SEARCH_PARAMETERS.map(([name, label]) => `<div class="pill${fwTripSearchParameterDeclared(fw, name) ? ' selected' : ''}" data-action="fw-trip-parameter" data-val="${esc(name)}">${esc(label)}</div>`).join('');
+  return `
+      <div class="fw-subsection" style="margin-top:12px">
+        <div class="fw-subsection-label" style="margin-bottom:8px">🧭 Trip search parameters — the tripSearchCriteria members the provider takes</div>
+        <div style="margin-bottom:6px;font-size:11px;color:#78909c">Set per trip in Test Config (Trip Search Criteria). A scenario sending one not ticked gets a warning, and a reference scenario needing it is not copied. Every run checks that the trips keep to the transfer limit, the vias, the places to avoid and the number of results sent, as warnings.</div>
+        <div class="pill-group">${pills}</div>
+      </div>`;
+}
+
+// #780 PR B: the first click starts from every parameter, as the options do.
+function fwToggleTripSearchParameter(el, name) {
+  if (!FW_TRIP_SEARCH_PARAMETERS.some(([n]) => n === name)) return;
+  const fw = wizData.framework;
+  const list = Array.isArray(fw.tripSearchParameters) ? fw.tripSearchParameters : FW_TRIP_SEARCH_PARAMETERS.map(([n]) => n);
+  const on = list.includes(name);
+  fw.tripSearchParameters = on ? list.filter((x) => x !== name) : [...list, name];
+  el.classList.toggle('selected', !on);
+}
+
 // #766: how the provider lets a place be chosen, OSDM's PlaceSelectionFlow.
 // Kept in sync with frameworkGating.js (PLACE_SELECTION_FLOWS,
 // placeSelectionFlowDeclared()).
@@ -4481,6 +4519,7 @@ function renderWizardStep1() {
       </div>
       ${offerRequestPanelHtml(fw)}
       ${offerSearchOptionsPanelHtml(fw)}
+      ${tripSearchParametersHtml(fw)}
     </div>
   </div>
 
@@ -8148,6 +8187,8 @@ document.body.addEventListener('click', function(e) {
       fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-offer-search-option':
       fwToggleOfferSearchOption(el, el.dataset.key, el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-trip-parameter':
+      fwToggleTripSearchParameter(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-offer-combinations-new-seed': {
       const input = document.getElementById('fw-offer-combinations-seed');
       const seed = fwNewOfferCombinationSeed();

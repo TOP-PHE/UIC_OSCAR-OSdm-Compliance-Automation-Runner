@@ -83,7 +83,7 @@ function defaultFramework() {
 const LIST_PATHS = new Set([
   'passengerTypes', 'offerRequestForms', 'returnModels', 'offerCriteria.flexibilities',
   'offerSearchOptions.offerModes', 'offerSearchOptions.requestedOfferParts', 'offerSearchOptions.travelClasses',
-  'offerSearchOptions.serviceClassTypes', 'offerSearchOptions.productTags', 'offerSearchOptions.productSelections', 'fulfillment.types', 'fulfillment.media', 'salesFlows', 'partialRefundScopes',
+  'offerSearchOptions.serviceClassTypes', 'offerSearchOptions.productTags', 'offerSearchOptions.productSelections', 'tripSearchParameters', 'fulfillment.types', 'fulfillment.media', 'salesFlows', 'partialRefundScopes',
   'iropsCodes.refund', 'iropsCodes.exchange', 'placeSelectionFlows', 'placeSelection.supportedModes', 'ancillaries',
   'rail.subModes', 'rail.ticketTypes',
 ]);

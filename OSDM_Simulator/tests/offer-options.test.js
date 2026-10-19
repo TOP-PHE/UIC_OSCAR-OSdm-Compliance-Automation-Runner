@@ -131,3 +131,48 @@ test('an answer with tagged products conforms to each provider\'s OSDM version',
     await sim.close();
   }
 });
+
+// #780 PR B: a search through a via.
+function viaAnswer(tripSearch) {
+  const request = offerRequest({});
+  Object.assign(request.tripSearchCriteria, tripSearch);
+  return buildOfferCollection(request, gamma, NOW).response;
+}
+
+test('a via: two legs changing there after the dwell time; none, one direct leg as before', () => {
+  const direct = viaAnswer({});
+  assert.equal(direct.trips[0].legs.length, 1);
+  const via = { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:0000050' };
+  const through = viaAnswer({ vias: [{ viaPlace: via, dwellTime: 'PT15M' }] });
+  const [trip] = through.trips;
+  assert.equal(trip.legs.length, 2);
+  assert.equal(trip.transfers, 1);
+  const [a, b] = trip.legs.map((l) => l.timedLeg);
+  assert.equal(a.end.stopPlaceRef.stopPlaceRef, 'urn:uic:stn:0000050');
+  assert.equal(b.start.stopPlaceRef.stopPlaceRef, 'urn:uic:stn:0000050');
+  assert.equal(Date.parse(b.start.serviceDeparture.timetabledTime) - Date.parse(a.end.serviceArrival.timetabledTime), 15 * 60000);
+  assert.equal(trip.startTime, direct.trips[0].startTime);
+  assert.notEqual(a.service.vehicleNumbers[0], b.service.vehicleNumbers[0]);
+  assert.ok(through.offers.length > 0);
+  // No dwell time: 10 minutes. Arrival basis: it still arrives when asked.
+  const tenMin = viaAnswer({ vias: [{ viaPlace: via }] }).trips[0].legs.map((l) => l.timedLeg);
+  assert.equal(Date.parse(tenMin[1].start.serviceDeparture.timetabledTime) - Date.parse(tenMin[0].end.serviceArrival.timetabledTime), 10 * 60000);
+  const byArrival = viaAnswer({ departureTime: undefined, arrivalTime: '2026-11-20T12:00:00', vias: [{ viaPlace: via }] }).trips[0];
+  assert.equal(Date.parse(byArrival.endTime), Date.parse(viaAnswer({ departureTime: undefined, arrivalTime: '2026-11-20T12:00:00' }).trips[0].endTime));
+});
+
+test('an answer through a via conforms to each provider\'s OSDM version', async () => {
+  const sim = await startSimulator();
+  try {
+    for (const key of ['alpha', 'beta', 'gamma', 'delta']) {
+      const token = await tokenFor(sim.base, key, SECRETS[key][0]);
+      const request = offerRequest({});
+      request.tripSearchCriteria.vias = [{ viaPlace: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:0000050' } }];
+      const res = await call(sim.base, token, 'POST', `/${key}/offers`, request);
+      assert.equal(res.status, 200, key);
+      assert.equal(res.body.trips[0].legs.length, 2, key);
+    }
+  } finally {
+    await sim.close();
+  }
+});

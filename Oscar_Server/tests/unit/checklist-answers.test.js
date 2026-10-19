@@ -83,11 +83,11 @@ describe('#827 reading the answers', () => {
   test('the simulator\'s alpha checklist reads back every answer it was filled with', () => {
     const xml = readZipEntry(alpha(), 'word/document.xml').toString('utf8');
     const all = CL.answersOfXml(xml);
-    expect(Object.keys(all)).toHaveLength(281);
+    expect(Object.keys(all)).toHaveLength(289);
     expect(all['fw.osdmVersion=3.6']).toBe(true);
     expect(all['api.baseUrl']).toBe('https://<simulator-host>/alpha');
     const { answers } = CL.answersOfDocx(alpha());
-    expect(Object.keys(answers)).toHaveLength(269);
+    expect(Object.keys(answers)).toHaveLength(277);
     expect(Object.keys(answers).some((k) => k.startsWith('api.') || k.startsWith('meta.'))).toBe(false);
   });
 

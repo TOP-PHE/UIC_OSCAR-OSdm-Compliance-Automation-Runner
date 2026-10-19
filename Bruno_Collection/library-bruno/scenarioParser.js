@@ -1765,6 +1765,12 @@ function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
 const OFFER_REQUEST_TEXT = { SEARCH: 'by trip search', SPECIFICATION: 'by trip specification', TRIP_IDS: 'by trip id' };
 // #780: the framework key of an offer search option → the OSDM member.
 const OFFER_OPTION_MEMBER = { offerModes: 'offerMode', requestedOfferParts: 'requestedOfferParts', travelClasses: 'travelClasses', serviceClassTypes: 'serviceClassTypes' };
+// #780 PR B: a trip search parameter of the Test Framework → what the search sends.
+const TRIP_PARAMETER_TEXT = {
+  ARRIVAL_TIME: 'an arrival time (arrivalTime)', VIAS: 'a via (vias)', NOT_VIAS: 'places to avoid (notVias)',
+  TRANSFER_LIMIT: 'a transfer limit (parameters.transferLimit)', NUMBER_OF_RESULTS: 'a number of results (parameters.numberOfResults…)',
+  IGNORE_REALTIME_DATA: 'real-time data ignored (parameters.ignoreRealtimeData)', TRAIN_FILTER: 'a train and operator filter (parameters.dataFilter)',
+};
 const PARTIAL_REFUND_SCOPE_OF = { partialRefundByFulfillment: 'fulfillment', partialRefundByLeg: 'leg', partialRefundByPax: 'passenger' };
 
 // The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
@@ -1781,6 +1787,12 @@ function featureNotDeclaredWarning(scenario, field) {
     const [key, value] = field.slice('offerOption:'.length).split('=');
     const member = OFFER_OPTION_MEMBER[key] || key;
     return `[WARNING] Scenario "${scenario.code}" asks for offers with offerSearchCriteria.${member} ${value}, which the Test Framework does not declare (Offer search options). The run will proceed; the provider may refuse or ignore it. Declare the value in the Test Framework, or change the scenario's offer search criteria.`;
+  }
+  // #780 PR B: a trip search parameter (tripParameter:<NAME>).
+  if (typeof field === 'string' && field.startsWith('tripParameter:')) {
+    const name = field.slice('tripParameter:'.length);
+    const text = TRIP_PARAMETER_TEXT[name] || name;
+    return `[WARNING] Scenario "${scenario.code}" searches its trip with ${text}, which the Test Framework does not declare (Trip search parameters). The run will proceed; the provider may refuse or ignore it. Declare the parameter in the Test Framework, or change the Trip Search Criteria of the scenario's trip.`;
   }
   // #781: a currency the framework does not declare (currency:<code>).
   if (typeof field === 'string' && field.startsWith('currency:')) {
