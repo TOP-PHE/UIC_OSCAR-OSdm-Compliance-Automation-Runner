@@ -63,6 +63,9 @@ function makeCard(id) {
         name, value: '', textContent: '', innerHTML: '', readOnly: false, disabled: false, className: '', style: {},
         classList: { toggle() {} },
         querySelectorAll: () => [],
+        children: [],
+        replaceChildren() { this.children = []; },
+        appendChild(child) { this.children.push(child); },
       });
     }
     return fields.get(name);
@@ -107,6 +110,7 @@ function openPage(role, { selected = null, failing = () => false } = {}) {
     console,
     user: { role },
     fetch,
+    document: { createElement: tag => ({ tag, textContent: '', innerHTML: '' }) },
     confirm: () => true,
     esc: s => String(s),
     oscarSelectedProvider: () => selected,
@@ -122,7 +126,8 @@ function openPage(role, { selected = null, failing = () => false } = {}) {
     declarationOf('CAN_EDIT_HEADERS'), declarationOf('CAN_EDIT_ENDPOINT'), declarationOf('targets'),
     ...['field', 'inTarget', 'credentialsSet', 'badge', 'markUnsaved', 'nameTarget', 'fillShared', 'fillCredentials',
       'fillTarget', 'targetUnavailable', 'loadTarget', 'sharedPayload', 'credentialsPayload', 'saveShared',
-      'saveTarget', 'clearCredentials', 'listTargets'].map(sourceOf),
+      'saveTarget', 'clearCredentials', 'listTargets',
+      'lifetimeText', 'credentialTestLines', 'showTestResult', 'testSavedCredentials'].map(sourceOf),
     // Expose the page's `const` to the test.
     'this.targets = targets;',
   ].join('\n\n');
@@ -453,5 +458,135 @@ describe('API Config page — one section per company or provider (#580)', () =>
       expect([...new Set(byId)].sort()).toEqual(['msg', 'page-hint', 'providers-link', 'target-template', 'targets', 'targets-summary', 'targets-summary-rows']);
       expect(script).not.toMatch(/querySelector\('#/);
     });
+  });
+});
+
+describe('API Config page — test my credentials (#872)', () => {
+  // The server's answer to POST /v1/me/credentials/test, for the tests below.
+  const ANSWER = {
+    token: { ok: true, mode: 'oauth2', profile: 'oauth2_post', expiresInSeconds: 3540 },
+    api: { ok: true, outcome: 'accepted', status: 200, versions: ['3.8.0'], versionsReadable: true, frameworkVersion: '3.8', frameworkVersionListed: true },
+    outcome: 'accepted',
+    summary: 'The provider accepted the token (GET /versions answered 200). It lists OSDM <b>3.8.0</b>.',
+  };
+  // Opens the page with the test route answering `status` and `body`.
+  function openWithTest(role, { status = 200, body = ANSWER, failing } = {}) {
+    const page = openPage(role, { failing });
+    const realFetch = page.context.fetch;
+    page.context.fetch = async (url, opts = {}) => {
+      if (url !== '/v1/me/credentials/test') return realFetch(url, opts);
+      page.calls.push({ method: opts.method || 'GET', url, target: opts.headers?.['X-Provider-Id'], body: opts.body });
+      return { ok: status >= 200 && status < 300, status, json: async () => body };
+    };
+    return page;
+  }
+  const lines = el => el.children.map(c => c.textContent);
+
+  test('every section has the button, named for it, and loses it with the others', async () => {
+    expect(SOURCE.some(l => l.includes('data-f="test-creds-btn"'))).toBe(true);
+    expect(SOURCE.some(l => l.includes('data-f="test-result"'))).toBe(true);
+    const page = openWithTest('company_user');
+    await page.context.loadTarget(page.cards[ALPHA]);
+    expect(page.cards[ALPHA].element('test-creds-btn').textContent).toBe('🔌 Test my credentials for Alpha');
+    const gone = openWithTest('company_user', { failing: c => (c.target === BETA ? 404 : 0) });
+    await gone.context.loadTarget(gone.cards[BETA]);
+    expect(gone.cards[BETA].element('test-creds-btn').disabled).toBe(true);
+  });
+
+  test('the button is wired to the test, in the section it belongs to', () => {
+    expect(sourceOf('addTarget')).toContain("field(card, 'test-creds-btn').addEventListener('click', () => { testSavedCredentials(card).catch(reportTargetError(card)); });");
+  });
+
+  test('the test names its section and sends nothing but the request', async () => {
+    const page = openWithTest('test_manager');
+    for (const id of [OWN, ALPHA, BETA]) await page.context.loadTarget(page.cards[id]);
+    page.calls.length = 0;
+    await page.context.testSavedCredentials(page.cards[BETA]);
+    expect(sent(page)).toEqual([`POST /v1/me/credentials/test @${BETA}`]);
+    expect(page.calls[0].body).toBeUndefined();
+    await page.context.testSavedCredentials(page.cards[OWN]);
+    expect(sent(page).at(-1)).toBe(`POST /v1/me/credentials/test @${OWN}`);
+  });
+
+  test('the answer is written as text under the button, line by line', async () => {
+    const page = openWithTest('company_user');
+    const card = page.cards[ALPHA];
+    await page.context.loadTarget(card);
+    await page.context.testSavedCredentials(card);
+    const out = card.element('test-result');
+    expect(lines(out)).toEqual([
+      'The provider accepted the token (GET /versions answered 200). It lists OSDM <b>3.8.0</b>.',
+      'Token: obtained (OAuth2, oauth2_post, valid 59 min).',
+      'GET /versions: HTTP 200.',
+      'Test Framework version: 3.8.',
+    ]);
+    // Text, never markup: the provider's words reach no innerHTML.
+    expect(out.innerHTML).toBe('');
+    expect(out.children.every(c => c.innerHTML === '')).toBe(true);
+    expect(out.className).toBe('msg target-msg test-result msg-ok');
+    expect(out.style.display).toBe('block');
+    expect(card.element('test-creds-btn').disabled).toBe(false);
+    // The other section shows nothing.
+    expect(page.cards[BETA].element('test-result').children).toEqual([]);
+  });
+
+  test('a refused token is red, a refusal of the test says why', async () => {
+    const refused = openWithTest('company_user', { body: { ...ANSWER, api: { ok: false, outcome: 'token_refused', status: 401 }, summary: 'The provider refused the token: GET /versions answered 401.' } });
+    await refused.context.testSavedCredentials(refused.cards[ALPHA]);
+    expect(refused.cards[ALPHA].element('test-result').className).toContain('msg-err');
+
+    const forbidden = openWithTest('certification_user', { status: 403, body: { status: 403, title: 'Forbidden', detail: 'Administrators and certifiers do not have access to test data (issue #60).' } });
+    await forbidden.context.testSavedCredentials(forbidden.cards[ALPHA]);
+    expect(lines(forbidden.cards[ALPHA].element('test-result'))).toEqual(['Administrators and certifiers do not have access to test data (issue #60).']);
+    const limited = openWithTest('company_user', { status: 429, body: {} });
+    await limited.context.testSavedCredentials(limited.cards[ALPHA]);
+    expect(lines(limited.cards[ALPHA].element('test-result'))).toEqual(['The test could not be run (HTTP 429).']);
+  });
+
+  test('unsaved changes are saved first when the user agrees, and only then tested', async () => {
+    const page = openWithTest('company_user');
+    const card = page.cards[ALPHA];
+    await page.context.loadTarget(card);
+    card.element('access_token').value = 'typed-not-saved';
+    page.context.markUnsaved(card, true);
+    const asked = [];
+    page.context.confirm = (text) => { asked.push(text); return true; };
+    page.calls.length = 0;
+    await page.context.testSavedCredentials(card);
+    expect(asked).toEqual(['Your changes for Alpha are not saved, and the test uses what is saved.\n\nSave them first, then test?']);
+    expect(sent(page)).toEqual([
+      `PATCH /v1/me/credentials @${ALPHA}`, `GET /v1/company @${ALPHA}`, `GET /v1/me/credentials @${ALPHA}`,
+      `POST /v1/me/credentials/test @${ALPHA}`,
+    ]);
+  });
+
+  test('declined, or a save that fails: nothing is tested', async () => {
+    const page = openWithTest('company_user');
+    const card = page.cards[ALPHA];
+    await page.context.loadTarget(card);
+    page.context.markUnsaved(card, true);
+    page.context.confirm = () => false;
+    page.calls.length = 0;
+    await page.context.testSavedCredentials(card);
+    expect(page.calls).toEqual([]);
+    expect(lines(card.element('test-result'))).toEqual(['Not tested: save your changes first, or reload the page to drop them.']);
+
+    const failing = openWithTest('company_user', { failing: c => (c.method === 'PATCH' ? 400 : 0) });
+    const other = failing.cards[BETA];
+    await failing.context.loadTarget(other);
+    failing.context.markUnsaved(other, true);
+    failing.calls.length = 0;
+    await failing.context.testSavedCredentials(other);
+    expect(sent(failing)).toEqual([`PATCH /v1/me/credentials @${BETA}`]);
+  });
+
+  test('the lines say what each step found', () => {
+    const { credentialTestLines, lifetimeText } = openPage('company_user').context;
+    expect(credentialTestLines({ summary: 'No token: Bearer token not configured.', token: { ok: false, mode: 'bearer', profile: null }, api: { ok: false, outcome: 'not_tried' } }))
+      .toEqual(['No token: Bearer token not configured.', 'Token: not obtained (bearer token).']);
+    expect(credentialTestLines({ summary: 'x', token: { ok: true, mode: 'bearer', expiresInSeconds: -5 }, api: { status: 501 } }))
+      .toEqual(['x', 'Token: obtained (bearer token, expired).', 'GET /versions: HTTP 501.']);
+    expect(credentialTestLines(null)).toEqual(['Token: not obtained (bearer token).']);
+    expect([0, 59, 600, 7200].map(lifetimeText)).toEqual(['expired', 'valid 59 s', 'valid 10 min', 'valid 2 h']);
   });
 });

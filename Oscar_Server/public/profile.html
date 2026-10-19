@@ -47,6 +47,9 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
 .target-body h3{margin-top:6px}
 .target-body h3.second{margin-top:28px}
 .target-msg{margin-top:14px;margin-bottom:0}
+/* #872: the result of "Test my credentials", under the buttons. */
+.msg-info{background:#e3f2fd;color:#0d47a1;border:1px solid #90caf9}
+.test-result div+div{margin-top:4px}
 </style>
 </head>
 <body>
@@ -231,6 +234,8 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
 
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button type="button" class="btn btn-primary" data-f="save-btn"></button>
+        <button type="button" class="btn btn-secondary" data-f="test-creds-btn"
+                title="Gets a token with what is saved here, the way a run does, then asks the provider's GET /versions with it."></button>
         <button type="button" class="btn btn-secondary" data-f="clear-creds-btn"
                 style="background:#c62828;color:white;border:none"
                 title="Wipes your stored credentials here (bearer token, client id/secret, oauth_extra, requestor, subscription key, cached access token)."></button>
@@ -239,6 +244,7 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
         </span>
       </div>
       <output class="msg target-msg" data-f="msg"></output>
+      <output class="msg target-msg test-result" data-f="test-result" aria-live="polite"></output>
     </div>
   </details>
 </template>
@@ -450,6 +456,7 @@ function nameTarget(card, c) {
     : 'Shared with everyone in your company. Editing it changes the OSDM endpoint for all testers.';
   field(card, 'save-btn').textContent = '💾 Save configuration for ' + name;
   field(card, 'clear-creds-btn').textContent = '🗑 Clear my credentials for ' + name;
+  field(card, 'test-creds-btn').textContent = '🔌 Test my credentials for ' + name;
 }
 
 // The shared part of a section: the endpoint and the dedicated headers.
@@ -507,6 +514,7 @@ function targetUnavailable(card, gone) {
   notice.style.display = 'block';
   field(card, 'save-btn').disabled = true;
   field(card, 'clear-creds-btn').disabled = true;
+  field(card, 'test-creds-btn').disabled = true;
 }
 
 async function loadTarget(card) {
@@ -641,6 +649,75 @@ async function clearCredentials(card) {
   showTargetMsg(card, 'Your credentials for ' + name + ' were cleared.', true);
 }
 
+// ── Test my credentials (#872) ────────────────────────────────────────────────
+// The test uses what is saved, never what is typed: the server gets a token the
+// way a run does, then asks the provider's GET /versions with it. The result
+// is drawn as text, line by line, under the buttons of its own section.
+
+// How long a token lives, in words.
+function lifetimeText(seconds) {
+  if (seconds <= 0) return 'expired';
+  if (seconds < 120) return 'valid ' + seconds + ' s';
+  if (seconds < 7200) return 'valid ' + Math.round(seconds / 60) + ' min';
+  return 'valid ' + Math.round(seconds / 3600) + ' h';
+}
+
+// The lines of a test's answer: what was found first, then the two steps.
+function credentialTestLines(d) {
+  const lines = [String(d?.summary || '')];
+  const t = d?.token || {};
+  let token = 'Token: ' + (t.ok ? 'obtained' : 'not obtained') + ' (' + (t.mode === 'oauth2' ? 'OAuth2, ' + t.profile : 'bearer token');
+  if (typeof t.expiresInSeconds === 'number') token += ', ' + lifetimeText(t.expiresInSeconds);
+  lines.push(token + ').');
+  const a = d?.api || {};
+  if (typeof a.status === 'number') lines.push('GET /versions: HTTP ' + a.status + '.');
+  if (a.frameworkVersion) lines.push('Test Framework version: ' + a.frameworkVersion + '.');
+  return lines.filter(Boolean);
+}
+
+// Draw a test's lines under the buttons. ok: true green, false red, null neutral.
+function showTestResult(card, lines, ok) {
+  const el = field(card, 'test-result');
+  el.replaceChildren();
+  lines.forEach(line => {
+    const row = document.createElement('div');
+    row.textContent = line;
+    el.appendChild(row);
+  });
+  let tone = 'msg-info';
+  if (ok === true) tone = 'msg-ok';
+  if (ok === false) tone = 'msg-err';
+  el.className = 'msg target-msg test-result ' + tone;
+  el.style.display = 'block';
+}
+
+async function testSavedCredentials(card) {
+  const name = field(card, 'name').textContent;
+  // What is typed and not saved is not what a run would use: save it first.
+  if (card.dataset.unsaved === '1') {
+    if (!confirm('Your changes for ' + name + ' are not saved, and the test uses what is saved.\n\nSave them first, then test?')) {
+      showTestResult(card, ['Not tested: save your changes first, or reload the page to drop them.'], null);
+      return;
+    }
+    await saveTarget(card);
+    if (card.dataset.unsaved === '1') return;   // the save stopped and said why
+  }
+  const button = field(card, 'test-creds-btn');
+  button.disabled = true;
+  showTestResult(card, ['Testing the credentials saved for ' + name + '…'], null);
+  try {
+    const r = await fetch('/v1/me/credentials/test', inTarget(card, { method: 'POST' }));
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showTestResult(card, [d.detail || d.title || ('The test could not be run (HTTP ' + r.status + ').')], false);
+      return;
+    }
+    showTestResult(card, credentialTestLines(d), !!(d.token?.ok && d.api?.ok));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 // ── Building the page ─────────────────────────────────────────────────────────
 // Reports a failed action in the section it belongs to (nothing awaits these).
 function reportTargetError(card) {
@@ -665,6 +742,7 @@ function addTarget(target, index) {
   field(card, 'oauth_profile').addEventListener('change', () => switchProfile(card));
   field(card, 'save-btn').addEventListener('click', () => { saveTarget(card).catch(reportTargetError(card)); });
   field(card, 'clear-creds-btn').addEventListener('click', () => { clearCredentials(card).catch(reportTargetError(card)); });
+  field(card, 'test-creds-btn').addEventListener('click', () => { testSavedCredentials(card).catch(reportTargetError(card)); });
   field(card, 'add-header-btn').addEventListener('click', () => {
     field(card, 'extra-headers-list').appendChild(makeHeaderRow('', ''));
     markUnsaved(card, true);
