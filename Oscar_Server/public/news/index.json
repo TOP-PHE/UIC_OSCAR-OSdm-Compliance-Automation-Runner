@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-test-credentials",
+    "date": "October 19, 2026",
+    "tag": "New",
+    "title": "Test your credentials before a run",
+    "summary": "API Config has a Test my credentials button per company or provider: OSCAR gets a token and tries it on the provider's API.",
+    "content": "The result says whether the token was obtained (or why not: a missing field, the token endpoint's HTTP status) and whether the provider accepts it on GET /versions, with the OSDM versions it lists. Secrets and the token are never shown."
+  },
+  {
     "id": "2026-10-19-ai-analysis-download",
     "date": "October 19, 2026",
     "tag": "New",
