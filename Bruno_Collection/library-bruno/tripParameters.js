@@ -72,11 +72,11 @@ function askedParameters(criteria) {
 const tripName = (trip, i) => (trip?.id ? `trip ${trip.id}` : `trip ${i + 1}`);
 
 // One check over the trips: the trips that do not keep to it, named.
-function overTrips(name, trips, keeps, describe) {
+function overTrips(trips, keeps, describe) {
   const off = trips.map((trip, i) => ({ trip, i })).filter(({ trip }) => !keeps(trip));
   const shown = off.slice(0, 3).map(({ trip, i }) => `${tripName(trip, i)}: ${describe(trip)}`).join('; ');
   return {
-    name, ok: off.length === 0, level: off.length === trips.length ? 'warn' : 'info',
+    ok: off.length === 0, level: off.length === trips.length ? 'warn' : 'info',
     message: `${off.length} of ${trips.length} trip(s) do not (${shown}${off.length > 3 ? '; …' : ''})`,
   };
 }
@@ -92,34 +92,38 @@ function checkTripParameters(criteria, response, ignored = []) {
   const trips = list(response?.trips);
   if (trips.length === 0) return [];
   const asked = askedParameters(criteria);
-  const checks = [];
-  const ignoredCheck = (name, member) => ({
-    name, ok: false, level: 'warn',
-    message: `the provider says it ignored tripSearchCriteria.${member} (PARAMETER_NOT_SUPPORTED): not supported`,
-  });
+  // Each check: its name, the member (and its lower-cased name in a
+  // PARAMETER_NOT_SUPPORTED answer) and how the trips are graded.
+  const wanted = [];
   if (asked.transferLimit !== null) {
-    const name = `Trip search: the trips keep to the transfer limit asked (${asked.transferLimit})`;
-    checks.push(ignored.includes('transferlimit') ? ignoredCheck(name, 'parameters.transferLimit')
-      : overTrips(name, trips, (t) => transfersOf(t) <= asked.transferLimit, (t) => `${transfersOf(t)} transfer(s)`));
+    wanted.push({
+      name: `Trip search: the trips keep to the transfer limit asked (${asked.transferLimit})`, member: 'parameters.transferLimit', key: 'transferlimit',
+      grade: () => overTrips(trips, (t) => transfersOf(t) <= asked.transferLimit, (t) => `${transfersOf(t)} transfer(s)`),
+    });
   }
   for (const via of asked.vias) {
-    const name = `Trip search: the trips pass the via asked (${via})`;
-    checks.push(ignored.includes('vias') ? ignoredCheck(name, 'vias')
-      : overTrips(name, trips, (t) => passes(t, via), () => 'does not pass it'));
+    wanted.push({
+      name: `Trip search: the trips pass the via asked (${via})`, member: 'vias', key: 'vias',
+      grade: () => overTrips(trips, (t) => passes(t, via), () => 'does not pass it'),
+    });
   }
   if (asked.notVias.length) {
-    const name = `Trip search: the trips avoid the places asked (${asked.notVias.join(', ')})`;
-    checks.push(ignored.includes('notvias') ? ignoredCheck(name, 'notVias')
-      : overTrips(name, trips, (t) => !asked.notVias.some((p) => passes(t, p)),
-        (t) => `passes ${asked.notVias.filter((p) => passes(t, p)).join(', ')}`));
+    const passed = (t) => asked.notVias.filter((p) => passes(t, p));
+    wanted.push({
+      name: `Trip search: the trips avoid the places asked (${asked.notVias.join(', ')})`, member: 'notVias', key: 'notvias',
+      grade: () => overTrips(trips, (t) => passed(t).length === 0, (t) => `passes ${passed(t).join(', ')}`),
+    });
   }
   if (asked.numberOfResults !== null) {
-    const name = `Trip search: no more trips than asked (${asked.numberOfResults})`;
     const ok = trips.length <= asked.numberOfResults;
-    checks.push(ignored.includes('numberofresults') ? ignoredCheck(name, 'parameters.numberOfResults')
-      : { name, ok, level: 'warn', message: ok ? '' : `${trips.length} trips given` });
+    wanted.push({
+      name: `Trip search: no more trips than asked (${asked.numberOfResults})`, member: 'parameters.numberOfResults', key: 'numberofresults',
+      grade: () => ({ ok, level: 'warn', message: ok ? '' : `${trips.length} trips given` }),
+    });
   }
-  return checks;
+  return wanted.map(({ name, member, key, grade }) => (ignored.includes(key)
+    ? { name, ok: false, level: 'warn', message: `the provider says it ignored tripSearchCriteria.${member} (PARAMETER_NOT_SUPPORTED): not supported` }
+    : { name, ...grade() }));
 }
 
 module.exports = { askedParameters, transfersOf, placesPassed, checkTripParameters };
