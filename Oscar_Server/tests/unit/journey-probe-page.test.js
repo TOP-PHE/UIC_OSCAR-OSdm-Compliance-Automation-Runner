@@ -18,7 +18,7 @@ const source = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 
 
 function loadFunction(name, context = {}) {
   const lines = source.split('\n');
-  const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
+  const start = lines.findIndex((l) => l.startsWith(`function ${name}(`) || l.startsWith(`async function ${name}(`));
   if (start === -1) throw new Error(`no top-level function ${name}`);
   const end = lines.findIndex((l, i) => i > start && l === '}');
   return vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n')})`, context);
@@ -91,4 +91,34 @@ test('the Probe button: a saved journey only, hidden from testers, its action aw
   expect(source).toMatch(/\$\{j\.id && !j\._unsaved \? `<button[^`]*data-action="wiz-probe-journey"/);
   expect(source).toContain(`[data-action="wiz-delete-journey"], [data-action="wiz-probe-journey"]').forEach`);
   expect(source).toContain("wizProbeJourney(Number.parseInt(el.dataset.jidx, 10), el.dataset.id).catch(reportActionError)");
+});
+
+// #868: Test Data ids are UUIDs (crypto.randomUUID). The page took only a
+// positive integer, so the replace button never sent its request.
+describe('#868 the replace button sends its request for a real Test Data id', () => {
+  const RESOURCE_ID = vm.runInNewContext(`(${/const RESOURCE_ID = (\/.*\/i);/.exec(source)[1]})`);
+  const resourceIdOf = loadFunction('resourceIdOf', { RESOURCE_ID });
+  const ID = '3f2b8c1e-9a4d-4e7b-8c2a-1d5e6f7a8b9c';
+
+  test('a UUID is taken; anything else is refused', () => {
+    expect(resourceIdOf(ID)).toBe(ID);
+    expect(resourceIdOf(ID.toUpperCase())).toBe(ID);
+    for (const v of [7, '7', `${ID}/x`, `../${ID}`, `${ID}?a=1`, '', null, undefined, {}]) expect(resourceIdOf(v)).toBeNull();
+  });
+
+  test('replaceProbedJourney posts to the journey of the probe', async () => {
+    const calls = [];
+    const ctx = {
+      resourceIdOf,
+      probeResults: { j0: { journey: { id: ID, label: 'J' }, offeredTrips: [{ legs: [{ a: 1 }], days: ['TUE'] }] } },
+      confirm: () => true,
+      fetch: async (url, init) => { calls.push({ url, init }); return { ok: true, json: async () => ({ journeys: [{ id: 'n1', created: true }] }) }; },
+      oscarToast: () => {}, refreshAllSections: async () => {}, showJourneyInTestData: () => {},
+    };
+    const replaceProbedJourney = loadFunction('replaceProbedJourney', ctx);
+    await replaceProbedJourney('j0');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`/v1/company/test-resources/${ID}/replace-journey`);
+    expect(JSON.parse(calls[0].init.body)).toEqual({ trips: [{ legs: [{ a: 1 }], days: ['TUE'] }] });
+  });
 });

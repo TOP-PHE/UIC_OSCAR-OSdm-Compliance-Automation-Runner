@@ -62,6 +62,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.348 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.383
+
+Issue #868. Collection unchanged.
+
+### Fixed
+- **Test Config › Provider checklist:** changing the Test Data choice, **Apply** and **Discard** sent no request (1.11.346).
+- **Test Data › Journeys › Probe:** **Replace this journey** sent no request (1.11.347).
+- In both, the page took an id read from the server only when it was a number, but OSCAR's ids are UUIDs. It now takes a UUID and nothing else.
+- Tests run the replace with a real id and check that the request goes out.
+
+---
+
 ## [server-1.11.347 / collection-OTST_V2.0.188] — 2026-10-19 · Release 2026.382
 
 Issue #865. A journey the provider does not offer is replaced, in one step, by every trip it offers. Collection unchanged.

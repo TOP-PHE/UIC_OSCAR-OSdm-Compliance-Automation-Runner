@@ -6327,13 +6327,21 @@ async function keepProbedTrip(key, idx) {
   showJourneyInTestData(body.journey.id);
 }
 
+// #868: a Test Data id from an answer: a UUID (the server makes them with
+// crypto.randomUUID), else null. Only that goes into a request address.
+const RESOURCE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function resourceIdOf(value) {
+  const text = typeof value === 'string' ? value : '';
+  return RESOURCE_ID.test(text) ? text.toLowerCase() : null;
+}
+
 // #865: replace the journey probed by every trip the provider offered, after
 // a confirmation; then Test Data is read again on the first new journey.
 async function replaceProbedJourney(key) {
   const result = probeResults[key];
-  const id = Number(result?.journey?.id);
+  const id = resourceIdOf(result?.journey?.id);
   const trips = Array.isArray(result?.offeredTrips) ? result.offeredTrips : [];
-  if (!Number.isSafeInteger(id) || id < 1 || trips.length === 0) return;
+  if (id === null || trips.length === 0) return;
   const name = result.journey.label || 'this journey';
   if (!confirm(`Replace "${name}" with the ${trips.length} trip(s) the provider offers?\n\nEach trip becomes a journey (its legs stored as train services); "${name}" is removed. Its train sets stay.`)) return;
   const res = await fetch(`/v1/company/test-resources/${id}/replace-journey`, {

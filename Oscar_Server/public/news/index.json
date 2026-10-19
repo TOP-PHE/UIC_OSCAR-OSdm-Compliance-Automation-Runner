@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-uuid-buttons",
+    "date": "October 19, 2026",
+    "tag": "Fix",
+    "title": "Checklist and journey replace buttons work again",
+    "summary": "Apply and Discard of a provider checklist, and Replace this journey after a probe, did nothing in the two previous releases. Fixed.",
+    "content": "The page refused the ids the server gives (UUIDs) before sending the request. Nothing was changed on the server side by those clicks."
+  },
+  {
     "id": "2026-10-19-journey-replace",
     "date": "October 19, 2026",
     "tag": "Improvement",

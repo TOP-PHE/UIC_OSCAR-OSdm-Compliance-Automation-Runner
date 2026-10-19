@@ -904,7 +904,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   7-digit codes as the collection does. `storeFramework` / `storeTestData`
   live in `api/helpers/configurationStore.js` now (shared with #810/#838).
   The apply also writes `provider_checklist`. PR 2 adds the catalogue's
-  scenarios.
+  scenarios. **Ids in OSCAR are UUIDs** (`crypto.randomUUID()`): a page that
+  validates an id read from an answer before putting it in a request address
+  (Sonar's taint rules S8476/S5696) checks for a UUID (`checklistIdOf()`,
+  `resourceIdOf()`), never `Number()`. #864 and #866 shipped a number check
+  and their buttons sent nothing (#868); test such a function with a real id.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network
