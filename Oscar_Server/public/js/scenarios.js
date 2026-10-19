@@ -3855,9 +3855,19 @@ function changePassengerUpdate(action, el) {
 // request), issuer (a URN) and name. The catalogue's card scenarios use the first.
 const FW_CARD_FIELDS = [['code', 'Code', 60], ['issuer', 'Issuer', 200], ['name', 'Name', 120]];
 
+function fwCardFieldHtml(card, i, [field, label, max]) {
+  const width = field === 'code' ? 110 : 220;
+  return `<label for="fw-card-${i}-${field}" style="font-size:11px;color:#78909c">${label}</label><input class="param-input" id="fw-card-${i}-${field}" data-action="fw-card-field" data-index="${i}" data-field="${field}" maxlength="${max}" value="${esc(card?.[field] || '')}" style="max-width:${width}px">`;
+}
+
+function fwCardRowHtml(card, i) {
+  const fields = FW_CARD_FIELDS.map((f) => fwCardFieldHtml(card, i, f)).join('');
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">${fields}<button class="btn btn-small btn-secondary" data-action="fw-card-remove" data-index="${i}" aria-label="Remove card ${i + 1}">✕</button></div>`;
+}
+
 function fwReductionCardsHtml(fw) {
   const cards = Array.isArray(fw.reductionCards) ? fw.reductionCards : [];
-  const rows = cards.map((card, i) => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">${FW_CARD_FIELDS.map(([field, label, max]) => `<label for="fw-card-${i}-${field}" style="font-size:11px;color:#78909c">${label}</label><input class="param-input" id="fw-card-${i}-${field}" data-action="fw-card-field" data-index="${i}" data-field="${field}" maxlength="${max}" value="${esc(card?.[field] || '')}" style="max-width:${field === 'code' ? 110 : 220}px">`).join('')}<button class="btn btn-small btn-secondary" data-action="fw-card-remove" data-index="${i}" aria-label="Remove card ${i + 1}">✕</button></div>`).join('');
+  const rows = cards.map((card, i) => fwCardRowHtml(card, i)).join('');
   const none = '<div style="color:#90a4ae;font-size:12px;padding:4px 0 8px">None declared: the catalogue\'s reduction card scenarios cannot be copied.</div>';
   return `<div class="fw-subsection">
         <div class="fw-subsection-label" style="margin-bottom:8px">Reduction cards the provider accepts<span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — the code as sent in an offer request, the issuer (a URN) and a name</span></div>

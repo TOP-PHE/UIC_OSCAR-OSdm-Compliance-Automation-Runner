@@ -330,8 +330,9 @@ function withCurrencies(datafile, entries) {
 }
 
 // What a limit entry takes from the framework: #699 its passenger count, #704
-// its departure day, #705 its passengers' ages, #887 its reduction card. Nothing when the framework
-// does not declare it (the entry then cannot be copied).
+// its departure day, #705 its passengers' ages, #887 its reduction card.
+// Nothing when the framework does not declare it (the entry then cannot be
+// copied).
 function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
   if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
     const horizon = salesHorizonOf(fw);
@@ -340,17 +341,21 @@ function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
     const declared = ageRangesOf(fw);
     if (declared) ownList(agedPassengers(source?.passengers, declared, toCheck));
   } else if (limit === 'REDUCTION_CARDS') {
-    // #887: the provider's own card, declared: nothing left to check about it.
-    const [card] = declaredCards(fw);
-    if (card) {
-      ownList(passengersWithCard(source?.passengers, card));
-      const i = toCheck.indexOf(CARDS_TO_CHECK);
-      if (i >= 0) toCheck.splice(i, 1);
-    }
+    applyCardLimit(source, fw, { ownList, toCheck });
   } else if (limit) {
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
   }
+}
+
+// #887: the card holder takes the provider's own card, declared: nothing is
+// left to check about it.
+function applyCardLimit(source, fw, { ownList, toCheck }) {
+  const [card] = declaredCards(fw);
+  if (!card) return;
+  ownList(passengersWithCard(source?.passengers, card));
+  const i = toCheck.indexOf(CARDS_TO_CHECK);
+  if (i >= 0) toCheck.splice(i, 1);
 }
 
 // #705: the type, other than CHILD, a passenger of this age is priced as: the

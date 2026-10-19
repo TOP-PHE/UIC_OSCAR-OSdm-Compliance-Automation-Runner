@@ -122,7 +122,7 @@ describe('the Test Framework page', () => {
     ctx.saveFrameworkDebounced = () => { ctx.saves += 1; };
     ctx.renderWizardStep1InSection = () => { ctx.renders += 1; };
     vm.createContext(ctx);
-    vm.runInContext(`${fields}\n${lift('fwReductionCardsHtml')}\n${lift('clickReductionCard')}\n${lift('changeReductionCard')}\nthis.html = fwReductionCardsHtml; this.click = clickReductionCard; this.change = changeReductionCard;`, ctx);
+    vm.runInContext(`${fields}\n${lift('fwCardFieldHtml')}\n${lift('fwCardRowHtml')}\n${lift('fwReductionCardsHtml')}\n${lift('clickReductionCard')}\n${lift('changeReductionCard')}\nthis.html = fwReductionCardsHtml; this.click = clickReductionCard; this.change = changeReductionCard;`, ctx);
     return ctx;
   };
 
