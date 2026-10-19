@@ -6224,26 +6224,49 @@ function journeyProbeDayHtml(d) {
   return `<div style="margin-top:4px">${head}${extra}</div>`;
 }
 
-// #815: a trip the provider offers, with the button that keeps it.
-function offeredTripHtml(t, key, i) {
+// #815: a trip the provider offers, with the button that keeps it when
+// `keepable` (a result of Find journeys, not saved yet).
+function offeredTripHtml(t, key, i, keepable) {
   const mark = t.asDefined ? ' <span style="color:#2e7d32">(as defined)</span>' : '';
+  const keep = keepable
+    ? `<button class="btn btn-sm btn-secondary" data-action="probe-keep-trip" data-key="${esc(key)}" data-idx="${esc(i)}" title="Store its legs as train services and make a journey of them" style="font-size:11px;padding:1px 7px;margin-left:6px">➕ Use this trip</button>`
+    : '';
   return `<li style="margin:3px 0"><code>${esc(t.text)}</code>${mark}
-    <span style="color:#78909c">· ${esc((t.days || []).join(' '))}</span>
-    <button class="btn btn-sm btn-secondary" data-action="probe-keep-trip" data-key="${esc(key)}" data-idx="${esc(i)}" title="Store its legs as train services and make a journey of them" style="font-size:11px;padding:1px 7px;margin-left:6px">➕ Use this trip</button></li>`;
+    <span style="color:#78909c">· ${esc((t.days || []).join(' '))}</span>${keep}</li>`;
+}
+
+// #865: whether a probe found the journey offered as defined, on one day at least.
+function probeOffersAsDefined(result) {
+  const days = Array.isArray(result?.days) ? result.days : [];
+  const trips = Array.isArray(result?.offeredTrips) ? result.offeredTrips : [];
+  return days.some((d) => d.outcome === 'found') || trips.some((t) => t.asDefined);
 }
 
 // #813: the answer of a journey probe, as HTML. Every text comes from the
 // provider or Test Data: always through esc(). `key` names the stored answer
 // (probeResults) the "Use this trip" buttons read.
+// #865: on a saved journey the provider does not offer as defined, one
+// button replaces it with every trip offered; trips are not kept one by one.
 function journeyProbeHtml(result, key) {
   const days = Array.isArray(result?.days) ? result.days : [];
   const trips = Array.isArray(result?.offeredTrips) ? result.offeredTrips : [];
+  const saved = String(key).startsWith('j');
   const offered = trips.length
-    ? `<div style="color:#546e7a;margin-top:6px">Trips the provider offers (days seen):</div><ul style="margin:2px 0 2px 18px">${trips.map((t, i) => offeredTripHtml(t, key, i)).join('')}</ul>`
+    ? `<div style="color:#546e7a;margin-top:6px">Trips the provider offers (days seen):</div><ul style="margin:2px 0 2px 18px">${trips.map((t, i) => offeredTripHtml(t, key, i, !saved)).join('')}</ul>`
     : '';
+  let footer = 'Nothing is changed in Test Data until you use a trip.';
+  if (saved && probeOffersAsDefined(result)) {
+    footer = 'The journey is offered as defined: nothing to change.';
+  } else if (saved && trips.length) {
+    const count = Number(trips.length);
+    footer = `<button class="btn btn-sm btn-primary" data-action="probe-replace-journey" data-key="${esc(key)}" style="font-size:12px;padding:2px 10px">🔁 Replace this journey with the ${count} trip(s) offered</button>
+      <span style="margin-left:6px">Each trip becomes a journey that works; this one is removed. Nothing is changed until you confirm.</span>`;
+  } else if (saved) {
+    footer = 'The provider offers no trip to replace it with.';
+  }
   return `<div style="margin:4px 0 8px;padding:8px 12px;background:#f5f9fc;border:1px solid #cfd8dc;border-radius:6px;font-size:12.5px;line-height:1.5">
     <div style="font-weight:700">🔎 ${esc(result?.summary || '')}</div>${days.map(journeyProbeDayHtml).join('')}${offered}
-    <div style="color:#78909c;margin-top:4px">Nothing is changed in Test Data until you use a trip.</div>
+    <div style="color:#78909c;margin-top:6px">${footer}</div>
   </div>`;
 }
 
@@ -6302,6 +6325,33 @@ async function keepProbedTrip(key, idx) {
   if (key.startsWith('f')) closeJourneyFinder();
   await refreshAllSections();
   showJourneyInTestData(body.journey.id);
+}
+
+// #865: replace the journey probed by every trip the provider offered, after
+// a confirmation; then Test Data is read again on the first new journey.
+async function replaceProbedJourney(key) {
+  const result = probeResults[key];
+  const id = Number(result?.journey?.id);
+  const trips = Array.isArray(result?.offeredTrips) ? result.offeredTrips : [];
+  if (!Number.isSafeInteger(id) || id < 1 || trips.length === 0) return;
+  const name = result.journey.label || 'this journey';
+  if (!confirm(`Replace "${name}" with the ${trips.length} trip(s) the provider offers?\n\nEach trip becomes a journey (its legs stored as train services); "${name}" is removed. Its train sets stay.`)) return;
+  const res = await fetch(`/v1/company/test-resources/${id}/replace-journey`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trips: trips.map((t) => ({ legs: t.legs, days: t.days })) }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    oscarToast(`Could not replace the journey: ${body.detail || body.title || res.status}`, 'error');
+    return;
+  }
+  const made = (body.journeys || []).filter((j) => j.created).length;
+  oscarToast(`"${name}" replaced: ${made} journey(s) made, ${(body.journeys || []).length - made} already there.`, 'success');
+  delete probeResults[key];
+  await refreshAllSections();
+  const first = (body.journeys || [])[0];
+  if (first) showJourneyInTestData(first.id);
 }
 
 // Open Test Data on the journey `id`: the section is drawn closed.
@@ -8174,6 +8224,8 @@ document.body.addEventListener('click', function(e) {
       journeyFinderProbe(Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); break;
     case 'probe-keep-trip':
       e.stopPropagation(); keepProbedTrip(el.dataset.key, Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); break;
+    case 'probe-replace-journey':
+      e.stopPropagation(); replaceProbedJourney(el.dataset.key).catch(reportActionError); break;
     case 'jf-create':
       journeyFinderCreate(Number.parseInt(el.dataset.idx, 10)); break;
     case 'wiz-duplicate-journey':

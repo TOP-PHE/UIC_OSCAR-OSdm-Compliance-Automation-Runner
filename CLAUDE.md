@@ -1912,6 +1912,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   /test-resources/probe-journey` probes legs not saved as a journey (Find
   journeys). The page keeps answers in `probeResults` by key (`j<n>` /
   `f<n>`).
+  **A saved journey not offered is replaced, not patched** (#865): under a
+  saved journey (`j<n>`) the page shows no per-trip button but one "Replace
+  this journey with the N trip(s) offered" (`probeOffersAsDefined()` says
+  when there is nothing to change). `POST /test-resources/:id/replace-journey`
+  checks every trip first (`checkedTrip()`), then in one `transaction()` keeps
+  each (`keepTrip()`, the #815 path) and deletes the old journey unless a
+  kept one is it; train sets stay. Find journeys results keep "Use this
+  trip". Train numbers compare number by number (`numbersOf()`): `382/382`
+  is `382`.
 - **A run goes on a day its trip's trains run** (#717, 1.11.273 /
   OTST_V2.0.153). Trips keep no calendar, so the server matches each trip
   requirement against the TRAIN resources when it serves the run's copy

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-19-journey-replace",
+    "date": "October 19, 2026",
+    "tag": "Improvement",
+    "title": "Replace a journey the provider does not offer",
+    "summary": "When the journey probe finds other trips than the one defined, one button replaces the journey with every trip the provider offers.",
+    "content": "Test Data › Journeys › Probe: if the provider does not offer the journey as defined, “Replace this journey with the N trip(s) offered” makes a journey of each trip offered and removes the old one, after a confirmation. Train sets are kept."
+  },
+  {
     "id": "2026-10-19-provider-checklist",
     "date": "October 19, 2026",
     "tag": "New",

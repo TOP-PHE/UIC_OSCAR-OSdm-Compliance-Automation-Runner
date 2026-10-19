@@ -89,6 +89,14 @@ describe('compareAnswer', () => {
     expect(compareAnswer(legs, null).trips).toBe(0);
   });
 
+  test('a number naming two trains matches when one number is shared (#865)', () => {
+    const through = legs.map((l, i) => (i === 1 ? { ...l, vehicleNumber: '382/382' } : l));
+    const offered = (n) => compareAnswer(through, { trips: [trip([A, B, '1061', '04:05', '04:38'], [B, C, n, '05:00', '06:10'])] });
+    expect(offered('382/382').outcome).toBe('found');
+    expect(offered('382').outcome).toBe('found');
+    expect(offered('383/384').differences).toEqual(['leg 2 is train 383/384, not 382/382']);
+  });
+
   test('an intermediate stop place named otherwise is a difference', () => {
     const r = compareAnswer(legs, { trips: [trip([A, 'urn:uic:stn:5454399', '1061', '04:05', '04:38'], ['urn:uic:stn:5454399', C, 'R 9', '05:00', '06:10'])] });
     expect(r.differences).toEqual(['leg 1 goes to 5454399, not 5454300', 'leg 2 leaves from 5454399, not 5454300']);

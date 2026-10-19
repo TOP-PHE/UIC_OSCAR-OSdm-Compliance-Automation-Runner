@@ -224,3 +224,58 @@ describe('#815: journey-from-trip', () => {
     expect(res.body.journey.label).toBe('8000001 → 8000003 (11:00)');
   });
 });
+
+describe('#865: replace-journey', () => {
+  const E = 'urn:uic:stn:8000010';
+  const tripA = { legs: [
+    { originURN: A, destinationURN: B, vehicleNumber: 'IC 21', departureTime: '12:00:00', arrivalTime: '13:00:00' },
+    { originURN: B, destinationURN: E, vehicleNumber: 'RE 22', departureTime: '13:20:00', arrivalTime: '14:00:00' },
+  ], days: ['WED'] };
+  const tripB = { legs: [
+    { originURN: A, destinationURN: E, vehicleNumber: 'EC 30', departureTime: '15:00:00', arrivalTime: '17:00:00' },
+  ], days: ['WED', 'THU'] };
+  const replace = (id, body, auth = tm()) => request(app).post(`/v1/company/test-resources/${id}/replace-journey`).set('Authorization', auth).send(body);
+  const journeyRow = id => get(`SELECT id FROM test_resources WHERE id = ? AND resource_type = 'JOURNEY'`, [id]);
+  const count = () => get('SELECT COUNT(*) AS n FROM test_resources WHERE company_id = ?', [companyId]).n;
+
+  test('403 for a tester; 404 for a train set or another company\'s journey; 400 for no trip or a wrong one, nothing changed', async () => {
+    const old = uuidv4();
+    seed(old, 'JOURNEY', { legs: [{ trainResourceId: t1, serviceIndex: 0 }, { trainResourceId: t2, serviceIndex: 0 }] });
+    expect((await replace(old, { trips: [tripA] }, token('company_user', testerId))).status).toBe(403);
+    expect((await replace(t1, { trips: [tripA] })).status).toBe(404);
+    const foreign = uuidv4();
+    seed(foreign, 'JOURNEY', { legs: [] }, otherId);
+    expect((await replace(foreign, { trips: [tripA] })).status).toBe(404);
+    expect((await replace(old, { trips: [] })).status).toBe(400);
+    const before = count();
+    const bad = await replace(old, { trips: [tripA, { legs: [tripB.legs[0]], days: [] }] });
+    expect(bad.status).toBe(400);
+    expect(bad.body.detail).toMatch(/^Trip 2: .*Nothing was changed\.$/);
+    expect(count()).toBe(before);
+    expect(journeyRow(old)).toBeTruthy();
+  });
+
+  test('every trip offered becomes a journey and the journey probed goes; its train sets stay', async () => {
+    const old = uuidv4();
+    seed(old, 'JOURNEY', { legs: [{ trainResourceId: t1, serviceIndex: 0 }, { trainResourceId: t2, serviceIndex: 0 }] });
+    const res = await replace(old, { trips: [tripA, tripB] });
+    expect(res.status).toBe(200);
+    expect(res.body.replaced).toMatchObject({ id: old, removed: true });
+    expect(res.body.journeys).toHaveLength(2);
+    expect(res.body.journeys.every(j => j.created)).toBe(true);
+    expect(journeyRow(old)).toBeUndefined();
+    for (const j of res.body.journeys) expect(journeyRow(j.id)).toBeTruthy();
+    expect(get('SELECT id FROM test_resources WHERE id = ?', [t1])).toBeTruthy();
+    expect(get('SELECT id FROM test_resources WHERE id = ?', [t2])).toBeTruthy();
+  });
+
+  test('a trip that is the journey itself keeps it', async () => {
+    const first = await request(app).post('/v1/company/test-resources/journey-from-trip').set('Authorization', tm()).send(tripA);
+    const sameId = first.body.journey.id;
+    const res = await replace(sameId, { trips: [tripA, tripB] });
+    expect(res.status).toBe(200);
+    expect(res.body.replaced.removed).toBe(false);
+    expect(res.body.journeys.map(j => j.id)).toContain(sameId);
+    expect(journeyRow(sameId)).toBeTruthy();
+  });
+});

@@ -18,7 +18,7 @@
 
 const express = require('express');
 const { randomUUID: uuidv4 } = require('node:crypto');
-const { get, all, run, colEncrypt, colDecrypt, decrypt } = require('../../db/db');
+const { get, all, run, transaction, colEncrypt, colDecrypt, decrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
@@ -719,52 +719,108 @@ router.post('/test-resources/probe-journey', async (req, res) => {
   return _probeJourney(req, res, targetCompanyId, journey, _resourcesOf(targetCompanyId, 'TRAIN'));
 });
 
-// ── POST /v1/company/test-resources/journey-from-trip (#815) ──────────────────
-// Keep a trip a probe listed: its legs are stored as train services the way
-// Discover timetable stores them (manual edits kept), on the weekdays the
-// probe saw it, and a journey is made of them. A journey with the same legs
-// is named, not made twice.
-router.post('/test-resources/journey-from-trip', (req, res) => {
-  if (!requireTestManager(req, res)) return;
-  const targetCompanyId = resolveCompanyScope(req, res);
-  if (targetCompanyId === null) return;
-  const trip = tripToKeep(req.body);
-  if (trip.error) return res.status(400).json({ status: 400, title: 'Bad Request', detail: trip.error });
-  // Checked before anything is written.
-  if (!fitsOneTripDate(trip.legs)) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'These legs do not make one journey on one trip date: a leg leaves before the previous one arrives.' });
-  }
-
-  const { toCreate, toUpdate } = groupAndMerge(trip.records, _resourcesOf(targetCompanyId, 'TRAIN'), {});
+// #815: store a trip a probe listed (`trip` from tripToKeep): its legs as
+// train services the way Discover timetable stores them (manual edits kept),
+// on the weekdays the probe saw it, then a journey made of them. A journey
+// with the same legs is named, not made twice. { journey, created,
+// trainsCreated, trainsUpdated } or { error } when no journey can be made.
+function keepTrip(companyId, trip) {
+  const { toCreate, toUpdate } = groupAndMerge(trip.records, _resourcesOf(companyId, 'TRAIN'), {});
   const trainsCreated = toCreate.map((c) => {
     const id = uuidv4();
     run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', ?, ?)`,
-      [id, targetCompanyId, c.label, colEncrypt(JSON.stringify(c.data))]);
+      [id, companyId, c.label, colEncrypt(JSON.stringify(c.data))]);
     return { id, label: c.label };
   });
   const trainsUpdated = toUpdate.map((u) => {
     run(`UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
-      [colEncrypt(JSON.stringify(u.data)), u.id, targetCompanyId]);
+      [colEncrypt(JSON.stringify(u.data)), u.id, companyId]);
     return { id: u.id, label: u.label };
   });
 
   // The journey, from the records of the first weekday seen.
   const firstDay = trip.records.filter((r) => r.dayOfWeek === trip.days[0]);
-  const { toCreate: made } = journeysFromConnections([firstDay], _resourcesOf(targetCompanyId, 'TRAIN'), []);
+  const { toCreate: made } = journeysFromConnections([firstDay], _resourcesOf(companyId, 'TRAIN'), []);
   if (made.length === 0) {
     // Not expected: the trains were just stored with these services.
-    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The journey could not be made from the train services stored.', trainsCreated, trainsUpdated });
+    return { error: 'The journey could not be made from the train services stored.', trainsCreated, trainsUpdated };
   }
   const legsKey = (legs) => legs.map((l) => `${l.trainResourceId}#${l.serviceIndex}`).join('>');
-  const same = _resourcesOf(targetCompanyId, 'JOURNEY').find((j) => Array.isArray(j.data.legs) && legsKey(j.data.legs) === legsKey(made[0].data.legs));
-  if (same) {
-    return res.json({ journey: { id: same.id, label: same.label }, created: false, trainsCreated, trainsUpdated });
-  }
+  const same = _resourcesOf(companyId, 'JOURNEY').find((j) => Array.isArray(j.data.legs) && legsKey(j.data.legs) === legsKey(made[0].data.legs));
+  if (same) return { journey: { id: same.id, label: same.label }, created: false, trainsCreated, trainsUpdated };
   const id = uuidv4();
   run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'JOURNEY', ?, ?)`,
-    [id, targetCompanyId, made[0].label, colEncrypt(JSON.stringify(made[0].data))]);
-  log.info({ companyId: targetCompanyId, journey: id, trainsCreated: trainsCreated.length, trainsUpdated: trainsUpdated.length }, 'Journey kept from a probe');
-  return res.status(201).json({ journey: { id, label: made[0].label }, created: true, trainsCreated, trainsUpdated });
+    [id, companyId, made[0].label, colEncrypt(JSON.stringify(made[0].data))]);
+  return { journey: { id, label: made[0].label }, created: true, trainsCreated, trainsUpdated };
+}
+
+// A trip of a request body, checked before anything is written: { trip } or { error }.
+function checkedTrip(body) {
+  const trip = tripToKeep(body);
+  if (trip.error) return { error: trip.error };
+  if (!fitsOneTripDate(trip.legs)) return { error: 'These legs do not make one journey on one trip date: a leg leaves before the previous one arrives.' };
+  return { trip };
+}
+
+// ── POST /v1/company/test-resources/journey-from-trip (#815) ──────────────────
+// Keep one trip a probe listed, as a journey.
+router.post('/test-resources/journey-from-trip', (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+  const checked = checkedTrip(req.body);
+  if (checked.error) return res.status(400).json({ status: 400, title: 'Bad Request', detail: checked.error });
+  const kept = keepTrip(targetCompanyId, checked.trip);
+  if (kept.error) return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: kept.error, trainsCreated: kept.trainsCreated, trainsUpdated: kept.trainsUpdated });
+  if (kept.created) log.info({ companyId: targetCompanyId, journey: kept.journey.id, trainsCreated: kept.trainsCreated.length, trainsUpdated: kept.trainsUpdated.length }, 'Journey kept from a probe');
+  return res.status(kept.created ? 201 : 200).json(kept);
+});
+
+// ── POST /v1/company/test-resources/:id/replace-journey (#865) ────────────────
+// A journey the provider does not offer as defined is replaced by every trip
+// its probe offered: { trips: [{ legs, days }, …] }, 1 to MAX_REPLACING. All
+// trips are checked before anything is written; then, in one transaction,
+// each is kept as a journey (as journey-from-trip does) and the journey
+// probed is removed, unless one of the trips is that very journey. Train sets
+// stay: other journeys or a direct run may use them.
+const MAX_REPLACING = 10;
+router.post('/test-resources/:id/replace-journey', (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+  const old = get(`SELECT id, label FROM test_resources WHERE id = ? AND company_id = ? AND resource_type = 'JOURNEY'`, [req.params.id, targetCompanyId]);
+  if (!old) return res.status(404).json({ status: 404, title: 'Not Found' });
+  const raw = req.body?.trips;
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_REPLACING) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: `trips must hold 1 to ${MAX_REPLACING} trips offered by the probe.` });
+  }
+  const trips = [];
+  for (let i = 0; i < raw.length; i++) {
+    const checked = checkedTrip(raw[i]);
+    if (checked.error) return res.status(400).json({ status: 400, title: 'Bad Request', detail: `Trip ${i + 1}: ${checked.error} Nothing was changed.` });
+    trips.push(checked.trip);
+  }
+  let result;
+  try {
+    transaction(() => {
+      const kept = trips.map((t) => keepTrip(targetCompanyId, t));
+      const failed = kept.find((k) => k.error);
+      if (failed) throw new Error(failed.error);
+      const stays = kept.some((k) => k.journey.id === old.id);
+      if (!stays) run('DELETE FROM test_resources WHERE id = ? AND company_id = ?', [old.id, targetCompanyId]);
+      result = {
+        replaced: { id: old.id, label: old.label, removed: !stays },
+        journeys: kept.map((k) => ({ ...k.journey, created: k.created })),
+        trainsCreated: kept.flatMap((k) => k.trainsCreated),
+        trainsUpdated: kept.flatMap((k) => k.trainsUpdated),
+      };
+    });
+  } catch (err) {
+    log.error({ err, companyId: targetCompanyId, journey: old.id }, 'Journey replacement failed');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The journey could not be replaced. Nothing was changed.' });
+  }
+  log.info({ companyId: targetCompanyId, journey: old.id, journeys: result.journeys.length }, 'Journey replaced by the trips offered');
+  return res.json(result);
 });
 
 module.exports = router;

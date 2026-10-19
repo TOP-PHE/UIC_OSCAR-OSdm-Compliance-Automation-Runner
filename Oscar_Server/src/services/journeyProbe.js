@@ -88,8 +88,11 @@ function legDifferences(n, want, got) {
   const out = [];
   if (stopKey(want.origin) !== stopKey(got.originURN)) out.push(`leg ${n} leaves from ${short(got.originURN)}, not ${short(want.origin)}`);
   if (stopKey(want.destination) !== stopKey(got.destinationURN)) out.push(`leg ${n} goes to ${short(got.destinationURN)}, not ${short(want.destination)}`);
+  // A number may name several trains ("382/382", a through train under two
+  // numbers): the leg is that train when one number of each side is shared.
   const numbers = numbersOf(got.vehicleNumber);
-  if (want.vehicleNumber && numbers.length && !numbers.includes(bareNumber(want.vehicleNumber))) {
+  const wanted = numbersOf(want.vehicleNumber);
+  if (wanted.length && numbers.length && !wanted.some((x) => numbers.includes(x))) {
     out.push(`leg ${n} is train ${got.vehicleNumber}, not ${want.vehicleNumber}`);
   }
   if (want.departure && clock(got.departureTime) && want.departure !== clock(got.departureTime)) {
