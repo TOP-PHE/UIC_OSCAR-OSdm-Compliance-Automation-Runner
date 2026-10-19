@@ -26,6 +26,7 @@
  */
 
 const { ageRangesOf } = require('./scenarioCatalogue');
+const { declaredCards, passengersWithCard } = require('./reductionCards');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -85,6 +86,8 @@ function saleFlexibility(own, framework) {
   return FLEXIBILITIES.find((f) => declared.includes(f)) || declared[0];
 }
 
+const CARDS_TO_CHECK = 'the passengers\' reduction cards must be ones the provider accepts';
+
 // What a reference scenario needs that OSCAR cannot see in the Test Data.
 function needsToCheck(needs) {
   const out = [];
@@ -93,7 +96,7 @@ function needsToCheck(needs) {
   }
   if (arr(needs.legClasses).length) out.push(`each leg must be sold in its class: ${needs.legClasses.join(', ')}`);
   if (needs.requestedInformation) out.push('the provider must ask for passenger details on the chosen trip');
-  if (needs.reductionCards) out.push('the passengers\' reduction cards must be ones the provider accepts');
+  if (needs.reductionCards) out.push(CARDS_TO_CHECK);
   return out;
 }
 
@@ -327,19 +330,37 @@ function withCurrencies(datafile, entries) {
 }
 
 // What a limit entry takes from the framework: #699 its passenger count, #704
-// its departure day, #705 its passengers' ages. Nothing when the framework
-// does not declare it (the entry then cannot be copied).
+// its departure day, #705 its passengers' ages, #887 its reduction card.
+// Nothing when the framework does not declare it (the entry then cannot be
+// copied).
 function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
   if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
-    const horizon = salesHorizonOf(fw);
-    if (horizon) scenario.departureDaysFromToday = limit === 'OVER_SALES_HORIZON' ? horizon + 1 : horizon;
+    applyHorizonLimit(limit, scenario, fw);
   } else if (limit === 'AGE_RANGES') {
     const declared = ageRangesOf(fw);
     if (declared) ownList(agedPassengers(source?.passengers, declared, toCheck));
+  } else if (limit === 'REDUCTION_CARDS') {
+    applyCardLimit(source, fw, { ownList, toCheck });
   } else if (limit) {
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
   }
+}
+
+// #704: the last day of the sales horizon, or the day after.
+function applyHorizonLimit(limit, scenario, fw) {
+  const horizon = salesHorizonOf(fw);
+  if (horizon) scenario.departureDaysFromToday = limit === 'OVER_SALES_HORIZON' ? horizon + 1 : horizon;
+}
+
+// #887: the card holder takes the provider's own card, declared: nothing is
+// left to check about it.
+function applyCardLimit(source, fw, { ownList, toCheck }) {
+  const [card] = declaredCards(fw);
+  if (!card) return;
+  ownList(passengersWithCard(source?.passengers, card));
+  const i = toCheck.indexOf(CARDS_TO_CHECK);
+  if (i >= 0) toCheck.splice(i, 1);
 }
 
 // #705: the type, other than CHILD, a passenger of this age is priced as: the

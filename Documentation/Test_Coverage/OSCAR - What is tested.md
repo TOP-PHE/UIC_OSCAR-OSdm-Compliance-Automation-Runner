@@ -235,6 +235,8 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_AGE_LIMITS` | Three passengers on the edges of the age ranges: a child on the last day of its range, a passenger the day it leaves it, an adult on the first day of the adult range; each priced as its type. | CHILD and ADULT age ranges | 408 | `SIM_SALE_AGE_LIMITS_38` |
 | `OTST_SALE_RETURN_SEPARATE_1ADT` | Return sold as two offers, one per direction (`returnSearchParameters.outwardOfferIds`). | return model SEPARATE | 314 | `SIM_RETURN_SEPARATE_1ADT_38` |
 | `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 356 | `SIM_RETURN_COMBINED_1ADT_38` |
+| `OTST_SALE_REDUCTION_CARD_1ADT` | Sale to an adult holding a reduction card, the first one the Test Framework declares: the offer names the card on the passenger and costs less than the same request without it. | a reduction card | 261 | `SIM_SALE_CARD_25_1ADT_38` |
+| `OTST_SALE_REDUCTION_CARD_2ADT` | Sale to two adults, one holding the first reduction card the Test Framework declares: only that passenger pays less. | a reduction card | 321 | `SIM_SALE_CARD_50_2ADT_38` |
 | `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 289 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
 | `OTST_SALE_RESERVATION_MANDATORY_2ADT` | A mandatory seat reservation, detected from the admission and booked with it. | — | 343 | `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` |
 | `OTST_SALE_RESERVATION_SELECTION_2ADT` | An optional seat reservation booked with `optionalReservationSelections`. | — | 369 | `SIM_SALE_RESERVATION_SELECTION_2ADT_38` |

@@ -355,6 +355,30 @@
       }
     },
     {
+      "code": "OTST_SALE_REDUCTION_CARD_1ADT",
+      "source": "SIM_SALE_CARD_25_1ADT_38",
+      "purpose": "Sale to an adult holding a reduction card, the first one the Test Framework declares: the offer names the card on the passenger and costs less than the same request without it.",
+      "checks": 261,
+      "limit": "REDUCTION_CARDS",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1,
+        "reductionCards": true
+      }
+    },
+    {
+      "code": "OTST_SALE_REDUCTION_CARD_2ADT",
+      "source": "SIM_SALE_CARD_50_2ADT_38",
+      "purpose": "Sale to two adults, one holding the first reduction card the Test Framework declares: only that passenger pays less.",
+      "checks": 321,
+      "limit": "REDUCTION_CARDS",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 2,
+        "reductionCards": true
+      }
+    },
+    {
       "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
       "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
       "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",

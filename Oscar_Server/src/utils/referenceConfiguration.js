@@ -163,6 +163,9 @@ function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) 
   const modes = framework.placeSelection?.supportedModes;
   if (Array.isArray(modes)) framework.placeSelection.seatMap = modes.includes('SEATMAP_AT_OFFER');
   withPassengerUpdateScope(framework, answers);
+  // #887: A3.7, the reduction cards the provider accepts.
+  const cards = require('./reductionCards').cardsFromChecklist(answers);
+  if (cards) framework.reductionCards = cards;
   return framework;
 }
 

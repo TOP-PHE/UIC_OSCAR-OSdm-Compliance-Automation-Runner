@@ -1452,7 +1452,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   route with `routeAfterOfferStep()`; a new step after the offer must go
   through it, not copy it. `__cardPriceCompareDone` keeps 01c to once per
   scenario and is in both reset lists. A ReductionCardType is an object:
-  compare code and issuer, never identity.
+  compare code and issuer, never identity. **The provider's own cards are
+  declared** (#887 PR 1, 1.11.362): `reductionCards` [{ code, issuer, name }]
+  in the framework (`utils/reductionCards.js`: `declaredCards()`,
+  `cardsFromChecklist()` for A3.7's `data.card.<n>.*` table, read by
+  `frameworkFromChecklist()`). Catalogue `limit` `REDUCTION_CARDS`: the copy
+  gives the card holder the first declared card (code + issuer, an object
+  entry) in a list of its own (`passengersWithCard()`), not copiable without
+  one. The page's list is drawn by `fwReductionCardsHtml()`, its click handled
+  before the click switch (`clickReductionCard()`), like the change chain.
+  Named products and groups are PRs 2-3 of #887.
 - **A scenario can name the product it sells** (#598, 1.11.229 /
   OTST_V2.0.113). `expectedProduct` is a code (exact) or words of the name;
   `library-bruno/products.js` (pure) lets a code match anywhere win over a
