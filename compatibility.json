@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.399",
+  "current_release": "2026.400",
   "releases": [
+    {
+      "release": "2026.400",
+      "date": "2026-10-20",
+      "server": "1.11.365",
+      "collection": "OTST_V2.0.200",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Group products: the Test Framework declares the provider's group tariffs (code, name, flexibility, group sizes; checklist question A4.19); OTST_SALE_GROUP_TARIFF sells the first for a group of its sizes, and NHF_SALE_GROUP_TOO_LARGE asks for one passenger over the first maximum, which must be refused or offered without that product (#887 PR 3)."
+      ]
+    },
     {
       "release": "2026.399",
       "date": "2026-10-20",

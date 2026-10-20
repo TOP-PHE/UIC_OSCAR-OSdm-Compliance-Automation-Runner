@@ -125,6 +125,14 @@ runtime:
           return;
         }
 
+        // #887 PR 3: a group too large for its product may be refused; the
+        // scenario ends here then.
+        if (require(bru.getEnvVar("library_base") + "groupOffers.js").checkGroupRefused(res.getStatus(), _tripIdsBody)) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (group size probe)");
+          return;
+        }
+
         // Validate HTTP response status
         bruTest(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");

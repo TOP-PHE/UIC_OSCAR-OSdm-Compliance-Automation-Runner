@@ -147,3 +147,70 @@ describe('the Test Framework page', () => {
     expect(src.indexOf('${fwProductsHtml(fw)}')).toBeGreaterThan(src.indexOf('id="fw-sales-horizon"'));
   });
 });
+
+// ── PR 3: group products ────────────────────────────────────────────────────
+
+const { declaredGroupProducts, groupProductsFromChecklist, sizeOf } = require('../../src/utils/namedProducts');
+const GROUP = { code: 'SKUP', name: 'Skupinová', flexibility: 'FULL_FLEXIBLE', minPassengers: 2, maxPassengers: 19 };
+
+describe('the group products a framework declares', () => {
+  test('a product plus the group sizes it takes; a size outside 1–99 or a maximum below the minimum is left out', () => {
+    expect(declaredGroupProducts({ groupProducts: [{ ...GROUP, minPassengers: '2', maxPassengers: ' 19 ' }, { code: 'G2', min: 5, max: 3 }, { code: 'G3', min: 0, max: 100 }, { code: 'SKUP' }] }))
+      .toEqual([GROUP, { code: 'G2', minPassengers: 5 }, { code: 'G3' }]);
+    for (const [v, want] of [[1, 1], ['99', 99], [0, null], ['1.5', null], [100, null], [null, null]]) expect(sizeOf(v)).toBe(want);
+  });
+
+  test('read from A4.19; NO = none; no answer keeps what the framework had', () => {
+    const answers = { 'data.groupProducts=YES': true, 'data.groupProduct.1.code': 'SKUP', 'data.groupProduct.1.name': 'Skupinová', 'data.groupProduct.1.flexibility': 'full flexible', 'data.groupProduct.1.min': '2', 'data.groupProduct.1.max': '19', 'data.groupProduct.1.other': 'x' };
+    expect(groupProductsFromChecklist(answers)).toEqual([GROUP]);
+    expect(groupProductsFromChecklist({ 'data.groupProducts=NO': true })).toEqual([]);
+    expect(groupProductsFromChecklist({})).toBeNull();
+    expect(frameworkFromChecklist(answers).groupProducts).toEqual([GROUP]);
+    expect(frameworkFromChecklist({}, { base: { groupProducts: [{ code: 'KEPT' }] } }).groupProducts).toEqual([{ code: 'KEPT' }]);
+  });
+});
+
+describe('the catalogue\'s group scenarios', () => {
+  const FW = { salesFlows: ['SALE'], passengerTypes: ['ADULT'] };
+  const CODES = ['OTST_SALE_GROUP_TARIFF', 'NHF_SALE_GROUP_TOO_LARGE'];
+  const entries = (fw) => catalogueFor(catalogue, simulator, fw).filter((e) => CODES.includes(e.code));
+  const copy = (fw) => {
+    const all = catalogueFor(catalogue, simulator, fw);
+    const { datafile, notes } = adaptCatalogueDatafile(catalogueDatafile(catalogue, simulator), all, fw);
+    const of = (code) => {
+      const scenario = datafile.scenarios.find((s) => s.code === code);
+      const passengers = datafile.passengersList.find((l) => l.id === scenario.passengersListId).passengers;
+      return { scenario, passengers, note: notes[code] };
+    };
+    return { of, datafile };
+  };
+
+  test('not copiable without a group product; the too-large one needs a maximum', () => {
+    const [sale, over] = entries(FW);
+    expect([sale.limit, over.limit, over.kind]).toEqual(['GROUP_TARIFF', 'OVER_GROUP_SIZE', 'NHF']);
+    expect(sale.missing).toEqual(['a group product the provider sells (Tariff Flexibility › Group products)']);
+    expect(entries({ ...FW, groupProducts: [{ code: 'G' }] }).map((e) => e.missing)).toEqual([[], ['a group product with its maximum group size (Tariff Flexibility › Group products)']]);
+    expect(entries({ ...FW, groupProducts: [GROUP] }).every((e) => e.missing.length === 0)).toBe(true);
+    expect(over.needsText[0]).toMatch(/^one passenger more than the maximum/);
+  });
+
+  test('the sale: the first group product by its code, a group of its sizes; the probe: its maximum plus one, product absent', () => {
+    const { of, datafile } = copy({ ...FW, groupProducts: [{ code: 'G', flexibility: 'NON_FLEXIBLE', minPassengers: 8 }, GROUP] });
+    const sale = of('OTST_SALE_GROUP_TARIFF');
+    expect([sale.scenario.expectedProduct, sale.scenario.desiredFlexibility, sale.passengers.length]).toEqual(['G', 'NON_FLEXIBLE', 8]);
+    expect(sale.note.toComplete.join(' ')).not.toMatch(/expectedProduct/);
+    const over = of('NHF_SALE_GROUP_TOO_LARGE');
+    expect([over.scenario.expectedProduct, over.scenario.expectedProductAbsent, over.passengers.length]).toEqual(['SKUP', 'on', 20]);
+    expect(new Set(over.passengers.map((p) => p.reference)).size).toBe(20);
+    const schema = JSON.parse(fs.readFileSync(path.join(DATA, '..', 'json_validator', 'datafile.schema.json'), 'utf8'));
+    expect(schemaProblems(datafile, schema).problems).toEqual([]);
+    expect(copy({ ...FW, groupProducts: [{ code: 'G', maxPassengers: 4 }] }).of('OTST_SALE_GROUP_TARIFF').passengers).toHaveLength(4);
+    expect(copy({ ...FW, groupProducts: [{ code: 'G' }] }).of('OTST_SALE_GROUP_TARIFF').passengers).toHaveLength(6);
+  });
+
+  test('the page draws the group list in Tariff Flexibility', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 'scenarios.js'), 'utf8');
+    expect(src.indexOf('${fwGroupProductsHtml(fw)}')).toBeGreaterThan(src.indexOf('${fwProductsHtml(fw)}'));
+    expect(src).toContain("group: { key: 'groupProducts', fields: FW_GROUP_FIELDS, noun: 'group product' }");
+  });
+});

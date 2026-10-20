@@ -27,7 +27,7 @@
 
 const { ageRangesOf } = require('./scenarioCatalogue');
 const { declaredCards, passengersWithCard } = require('./reductionCards');
-const { declaredProducts } = require('./namedProducts');
+const { declaredProducts, declaredGroupProducts } = require('./namedProducts');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -346,6 +346,8 @@ function applyLimit(limit, scenario, source, fw, { ownList, toCheck, toComplete 
     applyCardLimit(source, fw, { ownList, toCheck });
   } else if (limit === 'NAMED_PRODUCTS') {
     applyProductLimit(scenario, fw, toComplete);
+  } else if (limit === 'GROUP_TARIFF' || limit === 'OVER_GROUP_SIZE') {
+    applyGroupLimit(limit, scenario, source, fw, { ownList, toComplete });
   } else if (limit) {
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
@@ -376,6 +378,26 @@ function applyProductLimit(scenario, fw, toComplete) {
   if (!product) return;
   scenario.expectedProduct = product.code;
   if (product.flexibility) scenario.desiredFlexibility = product.flexibility;
+  const i = toComplete.indexOf(PRODUCT_TO_COMPLETE);
+  if (i >= 0) toComplete.splice(i, 1);
+}
+
+// #887 PR 3: a group sale with the first declared group product, for a
+// group its sizes take (the source's size, brought within them); or one
+// passenger more than the first declared maximum, which the provider must
+// refuse or answer without that product.
+function applyGroupLimit(limit, scenario, source, fw, { ownList, toComplete }) {
+  const groups = declaredGroupProducts(fw);
+  const product = limit === 'OVER_GROUP_SIZE' ? groups.find((g) => g.maxPassengers) : groups[0];
+  if (!product) return;
+  scenario.expectedProduct = product.code;
+  if (product.flexibility) scenario.desiredFlexibility = product.flexibility;
+  const given = arr(source?.passengers).filter(isObj).length;
+  const count = limit === 'OVER_GROUP_SIZE'
+    ? product.maxPassengers + 1
+    : Math.min(product.maxPassengers ?? Infinity, Math.max(product.minPassengers ?? 1, given));
+  if (count !== given) ownList(resizedPassengers(source?.passengers, count));
+  if (limit === 'OVER_GROUP_SIZE') scenario.expectedProductAbsent = 'on';
   const i = toComplete.indexOf(PRODUCT_TO_COMPLETE);
   if (i >= 0) toComplete.splice(i, 1);
 }

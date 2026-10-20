@@ -1486,6 +1486,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   actions `fw-card-*` / `fw-product-*`). Adding the products to the simulator
   checklists took the alpha one over the AI context's 20k: three simulator
   comments were shortened to fit (`cut` 0).
+  **Group products** (#887 PR 3, 1.11.365 / OTST_V2.0.200): `groupProducts`
+  [{ code, name, flexibility, minPassengers, maxPassengers }]
+  (`declaredGroupProducts()`, `groupProductsFromChecklist()` for A4.19's
+  `data.groupProducts` / `data.groupProduct.<n>.code|name|flexibility|min|max`).
+  Limits `GROUP_TARIFF` (`OTST_SALE_GROUP_TARIFF`, source `SIM_GROUP_6ADT_38`:
+  the first group product, the source's size brought within its min and max)
+  and `OVER_GROUP_SIZE` (`NHF_SALE_GROUP_TOO_LARGE`, source
+  `SIM_GROUP_WEEKEND_6PAX_ABSENT_38`: the first product with a max, max + 1
+  passengers, `expectedProductAbsent`), `applyGroupLimit()`. Step 01 grades a
+  4xx to such a COLLECTIVE request as a refusal before the status check
+  (`checkGroupRefused()`, `groupOffers.js`), and ends; a 2xx goes on to "no
+  offer holds the product". Each list added to the simulator checklists costs
+  AI context: three more comments were shortened (`cut` 0).
 - **A scenario can name the product it sells** (#598, 1.11.229 /
   OTST_V2.0.113). `expectedProduct` is a code (exact) or words of the name;
   `library-bruno/products.js` (pure) lets a code match anywhere win over a

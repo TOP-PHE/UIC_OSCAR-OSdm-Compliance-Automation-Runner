@@ -394,6 +394,35 @@
       }
     },
     {
+      "code": "OTST_SALE_GROUP_TARIFF",
+      "source": "SIM_GROUP_6ADT_38",
+      "purpose": "Group sale in the COLLECTIVE mode with the first group product the Test Framework declares, by its code, for a group of its sizes: one collective admission for the whole group, every passenger in appliedPassengerTypes, and the group compared with the same passengers alone.",
+      "checks": 458,
+      "limit": "GROUP_TARIFF",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 6,
+        "providerValues": [
+          "expectedProduct"
+        ]
+      }
+    },
+    {
+      "code": "NHF_SALE_GROUP_TOO_LARGE",
+      "source": "SIM_GROUP_WEEKEND_6PAX_ABSENT_38",
+      "purpose": "Group of one passenger more than the maximum of the first group product the Test Framework declares with one: the provider must refuse the request or offer it without that product.",
+      "checks": 172,
+      "limit": "OVER_GROUP_SIZE",
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "NON_FLEXIBLE",
+        "passengers": 6,
+        "providerValues": [
+          "expectedProduct"
+        ]
+      }
+    },
+    {
       "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
       "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
       "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",

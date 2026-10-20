@@ -3859,9 +3859,11 @@ function changePassengerUpdate(action, el) {
 // `fw-<list>-remove` and `fw-<list>-field`, the fields by `data-field`.
 const FW_CARD_FIELDS = [['code', 'Code', 60, 110], ['issuer', 'Issuer', 200, 220], ['name', 'Name', 120, 220], ['percent', 'Reduction %', 6, 70]];
 const FW_PRODUCT_FIELDS = [['code', 'Code', 60, 140], ['name', 'Name', 120, 220], ['flexibility', 'Flexibility', 20, 150]];
+const FW_GROUP_FIELDS = [...FW_PRODUCT_FIELDS, ['minPassengers', 'Min', 2, 60], ['maxPassengers', 'Max', 2, 60]];
 const FW_LISTS = {
   card: { key: 'reductionCards', fields: FW_CARD_FIELDS, noun: 'card' },
   product: { key: 'products', fields: FW_PRODUCT_FIELDS, noun: 'product' },
+  group: { key: 'groupProducts', fields: FW_GROUP_FIELDS, noun: 'group product' },
 };
 
 function fwListFieldHtml(list, item, i, [field, label, max, width]) {
@@ -3904,9 +3906,19 @@ function fwProductsHtml(fw) {
   });
 }
 
+function fwGroupProductsHtml(fw) {
+  return fwListHtml('group', fw, {
+    label: 'Group products the provider sells',
+    hint: 'the code as the offers give it, a name, its flexibility, and the group sizes it takes (min and max passengers)',
+    none: 'None declared: the catalogue\'s group tariff scenarios cannot be copied.',
+    add: '+ Add a group product',
+    help: 'The copies of the catalogue\'s group scenarios ask, in the COLLECTIVE mode, for the first group product listed here for a group of its sizes, and for one passenger more than the first maximum given (refused, or offered without that product). A provider\'s checklist (question A4.19) fills this list on import.',
+  });
+}
+
 // The list an action names ("fw-card-add" → card), or null.
 function fwListOf(action, kind) {
-  const m = /^fw-(card|product)-(add|remove|field)$/.exec(action);
+  const m = /^fw-(card|product|group)-(add|remove|field)$/.exec(action);
   return m && m[2] === kind ? m[1] : null;
 }
 
@@ -4726,6 +4738,7 @@ function renderWizardStep1() {
         </label>
         <input type="number" id="fw-sales-horizon" min="1" max="1000" value="${Number.isInteger(fw.salesHorizonDays) ? fw.salesHorizonDays : ''}" data-action="fw-sales-horizon" style="width:90px">
         <div style="margin-top:14px">${fwProductsHtml(fw)}</div>
+        <div style="margin-top:14px">${fwGroupProductsHtml(fw)}</div>
       </div>
     </div>
   </div>

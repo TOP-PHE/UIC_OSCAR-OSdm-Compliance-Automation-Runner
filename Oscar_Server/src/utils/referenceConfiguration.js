@@ -169,6 +169,9 @@ function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) 
   // #887 PR 2: A4.18, the products the provider sells.
   const products = require('./namedProducts').productsFromChecklist(answers);
   if (products) framework.products = products;
+  // PR 3: A4.19, the group products.
+  const groups = require('./namedProducts').groupProductsFromChecklist(answers);
+  if (groups) framework.groupProducts = groups;
   return framework;
 }
 

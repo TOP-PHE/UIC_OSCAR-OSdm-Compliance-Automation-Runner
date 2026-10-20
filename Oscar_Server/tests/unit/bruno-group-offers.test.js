@@ -198,3 +198,51 @@ describe('the steps', () => {
     expect(d).toMatch(/compareGroupOfferIndividual\(res\.getStatus\(\), _body\);\s+routeAfterOfferStep\(\);/);
   });
 });
+
+// #887 PR 3: a group too large for its product, refused at the offer request.
+describe('checkGroupRefused: the group size probe', () => {
+  const COLLECTIVE = JSON.stringify({ anonymousPassengerSpecifications: Array.from({ length: 20 }, (_, i) => ({ externalRef: `P${i}` })), offerSearchCriteria: { offerMode: 'COLLECTIVE' } });
+  const PROBLEM = { code: 'urn:uic:problem:TOO_MANY_PASSENGERS', title: 'At most 19 passengers', status: 400 };
+  const probe = (status, body) => {
+    const realTest = global.test;
+    const checks = [];
+    global.test = (name, fn) => { try { fn(); checks.push([name, true]); } catch (e) { checks.push([name, false, e.message]); } };
+    let ended;
+    const r = run(() => { ended = group.checkGroupRefused(status, body); });
+    global.test = realTest;
+    return { ended, checks, logs: r.logs };
+  };
+
+  test('armed (product expected absent, COLLECTIVE): a 4xx Problem passes and ends the scenario', () => {
+    Object.assign(envStore, { expectedProductAbsent: 'true', expectedProduct: 'SKUP', OfferCollectionRequest: COLLECTIVE });
+    const { ended, checks } = probe(400, PROBLEM);
+    expect(ended).toBe(true);
+    expect(checks.length).toBeGreaterThan(0);
+    expect(checks.every(([, ok]) => ok)).toBe(true);
+    expect(checks.map(([name]) => name).join(' ')).toMatch(/Group size probe/);
+  });
+
+  test('a 4xx without a Problem body is graded as a refusal that does not explain itself', () => {
+    Object.assign(envStore, { expectedProductAbsent: 'true', expectedProduct: 'SKUP', OfferCollectionRequest: COLLECTIVE });
+    const { ended, checks } = probe(400, '<html>refused</html>');
+    expect(ended).toBe(true);
+    expect(checks.some(([, ok]) => !ok)).toBe(true);
+  });
+
+  test('a 2xx, a probe not armed, or an INDIVIDUAL request: left to the usual checks', () => {
+    Object.assign(envStore, { expectedProductAbsent: 'true', expectedProduct: 'SKUP', OfferCollectionRequest: COLLECTIVE });
+    expect(probe(200, { offers: [] }).ended).toBe(false);
+    envStore.OfferCollectionRequest = JSON.stringify({ offerSearchCriteria: { offerMode: 'INDIVIDUAL' } });
+    expect(probe(400, PROBLEM).ended).toBe(false);
+    envStore.OfferCollectionRequest = COLLECTIVE;
+    envStore.expectedProductAbsent = 'false';
+    expect(probe(400, PROBLEM).ended).toBe(false);
+  });
+
+  test('step 01 asks it before the status check', () => {
+    const step = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', '02-Common Requests', '01. POST Get Offer.yml'), 'utf8');
+    const at = step.indexOf('groupOffers.js").checkGroupRefused(res.getStatus(), _tripIdsBody)');
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(step.indexOf('// Validate HTTP response status'));
+  });
+});
