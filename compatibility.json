@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.402",
+  "current_release": "2026.403",
   "releases": [
+    {
+      "release": "2026.403",
+      "date": "2026-10-20",
+      "server": "1.11.368",
+      "collection": "OTST_V2.0.203",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#897: an offer without cards is the same tariff only when the passengers without a card pay there what they pay in the chosen offer; otherwise the card holder is compared with such a passenger in the chosen offer. The All-Day ticket is no longer taken as the price without the card."
+      ]
+    },
     {
       "release": "2026.402",
       "date": "2026-10-20",

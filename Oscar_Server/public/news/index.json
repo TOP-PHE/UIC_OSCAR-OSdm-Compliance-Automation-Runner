@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-card-rate-same-tariff",
+    "date": "October 20, 2026",
+    "tag": "Fix",
+    "title": "Reduction card rate compared with the same tariff only",
+    "summary": "The price without cards is taken from an offer where the passengers without a card pay the same.",
+    "content": "A provider may sell a tariff only with a card, or offer other products to a group without cards. OSCAR now takes the price without a card from an offer only when the passengers without a card pay the same there; otherwise it compares the card holder with a passenger of the same type without a card in the chosen offer."
+  },
+  {
     "id": "2026-10-20-card-rate-not-against-group-tariff",
     "date": "October 20, 2026",
     "tag": "Fix",

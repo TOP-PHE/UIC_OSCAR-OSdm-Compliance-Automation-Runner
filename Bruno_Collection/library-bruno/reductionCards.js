@@ -217,13 +217,18 @@ const alone = (offer, ref) => admissionsOf(offer).some((p) => refsOf(p).length =
 const sameSplit = (a, b, refs) => refs.every((ref) => alone(a, ref) === alone(b, ref));
 
 /**
- * #895: the offer without cards to compare with: one of the same kind,
- * preferably pricing the passengers as the chosen offer does.
+ * #895, #897: the offer without cards to compare with, among those of the same
+ * kind: preferably one pricing the passengers as the chosen offer does and
+ * keeping the price of every passenger without a card (`plain`: the same
+ * tariff). `keeps` says whether it does; a provider may sell that tariff
+ * only with a card, or only alone, and offer another product without.
  */
-function counterpartOf(chosen, offers) {
+function counterpartOf(chosen, offers, plain = []) {
   const refs = Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : [];
   const candidates = (Array.isArray(offers) ? offers : []).filter((o) => sameKind(o, chosen));
-  return candidates.find((o) => sameSplit(chosen, o, refs)) || candidates[0];
+  const same = candidates.filter((o) => sameSplit(chosen, o, refs));
+  const keeping = same.find((o) => plain.every((ref) => priceOf(o, ref) === priceOf(chosen, ref)));
+  return { offer: keeping || same[0] || candidates[0], keeps: Boolean(keeping) };
 }
 
 // The check of a card holder's price against its declared rate.
@@ -334,6 +339,29 @@ function inOfferChecks(chosen, specs, withCards, declared) {
 }
 
 /**
+ * #895, #897: the checks when the offer without cards is another tariff, or
+ * null when it is the same one. Another tariff: no offer without cards keeps
+ * the price of the passengers without a card (the provider sells this one
+ * only with a card, or another to the group), or it prices the passengers
+ * otherwise (a group tariff for all). Each card holder is then compared
+ * within the chosen offer; with nobody to compare with, the second case
+ * gives one INFO line and the first falls back to the counterpart.
+ */
+function otherTariffChecks({ chosen, counterpart, keeps, plain, refs }, specs, withCards, declared) {
+  const otherPrice = plain.length > 0 && !keeps;
+  const otherSplit = !sameSplit(chosen, counterpart, refs);
+  if (!otherPrice && !otherSplit) return null;
+  const inOffer = inOfferChecks(chosen, specs, withCards, declared);
+  if (inOffer) return inOffer;
+  if (!otherSplit) return null;
+  return [{
+    name: 'Reduction cards: the answer without cards prices the passengers otherwise (another product); the card is not compared',
+    ok: true,
+    level: 'info',
+  }];
+}
+
+/**
  * The comparison of the chosen offer (with cards) with the offer of the same
  * flexibility and travel class in the answer without cards. A passenger with
  * a card must pay less; one without must pay the same (a warning only).
@@ -343,7 +371,9 @@ function inOfferChecks(chosen, specs, withCards, declared) {
  */
 function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false } = {}) {
   const withCards = new Set(passengersWithCards(specs).map((p) => p.ref));
-  const counterpart = counterpartOf(chosen, plainResponse?.offers);
+  const refs = (Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : []);
+  const plain = refs.filter((ref) => !withCards.has(ref) && priceOf(chosen, ref) !== null);
+  const { offer: counterpart, keeps } = counterpartOf(chosen, plainResponse?.offers, plain);
   if (!counterpart) {
     return [{
       name: 'Reduction cards: an offer of the same flexibility and travel class without cards to compare with',
@@ -357,18 +387,8 @@ function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false
   if (group && Object.keys(rates || {}).length > 0) {
     out.push({ name: 'Reduction cards: the declared rate is not checked on a group tariff', ok: true, level: 'info' });
   }
-  const refs = (Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : []);
-  if (!sameSplit(chosen, counterpart, refs)) {
-    // #895: another way of pricing (a group tariff without cards): the
-    // totals say nothing of a card; compare within the chosen offer.
-    const inOffer = inOfferChecks(chosen, specs, withCards, declared);
-    if (inOffer) return [...out, ...inOffer];
-    return [...out, {
-      name: 'Reduction cards: the answer without cards prices the passengers otherwise (another product); the card is not compared',
-      ok: true,
-      level: 'info',
-    }];
-  }
+  const otherTariff = otherTariffChecks({ chosen, counterpart, keeps, plain, refs }, specs, withCards, declared);
+  if (otherTariff) return [...out, ...otherTariff];
   const unpriced = {};
   for (const ref of refs) {
     const check = passengerCheck(chosen, counterpart, ref, withCards.has(ref), declared[ref]);

@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.368] / [collection-OTST_V2.0.203] — 2026-10-20
+
+Issue #897 (follow-up of #895), release 2026.403. Collection only (and its tests).
+
+### Fixed
+- **The offer without cards must keep the price of the passengers without a card** (`counterpartOf()`, `comparePrices()`, `library-bruno/reductionCards.js`). The provider's rerun of 20/10 (12:14), with #895: `OTST_SALE_REDUCTION_CARD_2ADT` still failed, against the All-Day ticket this time (356.00 with the card "against 799.00 without"). Without cards the provider offers no Flexi saver at all for two adults (a group tariff, first class, the All-Day ticket), and #895 preferred the offer pricing each passenger alone. An offer without cards now counts as the same tariff only when every passenger without a card, priced alone in the chosen offer, pays the same there; when none does, each card holder is compared with such a passenger of the same type in the chosen offer (356.00 against 475.00, 25 % off). One passenger alone, or every passenger with a card, keeps the comparison with the answer without cards.
+
+Checked:
+- `bruno-reduction-cards.test.js`: the provider's rerun (group, first class and All-Day without cards: the holder against the adult without card of the same offer, 25 % passes); a passenger without card priced otherwise without cards is now compared within the offer (the old "no reduction" test split into the same-price and the other-price case). With #895's `reductionCards.js` the two new tests fail.
+- The real collection on the simulator, the five card scenarios: the same checks (261, 321, 261, 409, 261) and the same one failure of `SIM_WRONG_CARD_RATE_38`.
+- The four combined-return refund scenarios of the provider's rerun pass (#893): 737 to 741 checks, none failed.
+
+---
+
 ## [server-1.11.367] / [collection-OTST_V2.0.202] — 2026-10-20
 
 Issue #895, release 2026.402. Collection only (and its tests).
