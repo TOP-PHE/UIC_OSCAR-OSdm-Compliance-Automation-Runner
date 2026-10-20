@@ -90,6 +90,32 @@ test('a booking made without a purchaser has none until one is written, and it n
   assert.equal((await call(sim.base, token, 'GET', `${base}/purchaser`)).body.purchaser.detail.firstName, 'Paula');
 });
 
+test('#899: a purchaser given in the booking is checked as a written one, and a refused booking books nothing', async () => {
+  const token = await tokenFor(sim.base, 'gamma', clientOf.gamma);
+  const offers = (await call(sim.base, token, 'POST', '/gamma/offers', from('urn:uic:stn:0000001'))).body.offers;
+  const cases = [
+    [(p) => { delete p.detail.firstName; }, '/purchaser/detail/firstName'],
+    [(p) => { delete p.detail.lastName; }, '/purchaser/detail/lastName'],
+    [(p) => { p.detail.contact = { ...p.detail.contact, email: 'not-an-email' }; }, '/purchaser/detail/contact/email'],
+    [(p) => { p.detail.contact = { ...p.detail.contact, phoneNumber: 'not-a-phone' }; }, '/purchaser/detail/contact/phoneNumber'],
+  ];
+  for (const [spoil, pointer] of cases) {
+    const body = bookingRequest(offers[0]);
+    spoil(body.purchaser);
+    const res = await call(sim.base, token, 'POST', '/gamma/bookings', body);
+    assert.equal(res.status, 400, pointer);
+    assert.deepEqual(res.body.pointers, [{ requestPointer: pointer }]);
+  }
+  // The offer is still bookable: nothing was booked by a refused request.
+  assert.equal((await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offers[0]))).status, 200);
+  // A provider without person checks keeps any purchaser.
+  const plainToken = await tokenFor(sim.base, 'plain', clientOf.plain);
+  const plainOffers = (await call(sim.base, plainToken, 'POST', '/plain/offers', offerRequest())).body.offers;
+  const plainBody = bookingRequest(plainOffers[0]);
+  plainBody.purchaser.detail.contact = { email: 'not-an-email' };
+  assert.equal((await call(sim.base, plainToken, 'POST', '/plain/bookings', plainBody)).status, 200);
+});
+
 // Only the main passenger may be changed, and only the main
 // passenger's names are kept (no date of birth, no contact).
 async function bookedTwo(lastNames) {

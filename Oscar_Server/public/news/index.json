@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-purchaser-probe-in-booking",
+    "date": "October 20, 2026",
+    "tag": "Fix",
+    "title": "Invalid purchaser probe in the booking",
+    "summary": "For a provider that takes the purchaser only in the booking, the invalid purchaser is now tested there.",
+    "content": "The invalid purchaser scenario used to book without a purchaser and test it afterwards, which a provider requiring the purchaser in the booking refuses before anything is tested. When the Test Framework says the provider takes no purchaser after the booking, OSCAR now sends the wrong purchaser in the booking itself, one field at a time, then books with the valid one. Importing a checklist now sets that Test Framework setting from question A5.1."
+  },
+  {
     "id": "2026-10-20-card-rate-same-tariff",
     "date": "October 20, 2026",
     "tag": "Fix",

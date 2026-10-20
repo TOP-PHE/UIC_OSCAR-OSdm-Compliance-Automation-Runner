@@ -88,6 +88,14 @@ runtime:
           }
         }
 
+        // #899: a pass of the invalid purchaser probe in the booking: graded,
+        // then the booking is sent again (next pass, or the valid purchaser).
+        {
+          let _purBody;
+          try { _purBody = res.getBody(); } catch (_e) { _purBody = null; }
+          if (require(bru.getEnvVar("library_base") + "purchaserAtBooking.js").gradePurchaserAtBooking(res.getStatus(), _purBody)) return;
+        }
+
         // #expired-offer: when armed, the booking MUST be rejected — an expired
         // offer must not be bookable. Grade the rejection here and short-circuit
         // (skip the normal happy-path postCreateBookingResponse + downstream

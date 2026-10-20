@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.403",
+  "current_release": "2026.404",
   "releases": [
+    {
+      "release": "2026.404",
+      "date": "2026-10-20",
+      "server": "1.11.369",
+      "collection": "OTST_V2.0.204",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#899: where the Test Framework says the provider takes no purchaser after the booking, the invalid purchaser probe (NHF_PURCHASER_INVALID) sends the wrong purchaser in the booking itself, one field per pass, then books with the valid one. Checklist question A5.1 now sets that framework setting on import. Simulator 0.42.0 checks a purchaser given in a booking."
+      ]
+    },
     {
       "release": "2026.403",
       "date": "2026-10-20",

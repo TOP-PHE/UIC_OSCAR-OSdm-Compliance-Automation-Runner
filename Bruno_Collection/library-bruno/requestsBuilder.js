@@ -245,6 +245,25 @@ function buildBookingRequest() {
   const body = { offers, passengerSpecifications };
   if (_purMode === "inline") {
     body.purchaser = parseEnvJson("bookingPurchaserSpecifications");
+  } else if (_purMode === "invalid_at_booking") {
+    // #899: the purchaser goes in the booking, one field wrong per pass;
+    // after the last pass, the valid one (02's after-response loops).
+    const atBooking = require("./purchaserAtBooking.js");
+    const valid = parseEnvJson("bookingPurchaserSpecifications");
+    const pass = atBooking.passOf(bru.getEnvVar("__purchaserAtBookingPass"));
+    if (pass === null) {
+      body.purchaser = valid;
+      bru.setEnvVar("__purchaserAtBookingProbe", "false");
+      validationLogger(`[INFO] Purchaser negative sweep in the booking: done — the booking is sent with the valid purchaser.`);
+    } else {
+      const { purchaser, target } = atBooking.corruptedPurchaser(valid, pass);
+      body.purchaser = purchaser;
+      bru.setEnvVar("__purchaserAtBookingProbe", "true");
+      bru.setEnvVar("__purchaserAtBookingTarget", JSON.stringify(target));
+      validationLogger(`[WARNING] Purchaser negative sweep in the booking ${pass + 1}/${atBooking.SWEEP.length}: `
+        + (target.value === undefined ? `OMIT required '${target.scenarioField}'` : `INVALID '${target.scenarioField}' = '${target.value}'`)
+        + ` — expecting the provider to refuse the booking.`);
+    }
   } else {
     validationLogger(`[DEBUG] bookingPurchaserMode='${_purMode}' → purchaser omitted from the booking request (OSDM allows this; will be set/probed via the Booking Purchaser step where applicable).`);
   }

@@ -114,7 +114,7 @@ function resetScenarioEnvVars() {
     // within a multi-timer scenario.
     "__expiredFlowQueue", "__expiredFlowQueueIndex", "__expiredFlowSubRunPending", "__expiredFlowSkipCount",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
-    "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
+    "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget", "__purchaserAtBookingPass", "__purchaserAtBookingProbe", "__purchaserAtBookingTarget",
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
@@ -686,6 +686,7 @@ function parseScenarioData(jsonData) {
       // Purchaser at booking (#258 / #203): inline (default — purchaser in the
       // booking request) | deferred (omit, then POST it to satisfy the demand) |
       // omit (never supply) | invalid (POST a bad purchaser → expect rejection).
+      // invalid_at_booking (#899): the bad purchaser in the booking itself.
       bru.setEnvVar("bookingPurchaserMode", ["", "null", null, undefined].includes(scenario.bookingPurchaserMode) ? "inline" : String(scenario.bookingPurchaserMode).toLowerCase());
       // Expired-booking negative test (#204): when true, OSCAR waits until just
       // past booking.confirmationTimeLimit, then attempts fulfillment and asserts

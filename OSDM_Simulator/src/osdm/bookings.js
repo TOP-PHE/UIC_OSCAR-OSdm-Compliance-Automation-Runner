@@ -171,6 +171,8 @@ function createBooking(body, findOffer, provider, nowMs) {
   const specs = Array.isArray(body.passengerSpecifications) ? body.passengerSpecifications : [];
   if (specs.length > MAX_PASSENGERS) throw bad(`at most ${MAX_PASSENGERS} passengerSpecifications`);
   const specByRef = new Map(specs.filter((s) => typeof s?.externalRef === 'string').map((s) => [s.externalRef, s]));
+  // #899: a purchaser given in the booking is checked as a written one, before anything is booked.
+  if (body.purchaser !== undefined) persons.checkPurchaser(body.purchaser, provider, '/purchaser');
 
   const createdOn = new Date(nowMs).toISOString();
   // #611: a booking of short-lived offers is short-lived too.

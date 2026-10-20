@@ -36,7 +36,7 @@ const ENUMS = {
   scenarioType:       [null, 'SALE', 'REFUND', 'EXCHANGE'],
   scenarioAction:     [null, 'PATCH', 'DELETE'],
   requestedInformationProbe: [null, 'omit', 'invalid'],
-  bookingPurchaserMode: ['inline', 'deferred', 'omit', 'invalid'],
+  bookingPurchaserMode: ['inline', 'deferred', 'omit', 'invalid', 'invalid_at_booking'],
   expiredBookingTest:             ['off', 'on'],
   expiredOfferTest:               ['off', 'on'],
   expiredAddReservationOfferTest: ['off', 'on'],
@@ -2044,7 +2044,7 @@ function buildDetailHTML(idx) {
             the new "Field-shape & payload probes" sub-group. The Tester Guide
             §4.8 always classified it as NHF; the wizard now matches. */ ''}
         ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
-          'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
+          'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem. Invalid at booking: the bad purchaser in the booking itself, one field per pass; a run uses it for Invalid when the Test Framework says the provider takes no purchaser after the booking.')}
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
         ${buildSelect(idx, 'stepFailurePolicy',  'Step Failure Policy',  ENUMS.stepFailurePolicy,
           'What a failed non-critical step (passenger PATCH/GET) does. Hard stop (default): abandon the scenario, loop to the next one. Continue: record the failure, warn, and keep testing the remaining steps (fulfillment & co) — the scenario verdict stays FAILED. Offer/booking failures always hard-stop.')}

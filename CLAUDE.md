@@ -1947,7 +1947,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   scenario at 03 and nothing after the booking was tested. Its twin
   `purchaserAfterBooking: false` (same section) refuses the catalogue's
   late-purchaser entry (`missingFor()`) and warns `bookingPurchaserMode:
-  deferred`. **Only the main passenger** (#885, 1.11.361):
+  deferred`. **The invalid purchaser probe then goes in the booking**
+  (#899, 1.11.369): the run's copy turns `invalid` into `invalid_at_booking`
+  (`withPurchaserProbeAtBooking()`); step 02 sends the purchaser with one
+  field wrong per pass, grades it, then books with the valid one
+  (`library-bruno/purchaserAtBooking.js`). Its `__purchaserAtBookingProbe`
+  stays set after 02's script: the `[OSCAR request]` check runs after it and
+  reads it (resetting it there failed two checks on the simulator). Checklist
+  A5.1 (`data.purchaser`) sets `purchaserAfterBooking` on import
+  (`withPurchaserTiming()`); before, no one read it. **Only the main passenger** (#885, 1.11.361):
   `passengerUpdateScope: 'MAIN'` (absent = every one; ignored when
   `passengerUpdate` is false, `mainPassengerOnly()`) makes the run's copy and
   the catalogue copies set the scenario's `passengerUpdateScope` MAIN; a

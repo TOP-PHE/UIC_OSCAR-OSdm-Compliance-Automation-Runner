@@ -329,9 +329,11 @@ function withFrameworkWarnings(plaintext, companyId) {
     // #809: and no passenger update where the framework says there is none
     // (after the annotation, which warns about it).
     const skipped = require('./utils/undeclaredSteps').withoutUndeclaredPassengerUpdate(datafile, framework);
+    // #899: and the invalid purchaser probe in the booking where the purchaser goes only there.
+    const probed = require('./utils/undeclaredSteps').withPurchaserProbeAtBooking(datafile, framework);
     // #889: and each declared card's reduction rate on the passengers' cards.
     const rated = require('./utils/reductionCards').withCardRates(datafile, framework);
-    if (annotated === 0 && versioned === 0 && formed === 0 && skipped === 0 && rated === 0) return plaintext;
+    if (annotated === 0 && versioned === 0 && formed === 0 && skipped === 0 && probed === 0 && rated === 0) return plaintext;
     return Buffer.from(JSON.stringify(datafile), 'utf8');
   } catch (err) {
     log.warn({ errMsg: err.message, companyId }, 'run datafile: framework warnings not added');
