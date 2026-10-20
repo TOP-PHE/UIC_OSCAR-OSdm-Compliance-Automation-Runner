@@ -74,7 +74,7 @@ function groupProductOf(entry) {
 function declaredList(framework, key, clean) {
   const fw = isObj(framework?.config) ? framework.config : framework;
   const out = [];
-  for (const item of (Array.isArray(fw?.[key]) ? fw[key] : []).map(clean)) {
+  for (const item of (Array.isArray(fw?.[key]) ? fw[key] : []).map((entry) => clean(entry))) {
     if (!item || out.some((p) => p.code === item.code)) continue;
     out.push(item);
     if (out.length === MAX_PRODUCTS) break;
