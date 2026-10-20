@@ -217,13 +217,18 @@ const alone = (offer, ref) => admissionsOf(offer).some((p) => refsOf(p).length =
 const sameSplit = (a, b, refs) => refs.every((ref) => alone(a, ref) === alone(b, ref));
 
 /**
- * #895: the offer without cards to compare with: one of the same kind,
- * preferably pricing the passengers as the chosen offer does.
+ * #895, #897: the offer without cards to compare with, among those of the same
+ * kind: preferably one pricing the passengers as the chosen offer does and
+ * keeping the price of every passenger without a card (`plain`: the same
+ * tariff). `keeps` says whether it does; a provider may sell that tariff
+ * only with a card, or only alone, and offer another product without.
  */
-function counterpartOf(chosen, offers) {
+function counterpartOf(chosen, offers, plain = []) {
   const refs = Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : [];
   const candidates = (Array.isArray(offers) ? offers : []).filter((o) => sameKind(o, chosen));
-  return candidates.find((o) => sameSplit(chosen, o, refs)) || candidates[0];
+  const same = candidates.filter((o) => sameSplit(chosen, o, refs));
+  const keeping = same.find((o) => plain.every((ref) => priceOf(o, ref) === priceOf(chosen, ref)));
+  return { offer: keeping || same[0] || candidates[0], keeps: Boolean(keeping) };
 }
 
 // The check of a card holder's price against its declared rate.
@@ -343,7 +348,9 @@ function inOfferChecks(chosen, specs, withCards, declared) {
  */
 function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false } = {}) {
   const withCards = new Set(passengersWithCards(specs).map((p) => p.ref));
-  const counterpart = counterpartOf(chosen, plainResponse?.offers);
+  const refs = (Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : []);
+  const plain = refs.filter((ref) => !withCards.has(ref) && priceOf(chosen, ref) !== null);
+  const { offer: counterpart, keeps } = counterpartOf(chosen, plainResponse?.offers, plain);
   if (!counterpart) {
     return [{
       name: 'Reduction cards: an offer of the same flexibility and travel class without cards to compare with',
@@ -357,7 +364,13 @@ function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false
   if (group && Object.keys(rates || {}).length > 0) {
     out.push({ name: 'Reduction cards: the declared rate is not checked on a group tariff', ok: true, level: 'info' });
   }
-  const refs = (Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : []);
+  if (plain.length > 0 && !keeps) {
+    // #897: no offer without cards keeps the price of the passengers without
+    // a card: another tariff (the provider sells this one only with a card,
+    // or another one to the group). Compare within the chosen offer.
+    const inOffer = inOfferChecks(chosen, specs, withCards, declared);
+    if (inOffer) return [...out, ...inOffer];
+  }
   if (!sameSplit(chosen, counterpart, refs)) {
     // #895: another way of pricing (a group tariff without cards): the
     // totals say nothing of a card; compare within the chosen offer.

@@ -148,10 +148,17 @@ describe('comparePrices: less with the card than without', () => {
   });
 
   // #644: what a card is worth on a tariff is the provider's choice.
-  test('no reduction is a warning, not a failure; so is another price for the passenger without card', () => {
-    const checks = rc.comparePrices(offerOf([part('P1', 160), part('P2', 150)]), plain, specs);
-    expect(checks.map((c) => [c.ok, c.level])).toEqual([[false, 'warn'], [false, 'warn']]);
+  test('no reduction is a warning, not a failure', () => {
+    const checks = rc.comparePrices(offerOf([part('P1', 160), part('P2', 160)]), plain, specs);
+    expect(checks.map((c) => [c.ok, c.level])).toEqual([[false, 'warn'], [true, 'warn']]);
     expect(checks[0].message).toBe('160 with the card is not below 160 without it (a commercial choice, not an OSDM rule)');
+  });
+
+  test('#897: the passenger without card pays otherwise without cards: another tariff, the holder is compared within the offer', () => {
+    const checks = rc.comparePrices(offerOf([part('P1', 160), part('P2', 150)]), plain, specs);
+    expect(checks.map((c) => [c.ok, c.level])).toEqual([[false, 'warn']]);
+    expect(checks[0].name).toBe('Reduction cards: passenger P1 pays less than passenger P2 (same type, no card) in the same offer — 160 against 150');
+    expect(checks[0].message).toBe('160 with the card is not below 150 without it (a commercial choice, not an OSDM rule)');
   });
 
   test('no counterpart, or no price to compare, is a warning only', () => {
@@ -335,6 +342,15 @@ describe('#889: a declared reduction rate', () => {
         ['Reduction cards: passenger 00002, who holds no card, pays the same — 47500 and 47500', true],
         ['Reduction cards: passenger 00001 pays 25 % less with the card — 35600 against 47500 without', true],
       ]);
+    });
+
+    test('#897: the provider\'s rerun: without cards no saver at all, the All-Day ticket priced alone is not the counterpart', () => {
+      const allDay = offerOf([part('00001', 79900), part('00002', 79900)], basic);
+      const checks = rc.comparePrices(chosen, { offers: [group, firstClass, allDay] }, adults, { '00001': 25 });
+      expect(checks.map((c) => [c.name, c.ok, c.level])).toEqual([[
+        'Reduction cards: passenger 00001 pays 25 % less than passenger 00002 (same type, no card) in the same offer — 35600 against 47500',
+        true, 'fail',
+      ]]);
     });
 
     test('every passenger holds a card: nothing to compare with, an INFO line, never a failure', () => {

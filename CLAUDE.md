@@ -1483,7 +1483,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`counterpartOf()`, `sameSplit()`: each alone or together); a split that
   differs (a group tariff for all, without cards) compares each holder with
   a same-type passenger without a card in the chosen offer
-  (`inOfferChecks()`), else one INFO line.
+  (`inOfferChecks()`), else one INFO line. **Same tariff = the plain passengers pay
+  the same** (#897, 1.11.368): a counterpart counts only when every passenger
+  without a card, priced alone in the chosen offer, pays there what they pay
+  in it (`counterpartOf()` → `{ offer, keeps }`); else the in-offer
+  comparison. #895's "same split" alone took the All-Day ticket.
   **The provider's own products are declared** (#887 PR 2, 1.11.364 /
   OTST_V2.0.199): `products` [{ code, name, flexibility }] in the framework
   (`utils/namedProducts.js`: `declaredProducts()`, `flexibilityOf()`,
