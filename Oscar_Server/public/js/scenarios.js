@@ -3853,54 +3853,91 @@ function changePassengerUpdate(action, el) {
 
 // #887: the reduction cards the provider accepts: code (as sent in an offer
 // request), issuer (a URN) and name. The catalogue's card scenarios use the first.
-const FW_CARD_FIELDS = [['code', 'Code', 60], ['issuer', 'Issuer', 200], ['name', 'Name', 120], ['percent', 'Reduction %', 6]];
+// #887: the Test Framework's lists of the provider's own codes, each row a
+// few text fields: reduction cards (Passenger Types) and products (Tariff
+// Flexibility, PR 2). One editor for both: `fw-<list>-add`,
+// `fw-<list>-remove` and `fw-<list>-field`, the fields by `data-field`.
+const FW_CARD_FIELDS = [['code', 'Code', 60, 110], ['issuer', 'Issuer', 200, 220], ['name', 'Name', 120, 220], ['percent', 'Reduction %', 6, 70]];
+const FW_PRODUCT_FIELDS = [['code', 'Code', 60, 140], ['name', 'Name', 120, 220], ['flexibility', 'Flexibility', 20, 150]];
+const FW_LISTS = {
+  card: { key: 'reductionCards', fields: FW_CARD_FIELDS, noun: 'card' },
+  product: { key: 'products', fields: FW_PRODUCT_FIELDS, noun: 'product' },
+};
 
-function fwCardFieldHtml(card, i, [field, label, max]) {
-  const width = { code: 110, percent: 70 }[field] || 220;
-  return `<label for="fw-card-${i}-${field}" style="font-size:11px;color:#78909c">${label}</label><input class="param-input" id="fw-card-${i}-${field}" data-action="fw-card-field" data-index="${i}" data-field="${field}" maxlength="${max}" value="${esc(card?.[field] || '')}" style="max-width:${width}px">`;
+function fwListFieldHtml(list, item, i, [field, label, max, width]) {
+  return `<label for="fw-${list}-${i}-${field}" style="font-size:11px;color:#78909c">${label}</label><input class="param-input" id="fw-${list}-${i}-${field}" data-action="fw-${list}-field" data-index="${i}" data-field="${field}" maxlength="${max}" value="${esc(item?.[field] || '')}" style="max-width:${width}px">`;
 }
 
-function fwCardRowHtml(card, i) {
-  const fields = FW_CARD_FIELDS.map((f) => fwCardFieldHtml(card, i, f)).join('');
-  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">${fields}<button class="btn btn-small btn-secondary" data-action="fw-card-remove" data-index="${i}" aria-label="Remove card ${i + 1}">✕</button></div>`;
+function fwListRowHtml(list, item, i) {
+  const fields = FW_LISTS[list].fields.map((f) => fwListFieldHtml(list, item, i, f)).join('');
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">${fields}<button class="btn btn-small btn-secondary" data-action="fw-${list}-remove" data-index="${i}" aria-label="Remove ${FW_LISTS[list].noun} ${i + 1}">✕</button></div>`;
 }
 
-function fwReductionCardsHtml(fw) {
-  const cards = Array.isArray(fw.reductionCards) ? fw.reductionCards : [];
-  const rows = cards.map((card, i) => fwCardRowHtml(card, i)).join('');
-  const none = '<div style="color:#90a4ae;font-size:12px;padding:4px 0 8px">None declared: the catalogue\'s reduction card scenarios cannot be copied.</div>';
+function fwListHtml(list, fw, { label, hint, none, add, help }) {
+  const items = Array.isArray(fw[FW_LISTS[list].key]) ? fw[FW_LISTS[list].key] : [];
+  const rows = items.map((item, i) => fwListRowHtml(list, item, i)).join('');
   return `<div class="fw-subsection">
-        <div class="fw-subsection-label" style="margin-bottom:8px">Reduction cards the provider accepts<span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — the code as sent in an offer request, the issuer (a URN), a name and, when the provider says it, the share of the price the card takes off</span></div>
-        ${rows || none}
-        <button class="btn btn-small btn-secondary" data-action="fw-card-add">+ Add a card</button>
-        <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">The copies of the catalogue's card scenarios give the passenger holding a card the first one listed here. With a reduction %, a run checks the price with the card against it (within one currency unit or 1 %); without, only that the card makes it cheaper. A provider's checklist (question A3.7) fills this list on import.</div>
+        <div class="fw-subsection-label" style="margin-bottom:8px">${label}<span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — ${hint}</span></div>
+        ${rows || `<div style="color:#90a4ae;font-size:12px;padding:4px 0 8px">${none}</div>`}
+        <button class="btn btn-small btn-secondary" data-action="fw-${list}-add">${add}</button>
+        <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">${help}</div>
       </div>`;
 }
 
-function clickReductionCard(action, el) {
-  if (action !== 'fw-card-add' && action !== 'fw-card-remove') return false;
+function fwReductionCardsHtml(fw) {
+  return fwListHtml('card', fw, {
+    label: 'Reduction cards the provider accepts',
+    hint: 'the code as sent in an offer request, the issuer (a URN), a name and, when the provider says it, the share of the price the card takes off',
+    none: 'None declared: the catalogue\'s reduction card scenarios cannot be copied.',
+    add: '+ Add a card',
+    help: 'The copies of the catalogue\'s card scenarios give the passenger holding a card the first one listed here. With a reduction %, a run checks the price with the card against it (within one currency unit or 1 %); without, only that the card makes it cheaper. A provider\'s checklist (question A3.7) fills this list on import.',
+  });
+}
+
+function fwProductsHtml(fw) {
+  return fwListHtml('product', fw, {
+    label: 'Products the provider sells',
+    hint: 'the product code as the offers give it, a name, and its flexibility (FULL_FLEXIBLE, SEMI_FLEXIBLE or NON_FLEXIBLE)',
+    none: 'None declared: the catalogue\'s named-product scenario cannot be copied.',
+    add: '+ Add a product',
+    help: 'The copy of the catalogue\'s named-product scenario sells the first one listed here, by its code and in its flexibility. A provider\'s checklist (question A4.18) fills this list on import.',
+  });
+}
+
+// The list an action names ("fw-card-add" → card), or null.
+function fwListOf(action, kind) {
+  const m = /^fw-(card|product)-(add|remove|field)$/.exec(action);
+  return m && m[2] === kind ? m[1] : null;
+}
+
+function clickFwList(action, el) {
+  const list = fwListOf(action, 'add') || fwListOf(action, 'remove');
+  if (!list) return false;
+  const { key, fields } = FW_LISTS[list];
   const fw = wizData.framework;
-  const cards = Array.isArray(fw.reductionCards) ? fw.reductionCards : [];
-  if (action === 'fw-card-add') {
-    cards.push({ code: '', issuer: '', name: '', percent: '' });
+  const items = Array.isArray(fw[key]) ? fw[key] : [];
+  if (action.endsWith('-add')) {
+    items.push(Object.fromEntries(fields.map(([f]) => [f, ''])));
   } else {
     const i = Number.parseInt(el.dataset.index, 10);
-    if (!Number.isInteger(i) || i < 0 || i >= cards.length) return true;
-    cards.splice(i, 1);
+    if (!Number.isInteger(i) || i < 0 || i >= items.length) return true;
+    items.splice(i, 1);
   }
-  fw.reductionCards = cards;
+  fw[key] = items;
   saveFrameworkDebounced();
   renderWizardStep1InSection();
   return true;
 }
 
-function changeReductionCard(action, el) {
-  if (action !== 'fw-card-field') return false;
-  const cards = wizData.framework.reductionCards;
+function changeFwList(action, el) {
+  const list = fwListOf(action, 'field');
+  if (!list) return false;
+  const { key, fields } = FW_LISTS[list];
+  const items = wizData.framework[key];
   const i = Number.parseInt(el.dataset.index, 10);
   const field = el.dataset.field;
-  if (!Array.isArray(cards) || !Number.isInteger(i) || !cards[i] || !FW_CARD_FIELDS.some(([f]) => f === field)) return true;
-  cards[i][field] = el.value.trim();
+  if (!Array.isArray(items) || !Number.isInteger(i) || !items[i] || !fields.some(([f]) => f === field)) return true;
+  items[i][field] = el.value.trim();
   saveFrameworkDebounced();
   return true;
 }
@@ -4688,6 +4725,7 @@ function renderWizardStep1() {
           <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — how far ahead the provider sells; the date scenarios of the catalogue ask for its last day and the day after (empty = not declared)</span>
         </label>
         <input type="number" id="fw-sales-horizon" min="1" max="1000" value="${Number.isInteger(fw.salesHorizonDays) ? fw.salesHorizonDays : ''}" data-action="fw-sales-horizon" style="width:90px">
+        <div style="margin-top:14px">${fwProductsHtml(fw)}</div>
       </div>
     </div>
   </div>
@@ -7833,7 +7871,7 @@ document.body.addEventListener('click', function(e) {
   // (preventDefault also undoes a checkbox tick before its change event).
   if (isLockedControl(el)) { e.preventDefault(); return; }
   const action = el.dataset.action;
-  if (clickReductionCard(action, el)) return;   // #887, before the switch (Sonar S1479)
+  if (clickFwList(action, el)) return;   // #887, before the switch (Sonar S1479)
 
   switch (action) {
     // ── Static / section actions ──────────────────────────────────────────────
@@ -8394,7 +8432,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeReductionCard(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
 
   switch (action) {
     case 'file-upload':

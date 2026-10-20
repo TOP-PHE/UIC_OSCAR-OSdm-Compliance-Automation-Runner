@@ -44,6 +44,7 @@ const {
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const { declaredCards } = require('./reductionCards');
+const { declaredProducts } = require('./namedProducts');
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const clone = (v) => structuredClone(v);
 const ARMED = new Set(['on', 'true', 'yes', true]);
@@ -68,8 +69,9 @@ const HORIZON_LIMITS = new Set(['SALES_HORIZON', 'OVER_SALES_HORIZON']);
 // #705: one whose passengers stand on the edges of the age ranges the Test
 // Framework declares for CHILD and ADULT (AGE_RANGES). #887: one whose card
 // holder takes the first reduction card the Test Framework declares
-// (REDUCTION_CARDS).
-const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES', 'REDUCTION_CARDS'];
+// (REDUCTION_CARDS). #887 PR 2: one that sells the first product it declares
+// (NAMED_PRODUCTS).
+const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES', 'REDUCTION_CARDS', 'NAMED_PRODUCTS'];
 // #780: an entry that stands for the offer search probes (`probe`
 // "OFFER_OPTIONS"): it comes once per option value the Test Framework
 // declares, each asking for that value alone. Per option: the framework key,
@@ -256,6 +258,7 @@ function limitsMissing(requirements, fw) {
   if (requirements.salesHorizon && !salesHorizonOf(fw)) missing.push('the sales horizon (Tariff Flexibility)');
   if (requirements.ageRanges && !ageRangesOf(fw)) missing.push('passenger types CHILD and ADULT with their age ranges (Passenger Types)');
   if (requirements.reductionCards && declaredCards(fw).length === 0) missing.push('a reduction card the provider accepts (Passenger Types › Reduction cards)');
+  if (requirements.namedProducts && declaredProducts(fw).length === 0) missing.push('a product the provider sells (Tariff Flexibility › Products)');
   return missing;
 }
 
@@ -418,6 +421,10 @@ function limitNeedsText(needs, limit) {
   }
   if (limit === 'REDUCTION_CARDS') {
     return ['the first reduction card the Test Framework declares, on the passenger holding a card', ...needsText({ ...needs, reductionCards: undefined })];
+  }
+  if (limit === 'NAMED_PRODUCTS') {
+    const values = arr(needs?.providerValues).filter((v) => v !== 'expectedProduct');
+    return ['the first product the Test Framework declares, by its code, in its flexibility', ...needsText({ ...needs, providerValues: values, tariff: undefined })];
   }
   if (HORIZON_LIMITS.has(limit)) {
     const day = limit === 'OVER_SALES_HORIZON' ? 'the day after the last day' : 'the last day';
@@ -603,6 +610,7 @@ function baseEntries(catalogue, simulator, framework) {
     if (HORIZON_LIMITS.has(entry.limit)) requirements.salesHorizon = true;
     if (entry.limit === 'AGE_RANGES') requirements.ageRanges = true;
     if (entry.limit === 'REDUCTION_CARDS') requirements.reductionCards = true;
+    if (entry.limit === 'NAMED_PRODUCTS') requirements.namedProducts = true;
     // #780: the offer search probes keep their search: they test the options, not the form.
     if (entry.probe) requirements.offerRequest = { ...requirements.offerRequest, convertible: false };
     return {

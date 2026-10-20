@@ -1473,6 +1473,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   total when the passengers are of one type; a COLLECTIVE request (group
   tariff) is told, not checked. No rate = the old "cheaper" check.
   `SIM_WRONG_CARD_RATE_38` declares 30 % on gamma's 25 % card.
+  **The provider's own products are declared** (#887 PR 2, 1.11.364 /
+  OTST_V2.0.199): `products` [{ code, name, flexibility }] in the framework
+  (`utils/namedProducts.js`: `declaredProducts()`, `flexibilityOf()`,
+  `productsFromChecklist()` for A4.18's `data.products` / `data.product.<n>.*`),
+  drawn in Tariff Flexibility. Catalogue `limit` `NAMED_PRODUCTS`
+  (`OTST_SALE_NAMED_PRODUCT_1ADT`, source `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38`):
+  the copy sets `expectedProduct` to the first product's code and
+  `desiredFlexibility` to its flexibility (`applyProductLimit()`), and nothing
+  is left to complete about the product. The page's card and product lists are
+  one editor (`FW_LISTS`, `fwListHtml()`, `clickFwList()`, `changeFwList()`;
+  actions `fw-card-*` / `fw-product-*`). Adding the products to the simulator
+  checklists took the alpha one over the AI context's 20k: three simulator
+  comments were shortened to fit (`cut` 0).
 - **A scenario can name the product it sells** (#598, 1.11.229 /
   OTST_V2.0.113). `expectedProduct` is a code (exact) or words of the name;
   `library-bruno/products.js` (pure) lets a code match anywhere win over a

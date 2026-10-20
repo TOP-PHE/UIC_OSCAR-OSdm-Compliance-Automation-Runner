@@ -146,7 +146,7 @@ describe('the catalogue\'s card scenarios', () => {
 describe('the Test Framework page', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'js', 'scenarios.js'), 'utf8');
   const lift = (name) => src.slice(src.indexOf(`function ${name}(`), src.indexOf('\n}\n', src.indexOf(`function ${name}(`)) + 3);
-  const fields = src.split('\n').find((l) => l.startsWith('const FW_CARD_FIELDS'));
+  const consts = src.slice(src.indexOf('const FW_CARD_FIELDS'), src.indexOf('};\n', src.indexOf('const FW_LISTS')) + 3);
 
   const page = () => {
     const ctx = { wizData: { framework: {} }, saves: 0, renders: 0 };
@@ -154,7 +154,8 @@ describe('the Test Framework page', () => {
     ctx.saveFrameworkDebounced = () => { ctx.saves += 1; };
     ctx.renderWizardStep1InSection = () => { ctx.renders += 1; };
     vm.createContext(ctx);
-    vm.runInContext(`${fields}\n${lift('fwCardFieldHtml')}\n${lift('fwCardRowHtml')}\n${lift('fwReductionCardsHtml')}\n${lift('clickReductionCard')}\n${lift('changeReductionCard')}\nthis.html = fwReductionCardsHtml; this.click = clickReductionCard; this.change = changeReductionCard;`, ctx);
+    const fns = ['fwListFieldHtml', 'fwListRowHtml', 'fwListHtml', 'fwReductionCardsHtml', 'fwProductsHtml', 'fwListOf', 'clickFwList', 'changeFwList'].map(lift).join('\n');
+    vm.runInContext(`${consts}\n${fns}\nthis.html = fwReductionCardsHtml; this.products = fwProductsHtml; this.click = clickFwList; this.change = changeFwList;`, ctx);
     return ctx;
   };
 
@@ -185,7 +186,7 @@ describe('the Test Framework page', () => {
 
   test('wired: drawn under Passenger Types, the click before the switch, the change in the chain', () => {
     expect(src).toContain('${fwReductionCardsHtml(fw)}');
-    expect(src).toContain("if (clickReductionCard(action, el)) return;");
-    expect(src).toContain('changePassengerUpdate(action, el) || changeReductionCard(action, el)');
+    expect(src).toContain("if (clickFwList(action, el)) return;");
+    expect(src).toContain('changePassengerUpdate(action, el) || changeFwList(action, el)');
   });
 });

@@ -204,6 +204,28 @@
         "name": "Simulator student card",
         "percent": 30
       }
+    ],
+    "products": [
+      {
+        "code": "SIM_FLEXI_BASIC",
+        "name": "Flexi basic",
+        "flexibility": "FULL_FLEXIBLE"
+      },
+      {
+        "code": "SIM_ALL_DAY",
+        "name": "All-day ticket",
+        "flexibility": "FULL_FLEXIBLE"
+      },
+      {
+        "code": "SIM_FLEXI_SAVER",
+        "name": "Flexi saver",
+        "flexibility": "SEMI_FLEXIBLE"
+      },
+      {
+        "code": "SIM_TRAIN_BOUND",
+        "name": "Train-bound saver",
+        "flexibility": "NON_FLEXIBLE"
+      }
     ]
   },
   "testResources": [

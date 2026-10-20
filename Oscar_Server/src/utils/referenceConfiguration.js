@@ -166,6 +166,9 @@ function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) 
   // #887: A3.7, the reduction cards the provider accepts.
   const cards = require('./reductionCards').cardsFromChecklist(answers);
   if (cards) framework.reductionCards = cards;
+  // #887 PR 2: A4.18, the products the provider sells.
+  const products = require('./namedProducts').productsFromChecklist(answers);
+  if (products) framework.products = products;
   return framework;
 }
 
