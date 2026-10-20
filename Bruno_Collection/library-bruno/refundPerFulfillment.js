@@ -75,9 +75,29 @@ const offersOf = (body) => {
   return Array.isArray(body.refundOffers) ? body.refundOffers : [body.refundOffers];
 };
 
-/** The answers to the requests one per fulfillment, read as one answer. */
+/**
+ * The answers to the requests one per fulfillment, read as one answer. Each
+ * refund offer once (#893): a provider may answer each request with every
+ * refund offer of the booking still proposed, the earlier ones included. The
+ * latest copy of an offer is kept, in the order first seen; `repeated` counts
+ * the copies left out. An offer without an id is kept as it is.
+ */
 function combineAnswers(bodies) {
-  const combined = { refundOffers: bodies.flatMap(offersOf) };
+  const offers = [];
+  const at = new Map();
+  let repeated = 0;
+  for (const offer of bodies.flatMap(offersOf)) {
+    const id = isObj(offer) && typeof offer.id === 'string' && offer.id ? offer.id : null;
+    if (id !== null && at.has(id)) {
+      offers[at.get(id)] = offer;
+      repeated += 1;
+      continue;
+    }
+    if (id !== null) at.set(id, offers.length);
+    offers.push(offer);
+  }
+  const combined = { refundOffers: offers };
+  if (repeated > 0) combined.repeated = repeated;
   const problems = bodies.flatMap((b) => (isObj(b) && Array.isArray(b.problems) ? b.problems : []));
   if (problems.length > 0) combined.problems = problems;
   return combined;
@@ -144,6 +164,10 @@ async function askOnePerFulfillment(status, answer) {
     answers.push(r.body);
   }
   const combined = combineAnswers(answers);
+  if (combined.repeated) {
+    log(`[INFO] Refund offers: ${combined.repeated} refund offer(s) came again in the answer for a later fulfillment; each is counted once.`);
+    delete combined.repeated;
+  }
   log(`[INFO] Refund offers asked one fulfillment at a time: ${combined.refundOffers.length} refund offer(s) for ${asked.length} fulfillments.`);
   return { status: 200, body: combined };
 }

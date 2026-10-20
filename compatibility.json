@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.400",
+  "current_release": "2026.401",
   "releases": [
+    {
+      "release": "2026.401",
+      "date": "2026-10-20",
+      "server": "1.11.366",
+      "collection": "OTST_V2.0.201",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#893: refund offers asked one fulfillment at a time are each counted once. A real provider answers each request with every refund offer of the booking still proposed, so OSCAR counted the first offer twice: a false \"fulfillment in two refund offers\", a false overrule total, and a 404 when the same offer was confirmed again."
+      ]
+    },
     {
       "release": "2026.400",
       "date": "2026-10-20",
