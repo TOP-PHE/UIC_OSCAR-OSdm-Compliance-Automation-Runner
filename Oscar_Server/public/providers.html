@@ -238,7 +238,8 @@ async function saveOperator(remove) {
 function linkRow(l) {
   const state = { waiting: 'Waiting for your answer', accepted: 'Accepted', refused: 'Refused' }[l.status] || l.status;
   const accept = l.status === 'accepted' ? '' : '<button class="btn btn-primary btn-sm" data-action="link-accept" data-provider="' + esc(l.provider_id) + '">Accept</button> ';
-  const refuse = l.status === 'refused' ? '' : '<button class="btn btn-secondary btn-sm" data-action="link-refuse" data-provider="' + esc(l.provider_id) + '">' + (l.status === 'accepted' ? 'Stop' : 'Refuse') + '</button>';
+  const refuseLabel = l.status === 'accepted' ? 'Stop' : 'Refuse';
+  const refuse = l.status === 'refused' ? '' : '<button class="btn btn-secondary btn-sm" data-action="link-refuse" data-provider="' + esc(l.provider_id) + '">' + refuseLabel + '</button>';
   return '<tr><td><strong>' + esc(l.distributor_name) + '</strong></td><td>' + esc(l.provider_name) + '</td><td>' + esc(state) + '</td>'
     + '<td style="white-space:nowrap">' + accept + refuse + '</td></tr>';
 }
