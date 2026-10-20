@@ -126,4 +126,36 @@ function compareGroupWithIndividual(groupOffer, body) {
   return [{ name: `${name} — ${what}`, ok: true }];
 }
 
-module.exports = { collectiveAsked, individualRequest, checkCollectiveOffer, compareGroupWithIndividual };
+// ── #887 PR 3: a group too large for the product, refused ───────────────────
+
+/**
+ * Step 01, after the response, before the status check: a COLLECTIVE request
+ * whose scenario expects the product absent (`expectedProductAbsent`, a group
+ * the product's sizes exclude) may also be refused outright. A 4xx with an
+ * RFC 9457 Problem passes, as the other refusal probes are graded, and the
+ * scenario ends. True when it ends here; a 2xx goes on to the check that no
+ * offer holds the product.
+ */
+function checkGroupRefused(status, body) {
+  if (String(bru.getEnvVar('expectedProductAbsent')) !== 'true') return false;
+  let request = bru.getEnvVar('OfferCollectionRequest');
+  if (typeof request === 'string') {
+    try { request = JSON.parse(request); } catch { request = null; }
+  }
+  if (!collectiveAsked(request) || typeof status !== 'number' || status < 300) return false;
+  const count = listOf(request.anonymousPassengerSpecifications).length;
+  require('./displays.js');
+  const { validateProblemResponse } = require('./requestedInformation.js');
+  validateProblemResponse({
+    status,
+    body,
+    targets: [],
+    prefix: '🧪 Group size probe',
+    label: `${count} passengers, product ${bru.getEnvVar('expectedProduct')}, POST /offers`,
+    assert: (name, ok, msg) => test(name, () => { if (!ok) throw new Error(msg); }),
+    log: (level, msg) => validationLogger(`[${level}] ${msg}`),
+  });
+  return true;
+}
+
+module.exports = { collectiveAsked, individualRequest, checkCollectiveOffer, compareGroupWithIndividual, checkGroupRefused };

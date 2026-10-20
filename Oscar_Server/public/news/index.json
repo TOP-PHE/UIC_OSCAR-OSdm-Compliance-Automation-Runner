@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-group-products",
+    "date": "October 20, 2026",
+    "tag": "Feature",
+    "title": "Group tariffs the provider sells, and two scenarios to test them",
+    "summary": "The Test Framework lists the provider's group products with their group sizes, and two reference scenarios test a group sale and a group too large.",
+    "content": "In Test Framework › Tariff Flexibility, list the group products the provider sells: code, name, flexibility and the group sizes each takes. A provider's checklist fills the list from question A4.19. The reference scenario OTST_SALE_GROUP_TARIFF then sells the first group product to a group of its sizes, and NHF_SALE_GROUP_TOO_LARGE asks for one passenger more than its maximum: the provider must refuse, or offer without that product."
+  },
+  {
     "id": "2026-10-20-named-products",
     "date": "October 20, 2026",
     "tag": "Feature",

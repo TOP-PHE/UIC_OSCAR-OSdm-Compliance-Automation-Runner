@@ -226,6 +226,22 @@
         "name": "Train-bound saver",
         "flexibility": "NON_FLEXIBLE"
       }
+    ],
+    "groupProducts": [
+      {
+        "code": "SIM_GROUP",
+        "name": "Group ticket",
+        "flexibility": "SEMI_FLEXIBLE",
+        "minPassengers": 2,
+        "maxPassengers": 19
+      },
+      {
+        "code": "SIM_WEEKEND_GROUP",
+        "name": "Weekend group",
+        "flexibility": "NON_FLEXIBLE",
+        "minPassengers": 2,
+        "maxPassengers": 5
+      }
     ]
   },
   "testResources": [

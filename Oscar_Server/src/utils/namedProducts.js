@@ -20,6 +20,11 @@
  *
  * A checklist (#795) gives them in question A4.18: `data.products=YES` or
  * `=NO`, and the table `data.product.<n>.code` / `.name` / `.flexibility`.
+ *
+ * PR 3: `groupProducts` lists the group tariffs the same way, each with the
+ * group sizes it takes (`minPassengers`, `maxPassengers`, 1 to 99, optional).
+ * Checklist A4.19: `data.groupProducts=YES` / `=NO` and the table
+ * `data.groupProduct.<n>.code` / `.name` / `.flexibility` / `.min` / `.max`.
  */
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -48,35 +53,71 @@ function productOf(entry) {
   return product;
 }
 
-/** The products a framework declares: each with a code, each code once, in order. */
-function declaredProducts(framework) {
+// A group size: a whole number from 1 to 99 ("19" or 19), or null.
+function sizeOf(value) {
+  const n = typeof value === 'string' && /^\s*\d{1,2}\s*$/.test(value) ? Number(value) : value;
+  return Number.isInteger(n) && n >= 1 && n <= 99 ? n : null;
+}
+
+/** One declared group product: a product, plus the group sizes it takes. */
+function groupProductOf(entry) {
+  const product = productOf(entry);
+  if (!product) return null;
+  const min = sizeOf(entry.minPassengers ?? entry.min);
+  const max = sizeOf(entry.maxPassengers ?? entry.max);
+  if (min !== null) product.minPassengers = min;
+  if (max !== null && (min === null || max >= min)) product.maxPassengers = max;
+  return product;
+}
+
+// A framework's list under `key`, cleaned by `clean`: each code once, in order.
+function declaredList(framework, key, clean) {
   const fw = isObj(framework?.config) ? framework.config : framework;
   const out = [];
-  for (const product of (Array.isArray(fw?.products) ? fw.products : []).map(productOf)) {
-    if (!product || out.some((p) => p.code === product.code)) continue;
-    out.push(product);
+  for (const item of (Array.isArray(fw?.[key]) ? fw[key] : []).map((entry) => clean(entry))) {
+    if (!item || out.some((p) => p.code === item.code)) continue;
+    out.push(item);
     if (out.length === MAX_PRODUCTS) break;
   }
   return out;
 }
 
-/**
- * The products a checklist's A4.18 declares: [] for NO, the table's rows for
- * YES, null when the question is not answered.
- */
-function productsFromChecklist(answers) {
+/** The products a framework declares: each with a code, each code once, in order. */
+const declaredProducts = (framework) => declaredList(framework, 'products', productOf);
+
+/** PR 3: the group products a framework declares, likewise. */
+const declaredGroupProducts = (framework) => declaredList(framework, 'groupProducts', groupProductOf);
+
+// A checklist table `data.<tag>.<n>.<field>`: [] for NO, its rows by number
+// for YES, null when the question is not answered.
+function rowsFromChecklist(answers, question, tag, fields) {
   const a = isObj(answers) ? answers : {};
-  if (a['data.products=NO'] === true) return [];
-  if (a['data.products=YES'] !== true) return null;
+  if (a[`data.${question}=NO`] === true) return [];
+  if (a[`data.${question}=YES`] !== true) return null;
+  const prefix = `data.${tag}.`;
   const rows = new Map();
-  for (const [tag, value] of Object.entries(a)) {
-    const m = /^data\.product\.(\d{1,3})\.(code|name|flexibility)$/.exec(tag);
-    if (!m || typeof value !== 'string') continue;
-    const n = Number(m[1]);
-    if (!rows.has(n)) rows.set(n, {});
-    rows.get(n)[m[2]] = value;
+  for (const [key, value] of Object.entries(a)) {
+    if (!key.startsWith(prefix) || typeof value !== 'string') continue;
+    const [n, field, ...rest] = key.slice(prefix.length).split('.');
+    if (rest.length > 0 || !/^\d{1,3}$/.test(n) || !fields.includes(field)) continue;
+    if (!rows.has(Number(n))) rows.set(Number(n), {});
+    rows.get(Number(n))[field] = value;
   }
-  return declaredProducts({ products: [...rows.keys()].sort((x, y) => x - y).map((n) => rows.get(n)) });
+  return [...rows.keys()].sort((x, y) => x - y).map((n) => rows.get(n));
 }
 
-module.exports = { FLEXIBILITIES, flexibilityOf, declaredProducts, productsFromChecklist };
+/** The products a checklist's A4.18 declares, or null when it is not answered. */
+function productsFromChecklist(answers) {
+  const rows = rowsFromChecklist(answers, 'products', 'product', ['code', 'name', 'flexibility']);
+  return rows && declaredProducts({ products: rows });
+}
+
+/** PR 3: the group products a checklist's A4.19 declares, or null. */
+function groupProductsFromChecklist(answers) {
+  const rows = rowsFromChecklist(answers, 'groupProducts', 'groupProduct', ['code', 'name', 'flexibility', 'min', 'max']);
+  return rows && declaredGroupProducts({ groupProducts: rows });
+}
+
+module.exports = {
+  FLEXIBILITIES, flexibilityOf, sizeOf, declaredProducts, productsFromChecklist, declaredGroupProducts, groupProductsFromChecklist,
+};

@@ -44,7 +44,7 @@ const {
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const { declaredCards } = require('./reductionCards');
-const { declaredProducts } = require('./namedProducts');
+const { declaredProducts, declaredGroupProducts } = require('./namedProducts');
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const clone = (v) => structuredClone(v);
 const ARMED = new Set(['on', 'true', 'yes', true]);
@@ -70,8 +70,11 @@ const HORIZON_LIMITS = new Set(['SALES_HORIZON', 'OVER_SALES_HORIZON']);
 // Framework declares for CHILD and ADULT (AGE_RANGES). #887: one whose card
 // holder takes the first reduction card the Test Framework declares
 // (REDUCTION_CARDS). #887 PR 2: one that sells the first product it declares
-// (NAMED_PRODUCTS).
-const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES', 'REDUCTION_CARDS', 'NAMED_PRODUCTS'];
+// (NAMED_PRODUCTS). PR 3: one that sells the first group product it
+// declares (GROUP_TARIFF), and one asking it for one passenger more than the
+// first group product's maximum (OVER_GROUP_SIZE).
+const GROUP_LIMITS = new Set(['GROUP_TARIFF', 'OVER_GROUP_SIZE']);
+const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES', 'REDUCTION_CARDS', 'NAMED_PRODUCTS', ...GROUP_LIMITS];
 // #780: an entry that stands for the offer search probes (`probe`
 // "OFFER_OPTIONS"): it comes once per option value the Test Framework
 // declares, each asking for that value alone. Per option: the framework key,
@@ -259,6 +262,8 @@ function limitsMissing(requirements, fw) {
   if (requirements.ageRanges && !ageRangesOf(fw)) missing.push('passenger types CHILD and ADULT with their age ranges (Passenger Types)');
   if (requirements.reductionCards && declaredCards(fw).length === 0) missing.push('a reduction card the provider accepts (Passenger Types › Reduction cards)');
   if (requirements.namedProducts && declaredProducts(fw).length === 0) missing.push('a product the provider sells (Tariff Flexibility › Products)');
+  if (requirements.groupProducts && declaredGroupProducts(fw).length === 0) missing.push('a group product the provider sells (Tariff Flexibility › Group products)');
+  if (requirements.groupProductMax && !declaredGroupProducts(fw).some((g) => g.maxPassengers)) missing.push('a group product with its maximum group size (Tariff Flexibility › Group products)');
   return missing;
 }
 
@@ -421,6 +426,13 @@ function limitNeedsText(needs, limit) {
   }
   if (limit === 'REDUCTION_CARDS') {
     return ['the first reduction card the Test Framework declares, on the passenger holding a card', ...needsText({ ...needs, reductionCards: undefined })];
+  }
+  if (GROUP_LIMITS.has(limit)) {
+    const values = arr(needs?.providerValues).filter((v) => v !== 'expectedProduct');
+    const first = limit === 'OVER_GROUP_SIZE'
+      ? 'one passenger more than the maximum of the first group product the Test Framework declares with one, by its code'
+      : 'the first group product the Test Framework declares, by its code, for a group of its sizes';
+    return [first, ...needsText({ ...needs, providerValues: values, tariff: undefined, passengers: undefined })];
   }
   if (limit === 'NAMED_PRODUCTS') {
     const values = arr(needs?.providerValues).filter((v) => v !== 'expectedProduct');
@@ -611,6 +623,8 @@ function baseEntries(catalogue, simulator, framework) {
     if (entry.limit === 'AGE_RANGES') requirements.ageRanges = true;
     if (entry.limit === 'REDUCTION_CARDS') requirements.reductionCards = true;
     if (entry.limit === 'NAMED_PRODUCTS') requirements.namedProducts = true;
+    if (GROUP_LIMITS.has(entry.limit)) requirements.groupProducts = true;
+    if (entry.limit === 'OVER_GROUP_SIZE') requirements.groupProductMax = true;
     // #780: the offer search probes keep their search: they test the options, not the form.
     if (entry.probe) requirements.offerRequest = { ...requirements.offerRequest, convertible: false };
     return {

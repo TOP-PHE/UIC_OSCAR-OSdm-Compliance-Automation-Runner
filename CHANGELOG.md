@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.365] / [collection-OTST_V2.0.200] — 2026-10-20
+
+Issue #887 part 3 (the last), release 2026.400. Server, pages, collection and the scenario catalogue.
+
+### Added
+- **The group products a provider sells** in the Test Framework (Tariff Flexibility › Group products the provider sells): code, name, flexibility, and the group sizes each takes (min and max passengers, 1 to 99). A checklist import fills the list from the new question **A4.19** (`data.groupProducts`, table `data.groupProduct.<n>.code` / `.name` / `.flexibility` / `.min` / `.max`); the public checklist and the four simulator checklists are regenerated, the simulator's declaring `SIM_GROUP` (2–19) and `SIM_WEEKEND_GROUP` (2–5).
+- **Two reference scenarios:**
+  - `OTST_SALE_GROUP_TARIFF` (source `SIM_GROUP_6ADT_38`, limit `GROUP_TARIFF`): a COLLECTIVE request for the first group product, by its code and in its flexibility, for the source's six passengers brought within the product's sizes; #599's checks (one collective admission, every passenger named, the group against the same passengers alone).
+  - `NHF_SALE_GROUP_TOO_LARGE` (source `SIM_GROUP_WEEKEND_6PAX_ABSENT_38`, limit `OVER_GROUP_SIZE`): one passenger more than the maximum of the first group product giving one; the product must not be offered.
+  Neither can be copied without a group product (the second without a maximum).
+- **A refusal of the group too large passes** (collection): step 01 grades a 4xx answer to a COLLECTIVE request whose scenario expects the product absent as the other refusal probes do (an RFC 9457 Problem), and ends the scenario (`checkGroupRefused()`); a 2xx goes on to the check that no offer holds the product, as before.
+
+### Changed
+- Three more comments of the simulator checklists are shorter, to keep the alpha checklist under the AI analysis's 20,000 characters.
+
+Checked:
+- `named-products-catalogue.test.js`: group products (sizes, a maximum below the minimum left out), A4.19 on import, both entries' requirements, the copies (code, flexibility, group size within the product's, max + 1 with distinct passengers, product expected absent), the schema, the page's list.
+- `bruno-group-offers.test.js`: the probe (armed, a Problem passes and ends; a body that is not a Problem fails a check; 2xx, not armed or INDIVIDUAL left alone; step 01 asks it before the status check). Making the probe never fire fails two tests.
+- The real collection on the simulator, copies made with the gamma reference framework: the group sale with `SIM_GROUP` and 6 passengers, 458 checks, none failed; the group of 20, refused by the simulator with a Problem, 71 checks, none failed.
+
+---
+
 ## [server-1.11.364] / [collection-OTST_V2.0.199] — 2026-10-20
 
 Issue #887 part 2, release 2026.399. Server, pages and the scenario catalogue.

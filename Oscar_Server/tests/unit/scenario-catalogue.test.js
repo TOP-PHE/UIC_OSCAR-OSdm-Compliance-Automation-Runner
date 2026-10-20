@@ -56,6 +56,8 @@ describe('the catalogue file', () => {
       if (e.limit === 'REDUCTION_CARDS') expect(e.source).toMatch(/^SIM_SALE_CARD_/);
       // PR 2: and a product scenario once its product does.
       else if (e.limit === 'NAMED_PRODUCTS') expect(e.source).toMatch(/^SIM_SALE_PRODUCT_/);
+      // PR 3: and a group scenario once its group product does.
+      else if (['GROUP_TARIFF', 'OVER_GROUP_SIZE'].includes(e.limit)) expect(e.source).toMatch(/^SIM_GROUP_/);
       else expect(e.source).not.toMatch(/^SIM_(WRONG|VARIANT|SALE_CARD|SALE_PRODUCT|GROUP)_/);
       if (e.code.startsWith('NHF_EXPIRED_')) expect(Object.values(e.set)).toEqual([40]);
     }
