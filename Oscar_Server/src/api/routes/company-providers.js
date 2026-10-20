@@ -16,6 +16,9 @@
  *   GET    /v1/company/providers/:id/access           who may use it (Test Manager)
  *   PUT    /v1/company/providers/:id/access/:userId   grant a tester (Test Manager)
  *   DELETE /v1/company/providers/:id/access/:userId   withdraw      (Test Manager)
+ *   GET    /v1/company/providers/operator-companies  companies a provider can be linked to (Test Manager)
+ *   PUT    /v1/company/providers/:id/operator        link the company that operates it (Test Manager, #901)
+ *   DELETE /v1/company/providers/:id/operator        remove that link  (Test Manager, #901)
  *
  * A provider is a child company (companies.parent_id = the distributor). It
  * then reuses every per-company route by its own id: a request names it with
@@ -128,7 +131,17 @@ function freeSlug(parentSlug, name) {
 
 function providerView(c) {
   return { id: c.id, name: c.name, slug: c.slug, api_base: c.api_base || null,
-           parent_id: c.parent_id, created_at: c.created_at };
+           parent_id: c.parent_id, created_at: c.created_at, operator: operatorView(c.id) };
+}
+
+// #901: the company that operates the provider, as linked, or null. The link
+// is optional: a provider whose operator has no company in OSCAR has none.
+function operatorView(providerId) {
+  const link = get(`SELECT po.operator_id, po.status, po.requested_at, po.decided_at, c.name AS operator_name
+                      FROM provider_operator po JOIN companies c ON c.id = po.operator_id
+                     WHERE po.provider_id = ?`, [providerId]);
+  return link ? { company_id: link.operator_id, company_name: link.operator_name, status: link.status,
+                  requested_at: link.requested_at, decided_at: link.decided_at || null } : null;
 }
 
 // ── GET / ─────────────────────────────────────────────────────────────────────
@@ -198,6 +211,57 @@ router.patch('/:id', providerMutationLimiter, (req, res) => {
   run(`UPDATE companies SET name = ?, updated_at = datetime('now') WHERE id = ?`, [name, provider.id]);
   auditLog(req.user.id, provider.id, req.user.email, 'provider_renamed');
   return res.json({ provider: providerView(get('SELECT * FROM companies WHERE id = ?', [provider.id])) });
+});
+
+// ── #901: the company that operates a provider ───────────────────────────────
+// A Test Manager of the distributor links a provider to the company that
+// operates it, so as to share runs with that company's Test Managers. The
+// link waits for their acceptance (company-run-shares.js); until then, and
+// after a refusal, nothing can be shared. Changing or removing the link stops
+// every share at once: a share counts only while its link names that company,
+// accepted (helpers/run-shares.js).
+
+// The companies a provider can be linked to: top-level companies other than
+// the distributor and the platform. Names only.
+function operatorCandidates(distributorId) {
+  return all(`SELECT id, name FROM companies
+               WHERE parent_id IS NULL AND id != ? AND slug != ?
+               ORDER BY name ASC`, [distributorId, PLATFORM_SLUG]);
+}
+
+router.get('/operator-companies', (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  return res.json({ companies: operatorCandidates(req.user.companyId) });
+});
+
+router.put('/:id/operator', providerMutationLimiter, (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const provider = ownProvider(req);
+  if (!provider) return res.status(404).json(NOT_FOUND);
+  const wanted = req.body?.company_id;
+  const target = typeof wanted === 'string' && operatorCandidates(provider.parent_id).find((c) => c.id === wanted);
+  if (!target) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id must name another company of OSCAR.' });
+  }
+  const current = get('SELECT operator_id FROM provider_operator WHERE provider_id = ?', [provider.id]);
+  if (current?.operator_id === target.id) return res.json({ provider: providerView(provider) });
+  run(`INSERT INTO provider_operator (provider_id, operator_id, status, requested_by, requested_at, decided_by, decided_at)
+       VALUES (?, ?, 'waiting', ?, datetime('now'), NULL, NULL)
+       ON CONFLICT(provider_id) DO UPDATE SET operator_id = excluded.operator_id, status = 'waiting',
+         requested_by = excluded.requested_by, requested_at = excluded.requested_at, decided_by = NULL, decided_at = NULL`,
+    [provider.id, target.id, req.user.id]);
+  auditLog(req.user.id, provider.id, req.user.email, `provider_operator_linked:${target.id}`);
+  return res.json({ provider: providerView(provider) });
+});
+
+router.delete('/:id/operator', providerMutationLimiter, (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const provider = ownProvider(req);
+  if (!provider) return res.status(404).json(NOT_FOUND);
+  const removed = run('DELETE FROM provider_operator WHERE provider_id = ?', [provider.id]);
+  if (!removed?.changes) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'This provider is linked to no company.' });
+  auditLog(req.user.id, provider.id, req.user.email, 'provider_operator_unlinked');
+  return res.json({ provider: providerView(provider) });
 });
 
 // ── Access list ───────────────────────────────────────────────────────────────

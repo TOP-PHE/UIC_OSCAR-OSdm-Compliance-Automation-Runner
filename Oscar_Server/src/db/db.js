@@ -887,6 +887,32 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_checklist_import_company ON checklist_import(company_id, imported_at)');
   }},
+  { version: 41, name: 'run-sharing', up: () => {
+      // #901 - a distributor's provider linked to the company that operates
+      // it (one per provider), accepted by that company's Test Manager before
+      // anything is shared; and the runs shared with it, one row per run and
+      // company, revocable. A share counts only while its link is accepted.
+      db.exec(`CREATE TABLE IF NOT EXISTS provider_operator (
+        provider_id   TEXT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+        operator_id   TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        status        TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'accepted', 'refused')),
+        requested_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+        requested_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        decided_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
+        decided_at    TEXT
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_provider_operator_operator ON provider_operator(operator_id)');
+      db.exec(`CREATE TABLE IF NOT EXISTS run_share (
+        run_id        TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        shared_by     TEXT REFERENCES users(id) ON DELETE SET NULL,
+        shared_at     TEXT NOT NULL DEFAULT (datetime('now')),
+        revoked_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
+        revoked_at    TEXT,
+        PRIMARY KEY (run_id, company_id)
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_run_share_company ON run_share(company_id, shared_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

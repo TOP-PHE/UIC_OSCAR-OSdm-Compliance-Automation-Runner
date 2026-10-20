@@ -115,10 +115,27 @@ function isRunStale(runRow) {
  * Returning null means "treat as not-found" — never disclose existence to
  * a user who shouldn't see the run.
  */
-const { canUserSeeRun } = require('../helpers/run-access');
+const { canUserSeeRun, canUserReadRun } = require('../helpers/run-access');
 function validateRunOwnership(runId, _companyId, req) {
   if (!req?.user) return null;
   return canUserSeeRun(runId, req.user);
+}
+
+// #901: the read routes also admit a run shared with the reader's company
+// (canUserReadRun); every other route keeps validateRunOwnership above.
+function readableRun(req) {
+  if (!req?.user) return null;
+  return canUserReadRun(req.params.id, req.user);
+}
+
+// What a text of a shared run becomes for the company it is shared with: the
+// distributor's people named by the distributor. Identity for an own run.
+function sharedTextOf(runRow) {
+  const view = runRow?.sharedView;
+  if (!view) return (text) => text;
+  const { replaceEmails } = require('../../utils/sharedRunView');
+  const emails = require('../helpers/run-shares').distributorEmails(view.distributor.id);
+  return (text) => replaceEmails(text, emails, view.distributor.name);
 }
 
 /**
@@ -390,6 +407,7 @@ router.get('/', (req, res) => {
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.user_id, r.deleted_by, r.batch_id, r.scenario_code,
               r.shared_with_certifier_at, r.shared_with_certifier_by,
+              (SELECT MAX(sh.shared_at) FROM run_share sh WHERE sh.run_id = r.id AND sh.revoked_at IS NULL) AS shared_with_operator_at,
               u.email AS submitted_by,
               COALESCE(ra.artifact_count, 0) AS artifact_count,
               COALESCE(rs.scenario_count,  0) AS scenario_count,
@@ -822,14 +840,15 @@ router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
 
 // ── GET /v1/runs/:id ──────────────────────────────────────────────────────────
 router.get('/:id', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
+  const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
+  if (runRow.sharedView) return res.json(require('../../utils/sharedRunView').sharedRunRow(runRow, runRow.sharedView));
   return res.json(runRow);
 });
 
 // ── GET /v1/runs/:id/logs ─────────────────────────────────────────────────────
 router.get('/:id/logs', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
+  const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const since  = req.query.since_id ? Number.parseInt(req.query.since_id, 10) : 0;
@@ -858,7 +877,8 @@ router.get('/:id/logs', (req, res) => {
 
   const rows = all(sql, params);
   // Transparent decrypt of the message column (handles legacy plaintext).
-  const events = rows.map(r => ({ ...r, message: colDecrypt(r.message) }));
+  const shown = sharedTextOf(runRow);
+  const events = rows.map(r => ({ ...r, message: shown(colDecrypt(r.message)) }));
 
   let filtered = events;
   if (wantSearch) {
@@ -882,8 +902,9 @@ router.get('/:id/logs', (req, res) => {
 // Returns structured assertion results in a 3-level hierarchy: suites → requests → assertions.
 // Supports filtering by status, category, domain, and suite.
 router.get('/:id/assertions', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
+  const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
+  const shown = sharedTextOf(runRow);
 
   const { status: statusFilter, category, domain, suite } = req.query;
 
@@ -913,11 +934,11 @@ router.get('/:id/assertions', (req, res) => {
       const assertions = all(assertSql, assertParams);
       return {
         ...r,
-        request_body:     colDecrypt(r.request_body),
-        request_headers:  colDecrypt(r.request_headers),
-        response_body:    colDecrypt(r.response_body),
-        response_headers: colDecrypt(r.response_headers),
-        context:          colDecrypt(r.context),
+        request_body:     shown(colDecrypt(r.request_body)),
+        request_headers:  shown(colDecrypt(r.request_headers)),
+        response_body:    shown(colDecrypt(r.response_body)),
+        response_headers: shown(colDecrypt(r.response_headers)),
+        context:          shown(colDecrypt(r.context)),
         assertions
       };
     });
@@ -972,7 +993,7 @@ router.get('/:id/assertions', (req, res) => {
 //   ?status_filter=all      — everything (default)
 //   ?scenario=CODE          — limit to one scenario (matches run_suites.scenario_name)
 router.get('/:id/requests', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
+  const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const { status_filter: filter = 'all', scenario } = req.query;
@@ -1023,7 +1044,7 @@ router.get('/:id/requests', (req, res) => {
 // non-JSON. Parent and children are returned as compact summaries (no bodies)
 // so the client can render "← parent" / "→ children" navigation.
 router.get('/:id/requests/:reqId', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
+  const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   // Tenant scope: the request row must belong to this run (which we just
@@ -1040,11 +1061,12 @@ router.get('/:id/requests/:reqId', (req, res) => {
   // Decrypt the at-rest-encrypted body + header + context columns before
   // shaping the response (Phase 2 of issue #60). Legacy plaintext rows
   // pass through colDecrypt() unchanged.
-  reqRow.request_body     = colDecrypt(reqRow.request_body);
-  reqRow.request_headers  = colDecrypt(reqRow.request_headers);
-  reqRow.response_body    = colDecrypt(reqRow.response_body);
-  reqRow.response_headers = colDecrypt(reqRow.response_headers);
-  reqRow.context          = colDecrypt(reqRow.context);
+  const shown = sharedTextOf(runRow);
+  reqRow.request_body     = shown(colDecrypt(reqRow.request_body));
+  reqRow.request_headers  = shown(colDecrypt(reqRow.request_headers));
+  reqRow.response_body    = shown(colDecrypt(reqRow.response_body));
+  reqRow.response_headers = shown(colDecrypt(reqRow.response_headers));
+  reqRow.context          = shown(colDecrypt(reqRow.context));
 
   // Parent (if any) — compact summary
   let parent = null;
@@ -1079,7 +1101,7 @@ router.get('/:id/requests/:reqId', (req, res) => {
 
 // ── GET /v1/runs/:id/artifacts ────────────────────────────────────────────────
 router.get('/:id/artifacts', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
+  const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const artifacts = all(`SELECT id, type, filename FROM run_artifacts WHERE run_id = ?`, [req.params.id]);
@@ -1088,7 +1110,7 @@ router.get('/:id/artifacts', (req, res) => {
 
 // ── GET /v1/runs/:id/artifacts/:aid ──────────────────────────────────────────
 router.get('/:id/artifacts/:aid', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
+  const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const artifact = get(`SELECT * FROM run_artifacts WHERE id = ? AND run_id = ?`, [req.params.aid, req.params.id]);
@@ -1112,6 +1134,7 @@ router.get('/:id/artifacts/:aid', (req, res) => {
     return res.status(500).json({ status: 500, title: 'Decryption failed', detail: err.message });
   }
 
+  if (runRow.sharedView) plaintext = Buffer.from(sharedTextOf(runRow)(plaintext.toString('utf8')), 'utf8');
   const mime = artifact.type === 'html_report' ? 'text/html' : 'application/json';
   res.setHeader('Content-Type', mime);
   res.setHeader('Content-Disposition', `inline; filename="${artifact.filename}"`);
@@ -1177,6 +1200,97 @@ router.delete('/:id/share', (req, res) => {
   );
   auditLog(req.user.id, runRow.company_id, req.user.email, `run_unshared_with_certifier:${req.params.id}`);
   return res.json({ ok: true, run: { id: req.params.id, shared_with_certifier_at: null } });
+});
+
+// ── #901: share runs of a provider with the company that operates it ─────────
+// A Test Manager of the distributor, for runs of a provider linked to that
+// company with the link accepted (company-providers.js /
+// company-run-shares.js). Terminal runs only, as for certifiers. The company
+// shared with reads them through canUserReadRun(); nothing here widens who may
+// change a run.
+const TERMINAL = new Set(['COMPLETED', 'FAILED', 'CANCELLED']);
+
+// The accepted operator of the run's provider, or a refusal { status, detail }.
+function shareTargetOf(runRow) {
+  const { operatorLinkOf } = require('../helpers/run-shares');
+  const company = get('SELECT parent_id FROM companies WHERE id = ?', [runRow.company_id]);
+  if (!company?.parent_id) return { status: 409, detail: 'Only runs of a provider can be shared with the company that operates it.' };
+  const link = operatorLinkOf(runRow.company_id);
+  if (!link) return { status: 409, detail: 'This provider is linked to no company (Providers page).' };
+  if (link.status !== 'accepted') return { status: 409, detail: `The company this provider is linked to has not accepted the link (${link.status}).` };
+  return { companyId: link.operator_id };
+}
+
+function shareRuns(req, runRows) {
+  const results = [];
+  for (const runRow of runRows) {
+    const target = shareTargetOf(runRow);
+    if (!target.companyId) { results.push({ id: runRow.id, shared: false, reason: target.detail }); continue; }
+    if (!TERMINAL.has(runRow.status)) { results.push({ id: runRow.id, shared: false, reason: `Run is ${runRow.status}.` }); continue; }
+    dbRun(`INSERT INTO run_share (run_id, company_id, shared_by, shared_at, revoked_by, revoked_at)
+           VALUES (?, ?, ?, datetime('now'), NULL, NULL)
+           ON CONFLICT(run_id, company_id) DO UPDATE SET shared_by = excluded.shared_by, shared_at = excluded.shared_at,
+             revoked_by = NULL, revoked_at = NULL`, [runRow.id, target.companyId, req.user.id]);
+    auditLog(req.user.id, runRow.company_id, req.user.email, `run_shared_with_operator:${runRow.id}:${target.companyId}`);
+    results.push({ id: runRow.id, shared: true });
+  }
+  return results;
+}
+
+function unshareRuns(req, runRows) {
+  const results = [];
+  for (const runRow of runRows) {
+    const done = dbRun(`UPDATE run_share SET revoked_by = ?, revoked_at = datetime('now')
+                         WHERE run_id = ? AND revoked_at IS NULL`, [req.user.id, runRow.id]);
+    if (done?.changes) auditLog(req.user.id, runRow.company_id, req.user.email, `run_unshared_with_operator:${runRow.id}`);
+    results.push({ id: runRow.id, shared: false });
+  }
+  return results;
+}
+
+function requireSharingTestManager(req, res) {
+  if (req.user.role !== 'test_manager') {
+    res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Only Test Managers share runs.' });
+    return false;
+  }
+  return true;
+}
+
+router.post('/:id/share-with-operator', (req, res) => {
+  if (!requireSharingTestManager(req, res)) return;
+  const runRow = canUserSeeRun(req.params.id, req.user);
+  if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
+  const [result] = shareRuns(req, [runRow]);
+  if (!result.shared) return res.status(409).json({ status: 409, title: 'Conflict', detail: result.reason });
+  return res.json({ ok: true, run: result });
+});
+
+router.delete('/:id/share-with-operator', (req, res) => {
+  if (!requireSharingTestManager(req, res)) return;
+  const runRow = canUserSeeRun(req.params.id, req.user);
+  if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
+  return res.json({ ok: true, run: unshareRuns(req, [runRow])[0] });
+});
+
+// The whole batch, as far as the Test Manager may see it.
+function batchRunsOf(req) {
+  return all('SELECT id FROM runs WHERE batch_id = ? ORDER BY queued_at ASC', [req.params.batchId])
+    .map((r) => canUserSeeRun(r.id, req.user)).filter(Boolean);
+}
+
+router.post('/batch/:batchId/share-with-operator', (req, res) => {
+  if (!requireSharingTestManager(req, res)) return;
+  const runs = batchRunsOf(req);
+  if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
+  const results = shareRuns(req, runs);
+  return res.json({ shared: results.filter((r) => r.shared).length, runs: results });
+});
+
+router.delete('/batch/:batchId/share-with-operator', (req, res) => {
+  if (!requireSharingTestManager(req, res)) return;
+  const runs = batchRunsOf(req);
+  if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
+  return res.json({ runs: unshareRuns(req, runs) });
 });
 
 // ── DELETE /v1/runs/:id/cancel ────────────────────────────────────────────────

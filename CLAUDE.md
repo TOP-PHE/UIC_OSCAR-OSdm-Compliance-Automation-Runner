@@ -532,6 +532,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   *routing* decisions (which query shape to run), never for *authorisation*.
   Note that `canUserSeeRun` returns `SELECT *`, so project the row before
   returning it or the response silently widens.
+  **A run shared with another company is read through `canUserReadRun()`,
+  never `canUserSeeRun()`** (#901, PR 1 = 1.11.370). A distributor's Test
+  Manager links a provider to the company that operates it
+  (`provider_operator`, migration 41; `PUT /v1/company/providers/:id/operator`),
+  that company's Test Manager accepts (`/v1/company/run-share-links`), then
+  runs are shared one by one or by batch (`run_share`,
+  `/v1/runs/:id/share-with-operator`). `canUserReadRun()` (`run-access.js`) is
+  `canUserSeeRun()` or a share that counts (`helpers/run-shares.js`
+  `sharedViewOf()`: not revoked, link to that company accepted, sharer still an
+  active Test Manager of the distributor, reader an active Test Manager of that
+  company). **Only read routes call it**: `canUserSeeRun()` also guards
+  delete, cancel, certifier sharing and compare, so widening it would let the
+  other company change the distributor's runs (a mutation test checks it). A
+  run read through a share carries a non-enumerable `sharedView`; the route
+  then shows `sharedRunRow()` and passes every text through
+  `replaceEmails()` (`utils/sharedRunView.js`): the distributor's users are
+  named by the distributor, never by e-mail. A new read route a shared run
+  should reach does both; any other keeps `canUserSeeRun()`.
 - **Read-only API keys (#503, PR 1 = 1.11.337).** A Test Manager makes a key
   for the company or provider of the request (`company-api-keys.js`,
   `api_key` migration 38; `utils/apiKeys.js` pure). `oscar_<8 hex>_<43
