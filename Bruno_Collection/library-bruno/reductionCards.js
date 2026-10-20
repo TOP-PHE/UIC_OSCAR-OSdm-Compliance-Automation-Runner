@@ -339,6 +339,29 @@ function inOfferChecks(chosen, specs, withCards, declared) {
 }
 
 /**
+ * #895, #897: the checks when the offer without cards is another tariff, or
+ * null when it is the same one. Another tariff: no offer without cards keeps
+ * the price of the passengers without a card (the provider sells this one
+ * only with a card, or another to the group), or it prices the passengers
+ * otherwise (a group tariff for all). Each card holder is then compared
+ * within the chosen offer; with nobody to compare with, the second case
+ * gives one INFO line and the first falls back to the counterpart.
+ */
+function otherTariffChecks({ chosen, counterpart, keeps, plain, refs }, specs, withCards, declared) {
+  const otherPrice = plain.length > 0 && !keeps;
+  const otherSplit = !sameSplit(chosen, counterpart, refs);
+  if (!otherPrice && !otherSplit) return null;
+  const inOffer = inOfferChecks(chosen, specs, withCards, declared);
+  if (inOffer) return inOffer;
+  if (!otherSplit) return null;
+  return [{
+    name: 'Reduction cards: the answer without cards prices the passengers otherwise (another product); the card is not compared',
+    ok: true,
+    level: 'info',
+  }];
+}
+
+/**
  * The comparison of the chosen offer (with cards) with the offer of the same
  * flexibility and travel class in the answer without cards. A passenger with
  * a card must pay less; one without must pay the same (a warning only).
@@ -364,24 +387,8 @@ function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false
   if (group && Object.keys(rates || {}).length > 0) {
     out.push({ name: 'Reduction cards: the declared rate is not checked on a group tariff', ok: true, level: 'info' });
   }
-  if (plain.length > 0 && !keeps) {
-    // #897: no offer without cards keeps the price of the passengers without
-    // a card: another tariff (the provider sells this one only with a card,
-    // or another one to the group). Compare within the chosen offer.
-    const inOffer = inOfferChecks(chosen, specs, withCards, declared);
-    if (inOffer) return [...out, ...inOffer];
-  }
-  if (!sameSplit(chosen, counterpart, refs)) {
-    // #895: another way of pricing (a group tariff without cards): the
-    // totals say nothing of a card; compare within the chosen offer.
-    const inOffer = inOfferChecks(chosen, specs, withCards, declared);
-    if (inOffer) return [...out, ...inOffer];
-    return [...out, {
-      name: 'Reduction cards: the answer without cards prices the passengers otherwise (another product); the card is not compared',
-      ok: true,
-      level: 'info',
-    }];
-  }
+  const otherTariff = otherTariffChecks({ chosen, counterpart, keeps, plain, refs }, specs, withCards, declared);
+  if (otherTariff) return [...out, ...otherTariff];
   const unpriced = {};
   for (const ref of refs) {
     const check = passengerCheck(chosen, counterpart, ref, withCards.has(ref), declared[ref]);
