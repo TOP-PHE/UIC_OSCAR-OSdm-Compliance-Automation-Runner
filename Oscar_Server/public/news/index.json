@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-share-runs-with-provider-pages",
+    "date": "October 20, 2026",
+    "tag": "New",
+    "title": "Sharing runs with a provider's company: the pages",
+    "summary": "Link a provider to its company on the Providers page, then share runs or batches from the Dashboard.",
+    "content": "On the Providers page, \"Operated by\" links a provider to the company that runs it in OSCAR, and that company's Test Manager accepts the link there. Finished runs and batches of the provider then have \"Share with …\" on the Dashboard. The other company finds them under \"Shared with your company\", read only, with your company's name in place of your testers' e-mails."
+  },
+  {
     "id": "2026-10-20-share-runs-with-provider",
     "date": "October 20, 2026",
     "tag": "New",

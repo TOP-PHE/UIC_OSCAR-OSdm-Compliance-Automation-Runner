@@ -141,6 +141,17 @@ h2{color:#0090D4;font-size:20px}
     <div id="runs-list"><div class="empty">Loading…</div></div>
   </div>
 
+  <!-- #901: runs other companies share with this one, read only -->
+  <div id="shared-runs-section" style="display:none">
+    <div class="section-label">↘ Shared with your company — read only</div>
+    <div class="card" style="border-radius:0 0 8px 8px;margin-top:0">
+      <div class="runs-header" style="grid-template-columns:3fr 1.2fr 2fr 1.2fr 1fr">
+        <div>Scenario</div><div>Status</div><div>Shared by</div><div>Date</div><div>Duration</div>
+      </div>
+      <div id="shared-runs-list"></div>
+    </div>
+  </div>
+
   <!-- Admin-deleted runs section (shown separately, cannot be selected) -->
   <div id="admin-deleted-section" style="display:none">
     <div class="section-label">⚠️ Flagged by Administrator — awaiting final removal</div>
@@ -237,7 +248,44 @@ function shareLineFor(r) {
   } else if (isTM && isTerminal) {
     inner = `<a href="#" data-action="share-run" data-run-id="${r.id}" style="color:#0090D4;text-decoration:none">↗ Share with certifiers</a>`;
   }
-  return `<div data-share-line="${r.id}" style="margin-top:${inner ? '3px' : '0'};font-size:11px">${inner}</div>`;
+  return `<div data-share-line="${r.id}" style="margin-top:${inner ? '3px' : '0'};font-size:11px">${inner}${operatorShareFor(r)}</div>`;
+}
+
+// #901: the company that operates each provider, when it accepted the link
+// (provider id → its name). Test Managers only; loaded before the runs.
+let operatorOf = {};
+
+async function loadOperators() {
+  if (user.role !== 'test_manager') return;
+  const res = await fetch('/v1/company/providers', {});
+  if (!res.ok) return;
+  const next = {};
+  for (const p of (await res.json()).providers || []) {
+    if (p.operator && p.operator.status === 'accepted') next[p.id] = p.operator.company_name;
+  }
+  operatorOf = next;
+}
+
+// Share / unshare one run with the company that operates its provider.
+function operatorShareFor(r) {
+  const name = operatorOf[r.company_id];
+  if (!name || user.role !== 'test_manager') return '';
+  if (r.shared_with_operator_at) {
+    return `<div style="margin-top:3px"><span title="Its Test Managers read this run, without your testers' e-mails" style="background:#ede7f6;color:#4527a0;border:1px solid #d1c4e9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with ${esc(name)}</span>`
+      + ` <a href="#" data-action="unshare-operator" data-run-id="${r.id}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a></div>`;
+  }
+  if (!['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status)) return '';
+  return `<div style="margin-top:3px"><a href="#" data-action="share-operator" data-run-id="${r.id}" style="color:#4527a0;text-decoration:none">↗ Share with ${esc(name)}</a></div>`;
+}
+
+// The batch's share action: every finished run of it, or undo.
+function batchOperatorAction(batchRuns, batchId) {
+  const name = operatorOf[batchRuns[0].company_id];
+  if (!name || user.role !== 'test_manager') return '';
+  const allShared = batchRuns.every(r => r.shared_with_operator_at);
+  const action = allShared ? 'unshare-batch-operator' : 'share-batch-operator';
+  const label = allShared ? `Unshare with ${esc(name)}` : `↗ Share with ${esc(name)}`;
+  return `<div style="margin-top:2px"><a href="#" data-action="${action}" data-batch-id="${batchId}" style="color:#4527a0;font-size:11px;font-weight:400;text-decoration:none">${label}</a></div>`;
 }
 
 // ── Render a single run row (used for both unbatched and batch-child rows) ───
@@ -401,7 +449,7 @@ function renderRuns(runs) {
     <div class="run-row batch-header" data-batch-id="${batchId}" data-action="toggle-batch">
       <div class="cb-cell" data-action="batch-cb-cell">${batchCheckboxCell}</div>
       <div style="font-weight:700;color:#0090D4">
-        <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)
+        <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)${batchOperatorAction(batchRuns, batchId)}
         ${batchRuns[0].submitted_by
           ? `<div style="color:#78909c;font-size:11px;font-weight:400;margin-top:2px">👤 ${esc(batchRuns[0].submitted_by)}${batchSubmitterSuffix}</div>`
           : ''}
@@ -650,6 +698,17 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
     return;
   }
 
+  // #901: share with the company that operates the provider, run or batch.
+  const opEl = e.target.closest('[data-action$="-operator"]');
+  if (opEl) {
+    e.preventDefault();
+    e.stopPropagation();
+    const share = opEl.dataset.action.startsWith('share');
+    if (opEl.dataset.batchId) toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share);
+    else toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share);
+    return;
+  }
+
   // Bulk download — all reports in a batch as a ZIP (#405). Must run BEFORE the
   // batch-header toggle below, since the button lives inside the toggle row.
   const dlEl = e.target.closest('[data-action="download-batch"]');
@@ -742,6 +801,52 @@ async function toggleShare(runId, share) {
     oscarToast('Network error while updating sharing: ' + e.message, 'error');
   }
 }
+// #901: share or unshare with the operating company, then redraw the list
+// (a batch changes several rows and its header).
+async function toggleOperatorShare(url, share) {
+  try {
+    const res = await fetch(url, { method: share ? 'POST' : 'DELETE' });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      oscarToast(`${share ? 'Share' : 'Unshare'} failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`, 'error');
+      return;
+    }
+    const skipped = (data.runs || []).filter(r => share && !r.shared);
+    if (skipped.length) oscarToast(`${skipped.length} run(s) not shared: ${skipped[0].reason}`, 'warning');
+    await loadRuns();
+  } catch (e) {
+    oscarToast('Network error while updating sharing: ' + e.message, 'error');
+  }
+}
+
+// #901: the runs other companies share with this one (Test Managers).
+function sharedRunRowHtml(r) {
+  const who = r.shared ? `${esc(r.shared.distributor)} · provider ${esc(r.shared.provider)}` : '';
+  return `
+    <div class="run-row" style="grid-template-columns:3fr 1.2fr 2fr 1.2fr 1fr" data-run-id="${esc(r.id)}">
+      <div style="font-weight:600;color:#1a3a6b;font-size:13px">${esc(r.scenario_code || r.env_name_used || String(r.id).slice(0, 8))}</div>
+      <div><span class="status s-${esc(r.status)}">${esc(r.status)}</span></div>
+      <div style="color:#4527a0;font-size:12px">${who}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(r.queued_at)}</div>
+      <div style="color:#546e7a;font-size:12px">${duration(r.started_at, r.completed_at)}</div>
+    </div>`;
+}
+
+async function loadSharedRuns() {
+  if (user.role !== 'test_manager') return;
+  const res = await fetch('/v1/company/shared-runs?limit=200', { headers: { 'X-Provider-Id': '' } });
+  if (!res.ok) return;
+  const runs = (await res.json()).runs || [];
+  document.getElementById('shared-runs-section').style.display = runs.length ? 'block' : 'none';
+  document.getElementById('shared-runs-list').innerHTML = runs.map(sharedRunRowHtml).join('');
+}
+
+document.getElementById('shared-runs-list').addEventListener('click', function(e) {
+  const row = e.target.closest('.run-row');
+  if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${encodeURIComponent(row.dataset.runId)}`;
+});
+
 document.getElementById('runs-list').addEventListener('change', function(e) {
   if (e.target.dataset.action === 'select')        toggleSelect(e.target);
   if (e.target.dataset.action === 'select-batch')  toggleBatchSelect(e.target);
@@ -752,7 +857,9 @@ document.getElementById('admin-deleted-list').addEventListener('click', function
   if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${row.dataset.runId}`;
 });
 
-loadRuns();
+// The operators first: the share actions are drawn with the runs.
+loadOperators().catch(() => {}).then(loadRuns);
+loadSharedRuns().catch(() => {});
 
 // ── Live queue status ────────────────────────────────────────────────────────
 async function pollQueueInfo() {

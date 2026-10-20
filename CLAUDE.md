@@ -550,6 +550,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `replaceEmails()` (`utils/sharedRunView.js`): the distributor's users are
   named by the distributor, never by e-mail. A new read route a shared run
   should reach does both; any other keeps `canUserSeeRun()`.
+  **The pages (PR 2, 1.11.371):** Providers ("Operated by", and the
+  acceptance card for the other side), Dashboard (`operatorShareFor()`,
+  `batchOperatorAction()`, every action ending `-operator`; the "Shared with
+  your company" list), run page (`showSharedNote()`, no certifier share on a
+  shared run). The links and the shared list are read with `X-Provider-Id: ''`:
+  they belong to the own company whatever is selected. Re-linking the same
+  company keeps its acceptance. Pinned by `run-share-pages.test.js`.
 - **Read-only API keys (#503, PR 1 = 1.11.337).** A Test Manager makes a key
   for the company or provider of the request (`company-api-keys.js`,
   `api_key` migration 38; `utils/apiKeys.js` pure). `oscar_<8 hex>_<43

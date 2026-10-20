@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.371] / [collection-OTST_V2.0.204] — 2026-10-20
+
+Issue #901 PR 2, release 2026.406. Pages only; the routes came in 1.11.370.
+
+### Added
+- **Run sharing with a provider's own company, in the pages.**
+  - Providers page: an "Operated by" column and button per provider (choose the company, or remove the link); a "Companies that share runs with you" card where the other company's Test Manager accepts, refuses or stops a link. A provider needs no link.
+  - Dashboard (Test Manager): under each finished run of a provider whose link is accepted, "↗ Share with <company>" or "✓ Shared with <company> · Unshare"; the same for a whole batch in its header. A "Shared with your company — read only" list shows the runs other companies share, each opening the run page.
+  - Run page: a shared run says who shared it and that it is read only; certifier sharing and delete are not offered.
+  - Names are text or escaped everywhere; the links and the shared list are read for the own company (`X-Provider-Id: ''`), whatever provider is selected.
+
+Checked:
+- `run-share-pages.test.js` (the page helpers in a `vm`), `ui-scripts.test.js`.
+- In Chromium on a throwaway server: link, acceptance, sharing and unsharing a batch, the shared list and the run page as the other company (the tester's e-mail never shown, "UIC" instead).
+
+---
+
 ## [server-1.11.370] / [collection-OTST_V2.0.204] — 2026-10-20
 
 Issue #901 PR 1, release 2026.405. Server only; the pages come in PR 2.

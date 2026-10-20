@@ -72,6 +72,33 @@ td.endpoint{font-family:Consolas,monospace;font-size:12px;color:#455a64;word-bre
     <div id="providers-list"><div class="empty">Loading…</div></div>
   </div>
 
+  <div class="card" id="operator-card" style="display:none">
+    <h3 id="operator-title">Company that operates this provider</h3>
+    <p class="muted" style="margin-bottom:10px;font-size:13px;color:#546e7a;line-height:1.6">
+      If the company that runs this OSDM system has its own account in OSCAR, link it here to share
+      chosen runs with its Test Managers (Dashboard, &ldquo;Share with&rdquo;). They accept the link first;
+      they then read the runs you share, without changing anything, and see your company&rsquo;s name
+      instead of your testers&rsquo; e-mails. A provider without such a company needs no link.
+    </p>
+    <div class="row">
+      <div class="field">
+        <label for="operator-select">Company</label>
+        <select id="operator-select"></select>
+      </div>
+    </div>
+    <button class="btn btn-primary" data-action="operator-save">Link</button>
+    <button class="btn btn-secondary" data-action="operator-remove" id="operator-remove">Remove the link</button>
+  </div>
+
+  <div class="card" id="links-card" style="display:none">
+    <h3>Companies that share runs with you</h3>
+    <p class="muted" style="margin-bottom:10px;font-size:13px;color:#546e7a;line-height:1.6">
+      These companies test your OSDM system as one of their providers and asked to share runs with you.
+      Once you accept, the runs they share appear on your Dashboard, read only.
+    </p>
+    <div id="links-list"></div>
+  </div>
+
   <div class="card" id="access-card" style="display:none">
     <h3 id="access-title">Testers with access</h3>
     <p class="muted" style="margin-bottom:10px">Test Managers always have access. Tick the testers who may use this provider.</p>
@@ -85,6 +112,8 @@ let providers = [];
 let testers = [];
 let accessCounts = {};
 let accessProvider = null;
+let operatorProvider = null;
+let operatorCompanies = [];
 
 function showMsg(text, ok) {
   const el = document.getElementById('msg');
@@ -126,10 +155,12 @@ function providerRow(p) {
     + '<td><strong>' + esc(p.name) + '</strong></td>'
     + '<td class="endpoint">' + (p.api_base ? esc(p.api_base) : '<span class="muted">not set</span>') + '</td>'
     + '<td>' + esc(testerText) + '</td>'
+    + '<td>' + operatorLabel(p.operator) + '</td>'
     + '<td style="white-space:nowrap">'
     + '<button class="btn btn-secondary btn-sm" data-action="rename" data-id="' + esc(p.id) + '">Rename</button> '
     + '<button class="btn btn-secondary btn-sm" data-action="endpoint" data-id="' + esc(p.id) + '">Endpoint</button> '
-    + '<button class="btn btn-secondary btn-sm" data-action="access" data-id="' + esc(p.id) + '">Testers</button>'
+    + '<button class="btn btn-secondary btn-sm" data-action="access" data-id="' + esc(p.id) + '">Testers</button> '
+    + '<button class="btn btn-secondary btn-sm" data-action="operator" data-id="' + esc(p.id) + '">Operated by</button>'
     + '</td></tr>';
 }
 
@@ -139,7 +170,7 @@ function renderProviders() {
     el.innerHTML = '<div class="empty">No provider yet. Your company works on its own endpoint, as before.</div>';
     return;
   }
-  el.innerHTML = '<table><thead><tr><th>Name</th><th>OSDM endpoint</th><th>Testers</th><th></th></tr></thead><tbody>'
+  el.innerHTML = '<table><thead><tr><th>Name</th><th>OSDM endpoint</th><th>Testers</th><th>Operated by</th><th></th></tr></thead><tbody>'
     + providers.map(providerRow).join('') + '</tbody></table>';
 }
 
@@ -153,6 +184,80 @@ async function loadProviders() {
     if (r.ok) accessCounts[p.id] = ((await r.json()).testers || []).length;
   }));
   renderProviders();
+}
+
+// #901: the company that operates a provider, and where its acceptance stands.
+function operatorLabel(op) {
+  if (!op) return '<span class="muted">—</span>';
+  const state = { waiting: 'waiting for their acceptance', accepted: 'accepted', refused: 'refused' }[op.status] || op.status;
+  const colour = { accepted: '#2e7d32', refused: '#c62828' }[op.status] || '#e65100';
+  return esc(op.company_name) + ' <span style="color:' + colour + ';font-size:11px">(' + esc(state) + ')</span>';
+}
+
+async function openOperator(p) {
+  operatorProvider = p;
+  if (!operatorCompanies.length) {
+    const res = await fetch('/v1/company/providers/operator-companies', {});
+    if (!res.ok) { showMsg(await readError(res, 'Could not load the companies.'), false); return; }
+    operatorCompanies = (await res.json()).companies || [];
+  }
+  document.getElementById('operator-title').textContent = 'Company that operates ' + p.name;
+  const select = document.getElementById('operator-select');
+  select.innerHTML = '<option value="">— choose a company —</option>'
+    + operatorCompanies.map(c => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('');
+  select.value = p.operator ? p.operator.company_id : '';
+  document.getElementById('operator-remove').style.display = p.operator ? '' : 'none';
+  document.getElementById('operator-card').style.display = 'block';
+  document.getElementById('operator-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function saveOperator(remove) {
+  const p = operatorProvider;
+  if (!p) return;
+  const url = '/v1/company/providers/' + encodeURIComponent(p.id) + '/operator';
+  let res;
+  if (remove) {
+    if (!confirm('Remove the link? Every run shared with ' + (p.operator ? p.operator.company_name : 'that company') + ' is hidden from them at once.')) return;
+    res = await fetch(url, { method: 'DELETE' });
+  } else {
+    const companyId = document.getElementById('operator-select').value;
+    if (!companyId) { showMsg('Choose a company.', false); return; }
+    res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId }) });
+  }
+  if (!res.ok) { showMsg(await readError(res, 'The link was not saved.'), false); return; }
+  const op = remove ? null : ((await res.json().catch(() => ({}))).provider || {}).operator;
+  let note = 'Linked. Their Test Managers now have to accept it (Providers page).';
+  if (remove) note = 'Link removed.';
+  else if (op && op.status !== 'waiting') note = 'This company is already linked (' + op.status + ').';
+  showMsg(note, true);
+  document.getElementById('operator-card').style.display = 'none';
+  await loadProviders();
+}
+
+// The other side: companies that linked one of their providers to this company.
+function linkRow(l) {
+  const state = { waiting: 'Waiting for your answer', accepted: 'Accepted', refused: 'Refused' }[l.status] || l.status;
+  const accept = l.status === 'accepted' ? '' : '<button class="btn btn-primary btn-sm" data-action="link-accept" data-provider="' + esc(l.provider_id) + '">Accept</button> ';
+  const refuse = l.status === 'refused' ? '' : '<button class="btn btn-secondary btn-sm" data-action="link-refuse" data-provider="' + esc(l.provider_id) + '">' + (l.status === 'accepted' ? 'Stop' : 'Refuse') + '</button>';
+  return '<tr><td><strong>' + esc(l.distributor_name) + '</strong></td><td>' + esc(l.provider_name) + '</td><td>' + esc(state) + '</td>'
+    + '<td style="white-space:nowrap">' + accept + refuse + '</td></tr>';
+}
+
+async function loadLinks() {
+  const res = await fetch('/v1/company/run-share-links', { headers: { 'X-Provider-Id': '' } });
+  if (!res.ok) return;
+  const links = (await res.json()).links || [];
+  document.getElementById('links-card').style.display = links.length ? 'block' : 'none';
+  document.getElementById('links-list').innerHTML = '<table><thead><tr><th>Company</th><th>As its provider</th><th>Status</th><th></th></tr></thead><tbody>'
+    + links.map(linkRow).join('') + '</tbody></table>';
+}
+
+async function decideLink(providerId, verb) {
+  if (verb === 'refuse' && !confirm('The runs this company shared with you will no longer be shown. Go on?')) return;
+  const res = await fetch('/v1/company/run-share-links/' + encodeURIComponent(providerId) + '/' + verb, { method: 'POST', headers: { 'X-Provider-Id': '' } });
+  if (!res.ok) { showMsg(await readError(res, 'Not saved.'), false); return; }
+  showMsg(verb === 'accept' ? 'Accepted: the runs they share appear on your Dashboard.' : 'Done.', true);
+  await loadLinks();
 }
 
 async function loadTesters() {
@@ -242,6 +347,11 @@ document.addEventListener('click', e => {
   else if (el.dataset.action === 'rename' && p) renameProvider(p).catch(reportError);
   else if (el.dataset.action === 'endpoint' && p) changeEndpoint(p).catch(reportError);
   else if (el.dataset.action === 'access' && p) openAccess(p).catch(reportError);
+  else if (el.dataset.action === 'operator' && p) openOperator(p).catch(reportError);
+  else if (el.dataset.action === 'operator-save') saveOperator(false).catch(reportError);
+  else if (el.dataset.action === 'operator-remove') saveOperator(true).catch(reportError);
+  else if (el.dataset.action === 'link-accept') decideLink(el.dataset.provider, 'accept').catch(reportError);
+  else if (el.dataset.action === 'link-refuse') decideLink(el.dataset.provider, 'refuse').catch(reportError);
 });
 document.addEventListener('change', e => {
   const el = e.target.closest('[data-action="toggle-access"]');
@@ -249,7 +359,7 @@ document.addEventListener('change', e => {
 });
 
 if (user.role === 'test_manager') {
-  Promise.all([loadProviders(), loadTesters()]).catch(reportError);
+  Promise.all([loadProviders(), loadTesters(), loadLinks()]).catch(reportError);
 } else {
   document.getElementById('create-card').style.display = 'none';
   document.getElementById('providers-list').innerHTML =

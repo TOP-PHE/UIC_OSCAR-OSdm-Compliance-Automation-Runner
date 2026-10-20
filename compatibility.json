@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.405",
+  "current_release": "2026.406",
   "releases": [
+    {
+      "release": "2026.406",
+      "date": "2026-10-20",
+      "server": "1.11.371",
+      "collection": "OTST_V2.0.204",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#901 PR 2 (pages): the Providers page links a provider to the company that operates it and lets that company accept; the Dashboard shares runs or whole batches with it and lists the runs shared with one's own company; a shared run opens read only."
+      ]
+    },
     {
       "release": "2026.405",
       "date": "2026-10-20",
