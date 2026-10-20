@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-refund-offers-counted-once",
+    "date": "October 20, 2026",
+    "tag": "Fix",
+    "title": "Refund offers asked one fulfillment at a time are counted once",
+    "summary": "When a provider repeats earlier refund offers in its answers, OSCAR no longer counts them twice.",
+    "content": "A provider that takes one fulfillment per refund offer request may answer each request with every refund offer of the booking still proposed. OSCAR counted the repeated offers twice: a false 'fulfillment in two refund offers', a false total for a technical cancellation, and the same offer confirmed twice. Each refund offer is now counted once."
+  },
+  {
     "id": "2026-10-20-group-products",
     "date": "October 20, 2026",
     "tag": "Feature",

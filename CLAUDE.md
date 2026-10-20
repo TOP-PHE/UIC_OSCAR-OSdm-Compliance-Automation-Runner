@@ -1427,7 +1427,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   from its script (`askOnePerFulfillment()`, `refundPerFulfillment.js`), the
   answers graded as one; `requestRefundOffersBodyData` keeps the whole list,
   which `_proposedScope()` reads as what was asked. Simulator variant
-  `one-fulfillment-per-refund-request`. The release script replaces
+  `one-fulfillment-per-refund-request`. **The answers may repeat earlier offers** (#893,
+  1.11.366): a real provider answers each request with every refund offer of
+  the booking still proposed, so `combineAnswers()` keeps each offer once by
+  id (latest copy, first-seen order, one INFO line); counting them twice
+  failed the scenario with a 404 on the second confirmation of one offer. The release script replaces
   `{COLL}`, not `COLL` (it once turned "COLLECTIVE" into a version).
 - **An overrule code is a technical cancellation: everything back, no fee**
   (#596, 1.11.227 / OTST_V2.0.111). One refund offer is compared with

@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.366] / [collection-OTST_V2.0.201] — 2026-10-20
+
+Issue #893, release 2026.401. Collection only (and its tests).
+
+### Fixed
+- **Refund offers asked one fulfillment at a time are each counted once** (`combineAnswers()`, `library-bruno/refundPerFulfillment.js`). Since #883, when a provider refuses a refund offer request naming several fulfillments, step 10 asks one per fulfillment and reads the answers as one. A real provider's run of 20/10 showed its answer to the second request holding **every refund offer of the booking still proposed**, the first one again. OSCAR read 3 refund offers for 2 fulfillments, so the four combined-return refund scenarios failed three ways that were OSCAR's:
+  - "No fulfillment is in two of the 3 refund offers" (the same offer twice);
+  - the overrule total of the technical cancellation (123,500 against a confirmedPrice of 77,000: the first offer added twice);
+  - step 13 confirming the first offer a second time, answered 404 "refund offer not found", which ended the scenario before the second offer was confirmed.
+  Each refund offer is now kept once by its id, the latest copy, in the order first seen, with one INFO line saying how many came again. Two different offers naming one fulfillment are still a failure; offers without an id are all kept.
+
+Checked:
+- `bruno-refund-one-per-request.test.js`: the provider's shape (the second answer holding the first offer), two different offers on one fulfillment, offers without an id, and step 10's path with cumulative answers (2 offers, the INFO line). With the old `combineAnswers()` two of the new tests fail.
+- Not run on the simulator: its `one-fulfillment-per-refund-request` variant answers each request with its own offer only, so its replay does not change.
+
+---
+
 ## [server-1.11.365] / [collection-OTST_V2.0.200] — 2026-10-20
 
 Issue #887 part 3 (the last), release 2026.400. Server, pages, collection and the scenario catalogue.

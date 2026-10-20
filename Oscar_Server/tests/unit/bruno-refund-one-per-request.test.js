@@ -72,6 +72,22 @@ describe('the requests one per fulfillment', () => {
     expect(combineAnswers([one, two])).toEqual({ refundOffers: [{ id: 'r1' }, { id: 'r2' }], problems: [{ code: 'W' }] });
     expect(combineAnswers([null])).toEqual({ refundOffers: [] });
   });
+
+  test('#893: an offer given again in a later answer is kept once, its latest copy, in the order first seen', () => {
+    // The real provider's answers: the second holds the first offer again.
+    const first = { refundOffers: [{ id: 'A', fulfillments: [{ id: 'f1' }], status: 'PROPOSED' }] };
+    const second = { refundOffers: [{ id: 'A', fulfillments: [{ id: 'f1' }], status: 'PROPOSED', v: 2 }, { id: 'B', fulfillments: [{ id: 'f2' }] }] };
+    expect(combineAnswers([first, second])).toEqual({
+      refundOffers: [{ id: 'A', fulfillments: [{ id: 'f1' }], status: 'PROPOSED', v: 2 }, { id: 'B', fulfillments: [{ id: 'f2' }] }],
+      repeated: 1,
+    });
+  });
+
+  test('#893: two different offers stay two, even naming one fulfillment; offers without an id are all kept', () => {
+    const one = { refundOffers: [{ id: 'A', fulfillments: [{ id: 'f1' }] }, {}] };
+    const two = { refundOffers: [{ id: 'B', fulfillments: [{ id: 'f1' }] }, {}] };
+    expect(combineAnswers([one, two])).toEqual({ refundOffers: [{ id: 'A', fulfillments: [{ id: 'f1' }] }, {}, { id: 'B', fulfillments: [{ id: 'f1' }] }, {}] });
+  });
 });
 
 describe('step 10 asks again, one fulfillment at a time', () => {
@@ -122,6 +138,18 @@ describe('step 10 asks again, one fulfillment at a time', () => {
     ]);
     expect(logs.filter((l) => l.startsWith('[WARNING]'))).toHaveLength(1);
     expect(logs[0]).toMatch(/refuses a request naming 2 fulfillments \(HTTP 501: "Only one value/);
+  });
+
+  test('#893: each answer holding the offers before it: each offer counted once, one INFO line', async () => {
+    const given = [];
+    setUp(env, (body) => {
+      given.push({ id: `ro-${body.fulfillmentIds[0]}` });
+      return { status: 200, data: { refundOffers: given.map((o) => ({ ...o })) } };
+    });
+    const out = await askOnePerFulfillment(501, REFUSAL);
+    expect(out).toEqual({ status: 200, body: { refundOffers: [{ id: 'ro-f1' }, { id: 'ro-f2' }] } });
+    expect(logs).toContain('[INFO] Refund offers: 1 refund offer(s) came again in the answer for a later fulfillment; each is counted once.');
+    expect(logs).toContain('[INFO] Refund offers asked one fulfillment at a time: 2 refund offer(s) for 2 fulfillments.');
   });
 
   test('a request of one fulfillment refused: its answer is graded, the rest not asked', async () => {
