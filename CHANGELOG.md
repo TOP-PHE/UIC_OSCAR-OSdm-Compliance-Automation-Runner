@@ -62,6 +62,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.364] / [collection-OTST_V2.0.199] — 2026-10-20
+
+Issue #887 part 2, release 2026.399. Server, pages and the scenario catalogue.
+
+### Added
+- **The products a provider sells** in the Test Framework (Tariff Flexibility › Products the provider sells): code as the offers give it, name, and flexibility (FULL_FLEXIBLE, SEMI_FLEXIBLE or NON_FLEXIBLE; "full flexible" or "Non-flexible" are read too). A checklist import fills the list from the new question **A4.18** (`data.products`, table `data.product.<n>.code` / `.name` / `.flexibility`); the public checklist and the four simulator checklists are regenerated, the simulator's declaring its four non-group products.
+- **A reference scenario, `OTST_SALE_NAMED_PRODUCT_1ADT`** (source `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38`, limit `NAMED_PRODUCTS`): the copy sells the first declared product by its code (`expectedProduct`) and in its flexibility; the offer, the booking and the fulfilment must name it (#598's checks). Not copiable without a declared product. Before, a catalogue copy dropped the product and left it to complete.
+- The card and product lists of the Test Framework page are one editor.
+
+### Changed
+- Three comments of the simulator checklists are shorter: with the products, the alpha checklist went over the AI analysis's 20,000 characters of context.
+
+Checked:
+- `named-products-catalogue.test.js`: declared products (code once, trimmed, bounded), the flexibility's spellings, A4.18 read on import, the entry not copiable without a product, the copy's code and flexibility and its schema, the page's list (labelled, escaped, add / edit / remove, cards untouched).
+- The real collection on the simulator: the copy made with the gamma reference framework sells `SIM_FLEXI_BASIC` in FULL_FLEXIBLE, 237 checks, none failed (the same number as its source).
+- Making the copy not set the product fails a test.
+
+---
+
 ## [server-1.11.363] / [collection-OTST_V2.0.198] — 2026-10-20
 
 Issue #889, release 2026.398. Server, pages, collection and the simulator's data file (the simulator itself is unchanged).

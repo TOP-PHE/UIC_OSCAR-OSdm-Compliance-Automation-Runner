@@ -27,6 +27,7 @@
 
 const { ageRangesOf } = require('./scenarioCatalogue');
 const { declaredCards, passengersWithCard } = require('./reductionCards');
+const { declaredProducts } = require('./namedProducts');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -87,6 +88,7 @@ function saleFlexibility(own, framework) {
 }
 
 const CARDS_TO_CHECK = 'the passengers\' reduction cards must be ones the provider accepts';
+const PRODUCT_TO_COMPLETE = 'the provider\'s product (expectedProduct)';
 
 // What a reference scenario needs that OSCAR cannot see in the Test Data.
 function needsToCheck(needs) {
@@ -117,7 +119,7 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
   }
   if (arr(n.providerValues).includes('expectedProduct')) {
     delete out.expectedProduct;
-    toComplete.push('the provider\'s product (expectedProduct)');
+    toComplete.push(PRODUCT_TO_COMPLETE);
   }
   // #766 PR 4: the simulator's coach and place mean nothing on another train.
   if (arr(n.providerValues).includes('referencePlace')) {
@@ -191,7 +193,7 @@ function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
       scenario.passengersListId = ids.next;
       ids.next += 1;
     };
-    applyLimit(entry.limit, scenario, source, fw, { ownList, toCheck });
+    applyLimit(entry.limit, scenario, source, fw, { ownList, toCheck, toComplete });
     // #748: OSDM's DatedJourney requires the train number and the carrier.
     if (entry.tripAs === 'SPECIFICATION') {
       toCheck.push('the chosen train must have its number and operator code in Test Data: a trip specification names both');
@@ -330,10 +332,11 @@ function withCurrencies(datafile, entries) {
 }
 
 // What a limit entry takes from the framework: #699 its passenger count, #704
-// its departure day, #705 its passengers' ages, #887 its reduction card.
+// its departure day, #705 its passengers' ages, #887 its reduction card and
+// (PR 2) its product.
 // Nothing when the framework does not declare it (the entry then cannot be
 // copied).
-function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
+function applyLimit(limit, scenario, source, fw, { ownList, toCheck, toComplete }) {
   if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
     applyHorizonLimit(limit, scenario, fw);
   } else if (limit === 'AGE_RANGES') {
@@ -341,6 +344,8 @@ function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
     if (declared) ownList(agedPassengers(source?.passengers, declared, toCheck));
   } else if (limit === 'REDUCTION_CARDS') {
     applyCardLimit(source, fw, { ownList, toCheck });
+  } else if (limit === 'NAMED_PRODUCTS') {
+    applyProductLimit(scenario, fw, toComplete);
   } else if (limit) {
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
@@ -361,6 +366,18 @@ function applyCardLimit(source, fw, { ownList, toCheck }) {
   ownList(passengersWithCard(source?.passengers, card));
   const i = toCheck.indexOf(CARDS_TO_CHECK);
   if (i >= 0) toCheck.splice(i, 1);
+}
+
+// #887 PR 2: the scenario sells the provider's first declared product, by its
+// code, in its flexibility when the product says one: nothing is left to
+// complete about it.
+function applyProductLimit(scenario, fw, toComplete) {
+  const [product] = declaredProducts(fw);
+  if (!product) return;
+  scenario.expectedProduct = product.code;
+  if (product.flexibility) scenario.desiredFlexibility = product.flexibility;
+  const i = toComplete.indexOf(PRODUCT_TO_COMPLETE);
+  if (i >= 0) toComplete.splice(i, 1);
 }
 
 // #705: the type, other than CHILD, a passenger of this age is priced as: the

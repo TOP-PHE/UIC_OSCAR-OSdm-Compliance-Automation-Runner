@@ -379,6 +379,21 @@
       }
     },
     {
+      "code": "OTST_SALE_NAMED_PRODUCT_1ADT",
+      "source": "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38",
+      "purpose": "Sale to an adult of a named product, the first one the Test Framework declares, by its code and in its flexibility: the offer chosen holds that product, and the booking and its fulfilment name it.",
+      "checks": 237,
+      "limit": "NAMED_PRODUCTS",
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "NON_FLEXIBLE",
+        "passengers": 1,
+        "providerValues": [
+          "expectedProduct"
+        ]
+      }
+    },
+    {
       "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
       "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
       "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",

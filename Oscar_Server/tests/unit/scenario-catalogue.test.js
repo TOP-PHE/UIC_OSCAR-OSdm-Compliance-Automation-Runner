@@ -54,6 +54,8 @@ describe('the catalogue file', () => {
     for (const e of catalogue.entries) {
       // #887: a card scenario is generic once its card comes from the Test Framework.
       if (e.limit === 'REDUCTION_CARDS') expect(e.source).toMatch(/^SIM_SALE_CARD_/);
+      // PR 2: and a product scenario once its product does.
+      else if (e.limit === 'NAMED_PRODUCTS') expect(e.source).toMatch(/^SIM_SALE_PRODUCT_/);
       else expect(e.source).not.toMatch(/^SIM_(WRONG|VARIANT|SALE_CARD|SALE_PRODUCT|GROUP)_/);
       if (e.code.startsWith('NHF_EXPIRED_')) expect(Object.values(e.set)).toEqual([40]);
     }

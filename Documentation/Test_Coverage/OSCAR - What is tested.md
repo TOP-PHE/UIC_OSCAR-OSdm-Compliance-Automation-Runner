@@ -237,6 +237,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 356 | `SIM_RETURN_COMBINED_1ADT_38` |
 | `OTST_SALE_REDUCTION_CARD_1ADT` | Sale to an adult holding a reduction card, the first one the Test Framework declares: the offer names the card on the passenger and costs less than the same request without it. | a reduction card | 261 | `SIM_SALE_CARD_25_1ADT_38` |
 | `OTST_SALE_REDUCTION_CARD_2ADT` | Sale to two adults, one holding the first reduction card the Test Framework declares: only that passenger pays less. | a reduction card | 321 | `SIM_SALE_CARD_50_2ADT_38` |
+| `OTST_SALE_NAMED_PRODUCT_1ADT` | Sale to an adult of a named product, the first one the Test Framework declares, by its code and in its flexibility: the offer chosen holds that product, and the booking and its fulfilment name it. | a product the provider sells | 237 | `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38` |
 | `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 289 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
 | `OTST_SALE_RESERVATION_MANDATORY_2ADT` | A mandatory seat reservation, detected from the admission and booked with it. | — | 343 | `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` |
 | `OTST_SALE_RESERVATION_SELECTION_2ADT` | An optional seat reservation booked with `optionalReservationSelections`. | — | 369 | `SIM_SALE_RESERVATION_SELECTION_2ADT_38` |

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-named-products",
+    "date": "October 20, 2026",
+    "tag": "Feature",
+    "title": "Products the provider sells, and a scenario that sells one",
+    "summary": "The Test Framework lists the provider's products, and a reference scenario sells the first one by its code.",
+    "content": "In Test Framework › Tariff Flexibility, list the products the provider sells: code, name and flexibility. A provider's checklist fills the list from question A4.18. The reference scenario OTST_SALE_NAMED_PRODUCT_1ADT then sells the first product by its code and in its flexibility, and checks that the offer, the booking and the ticket name it."
+  },
+  {
     "id": "2026-10-20-card-rates",
     "date": "October 20, 2026",
     "tag": "Feature",
