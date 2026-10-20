@@ -173,6 +173,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
   </div>
 
   <div id="meta" class="meta"></div>
+  <div id="shared-note" style="display:none;background:#ede7f6;color:#4527a0;border:1px solid #d1c4e9;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px"></div>
 
   <!-- Live Log (collapsed by default) -->
   <div class="card collapsed" id="log-card">
@@ -307,6 +308,7 @@ function updateStatus(run) {
   const spin = (run.status === 'RUNNING' || run.status === 'QUEUED') ? '<span class="spin">⟳</span> ' : '';
   badge.innerHTML = `${spin}${run.status}`;
   document.getElementById('run-title').textContent = run.env_name_used || `Run ${run.id.slice(0,8)}`;
+  showSharedNote(run);
 
   const metaItems = [
     { lbl: 'Run ID',    val: run.id.slice(0,8) + '...' },
@@ -390,7 +392,7 @@ function updateStatus(run) {
     // Visible only to test_managers; the button text + colour reflect the
     // current shared state, which the run object now carries via the
     // shared_with_certifier_at timestamp (null = not shared).
-    if (user.role === 'test_manager') {
+    if (user.role === 'test_manager' && !run.shared) {
       const shareWrap = document.getElementById('share-btn-wrap');
       if (shareWrap) {
         const isShared = !!run.shared_with_certifier_at;
@@ -410,6 +412,15 @@ function updateStatus(run) {
       }
     }
   }
+}
+
+// #901: a run another company shared with this one is read only. Its people
+// are named by that company, never by e-mail (the server replaces them).
+function showSharedNote(run) {
+  const note = document.getElementById('shared-note');
+  if (!run.shared) { note.style.display = 'none'; return; }
+  note.textContent = `Shared with your company by ${run.shared.distributor}, which tests your system as its provider "${run.shared.provider}". Read only.`;
+  note.style.display = 'block';
 }
 
 // ── Share / unshare with certifier (issue #60, v1.10.0) ──────────────────────

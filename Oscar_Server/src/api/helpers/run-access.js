@@ -87,4 +87,28 @@ function canUserSeeRun(runId, user) {
   return null;
 }
 
-module.exports = { canUserSeeRun };
+/**
+ * #901: canUserSeeRun(), or else a run shared with the reader's company
+ * (helpers/run-shares.js). For READ routes only: the run comes back with a
+ * non-enumerable `sharedView` ({ distributor, provider }) when it is read
+ * through a share, so the route shows it as the company shared with sees it
+ * (utils/sharedRunView.js). Every route that changes a run, or writes
+ * anything about it, keeps canUserSeeRun(): a share never lets the other
+ * company delete, cancel, re-share or compare the distributor's runs.
+ */
+function canUserReadRun(runId, user) {
+  const own = canUserSeeRun(runId, user);
+  if (own) return own;
+  if (!runId || user?.role !== 'test_manager') return null;
+  const run = get(
+    "SELECT * FROM runs WHERE id = ? AND status NOT IN ('DELETED', 'DELETION_REQUESTED', 'DELETED_BY_ADMIN')",
+    [runId],
+  );
+  if (!run) return null;
+  const view = require('./run-shares').sharedViewOf(run, user);
+  if (!view) return null;
+  Object.defineProperty(run, 'sharedView', { value: view, enumerable: false });
+  return run;
+}
+
+module.exports = { canUserSeeRun, canUserReadRun };

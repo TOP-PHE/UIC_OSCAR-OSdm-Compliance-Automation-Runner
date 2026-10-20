@@ -62,6 +62,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.371] / [collection-OTST_V2.0.204] — 2026-10-20
+
+Issue #901 PR 2, release 2026.406. Pages only; the routes came in 1.11.370.
+
+### Added
+- **Run sharing with a provider's own company, in the pages.**
+  - Providers page: an "Operated by" column and button per provider (choose the company, or remove the link); a "Companies that share runs with you" card where the other company's Test Manager accepts, refuses or stops a link. A provider needs no link.
+  - Dashboard (Test Manager): under each finished run of a provider whose link is accepted, "↗ Share with <company>" or "✓ Shared with <company> · Unshare"; the same for a whole batch in its header. A "Shared with your company — read only" list shows the runs other companies share, each opening the run page.
+  - Run page: a shared run says who shared it and that it is read only; certifier sharing and delete are not offered.
+  - Names are text or escaped everywhere; the links and the shared list are read for the own company (`X-Provider-Id: ''`), whatever provider is selected.
+
+Checked:
+- `run-share-pages.test.js` (the page helpers in a `vm`), `ui-scripts.test.js`.
+- In Chromium on a throwaway server: link, acceptance, sharing and unsharing a batch, the shared list and the run page as the other company (the tester's e-mail never shown, "UIC" instead).
+
+---
+
+## [server-1.11.370] / [collection-OTST_V2.0.204] — 2026-10-20
+
+Issue #901 PR 1, release 2026.405. Server only; the pages come in PR 2.
+
+### Added
+- **Sharing a provider's runs with the company that operates it.** A distributor tests a provider's system under its own company; the provider's own company could not see those runs.
+  - `PUT`/`DELETE /v1/company/providers/:id/operator` (distributor Test Manager) links a provider to another company of OSCAR; `GET /v1/company/providers/operator-companies` lists them. The link is optional: a provider whose operator has no company in OSCAR has none, and nothing changes for it.
+  - The link waits for the other company: `GET /v1/company/run-share-links`, `POST …/:providerId/accept` and `…/refuse` (its Test Managers only).
+  - `POST`/`DELETE /v1/runs/:id/share-with-operator` and `/v1/runs/batch/:batchId/share-with-operator` share or revoke terminal runs of a linked provider (distributor Test Manager); `GET /v1/company/shared-runs` lists them on the other side. The distributor's run list gives `shared_with_operator_at`.
+  - The run, its log, checks, requests and reports are read through the usual run pages, **read only**: a new `canUserReadRun()` next to `canUserSeeRun()` (`api/helpers/run-access.js`, rule in `helpers/run-shares.js`), used by the read routes only. Delete, cancel, certifier sharing and every other write keep `canUserSeeRun()`, so the other company can change nothing.
+  - A share counts while it is not revoked, the link names that company and is accepted, the sharer is still an active Test Manager of the distributor, and the reader is an active Test Manager of that company; testers, certifiers and other companies get 404.
+  - The distributor's people are named by the distributor (e.g. "UIC"), never by e-mail: in the run row (`submitted_by`; `user_id`, `error_message` and the deletion and certifier fields are left out), the log, request and response texts, and the reports (`utils/sharedRunView.js`).
+  - Migration 41: `provider_operator`, `run_share`. Every link, decision and share is in the audit log.
+
+Checked:
+- `run-shares.test.js` (17 tests through the real routes: link, acceptance, sharing, reading, read only, what stops a share, a batch, the audit log), `shared-run-view.test.js`. Each guard was removed in turn (acceptance, sharer, reader, delete through the read rule) and the tests failed each time.
+
+---
+
 ## [server-1.11.369] / [collection-OTST_V2.0.204] — 2026-10-20
 
 Issue #899, from a real provider's rerun of 20/10, release 2026.404. Simulator 0.42.0.

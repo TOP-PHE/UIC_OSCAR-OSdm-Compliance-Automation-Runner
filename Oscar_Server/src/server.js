@@ -518,8 +518,9 @@ app.get('/artifacts/:runId/:filename', fileDownloadLimiter, (req, res) => {
   // Reuse the same ownership-check the /v1/runs endpoints apply. A miss
   // returns 404 (not 403) so existence is not disclosed — same shape as
   // the existing v15 certifier privacy guard.
-  const { canUserSeeRun } = require('./api/helpers/run-access');
-  const run = canUserSeeRun(runId, user);
+  // #901: a run shared with the reader's company is read too (read only).
+  const { canUserReadRun } = require('./api/helpers/run-access');
+  const run = canUserReadRun(runId, user);
   if (!run) return res.status(404).send('Not found');
 
   // Resolve + path-traversal guard (defence in depth)
@@ -547,6 +548,12 @@ app.get('/artifacts/:runId/:filename', fileDownloadLimiter, (req, res) => {
     return res.status(500).send('Artifact decryption failed');
   }
 
+  // #901: the distributor's people are named by the distributor in a shared run's reports.
+  if (run.sharedView) {
+    const { replaceEmails } = require('./utils/sharedRunView');
+    const emails = require('./api/helpers/run-shares').distributorEmails(run.sharedView.distributor.id);
+    plaintext = Buffer.from(replaceEmails(plaintext.toString('utf8'), emails, run.sharedView.distributor.name), 'utf8');
+  }
   const isHtml = filename.toLowerCase().endsWith('.html');
   res.setHeader('Content-Type', isHtml ? 'text/html; charset=utf-8' : 'application/json');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
@@ -588,6 +595,7 @@ app.use('/v1/company',         require('./api/routes/company-ai-analysis-results
 app.use('/v1/company',         require('./api/routes/company-ai-checklist'));
 app.use('/v1/company',         require('./api/routes/company-checklist'));
 app.use('/v1/company',         require('./api/routes/company-api-keys'));
+app.use('/v1/company',         require('./api/routes/company-run-shares'));
 app.use('/v1/runs',            require('./api/routes/runs'));
 app.use('/v1/reports',         require('./api/routes/reports'));
 app.use('/v1/admin',           require('./api/routes/admin'));
