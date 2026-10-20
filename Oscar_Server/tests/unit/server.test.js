@@ -392,6 +392,29 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #889: and each declared card's reduction rate on the passengers' cards.
+  test('a run\'s copy writes the declared reduction rates on the passengers\' cards', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [uuidv4(), companyId, colEncrypt(JSON.stringify({ reductionCards: [{ code: '1', issuer: 'urn:uic:rics:1154', percent: '25' }] }))]);
+    const stored = JSON.stringify({ scenarios: [{ code: 'A' }], passengersList: [{ id: 1, passengers: [{ reference: '00001', reductionCards: ['1'] }] }] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.body.passengersList[0].passengers[0].reductionCards).toEqual([{ code: '1', percent: 25 }]);
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // #717: the run's copy says the days its trip's Test Data trains run.
   test('a run gets its trips\' calendars in its copy; a Test Manager the stored file', async () => {
     const { companyId, userId, slug } = seedCompanyUser();

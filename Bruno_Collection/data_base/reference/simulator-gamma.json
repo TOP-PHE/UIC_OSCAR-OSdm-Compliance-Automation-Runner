@@ -190,17 +190,20 @@
       {
         "code": "SIM_CARD_25",
         "issuer": "urn:x_osdm_simulator:carrier:gamma",
-        "name": "Simulator card 25 (25 % off)"
+        "name": "Simulator card 25",
+        "percent": 25
       },
       {
         "code": "SIM_CARD_50",
         "issuer": "urn:x_osdm_simulator:carrier:gamma",
-        "name": "Simulator card 50 (50 % off)"
+        "name": "Simulator card 50",
+        "percent": 50
       },
       {
         "code": "SIM_STUDENT",
         "issuer": "urn:x_osdm_simulator:carrier:gamma",
-        "name": "Simulator student card (30 % off)"
+        "name": "Simulator student card",
+        "percent": 30
       }
     ]
   },

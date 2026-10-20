@@ -329,7 +329,9 @@ function withFrameworkWarnings(plaintext, companyId) {
     // #809: and no passenger update where the framework says there is none
     // (after the annotation, which warns about it).
     const skipped = require('./utils/undeclaredSteps').withoutUndeclaredPassengerUpdate(datafile, framework);
-    if (annotated === 0 && versioned === 0 && formed === 0 && skipped === 0) return plaintext;
+    // #889: and each declared card's reduction rate on the passengers' cards.
+    const rated = require('./utils/reductionCards').withCardRates(datafile, framework);
+    if (annotated === 0 && versioned === 0 && formed === 0 && skipped === 0 && rated === 0) return plaintext;
     return Buffer.from(JSON.stringify(datafile), 'utf8');
   } catch (err) {
     log.warn({ errMsg: err.message, companyId }, 'run datafile: framework warnings not added');

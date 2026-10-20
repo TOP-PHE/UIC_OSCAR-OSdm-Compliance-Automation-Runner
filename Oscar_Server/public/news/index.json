@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-card-rates",
+    "date": "October 20, 2026",
+    "tag": "Feature",
+    "title": "Reduction cards: the declared rate is checked",
+    "summary": "A reduction card in the Test Framework can now say what share of the price it takes off, and a run checks the price against it.",
+    "content": "In Test Framework › Passenger Types, each reduction card the provider accepts has a \"Reduction %\" field; a provider's checklist fills it from question A3.7. When it is set, a run compares the price with the card and the same offer without it: the price must be that share lower, within one currency unit or 1 %, or the check fails. Without a rate, OSCAR only checks that the card makes the offer cheaper, as before. Group tariffs are not checked against the rate."
+  },
+  {
     "id": "2026-10-19-reduction-card-scenarios",
     "date": "October 19, 2026",
     "tag": "New",

@@ -2171,7 +2171,14 @@ function compareOfferWithoutCards(status, body) {
     validationLogger(`[WARNING] Reduction cards: the offer request without cards answered ${status}; prices not compared.`);
     return;
   }
-  comparePrices(chosenOffer(), { ...body, offers: searchTripOffers(body) }, parseEnvJson("offerPassengerSpecifications", [])).forEach((c) => {
+  // #889: the declared reduction rates (set by the parser), not on a group tariff.
+  const rates = parseEnvJson("__cardRates", {});
+  const group = require('./groupOffers.js').collectiveAsked(parseEnvJson("OfferCollectionRequest", {}));
+  comparePrices(chosenOffer(), { ...body, offers: searchTripOffers(body) }, parseEnvJson("offerPassengerSpecifications", []), rates, { group }).forEach((c) => {
+    if (c.level === "info") {
+      validationLogger(`[INFO] ${c.name}`);
+      return;
+    }
     if (c.level === "warn") {
       if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
       return;

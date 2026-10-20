@@ -194,7 +194,7 @@ without a code, it would cost a quarter of its price.
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
-| `SIM_SALE_CARD_25_1ADT_38` | A passenger with a 25 % card: the card is sent, the chosen offer names it in `appliedPassengerTypes`, and step `01c` (the same request without cards) shows the offer costs less. | The card applied: 25 % off, named on the admission. | No failed check. |
+| `SIM_SALE_CARD_25_1ADT_38` | A passenger with a 25 % card: the card is sent, the chosen offer names it in `appliedPassengerTypes`, and step `01c` (the same request without cards) shows the offer costs 25 % less, the rate the card declares (`percent`, #889). | The card applied: 25 % off, named on the admission. | No failed check. |
 | `SIM_SALE_CARD_50_2ADT_38` | Two adults, one with a 50 % card: only that passenger pays less. | 50 % off that passenger's price only. | No failed check. |
 | `SIM_SALE_CARD_STUDENT_1YTH_38` | A young traveller with the student card. | 30 % off. | No failed check. |
 | `SIM_SALE_CARD_STUDENT_RETURN_1YTH_38` | The student card on a return sold as one offer, one ticket per direction: the card is applied on the outbound and on the return offer, and kept in the booking. | 30 % off, named on the admissions of both directions. | No failed check; the two merged-PDF warnings. |
@@ -358,6 +358,7 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 | `SIM_WRONG_TRIP_PROBE_VIA_TRANSFER_LIMIT_38` | Trip search probe (#780 PR B), a via and `transferLimit` 0 together (trip 23). | Gamma honours the via: one trip with one transfer. | One failed check at 01: the trip does not keep to the transfer limit. |
 | `SIM_WRONG_OFFER_PROBE_NOT_DECLARED_SOLD_38` | Undeclared option probe (#780 PR C) asking `travelClasses` `FIRST`, which gamma sells. | First-class offers only. | One failed check at 01: every offer keeps to the value, so the Test Framework should declare it. |
 | `SIM_WRONG_CURRENCY_DEFAULT_38` | No currency asked; the scenario expects EUR as the default (`expectedCurrency`). Deliberately wrong. | Offers in gamma's default, CZK. | One failed check at 01: the offers are not in the currency expected. |
+| `SIM_WRONG_CARD_RATE_38` | The 25 % card is declared as taking 30 % off (`percent: 30` on the passenger's card). Deliberately wrong. | The card applied: 25 % off. | One failed check at 01c: the price with the card is not 30 % below the price without it. |
 
 ### Injected faults (#833)
 

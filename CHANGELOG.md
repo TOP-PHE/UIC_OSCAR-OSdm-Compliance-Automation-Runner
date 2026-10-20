@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.363] / [collection-OTST_V2.0.198] — 2026-10-20
+
+Issue #889, release 2026.398. Server, pages, collection and the simulator's data file (the simulator itself is unchanged).
+
+### Added
+- **A reduction card's rate.** A card the Test Framework declares may say what share of the price it takes off (`percent`, above 0 and at most 100; "25", "25 %" and "12,5" are read). The page has a "Reduction %" field per card, and a checklist import reads it from question A3.7, whose card table has a "Reduction %" column (the public checklist and the four simulator checklists are regenerated; the simulator's give 25, 50 and 30).
+- **The run checks it.** The run's copy of the data file writes each declared rate on the passengers' cards of the same code (`withCardRates()`; the issuer is compared when both name one, and a rate the scenario gives a card itself is kept). The collection keeps the rates in `__cardRates`, never in the request, and step `01c` checks the price with the card against the price without it at that rate:
+  - within one currency unit per card holder, or 1 % of the price without the card, whichever is larger (a provider rounds);
+  - another amount is a FAIL: the provider declared what the card is worth;
+  - when no admission prices a passenger alone, the offer's total is compared, if every passenger is of one type; otherwise a WARNING says the rate is not checked;
+  - on a group tariff (a COLLECTIVE request), an INFO line says the rate is not checked, and the old comparison stays.
+  - No rate declared: the check stays "cheaper with the card", as before.
+- **Simulator scenarios:** `SIM_SALE_CARD_25_1ADT_38` and `SIM_SALE_CARD_50_2ADT_38` give their card's rate (the same number of checks; the price check now names the rate), and `SIM_WRONG_CARD_RATE_38` (out of the run list) declares 30 % on the 25 % card and fails that one check. The reference configurations carry the rates.
+
+Checked:
+- `bruno-reduction-cards.test.js`: the rates of a passenger list; the rate never sent; the price at the rate and at both ends of the rounding passes, another fails with what was expected; no rate as before; a group tariff; one price for all, of one type or not; step 01c reading the parser's rates and a COLLECTIVE request.
+- `reduction-cards-catalogue.test.js`: the rate's forms, declared with the card, read from A3.7, written by the run's copy (code, issuer, a card's own rate); the page's field. `server.test.js`: a run's copy carries the rate.
+- The real collection on the simulator: `SIM_SALE_CARD_25_1ADT_38` 261 checks and `SIM_SALE_CARD_50_2ADT_38` 321, none failed, each naming its rate; `SIM_WRONG_CARD_RATE_38` one failed check (2,391.26 with the card against 2,231.85 expected).
+
+---
+
 ## [server-1.11.362 / collection-OTST_V2.0.197] — 2026-10-19 · Release 2026.397
 
 Issue #887 (PR 1 of 3: reduction cards), from the ČD coverage review of #592. No simulator change.
