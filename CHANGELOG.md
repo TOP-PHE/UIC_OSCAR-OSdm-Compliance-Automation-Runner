@@ -62,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.367] / [collection-OTST_V2.0.202] — 2026-10-20
+
+Issue #895, release 2026.402. Collection only (and its tests).
+
+### Fixed
+- **A reduction card's rate is no longer compared with a group tariff** (`comparePrices()`, `library-bruno/reductionCards.js`). A real provider's run of 20/10: `OTST_SALE_REDUCTION_CARD_2ADT` (two adults, one with a card declared at 25 %) failed at 01c although the provider applied the card exactly (its card product at 356.00 against 475.00 for the adult without a card, 25 % off). Without cards, the cheapest offer of the same flexibility was a group tariff, one admission for both at 940.00; OSCAR compared the two totals and expected 822.50.
+  - The offer without cards to compare with now has the same flexibility, travel class **and service class** (when both name one: the provider gives no `overallTravelClass`, so a first-class offer counted as the same kind), and one pricing the passengers the same way (each alone, or together) is preferred (`counterpartOf()`).
+  - When the passengers are priced otherwise on the two sides, each card holder is compared with a passenger of the same type without a card in the chosen offer itself (`inOfferChecks()`); with nobody to compare with (every passenger holds a card), one INFO line, never a failure.
+- The message of the total comparison said "25 % % off"; it names each rate once.
+
+Checked:
+- `bruno-reduction-cards.test.js`: the provider's shape (no travel class, a service class, a group tariff without cards, a first-class offer): 25 % passes within the same offer, a wrong price fails, no rate means "cheaper", a first-class offer is never taken, an offer pricing each passenger alone is preferred, every passenger with a card gives the INFO line, the total message. With the old `reductionCards.js` five of them fail.
+- The real collection on the simulator, the five card scenarios, before and after: the same checks (261, 321, 261, 409, 261) and the same one failure of `SIM_WRONG_CARD_RATE_38`.
+
+---
+
 ## [server-1.11.366] / [collection-OTST_V2.0.201] — 2026-10-20
 
 Issue #893, release 2026.401. Collection only (and its tests).

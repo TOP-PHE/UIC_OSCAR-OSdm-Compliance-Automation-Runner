@@ -1477,6 +1477,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   total when the passengers are of one type; a COLLECTIVE request (group
   tariff) is told, not checked. No rate = the old "cheaper" check.
   `SIM_WRONG_CARD_RATE_38` declares 30 % on gamma's 25 % card.
+  **Never against another way of pricing** (#895, 1.11.367): the counterpart
+  without cards also has the chosen offer's service class (a real provider
+  gives no `overallTravelClass`) and preferably the same split of passengers
+  (`counterpartOf()`, `sameSplit()`: each alone or together); a split that
+  differs (a group tariff for all, without cards) compares each holder with
+  a same-type passenger without a card in the chosen offer
+  (`inOfferChecks()`), else one INFO line.
   **The provider's own products are declared** (#887 PR 2, 1.11.364 /
   OTST_V2.0.199): `products` [{ code, name, flexibility }] in the framework
   (`utils/namedProducts.js`: `declaredProducts()`, `flexibilityOf()`,
