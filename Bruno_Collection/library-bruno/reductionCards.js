@@ -240,6 +240,43 @@ function compareTotals(chosen, counterpart, specs, rates) {
   );
 }
 
+// One passenger's price check, or null when a declared rate cannot be
+// checked on that passenger alone (no single-passenger admission): the
+// offer's total is then compared (compareTotals).
+function passengerCheck(chosen, counterpart, ref, carded, percent) {
+  const withCard = priceOf(chosen, ref);
+  const without = priceOf(counterpart, ref);
+  if (withCard === null || without === null) {
+    if (percent !== undefined) return null;
+    return { name: `Reduction cards: the price of passenger ${ref} can be compared`, ok: false, level: 'warn', message: 'no single-passenger admission with a price on one side' };
+  }
+  if (percent !== undefined) {
+    // #889: the provider declared the rate, so the amount is checked.
+    return rateCheck(
+      `Reduction cards: passenger ${ref} pays ${percent} % less with the card — ${withCard} against ${without} without`,
+      withCard, expectedWith(without, percent), toleranceFor(without, 1, unitOf(chosen)), percent,
+    );
+  }
+  if (carded) {
+    // Cheaper passes. Not cheaper is a warning (#644): what a card is worth
+    // on a tariff is the provider's commercial choice, which OSDM does not
+    // set; whether the card was applied is checked on the offer itself.
+    const cheaper = withCard < without;
+    return {
+      name: `Reduction cards: passenger ${ref} pays less with the card — ${withCard} against ${without} without`,
+      ok: cheaper,
+      level: cheaper ? 'fail' : 'warn',
+      message: cheaper ? undefined : `${withCard} with the card is not below ${without} without it (a commercial choice, not an OSDM rule)`,
+    };
+  }
+  return {
+    name: `Reduction cards: passenger ${ref}, who holds no card, pays the same — ${withCard} and ${without}`,
+    ok: withCard === without,
+    level: 'warn',
+    message: withCard === without ? undefined : `${withCard} with the other passengers' cards, ${without} without`,
+  };
+}
+
 /**
  * The comparison of the chosen offer (with cards) with the offer of the same
  * flexibility and travel class in the answer without cards. A passenger with
@@ -267,38 +304,9 @@ function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false
   const refs = (Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : []);
   const unpriced = {};
   for (const ref of refs) {
-    const withCard = priceOf(chosen, ref);
-    const without = priceOf(counterpart, ref);
-    const carded = withCards.has(ref);
-    if (withCard === null || without === null) {
-      if (ref in declared) { unpriced[ref] = declared[ref]; continue; }
-      out.push({ name: `Reduction cards: the price of passenger ${ref} can be compared`, ok: false, level: 'warn', message: 'no single-passenger admission with a price on one side' });
-    } else if (ref in declared) {
-      // #889: the provider declared the rate, so the amount is checked.
-      const percent = declared[ref];
-      out.push(rateCheck(
-        `Reduction cards: passenger ${ref} pays ${percent} % less with the card — ${withCard} against ${without} without`,
-        withCard, expectedWith(without, percent), toleranceFor(without, 1, unitOf(chosen)), percent,
-      ));
-    } else if (carded) {
-      // Cheaper passes. Not cheaper is a warning (#644): what a card is worth
-      // on a tariff is the provider's commercial choice, which OSDM does not
-      // set; whether the card was applied is checked on the offer itself.
-      const cheaper = withCard < without;
-      out.push({
-        name: `Reduction cards: passenger ${ref} pays less with the card — ${withCard} against ${without} without`,
-        ok: cheaper,
-        level: cheaper ? 'fail' : 'warn',
-        message: cheaper ? undefined : `${withCard} with the card is not below ${without} without it (a commercial choice, not an OSDM rule)`,
-      });
-    } else {
-      out.push({
-        name: `Reduction cards: passenger ${ref}, who holds no card, pays the same — ${withCard} and ${without}`,
-        ok: withCard === without,
-        level: 'warn',
-        message: withCard === without ? undefined : `${withCard} with the other passengers' cards, ${without} without`,
-      });
-    }
+    const check = passengerCheck(chosen, counterpart, ref, withCards.has(ref), declared[ref]);
+    if (check) out.push(check);
+    else unpriced[ref] = declared[ref];
   }
   if (Object.keys(unpriced).length > 0) {
     out.push(compareTotals(chosen, counterpart, specs, unpriced) || {

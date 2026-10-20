@@ -38,7 +38,7 @@ const MAX_CARDS = 50;
 function percentOf(value) {
   let n = value;
   if (typeof value === 'string') {
-    const m = /^\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*%?\s*$/.exec(value);
+    const m = /^(\d{1,3}(?:[.,]\d{1,2})?)(?: ?%)?$/.exec(value.trim());
     n = m ? Number(m[1].replace(',', '.')) : Number.NaN;
   }
   return typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
