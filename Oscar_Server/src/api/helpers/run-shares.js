@@ -61,7 +61,7 @@ function operatorLinkOf(providerId) {
  * `run` is the runs row; `user` is { id, role } as requireAuth sets it.
  */
 function sharedViewOf(run, user) {
-  if (!run || !user || user.role !== 'test_manager') return null;
+  if (!run || user?.role !== 'test_manager') return null;
   const reader = storedUser(user.id);
   if (!reader || !ROLE_TM.has(reader.role) || (reader.status || 'active') !== 'active') return null;
   const share = get(

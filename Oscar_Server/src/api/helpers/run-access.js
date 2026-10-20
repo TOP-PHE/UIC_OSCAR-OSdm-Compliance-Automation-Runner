@@ -99,7 +99,7 @@ function canUserSeeRun(runId, user) {
 function canUserReadRun(runId, user) {
   const own = canUserSeeRun(runId, user);
   if (own) return own;
-  if (!runId || !user || user.role !== 'test_manager') return null;
+  if (!runId || user?.role !== 'test_manager') return null;
   const run = get(
     "SELECT * FROM runs WHERE id = ? AND status NOT IN ('DELETED', 'DELETION_REQUESTED', 'DELETED_BY_ADMIN')",
     [runId],
