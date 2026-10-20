@@ -50,8 +50,9 @@ function passOf(raw) {
  * Returns { purchaser, target } (target as validateProblemResponse reads it).
  */
 function corruptedPurchaser(purchaser, pass) {
-  const out = isObj(purchaser) ? structuredCopy(purchaser) : {};
-  out.detail = isObj(out.detail) ? out.detail : {};
+  // Copies of the levels changed (purchaser, detail, contact): the valid one stays as it is.
+  const out = isObj(purchaser) ? { ...purchaser } : {};
+  out.detail = isObj(out.detail) ? { ...out.detail } : {};
   const field = SWEEP[pass];
   if (!(field in BAD)) {
     delete out.detail[field];
@@ -61,15 +62,10 @@ function corruptedPurchaser(purchaser, pass) {
   if (flat) {
     out.detail[field] = BAD[field];
   } else {
-    out.detail.contact = isObj(out.detail.contact) ? out.detail.contact : {};
+    out.detail.contact = isObj(out.detail.contact) ? { ...out.detail.contact } : {};
     out.detail.contact[field] = BAD[field];
   }
   return { purchaser: out, target: { scenarioField: field, value: BAD[field] } };
-}
-
-// Bruno's sandbox has no structuredClone: a purchaser is plain JSON.
-function structuredCopy(value) {
-  return JSON.parse(JSON.stringify(value));
 }
 
 /**
@@ -115,7 +111,8 @@ function gradePurchaserAtBooking(status, body) {
   const { next, accepted } = afterPass(pass, status);
   if (accepted) {
     const id = bookingIdOf(body);
-    validationLogger(`[INFO] Purchaser negative sweep in the booking: the provider booked with the wrong '${field}'${id ? ` (booking ${id})` : ''}; that pre-booking is not confirmed and is left to expire.`);
+    const named = id ? ` (booking ${id})` : '';
+    validationLogger(`[INFO] Purchaser negative sweep in the booking: the provider booked with the wrong '${field}'${named}; that pre-booking is not confirmed and is left to expire.`);
   }
   // __purchaserAtBookingProbe stays as it is: the collection's [OSCAR request]
   // check runs after this script and reads it; the next build sets it again.
