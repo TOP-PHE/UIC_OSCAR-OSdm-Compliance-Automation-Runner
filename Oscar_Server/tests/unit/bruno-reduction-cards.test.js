@@ -234,6 +234,93 @@ describe('the steps: checks recorded, 01c asked for once, routing shared', () =>
   });
 });
 
+describe('#889: a declared reduction rate', () => {
+  const specs = [{ externalRef: 'P1', type: 'PERSON', cards: [card('C1')] }, { externalRef: 'P2', type: 'PERSON' }];
+  const plain = { offers: [offerOf([part('P1', 35900), part('P2', 35900)])] };
+
+  test('the rates of a passenger list: the first card with a rate, above 0 and at most 100; codes alone have none', () => {
+    expect(rc.ratesOfPassengers([
+      { reference: '00001', reductionCards: [{ code: 'A' }, { code: 'B', percent: 25 }, { code: 'C', percent: 50 }] },
+      { reference: '00002', reductionCards: ['C1'] },
+      { reference: '00003', reductionCards: [{ code: 'X', percent: 0 }, { code: 'Y', percent: 101 }, { code: '', percent: 10 }] },
+      { reference: '00004', reductionCards: [{ code: 'Z', percent: '12.5' }] },
+      { reductionCards: [{ code: 'Q', percent: 10 }] },
+      null,
+    ])).toEqual({ '00001': 25, '00004': 12.5 });
+    expect(rc.ratesOfPassengers(undefined)).toEqual({});
+  });
+
+  test('the rate is never sent: the CardReference holds type, code and issuer only', () => {
+    expect(rc.cardsOfPassenger({ reductionCards: [{ code: 'C1', issuer: 'urn:x', percent: 25 }] }))
+      .toEqual([{ type: 'REDUCTION_CARD', code: 'C1', issuer: 'urn:x' }]);
+  });
+
+  test('the price at the rate passes; within the tolerance too (one currency unit, or 1 %)', () => {
+    // 359.00 CZK at 25 % off is 269.25: a provider rounding to 269 or 270 passes.
+    for (const amount of [26925, 26900, 27000]) {
+      const [check] = rc.comparePrices(offerOf([part('P1', amount), part('P2', 35900)]), plain, specs, { P1: 25 });
+      expect([check.name, check.ok, check.level]).toEqual([`Reduction cards: passenger P1 pays 25 % less with the card — ${amount} against 35900 without`, true, 'fail']);
+    }
+  });
+
+  test('another amount fails, saying what was expected; a rate for a passenger without card is ignored', () => {
+    const [check, other] = rc.comparePrices(offerOf([part('P1', 25130), part('P2', 35900)]), plain, specs, { P1: 25, P2: 50 });
+    expect([check.ok, check.level]).toEqual([false, 'fail']);
+    expect(check.message).toBe('25130 with the card; 26925 expected (25 % off, within 359)');
+    expect(other.name).toMatch(/P2, who holds no card, pays the same/);
+  });
+
+  test('no rate: the check stays "cheaper", as before', () => {
+    const [check] = rc.comparePrices(offerOf([part('P1', 25130), part('P2', 35900)]), plain, specs, {});
+    expect(check.name).toBe('Reduction cards: passenger P1 pays less with the card — 25130 against 35900 without');
+    expect(check.ok).toBe(true);
+  });
+
+  test('a group tariff: the rate is told not checked, and the comparison is the old one', () => {
+    const checks = rc.comparePrices(offerOf([part('P1', 30000), part('P2', 35900)]), plain, specs, { P1: 25 }, { group: true });
+    expect(checks.map((c) => [c.name, c.ok, c.level])).toEqual([
+      ['Reduction cards: the declared rate is not checked on a group tariff', true, 'info'],
+      ['Reduction cards: passenger P1 pays less with the card — 30000 against 35900 without', true, 'fail'],
+      ['Reduction cards: passenger P2, who holds no card, pays the same — 35900 and 35900', true, 'warn'],
+    ]);
+  });
+
+  test('a price for all (no single-passenger admission): the total against the rates, when the passengers are of one type', () => {
+    const both = (amount) => offerOf([{ passengerRefs: ['P1', 'P2'], price: price(amount) }]);
+    const together = { ...both(0), passengerRefs: ['P1', 'P2'] };
+    const plainBoth = { offers: [{ ...both(71800), passengerRefs: ['P1', 'P2'] }] };
+    // 2 × 359.00, one of them 25 % off: 628.25.
+    const ok = rc.comparePrices({ ...together, admissionOfferParts: both(62825).admissionOfferParts }, plainBoth, specs, { P1: 25 });
+    expect(ok.map((c) => [c.ok, c.level])).toEqual([[false, 'warn'], [true, 'fail']]);
+    expect(ok[0].name).toMatch(/passenger P2 can be compared/);
+    expect(ok[1].name).toBe('Reduction cards: the offer costs the declared rates less (P1 25 %) — 62825 against 71800 without');
+    const wrong = rc.comparePrices({ ...together, admissionOfferParts: both(53850).admissionOfferParts }, plainBoth, specs, { P1: 25 });
+    expect(wrong[1]).toMatchObject({ ok: false, level: 'fail' });
+    const mixed = [specs[0], { externalRef: 'P2', type: 'CHILD' }];
+    const told = rc.comparePrices({ ...together, admissionOfferParts: both(62825).admissionOfferParts }, plainBoth, mixed, { P1: 25 });
+    expect(told[1]).toMatchObject({ ok: false, level: 'warn', message: expect.stringMatching(/not all of one type: the rate is not checked/) });
+  });
+
+  test('01c reads the rates the parser kept, and a COLLECTIVE request is a group tariff', () => {
+    envStore.offerPassengerSpecifications = JSON.stringify(specs);
+    envStore.offer = offerOf([part('P1', 25130), part('P2', 35900)]);
+    envStore.__cardRates = JSON.stringify({ P1: 25 });
+    let r = run(() => offers.compareOfferWithoutCards(200, plain));
+    expect(failed(r)).toEqual(['Reduction cards: passenger P1 pays 25 % less with the card — 25130 against 35900 without']);
+    envStore.OfferCollectionRequest = JSON.stringify({ offerSearchCriteria: { offerMode: 'COLLECTIVE' } });
+    r = run(() => offers.compareOfferWithoutCards(200, plain));
+    expect(failed(r)).toEqual([]);
+    expect(r.logs).toContain('[INFO] Reduction cards: the declared rate is not checked on a group tariff');
+  });
+
+  test('the parser keeps the rates for 01c', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const parser = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno', 'scenarioParser.js'), 'utf8');
+    expect(parser).toContain('bru.setEnvVar("__cardRates", JSON.stringify(ratesOfPassengers(passengersList.passengers)));');
+  });
+});
+
 describe('the requests carry the cards', () => {
   test('the parser puts the cards on the offer and booking passengers, and the reset lists name the new variables', () => {
     const fs = require('node:fs');
@@ -243,7 +330,7 @@ describe('the requests carry the cards', () => {
     expect(parser).toMatch(/if \(cards\.length > 0\) offerSpec\.cards = cards;/);
     expect(parser).toMatch(/passengerSpecs\.at\(-1\)\.cards = cards;/);
     for (const file of [path.join(root, 'library-bruno', 'scenarioParser.js'), path.join(root, 'opencollection.yml')]) {
-      expect(fs.readFileSync(file, 'utf8')).toMatch(/"__cardPriceCompareDone", "OfferCollectionRequestWithoutCards"/);
+      expect(fs.readFileSync(file, 'utf8')).toMatch(/"__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards"/);
     }
   });
 });

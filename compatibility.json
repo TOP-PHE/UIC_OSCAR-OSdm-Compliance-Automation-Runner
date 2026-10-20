@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.397",
+  "current_release": "2026.398",
   "releases": [
+    {
+      "release": "2026.398",
+      "date": "2026-10-20",
+      "server": "1.11.363",
+      "collection": "OTST_V2.0.198",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Reduction cards: the Test Framework may declare each card's reduction rate (#889), also read from checklist A3.7's new \"Reduction %\" column; a run then checks the price with the card against it (step 01c, within one currency unit or 1 %), a FAIL when it is not; no rate keeps the \"cheaper\" check, and a group tariff is not checked."
+      ]
+    },
     {
       "release": "2026.397",
       "date": "2026-10-19",

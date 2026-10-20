@@ -1462,6 +1462,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   one. The page's list is drawn by `fwReductionCardsHtml()`, its click handled
   before the click switch (`clickReductionCard()`), like the change chain.
   Named products and groups are PRs 2-3 of #887.
+  **A card's rate is checked when declared** (#889, 1.11.363 / OTST_V2.0.198):
+  `percent` on a framework card (`percentOf()`: "25", "25 %", "12,5"; A3.7's
+  "Reduction %" column, `data.card.<n>.percent`). The run's copy writes it on
+  the passengers' cards of that code (`withCardRates()`, issuer compared when
+  both name one, a card's own rate kept); the parser keeps them in
+  `__cardRates` (never in the request: `cardOfEntry()` drops it), and 01c
+  checks the price at the rate within one currency unit per holder or 1 %
+  (`comparePrices()`), a FAIL otherwise; one price for all is compared as a
+  total when the passengers are of one type; a COLLECTIVE request (group
+  tariff) is told, not checked. No rate = the old "cheaper" check.
+  `SIM_WRONG_CARD_RATE_38` declares 30 % on gamma's 25 % card.
 - **A scenario can name the product it sells** (#598, 1.11.229 /
   OTST_V2.0.113). `expectedProduct` is a code (exact) or words of the name;
   `library-bruno/products.js` (pure) lets a code match anywhere win over a

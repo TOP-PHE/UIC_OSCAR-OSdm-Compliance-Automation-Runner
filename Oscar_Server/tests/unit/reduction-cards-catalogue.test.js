@@ -16,7 +16,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { declaredCards, cardsFromChecklist, passengersWithCard } = require('../../src/utils/reductionCards');
+const { declaredCards, cardsFromChecklist, passengersWithCard, percentOf, withCardRates } = require('../../src/utils/reductionCards');
 const { catalogueFor, catalogueDatafile } = require('../../src/utils/scenarioCatalogue');
 const { adaptCatalogueDatafile } = require('../../src/utils/catalogueMatch');
 const { frameworkFromChecklist } = require('../../src/utils/referenceConfiguration');
@@ -40,6 +40,38 @@ describe('the cards a framework declares', () => {
   test('lengths are bounded', () => {
     const [card] = declaredCards({ reductionCards: [{ code: 'C'.repeat(100), issuer: 'I'.repeat(500), name: 'N'.repeat(500) }] });
     expect([card.code.length, card.issuer.length, card.name.length]).toEqual([60, 200, 120]);
+  });
+});
+
+describe('#889: a card\'s reduction rate', () => {
+  test('a number or a text, above 0 and at most 100; anything else is no rate', () => {
+    for (const [v, want] of [[25, 25], ['25', 25], ['25 %', 25], [' 12,5% ', 12.5], ['100', 100], ['0.5', 0.5]]) expect(percentOf(v)).toBe(want);
+    for (const v of [0, '0', 101, '-5', 'abc', '25 %%', '', null, undefined, Number.NaN, '1e2', '12.555']) expect(percentOf(v)).toBeNull();
+  });
+
+  test('declared with the card; a card without a valid one has none', () => {
+    expect(declaredCards({ reductionCards: [{ code: '1', percent: '25' }, { code: '2', percent: 'half' }] }))
+      .toEqual([{ code: '1', percent: 25 }, { code: '2' }]);
+  });
+
+  test('read from A3.7\'s "Reduction %" column', () => {
+    expect(cardsFromChecklist({ 'data.reductionCards=YES': true, 'data.card.1.code': '1', 'data.card.1.percent': '25 %', 'data.card.2.code': '18' }))
+      .toEqual([{ code: '1', percent: 25 }, { code: '18' }]);
+  });
+
+  test('the run\'s copy writes each declared rate on the passengers\' cards of that code; a card\'s own rate stays', () => {
+    const fw = { reductionCards: [{ code: '1', issuer: 'urn:uic:rics:1154', percent: 25 }, { code: '2', issuer: 'urn:uic:rics:1154' }] };
+    const df = { passengersList: [{ id: 1, passengers: [
+      { reference: '00001', reductionCards: ['1', { code: '1', issuer: 'urn:other' }, { code: '1', issuer: 'urn:uic:rics:1154', number: '7' }, { code: '1', percent: 30 }, '2', 'X'] },
+      { reference: '00002' }, null,
+    ] }, null] };
+    expect(withCardRates(df, fw)).toBe(2);
+    expect(df.passengersList[0].passengers[0].reductionCards).toEqual([
+      { code: '1', percent: 25 }, { code: '1', issuer: 'urn:other' }, { code: '1', issuer: 'urn:uic:rics:1154', number: '7', percent: 25 },
+      { code: '1', percent: 30 }, '2', 'X',
+    ]);
+    expect(withCardRates({ passengersList: [] }, { reductionCards: [{ code: '1' }] })).toBe(0);
+    expect(withCardRates(null, fw)).toBe(0);
   });
 });
 
@@ -129,7 +161,7 @@ describe('the Test Framework page', () => {
   test('each field is labelled and its value escaped; none declared says so', () => {
     const ctx = page();
     const html = ctx.html({ reductionCards: [{ code: '1', issuer: 'urn:uic:rics:1154', name: 'IN "25" <b>' }] });
-    for (const f of ['code', 'issuer', 'name']) expect(html).toContain(`<label for="fw-card-0-${f}"`);
+    for (const f of ['code', 'issuer', 'name', 'percent']) expect(html).toContain(`<label for="fw-card-0-${f}"`);
     expect(html).toContain('value="IN &quot;25&quot; &lt;b&gt;"');
     expect(ctx.html({})).toContain('None declared');
   });
@@ -138,16 +170,17 @@ describe('the Test Framework page', () => {
     const ctx = page();
     expect(ctx.click('fw-card-add', {})).toBe(true);
     expect(ctx.change('fw-card-field', { dataset: { index: '0', field: 'code' }, value: ' 1 ' })).toBe(true);
-    expect(ctx.wizData.framework.reductionCards).toEqual([{ code: '1', issuer: '', name: '' }]);
+    ctx.change('fw-card-field', { dataset: { index: '0', field: 'percent' }, value: ' 25 ' });
+    expect(ctx.wizData.framework.reductionCards).toEqual([{ code: '1', issuer: '', name: '', percent: '25' }]);
     ctx.change('fw-card-field', { dataset: { index: '0', field: '__proto__' }, value: 'x' });
     ctx.change('fw-card-field', { dataset: { index: '5', field: 'code' }, value: 'x' });
     ctx.click('fw-card-remove', { dataset: { index: 'NaN' } });
-    expect(ctx.wizData.framework.reductionCards).toEqual([{ code: '1', issuer: '', name: '' }]);
+    expect(ctx.wizData.framework.reductionCards).toEqual([{ code: '1', issuer: '', name: '', percent: '25' }]);
     ctx.click('fw-card-remove', { dataset: { index: '0' } });
     expect(ctx.wizData.framework.reductionCards).toEqual([]);
     expect(ctx.click('fw-other', {})).toBe(false);
     expect(ctx.change('fw-other', {})).toBe(false);
-    expect([ctx.saves, ctx.renders]).toEqual([3, 2]);
+    expect([ctx.saves, ctx.renders]).toEqual([4, 2]);
   });
 
   test('wired: drawn under Passenger Types, the click before the switch, the change in the chain', () => {

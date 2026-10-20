@@ -3853,10 +3853,10 @@ function changePassengerUpdate(action, el) {
 
 // #887: the reduction cards the provider accepts: code (as sent in an offer
 // request), issuer (a URN) and name. The catalogue's card scenarios use the first.
-const FW_CARD_FIELDS = [['code', 'Code', 60], ['issuer', 'Issuer', 200], ['name', 'Name', 120]];
+const FW_CARD_FIELDS = [['code', 'Code', 60], ['issuer', 'Issuer', 200], ['name', 'Name', 120], ['percent', 'Reduction %', 6]];
 
 function fwCardFieldHtml(card, i, [field, label, max]) {
-  const width = field === 'code' ? 110 : 220;
+  const width = { code: 110, percent: 70 }[field] || 220;
   return `<label for="fw-card-${i}-${field}" style="font-size:11px;color:#78909c">${label}</label><input class="param-input" id="fw-card-${i}-${field}" data-action="fw-card-field" data-index="${i}" data-field="${field}" maxlength="${max}" value="${esc(card?.[field] || '')}" style="max-width:${width}px">`;
 }
 
@@ -3870,10 +3870,10 @@ function fwReductionCardsHtml(fw) {
   const rows = cards.map((card, i) => fwCardRowHtml(card, i)).join('');
   const none = '<div style="color:#90a4ae;font-size:12px;padding:4px 0 8px">None declared: the catalogue\'s reduction card scenarios cannot be copied.</div>';
   return `<div class="fw-subsection">
-        <div class="fw-subsection-label" style="margin-bottom:8px">Reduction cards the provider accepts<span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — the code as sent in an offer request, the issuer (a URN) and a name</span></div>
+        <div class="fw-subsection-label" style="margin-bottom:8px">Reduction cards the provider accepts<span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — the code as sent in an offer request, the issuer (a URN), a name and, when the provider says it, the share of the price the card takes off</span></div>
         ${rows || none}
         <button class="btn btn-small btn-secondary" data-action="fw-card-add">+ Add a card</button>
-        <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">The copies of the catalogue's card scenarios give the passenger holding a card the first one listed here. A provider's checklist (question A3.7) fills this list on import.</div>
+        <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">The copies of the catalogue's card scenarios give the passenger holding a card the first one listed here. With a reduction %, a run checks the price with the card against it (within one currency unit or 1 %); without, only that the card makes it cheaper. A provider's checklist (question A3.7) fills this list on import.</div>
       </div>`;
 }
 
@@ -3882,7 +3882,7 @@ function clickReductionCard(action, el) {
   const fw = wizData.framework;
   const cards = Array.isArray(fw.reductionCards) ? fw.reductionCards : [];
   if (action === 'fw-card-add') {
-    cards.push({ code: '', issuer: '', name: '' });
+    cards.push({ code: '', issuer: '', name: '', percent: '' });
   } else {
     const i = Number.parseInt(el.dataset.index, 10);
     if (!Number.isInteger(i) || i < 0 || i >= cards.length) return true;

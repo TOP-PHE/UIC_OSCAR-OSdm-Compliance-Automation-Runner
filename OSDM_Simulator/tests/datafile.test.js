@@ -220,6 +220,7 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38: ['refuses-bare-place-selection'],
     SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38: ['one-fulfillment-per-refund-request'],
     SIM_WRONG_OFFER_PRICE_38: [],
+    SIM_WRONG_CARD_RATE_38: [],
     SIM_WRONG_BOOKING_PRICE_38: ['wrong-booking-price'],
     SIM_WRONG_FULFILLMENT_STATUS_38: ['wrong-fulfillment-status'],
     SIM_WRONG_REFUND_AMOUNT_38: ['wrong-refund-amount'],
@@ -303,9 +304,17 @@ test('the reduction card scenarios: each card gamma lists, on a passenger of its
     const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
     const cards = list.passengers.flatMap((p) => p.reductionCards || []);
     assert.equal(cards.length, 1, `${scenario.code}: one passenger holds one card`);
-    used.push(...cards);
+    // #889: a card given as an object declares gamma's own rate.
+    const card = cards[0];
+    if (typeof card === 'object') assert.equal(card.percent, gamma.reductionCards.find((c) => c.code === card.code).percent, scenario.code);
+    used.push(typeof card === 'object' ? card.code : card);
   }
   assert.deepEqual([...new Set(used)].sort(), gamma.reductionCards.map((c) => c.code).sort());
+  // #889: the deliberately wrong rate, on gamma's 25 % card.
+  const wrong = datafile.scenarios.find((s) => s.code === 'SIM_WRONG_CARD_RATE_38');
+  const wrongCards = datafile.passengersList.find((l) => l.id === wrong.passengersListId).passengers.flatMap((p) => p.reductionCards || []);
+  assert.deepEqual(wrongCards, [{ code: 'SIM_CARD_25', percent: 30 }]);
+  carded.push(wrong);
   for (const scenario of datafile.scenarios.filter((s) => !carded.includes(s))) {
     const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
     assert.ok(list.passengers.every((p) => !p.reductionCards), `${scenario.code} holds no card`);

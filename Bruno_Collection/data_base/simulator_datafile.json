@@ -5239,6 +5239,39 @@
       "simulatorFaults": [
         "error.server-error-for-refusal"
       ]
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_CARD_RATE_38",
+      "description": "Simulated provider: deliberately wrong. The passenger's 25 % card is declared as taking 30 % off (`percent` on the card, as the run's copy writes the Test Framework's rate): step 01c fails the amount. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 28,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -5793,7 +5826,7 @@
           "updatePhoneNumber": "+33199000012",
           "updateEmail": "charles.sample@example.org",
           "type": "PERSON",
-          "reductionCards": ["SIM_CARD_25"]
+          "reductionCards": [{ "code": "SIM_CARD_25", "percent": 25 }]
         }
       ]
     },
@@ -5814,7 +5847,7 @@
           "updatePhoneNumber": "+33199000014",
           "updateEmail": "danae.sample@example.org",
           "type": "PERSON",
-          "reductionCards": ["SIM_CARD_50"]
+          "reductionCards": [{ "code": "SIM_CARD_50", "percent": 50 }]
         },
         {
           "reference": "00002",
@@ -7254,6 +7287,27 @@
           "updatePhoneNumber": "+33199000002",
           "updateEmail": "alexis.sample@example.org",
           "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1992-04-10",
+          "firstName": "Charlie",
+          "lastName": "Example",
+          "phoneNumber": "+33199000011",
+          "email": "charlie.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Charles",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1992-04-11",
+          "updatePhoneNumber": "+33199000012",
+          "updateEmail": "charles.sample@example.org",
+          "type": "PERSON",
+          "reductionCards": [{ "code": "SIM_CARD_25", "percent": 30 }]
         }
       ]
     }
