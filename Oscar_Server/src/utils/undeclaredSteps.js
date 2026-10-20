@@ -82,4 +82,26 @@ function withoutUndeclaredPassengerUpdate(datafile, framework) {
   return count;
 }
 
-module.exports = { updatesPassengers, purchaserAfterBooking, mainPassengerOnly, undeclaredStepWarnings, withoutUndeclaredPassengerUpdate };
+/**
+ * #899: the run's copy of the invalid purchaser probe on a provider that takes
+ * no purchaser after the booking. `invalid` books without one and probes
+ * …/purchaser afterwards: such a provider refuses that booking, and nothing
+ * is probed. It becomes `invalid_at_booking`: the wrong purchaser goes in the
+ * booking itself. Changes `datafile`; returns how many scenarios changed.
+ */
+function withPurchaserProbeAtBooking(datafile, framework) {
+  if (framework?.purchaserAfterBooking !== false || !Array.isArray(datafile?.scenarios)) return 0;
+  let count = 0;
+  for (const sc of datafile.scenarios) {
+    if (!isObj(sc) || typeof sc.bookingPurchaserMode !== 'string') continue;
+    if (sc.bookingPurchaserMode.trim().toLowerCase() !== 'invalid') continue;
+    sc.bookingPurchaserMode = 'invalid_at_booking';
+    count += 1;
+  }
+  return count;
+}
+
+module.exports = {
+  updatesPassengers, purchaserAfterBooking, mainPassengerOnly, undeclaredStepWarnings, withoutUndeclaredPassengerUpdate,
+  withPurchaserProbeAtBooking,
+};

@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.369] / [collection-OTST_V2.0.204] — 2026-10-20
+
+Issue #899, from a real provider's rerun of 20/10, release 2026.404. Simulator 0.42.0.
+
+### Simulator 0.42.0
+- **A purchaser given in `POST /bookings` is checked as a written one** on a provider with `personChecks` (gamma, alpha, beta): first and last name required, e-mail and phone of the right form, else `400 INVALID_PERSON_DATA` with a pointer under `/purchaser/detail`, and nothing is booked. Every purchaser of the data file is valid, so no other scenario moves.
+
+### Fixed
+- **The invalid purchaser probe goes in the booking where the purchaser goes only there.** `NHF_PURCHASER_INVALID` (`bookingPurchaserMode: invalid`) books without a purchaser and sends invalid ones to `…/purchaser` afterwards. A real provider requires the purchaser in the booking (400 "Parameter 'purchaser' must be entered"), so the scenario stopped at step 02 and never probed anything (3 runs on 20/10). New mode `invalid_at_booking` (`library-bruno/purchaserAtBooking.js`): step 02 sends the booking with the purchaser, one field wrong per pass (first name, last name left out; e-mail, phone of the wrong form, the after-booking sweep's fields), grades each answer as that sweep does, then books with the valid purchaser and the sale goes on. A pass the provider accepts leaves a pre-booking, named in the log. The run's copy turns `invalid` into it when the Test Framework says `purchaserAfterBooking: false` (`withPurchaserProbeAtBooking()`, `utils/undeclaredSteps.js`); the `[OSCAR request]` check counts those passes as a negative test. Test Config offers the mode too.
+- **Checklist question A5.1 ("The purchaser") sets the Test Framework on import.** AT_BOOKING or NOT_NEEDED: "The provider takes the purchaser after the booking" off (`purchaserAfterBooking: false`); LATER_ALLOWED: on. Before, the answer was read by no one, so the late-purchaser scenarios were copied and failed on a provider that had answered AT_BOOKING.
+
+Checked:
+- `bruno-purchaser-at-booking.test.js` (each pass's booking body, the grading, the [OSCAR request] negative test), `purchaser-at-booking.test.js` (the run's copy, A5.1), `server.test.js` (the run's copy served to a run), the simulator's `persons.test.js`.
+- The real collection on the simulator: the new `SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38`, 246 checks, none failed (four bookings refused, then the sale); `SIM_NHF_PURCHASER_INVALID_1ADT_38` (250) and `SIM_PURCHASER_DEFERRED_1ADT_38` (239) unchanged, none failed.
+
+---
+
 ## [server-1.11.368] / [collection-OTST_V2.0.203] — 2026-10-20
 
 Issue #897 (follow-up of #895), release 2026.403. Collection only (and its tests).

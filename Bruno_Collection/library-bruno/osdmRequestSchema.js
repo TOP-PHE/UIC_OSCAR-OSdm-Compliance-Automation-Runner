@@ -191,6 +191,7 @@ const NEGATIVE_TESTS = [
   { method: 'POST', path: '/bookings/{bookingId}/purchaser', variable: 'bookingPurchaserMode', value: 'invalid', label: 'purchaser negative sweep' },
   { method: 'PATCH', path: '/bookings/{bookingId}/purchaser', variable: 'bookingPurchaserMode', value: 'invalid', label: 'purchaser negative sweep' },
   { method: 'POST', path: '/offers', variable: 'emptyPassengersExpectRejection', value: 'true', label: 'empty passenger list' },
+  { method: 'POST', path: '/bookings', variable: '__purchaserAtBookingProbe', value: 'true', label: 'purchaser negative sweep in the booking' },
 ];
 
 // The negative test a request belongs to, from the run's variables

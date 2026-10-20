@@ -267,6 +267,7 @@ test('the requested information and purchaser scenarios: the probe each one runs
     SIM_NHF_RI_INVALID_1ADT_38: ['invalid', null, true],
     SIM_PURCHASER_DEFERRED_1ADT_38: [null, 'deferred', false],
     SIM_NHF_PURCHASER_INVALID_1ADT_38: [null, 'invalid', false],
+    SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38: [null, 'invalid_at_booking', false],
   });
 });
 

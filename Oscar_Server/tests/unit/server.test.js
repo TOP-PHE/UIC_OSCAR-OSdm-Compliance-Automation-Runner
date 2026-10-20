@@ -392,6 +392,29 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #899: and the invalid purchaser probe in the booking where the purchaser goes only there.
+  test('a run\'s copy sends the invalid purchaser probe in the booking when the framework takes no purchaser after it', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [uuidv4(), companyId, colEncrypt(JSON.stringify({ purchaserAfterBooking: false }))]);
+    const stored = JSON.stringify({ scenarios: [{ code: 'A', bookingPurchaserMode: 'invalid' }, { code: 'B', bookingPurchaserMode: 'inline' }] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.body.scenarios.map((s) => s.bookingPurchaserMode)).toEqual(['invalid_at_booking', 'inline']);
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // #889: and each declared card's reduction rate on the passengers' cards.
   test('a run\'s copy writes the declared reduction rates on the passengers\' cards', async () => {
     const { companyId, slug } = seedCompanyUser();

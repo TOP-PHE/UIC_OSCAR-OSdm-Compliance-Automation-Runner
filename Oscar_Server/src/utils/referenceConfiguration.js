@@ -163,6 +163,7 @@ function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) 
   const modes = framework.placeSelection?.supportedModes;
   if (Array.isArray(modes)) framework.placeSelection.seatMap = modes.includes('SEATMAP_AT_OFFER');
   withPassengerUpdateScope(framework, answers);
+  withPurchaserTiming(framework, answers);
   // #887: A3.7, the reduction cards the provider accepts.
   const cards = require('./reductionCards').cardsFromChecklist(answers);
   if (cards) framework.reductionCards = cards;
@@ -189,6 +190,19 @@ function withPassengerUpdateScope(framework, answers) {
   delete framework.passengerUpdateScope;
   if (ticked === 'MAIN') framework.passengerUpdateScope = 'MAIN';
   if (ticked === 'NONE') framework.passengerUpdate = false;
+}
+
+/**
+ * #899: question A5.1 (`data.purchaser`, one tick) says when the provider
+ * takes the purchaser. AT_BOOKING (required in the booking) and NOT_NEEDED
+ * mean none after the booking (`purchaserAfterBooking: false`); LATER_ALLOWED
+ * is what an absent key says. No tick leaves the framework as it is.
+ */
+function withPurchaserTiming(framework, answers) {
+  const ticked = ['AT_BOOKING', 'LATER_ALLOWED', 'NOT_NEEDED'].find((code) => answers?.[`data.purchaser=${code}`] === true);
+  if (!ticked) return;
+  delete framework.purchaserAfterBooking;
+  if (ticked !== 'LATER_ALLOWED') framework.purchaserAfterBooking = false;
 }
 
 // ── Test Data ────────────────────────────────────────────────────────────────

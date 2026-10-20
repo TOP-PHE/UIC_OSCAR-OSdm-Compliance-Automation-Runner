@@ -14,8 +14,8 @@
  *   - A passenger update (PATCH) is refused when a value it sends is not
  *     valid: gender not in the OSDM list, a date of birth that is no date,
  *     an e-mail or phone number of the wrong form, an empty name.
- *   - A purchaser written (POST, PATCH) must have a first and a last name, and
- *     valid contact data.
+ *   - A purchaser written (POST, PATCH), or given in a booking (#899), must
+ *     have a first and a last name, and valid contact data.
  *   - The offers of a trip from `personChecks.requestedInformationFrom` ask
  *     for each passenger's date of birth and phone number
  *     (`requestedInformation`), and so does the booking while one is missing.
@@ -74,10 +74,14 @@ function checkPassengerPatch(body, provider) {
   if (body.detail !== undefined) checkDetail(body.detail, '/detail');
 }
 
-/** A purchaser written: names required, contact data valid. */
-function checkPurchaser(body, provider) {
+/**
+ * A purchaser written: names required, contact data valid. `at` is where the
+ * purchaser sits in the request: '' for …/purchaser, '/purchaser' in a
+ * booking (#899).
+ */
+function checkPurchaser(body, provider, at = '') {
   if (!provider.personChecks) return;
-  checkDetail(body?.detail, '/detail', { requireNames: true });
+  checkDetail(body?.detail, `${at}/detail`, { requireNames: true });
 }
 
 /** Whether the offers of these trips ask for requested information. */
