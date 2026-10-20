@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-20-card-rate-not-against-group-tariff",
+    "date": "October 20, 2026",
+    "tag": "Fix",
+    "title": "Reduction card rate no longer compared with a group tariff",
+    "summary": "When the offers without cards are a group tariff, the card holder is compared with a fellow passenger of the same offer.",
+    "content": "To check a reduction card's rate, OSCAR asks the same offers without cards. A provider may then offer a group tariff for all passengers, a different product: OSCAR compared the totals and reported a wrong rate. The card holder is now compared with a passenger of the same type without a card in the same offer, and only an offer of the same service class is used for the comparison."
+  },
+  {
     "id": "2026-10-20-refund-offers-counted-once",
     "date": "October 20, 2026",
     "tag": "Fix",

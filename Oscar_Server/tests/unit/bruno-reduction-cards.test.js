@@ -301,6 +301,57 @@ describe('#889: a declared reduction rate', () => {
     expect(told[1]).toMatchObject({ ok: false, level: 'warn', message: expect.stringMatching(/not all of one type: the rate is not checked/) });
   });
 
+  describe('#895: the answer without cards prices the passengers otherwise', () => {
+    // The real provider's 20/10 answers, in its own shape: no overallTravelClass,
+    // a service class; with the card each adult alone, without cards the
+    // cheapest second-class offer a group tariff for both.
+    const basic = { overallFlexibility: 'FULL_FLEXIBLE', overallServiceClass: { type: 'BASIC' } };
+    const best = { overallFlexibility: 'FULL_FLEXIBLE', overallServiceClass: { type: 'BEST' } };
+    const adults = [{ externalRef: '00001', type: 'ADULT', cards: [card('1')] }, { externalRef: '00002', type: 'ADULT' }];
+    const chosen = offerOf([part('00002', 47500), part('00001', 35600)], basic);
+    const group = { offerId: 'G', offerSummary: basic, passengerRefs: ['00001', '00002'], admissionOfferParts: [{ passengerRefs: ['00001', '00002'], price: price(94000) }] };
+    const firstClass = offerOf([part('00001', 69800), part('00002', 69800)], best);
+
+    test('the holder is compared with the adult without a card in the same offer: 356.00 against 475.00 is 25 % off', () => {
+      const checks = rc.comparePrices(chosen, { offers: [group, firstClass] }, adults, { '00001': 25 });
+      expect(checks.map((c) => [c.name, c.ok, c.level])).toEqual([[
+        'Reduction cards: passenger 00001 pays 25 % less than passenger 00002 (same type, no card) in the same offer — 35600 against 47500',
+        true, 'fail',
+      ]]);
+    });
+
+    test('a wrong price there fails; without a declared rate it must be cheaper', () => {
+      const wrong = offerOf([part('00002', 47500), part('00001', 41000)], basic);
+      expect(rc.comparePrices(wrong, { offers: [group] }, adults, { '00001': 25 })[0])
+        .toMatchObject({ ok: false, level: 'fail', message: '41000 with the card; 35625 expected (25 % off, within 475)' });
+      expect(rc.comparePrices(chosen, { offers: [group] }, adults, {})[0])
+        .toMatchObject({ ok: true, level: 'fail', name: expect.stringMatching(/^Reduction cards: passenger 00001 pays less than passenger 00002/) });
+    });
+
+    test('an offer of another service class is never the counterpart, and one pricing alone is preferred', () => {
+      const alone = offerOf([part('00001', 47500), part('00002', 47500)], basic);
+      const checks = rc.comparePrices(chosen, { offers: [firstClass, group, alone] }, adults, { '00001': 25 });
+      expect(checks.map((c) => [c.name, c.ok])).toEqual([
+        ['Reduction cards: passenger 00002, who holds no card, pays the same — 47500 and 47500', true],
+        ['Reduction cards: passenger 00001 pays 25 % less with the card — 35600 against 47500 without', true],
+      ]);
+    });
+
+    test('every passenger holds a card: nothing to compare with, an INFO line, never a failure', () => {
+      const both = adults.map((s) => ({ ...s, cards: [card('1')] }));
+      expect(rc.comparePrices(chosen, { offers: [group] }, both, { '00001': 25, '00002': 25 })).toEqual([{
+        name: 'Reduction cards: the answer without cards prices the passengers otherwise (another product); the card is not compared',
+        ok: true, level: 'info',
+      }]);
+    });
+
+    test('the totals message names each rate once ("P1 25 %", not "25 % %")', () => {
+      const both = (amount) => ({ offerId: 'T', offerSummary: basic, passengerRefs: ['00001', '00002'], admissionOfferParts: [{ passengerRefs: ['00001', '00002'], price: price(amount) }] });
+      const [, total] = rc.comparePrices(both(83100), { offers: [group] }, adults, { '00001': 25 });
+      expect(total.message).toBe('83100 with the card; 82250 expected (00001 25 % off, within 470)');
+    });
+  });
+
   test('01c reads the rates the parser kept, and a COLLECTIVE request is a group tariff', () => {
     envStore.offerPassengerSpecifications = JSON.stringify(specs);
     envStore.offer = offerOf([part('P1', 25130), part('P2', 35900)]);

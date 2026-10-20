@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.401",
+  "current_release": "2026.402",
   "releases": [
+    {
+      "release": "2026.402",
+      "date": "2026-10-20",
+      "server": "1.11.367",
+      "collection": "OTST_V2.0.202",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#895: a reduction card's rate is no longer compared with a group tariff. When the offers without cards price the passengers otherwise (a group tariff for all), the card holder is compared with a passenger of the same type without a card in the same offer; the counterpart must also have the same service class."
+      ]
+    },
     {
       "release": "2026.401",
       "date": "2026-10-20",

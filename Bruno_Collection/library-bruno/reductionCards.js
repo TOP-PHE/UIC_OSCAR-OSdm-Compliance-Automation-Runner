@@ -204,17 +204,37 @@ const toleranceFor = (without, holders, unit) => Math.max(unit * holders, Math.a
 /** The amount with a card of `percent`, from the amount without it. */
 const expectedWith = (without, percent) => without * (100 - percent) / 100;
 
+// #895: the service class too, when both offers name one (a provider may
+// give no overallTravelClass, and first class would then count as the same).
+const serviceClassOf = (offer) => offer?.offerSummary?.overallServiceClass?.type;
 const sameKind = (a, b) => a?.offerSummary?.overallFlexibility === b?.offerSummary?.overallFlexibility
-  && a?.offerSummary?.overallTravelClass === b?.offerSummary?.overallTravelClass;
+  && a?.offerSummary?.overallTravelClass === b?.offerSummary?.overallTravelClass
+  && (serviceClassOf(a) === undefined || serviceClassOf(b) === undefined || serviceClassOf(a) === serviceClassOf(b));
+
+// #895: both offers price the same passengers alone (each in an admission of
+// their own) and the others together.
+const alone = (offer, ref) => admissionsOf(offer).some((p) => refsOf(p).length === 1 && refsOf(p)[0] === ref);
+const sameSplit = (a, b, refs) => refs.every((ref) => alone(a, ref) === alone(b, ref));
+
+/**
+ * #895: the offer without cards to compare with: one of the same kind,
+ * preferably pricing the passengers as the chosen offer does.
+ */
+function counterpartOf(chosen, offers) {
+  const refs = Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : [];
+  const candidates = (Array.isArray(offers) ? offers : []).filter((o) => sameKind(o, chosen));
+  return candidates.find((o) => sameSplit(chosen, o, refs)) || candidates[0];
+}
 
 // The check of a card holder's price against its declared rate.
-function rateCheck(name, withCard, expected, tolerance, percent) {
+// `rates` names the rate(s) as text, the % included ("25 %", "P1 25 %").
+function rateCheck(name, withCard, expected, tolerance, rates) {
   const ok = Math.abs(withCard - expected) <= tolerance;
   return {
     name,
     ok,
     level: 'fail',
-    message: ok ? undefined : `${withCard} with the card; ${Math.round(expected)} expected (${percent} % off, within ${Math.round(tolerance)})`,
+    message: ok ? undefined : `${withCard} with the card; ${Math.round(expected)} expected (${rates} off, within ${Math.round(tolerance)})`,
   };
 }
 
@@ -254,7 +274,7 @@ function passengerCheck(chosen, counterpart, ref, carded, percent) {
     // #889: the provider declared the rate, so the amount is checked.
     return rateCheck(
       `Reduction cards: passenger ${ref} pays ${percent} % less with the card — ${withCard} against ${without} without`,
-      withCard, expectedWith(without, percent), toleranceFor(without, 1, unitOf(chosen)), percent,
+      withCard, expectedWith(without, percent), toleranceFor(without, 1, unitOf(chosen)), `${percent} %`,
     );
   }
   if (carded) {
@@ -278,6 +298,42 @@ function passengerCheck(chosen, counterpart, ref, carded, percent) {
 }
 
 /**
+ * #895: when the offer without cards prices the passengers otherwise than the
+ * chosen one (a group tariff for all, say), each card holder priced alone is
+ * compared with a passenger of the same type, without a card, priced alone in
+ * the chosen offer itself. Null when some card holder has no such passenger.
+ */
+function inOfferChecks(chosen, specs, withCards, declared) {
+  const list = Array.isArray(specs) ? specs : [];
+  const typeOf = (ref) => list.find((s) => s?.externalRef === ref)?.type;
+  const holders = [...withCards];
+  const out = [];
+  for (const ref of holders) {
+    const withCard = priceOf(chosen, ref);
+    const other = list.map((s) => s?.externalRef)
+      .find((o) => o && !withCards.has(o) && typeOf(o) === typeOf(ref) && priceOf(chosen, o) !== null);
+    if (withCard === null || !other) return null;
+    const without = priceOf(chosen, other);
+    const percent = declared[ref];
+    if (percent !== undefined) {
+      out.push(rateCheck(
+        `Reduction cards: passenger ${ref} pays ${percent} % less than passenger ${other} (same type, no card) in the same offer — ${withCard} against ${without}`,
+        withCard, expectedWith(without, percent), toleranceFor(without, 1, unitOf(chosen)), `${percent} %`,
+      ));
+    } else {
+      const cheaper = withCard < without;
+      out.push({
+        name: `Reduction cards: passenger ${ref} pays less than passenger ${other} (same type, no card) in the same offer — ${withCard} against ${without}`,
+        ok: cheaper,
+        level: cheaper ? 'fail' : 'warn',
+        message: cheaper ? undefined : `${withCard} with the card is not below ${without} without it (a commercial choice, not an OSDM rule)`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * The comparison of the chosen offer (with cards) with the offer of the same
  * flexibility and travel class in the answer without cards. A passenger with
  * a card must pay less; one without must pay the same (a warning only).
@@ -287,7 +343,7 @@ function passengerCheck(chosen, counterpart, ref, carded, percent) {
  */
 function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false } = {}) {
   const withCards = new Set(passengersWithCards(specs).map((p) => p.ref));
-  const counterpart = (Array.isArray(plainResponse?.offers) ? plainResponse.offers : []).find((o) => sameKind(o, chosen));
+  const counterpart = counterpartOf(chosen, plainResponse?.offers);
   if (!counterpart) {
     return [{
       name: 'Reduction cards: an offer of the same flexibility and travel class without cards to compare with',
@@ -302,6 +358,17 @@ function comparePrices(chosen, plainResponse, specs, rates = {}, { group = false
     out.push({ name: 'Reduction cards: the declared rate is not checked on a group tariff', ok: true, level: 'info' });
   }
   const refs = (Array.isArray(chosen?.passengerRefs) ? chosen.passengerRefs : []);
+  if (!sameSplit(chosen, counterpart, refs)) {
+    // #895: another way of pricing (a group tariff without cards): the
+    // totals say nothing of a card; compare within the chosen offer.
+    const inOffer = inOfferChecks(chosen, specs, withCards, declared);
+    if (inOffer) return [...out, ...inOffer];
+    return [...out, {
+      name: 'Reduction cards: the answer without cards prices the passengers otherwise (another product); the card is not compared',
+      ok: true,
+      level: 'info',
+    }];
+  }
   const unpriced = {};
   for (const ref of refs) {
     const check = passengerCheck(chosen, counterpart, ref, withCards.has(ref), declared[ref]);
