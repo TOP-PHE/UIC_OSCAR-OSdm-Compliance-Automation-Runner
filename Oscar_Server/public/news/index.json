@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-21-fare-offers",
+    "date": "October 21, 2026",
+    "tag": "New",
+    "title": "Fare offers for a section",
+    "summary": "A scenario can ask fare offers for a section of a trip, and OSCAR checks the fares.",
+    "content": "In Test Config, a scenario now has a fare section (start and end stop place), \"Part of an international trip\" and a fare cluster. With FARE_ADMISSION in the requested offer parts, the offer step asks the provider for fares on that section and checks them: a fare for every passenger, the section covered without a gap, the members OSDM requires, the clusters and validity. Booking fares comes in a later release; for now a fare scenario ends after the offer step."
+  },
+  {
     "id": "2026-10-20-share-runs-with-provider-pages",
     "date": "October 20, 2026",
     "tag": "New",

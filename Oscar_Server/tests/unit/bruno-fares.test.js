@@ -1,0 +1,225 @@
+'use strict';
+
+/**
+ * bruno-fares.test.js — the fare checks of step 01 (#903).
+ *
+ * The answers come from the OSDM simulator itself (gamma, OSDM 3.8): its
+ * normal fares pass every check, and each of its wrong variants fails
+ * exactly the check it is made for, and no other.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const fares = require('../../../Bruno_Collection/library-bruno/fares.js');
+const { buildOfferCollection } = require('../../../OSDM_Simulator/src/osdm/offers');
+const { loadProviders } = require('../../../OSDM_Simulator/src/config');
+
+const ROOT = path.join(__dirname, '..', '..', '..');
+const providers = loadProviders(path.join(ROOT, 'OSDM_Simulator', 'providers'));
+const NOW = Date.parse('2026-11-02T09:00:00Z');
+const station = (code) => ({ objectType: 'StopPlaceRef', stopPlaceRef: `urn:uic:stn:${code}` });
+const ADULT = { externalRef: '00001', type: 'PERSON', dateOfBirth: '1990-01-15' };
+const SECOND = { externalRef: '00002', type: 'PERSON', dateOfBirth: '1985-06-01' };
+const CHILD = { externalRef: '00003', type: 'PERSON', dateOfBirth: '2023-03-01' };
+
+function request({ start = '0000001', parts = ['FARE_ADMISSION'], passengers = [ADULT, SECOND] } = {}) {
+  return {
+    tripSpecifications: [{
+      isPartOfInternationalTrip: true,
+      legs: [{ timedLeg: {
+        start: { stopPlaceRef: station('0000001'), serviceDeparture: { timetabledTime: '2026-11-20T08:00:00+01:00' } },
+        end: { stopPlaceRef: station('0000002'), serviceArrival: { timetabledTime: '2026-11-20T11:00:00+01:00' } },
+        service: { vehicleNumbers: ['1001'] },
+      } }],
+    }],
+    requestedSections: [{ startPlace: station(start), endPlace: station('0000002') }],
+    offerSearchCriteria: { requestedOfferParts: parts },
+    anonymousPassengerSpecifications: passengers,
+  };
+}
+
+const answer = (req) => buildOfferCollection(req, providers.get('gamma'), NOW).response;
+const failing = (checks) => checks.filter((c) => !c.ok).map((c) => `${c.id} ${c.level}`).sort();
+const run = (req) => failing(fares.fareChecks(answer(req), req, { travelDay: '2026-11-20' }));
+
+describe('fare checks on the simulator\'s answers', () => {
+  test('normal fares, with a free child, pass every check', () => {
+    expect(run(request({ passengers: [ADULT, SECOND, CHILD] }))).toEqual([]);
+  });
+
+  test.each([
+    ['0000080', 'a passenger without a fare', ['O7 FAIL']],
+    ['0000081', 'a cluster outside the list', ['O10 WARNING']],
+    ['0000082', 'allowed clusters wider than the reference', ['O11 WARNING']],
+    ['0000083', 'a gap in the section', ['O8 FAIL']],
+    ['0000084', 'overlapping fares', ['O8 WARNING']],
+  ])('variant %s (%s) fails exactly %j', (start, _what, expected) => {
+    expect(run(request({ start }))).toEqual(expected);
+  });
+
+  test('fares that were not asked fail O14; asked ones do not', () => {
+    const req = request({ start: '0000085', parts: ['ADMISSION'] });
+    expect(fares.unaskedFaresCheck(answer(req), req)).toMatchObject({ id: 'O14', ok: false });
+    const asked = request();
+    expect(fares.unaskedFaresCheck(answer(asked), asked)).toBeNull();
+    const none = request({ parts: ['ADMISSION'] });
+    expect(fares.unaskedFaresCheck(answer(none), none)).toMatchObject({ ok: true });
+  });
+
+  test('no fare offer at all fails O1 and stops there', () => {
+    const req = request();
+    const checks = fares.fareChecks({ offers: [] }, req);
+    expect(checks.map((c) => c.id)).toEqual(['O1']);
+    expect(checks[0].ok).toBe(false);
+  });
+});
+
+describe('fare checks on hand-made answers', () => {
+  const req = request({ passengers: [ADULT] });
+  const base = () => answer(req);
+  const firstFare = (body) => body.offers.find((o) => o.fares).fares[0];
+
+  test('a missing required member, a type not asked, a negative price', () => {
+    const body = base();
+    delete firstFare(body).travelClass;
+    expect(run2(body)).toContain('O2 FAIL');
+    const typed = base();
+    firstFare(typed).type = 'RESERVATION';
+    expect(run2(typed)).toContain('O3 FAIL');
+    const neg = base();
+    firstFare(neg).prices[0].amount = -1;
+    expect(run2(neg)).toContain('O13 FAIL');
+  });
+
+  test('regional validities, after-sales conditions, validity range, TCOs, combination model', () => {
+    const cases = [
+      [(f) => { f.regionalConstraint.regionalValidities = []; }, 'O4 FAIL'],
+      [(f) => { f.regionalConstraint.regionalValidities = [{ seqNb: 1 }]; }, 'O4 WARNING'],
+      [(f) => { f.afterSalesCondition.conditions = []; }, 'O5 FAIL'],
+      [(f) => { delete f.travelValidityConstraint.validityRange; }, 'O6 FAIL'],
+      [(f) => { f.travelValidityConstraint.validTravelDates = { from: '2026-12-01T00:00:00Z', until: '2026-12-02T00:00:00Z' }; }, 'O6 WARNING'],
+      [(f) => { delete f.involvedTCOs; }, 'O12 WARNING'],
+      [(f) => { f.combinationConstraint[0].model = 'CLUSTER'; }, 'O9 WARNING'],
+      [(f) => { delete f.coveredSection; }, 'O8 WARNING'],
+    ];
+    for (const [change, expected] of cases) {
+      const body = base();
+      change(firstFare(body));
+      expect(run2(body)).toEqual([expected]);
+    }
+  });
+
+  test('without coveredSection, the entry and exit connection points say what a fare covers', () => {
+    const body = base();
+    for (const offer of body.offers.filter((o) => o.fares)) {
+      for (const f of offer.fares) {
+        delete f.coveredSection;
+        f.regionalConstraint.exitConnectionPoint = { objectType: 'FareConnectionPoint', id: 'x', stationSets: [{ stations: [station('2')] }] };
+      }
+    }
+    expect(run2(body)).toEqual([]);
+  });
+
+  function run2(body) {
+    return failing(fares.fareChecks(body, req, { travelDay: '2026-11-20' }));
+  }
+});
+
+describe('the pure helpers', () => {
+  test('asksFares and the types asked', () => {
+    expect(fares.asksFares({ offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } })).toBe(true);
+    expect(fares.asksFares({ offerSearchCriteria: { requestedOfferParts: ['ALL'] } })).toBe(true);
+    expect(fares.asksFares({ offerSearchCriteria: { requestedOfferParts: ['ADMISSION'] } })).toBe(false);
+    expect(fares.asksFares({})).toBe(false);
+    expect(fares.typesAsked({ offerSearchCriteria: { requestedOfferParts: ['ALL'] } })).toEqual(['ADMISSION', 'RESERVATION', 'ANCILLARY']);
+  });
+
+  test('the coverage walk: covered, gap, overlap, unknown; stations compared without leading zeros', () => {
+    const fare = (a, b) => ({ coveredSection: { startPlace: station(a), endPlace: station(b) } });
+    const section = { start: 'urn:uic:stn:0000001', end: 'urn:uic:stn:0000003' };
+    expect(fares.coverageOfPassenger([fare('1', '2'), fare('0000002', '3')], section)).toBe('covered');
+    expect(fares.coverageOfPassenger([fare('1', '2')], section)).toBe('gap');
+    expect(fares.coverageOfPassenger([fare('1', '3'), fare('1', '2')], section)).toBe('overlap');
+    expect(fares.coverageOfPassenger([{}], section)).toBe('unknown');
+  });
+
+  test('chooseFareOffer takes the cluster asked, else the first fare offer', () => {
+    const body = answer(request());
+    expect(fares.chooseFareOffer(body, 'SEMI_FLEX').fares[0].combinationConstraint[0].referenceCluster).toBe('SEMI_FLEX');
+    expect(fares.chooseFareOffer(body, null).fares[0].combinationConstraint[0].referenceCluster).toBe('FULL_FLEX');
+    expect(fares.chooseFareOffer(body, 'PROMO')).toBeNull();
+  });
+
+  test('productOffersOf leaves fare-only offers out', () => {
+    const body = answer(request());
+    expect(fares.productOffersOf(body).every((o) => !o.fares)).toBe(true);
+    expect(fares.productOffersOf(body).length).toBeGreaterThan(0);
+  });
+
+  test('fareFieldsOf reads a scenario', () => {
+    expect(fares.fareFieldsOf({
+      requestedSections: [{ startPlace: '8000001', endPlace: 'urn:uic:stn:8500010' }, { startPlace: 'x', endPlace: '' }],
+      isPartOfInternationalTrip: 'true', desiredFareCluster: 'semi_flex', bookMode: 'fare',
+    })).toEqual({
+      requestedSections: [{ startPlace: station('8000001'), endPlace: station('8500010') }],
+      isPartOfInternationalTrip: true, desiredFareCluster: 'SEMI_FLEX', bookMode: 'FARE',
+    });
+    expect(fares.fareFieldsOf({})).toEqual({ requestedSections: [], isPartOfInternationalTrip: null, desiredFareCluster: null, bookMode: null });
+  });
+});
+
+describe('the wiring', () => {
+  const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+
+  test('01 checks fares after the status check and before the product checks, and ends a fare scenario', () => {
+    const yml = read('Bruno_Collection/02-Common Requests/01. POST Get Offer.yml');
+    const fareAt = yml.indexOf('fares.js").checkFareOffers(jsonData)');
+    expect(fareAt).toBeGreaterThan(yml.indexOf('Stop flow if status != 200'));
+    expect(fareAt).toBeLessThan(yml.indexOf('postOfferResponse(jsonData);'));
+  });
+
+  test('the request carries the sections, the trip specification the flag', () => {
+    expect(read('Bruno_Collection/library-bruno/requestsBuilder.js')).toContain('body.requestedSections = requestedSections');
+    expect(read('Bruno_Collection/library-bruno/scenarioParser.js')).toContain('tripSpecification.isPartOfInternationalTrip =');
+  });
+
+  test('both reset lists name the new variables', () => {
+    for (const file of ['Bruno_Collection/opencollection.yml', 'Bruno_Collection/library-bruno/scenarioParser.js']) {
+      const text = read(file);
+      for (const v of ['requestedSections', 'isPartOfInternationalTrip', 'desiredFareCluster', 'bookMode', 'fareOfferId']) {
+        expect(text).toContain(`"${v}"`);
+      }
+    }
+  });
+});
+
+describe('the Test Config fields (#903)', () => {
+  const vm = require('vm');
+  const src = fs.readFileSync(path.join(ROOT, 'Oscar_Server/public/js/scenarios.js'), 'utf8');
+  const lift = (name, context = {}) => {
+    const lines = src.split('\n');
+    const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
+    const end = lines.findIndex((l, i) => i > start && l === '}');
+    return vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n')})`, context);
+  };
+  const requestedSectionOf = lift('requestedSectionOf');
+  const withRequestedSection = lift('withRequestedSection', { requestedSectionOf });
+
+  test('one end typed keeps the other; both empty removes the section; later sections stay', () => {
+    expect(withRequestedSection({}, 'startPlace', ' 8000001 ')).toEqual([{ startPlace: '8000001', endPlace: '' }]);
+    const one = { requestedSections: [{ startPlace: '8000001', endPlace: '' }] };
+    expect(withRequestedSection(one, 'endPlace', '8500010')).toEqual([{ startPlace: '8000001', endPlace: '8500010' }]);
+    expect(withRequestedSection(one, 'startPlace', '')).toBeNull();
+    const two = { requestedSections: [{ startPlace: 'a', endPlace: '' }, { startPlace: 'c', endPlace: 'd' }] };
+    expect(withRequestedSection(two, 'startPlace', '')).toEqual([{ startPlace: 'c', endPlace: 'd' }]);
+    expect(requestedSectionOf({ requestedSections: null })).toEqual({ startPlace: '', endPlace: '' });
+  });
+
+  test('the fields are drawn, the input handled before the switch, the flag shown when stored as a boolean', () => {
+    expect(src).toContain('${buildFareFields(idx)}');
+    expect(src).toContain("if (inputRequestedSection(action, el)) return;\n\n  switch (action) {");
+    expect(src).toContain('String(optionValue(val)) === String(optionValue(o))');
+    const access = require(path.join(ROOT, 'Oscar_Server/public/js/scenario-access.js'));
+    expect(access.READ_ONLY_CARD_ACTIONS).not.toContain('set-scenario-section');
+  });
+});

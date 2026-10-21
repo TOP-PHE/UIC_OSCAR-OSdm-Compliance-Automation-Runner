@@ -118,7 +118,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults", "requestedSections", "isPartOfInternationalTrip", "desiredFareCluster", "bookMode", "fareOfferId",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -755,6 +755,13 @@ function parseScenarioData(jsonData) {
       //  : null;
       validationLogger(`[INFO] 📋 Scenario selected: "${scenario.code}" ; Scenario Type: "${bru.getEnvVar("scenarioType")}" ; Scenario Action: "${bru.getEnvVar("scenarioAction")}" ; OSDM version: "${bru.getEnvVar("osdmVersion")}"`);
       bru.setEnvVar("desiredFlexibility", ["", "null"].includes(scenario.desiredFlexibility) ? null : scenario.desiredFlexibility);
+      // #903: fares — the section of the trip the provider prices, the
+      // international flag of a trip specification, the cluster to book.
+      const _fareFields = require('./fares.js').fareFieldsOf(scenario);
+      bru.setEnvVar("requestedSections", _fareFields.requestedSections.length ? JSON.stringify(_fareFields.requestedSections) : null);
+      bru.setEnvVar("isPartOfInternationalTrip", _fareFields.isPartOfInternationalTrip === null ? null : String(_fareFields.isPartOfInternationalTrip));
+      bru.setEnvVar("desiredFareCluster", _fareFields.desiredFareCluster);
+      bru.setEnvVar("bookMode", _fareFields.bookMode);
       bru.setEnvVar("accommodationSelection", ["", "null"].includes(scenario.accommodationSelection) ? null : scenario.accommodationSelection);
       // #211 — desired gender-segregated placeProperties value (MEN/LADIES/MIXED)
       // for COUCHETTE/BERTH night-train compartments. Sibling of accommodationSelection.
@@ -1730,6 +1737,10 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
 
   // Return trip (#176, #594): the inbound date, from the first leg's departure.
   applyReturnOpts(tripSpecification, returnOpts, outboundStartDateTime);
+  // #903: the trip is part of an international trip (OSDM: for VAT). Sent
+  // only when the scenario says so, either way.
+  const _international = bru.getEnvVar("isPartOfInternationalTrip");
+  if (_international === "true" || _international === "false") tripSpecification.isPartOfInternationalTrip = _international === "true";
 
   bru.setEnvVar("offerTripSpecifications", JSON.stringify([tripSpecification]));
 }

@@ -47,6 +47,7 @@ const persons = require('./persons');
 const ticketing = require('./ticketing');
 const { horizonProblem } = require('./salesHorizon');
 const ageTariffs = require('./ageTariffs');
+const { fareOffersOf } = require('./fares');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -779,10 +780,15 @@ function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const { remembered } = built;
   applyStopPlaceVariants(trips, provider, built.offers, remembered);
   // #780: offers asked by product tag or product code.
-  const { offers, problems: productProblems } = selectProducts(criteria, built.offers);
+  const { offers: productOffers, problems: productProblems } = selectProducts(criteria, built.offers);
+  // #903: fare offers for a requested section, next to the product offers.
+  const fareOffers = beyondHorizon ? [] : fareOffersOf({
+    body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS,
+  });
+  const offers = [...productOffers, ...fareOffers];
   const allTrips = [...outboundTrips, ...trips];
   const problems = [...problemsOf(passengers, built.offers, collective, refusals), ...productProblems];
-  const partsIgnored = offerPartsIgnored(criteria);
+  const partsIgnored = fareOffers.length > 0 ? null : offerPartsIgnored(criteria);
   if (partsIgnored) problems.push(partsIgnored);
   if (beyondHorizon) problems.push(beyondHorizon);
   const response = { anonymousPassengerSpecifications: passengers, trips: allTrips, offers };

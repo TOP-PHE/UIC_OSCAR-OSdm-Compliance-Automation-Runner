@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.372] / [collection-OTST_V2.0.205] — 2026-10-21
+
+Issue #903, fares phase 1a, release 2026.407. Simulator 0.43.0.
+
+### Simulator 0.43.0
+- **Fare offers for a requested section.** Asked for `FARE_ADMISSION` (or `ALL`) with `requestedSections`, a provider with `fares` in its profile (all four) answers, next to its product offers, one offer per fare cluster of its profile (FULL_FLEX, SEMI_FLEX, NON_FLEX): one fare per passenger for the section, OSDM 3.8 `Fare` shapes (regional constraint with an entry connection point and a route, after-sales conditions, CLUSTERING combination, validity, TCOs, the section covered). A passenger under `freeUnderAge` (6) travels free: a fare priced 0. A section that is not valid, or an `isPartOfInternationalTrip` that is not a boolean, is refused (400).
+- Six wrong variants, chosen by the section's start station (`0000080`–`0000085`): a passenger without a fare, a cluster outside OSDM's list, allowed clusters more flexible than the reference one, a gap, an overlap, fares not asked.
+- Below 3.8 `isProviderFee` is left out, below 3.7 `routeSummary`.
+
+### Added
+- **Fare offers in a scenario.** New scenario fields: `requestedSections` (start and end stop place), `isPartOfInternationalTrip`, `desiredFareCluster`, `bookMode`; Test Config shows them under the scenario's parameters, the stop places with the place lookup. The offer request carries the sections, the trip specification the flag; `FARE_ADMISSION` in the requested offer parts asks the fares.
+- **Step 01 checks the fares** (`library-bruno/fares.js`), one check per rule over all fares: an offer holds fares; each fare has the members OSDM requires and `passengerRefs`, a type asked, regional validities, after-sales conditions, a validity range, no negative price; every passenger has a fare in each fare offer and their fares cover the section (a gap fails, an overlap is a WARNING). WARNINGs: a CLUSTERING cluster outside OSDM's five, an allowed cluster more flexible than the reference one, no TCO named, a validity that misses the travel day. Fares the request did not ask for fail. The fare offer of `desiredFareCluster` is chosen (none offered fails); booking fares comes with #906, so a fare scenario ends after step 01. Product offers next to fare offers are checked as before.
+- Simulator data file: `SIM_FARE_SPEC_1ADT_38`, `SIM_FARE_SPEC_FREE_CHILD_38` (run list) and six `SIM_WRONG_FARE_*_38` (not in it), on a new two-leg trip specification.
+
+Checked:
+- `bruno-fares.test.js` (the checks on the simulator's own answers: normal fares pass, each wrong variant fails exactly its rule; hand-made answers; the Test Config helpers), the simulator's `fares.test.js` (shapes conform to each provider's OSDM version) and `datafile.test.js`.
+- The real collection standalone on the simulator (gamma): `SIM_FARE_SPEC_1ADT_38` 81 checks and `SIM_FARE_SPEC_FREE_CHILD_38` 80, none failed; each wrong scenario fails or warns on its own rule only (O7, O8 gap, O14 fail; O8 overlap, O10, O11 warn).
+
+---
+
 ## [server-1.11.371] / [collection-OTST_V2.0.204] — 2026-10-20
 
 Issue #901 PR 2, release 2026.406. Pages only; the routes came in 1.11.370.

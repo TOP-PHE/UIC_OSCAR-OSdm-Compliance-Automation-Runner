@@ -1,0 +1,388 @@
+/*
+Copyright UIC, Union Internationale des Chemins de fer
+Licensed under the Apache License, Version 2.0 (the "License");
+http://www.apache.org/licenses/LICENSE-2.0
+*/
+
+'use strict';
+
+/**
+ * fares.js — fare offers for a requested section (#903, fares phase 1a).
+ *
+ * A scenario that asks for `FARE_*` sends a trip and the section of it the
+ * provider prices (`requestedSections`). Step 01 then checks the fares of
+ * the answer (`offers[].fares[]`), one check per rule over every fare offer,
+ * naming each place that breaks it:
+ *
+ *   O1  an offer holds fares                                  FAIL
+ *   O2  each fare has the members OSDM requires               FAIL
+ *   O3  its type is one asked (ADMISSION for FARE_ADMISSION)  FAIL
+ *   O4  regional validities (each a zone, route, …)           FAIL / WARNING
+ *   O5  after-sales conditions; isProviderFee logged          FAIL / INFO
+ *   O6  a validity range; the travel day within the dates     FAIL / WARNING
+ *   O7  every passenger in a fare of each offer               FAIL
+ *   O8  each passenger's fares cover the section: gap, overlap FAIL / WARNING
+ *   O9  combination model of the YAML list                    WARNING
+ *   O10 CLUSTERING: reference and allowed clusters listed     WARNING
+ *   O11 CLUSTERING: none allowed more flexible                WARNING
+ *   O12 involvedTCOs present                                  WARNING
+ *   O13 no negative price                                     FAIL
+ *   O14 fares that were not asked                             FAIL
+ *   O15 products and fares counted                            INFO
+ *
+ * Booking a fare is phase 2 (#906): until then a fare scenario ends after
+ * step 01. Sources and levels are in #903 and #242.
+ *
+ * The pure part has no Bruno globals; the glue at the bottom has.
+ */
+
+const { sameStopPlace } = require('./returnJourney.js');
+
+// The clusters of OSDM's "constructing products from fares", most flexible first.
+const CLUSTERS = ['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO'];
+// FareCombinationModel.model, as the YAML spells it (no code list exists).
+const COMBINATION_MODELS = ['SEPARATE_TICKET', 'SEPARATE_CONTRACT', 'CLUSTERING', 'COMBINING'];
+const FARE_TYPES = ['ADMISSION', 'RESERVATION', 'ANCILLARY'];
+const TYPE_OF_PART = { FARE_ADMISSION: 'ADMISSION', FARE_RESERVATION: 'RESERVATION', FARE_ANCILLARY: 'ANCILLARY' };
+const REGIONAL_KINDS = ['zone', 'route', 'trainLink', 'line', 'polygon'];
+// Fare.required (OSDM 3.8), and passengerRefs, which the wiki scenario asks for (#903 O2).
+const REQUIRED = ['id', 'type', 'prices', 'regionalConstraint', 'travelClass', 'afterSalesCondition', 'combinationConstraint', 'travelValidityConstraint', 'passengerRefs'];
+const NON_EMPTY = new Set(['prices', 'combinationConstraint', 'passengerRefs']);
+const MAX_LISTED = 5;
+
+const list = (v) => (Array.isArray(v) ? v.filter((x) => x != null) : []);
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const stationOf = (place) => (isObject(place) ? place.stopPlaceRef || place.id || null : null);
+
+/** The offer parts a request asks for, [] when it names none. */
+const partsOf = (request) => list(request?.offerSearchCriteria?.requestedOfferParts);
+
+/** Does the request ask for fares? */
+function asksFares(request) {
+  return partsOf(request).some((p) => p === 'ALL' || String(p).startsWith('FARE_'));
+}
+
+/** The fare types the request asks for: the three for ALL. */
+function typesAsked(request) {
+  const parts = partsOf(request);
+  if (parts.includes('ALL')) return [...FARE_TYPES];
+  return parts.map((p) => TYPE_OF_PART[p]).filter(Boolean);
+}
+
+/** Every (offer, fare) of the answer, with a path for messages. */
+function faresOf(response) {
+  return list(response?.offers).flatMap((offer, i) => list(offer.fares).map((fare, j) => ({
+    offer, fare, path: `offers[${i}].fares[${j}]`,
+  })));
+}
+
+const fareOffersOf = (response) => list(response?.offers).filter((o) => list(o.fares).length > 0);
+
+// One check over many places: ok when none breaks the rule.
+function check(id, level, title, broken, explain) {
+  const shown = broken.slice(0, MAX_LISTED).join('; ');
+  const more = broken.length > MAX_LISTED ? ` and ${broken.length - MAX_LISTED} more` : '';
+  return { id, level, title, ok: broken.length === 0, message: broken.length ? `${explain}: ${shown}${more}` : '' };
+}
+
+function missingMembers(fare) {
+  return REQUIRED.filter((key) => {
+    const v = fare?.[key];
+    if (v === undefined || v === null || v === '') return true;
+    return NON_EMPTY.has(key) && (!Array.isArray(v) || v.length === 0);
+  });
+}
+
+function regionalIssues(all) {
+  const noList = [];
+  const emptyItems = [];
+  for (const { fare, path } of all) {
+    const validities = fare?.regionalConstraint?.regionalValidities;
+    if (!Array.isArray(validities) || validities.length === 0) { noList.push(path); continue; }
+    validities.forEach((item, k) => {
+      if (!REGIONAL_KINDS.some((kind) => item?.[kind] != null)) emptyItems.push(`${path}.regionalConstraint.regionalValidities[${k}]`);
+    });
+  }
+  return { noList, emptyItems };
+}
+
+// The travel day within validTravelDates (from/until), when both are given.
+function dayOutside(fare, travelDay) {
+  const dates = fare?.travelValidityConstraint?.validTravelDates;
+  if (!travelDay || !isObject(dates) || !dates.from || !dates.until) return false;
+  const day = String(travelDay).slice(0, 10);
+  return day < String(dates.from).slice(0, 10) || day > String(dates.until).slice(0, 10);
+}
+
+// The [start, end] stations a fare covers: its coveredSection, else its entry
+// and exit connection points. null when neither says.
+function coveredOf(fare) {
+  const section = fare?.coveredSection;
+  if (isObject(section) && stationOf(section.startPlace) && stationOf(section.endPlace)) {
+    return { start: [stationOf(section.startPlace)], end: [stationOf(section.endPlace)] };
+  }
+  const points = (cp) => list(cp?.stationSets).flatMap((set) => list(set.stations).map(stationOf)).filter(Boolean);
+  const start = points(fare?.regionalConstraint?.entryConnectionPoint);
+  const end = points(fare?.regionalConstraint?.exitConnectionPoint);
+  return start.length && end.length ? { start, end } : null;
+}
+
+const among = (station, stations) => stations.some((s) => sameStopPlace(s, station));
+
+/**
+ * How one passenger's fares cover the section: 'covered', 'gap', 'overlap'
+ * (covered, with fares left over) or 'unknown' (a fare that does not say
+ * what it covers). From the section's start, each step takes a fare starting
+ * where the last one ended, one reaching the end first.
+ */
+function coverageOfPassenger(fares, section) {
+  const spans = fares.map(coveredOf);
+  if (spans.some((s) => s === null)) return 'unknown';
+  const left = [...spans];
+  let at = section.start;
+  for (let steps = 0; steps <= spans.length; steps++) {
+    if (sameStopPlace(at, section.end)) return left.length ? 'overlap' : 'covered';
+    const from = left.filter((s) => among(at, s.start));
+    if (from.length === 0) return 'gap';
+    const next = from.find((s) => among(section.end, s.end)) || from[0];
+    left.splice(left.indexOf(next), 1);
+    at = next.end[0];
+  }
+  return 'gap';
+}
+
+function sectionOf(request) {
+  const first = list(request?.requestedSections)[0];
+  const start = stationOf(first?.startPlace);
+  const end = stationOf(first?.endPlace);
+  return start && end ? { start, end } : null;
+}
+
+// O7, O8: per offer, each passenger's fares.
+function passengerChecks(response, request) {
+  const passengers = list(request?.anonymousPassengerSpecifications).map((p) => p.externalRef).filter(Boolean);
+  const section = sectionOf(request);
+  const withoutFare = [];
+  const gaps = [];
+  const overlaps = [];
+  const unknown = [];
+  list(response?.offers).forEach((offer, i) => {
+    const fares = list(offer.fares);
+    if (fares.length === 0) return;
+    for (const ref of passengers) {
+      const own = fares.filter((f) => list(f.passengerRefs).includes(ref));
+      if (own.length === 0) { withoutFare.push(`passenger ${ref} in offers[${i}]`); continue; }
+      if (!section) continue;
+      const how = coverageOfPassenger(own, section);
+      if (how === 'gap') gaps.push(`passenger ${ref} in offers[${i}]`);
+      if (how === 'overlap') overlaps.push(`passenger ${ref} in offers[${i}]`);
+      if (how === 'unknown') unknown.push(`passenger ${ref} in offers[${i}]`);
+    }
+  });
+  return { withoutFare, gaps, overlaps, unknown, section };
+}
+
+// O9 to O11: the combination constraints.
+function combinationIssues(all) {
+  const models = [];
+  const reference = [];
+  const allowed = [];
+  const wider = [];
+  for (const { fare, path } of all) {
+    list(fare?.combinationConstraint).forEach((c, k) => {
+      const at = `${path}.combinationConstraint[${k}]`;
+      if (!COMBINATION_MODELS.includes(c?.model)) models.push(`${at}.model = ${JSON.stringify(c?.model)}`);
+      if (c?.model !== 'CLUSTERING') return;
+      if (!CLUSTERS.includes(c.referenceCluster)) reference.push(`${at}.referenceCluster = ${JSON.stringify(c.referenceCluster)}`);
+      const outside = list(c.allowedClusters).filter((x) => !CLUSTERS.includes(x));
+      if (outside.length) allowed.push(`${at}.allowedClusters holds ${outside.join(', ')}`);
+      const rank = CLUSTERS.indexOf(c.referenceCluster);
+      const more = rank < 0 ? [] : list(c.allowedClusters).filter((x) => CLUSTERS.includes(x) && CLUSTERS.indexOf(x) < rank);
+      if (more.length) wider.push(`${at} (${c.referenceCluster}) allows ${more.join(', ')}`);
+    });
+  }
+  return { models, reference, allowed, wider };
+}
+
+function negativePrices(all) {
+  return all.flatMap(({ fare, path }) => list(fare?.prices)
+    .map((p, k) => ({ p, k }))
+    .filter(({ p }) => Number(p?.amount) < 0)
+    .map(({ p, k }) => `${path}.prices[${k}].amount = ${p.amount}`));
+}
+
+/**
+ * The checks of the fares of an answer to a request that asks for them
+ * (O1 to O13, O15). Each: { id, level: FAIL | WARNING | INFO, title, ok, message }.
+ */
+function fareChecks(response, request, { travelDay } = {}) {
+  const all = faresOf(response);
+  const out = [];
+  const offers = fareOffersOf(response);
+  out.push(check('O1', 'FAIL', 'At least one offer holds fares (offers[].fares)', offers.length ? [] : ['no offer'],
+    'the request asks for fares and names a section, but no offer holds any'));
+  if (offers.length === 0) return out;
+  out.push(check('O2', 'FAIL', 'Each fare has the members OSDM requires (Fare.required, passengerRefs)',
+    all.map(({ fare, path }) => ({ path, missing: missingMembers(fare) })).filter((x) => x.missing.length).map((x) => `${x.path} lacks ${x.missing.join(', ')}`),
+    'members missing or empty'));
+  const types = typesAsked(request);
+  out.push(check('O3', 'FAIL', `Each fare is of a type asked (${types.join(', ') || 'none'})`,
+    all.filter(({ fare }) => !types.includes(fare?.type)).map(({ fare, path }) => `${path}.type = ${JSON.stringify(fare?.type)}`),
+    `fare types outside ${types.join(' / ')} (OSDM allows no provider-specific value here, #242 D2)`));
+  const regional = regionalIssues(all);
+  out.push(check('O4', 'FAIL', 'Each fare has regional validities (regionalConstraint.regionalValidities)', regional.noList, 'no regional validity'));
+  out.push(check('O4', 'WARNING', 'Each regional validity names a zone, route, train link, line or polygon', regional.emptyItems, 'an empty regional validity'));
+  out.push(check('O5', 'FAIL', 'Each fare has after-sales conditions (afterSalesCondition.conditions)',
+    all.filter(({ fare }) => list(fare?.afterSalesCondition?.conditions).length === 0).map(({ path }) => path), 'no after-sales condition'));
+  const providerFee = all.filter(({ fare }) => fare?.afterSalesCondition?.isProviderFee === true).length;
+  out.push({ id: 'O5', level: 'INFO', title: 'After-sales fees attributed to the provider (isProviderFee)', ok: true,
+    message: `${providerFee} of ${all.length} fare(s) say the after-sales fees are the provider's` });
+  out.push(check('O6', 'FAIL', 'Each fare has a validity range (travelValidityConstraint.validityRange)',
+    all.filter(({ fare }) => !isObject(fare?.travelValidityConstraint?.validityRange)).map(({ path }) => path), 'no validity range'));
+  out.push(check('O6', 'WARNING', 'The travel day lies within each fare\'s valid travel dates',
+    all.filter(({ fare }) => dayOutside(fare, travelDay)).map(({ path }) => path), `the travel day ${String(travelDay || '').slice(0, 10)} is outside the valid travel dates`));
+  const pax = passengerChecks(response, request);
+  out.push(check('O7', 'FAIL', 'Every passenger has a fare in each fare offer (a free one priced 0)', pax.withoutFare, 'passengers without a fare'));
+  if (pax.section) {
+    out.push(check('O8', 'FAIL', 'Each passenger\'s fares cover the requested section without a gap', pax.gaps,
+      `fares that leave part of the section ${pax.section.start} - ${pax.section.end} uncovered`));
+    out.push(check('O8', 'WARNING', 'Each passenger\'s fares do not overlap', pax.overlaps, 'fares covering a part of the section twice'));
+    out.push(check('O8', 'WARNING', 'Each fare says what it covers (coveredSection, else entry and exit connection points)', pax.unknown,
+      'the coverage of the section cannot be checked'));
+  }
+  const combination = combinationIssues(all);
+  out.push(check('O9', 'WARNING', 'Each combination model is one of the YAML list (SEPARATE_TICKET, SEPARATE_CONTRACT, CLUSTERING, COMBINING)', combination.models, 'models outside the list'));
+  out.push(check('O10', 'WARNING', 'CLUSTERING: the reference cluster is one of BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO', combination.reference, 'reference clusters outside the list'));
+  out.push(check('O10', 'WARNING', 'CLUSTERING: the allowed clusters are from the same list', combination.allowed, 'allowed clusters outside the list'));
+  out.push(check('O11', 'WARNING', 'CLUSTERING: no allowed cluster is more flexible than the reference one', combination.wider, 'allowed clusters more flexible than the reference'));
+  out.push(check('O12', 'WARNING', 'Each fare names the TCOs involved (involvedTCOs)',
+    all.filter(({ fare }) => list(fare?.involvedTCOs).length === 0).map(({ path }) => path), 'no involvedTCOs'));
+  out.push(check('O13', 'FAIL', 'No fare price is negative', negativePrices(all), 'negative prices'));
+  out.push(countCheck(response));
+  return out;
+}
+
+/** O15: how many offers hold products, and how many fares. */
+function countCheck(response) {
+  const offers = list(response?.offers);
+  const withProducts = offers.filter((o) => list(o.products).length || list(o.admissionOfferParts).length).length;
+  const withFares = offers.filter((o) => list(o.fares).length).length;
+  return { id: 'O15', level: 'INFO', title: 'Offers with products and with fares', ok: true,
+    message: `${offers.length} offer(s): ${withProducts} with products, ${withFares} with fares` };
+}
+
+/**
+ * O14: fares in the answer though the request named its offer parts without
+ * FARE_* or ALL. Null when the request named none (OSDM: all types then).
+ */
+function unaskedFaresCheck(response, request) {
+  const parts = partsOf(request);
+  if (parts.length === 0 || asksFares(request)) return null;
+  const fares = faresOf(response).length;
+  return check('O14', 'FAIL', `No fare when the request asks for ${parts.join(', ')} only`, fares ? [`${fares} fare(s)`] : [],
+    'fares that were not asked (OSDM DistributionMode: without FARE_* the answer holds products)');
+}
+
+/**
+ * The fare offer a scenario books: the first holding fares, of the cluster
+ * asked when one is. null when none fits.
+ */
+function chooseFareOffer(response, desiredCluster) {
+  const offers = fareOffersOf(response);
+  if (!desiredCluster) return offers[0] || null;
+  return offers.find((o) => list(o.fares).some((f) => list(f.combinationConstraint).some((c) => c?.referenceCluster === desiredCluster))) || null;
+}
+
+const BOOK_MODES = ['FARE', 'PRODUCT'];
+
+// A station of the data file as an OSDM StopPlaceRef: a URN as it is, a bare
+// UIC code as urn:uic:stn:<code>. null for anything else.
+function stopPlaceRefOf(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (/^\d{5,9}$/.test(text)) return { objectType: 'StopPlaceRef', stopPlaceRef: `urn:uic:stn:${text}` };
+  if (/^urn:[^\s]{3,117}$/.test(text)) return { objectType: 'StopPlaceRef', stopPlaceRef: text };
+  return null;
+}
+
+/**
+ * The fare fields of a scenario (#903): the requested sections as OSDM
+ * Sections, the international flag (true, false or null), the cluster to
+ * book and the booking mode (null when not named). Sections that name no
+ * usable station on both ends are left out.
+ */
+function fareFieldsOf(scenario) {
+  const requestedSections = list(scenario?.requestedSections)
+    .map((s) => ({ startPlace: stopPlaceRefOf(s?.startPlace), endPlace: stopPlaceRefOf(s?.endPlace) }))
+    .filter((s) => s.startPlace && s.endPlace);
+  const flag = scenario?.isPartOfInternationalTrip;
+  const cluster = String(scenario?.desiredFareCluster || '').toUpperCase();
+  const mode = String(scenario?.bookMode || '').toUpperCase();
+  return {
+    requestedSections,
+    isPartOfInternationalTrip: flag === true || flag === 'true' ? true : (flag === false || flag === 'false' ? false : null),
+    desiredFareCluster: CLUSTERS.includes(cluster) ? cluster : null,
+    bookMode: BOOK_MODES.includes(mode) ? mode : null,
+  };
+}
+
+/** The offers that hold products (or no fares): what the product checks look at. */
+function productOffersOf(response) {
+  return list(response?.offers).filter((o) => list(o.fares).length === 0 || list(o.products).length || list(o.admissionOfferParts).length);
+}
+
+// ── Bruno glue ──────────────────────────────────────────────────────────────
+
+function readJson(name) {
+  const raw = bru.getEnvVar(name);
+  if (raw && typeof raw === 'object') return raw;
+  try { return JSON.parse(raw || 'null'); } catch { return null; }
+}
+
+function record(c) {
+  if (c.level === 'FAIL') {
+    test(`[fares ${c.id}] ${c.title}`, () => { if (!c.ok) throw new Error(c.message); });
+  } else if (c.level === 'WARNING') {
+    if (!c.ok) validationLogger(`[WARNING] [fares ${c.id}] ${c.title} — ${c.message}`);
+  } else {
+    validationLogger(`[INFO] [fares ${c.id}] ${c.message}`);
+  }
+}
+
+/**
+ * Step 01, after a 200. A request that asks for fares has its fares checked
+ * and ends here (booking a fare is #906): true. Otherwise only O14 is
+ * checked, and the answer goes on without its fare-only offers: false.
+ */
+function checkFareOffers(body) {
+  const request = readJson('OfferCollectionRequest') || {};
+  if (!asksFares(request)) {
+    const unasked = unaskedFaresCheck(body, request);
+    if (unasked) record(unasked);
+    if (fareOffersOf(body).length > 0 && Array.isArray(body?.offers)) {
+      body.offers = productOffersOf(body);
+      validationLogger('[INFO] [fares] Offers holding fares only are left out of the product checks.');
+    }
+    return false;
+  }
+  if (list(request.requestedSections).length === 0) {
+    validationLogger('[WARNING] [fares] The request asks for fares without a requested section; OSDM asks for one when trips are given (processes).');
+  }
+  for (const c of fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') })) record(c);
+  const desired = bru.getEnvVar('desiredFareCluster') || null;
+  const chosen = chooseFareOffer(body, desired);
+  if (desired) {
+    test(`[fares] An offer holds fares of cluster ${desired} (desiredFareCluster)`, () => {
+      if (!chosen) throw new Error(`no fare offer has the reference cluster ${desired}`);
+    });
+  }
+  if (chosen) {
+    bru.setEnvVar('fareOfferId', chosen.offerId);
+    validationLogger(`[INFO] [fares] Fare offer chosen: ${chosen.offerId} (${list(chosen.fares).length} fare(s)). Booking a fare comes with #906; the scenario ends after the offer step.`);
+  }
+  return true;
+}
+
+module.exports = {
+  CLUSTERS, COMBINATION_MODELS, stopPlaceRefOf, fareFieldsOf, asksFares, typesAsked, fareChecks, unaskedFaresCheck, chooseFareOffer,
+  coverageOfPassenger, productOffersOf, checkFareOffers,
+};

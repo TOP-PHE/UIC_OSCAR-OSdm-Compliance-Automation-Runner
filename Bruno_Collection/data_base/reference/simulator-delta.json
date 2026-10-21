@@ -768,6 +768,58 @@
     },
     {
       "id": 21,
+      "resource_type": "TRAIN",
+      "label": "Train 103 0000001–0000004",
+      "data": {
+        "originURN": "urn:uic:stn:0000001",
+        "destinationURN": "urn:uic:stn:0000004",
+        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+        "productCategoryName": "InterCity",
+        "productCategoryShortName": "IC",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "103",
+            "departureTime": "12:00:00+01:00",
+            "arrivalTime": "14:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 22,
+      "resource_type": "TRAIN",
+      "label": "Train 2204 0000004–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000004",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2204",
+            "departureTime": "14:20:00+01:00",
+            "arrivalTime": "15:20:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 23,
       "resource_type": "JOURNEY",
       "label": "Trip 4: 0000001–0000002, 2 legs",
       "data": {
@@ -784,7 +836,7 @@
       }
     },
     {
-      "id": 22,
+      "id": 24,
       "resource_type": "JOURNEY",
       "label": "Trip 5: 0000001–0000002, 2 legs",
       "data": {
@@ -801,7 +853,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 25,
       "resource_type": "JOURNEY",
       "label": "Trip 11: 0000095–0000002, 2 legs",
       "data": {
@@ -812,6 +864,23 @@
           },
           {
             "trainResourceId": 4,
+            "serviceIndex": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "resource_type": "JOURNEY",
+      "label": "Trip 24: 0000001–0000002, 2 legs",
+      "data": {
+        "legs": [
+          {
+            "trainResourceId": 21,
+            "serviceIndex": 0
+          },
+          {
+            "trainResourceId": 22,
             "serviceIndex": 0
           }
         ]
