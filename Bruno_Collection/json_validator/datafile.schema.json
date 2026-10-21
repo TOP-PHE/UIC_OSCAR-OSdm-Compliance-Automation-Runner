@@ -250,6 +250,33 @@
             "description": "The product (tariff) the scenario expects (#598): a product code, matched exactly, or else words of the product's name (summary, then description), without case. The offer step keeps the offers that hold it and stops the scenario when none does; the fulfilled booking must hold it. Empty or null: the offer is chosen as before.",
             "type": ["string", "null"]
           },
+          "requestedSections": {
+            "description": "Fares (#903): the sections of the trip the provider prices, sent as OfferCollectionRequest.requestedSections. Each names a start and an end station, a UIC URN (urn:uic:stn:8500010) or a bare UIC code; the start is usually a border station. OSDM asks for a section whenever fares are asked for given trips. Empty or null: none is sent.",
+            "type": ["array", "null"],
+            "items": {
+              "type": "object",
+              "required": ["startPlace", "endPlace"],
+              "properties": {
+                "startPlace": { "type": "string", "minLength": 1, "maxLength": 120 },
+                "endPlace": { "type": "string", "minLength": 1, "maxLength": 120 }
+              }
+            }
+          },
+          "isPartOfInternationalTrip": {
+            "description": "Fares (#903): TripSpecification.isPartOfInternationalTrip, sent on a trip specification only. OSDM uses it for VAT; OSCAR asserts nothing from it. Empty or null: not sent.",
+            "type": ["boolean", "string", "null"],
+            "enum": [true, false, "true", "false", "", null]
+          },
+          "desiredFareCluster": {
+            "description": "Fares (#903): the cluster of the fare offer to choose (CLUSTERING model). Empty or null: the first fare offer.",
+            "type": ["string", "null"],
+            "enum": ["BUSINESS", "FULL_FLEX", "SEMI_FLEX", "NON_FLEX", "PROMO", "", null]
+          },
+          "bookMode": {
+            "description": "Fares (#903, used from #906): book the fare offer (FARE) or a product offer (PRODUCT). Empty or null: FARE when fares are asked for.",
+            "type": ["string", "null"],
+            "enum": ["FARE", "PRODUCT", "", null]
+          },
           "simulatorFaults": {
             "description": "Faults the OSDM simulator answers this scenario with (#833): a list of fault codes, or the same as text, \"offer.price-below-parts, booking.passenger-dropped\". The collection sends them in the header X-Simulator-Faults; a real provider ignores it. The codes are listed in the simulator's documentation. Empty or null: no fault.",
             "type": ["array", "string", "null"],

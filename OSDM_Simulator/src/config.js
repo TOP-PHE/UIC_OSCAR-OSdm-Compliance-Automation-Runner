@@ -97,7 +97,28 @@ function checkProvider(key, raw) {
     ...checkPlacePreferences(raw.placePreferences, bad),
     ...checkPlaceMap(raw.placeMap, bad),
     ...checkOtherCurrencies(raw.otherCurrencies, raw.currency, bad),
+    ...checkFares(raw.fares, bad),
   };
+}
+
+// #903: fare offers for a requested section. `clusters` in OSDM's spelling,
+// `freeUnderAge` the age under which a passenger travels free, and the start
+// station of each wrong variant. Absent: no fare is offered.
+const FARE_CLUSTERS = new Set(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO']);
+const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares']);
+function checkFares(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object') throw bad('fares');
+  const { clusters, freeUnderAge, variants = {} } = value;
+  if (!Array.isArray(clusters) || clusters.length === 0 || !clusters.every((c) => FARE_CLUSTERS.has(c))
+    || new Set(clusters).size !== clusters.length) throw bad('fares');
+  if (!Number.isInteger(freeUnderAge) || freeUnderAge < 0 || freeUnderAge > 30) throw bad('fares');
+  if (!variants || typeof variants !== 'object' || Array.isArray(variants)) throw bad('fares');
+  for (const [name, station] of Object.entries(variants)) {
+    if (!FARE_VARIANTS.has(name) || !isText(station, 1, 120)) throw bad('fares');
+  }
+  if (new Set(Object.values(variants)).size !== Object.keys(variants).length) throw bad('fares');
+  return { fares: { clusters: [...clusters], freeUnderAge, variants: { ...variants } } };
 }
 
 // #781: the other currencies a provider sells in, each with its own price

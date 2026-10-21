@@ -62,7 +62,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697), the passenger limits (#699), the accented names (#703), the sales horizon (#704), the age bands (#705), the train filter (#722), the seat preferences, named and nearby places (#766), the offer search probes (#780), the currencies (#781) and,
+  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697), the passenger limits (#699), the accented names (#703), the sales horizon (#704), the age bands (#705), the train filter (#722), the seat preferences, named and nearby places (#766), the offer search probes (#780), the currencies (#781), the fares (#903) and,
   // with the rest of #592 and #611, the later functions are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_CURRENCY_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE', 'SIM_SALE_NAMED_', 'SIM_SALE_NEARBY_', 'SIM_OFFER_PROBE_', 'SIM_TRIP_PROBE_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_CURRENCY_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE', 'SIM_SALE_NAMED_', 'SIM_SALE_NEARBY_', 'SIM_OFFER_PROBE_', 'SIM_TRIP_PROBE_', 'SIM_FARE_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     // delta (3.9, #858) runs beta's small set: 3.9 changed no schema OSCAR sends or reads.
@@ -232,6 +232,13 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_TRIP_PROBE_VIA_TRANSFER_LIMIT_38: [],
     SIM_WRONG_OFFER_PROBE_NOT_DECLARED_SOLD_38: [],
     SIM_WRONG_CURRENCY_DEFAULT_38: [],
+    // #903: the fare variants are chosen by the section's start station.
+    SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38: [],
+    SIM_WRONG_FARE_UNKNOWN_CLUSTER_38: [],
+    SIM_WRONG_FARE_WIDER_CLUSTERS_38: [],
+    SIM_WRONG_FARE_SECTION_GAP_38: [],
+    SIM_WRONG_FARE_OVERLAP_38: [],
+    SIM_WRONG_FARE_UNREQUESTED_38: [],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -516,7 +523,8 @@ test('the age scenario: the only one on gamma\'s age-tariff stop place, three pa
   assert.deepEqual(datafile.tripRequirements.filter((t) => origins(t).includes(from)).map((t) => t.id), [13]);
   assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === 13).map((s) => [s.code, s.passengersListId]), [['SIM_SALE_AGE_LIMITS_38', 22]]);
   const aged = datafile.passengersList.filter((l) => l.passengers.some((p) => p.bornYearsBeforeTravel !== undefined)).map((l) => l.id);
-  assert.deepEqual(aged, [22]);
+  // #903: the free child of the fare scenario is aged too (3 on the day of travel).
+  assert.deepEqual(aged, [22, 29]);
   const child = bands.find((b) => b.type === 'CHILD');
   const youth = bands.find((b) => b.type === 'YOUTH');
   const list = datafile.passengersList.find((l) => l.id === 22).passengers;
@@ -588,5 +596,34 @@ test('the fault scenarios: one per fault of the catalogue, out of the run list (
     const code = `SIM_FAULT_${scenario.simulatorFaults[0].replace('.', '_').replaceAll('-', '_').toUpperCase()}_38`;
     assert.equal(scenario.code, code);
     assert.ok(!datafile.scenariosToRun.includes(scenario.code), scenario.code);
+  }
+});
+
+test('the fare scenarios: a trip specification with a section; each wrong one starts its section at the station of its variant (#903)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const fareScenarios = datafile.scenarios.filter((s) => s.code.includes('_FARE_'));
+  const startOf = (s) => s.requestedSections?.[0]?.startPlace;
+  const expected = {
+    SIM_FARE_SPEC_1ADT_38: 'urn:uic:stn:0000004',
+    SIM_FARE_SPEC_FREE_CHILD_38: 'urn:uic:stn:0000004',
+    SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38: gamma.fares.variants.passengerWithoutFare,
+    SIM_WRONG_FARE_UNKNOWN_CLUSTER_38: gamma.fares.variants.unknownCluster,
+    SIM_WRONG_FARE_WIDER_CLUSTERS_38: gamma.fares.variants.widerClusters,
+    SIM_WRONG_FARE_SECTION_GAP_38: gamma.fares.variants.sectionGap,
+    SIM_WRONG_FARE_OVERLAP_38: gamma.fares.variants.overlappingFares,
+    SIM_WRONG_FARE_UNREQUESTED_38: gamma.fares.variants.unrequestedFares,
+  };
+  assert.deepEqual(Object.fromEntries(fareScenarios.map((s) => [s.code, startOf(s)])), expected);
+  for (const s of fareScenarios) {
+    const trip = datafile.tripRequirements.find((t) => t.id === s.tripRequirementId);
+    assert.equal(trip.tripType, 'SPECIFICATION', s.code);
+    assert.equal(s.isPartOfInternationalTrip, true, s.code);
+    const fares = s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION');
+    assert.equal(fares, s.code !== 'SIM_WRONG_FARE_UNREQUESTED_38', s.code);
+  }
+  // No other scenario starts a section at a variant station.
+  const variantStations = new Set(Object.values(gamma.fares.variants));
+  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_'))) {
+    assert.ok(!variantStations.has(startOf(s)), s.code);
   }
 });

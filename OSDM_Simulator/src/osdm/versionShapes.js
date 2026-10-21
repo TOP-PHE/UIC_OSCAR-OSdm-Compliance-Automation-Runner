@@ -18,9 +18,10 @@
  *  - below 3.8, a fulfilment holds its documents (`fulfillmentDocuments`)
  *    instead of naming them (`fulfillmentDocumentRefs`) from a list of the
  *    booking or of the answer; a document has no `id` or `controlNumber`;
- *    `distributionMode` and `summaryTranslations` do not exist;
+ *    `distributionMode`, `summaryTranslations` and a fare's `isProviderFee`
+ *    do not exist;
  *  - below 3.7, `inboundTripCoverage`, `isIncluded`, `compartmentNumber` and
- *    `fulfillmentStatus` do not exist.
+ *    `fulfillmentStatus` and a fare route's `routeSummary` do not exist.
  *
  * Each member removed by name exists in no schema of the earlier version, so
  * removing it wherever it is found removes nothing that version has.
@@ -36,8 +37,8 @@ const rank = (version) => {
 
 // Members that do not exist below a version, by name.
 const ABSENT_BELOW = [
-  { below: '3.8', names: ['fulfillmentDocumentRefs', 'distributionMode', 'summaryTranslations'] },
-  { below: '3.7', names: ['inboundTripCoverage', 'isIncluded', 'compartmentNumber', 'fulfillmentStatus'] },
+  { below: '3.8', names: ['fulfillmentDocumentRefs', 'distributionMode', 'summaryTranslations', 'isProviderFee'] },
+  { below: '3.7', names: ['inboundTripCoverage', 'isIncluded', 'compartmentNumber', 'fulfillmentStatus', 'routeSummary'] },
 ];
 
 // A FulfillmentDocument's members that 3.8 added.

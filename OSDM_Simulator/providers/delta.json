@@ -177,5 +177,17 @@
         "followerPercent": 60
       }
     }
-  ]
+  ],
+  "fares": {
+    "clusters": ["FULL_FLEX", "SEMI_FLEX", "NON_FLEX"],
+    "freeUnderAge": 6,
+    "variants": {
+      "passengerWithoutFare": "urn:uic:stn:0000080",
+      "unknownCluster": "urn:uic:stn:0000081",
+      "widerClusters": "urn:uic:stn:0000082",
+      "sectionGap": "urn:uic:stn:0000083",
+      "overlappingFares": "urn:uic:stn:0000084",
+      "unrequestedFares": "urn:uic:stn:0000085"
+    }
+  }
 }

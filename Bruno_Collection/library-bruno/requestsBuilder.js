@@ -119,6 +119,10 @@ function buildOfferCollectionRequest() {
     body.tripSearchCriteria = parseEnvJson("offerTripSearchCriteria");
   }
 
+  // #903: the section of the trip a fare provider prices.
+  const requestedSections = parseEnvJson("requestedSections", null);
+  if (Array.isArray(requestedSections) && requestedSections.length > 0) body.requestedSections = requestedSections;
+
   body.anonymousPassengerSpecifications = passengersWithCardIssuers("offerPassengerSpecifications");
   body.offerSearchCriteria = parseEnvJson("offerSearchCriteria");
   // PAXONE requires offerSearchCriteria.currency + .offerMode (422 if absent).

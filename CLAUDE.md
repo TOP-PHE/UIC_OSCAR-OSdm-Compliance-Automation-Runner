@@ -1561,6 +1561,30 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   simulator's group rules live on the product (`group` in the profile); a
   group product is never offered to an INDIVIDUAL request, so the earlier
   gamma scenarios see the same offers. Offers and bookings take 19 passengers.
+- **Fare offers for a requested section** (#903, fares 1a, 1.11.372 /
+  OTST_V2.0.205, simulator 0.43.0). A scenario's `requestedSections`
+  [{ startPlace, endPlace }] (station codes or URNs) goes in the offer request
+  (`buildOfferCollectionRequest`), `isPartOfInternationalTrip` on the trip
+  specification; `FARE_ADMISSION` in the requested offer parts asks the fares.
+  `library-bruno/fares.js` (pure but `checkFareOffers()`) grades `offers[].fares`
+  in step 01 after the status check, one aggregated check per rule (O1–O15):
+  OSDM's `Fare.required` + `passengerRefs` (not required in 3.8, kept on
+  purpose), type asked, regional validities, after-sales conditions,
+  validity range, a fare per passenger in each fare offer (a free child
+  priced 0), coverage of the first section (gap FAIL, overlap WARNING),
+  CLUSTERING clusters (outside OSDM's five, or allowing a more flexible one:
+  WARNING), TCOs (WARNING), negative price, fares not asked (O14 FAIL; fare-only
+  offers are then removed so the product checks see products only).
+  `desiredFareCluster` chooses the fare offer (`fareOfferId`); `bookMode`
+  is read but booking fares is #906, so a fare scenario ends after 01. The
+  five variables are in both reset lists. Simulator: `fares` in every
+  profile (#824 rule), offers per cluster next to the product offers, wrong
+  variants by the section's start station (`0000080`–`0000085`); the
+  data-file scenarios are gamma's only (`SIM_FARE_`, `SIM_WRONG_FARE_`).
+  `routeSummary` (3.7) and `isProviderFee` (3.8) are in `ABSENT_BELOW`. Test
+  Config: `buildFareFields()`; the section input is handled before the input
+  switch (`inputRequestedSection()`), and `buildSelect` compares as text so a
+  boolean stored flag shows.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

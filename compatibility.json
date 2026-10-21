@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.406",
+  "current_release": "2026.407",
   "releases": [
+    {
+      "release": "2026.407",
+      "date": "2026-10-21",
+      "server": "1.11.372",
+      "collection": "OTST_V2.0.205",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#903 (fares phase 1a): a scenario can ask fare offers for a requested section (FARE_ADMISSION, isPartOfInternationalTrip); step 01 checks the fares (members, coverage per passenger, clusters, validity, after-sales conditions) and chooses one by cluster; booking fares comes with #906. Simulator 0.43.0 answers fares and six wrong variants."
+      ]
+    },
     {
       "release": "2026.406",
       "date": "2026-10-20",

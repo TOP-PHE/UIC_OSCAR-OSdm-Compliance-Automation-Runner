@@ -80,6 +80,10 @@ const ENUMS = {
   refundAgainProbe:                  ['off', 'on'],
   exchangeRefundedProbe:             ['off', 'on'],
   confirmAgainProbe:                 ['off', 'on'],
+  // #903: fare offers (fares phase 1a).
+  isPartOfInternationalTrip:         [null, 'true', 'false'],
+  desiredFareCluster:                [null, 'BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO'],
+  bookMode:                          [null, 'FARE', 'PRODUCT'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
   // (historical) or record the failure and keep testing the remaining steps.
@@ -2057,6 +2061,7 @@ function buildDetailHTML(idx) {
           'The class expected on each leg, in the order of the legs (#600): for a train with a first class and one without. The request asks for every class named; the offer chosen must give each leg its class, by an admission of its own or by a supplement on that leg, and so must the booking. Empty: the travel class criterion applies.')}
         ${buildText(idx, 'simulatorFaults', 'Simulator faults', 'e.g. offer.price-below-parts, booking.passenger-dropped',
           'For the OSDM simulator only (#833): the faults it answers this scenario with, to check that OSCAR reports them. Codes of the simulator documentation, separated by commas. Sent in the X-Simulator-Faults header, which a real provider ignores. Empty: no fault.')}
+        ${buildFareFields(idx)}
         ${buildSelect(idx, 'expectedProductAbsent', 'Expected product absent', ENUMS.expectedProductAbsent,
           'Negative test (#599). On: no offer may hold the expected product above, for example a group its rules exclude (too many passengers, too many adults, a weekday). Passes when none does, fails when one does; the scenario ends after the offer either way.')}
         ${buildSelect(idx, 'offerSearchProbe', 'Offer search probe', ENUMS.offerSearchProbe,
@@ -2863,7 +2868,7 @@ function buildSelect(idx, field, label, options, hint) {
   const val = state.scenarios[idx]?.[field];
   const hintHtml = hint ? `<span class="param-hint">${esc(hint)}</span>` : '';
   const opts = options.map(o =>
-    `<option value="${esc(optionValue(o))}" ${optionValue(val) === optionValue(o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
+    `<option value="${esc(optionValue(o))}" ${String(optionValue(val)) === String(optionValue(o)) ? 'selected' : ''}>${esc(lbl(o))}</option>`
   ).join('');
   return `
   <div class="param-field">
@@ -2873,6 +2878,56 @@ function buildSelect(idx, field, label, options, hint) {
       ${opts}
     </select>
   </div>`;
+}
+
+// #903: the fare request of a scenario: the section asked (start and end stop
+// place), whether the trip is part of an international trip, the fare cluster
+// to choose and the booking mode. Only the first section is edited here.
+function buildFareFields(idx) {
+  const section = requestedSectionOf(state.scenarios[idx]);
+  const place = (end, label, hint) => `
+  <div class="param-field">
+    <span class="param-label">${esc(label)}<span class="param-hint">${esc(hint)}</span></span>
+    <input class="param-input" type="text" value="${esc(section[end])}" placeholder="urn:uic:stn:8500010 (or just 8500010)"
+      data-action="set-scenario-section" data-end="${esc(end)}" data-idx="${esc(idx)}" data-place-lookup autocomplete="off">
+  </div>`;
+  return `
+        ${place('startPlace', 'Fare section start', 'Fares (#903): the stop place where the section to price starts. With its end, the offer request asks fares for that section (requestedSections), and FARE_ADMISSION in the requested offer parts asks the fares themselves. Both empty: no section.')}
+        ${place('endPlace', 'Fare section end', 'Fares (#903): the stop place where the section to price ends.')}
+        ${buildSelect(idx, 'isPartOfInternationalTrip', 'Part of an international trip', ENUMS.isPartOfInternationalTrip,
+          'Fares (#903): sent as isPartOfInternationalTrip of the trip specification. Yes when the section is one part of a trip across borders, priced by several providers. Empty: not sent.')}
+        ${buildSelect(idx, 'desiredFareCluster', 'Fare cluster', ENUMS.desiredFareCluster,
+          'Fares (#903): the cluster of the fare offer to choose (BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO). None offered fails the scenario. Empty: the first fare offer.')}
+        ${buildSelect(idx, 'bookMode', 'Book mode', ENUMS.bookMode,
+          'Fares (#903): what the scenario books, fares or products. Booking fares comes with #906; until then a fare scenario ends after the offer step.')}`;
+}
+
+// #903: the first requested section of a scenario, as two texts.
+function requestedSectionOf(sc) {
+  const first = Array.isArray(sc?.requestedSections) ? sc.requestedSections[0] : null;
+  return { startPlace: String(first?.startPlace ?? ''), endPlace: String(first?.endPlace ?? '') };
+}
+
+// #903: the scenario's requested sections with one end of the first changed.
+// Both ends empty = no section (null); other sections are kept.
+function withRequestedSection(sc, end, value) {
+  const list = Array.isArray(sc?.requestedSections) ? sc.requestedSections.slice() : [];
+  const first = { ...requestedSectionOf(sc), [end]: String(value ?? '').trim() };
+  if (!first.startPlace && !first.endPlace) list.splice(0, 1);
+  else list[0] = first;
+  return list.length > 0 ? list : null;
+}
+
+// #903: typing in a fare section field. Outside the input switch, which is long enough.
+function inputRequestedSection(action, el) {
+  if (action !== 'set-scenario-section') return false;
+  const end = el.dataset.end === 'endPlace' ? 'endPlace' : 'startPlace';
+  const idx = Number.parseInt(el.dataset.idx);
+  const sc = state.scenarios[idx];
+  if (!sc) return true;
+  sc.requestedSections = withRequestedSection(sc, end, el.value);
+  markDirty();
+  return true;
 }
 
 function buildText(idx, field, label, placeholder, hint) {
@@ -8917,6 +8972,7 @@ document.body.addEventListener('input', function(e) {
   if (!el) return;
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }   // #515, as above
   const action = el.dataset.action;
+  if (inputRequestedSection(action, el)) return;
 
   switch (action) {
     case 'set-scenario-text':

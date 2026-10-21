@@ -340,6 +340,21 @@ A variant is chosen by a passenger's last name at booking time: `Simvariant-<nam
 | `SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38` | Variant `refuses-bare-place-selection` (passenger list 26) on trip 5, the SuperCity with a mandatory reservation, with `mandatoryReservationForm` NONE (#793): the mandatory reservation is named nowhere in the booking request. | The variant refuses a placeSelection asking nothing; the booking, which names none, holds the mandatory reservation. | No failed check; the warnings of `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` about the optional EuroCity reservation, which this scenario does not book. |
 | `SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38` | Variant `one-fulfillment-per-refund-request` (passenger list 27) on the full refund of a return sold as one offer, one ticket per direction (#883). | The variant refuses the refund offer request naming both tickets with 501 `VALUE_NOT_SUPPORTED` and answers one refund offer to a request naming one ticket. | No failed check; the two merged-PDF warnings of `SIM_REFUND_COMBINED_RETURN_1ADT_38`, and one at step 10: the provider refuses a list of fulfillments, so the refund offers are asked one ticket at a time (two more checks, one per request). |
 
+### Fares (#903)
+
+Fare offers for a requested section (fares phase 1a). The trip is trip 24, a specification of the whole trip (InterCity 0000001 to 0000004, regional 0000004 to 0000002), sent with `isPartOfInternationalTrip: true` and `requestedOfferParts` `FARE_ADMISSION`. The section starts at the border station 0000004. Asked for fares with a section, gamma (`fares` in its profile) answers its product offers and one fare offer per cluster (FULL_FLEX, SEMI_FLEX, NON_FLEX, model CLUSTERING), each with one fare per passenger. Each wrong variant is chosen by the station its section starts at (`fares.variants`), since offers are anonymous. Every fare scenario ends after the offer step: booking a fare is #906.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_FARE_SPEC_1ADT_38` | Fares for one adult on a trip specification with a requested section; the semi-flexible fare offer is chosen (`desiredFareCluster`). | Three fare offers next to the product offers; each fare has its regional constraint (entry connection point, route), validity, after-sales conditions, TCOs and covered section. | No failed check and no fare warning; the scenario ends at 01 with the fare offer chosen. |
+| `SIM_FARE_SPEC_FREE_CHILD_38` | The same for an adult and a child aged 3 on the day of travel (passenger list 29). | The child's fare is priced 0. | No failed check: every passenger has a fare, the free one included. |
+| `SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38` | Two adults; section from station 0000080. Deliberately wrong. | The second passenger has no fare. | Check O7 fails at 01. |
+| `SIM_WRONG_FARE_UNKNOWN_CLUSTER_38` | Section from station 0000081. Deliberately wrong. | Reference cluster `GOLD`. | A WARNING of check O10 at 01; no failed check. |
+| `SIM_WRONG_FARE_WIDER_CLUSTERS_38` | Section from station 0000082. Deliberately wrong. | Every fare allows all five clusters. | A WARNING of check O11 at 01; no failed check. |
+| `SIM_WRONG_FARE_SECTION_GAP_38` | Section from station 0000083. Deliberately wrong. | The fares stop at station 0000079, short of the section's end. | Check O8 (gap) fails at 01. |
+| `SIM_WRONG_FARE_OVERLAP_38` | Section from station 0000084. Deliberately wrong. | Two fares per passenger, the second over the start of the section again. | A WARNING of check O8 (overlap) at 01; no failed check. |
+| `SIM_WRONG_FARE_UNREQUESTED_38` | `ADMISSION` asked, section from station 0000085. Deliberately wrong. | Fare offers added to the product offers. | Check O14 fails at 01; the sale goes on with the product offers. |
+
 ### Deliberately wrong answers (#611)
 
 Each of these makes one validator family fail on purpose, so that its FAIL path runs. They are not in the data file's run list. The offer one uses the trip from station `0000098` (`variants.wrongOffersFrom`); the others a passenger list naming the variant.
