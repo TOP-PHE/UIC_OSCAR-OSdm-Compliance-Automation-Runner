@@ -137,7 +137,7 @@ const among = (station, stations) => stations.some((s) => sameStopPlace(s, stati
  */
 function coverageOfPassenger(fares, section) {
   const spans = fares.map(coveredOf);
-  if (spans.some((s) => s === null)) return 'unknown';
+  if (spans.includes(null)) return 'unknown';
   const left = [...spans];
   let at = section.start;
   for (let steps = 0; steps <= spans.length; steps++) {
@@ -217,49 +217,56 @@ function negativePrices(all) {
  */
 function fareChecks(response, request, { travelDay } = {}) {
   const all = faresOf(response);
-  const out = [];
   const offers = fareOffersOf(response);
-  out.push(check('O1', 'FAIL', 'At least one offer holds fares (offers[].fares)', offers.length ? [] : ['no offer'],
-    'the request asks for fares and names a section, but no offer holds any'));
-  if (offers.length === 0) return out;
-  out.push(check('O2', 'FAIL', 'Each fare has the members OSDM requires (Fare.required, passengerRefs)',
-    all.map(({ fare, path }) => ({ path, missing: missingMembers(fare) })).filter((x) => x.missing.length).map((x) => `${x.path} lacks ${x.missing.join(', ')}`),
-    'members missing or empty'));
+  const first = check('O1', 'FAIL', 'At least one offer holds fares (offers[].fares)', offers.length ? [] : ['no offer'],
+    'the request asks for fares and names a section, but no offer holds any');
+  if (offers.length === 0) return [first];
   const types = typesAsked(request);
-  out.push(check('O3', 'FAIL', `Each fare is of a type asked (${types.join(', ') || 'none'})`,
-    all.filter(({ fare }) => !types.includes(fare?.type)).map(({ fare, path }) => `${path}.type = ${JSON.stringify(fare?.type)}`),
-    `fare types outside ${types.join(' / ')} (OSDM allows no provider-specific value here, #242 D2)`));
   const regional = regionalIssues(all);
-  out.push(check('O4', 'FAIL', 'Each fare has regional validities (regionalConstraint.regionalValidities)', regional.noList, 'no regional validity'));
-  out.push(check('O4', 'WARNING', 'Each regional validity names a zone, route, train link, line or polygon', regional.emptyItems, 'an empty regional validity'));
-  out.push(check('O5', 'FAIL', 'Each fare has after-sales conditions (afterSalesCondition.conditions)',
-    all.filter(({ fare }) => list(fare?.afterSalesCondition?.conditions).length === 0).map(({ path }) => path), 'no after-sales condition'));
   const providerFee = all.filter(({ fare }) => fare?.afterSalesCondition?.isProviderFee === true).length;
-  out.push({ id: 'O5', level: 'INFO', title: 'After-sales fees attributed to the provider (isProviderFee)', ok: true,
-    message: `${providerFee} of ${all.length} fare(s) say the after-sales fees are the provider's` });
-  out.push(check('O6', 'FAIL', 'Each fare has a validity range (travelValidityConstraint.validityRange)',
-    all.filter(({ fare }) => !isObject(fare?.travelValidityConstraint?.validityRange)).map(({ path }) => path), 'no validity range'));
-  out.push(check('O6', 'WARNING', 'The travel day lies within each fare\'s valid travel dates',
-    all.filter(({ fare }) => dayOutside(fare, travelDay)).map(({ path }) => path), `the travel day ${String(travelDay || '').slice(0, 10)} is outside the valid travel dates`));
   const pax = passengerChecks(response, request);
-  out.push(check('O7', 'FAIL', 'Every passenger has a fare in each fare offer (a free one priced 0)', pax.withoutFare, 'passengers without a fare'));
-  if (pax.section) {
-    out.push(check('O8', 'FAIL', 'Each passenger\'s fares cover the requested section without a gap', pax.gaps,
-      `fares that leave part of the section ${pax.section.start} - ${pax.section.end} uncovered`));
-    out.push(check('O8', 'WARNING', 'Each passenger\'s fares do not overlap', pax.overlaps, 'fares covering a part of the section twice'));
-    out.push(check('O8', 'WARNING', 'Each fare says what it covers (coveredSection, else entry and exit connection points)', pax.unknown,
-      'the coverage of the section cannot be checked'));
-  }
   const combination = combinationIssues(all);
-  out.push(check('O9', 'WARNING', 'Each combination model is one of the YAML list (SEPARATE_TICKET, SEPARATE_CONTRACT, CLUSTERING, COMBINING)', combination.models, 'models outside the list'));
-  out.push(check('O10', 'WARNING', 'CLUSTERING: the reference cluster is one of BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO', combination.reference, 'reference clusters outside the list'));
-  out.push(check('O10', 'WARNING', 'CLUSTERING: the allowed clusters are from the same list', combination.allowed, 'allowed clusters outside the list'));
-  out.push(check('O11', 'WARNING', 'CLUSTERING: no allowed cluster is more flexible than the reference one', combination.wider, 'allowed clusters more flexible than the reference'));
-  out.push(check('O12', 'WARNING', 'Each fare names the TCOs involved (involvedTCOs)',
-    all.filter(({ fare }) => list(fare?.involvedTCOs).length === 0).map(({ path }) => path), 'no involvedTCOs'));
-  out.push(check('O13', 'FAIL', 'No fare price is negative', negativePrices(all), 'negative prices'));
-  out.push(countCheck(response));
-  return out;
+  return [
+    first,
+    check('O2', 'FAIL', 'Each fare has the members OSDM requires (Fare.required, passengerRefs)',
+      all.map(({ fare, path }) => ({ path, missing: missingMembers(fare) })).filter((x) => x.missing.length).map((x) => `${x.path} lacks ${x.missing.join(', ')}`),
+      'members missing or empty'),
+    check('O3', 'FAIL', `Each fare is of a type asked (${types.join(', ') || 'none'})`,
+      all.filter(({ fare }) => !types.includes(fare?.type)).map(({ fare, path }) => `${path}.type = ${JSON.stringify(fare?.type)}`),
+      `fare types outside ${types.join(' / ')} (OSDM allows no provider-specific value here, #242 D2)`),
+    check('O4', 'FAIL', 'Each fare has regional validities (regionalConstraint.regionalValidities)', regional.noList, 'no regional validity'),
+    check('O4', 'WARNING', 'Each regional validity names a zone, route, train link, line or polygon', regional.emptyItems, 'an empty regional validity'),
+    check('O5', 'FAIL', 'Each fare has after-sales conditions (afterSalesCondition.conditions)',
+      all.filter(({ fare }) => list(fare?.afterSalesCondition?.conditions).length === 0).map(({ path }) => path), 'no after-sales condition'),
+    { id: 'O5', level: 'INFO', title: 'After-sales fees attributed to the provider (isProviderFee)', ok: true,
+      message: `${providerFee} of ${all.length} fare(s) say the after-sales fees are the provider's` },
+    check('O6', 'FAIL', 'Each fare has a validity range (travelValidityConstraint.validityRange)',
+      all.filter(({ fare }) => !isObject(fare?.travelValidityConstraint?.validityRange)).map(({ path }) => path), 'no validity range'),
+    check('O6', 'WARNING', 'The travel day lies within each fare\'s valid travel dates',
+      all.filter(({ fare }) => dayOutside(fare, travelDay)).map(({ path }) => path), `the travel day ${String(travelDay || '').slice(0, 10)} is outside the valid travel dates`),
+    check('O7', 'FAIL', 'Every passenger has a fare in each fare offer (a free one priced 0)', pax.withoutFare, 'passengers without a fare'),
+    ...sectionChecks(pax),
+    check('O9', 'WARNING', 'Each combination model is one of the YAML list (SEPARATE_TICKET, SEPARATE_CONTRACT, CLUSTERING, COMBINING)', combination.models, 'models outside the list'),
+    check('O10', 'WARNING', 'CLUSTERING: the reference cluster is one of BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO', combination.reference, 'reference clusters outside the list'),
+    check('O10', 'WARNING', 'CLUSTERING: the allowed clusters are from the same list', combination.allowed, 'allowed clusters outside the list'),
+    check('O11', 'WARNING', 'CLUSTERING: no allowed cluster is more flexible than the reference one', combination.wider, 'allowed clusters more flexible than the reference'),
+    check('O12', 'WARNING', 'Each fare names the TCOs involved (involvedTCOs)',
+      all.filter(({ fare }) => list(fare?.involvedTCOs).length === 0).map(({ path }) => path), 'no involvedTCOs'),
+    check('O13', 'FAIL', 'No fare price is negative', negativePrices(all), 'negative prices'),
+    countCheck(response),
+  ];
+}
+
+// O8: the coverage of the requested section, when the request names one.
+function sectionChecks(pax) {
+  if (!pax.section) return [];
+  return [
+    check('O8', 'FAIL', 'Each passenger\'s fares cover the requested section without a gap', pax.gaps,
+      `fares that leave part of the section ${pax.section.start} - ${pax.section.end} uncovered`),
+    check('O8', 'WARNING', 'Each passenger\'s fares do not overlap', pax.overlaps, 'fares covering a part of the section twice'),
+    check('O8', 'WARNING', 'Each fare says what it covers (coveredSection, else entry and exit connection points)', pax.unknown,
+      'the coverage of the section cannot be checked'),
+  ];
 }
 
 /** O15: how many offers hold products, and how many fares. */
@@ -293,7 +300,7 @@ function chooseFareOffer(response, desiredCluster) {
   return offers.find((o) => list(o.fares).some((f) => list(f.combinationConstraint).some((c) => c?.referenceCluster === desiredCluster))) || null;
 }
 
-const BOOK_MODES = ['FARE', 'PRODUCT'];
+const BOOK_MODES = new Set(['FARE', 'PRODUCT']);
 
 // A station of the data file as an OSDM StopPlaceRef: a URN as it is, a bare
 // UIC code as urn:uic:stn:<code>. null for anything else.
@@ -314,14 +321,17 @@ function fareFieldsOf(scenario) {
   const requestedSections = list(scenario?.requestedSections)
     .map((s) => ({ startPlace: stopPlaceRefOf(s?.startPlace), endPlace: stopPlaceRefOf(s?.endPlace) }))
     .filter((s) => s.startPlace && s.endPlace);
-  const flag = scenario?.isPartOfInternationalTrip;
+  const flag = String(scenario?.isPartOfInternationalTrip);
+  let international = null;
+  if (flag === 'true') international = true;
+  else if (flag === 'false') international = false;
   const cluster = String(scenario?.desiredFareCluster || '').toUpperCase();
   const mode = String(scenario?.bookMode || '').toUpperCase();
   return {
     requestedSections,
-    isPartOfInternationalTrip: flag === true || flag === 'true' ? true : (flag === false || flag === 'false' ? false : null),
+    isPartOfInternationalTrip: international,
     desiredFareCluster: CLUSTERS.includes(cluster) ? cluster : null,
-    bookMode: BOOK_MODES.includes(mode) ? mode : null,
+    bookMode: BOOK_MODES.has(mode) ? mode : null,
   };
 }
 
