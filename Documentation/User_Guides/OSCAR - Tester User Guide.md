@@ -2,7 +2,7 @@
 
 *How to point OSCAR at an OSDM provider and build, run, and read a conformance test.*
 
-> Reflects collection **OTST_V2.0.40** / server **1.11.92** / release **2026.120**.
+> Reflects collection **OTST_V2.0.204** / server **1.11.371** / release **2026.406**.
 > Labels in **bold** match the on‑screen controls. When the UI and this guide
 > disagree, the UI wins — please open an issue so we can update the guide.
 
@@ -17,6 +17,7 @@
    - 2.3 API keys (Test Managers)
    - 2.4 AI analysis of results (Test Managers)
 3. [Provider setup — Framework, Test data & Discovery](#3-provider-setup--framework-test-data--discovery)
+   - [3.0 Setting up a provider from its checklist and the scenario catalogue](#30-setting-up-a-provider-from-its-checklist-and-the-scenario-catalogue) (start here)
    - 3.1 Test Framework (capabilities) · 3.2 Train sets · 3.3 Journeys · 3.4 Timetable Discovery
 4. [Authoring a scenario](#4-authoring-a-scenario)
 5. [Running tests](#5-running-tests)
@@ -63,6 +64,11 @@ Company  ──►  Test Framework  ──►  Scenario(s)  ──►  Run  ─�
 | `administrator` | Platform operations & security. | Manages users/companies/config. **Does not read test data** (privacy‑strict, issue #60). |
 
 If you are a tester, you live mostly in sections **3–6** below.
+
+**New provider? Start with §3.0.** The provider fills in a checklist, OSCAR
+turns it into the Test Framework and the Test Data, and the scenario
+catalogue supplies ready-made scenarios. Most of a first configuration is
+done that way, before any scenario is written by hand.
 
 ---
 
@@ -151,7 +157,8 @@ Framework, test resources, findings, runs and reports.
   what is missing: declare it, or leave the scenario. The copy works as above:
   you choose a train for each trip, and the copies are yours. A negative probe
   that waits for a deadline (`NHF_EXPIRED_…`) waits at most 40 minutes; raise
-  its *Max wait* if your provider's deadline is longer.
+  its *Max wait* if your provider's deadline is longer. How the catalogue fits
+  with the provider's checklist, step by step, is in §3.0.
 - **"The data file has changed since this page loaded it."** Test Config
   refuses a save when the data file changed after you opened the page: in
   another tab, by your Test Manager, or by a copy. Nothing is saved. Your edits
@@ -342,12 +349,53 @@ supports, and the **trains/journeys** to test against. Scenarios (§4) are then
 authored *on top of* this. Plain testers (`company_user`) consume this setup —
 the train/journey/discovery edit controls are hidden from them.
 
-### 3.0 Starting from the provider's checklist (since 1.11.346)
+### 3.0 Setting up a provider from its checklist and the scenario catalogue
 
-When the provider has filled in the set-up checklist (`OSCAR_Test_Config_Checklist.docx`),
-OSCAR can set up the Test Framework and the Test Data from it, as it does
-for the simulator. Choose the provider in **Working on**, then in
-**Test Config → 📋 Provider checklist** pick the filled `.docx`.
+This is the shortest way from a new provider to a first run. The provider's
+answers set up the Test Framework and the Test Data, and the scenario
+catalogue supplies scenarios that have already been run end to end. You then
+complete what only you can know, and run. The steps below are for a
+**Test Manager**. A tester can follow step 6 onwards on the scenarios their
+Test Manager shares with them.
+
+```
+ Blank checklist ──► provider fills it in ──► 📋 Provider checklist (import, preview, apply)
+                                                 │  Test Framework  (Part A)
+                                                 │  Test Data       (Parts B and C)
+                                                 └► reference scenarios copied from 📚 the catalogue
+                                                        │
+                       complete what is "to complete" ◄─┘
+                                  │
+                       tick them in your run list ──► run ──► read, then refine
+```
+
+#### Step 1. Send the blank checklist to the provider
+
+The blank checklist is
+[`OSCAR_Test_Config_Checklist.docx`](OSCAR_Test_Config_Checklist.docx), next
+to this guide. It asks the provider, in business terms, what their system does:
+- **Part A** covers the whole provider: OSDM version, passenger types and
+  ages, reduction cards, products, sales and after-sales flows, seat selection,
+  fulfilment, currencies, limits.
+- **Part B** has one sheet per service: the route, the trains and their times,
+  days, classes, accommodations and reservations.
+- **Part C** covers the journeys with changes that the provider sells.
+
+The provider answers **in the boxes**: text in the text boxes, ticks in the
+check boxes. Ask them not to retype the document or paste it into another
+one. Each answer is a tagged field, and OSCAR reads the fields back, not the
+page. The annex at the end says where each answer goes in OSCAR.
+
+The API answers (endpoint, token URL, kind of authentication, requestor,
+extra headers) are for you to enter in **API Config** (§2). OSCAR never reads
+them from the file. The checklist asks the provider not to write passwords or
+client secrets in it: they give those to you separately, and each tester
+enters their own in OSCAR.
+
+#### Step 2. Import the filled checklist
+
+Choose the provider in **Working on**, then in **Test Config → 📋 Provider
+checklist** pick the filled `.docx`.
 
 - **Importing changes nothing.** The box shows what applying the checklist
   would change:
@@ -355,7 +403,8 @@ for the simulator. Choose the provider in **Working on**, then in
     question;
   - each Test Framework setting that would change (now / after);
   - the trains and journeys the Test Data would gain, those already there,
-    and, if you choose **replace them**, those removed.
+    and, if you choose **replace them**, those removed;
+  - the reference scenarios that would be copied (step 3).
 - **Apply these changes** asks for a confirmation, then writes exactly what
   was shown. If someone changed the Test Framework or the Test Data in the
   meantime, OSCAR shows the new preview instead and changes nothing.
@@ -374,17 +423,124 @@ for the simulator. Choose the provider in **Working on**, then in
   it, and whether it was applied or discarded. OSCAR keeps the answers,
   encrypted, never the API and contact answers, and not the file itself.
   The checklist applied is also the one the AI analysis is told about (§2.4).
-- **Reference scenarios** (since 1.11.349). The preview also lists the
-  reference scenarios of the catalogue that the new Test Framework declares
-  everything for. With **copy them** (the default), applying copies them into
-  the data file as **Copy scenarios** would: each trip on the first train set,
-  or on a journey of as many legs. The copies are yours, not shared, and in
-  no run list: tick them to run them. The list says what is left to complete
-  in a scenario, and which scenarios are not copied and why (not declared, no
-  journey of as many legs, no train set). A scenario whose code the data file
-  already holds is left as it is, so the next checklist copies only the new
-  ones. **do not copy** applies the framework and the Test Data only.
 - The endpoint and the credentials are not changed.
+
+Read the Test Framework once after applying (§3.1). It is the *menu* that
+every scenario is checked against, and a wrong tick there decides what is
+tested.
+
+#### Step 3. Reference scenarios from the catalogue
+
+The **scenario catalogue** holds generic reference scenarios:
+- happy flows (`OTST_…`): sale, return, refund, exchange, seats, cards,
+  groups, currencies…;
+- negative probes (`NHF_…`, 🚫): a request the provider must refuse, such as
+  too many passengers, an expired offer, or a code it does not declare.
+
+Each comes with one line saying what it tests, and has been run end to end on
+the OSDM simulator. The documents
+[OSCAR - What is tested](../Test_Coverage/OSCAR%20-%20What%20is%20tested.md)
+and its reference-scenario tables describe each one.
+
+There are two ways to bring them in:
+- **With the checklist** (step 2). Leave **copy them** chosen (the default)
+  and applying copies every reference scenario that the new Test Framework
+  declares everything for. **do not copy** applies the framework and the Test
+  Data only.
+- **By hand, at any time.** **Test Config → 📋 Copy scenarios from… → 📚
+  Scenario catalogue**. Tick the scenarios, choose a train set (and service)
+  or a journey for each trip, and copy. A trip is asked once, however many
+  scenarios share it.
+
+What decides which scenarios you get:
+- **Your Test Framework** (the golden rule). A reference scenario that needs
+  something the framework does not declare is greyed out, with what is
+  missing: a sales flow, a return model, an OSDM version, a passenger type,
+  a declared limit such as the maximum number of passengers. Declare it if
+  the provider supports it, or leave the scenario.
+- **Your Test Data.** A trip of several legs needs a journey of as many legs;
+  without one the scenario is greyed out ("no journey of N legs"). A scenario
+  with no train set at all is not copied.
+- **Some entries become several scenarios**, following what you declared:
+  - one per offer request form (search, specification, trip ids);
+  - one per currency sold;
+  - one per search option value listed explicitly;
+  - the random combinations of options (drawn from the seed in the
+    framework).
+
+  The card and product entries take the first declared reduction card,
+  product or group product.
+
+On the copy, OSCAR adapts each scenario to the provider:
+- the OSDM version becomes the framework's;
+- the tariff flexibility becomes one the provider sells;
+- passenger lists are resized to the declared limits, and ages follow the
+  declared age bands;
+- overrule codes are taken from the declared list (and one it does not
+  declare, for the refusal probe).
+
+The copies are **yours**: not shared, and in **no run list**. A scenario whose
+code the data file already holds is left as it is, so copying again (or
+importing the next checklist) adds only the new ones.
+
+#### Step 4. Complete what is "to complete"
+
+The copy report sorts the scenarios ticked into three groups: **ready to run**,
+**to complete first**, and **not allowed by the Test Framework**. A scenario
+to complete names what OSCAR could not know from the checklist or the Test
+Data. For example:
+- a train with a reservation, or a class the train has (Test Data carries no
+  reservation or class per service);
+- a value only the provider knows: the reference place for a "near this seat"
+  test, a named seat, an overrule code;
+- a deadline longer than the default wait of a negative probe
+  (`NHF_EXPIRED_…` waits at most 40 minutes: raise its *Max wait* if the
+  provider's deadline is longer).
+
+Open each one in Test Config and fill it in (§4). Until then, leave it out of
+your run list.
+
+#### Step 5. Choose what to run
+
+Tick **✓ In run** on the scenarios to run (§5). Your run list is yours, and
+copies are never added to it. If your run list is **ALL**, every copied
+scenario runs, including the ones still to complete, and those fail until
+they are completed. The copy report warns you when this is the case.
+
+A good first run is a handful of happy flows (a one-way sale, a refund), to
+check the endpoint, the credentials and the Test Data. After that, run the
+whole list.
+
+#### Step 6. Run, read, refine
+
+Run (§5) and read the report (§6). A failure is not always the provider's:
+1. **A setting.** The scenario asks for something the provider does not do,
+   because a tick in the framework or a train set is wrong. Correct the
+   framework or the Test Data. If the provider gave the wrong answer, correct
+   the checklist and import it again.
+2. **A known deviation.** Record it in **Test Findings** (and, once agreed,
+   as a known deviation, so the run reports it as a warning).
+3. **OSCAR.** Report it as an issue. The AI analysis (§2.4) can help sort
+   the failures of a batch into these groups.
+
+#### When the provider's answers change
+
+Ask for the checklist again, filled in where it changed, and import it. The
+preview shows only what moved: the answers, the framework settings and the
+trains. With **copy them**, it also lists the reference scenarios that the new
+declarations allow and that you do not have yet. Your own scenarios and your
+edits to the copies are never changed.
+
+#### Without a checklist
+
+Everything above can be done by hand:
+- the Test Framework (§3.1);
+- the train sets, from **🔍 Discover timetable** (§3.4) or typed in (§3.2);
+- the journeys (§3.3);
+- the reference scenarios, through **📋 Copy scenarios from… → 📚 Scenario
+  catalogue** (step 3).
+
+The catalogue then works the same way: it offers what your framework declares.
 
 ### 3.1 Test Framework (capabilities)
 
@@ -1361,7 +1517,7 @@ Data.
    `https://<simulator-host>/<provider>/oauth/token`, their client id and
    secret, scope empty.
 2. **Test Config → 🔗 Reference configuration** (since 1.11.335): choose
-   `simulator-alpha`, `simulator-beta` or `simulator-gamma`, then
+   `simulator-alpha`, `simulator-beta`, `simulator-gamma` or `simulator-delta`, then
    **Update from the reference**. OSCAR fills in the scenarios, the Test
    Framework, the Test Data and the run list of that provider. The endpoint
    and the credentials are not touched; the replaced data file can be got
