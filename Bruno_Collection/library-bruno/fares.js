@@ -353,7 +353,7 @@ function stationsOfLegs(legs) {
     const timed = leg?.timedLeg || leg?.transferLeg || leg?.continuousLeg || leg;
     for (const point of [timed?.start, ...list(timed?.intermediates), timed?.end]) {
       const station = placeOf(point);
-      if (station && !(out.length && sameStopPlace(out[out.length - 1], station))) out.push(station);
+      if (station && !(out.length && sameStopPlace(out.at(-1), station))) out.push(station);
     }
   }
   return out;
