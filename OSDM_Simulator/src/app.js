@@ -153,6 +153,16 @@ function developmentOf(providers) {
   return Object.keys(dev).length ? { development: dev } : {};
 }
 
+// #602: a provider with a trip search answers POST /trips-collection; the
+// others answer 501. #920: OSDM 3.10 names it POST /trips-collections
+// (OSDM#1487) and keeps the singular, deprecated; below 3.10 the plural is
+// not OSDM.
+function servesTripSearch(provider, resource) {
+  if (!provider.tripsCollection) return false;
+  if (resource === 'trips-collection') return true;
+  return resource === 'trips-collections' && osdmRank(provider.osdmVersion) >= osdmRank('3.10');
+}
+
 function createApp({ providers, clients, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
   const allow = createRateLimiter({ perMinute: limits.requestsPerMinute, now });
 
@@ -455,16 +465,6 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (rest.length !== 1 || rest[0] !== 'preferences' || !provider.placePreferences) throw notProvided();
     requireMethod(req, 'GET');
     return preferenceAvailability(query, found(), provider);
-  }
-
-  // #602: a provider with a trip search answers POST /trips-collection; the
-  // others answer 501. #920: OSDM 3.10 names it POST /trips-collections
-  // (OSDM#1487) and keeps the singular, deprecated; below 3.10 the plural is
-  // not OSDM.
-  function servesTripSearch(provider, resource) {
-    if (!provider.tripsCollection) return false;
-    if (resource === 'trips-collection') return true;
-    return resource === 'trips-collections' && osdmRank(provider.osdmVersion) >= osdmRank('3.10');
   }
 
   async function osdmRoute(req, provider, clientId, segments) {
