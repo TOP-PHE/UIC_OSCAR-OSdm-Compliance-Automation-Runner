@@ -107,7 +107,7 @@ function checkProvider(key, raw) {
 // station of each variant (for `faresWithoutSection`, #905, the trip's
 // origin: that request names no section). Absent: no fare is offered.
 const FARE_CLUSTERS = new Set(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO']);
-const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares']);
+const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares', 'bicycleReservationProductMode']);
 function checkFares(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object') throw bad('fares');

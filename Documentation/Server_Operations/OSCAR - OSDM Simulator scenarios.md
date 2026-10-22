@@ -412,6 +412,15 @@ Fare offers for a requested section (fares phase 1a). The trip is trip 24, a spe
 | `SIM_WRONG_FARE_COMBINING_FEE_38` | The refund of `SIM_FARE_REFUND_COMBINING_1ADT_38`, booked by a passenger named `Simvariant-Fare-Wrong-Combining-Fee` (passenger list 32). Deliberately wrong. | The fee of the fare's other REFUND window. | A WARNING of check R3 at 10; no failed check. |
 | `SIM_WRONG_FARE_IGNORES_REFUND_FEE_38` | The refund of `SIM_FARE_REFUND_FEE_1ADT_38`, booked by a passenger named `Simvariant-Fare-Ignores-Refund-Fee` (passenger list 33). Deliberately wrong. | The fee stated is ignored: the fare's own conditions keep nothing. | Check R4 fails at 10. |
 
+**Fare reservations (#255).** `FARE_RESERVATION` in the requested offer parts asks for fare reservations: from OSDM 3.8 a reservation part marked `distributionMode: FARE_MODE` (osdm.io, handling reservations). Gamma gives each BICYCLE passenger a bicycle place on each leg of the section, with no product and no fare of its own; with fare admissions asked too, every fare offer holds the places, else one offer holds them alone. Below 3.8 none is offered, so these scenarios have no 3.6 or 3.7 copy. Step 01 selects the chosen offer's fare reservations (`optionalReservationSelections`: OSDM books only the mandatory ones unless asked); they are booked and confirmed with the fares, in one fulfilment of fares. The checks V1 to V12 are those of `fareReservations.js`.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_FARE_BICYCLE_1ADT_38` | One adult and a bicycle on trip 24, fare admissions and fare reservations asked for the section from 0000004 (passenger list 34). | Fare offers holding the adult's fare and the bicycle's place in FARE_MODE; the place booked when selected, confirmed with the fare. | No failed check and no fare warning: V1, V3 at 01; V9, V1, V3, V10 at 02, 05, 07; V11 at 07. |
+| `SIM_FARE_BICYCLE_ONLY_38` | A bicycle alone, fare reservations only (passenger list 35). | One offer holding the place alone, no fare. | No failed check and no fare warning; booked and confirmed. |
+| `SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38` | The same request for a section from station 0000088, on trip 33. Deliberately wrong. | The bicycle place without `distributionMode` (product mode). | Check V1 fails at 01; the offer is not booked. |
+| `SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38` | The fare sale of `SIM_FARE_BICYCLE_1ADT_38`, the adult named `Simvariant-Fare-Reservation-Product-Mode` (passenger list 36). Deliberately wrong. | The place booked without `distributionMode`. | Check V1 fails at 02, 05 and 07. |
+
 ### Deliberately wrong answers (#611)
 
 Each of these makes one validator family fail on purpose, so that its FAIL path runs. They are not in the data file's run list. The offer one uses the trip from station `0000098` (`variants.wrongOffersFrom`); the others a passenger list naming the variant.

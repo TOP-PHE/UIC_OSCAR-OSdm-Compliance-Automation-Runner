@@ -332,3 +332,93 @@ test('COMBINING fares: the fee of the REFUND window valid at the time; the wrong
   const wrong = await fareSale(sim, token, 'gamma', { start: '0000087', lastName: 'Simvariant-Fare-Wrong-Combining-Fee' });
   assert.equal((await refundOf(wrong)).refundFee.amount, Math.round(wrong.fare.prices[0].amount / 2));
 });
+
+// #255: fare reservations, a bicycle place in fare mode, from OSDM 3.8.
+const BICYCLE = { externalRef: '00002', type: 'BICYCLE' };
+
+test('FARE_RESERVATION: each bicycle gets a place in fare mode on each leg of the section, no product, and no fare of its own', () => {
+  const both = build(fareRequest({ parts: ['FARE_ADMISSION', 'FARE_RESERVATION'], passengers: [ADULT, BICYCLE] }));
+  const offers = fareOffers(both);
+  assert.equal(offers.length, 3);
+  for (const offer of offers) {
+    assert.deepEqual(offer.fares.map((f) => f.passengerRefs), [['00001']], 'the bicycle has no fare');
+    const [place] = offer.reservationOfferParts;
+    assert.equal(offer.reservationOfferParts.length, 1);
+    assert.equal(place.distributionMode, 'FARE_MODE');
+    assert.deepEqual(place.products, []);
+    assert.deepEqual(place.passengerRefs, ['00002']);
+    assert.deepEqual(place.tripCoverage.coveredLegIds, [both.trips[0].legs[0].id]);
+  }
+  // Fare reservations alone: one offer holding the places only.
+  const alone = build(fareRequest({ parts: ['FARE_RESERVATION'], passengers: [BICYCLE] }));
+  const only = alone.offers.filter((o) => Array.isArray(o.reservationOfferParts) && o.reservationOfferParts.some((p) => p.distributionMode === 'FARE_MODE'));
+  assert.equal(only.length, 1);
+  assert.equal(only[0].fares, undefined);
+  // Not asked: no fare reservation; a bicycle alone with fare admissions gets nothing.
+  assert.ok(!fareOffers(build(fareRequest({ passengers: [ADULT, BICYCLE] }))).some((o) => o.reservationOfferParts));
+  assert.equal(fareOffers(build(fareRequest({ passengers: [BICYCLE] }))).length, 0);
+});
+
+test('FARE_RESERVATION below OSDM 3.8 gives no fare reservation: 3.6 and 3.7 have no distributionMode', () => {
+  for (const key of ['alpha', 'beta']) {
+    const answer = build(fareRequest({ parts: ['FARE_ADMISSION', 'FARE_RESERVATION'], passengers: [ADULT, BICYCLE] }), key);
+    assert.ok(fareOffers(answer).every((o) => !o.reservationOfferParts), key);
+  }
+  for (const key of ['delta', 'epsilon']) {
+    const answer = build(fareRequest({ parts: ['FARE_ADMISSION', 'FARE_RESERVATION'], passengers: [ADULT, BICYCLE] }), key);
+    assert.ok(fareOffers(answer).every((o) => o.reservationOfferParts?.[0]?.distributionMode === 'FARE_MODE'), key);
+  }
+});
+
+test('the wrong offer variant: a section from the bicycleReservationProductMode station gives the place without its mode', () => {
+  const answer = build(fareRequest({ start: '0000088', parts: ['FARE_ADMISSION', 'FARE_RESERVATION'], passengers: [ADULT, BICYCLE] }));
+  const [place] = fareOffers(answer)[0].reservationOfferParts;
+  assert.equal(place.distributionMode, undefined);
+});
+
+test('a bicycle place is booked when selected, confirmed with the fares in one fulfilment of fares, on every provider from 3.8 (#255)', async (t) => {
+  const { SECRETS, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  const asked = offerRequest({
+    requestedSections: [{ startPlace: station('0000001'), endPlace: station('0000002') }],
+    offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION', 'FARE_RESERVATION'] },
+    anonymousPassengerSpecifications: [ADULT, BICYCLE],
+  });
+  for (const provider of ['gamma', 'delta', 'epsilon']) {
+    const token = await tokenFor(sim.base, provider, SECRETS[provider][0]);
+    const offer = fareOffers((await call(sim.base, token, 'POST', `/${provider}/offers`, asked)).body)[0];
+    const [place] = offer.reservationOfferParts;
+    const request = bookingRequest(offer);
+    request.offers[0].optionalReservationSelections = [{ reservationId: place.id }];
+    const booked = await call(sim.base, token, 'POST', `/${provider}/bookings`, request);
+    assert.equal(booked.status, 200, provider);
+    const [reservation] = booked.body.booking.bookedOffers[0].reservations;
+    assert.equal(reservation.distributionMode, 'FARE_MODE', provider);
+    assert.deepEqual(reservation.products, [], provider);
+    assert.equal(reservation.placeAllocation.accommodationSubType, 'BICYCLE', provider);
+    const bicycleId = booked.body.booking.passengers.find((p) => p.externalRef === '00002').id;
+    assert.deepEqual(reservation.passengerIds, [bicycleId], provider);
+    assert.equal(booked.body.booking.provisionalPrice.amount, offer.fares[0].prices[0].amount + place.price.amount, provider);
+    const confirmed = await call(sim.base, token, 'POST', `/${provider}/bookings/${booked.body.booking.id}/fulfillments`, {});
+    assert.equal(confirmed.status, 200, provider);
+    assert.equal(confirmed.body.fulfillments.length, 1, provider);
+    assert.deepEqual(confirmed.body.fulfillments[0].bookingParts.map((p) => p.id).sort(), [offer.fares[0].id, place.id].sort(), provider);
+    assert.equal(confirmed.body.fulfillments[0].controlNumber, undefined, provider);
+    const read = (await call(sim.base, token, 'GET', `/${provider}/bookings/${booked.body.booking.id}`)).body.booking;
+    assert.equal(read.bookedOffers[0].reservations[0].status, 'FULFILLED', provider);
+  }
+  // Not selected: not booked (OSDM books the mandatory reservations only).
+  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
+  const offer = fareOffers((await call(sim.base, token, 'POST', '/gamma/offers', asked)).body)[0];
+  const plain = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
+  assert.deepEqual(plain.bookedOffers[0].reservations, []);
+  // The wrong booking variant: the place booked without its mode.
+  const request = bookingRequest(offer);
+  request.offers[0].optionalReservationSelections = [{ reservationId: offer.reservationOfferParts[0].id }];
+  request.passengerSpecifications[0].detail.lastName = 'Simvariant-Fare-Reservation-Product-Mode';
+  const wrong = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+  assert.equal(wrong.bookedOffers[0].reservations[0].distributionMode, undefined);
+  const fulfilled = (await call(sim.base, token, 'POST', `/gamma/bookings/${wrong.id}/fulfillments`, {})).body.fulfillments;
+  assert.equal(fulfilled.length, 1, 'still a fulfilment of fares');
+});

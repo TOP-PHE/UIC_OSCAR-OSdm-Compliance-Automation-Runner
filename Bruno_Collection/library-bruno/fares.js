@@ -40,12 +40,16 @@ http://www.apache.org/licenses/LICENSE-2.0
  * A fare offer that passed every FAIL-level check is booked and confirmed
  * (#906, `fareBooking.js`: step 01 sets `__fareSale` and routes to 02);
  * with `bookMode` PRODUCT the sale goes on with a product offer instead.
- * Sources and levels are in #903, #905, #906 and #242.
+ * Fare reservations (#255, `fareReservations.js`): a request asking
+ * FARE_RESERVATION gets checks V1–V3 and V8 here; an offer holding only fare
+ * reservations is a fare offer, and a bicycle held by one needs no fare (O7).
+ * Sources and levels are in #903, #905, #906, #255 and #242.
  *
  * The pure part has no Bruno globals; the glue at the bottom has.
  */
 
 const { sameStopPlace } = require('./returnJourney.js');
+const fareReservations = require('./fareReservations.js');
 
 // The clusters of OSDM's "constructing products from fares", most flexible first.
 const CLUSTERS = ['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO'];
@@ -71,6 +75,11 @@ function asksFares(request) {
   return partsOf(request).some((p) => p === 'ALL' || String(p).startsWith('FARE_'));
 }
 
+/** #255: does the request ask for fares other than reservations (admissions, ancillaries, ALL)? */
+function asksFareProducts(request) {
+  return typesAsked(request).some((type) => type !== 'RESERVATION');
+}
+
 /** The fare types the request asks for: the three for ALL. */
 function typesAsked(request) {
   const parts = partsOf(request);
@@ -85,7 +94,8 @@ function faresOf(response) {
   })));
 }
 
-const fareOffersOf = (response) => list(response?.offers).filter((o) => list(o.fares).length > 0);
+// An offer of fares: one holding fares, or fare reservations (#255).
+const fareOffersOf = (response) => list(response?.offers).filter(fareReservations.hasFareParts);
 
 // One check over many places: ok when none breaks the rule.
 function check(id, level, title, broken, explain) {
@@ -170,6 +180,7 @@ function sectionOf(request) {
 // O7, O8: per offer, each passenger's fares.
 function passengerChecks(response, request) {
   const passengers = list(request?.anonymousPassengerSpecifications).map((p) => p.externalRef).filter(Boolean);
+  const bicycles = new Set(fareReservations.bicycleRefsOf(request));
   const section = sectionOf(request);
   const withoutFare = [];
   const gaps = [];
@@ -178,8 +189,11 @@ function passengerChecks(response, request) {
   list(response?.offers).forEach((offer, i) => {
     const fares = list(offer.fares);
     if (fares.length === 0) return;
+    // #255: a bicycle travels on its reservation, without a fare (its mode is V1's).
+    const reserved = new Set(list(offer.reservationOfferParts).flatMap((r) => list(r.passengerRefs)).filter((ref) => bicycles.has(ref)));
     for (const ref of passengers) {
       const own = fares.filter((f) => list(f.passengerRefs).includes(ref));
+      if (own.length === 0 && reserved.has(ref)) continue;
       if (own.length === 0) { withoutFare.push(`passenger ${ref} in offers[${i}]`); continue; }
       if (!section) continue;
       const how = coverageOfPassenger(own, section);
@@ -226,7 +240,7 @@ function negativePrices(all) {
  */
 function fareChecks(response, request, { travelDay } = {}) {
   const all = faresOf(response);
-  const offers = fareOffersOf(response);
+  const offers = list(response?.offers).filter((o) => list(o.fares).length > 0);
   const first = check('O1', 'FAIL', 'At least one offer holds fares (offers[].fares)', offers.length ? [] : ['no offer'],
     'the request asks for fares and names a section, but no offer holds any');
   if (offers.length === 0) return [first];
@@ -308,8 +322,12 @@ function noFareChecks(response, request) {
   const unasked = unaskedFaresCheck(response, request);
   const fares = faresOf(response).length;
   const offers = fareOffersOf(response).length;
+  const reservations = fareReservations.fareReservationCount(response);
+  const found = [];
+  if (fares) found.push(`${fares} fare(s) in ${offers} offer(s)`);
+  if (reservations) found.push(`${reservations} fare reservation(s)`);
   const none = unasked || check('N', 'FAIL', 'No fare in the answer, as the scenario expects (expectFares: false)',
-    fares ? [`${fares} fare(s) in ${offers} offer(s)`] : [],
+    found,
     'fares though the scenario expects none (the Test Manager\'s expectation for this provider, #242 D4)');
   return [none, countCheck(response)];
 }
@@ -460,7 +478,7 @@ function sectionsOutsideTrip(request, chosenTripLegs) {
 
 /** The offers that hold products (or no fares): what the product checks look at. */
 function productOffersOf(response) {
-  return list(response?.offers).filter((o) => list(o.fares).length === 0 || list(o.products).length || list(o.admissionOfferParts).length);
+  return list(response?.offers).filter((o) => !fareReservations.hasFareParts(o) || list(o.products).length || list(o.admissionOfferParts).length);
 }
 
 // ── Bruno glue ──────────────────────────────────────────────────────────────
@@ -510,9 +528,12 @@ function checkNoFares(body, request) {
 function checkFareOffers(body) {
   const request = readJson('OfferCollectionRequest') || {};
   if (String(bru.getEnvVar('expectFares')) === 'false') return checkNoFares(body, request);
+  // #255: fare reservations that were not asked.
+  const unaskedReservations = fareReservations.unaskedReservationsCheck(body, request);
   if (!asksFares(request)) {
     const unasked = unaskedFaresCheck(body, request);
     if (unasked) record(unasked);
+    if (unaskedReservations) record(unaskedReservations);
     if (fareOffersOf(body).length > 0 && Array.isArray(body?.offers)) {
       body.offers = productOffersOf(body);
       validationLogger('[INFO] [fares] Offers holding fares only are left out of the product checks.');
@@ -522,7 +543,12 @@ function checkFareOffers(body) {
   if (list(request.requestedSections).length === 0) {
     validationLogger('[WARNING] [fares] The request asks for fares without a requested section; OSDM asks for one when trips are given (processes).');
   }
-  const checks = fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') });
+  const checks = [
+    // A request for fare reservations alone checks no fare, unless the answer holds some.
+    ...(asksFareProducts(request) || faresOf(body).length > 0 ? fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') }) : [countCheck(body)]),
+    ...fareReservations.offerChecks(body, request, { osdmVersion: bru.getEnvVar('osdmVersion') }),
+    ...(unaskedReservations ? [unaskedReservations] : []),
+  ];
   for (const c of checks) record(c);
   const desired = bru.getEnvVar('desiredFareCluster') || null;
   const chosen = chooseFareOffer(body, desired);
@@ -544,6 +570,12 @@ function checkFareOffers(body) {
     bru.setEnvVar('__fareSale', 'true');
     bru.setEnvVar('offer', chosen);
     bru.setEnvVar('offerId', chosen.offerId);
+    // #255: OSDM books only the mandatory reservations unless selected.
+    const selections = fareReservations.selectionsFor(chosen);
+    if (selections.length > 0) {
+      bru.setEnvVar('optionalReservationSelections', JSON.stringify(selections));
+      validationLogger(`[INFO] [fares] ${selections.length} fare reservation(s) of the offer selected for the booking (optionalReservationSelections).`);
+    }
   }
   validationLogger(`[INFO] [fares] ${decision.reason}`);
   return true;
@@ -592,7 +624,7 @@ function stopOnSectionsOutside() {
 }
 
 module.exports = {
-  CLUSTERS, COMBINATION_MODELS, missingFareMembers, fareSaleDecision, isFareSale, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, typesAsked, fareChecks, unaskedFaresCheck,
+  CLUSTERS, COMBINATION_MODELS, missingFareMembers, fareSaleDecision, isFareSale, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, asksFareProducts, typesAsked, fareChecks, unaskedFaresCheck, fareOffersOf,
   noFareChecks, chooseFareOffer, coverageOfPassenger, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip,
   prepareSectionCheck, stopOnSectionsOutside,
 };

@@ -19,7 +19,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf } = require('./reductionCards');
-const { reservationsToBook, reservationFrom, linkReservations, propertiesAsked, propertiesGiven } = require('./reservations');
+const { reservationsToBook, reservationFrom, linkReservations, propertiesAsked, propertiesGiven, isFarePlace } = require('./reservations');
 const placeMap = require('./placeMap');
 
 /**
@@ -118,10 +118,11 @@ const sumOf = (prices, currency) => ({ amount: prices.reduce((total, p) => total
 // #781: a booking is in the currency its offers were sold in.
 const currencyOf = (booking, provider) => partsOf(booking).find((p) => p.price?.currency)?.price.currency || provider.currency;
 // Every part of a booking: its admissions and, since #601, its reservations;
-// since #906, its fares.
+// since #906, its fares. A fare reservation (#255) is a fare part, not a product.
 const faresOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.fares || []);
-const productPartsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...bookedOffer.reservations]);
-const partsOf = (booking) => [...productPartsOf(booking), ...faresOf(booking)];
+const fareReservationsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.reservations.filter(isFarePlace));
+const productPartsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...bookedOffer.reservations.filter((r) => !isFarePlace(r))]);
+const partsOf = (booking) => [...productPartsOf(booking), ...faresOf(booking), ...fareReservationsOf(booking)];
 // A booked part's price: a fare gives a list of prices, the first one counts (#906).
 const priceOf = (part) => part.price || (Array.isArray(part.prices) ? part.prices[0] : undefined);
 // #906: a fulfilment of fares only, which OSDM gives no document, control number or issuer.
@@ -221,6 +222,8 @@ function createBooking(body, findOffer, provider, nowMs) {
     };
     // #906: an offer of fares books its fares.
     if (Array.isArray(offer.fares) && offer.fares.length > 0) bookedOffer.fares = offer.fares.map((fare) => fareFrom(fare, passengers));
+    // #255: the wrong variant books a fare reservation without its mode.
+    if (chosenVariants.has('fare-reservation-product-mode')) for (const r of bookedOffer.reservations.filter(isFarePlace)) delete r.distributionMode;
     linkReservations(bookedOffer);
     if (offer.inboundTripCoverage) bookedOffer.inboundTripCoverage = offer.inboundTripCoverage;
     bookedOffers.push(bookedOffer);
@@ -300,6 +303,13 @@ function confirmBooking(booking, provider, nowMs) {
   // #906: a fare has a status and nothing else of the confirmation.
   const fares = faresOf(booking);
   for (const fare of fares) fare.status = 'FULFILLED';
+  // #255: a fare reservation is confirmed as a reservation, and fulfilled with the fares.
+  const fareReservations = fareReservationsOf(booking);
+  for (const reservation of fareReservations) {
+    reservation.status = 'FULFILLED';
+    reservation.confirmedOn = confirmedOn;
+    delete reservation.confirmableUntil;
+  }
   booking.confirmedPrice = sumOf(partsOf(booking).map(priceOf), currencyOf(booking, provider));
   booking.provisionalPrice = { amount: 0, currency: currencyOf(booking, provider), scale: 2 };
   delete booking.confirmationTimeLimit;
@@ -318,7 +328,8 @@ function confirmBooking(booking, provider, nowMs) {
   }));
   // #603: the documents of the media asked for, when the provider issues them.
   if (provider.documents) issueDocuments(booking, provider, [...booking.fulfillments]);
-  if (fares.length > 0) booking.fulfillments.push(fareFulfillmentOf(booking, fares, provider, confirmedOn));
+  const fareParts = [...fares, ...fareReservations];
+  if (fareParts.length > 0) booking.fulfillments.push(fareFulfillmentOf(booking, fareParts, provider, confirmedOn));
   variants.shapeIssuedFulfillments(booking);
   return booking.fulfillments;
 }

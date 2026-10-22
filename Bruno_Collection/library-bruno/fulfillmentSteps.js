@@ -76,7 +76,11 @@ function readNextFulfillment() {
 function checkFulfillmentReadStep(status, body) {
   const ids = parseEnvJson('__fulfillmentsToRead', []) || [];
   const id = ids[0];
-  if (status !== 200) {
+  if (status !== 200 && fareReservationRead()) {
+    // #255 V12: in fare mode the client makes the fulfilment; an error is allowed.
+    validationLogger(`[INFO] [fares V12] GET /fulfillments/${id} answered ${status}, which OSDM allows for a fare reservation (${require('./fareReservations.js').READ_ALLOWED}).`);
+    test(`HTTP response status — 06b. GET Fulfillment returns ${status}, allowed for a fare reservation (OSDM handling reservations)`, () => {});
+  } else if (status !== 200) {
     const { classifySystemInfoStatus } = require('./osdmCompliance.js');
     const cls = classifySystemInfoStatus(status, 'Fulfillment', body);
     if (cls.outcome === 'skip') {
@@ -102,6 +106,11 @@ function checkFulfillmentReadStep(status, body) {
   const rest = ids.slice(1);
   bru.setEnvVar('__fulfillmentsToRead', JSON.stringify(rest));
   return rest.length > 0 ? READ_STEP : AFTER_READS;
+}
+
+// #255: the read of a fulfilment in a fare sale that holds fare reservations.
+function fareReservationRead() {
+  return require('./fares.js').isFareSale() && (parseEnvJson('__fareReservationIds', []) || []).length > 0;
 }
 
 // ── 07 ──────────────────────────────────────────────────────────────────────

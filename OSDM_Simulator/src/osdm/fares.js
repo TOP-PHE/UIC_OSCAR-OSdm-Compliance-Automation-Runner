@@ -32,10 +32,22 @@
  * station gets fares combined by COMBINING, whose refund fee is the fare's own
  * and depends on the date: a tenth of the price until noon (UTC) the day
  * before travel, half of it after.
+ *
+ * Fare reservations (#255): from OSDM 3.8, `FARE_RESERVATION` asked gives each
+ * BICYCLE passenger a bicycle place on each leg of the section, a
+ * ReservationOfferPart marked `distributionMode: FARE_MODE` with no product
+ * (osdm.io, handling reservations). A bicycle has no fare of its own: its
+ * place is its fare. With fare admissions asked too, every fare offer holds
+ * the places; else one offer holds them alone. Below 3.8 a fare reservation
+ * cannot be told from a product one, and none is offered. A section from the
+ * `bicycleReservationProductMode` station gives the places without
+ * `distributionMode` (so in product mode): deliberately wrong.
  */
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
+const { rank } = require('./versionShapes');
+const { FARE_PLACE } = require('./reservations');
 
 const MAX_SECTIONS = 4;
 const MAX_REF_LENGTH = 120;
@@ -87,10 +99,60 @@ function checkInternationalFlags(body) {
   });
 }
 
+const partsAsked = (criteria) => (Array.isArray(criteria?.requestedOfferParts) ? criteria.requestedOfferParts : []);
+
 /** Does the request ask for fare admissions? */
 function asksFares(criteria) {
-  const parts = Array.isArray(criteria?.requestedOfferParts) ? criteria.requestedOfferParts : [];
+  const parts = partsAsked(criteria);
   return parts.includes('FARE_ADMISSION') || parts.includes('ALL');
+}
+
+/** #255: does the request ask for fare reservations? */
+function asksFareReservations(criteria) {
+  const parts = partsAsked(criteria);
+  return parts.includes('FARE_RESERVATION') || parts.includes('ALL');
+}
+
+// #255: a bicycle travels on a place of its own, its fare reservation.
+const isBicycle = (passenger) => passenger.type === 'BICYCLE';
+const BICYCLE_PLACE_CENTS = 300;
+// OSDM 3.8 marks a fare reservation with ReservationOfferPart.distributionMode.
+const FARE_RESERVATIONS_FROM = rank('3.8');
+
+// #255: the legs of a trip a section runs over: from the one it starts at to
+// the one it ends at; every leg when the section names neither.
+function legsOfSection(trip, section) {
+  const legs = Array.isArray(trip.legs) ? trip.legs : [];
+  const at = (leg, end) => leg.timedLeg?.[end]?.stopPlaceRef?.stopPlaceRef;
+  const first = legs.findIndex((leg) => at(leg, 'start') === section.startPlace.stopPlaceRef);
+  const last = legs.findIndex((leg, i) => i >= Math.max(first, 0) && at(leg, 'end') === section.endPlace.stopPlaceRef);
+  if (first < 0 || last < 0) return legs;
+  return legs.slice(first, last + 1);
+}
+
+// #255: the bicycle places of a request, one per bicycle and leg: fare
+// reservations, without a product. The wrong variant leaves out their mode.
+function bicyclePlacesOf({ trip, section, bicycles, provider, createdOn, fulfillmentOptions, variant }) {
+  const price = { amount: Math.round(BICYCLE_PLACE_CENTS * provider.priceFactor), currency: provider.currency, scale: 2 };
+  const marked = (part) => Object.defineProperty(part, FARE_PLACE, { value: true });
+  return bicycles.flatMap((bicycle) => legsOfSection(trip, section).map((leg) => marked({
+    objectType: 'ReservationOfferPart',
+    id: `${provider.idPrefix}-FRES-${randomId()}`,
+    summary: `Bicycle place, train ${leg.timedLeg.service.vehicleNumbers[0]}`,
+    createdOn,
+    validFrom: leg.timedLeg.start.serviceDeparture.timetabledTime,
+    validUntil: leg.timedLeg.end.serviceArrival.timetabledTime,
+    price: { ...price },
+    tripCoverage: { coveredTripId: trip.id, coveredLegIds: [leg.id] },
+    offerMode: 'INDIVIDUAL',
+    isReusable: false,
+    passengerRefs: [bicycle.externalRef],
+    refundable: 'YES',
+    exchangeable: 'NO',
+    products: [],
+    availableFulfillmentOptions: fulfillmentOptions,
+    ...(variant === 'bicycleReservationProductMode' ? {} : { distributionMode: 'FARE_MODE' }),
+  })));
 }
 
 // The age of a passenger on a day, or null without a date of birth.
@@ -207,7 +269,7 @@ function applyCombiningVariant(fare, variant, day) {
  * "unrequested fares" variant station, or the trip leaves from the "fares
  * without section" one).
  */
-function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, lifetimeMs }) {
+function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, lifetimeMs, fulfillmentOptions = [] }) {
   checkInternationalFlags(body);
   const rules = provider.fares;
   const sections = sectionsOf(body);
@@ -215,16 +277,32 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
   const section = sections[0] || wholeTripWithoutSection(trips, rules);
   if (!section) return [];
   const variant = sections.length ? variantOf(section, rules) : null;
-  if (!asksFares(criteria) && variant !== 'unrequestedFares') return [];
+  const admissions = asksFares(criteria) || variant === 'unrequestedFares';
+  // #255: bicycle places in fare mode, from OSDM 3.8.
+  const bicycles = asksFareReservations(criteria) && rank(provider.osdmVersion) >= FARE_RESERVATIONS_FROM ? passengers.filter(isBicycle) : [];
+  if (!admissions && bicycles.length === 0) return [];
+  const persons = passengers.filter((p) => !isBicycle(p));
+  if (persons.length === 0 && bicycles.length === 0) return [];
   const day = trips[0].startTime.slice(0, 10);
   const seed = hashOf(`${section.startPlace.stopPlaceRef}|${section.endPlace.stopPlaceRef}`);
   const baseCents = 800 + (seed.readUInt16BE(0) % 4200);
   const clusters = rules.clusters.filter((c) => CLUSTERS.includes(c));
   const createdOn = new Date(nowMs).toISOString();
+  const places = () => bicyclePlacesOf({ trip: trips[0], section, bicycles, provider, createdOn, fulfillmentOptions, variant });
+  const route = `${stopName(section.startPlace.stopPlaceRef)} - ${stopName(section.endPlace.stopPlaceRef)}`;
+  const offerOf = (summary, members) => ({
+    offerId: `${provider.idPrefix}-FOF-${randomId()}`,
+    summary,
+    createdOn,
+    preBookableUntil: new Date(nowMs + lifetimeMs).toISOString(),
+    passengerRefs: passengers.map((p) => p.externalRef),
+    ...members,
+  });
+  if (!admissions || persons.length === 0) return [offerOf(`${provider.name} bicycle places, ${route}`, { reservationOfferParts: places() })];
   return clusters.map((cluster) => {
     const priceCents = Math.round(baseCents * CLUSTER_FACTOR[cluster] * provider.priceFactor);
-    const fares = passengers
-      .filter((p, i) => !(variant === 'passengerWithoutFare' && i === passengers.length - 1))
+    const fares = persons
+      .filter((p, i) => !(variant === 'passengerWithoutFare' && i === persons.length - 1))
       .flatMap((passenger) => faresOfPassenger(passenger, section, {
         variant, cluster, clusters, day, provider,
         priceCents: isFree(passenger, day, rules) ? 0 : priceCents,
@@ -233,15 +311,9 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
       applyClusterVariant(fare, variant);
       applyCombiningVariant(fare, variant, day);
     }
-    return {
-      offerId: `${provider.idPrefix}-FOF-${randomId()}`,
-      summary: `${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fares, ${stopName(section.startPlace.stopPlaceRef)} - ${stopName(section.endPlace.stopPlaceRef)}`,
-      createdOn,
-      preBookableUntil: new Date(nowMs + lifetimeMs).toISOString(),
-      passengerRefs: passengers.map((p) => p.externalRef),
-      fares,
-    };
+    const reservations = bicycles.length > 0 ? { reservationOfferParts: places() } : {};
+    return offerOf(`${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fares, ${route}`, { fares, ...reservations });
   });
 }
 
-module.exports = { fareOffersOf, sectionsOf, asksFares, CLUSTERS };
+module.exports = { fareOffersOf, sectionsOf, asksFares, asksFareReservations, CLUSTERS };

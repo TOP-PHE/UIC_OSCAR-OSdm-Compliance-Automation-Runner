@@ -246,6 +246,11 @@ function placesOf(partId, count) {
   return { coachNumber: coach, placeNumbers: Array.from({ length: count }, (_, i) => String(first + i)) };
 }
 
+// #255: a fare reservation (a bicycle place), whatever mode the answer states:
+// a hidden mark, never sent.
+const FARE_PLACE = Symbol('fare reservation');
+const isFarePlace = (part) => part?.[FARE_PLACE] === true;
+
 /** The booked reservation made from a reservation offer part. */
 function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil, { placeProperties = [], named = null, fee = 0, otherPlace = false, near = null, ignoreReference = false, onMap = false } = {}) {
   const tripId = part.tripCoverage.coveredTripId;
@@ -265,7 +270,7 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
   else given = placesOf(part.id, passengerIds.length);
   const { coachNumber, placeNumbers } = given;
   const charged = named ? { ...part.price, amount: part.price.amount + named.fees * fee } : part.price;
-  return {
+  const reservation = {
     objectType: 'Reservation',
     id: part.id,
     summary: part.summary,
@@ -283,9 +288,10 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
     availableFulfillmentOptions: part.availableFulfillmentOptions,
     refundable: part.refundable,
     exchangeable: part.exchangeable,
+    ...(part.distributionMode ? { distributionMode: part.distributionMode } : {}),
     placeAllocation: {
-      accommodationType: 'SEAT',
-      accommodationSubType: named?.compartment ? 'COMPARTMENT' : 'ANY_SEAT',
+      accommodationType: isFarePlace(part) ? 'STORAGE' : 'SEAT',
+      accommodationSubType: subTypeOf(part, named),
       reservedPlaces: [{
         id: `${part.id}-PLACES`,
         passengerIds,
@@ -298,6 +304,14 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
       tripLegCoverage: { tripId, legId },
     },
   };
+  if (isFarePlace(part)) Object.defineProperty(reservation, FARE_PLACE, { value: true });
+  return reservation;
+}
+
+// The place a reservation gives: a bicycle place (#255), a compartment, any seat.
+function subTypeOf(part, named) {
+  if (isFarePlace(part)) return 'BICYCLE';
+  return named?.compartment ? 'COMPARTMENT' : 'ANY_SEAT';
 }
 
 /** Each admission of a booked offer points to the booked reservations of its trip. */
@@ -312,5 +326,5 @@ function linkReservations(bookedOffer) {
 
 module.exports = {
   reservationKind, reservationProductOf, reservationsOfDirection, reservationsToBook, reservationFrom, linkReservations,
-  propertiesAsked, propertiesGiven, preferenceAvailability, PRICE_PER_PASSENGER,
+  propertiesAsked, propertiesGiven, preferenceAvailability, PRICE_PER_PASSENGER, FARE_PLACE, isFarePlace,
 };
