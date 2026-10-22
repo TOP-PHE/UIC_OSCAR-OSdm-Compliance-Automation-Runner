@@ -440,4 +440,4 @@ function exchangedBookedOffer(booking, entry, nowMs) {
   return bookedOffer;
 }
 
-module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf, currencyOf };
+module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf, currencyOf, partsOf, priceOf };

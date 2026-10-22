@@ -54,11 +54,14 @@ runtime:
             return;
         }
         if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking before Patch Refund")) return;
+        // #907: a booking of fares has its own checks.
+        if (!require(bru.getEnvVar("library_base") + "fareRefund.js").checkFareBookingInRefund(jsonData, "confirmed")) {
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,
         ["FULFILLED", "CONFIRMED"],
         ["FULFILLED", "CONFIRMED"]);
+        }
 
         displayFulFilledBooking(jsonData);
 

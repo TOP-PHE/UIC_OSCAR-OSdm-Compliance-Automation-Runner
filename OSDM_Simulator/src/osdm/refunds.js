@@ -21,12 +21,18 @@
  * one not at all (the fee is its price). An overrule code waives the fee: the
  * whole price is refunded, and the offer says which code it applied. A
  * provider that lists its overrule codes refuses any other (#596).
+ *
+ * A booked fare (#907) is refunded by its own after-sales conditions: the fee
+ * of its REFUND condition valid at the time (none valid: nothing back). For
+ * fares combined by CLUSTERING whose fee is the provider's (isProviderFee),
+ * the client may state the fee in RefundSpecification.refundFee (osdm.io,
+ * constructing products from fares), and that is the fee taken.
  */
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { noteRefund } = require('./documents');
-const { lifetimeOf, currencyOf } = require('./bookings');
+const { lifetimeOf, currencyOf, partsOf, priceOf } = require('./bookings');
 const variants = require('./variants');
 const ticketing = require('./ticketing');
 
@@ -39,18 +45,59 @@ const conflict = (detail) => new HttpError(409, 'CONFLICT', 'Conflict', detail);
 const notFound = () => new HttpError(404, 'RESOURCE_NOT_FOUND', 'Refund offer not found');
 const randomId = () => crypto.randomBytes(8).toString('hex');
 
-// Every part of a booking, reservations included (#601).
-const admissionsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...(bookedOffer.reservations || [])]);
+// Every part of a booking, reservations (#601) and fares (#907) included.
+const admissionsOf = partsOf;
 const price = (amount, currency) => ({ amount, currency, scale: 2 });
+const isFare = (part) => Array.isArray(part.prices);
+const modelsOf = (fare) => (fare.combinationConstraint || []).map((c) => c.model);
+
+// #907: a fare's own refund fee, from its REFUND condition valid at `nowMs`;
+// none valid, the fee is its price. The wrong variant takes another window's.
+function fareFee(fare, booking, nowMs) {
+  const amount = priceOf(fare).amount;
+  const windows = (fare.afterSalesCondition?.conditions || []).filter((c) => c.condition === 'REFUND');
+  const valid = (c) => (!c.validFrom || Date.parse(c.validFrom) <= nowMs) && (!c.validUntil || nowMs <= Date.parse(c.validUntil));
+  let chosen = windows.find(valid);
+  if (modelsOf(fare).includes('COMBINING') && variants.has(booking, 'fare-wrong-combining-fee')) chosen = windows.find((c) => c !== chosen) || chosen;
+  return chosen ? Math.min(chosen.afterSaleFee.amount, amount) : amount;
+}
 
 // What a part gives back: its fee and what is left of its price.
-function refundOfPart(part, overruled) {
-  const amount = part.price.amount;
+function refundOfPart(part, overruled, booking, nowMs) {
+  const amount = priceOf(part).amount;
   let fee = 0;
   if (overruled) return { fee, refundable: amount };
-  if (part.refundable === 'NO') fee = amount;
+  if (isFare(part)) fee = fareFee(part, booking, nowMs);
+  else if (part.refundable === 'NO') fee = amount;
   else if (part.refundable === 'WITH_CONDITION') fee = Math.round(amount * SEMI_FLEXIBLE_FEE_SHARE);
   return { fee, refundable: amount - fee };
+}
+
+// #907: the fee a client states (RefundSpecification.refundFee), checked: a
+// CurrencyAmount in the booking's currency. null when none is stated.
+function statedFeeOf(spec, booking, provider) {
+  const fee = spec?.refundFee;
+  if (fee == null) return null;
+  const ok = typeof fee === 'object' && Number.isInteger(fee.amount) && fee.amount >= 0 && fee.amount <= 1e9
+    && fee.currency === currencyOf(booking, provider) && (fee.scale == null || fee.scale === 2);
+  if (!ok) throw bad(`refundFee of fulfillment ${String(spec.fulfillmentId).slice(0, 80)} must be an amount in cents in ${currencyOf(booking, provider)}`);
+  return fee.amount;
+}
+
+// #907: the fee stated applies to fares combined by CLUSTERING whose fee is the
+// provider's, unless the wrong variant ignores it.
+const takesStatedFee = (parts, booking) => parts.length > 0 && !variants.has(booking, 'fare-ignores-refund-fee')
+  && parts.every((p) => isFare(p) && modelsOf(p).includes('CLUSTERING') && p.afterSalesCondition?.isProviderFee !== false);
+
+// The fee stated, shared over the parts in their order, no part keeping more than its price.
+function withStatedFee(items, fee) {
+  let left = fee;
+  return items.map((item) => {
+    const amount = priceOf(item.part).amount;
+    const kept = Math.min(left, amount);
+    left -= kept;
+    return { ...item, fee: kept, refundable: amount - kept };
+  });
 }
 
 // The ids a request names, checked against the booking's fulfillments.
@@ -87,10 +134,11 @@ function refuseScopedRefund(body, booking) {
   }
 }
 
-function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs, scoped = null) {
+function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs, scoped = null, statedFee = null) {
   const partIds = new Set(scoped || fulfillment.bookingParts.map((p) => p.id));
   const parts = admissionsOf(booking).filter((a) => partIds.has(a.id));
-  const items = parts.map((part) => ({ part, ...refundOfPart(part, !!overruleCode) }));
+  let items = parts.map((part) => ({ part, ...refundOfPart(part, !!overruleCode, booking, nowMs) }));
+  if (statedFee !== null && !overruleCode && takesStatedFee(parts, booking)) items = withStatedFee(items, statedFee);
   const sum = (key) => items.reduce((total, item) => total + item[key], 0);
   return {
     id: `${provider.idPrefix}-RFO-${randomId()}`,
@@ -142,7 +190,7 @@ function createRefundOffers(booking, body, provider, nowMs) {
     const spec = specs.find((s) => s?.fulfillmentId === f.id) || (specs.length === 1 && !specs[0]?.fulfillmentId ? specs[0] : null);
     const scoped = spec ? variants.scopedPartIds(booking, f, spec, admissionsOf(booking)) : null;
     if (scoped?.length === 0) throw bad(`the refund specification names no part of fulfillment ${f.id}`);
-    return buildRefundOffer(booking, f, overruleCode, provider, nowMs, scoped);
+    return buildRefundOffer(booking, f, overruleCode, provider, nowMs, scoped, statedFeeOf(spec, booking, provider));
   });
   booking.refundOffers = [...(booking.refundOffers || []), ...offers];
   return offers;

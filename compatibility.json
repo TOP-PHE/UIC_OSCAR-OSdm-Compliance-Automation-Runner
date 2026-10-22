@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.413",
+  "current_release": "2026.414",
   "releases": [
+    {
+      "release": "2026.414",
+      "date": "2026-10-22",
+      "server": "1.11.379",
+      "collection": "OTST_V2.0.212",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#907 (fares phase 3): a fare REFUND scenario refunds the fare fulfilments in full after the sale: the refund offers cover them (R1) and give back and keep what the fares cost (R2); a COMBINING fee is the one the fares' conditions give at the time (R3, WARNING); for a CLUSTERING fare whose fee is the provider's, the fee OSCAR states (new field fareRefundFee, RefundSpecification.refundFee from OSDM 3.8, provisional request form of #242 D6) is the fee taken (R4); after the confirmation the fares and their fulfilment are REFUNDED (R5). Simulator 0.48.0 refunds fares, offers COMBINING fares from station 0000087, and has two wrong fare refunds."
+      ]
+    },
     {
       "release": "2026.413",
       "date": "2026-10-22",

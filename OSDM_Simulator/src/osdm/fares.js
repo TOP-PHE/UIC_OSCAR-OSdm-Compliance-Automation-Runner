@@ -27,6 +27,11 @@
  * its station. One variant is asked without a section (#905): a trip from
  * the `faresWithoutSection` station gets fares for the whole trip all the
  * same, as a provider that ignores the missing section would give.
+ *
+ * One variant is not wrong (#907): a section from the `combiningFares`
+ * station gets fares combined by COMBINING, whose refund fee is the fare's own
+ * and depends on the date: a tenth of the price until noon (UTC) the day
+ * before travel, half of it after.
  */
 
 const crypto = require('node:crypto');
@@ -182,6 +187,20 @@ function applyClusterVariant(fare, variant) {
   if (variant === 'widerClusters') model.allowedClusters = [...CLUSTERS];
 }
 
+// #907: a fare combined by COMBINING gives its own refund fee, by date.
+function applyCombiningVariant(fare, variant, day) {
+  if (variant !== 'combiningFares') return;
+  const { amount, currency } = fare.prices[0];
+  const price = (cents) => ({ amount: cents, currency, scale: 2 });
+  const eve = new Date(Date.parse(`${day}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
+  fare.combinationConstraint = [{ model: 'COMBINING' }];
+  fare.afterSalesCondition.conditions = [
+    { condition: 'REFUND', validUntil: `${eve}T11:59:59Z`, afterSaleFee: price(Math.round(amount / 10)) },
+    { condition: 'REFUND', validFrom: `${eve}T12:00:00Z`, validUntil: `${day}T23:59:59Z`, afterSaleFee: price(Math.round(amount / 2)) },
+    { condition: 'EXCHANGE', afterSaleFee: price(0) },
+  ];
+}
+
 /**
  * The fare offers of a request: [] unless the provider sells fares, the
  * request asks for them and names a section (or the section starts at the
@@ -210,7 +229,10 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
         variant, cluster, clusters, day, provider,
         priceCents: isFree(passenger, day, rules) ? 0 : priceCents,
       }));
-    for (const fare of fares) applyClusterVariant(fare, variant);
+    for (const fare of fares) {
+      applyClusterVariant(fare, variant);
+      applyCombiningVariant(fare, variant, day);
+    }
     return {
       offerId: `${provider.idPrefix}-FOF-${randomId()}`,
       summary: `${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fares, ${stopName(section.startPlace.stopPlaceRef)} - ${stopName(section.endPlace.stopPlaceRef)}`,

@@ -1620,8 +1620,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   06, 07 call `library-bruno/fareBooking.js` right after their status
   and JSON checks, and 06b's `checkFulfillmentReadStep()` does, so no
   product validator sees a booking of fares; 02 goes straight to 05
-  (no passenger update), 07 ends the scenario (the refund is #907) and
-  keeps the fare ids in `admissionReservationAncillaryBookingPartsIds`.
+  (no passenger update), 07 keeps the fare ids in
+  `admissionReservationAncillaryBookingPartsIds` and ends the scenario,
+  or goes on to the refund (next note).
   Offered and booked fares are paired by content (`pairFares()`: id, else
   passengers through the booking's ids, then section and price, ties by
   text). A fulfilment naming a fare, or naming no part, is a fare
@@ -1631,6 +1632,35 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `fare-not-in-fulfillment` / `fare-fulfillment-document` by last name.
   A `Fare` is a closed schema: a booked one gets a status and nothing of
   an admission's confirmation (`confirmedOn` would break conformance).
+  **The fare refund** (#907, fares 3, 1.11.379 / OTST_V2.0.212, simulator
+  0.48.0): a fare REFUND scenario goes from 07 to 10
+  (`prepareFareRefund()` in `library-bruno/fareRefund.js` sets
+  `fulfillmentIds`, `__bookingFulfillmentIds`, `confirmedPriceAmount` and
+  `__fareRefundFulfillments`, which a product sale gets from
+  `postCreateBookingResponse()`). 10's before-request returns early on
+  `prepareFareRefundRequest()`: the fare fulfilments in full, no partial
+  refund of fares (a partial flag is warned and degraded). The refund
+  steps keep their own checks; R1–R4 are added at 10
+  (`refundOfferChecks()`), 12/14/16 run `checkFareBookingInRefund()`
+  instead of `postCreateBookingResponse()`, and R5 is
+  `checkRefundScopeOnBooking()` (`refunds.js`), which reads `fares` among
+  the booking parts. The fee rule of a fulfilment (`feeRuleOf()`) is
+  COMBINING or CLUSTERING when all its fares are and none the other way,
+  else OTHER (nothing checked). `fareRefundFee` (cents) is sent only for
+  CLUSTERING fares whose fee is the provider's (`isProviderFee`, default
+  true), from OSDM 3.8 (`RefundSpecification.refundFee`), as one
+  specification per fare fulfilment holding `fulfillmentId` and
+  `refundFee`: the provisional form of #242 D6, to change when OTST
+  answers. R3 reads the fares' REFUND windows through
+  `afterSalesRules.js` at the refund offer's `createdOn`. Simulator: a
+  fare's own fee is its REFUND window valid at the time (none: nothing
+  back), a stated fee is shared over the fares, COMBINING fares come from
+  a section starting at `0000087` (`fares.variants.combiningFares`, not a
+  wrong variant), wrong variants `fare-wrong-combining-fee` and
+  `fare-ignores-refund-fee`. `version-copies-lib.js` gives a scenario
+  with `fareRefundFee` no copy below 3.8. **The simulator of the tests
+  runs on a fixed clock** (`tests/helpers.js`, 2026-11-02T09:00Z): a test
+  date must be fixed too, never "now plus N days".
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

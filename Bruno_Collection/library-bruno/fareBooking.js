@@ -30,8 +30,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   F5  every booked fare is in a fulfilment                          07 FAIL
  *   F6  the fulfilment-step attributes are the offer's                07 WARNING
  *
- * Sources and levels are in #906 and #242 (D3 for F2). The refund of a fare is
- * #907: until then a fare sale ends after 07.
+ * Sources and levels are in #906 and #242 (D3 for F2). A fare REFUND scenario
+ * goes on from 07 to the refund (#907, fareRefund.js); any other ends there.
  *
  * The pure part has no Bruno globals; the glue at the bottom has.
  */
@@ -171,7 +171,9 @@ function statusChecks(booked, stage) {
 
 /**
  * The checks of a booking of fares against the fare offer booked. `stage` is
- * 'booked' (02's answer), 'prebooked' (05) or 'confirmed' (07).
+ * 'booked' (02's answer), 'prebooked' (05), 'confirmed' (07, and 12 and 16 of
+ * a refund) or 'refunded' (14, #907: B1–B3 only, the refund's own checks say
+ * which fare is refunded).
  * Each check: { id, level: FAIL | WARNING | INFO, title, ok, message }.
  */
 function bookingChecks(booking, offer, stage) {
@@ -191,13 +193,13 @@ function bookingChecks(booking, offer, stage) {
       booked.map(({ fare, path }) => ({ path, missing: missingFareMembers(fare) })).filter((x) => x.missing.length).map((x) => `${x.path} lacks ${x.missing.join(', ')}`),
       'members missing or empty'),
   ];
-  if (stage !== 'confirmed') {
+  if (stage === 'booked' || stage === 'prebooked') {
     checks.push(check('B4', 'FAIL', 'Each booked fare\'s price is the offered fare\'s',
       pairs.filter((p) => priceText(p.offered) !== priceText(p.booked)).map((p) => `${p.path}: ${priceText(p.booked) || 'none'}, offered ${priceText(p.offered) || 'none'}`),
       'prices that differ from the offer'));
   }
   if (stage === 'prebooked') checks.push(provisionalPriceCheck(booking, booked));
-  if (stage !== 'booked') checks.push(...statusChecks(booked, stage));
+  if (stage === 'prebooked' || stage === 'confirmed') checks.push(...statusChecks(booked, stage));
   return checks;
 }
 
@@ -337,21 +339,23 @@ function fulfillmentReadChecks(body, id) {
   return [same, ...fulfillmentChecks([fulfillment], { fareIds: readJson('__fareIds', []), productIds: readJson('__fareProductIds', []), documents: body?.fulfillmentDocuments })];
 }
 
-/** Step 07's after-response, for a fare sale: checks the confirmed booking, then ends the scenario. */
+/** Step 07's after-response, for a fare sale: checks the confirmed booking, then goes on to the refund (#907) or ends the scenario. */
 function checkFareConfirmedStep(body) {
   if (!isFareSale()) return false;
   const booking = bookingOf(body);
   recordFareChecks(confirmedBookingChecks(booking, readJson('offer')));
-  // For the refund of phase 3 (#907): the booked fares are the parts to refund.
+  // The booked fares are the parts a refund (#907) names.
   bru.setEnvVar('admissionReservationAncillaryBookingPartsIds', bookedFaresOf(booking).map(({ fare }) => fare.id).filter(Boolean));
-  if (/REFUND|EXCHANGE/.test(String(bru.getEnvVar('scenarioType') || ''))) {
-    validationLogger('[WARNING] [fares] The refund or exchange of a fare comes with #907: this fare scenario ends after its confirmation.');
-  } else {
-    validationLogger('[INFO] [fares] Fare sale complete: booked and confirmed.');
+  const next = require('./fareRefund.js').prepareFareRefund(booking);
+  if (next) {
+    validationLogger('[INFO] [fares] Fare sale booked and confirmed: its refund comes next (#907).');
+    bru.runner.setNextRequest(next);
+    return true;
   }
+  validationLogger('[INFO] [fares] Fare sale complete: booked and confirmed.');
   const scenarios = readJson('__scenariosList', []) || [];
-  const next = Number.parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
-  if (scenarios.length > 0 && next < scenarios.length) {
+  const index = Number.parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+  if (scenarios.length > 0 && index < scenarios.length) {
     bru.setEnvVar('__loopback', 'true');
     bru.runner.setNextRequest('01. POST Get Offer');
   } else {

@@ -2900,9 +2900,25 @@ function buildFareFields(idx) {
         ${buildSelect(idx, 'desiredFareCluster', 'Fare cluster', ENUMS.desiredFareCluster,
           'Fares (#903): the cluster of the fare offer to choose (BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO). None offered fails the scenario. Empty: the first fare offer.')}
         ${buildSelect(idx, 'bookMode', 'Book mode', ENUMS.bookMode,
-          'Fares (#903, #906): what the scenario books, fares or products. FARE (or empty): the fare offer chosen is booked and confirmed, then the scenario ends (the refund of a fare comes with #907); it is not booked when a check of the offer step failed. PRODUCT: the sale goes on with a product offer, also when Fares expected is false (#905).')}
+          'Fares (#903, #906): what the scenario books, fares or products. FARE (or empty): the fare offer chosen is booked and confirmed; a REFUND scenario then refunds its fare fulfilments in full (#907), any other ends there. It is not booked when a check of the offer step failed. PRODUCT: the sale goes on with a product offer, also when Fares expected is false (#905).')}
         ${buildSelect(idx, 'expectFares', 'Fares expected', ENUMS.expectFares,
-          'Fares (#905): false for a negative test, where the answer must hold no fare: a domestic trip, a request without a section, or fares not asked. OSDM sets no such rule, so this is your expectation for this provider. The scenario then ends after the offer step, unless Book mode is PRODUCT. Empty: fares are expected when asked with a section.')}`;
+          'Fares (#905): false for a negative test, where the answer must hold no fare: a domestic trip, a request without a section, or fares not asked. OSDM sets no such rule, so this is your expectation for this provider. The scenario then ends after the offer step, unless Book mode is PRODUCT. Empty: fares are expected when asked with a section.')}
+        ${fareRefundFeeField(idx)}`;
+}
+
+// #907: the refund fee OSCAR states for a CLUSTERING fare, on a REFUND scenario.
+function fareRefundFeeField(idx) {
+  const sc = state.scenarios[idx];
+  if (!String(sc?.scenarioType || '').includes('REFUND')) return '';
+  const hint = "Fares (#907): the fee you set for the refund of a CLUSTERING fare whose fee is the provider's (isProviderFee), in cents of the offer's currency (250 = 2.50). It is sent as RefundSpecification.refundFee (OSDM 3.8 and later), and the refund offer's fee must be it. Empty: no fee is sent; the provider applies its own conditions and its fee is not checked.";
+  return `
+        <div class="param-field">
+          <span class="param-label">Fare refund fee (cents) <span class="param-hint">${esc(hint)}</span></span>
+          <input class="param-input" type="number" min="0" max="10000000" step="1"
+            value="${esc(sc?.fareRefundFee ?? '')}"
+            placeholder="leave empty = no fee sent"
+            data-action="set-scenario-fare-refund-fee" data-idx="${esc(idx)}">
+        </div>`;
 }
 
 // #904: OSDM has isPartOfInternationalTrip on a trip specification only (up
@@ -2929,6 +2945,18 @@ function withRequestedSection(sc, end, value) {
   if (!first.startPlace && !first.endPlace) list.splice(0, 1);
   else list[0] = first;
   return list.length > 0 ? list : null;
+}
+
+// #907: the fare refund fee, a whole number of cents; empty clears it,
+// anything else is ignored mid-edit. Outside the input switch, like the next one.
+function inputFareRefundFee(action, el) {
+  if (action !== 'set-scenario-fare-refund-fee') return false;
+  const v = el.value.trim();
+  const n = Number(v);
+  const idx = Number.parseInt(el.dataset.idx);
+  if (v === '') setScenarioField(idx, 'fareRefundFee', null);
+  else if (Number.isInteger(n) && n >= 0 && n <= 10000000) setScenarioField(idx, 'fareRefundFee', n);
+  return true;
 }
 
 // #903: typing in a fare section field. Outside the input switch, which is long enough.
@@ -8986,6 +9014,7 @@ document.body.addEventListener('input', function(e) {
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }   // #515, as above
   const action = el.dataset.action;
   if (inputRequestedSection(action, el)) return;
+  if (inputFareRefundFee(action, el)) return;
 
   switch (action) {
     case 'set-scenario-text':

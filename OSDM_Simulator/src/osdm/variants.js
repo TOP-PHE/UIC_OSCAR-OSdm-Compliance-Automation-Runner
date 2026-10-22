@@ -40,8 +40,13 @@
  *                           its bookingParts (#906)
  *   fare-fulfillment-document the fare fulfilment carries a PDF ticket, which
  *                           OSDM gives a fare fulfilment none of (#906)
+ *   fare-wrong-combining-fee the refund of a COMBINING fare takes the fee of
+ *                           another of its windows than the one valid then (#907)
+ *   fare-ignores-refund-fee the refund of a CLUSTERING fare ignores the
+ *                           refundFee the client states, and applies the
+ *                           fare's own conditions (#907)
  *
- * The four "wrong-" variants and the two "fare-" ones are deliberately wrong: each must make a check of
+ * The four "wrong-" variants and the four "fare-" ones are deliberately wrong: each must make a check of
  * the collection fail. The offers of a trip from `variants.wrongOffersFrom`
  * are wrong too (minimalPrice one cent off), for the offer validators.
  */
@@ -50,7 +55,7 @@ const PREFIX = 'simvariant-';
 const NAMES = new Set([
   'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount',
-  'fare-not-in-fulfillment', 'fare-fulfillment-document',
+  'fare-not-in-fulfillment', 'fare-fulfillment-document', 'fare-wrong-combining-fee', 'fare-ignores-refund-fee',
 ]);
 
 const VARIANTS = Symbol('variants');

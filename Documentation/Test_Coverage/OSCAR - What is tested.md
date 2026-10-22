@@ -86,7 +86,7 @@ identifiers and their token lifetime:
 | Expiry after 60 s for trips from station 0000099 | yes | yes | yes | yes | yes |
 | Response variants, deliberately wrong answers | yes | yes | yes | yes | yes |
 | Requested information and passenger data checks, sales horizon, age tariffs | yes | yes | yes | yes | yes |
-| Fare offers for a requested section (`FARE_ADMISSION`, five clusters, a free child), seven wrong variants (one priced without a section, #905); booking and fulfilment of a fare, two wrong fare fulfilments (#906) | yes | yes | yes | yes | yes |
+| Fare offers for a requested section (`FARE_ADMISSION`, five clusters, a free child), seven wrong variants (one priced without a section, #905); booking and fulfilment of a fare, two wrong fare fulfilments (#906); the refund of a fare, COMBINING fares, two wrong fare refunds (#907) | yes | yes | yes | yes | yes |
 
 Every new function goes to every provider: a test of the simulator
 (`config.test.js`) fails when `alpha`, `beta`, `delta` or `epsilon` lacks a setting `gamma` has.
@@ -137,17 +137,17 @@ WARNING.
 | 05. GET Booking before Fulfillments | `GET /bookings/{id}` | the same checks as 02, on the stored booking. In a fare sale (#906): the same fare checks, each fare PREBOOKED, and `provisionalPrice` the sum of the fares (a WARNING) |
 | 06. POST Obtaining Fulfillments from Booking | `POST /bookings/{id}/fulfillments` | the booking is confirmed: each fulfillment has an id, belongs to this booking, has a valid status and creation date, a control number, and names booking parts of this booking; in 3.8 its document references resolve to documents of the booking. With `Idempotency-Key`: the same key gives the same fulfillment. In a fare sale (#906), instead: each fare fulfilment is CONFIRMED or FULFILLED and names the parts it covers; a document, control number, issuer, continuous-service usage or links on it is a WARNING (OSDM: a fare fulfilment has none); no fulfilment holds fares and products together |
 | 06b. GET Fulfillment | `GET /fulfillments/{id}` | an optional read: the answer is that fulfillment, with its documents (`501` = not implemented). In a fare sale (#906): the fare fulfilment checks of 06, no document check |
-| 07. GET Booking after Fulfillments | `GET /bookings/{id}` | parts and fulfillments `FULFILLED` or `CONFIRMED`; `confirmedPrice` present and in the booking's currency; the number of fulfillments a return should have; the documents asked for are there (a missing one is a WARNING); the product, the class per leg and the reservations booked are those of the offer. In a fare sale (#906), instead: the fare checks of 02 and 06, each fare CONFIRMED or FULFILLED, every fare in a fulfilment, and the regional constraint, travel validity and passenger constraints the offer gave (a WARNING when they differ); the scenario then ends, the refund of a fare being #907 |
+| 07. GET Booking after Fulfillments | `GET /bookings/{id}` | parts and fulfillments `FULFILLED` or `CONFIRMED`; `confirmedPrice` present and in the booking's currency; the number of fulfillments a return should have; the documents asked for are there (a missing one is a WARNING); the product, the class per leg and the reservations booked are those of the offer. In a fare sale (#906), instead: the fare checks of 02 and 06, each fare CONFIRMED or FULFILLED, every fare in a fulfilment, and the regional constraint, travel validity and passenger constraints the offer gave (a WARNING when they differ); a REFUND scenario then goes on to the refund of the fares (10, #907), any other ends |
 
 ### Refund
 
 | Step | Request | What is checked |
 |---|---|---|
-| 10. POST Refund Offers | `POST /bookings/{id}/refund-offers` | one or more refund offers, each `PROPOSED`, with dates in order, a well-formed refundable amount and fee, non-negative, together not above the confirmed price; each names fulfillments of this booking, none twice. A partial refund gives back less than the whole. With an overrule code: the code is echoed, every fee is zero and the offers together give back what was paid; a code the provider does not accept is refused with a 4xx Problem |
+| 10. POST Refund Offers | `POST /bookings/{id}/refund-offers` | one or more refund offers, each `PROPOSED`, with dates in order, a well-formed refundable amount and fee, non-negative, together not above the confirmed price; each names fulfillments of this booking, none twice. A partial refund gives back less than the whole. With an overrule code: the code is echoed, every fee is zero and the offers together give back what was paid; a code the provider does not accept is refused with a 4xx Problem. In a fare refund (#907): the fare fulfilments are refunded in full; the refund offers cover them (R1) and give back and keep what their fares cost (R2); for COMBINING fares the fee is the one the fares' after-sales conditions give at the time (R3, a WARNING); for a CLUSTERING fare whose fee is the provider's, the fee the scenario states (`fareRefundFee`, sent as `RefundSpecification.refundFee` from OSDM 3.8) is the refund offer's fee (R4) |
 | 11. GET Refund Offer | `GET …/refund-offers/{id}` | the same, on the stored refund offer |
-| 12. GET Booking before Patch Refund | `GET /bookings/{id}` | the booking is still fulfilled and unchanged |
+| 12. GET Booking before Patch Refund | `GET /bookings/{id}` | the booking is still fulfilled and unchanged. In a fare refund (#907), the fare checks of 07 on the booking instead |
 | 13. PATCH Refund Offer | `PATCH …/refund-offers/{id}` | the refund offer is confirmed at the amounts it was proposed at |
-| 14. GET Booking after Patch Refund | `GET /bookings/{id}` | the fulfillments the refund covered are `REFUNDED`, the others are not; for a full refund, every fulfillment is refunded (each refund offer confirmed in turn) |
+| 14. GET Booking after Patch Refund | `GET /bookings/{id}` | the fulfillments the refund covered are `REFUNDED`, the others are not; for a full refund, every fulfillment is refunded (each refund offer confirmed in turn). In a fare refund (#907): the booked fares of the refunded fulfilments are `REFUNDED` too (R5), and the booking keeps its fares with the members OSDM requires |
 | 14b. GET Booking Refund Receipt | `GET /bookings/{id}`, repeated | the refund receipt appears in the booking within the wait the scenario allows |
 | 15. DEL Refund Offer / 16. GET Booking | `DELETE …/refund-offers/{id}` | a withdrawn refund offer leaves the ticket fulfilled |
 
@@ -218,6 +218,7 @@ have the same, as copies. In short:
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |
 | Fare sales for a requested section (#903, #904, #906): on a trip specification, by search criteria and by trip id, a free child, each fare booked and confirmed; eight wrong answers (not in the run list) | 4 + 8 | `gamma` |
+| Fare refunds (#907): a CLUSTERING fare by its own conditions, with a fee OSCAR states, COMBINING fares by date; two wrong answers (not in the run list) | 3 + 2 | `gamma` |
 | Negative fare requests (#905): fares not asked, no section (by search, then a product sale; on a specification sent as domestic), an empty list of sections; one wrong answer (not in the run list) | 4 + 1 | `gamma` |
 
 ### 4.2 The reference scenarios of the catalogue (50)

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-fare-refund",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "Fare sales: refund",
+    "summary": "A fare REFUND scenario now refunds the fares it sold, and OSCAR checks the refund amounts and the fee by the fare's combination model.",
+    "content": "After the booking and its confirmation, a fare scenario of type REFUND goes on to the refund: the fare fulfilment is refunded in full. Each refund offer must cover the fare fulfilments asked and give back and keep exactly what the fares cost. For fares combined by COMBINING, the fee must be the one the fare's own after-sales conditions give at the time (a warning otherwise). After the confirmation, the fares and their fulfilment must be REFUNDED.\n\nFor fares combined by CLUSTERING, the distributor applies its own after-sales rules. A new scenario field, Fare refund fee, lets you state the fee in cents (OSDM 3.8 and later): OSCAR sends it in RefundSpecification.refundFee and checks that the provider takes it. Its request form is provisional until the OSDM testing team answers an open question (D6 in #242). Without it, the provider's fee for a CLUSTERING fare is not checked.\n\nA partial refund of fares and the exchange of fares are not covered yet."
+  },
+  {
     "id": "2026-10-22-osdm-3-10-in-development",
     "date": "October 22, 2026",
     "tag": "Improvement",

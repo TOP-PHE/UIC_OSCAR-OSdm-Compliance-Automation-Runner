@@ -243,3 +243,92 @@ test('the two wrong fare fulfilments: a fare left out of bookingParts, a PDF tic
   assert.equal(ticket.answer.fulfillments[0].fulfillmentDocumentRefs.length, 1);
   assert.equal(ticket.answer.fulfillmentDocuments[0].id, ticket.answer.fulfillments[0].fulfillmentDocumentRefs[0]);
 });
+
+// #907: the refund of a booked fare. The simulator of the tests runs on a
+// fixed clock (helpers.js), before the trip's day, so the date windows of the
+// COMBINING fares give the same fee whenever the tests run.
+
+async function fareSale(sim, token, provider, { start = '0000001', cluster = 0, lastName } = {}) {
+  const { call, offerRequest, bookingRequest } = require('./helpers');
+  const asked = offerRequest({
+    requestedSections: [{ startPlace: station(start), endPlace: station('0000002') }],
+    offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] },
+  });
+  const offer = fareOffers((await call(sim.base, token, 'POST', `/${provider}/offers`, asked)).body)[cluster];
+  const request = bookingRequest(offer);
+  if (lastName) request.passengerSpecifications[0].detail.lastName = lastName;
+  const booking = (await call(sim.base, token, 'POST', `/${provider}/bookings`, request)).body.booking;
+  const [fulfillment] = (await call(sim.base, token, 'POST', `/${provider}/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
+  return { offer, fare: offer.fares[0], booking, fulfillment };
+}
+
+test('a fare is refunded by its own after-sales conditions, then REFUNDED with its fulfilment, on every provider (#907)', async (t) => {
+  const { SECRETS, startSimulator, tokenFor, call } = require('./helpers');
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  for (const provider of ['alpha', 'beta', 'gamma', 'delta', 'epsilon']) {
+    const token = await tokenFor(sim.base, provider, SECRETS[provider][0]);
+    // The semi-flexible fare: a quarter of its price kept.
+    const { fare, booking, fulfillment } = await fareSale(sim, token, provider, { cluster: 1 });
+    assert.equal(fare.combinationConstraint[0].referenceCluster, 'SEMI_FLEX', provider);
+    const price = fare.prices[0].amount;
+    const asked = await call(sim.base, token, 'POST', `/${provider}/bookings/${booking.id}/refund-offers`, { fulfillmentIds: [fulfillment.id] });
+    assert.equal(asked.status, 200, provider);
+    const [refundOffer] = asked.body.refundOffers;
+    assert.equal(asked.body.refundOffers.length, 1, provider);
+    assert.equal(refundOffer.refundFee.amount, Math.round(price * 0.25), provider);
+    assert.equal(refundOffer.refundableAmount.amount + refundOffer.refundFee.amount, price, provider);
+    assert.deepEqual(refundOffer.refundOfferBreakdown.map((b) => b.bookingParts.map((p) => p.id)), [[fare.id]], provider);
+    const confirmed = await call(sim.base, token, 'PATCH', `/${provider}/bookings/${booking.id}/refund-offers/${refundOffer.id}`, { status: 'CONFIRMED' });
+    assert.equal(confirmed.status, 200, provider);
+    const read = (await call(sim.base, token, 'GET', `/${provider}/bookings/${booking.id}`)).body.booking;
+    assert.deepEqual(read.bookedOffers[0].fares.map((f) => f.status), ['REFUNDED'], provider);
+    assert.deepEqual(read.fulfillments.map((f) => f.status), ['REFUNDED'], provider);
+    assert.equal(read.confirmedPrice.amount, refundOffer.refundFee.amount, provider);
+  }
+});
+
+test('a CLUSTERING fare takes the refund fee the client states; a wrong one is refused, the variant ignores it (#907)', async (t) => {
+  const { SECRETS, startSimulator, tokenFor, call } = require('./helpers');
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
+  const ask = (sale, refundFee) => call(sim.base, token, 'POST', `/gamma/bookings/${sale.booking.id}/refund-offers`, {
+    fulfillmentIds: [sale.fulfillment.id], refundSpecifications: [{ fulfillmentId: sale.fulfillment.id, refundFee }],
+  });
+  // The fully flexible fare keeps nothing of its own.
+  const sale = await fareSale(sim, token, 'gamma', { cluster: 0 });
+  assert.equal(sale.fare.afterSalesCondition.isProviderFee, true);
+  const price = sale.fare.prices[0].amount;
+  const stated = await ask(sale, { currency: 'CZK', amount: 250, scale: 2 });
+  assert.equal(stated.status, 200);
+  assert.equal(stated.body.refundOffers[0].refundFee.amount, 250);
+  assert.equal(stated.body.refundOffers[0].refundableAmount.amount, price - 250);
+  assert.equal((await ask(sale, { currency: 'EUR', amount: 250 })).status, 400);
+  assert.equal((await ask(sale, { currency: 'CZK', amount: -1 })).status, 400);
+  // The fee is never more than the fare's price.
+  assert.equal((await ask(sale, { currency: 'CZK', amount: price + 1000 })).body.refundOffers[0].refundableAmount.amount, 0);
+  const ignored = await ask(await fareSale(sim, token, 'gamma', { cluster: 0, lastName: 'Simvariant-Fare-Ignores-Refund-Fee' }), { currency: 'CZK', amount: 250 });
+  assert.equal(ignored.status, 200);
+  assert.equal(ignored.body.refundOffers[0].refundFee.amount, 0);
+});
+
+test('COMBINING fares: the fee of the REFUND window valid at the time; the wrong variant takes the other (#907)', async (t) => {
+  const { SECRETS, startSimulator, tokenFor, call } = require('./helpers');
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
+  const sale = await fareSale(sim, token, 'gamma', { start: '0000087' });
+  assert.deepEqual(sale.fare.combinationConstraint, [{ model: 'COMBINING' }]);
+  const windows = sale.fare.afterSalesCondition.conditions.filter((c) => c.condition === 'REFUND');
+  const price = sale.fare.prices[0].amount;
+  assert.deepEqual(windows.map((c) => c.afterSaleFee.amount), [Math.round(price / 10), Math.round(price / 2)]);
+  assert.ok(windows[0].validUntil < windows[1].validFrom);
+  const refundOf = async (s, body = {}) => (await call(sim.base, token, 'POST', `/gamma/bookings/${s.booking.id}/refund-offers`, { fulfillmentIds: [s.fulfillment.id], ...body })).body.refundOffers[0];
+  assert.equal((await refundOf(sale)).refundFee.amount, Math.round(price / 10));
+  // A fee stated for COMBINING fares is not taken: the fares give theirs.
+  const stated = await refundOf(sale, { refundSpecifications: [{ fulfillmentId: sale.fulfillment.id, refundFee: { currency: 'CZK', amount: 1 } }] });
+  assert.equal(stated.refundFee.amount, Math.round(price / 10));
+  const wrong = await fareSale(sim, token, 'gamma', { start: '0000087', lastName: 'Simvariant-Fare-Wrong-Combining-Fee' });
+  assert.equal((await refundOf(wrong)).refundFee.amount, Math.round(wrong.fare.prices[0].amount / 2));
+});
