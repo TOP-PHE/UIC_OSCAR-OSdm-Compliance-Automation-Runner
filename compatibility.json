@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.409",
+  "current_release": "2026.410",
   "releases": [
+    {
+      "release": "2026.410",
+      "date": "2026-10-22",
+      "server": "1.11.375",
+      "collection": "OTST_V2.0.208",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#914: every simulator scenario written for gamma (OSDM 3.8) now also runs on alpha (3.6), beta (3.7) and delta (3.9), except what a version cannot express; an update from a reference stores only its provider's scenarios; simulator 0.44.0 gives the refund receipt below 3.8."
+      ]
+    },
     {
       "release": "2026.409",
       "date": "2026-10-22",

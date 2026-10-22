@@ -105,7 +105,9 @@ test('the update replaces scenarios, framework and Test Data, and keeps the endp
 
   const datafile = JSON.parse(decryptFromFile(livePath).toString('utf8'));
   const simulator = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../../Bruno_Collection/data_base', R.DATAFILE_NAME), 'utf8'));
-  expect(datafile.scenarios.map(s => s.code)).toEqual(simulator.scenarios.map(s => s.code));
+  // #914: beta's scenarios only.
+  expect(datafile.scenarios.map(s => s.code)).toEqual(simulator.scenarios.filter(s => s.osdmVersion === BETA[R.REFERENCE_KEY].osdmVersion).map(s => s.code));
+  expect(datafile.scenarios.length).toBeLessThan(simulator.scenarios.length);
   expect(datafile.scenariosToRun).toEqual(BETA.scenariosToRun);
   expect(JSON.parse(decryptFromFile(prevPath).toString('utf8')).scenarios[0].code).toBe('OLD_ONE');
 

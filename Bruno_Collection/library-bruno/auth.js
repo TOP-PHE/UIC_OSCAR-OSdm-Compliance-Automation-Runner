@@ -211,6 +211,41 @@ function oscarRunSecretHeader() {
  * @param {string}  [opts.callerLabel='request']  for diagnostic messages
  * @returns {Promise<boolean>} true when the env var was updated
  */
+// #914: a standalone run has no OSCAR to renew its token, and a wait (the
+// refund receipt, the expiry probes) can outlive a short-lived one (beta's two
+// minutes). With `standalone_token_url` set, the client-credentials request of
+// the run's own token step is sent again, at most once a minute. Never logs
+// the token.
+const STANDALONE_RENEWAL_MS = 60 * 1000;
+async function renewStandaloneToken(callerLabel) {
+  const url = bru.getEnvVar('standalone_token_url');
+  const clientId = bru.getEnvVar('client_id');
+  const clientSecret = bru.getEnvVar('client_secret');
+  if (!url || !clientId || !clientSecret) return false;
+  const last = Number(bru.getEnvVar('__standaloneTokenAt') || 0);
+  if (Date.now() - last < STANDALONE_RENEWAL_MS) return false;
+  const form = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`;
+  try {
+    const resp = await new Promise(function (resolve, reject) {
+      bru.sendRequest(
+        { url: url, method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: form },
+        function (err, r) { if (err && !err.response) reject(err); else resolve(r || err.response); }
+      );
+    });
+    let body = resp?.data ?? resp?.body ?? null;
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = null; } }
+    if ((resp?.status || resp?.statusCode) === 200 && body?.access_token) {
+      bru.setEnvVar('access_token', body.access_token);
+      bru.setEnvVar('__standaloneTokenAt', String(Date.now()));
+      return true;
+    }
+    validationLogger(`[WARNING] auth: the standalone token renewal before ${callerLabel} answered ${resp?.status || resp?.statusCode || 0}; the run goes on with its token.`);
+  } catch (err) {
+    validationLogger(`[WARNING] auth: the standalone token renewal before ${callerLabel} could not be sent (${err?.message || err}); the run goes on with its token.`);
+  }
+  return false;
+}
+
 async function refreshAccessTokenIfNeeded(opts) {
   opts = opts || {};
   const force        = opts.force === true;
@@ -219,9 +254,11 @@ async function refreshAccessTokenIfNeeded(opts) {
   const loopbackBase = bru.getEnvVar('oscar_loopback_base') || 'http://127.0.0.1:3001';
   if (!runId) {
     // Not in a runner-managed run, or the env var was never injected
-    // (older runner builds). Skip silently — auth.js's older logic still
+    // (older runner builds). A standalone run that names its token endpoint
+    // (`standalone_token_url`, the simulator replay does, #914) renews the
+    // token itself; otherwise skip silently — auth.js's older logic still
     // protects the run via checkAuthRejection on 401/403.
-    return false;
+    return renewStandaloneToken(callerLabel);
   }
   const url = `${loopbackBase}/v1/runs/${runId}/refresh-access-token${force ? '?force=1' : ''}`;
   // S8-loopback: the route requires this run's secret (oscarRunSecretHeader).

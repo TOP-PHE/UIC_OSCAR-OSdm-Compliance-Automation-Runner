@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-every-scenario-every-version",
+    "date": "October 22, 2026",
+    "tag": "Improvement",
+    "title": "Simulator: every scenario on every OSDM version",
+    "summary": "The simulator references for alpha (3.6), beta (3.7) and delta (3.9) now run every scenario gamma (3.8) runs, except what their version cannot express.",
+    "content": "A company following simulator-alpha, -beta or -delta used to run five or six scenarios. Each now runs about a hundred: every gamma scenario, copied for its OSDM version and currencies. Left out: a return in one offer and product selections on 3.6, a named compartment before 3.8. An update from a reference now stores only that provider's scenarios. After this release, a Test Manager updates once in Test Config, Reference configuration."
+  },
+  {
     "id": "2026-10-22-reference-version-per-provider",
     "date": "October 22, 2026",
     "tag": "Fix",

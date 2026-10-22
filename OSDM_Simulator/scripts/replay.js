@@ -87,6 +87,8 @@ function runOne(code, index) {
     run = spawnSync(process.execPath, [bruScript(), 'run', ...FOLDERS, '--sandbox=developer', '--env', 'OTST_Simulator_Env',
       '--env-var', `client_id=${client.client_id}`, '--env-var', `client_secret=${client.client_secret}`,
       '--env-var', `api_base=${SIM_BASE}/${provider}`, '--env-var', `data_base=${DATA_URL}`,
+      // #914: long waits outlive beta's two-minute tokens; the run renews its own.
+      '--env-var', `standalone_token_url=${SIM_BASE}/${provider}/oauth/token`,
       '--env-var', `scenario_override=${code}`, '--reporter-json', report], {
       cwd: COLLECTION,
       encoding: 'utf8',
