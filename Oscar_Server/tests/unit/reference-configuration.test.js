@@ -146,7 +146,54 @@ describe('the framework from the checklist', () => {
   });
 });
 
-test('the version changes with the data file', () => {
-  const ref = JSON.parse(storedOf('beta'));
-  expect(R.versionOf(ref, DATAFILE_TEXT)).not.toBe(R.versionOf(ref, DATAFILE_TEXT + ' '));
+describe('a version per provider (#912)', () => {
+  const ref = JSON.parse(storedOf('delta'));
+  const version = (datafile) => R.versionOf(ref, datafile);
+  const copy = () => JSON.parse(DATAFILE_TEXT);
+  const own = (df) => df.scenarios.find(s => s.osdmVersion === '3.9.0');
+
+  test('the text or the parsed file give the same version; formatting does not count', () => {
+    expect(version(DATAFILE_TEXT)).toBe(version(DATAFILE));
+    expect(version(DATAFILE_TEXT + ' ')).toBe(version(DATAFILE));
+  });
+
+  test('a scenario, trip or passenger list added for another provider leaves it as it is', () => {
+    const df = copy();
+    const tripId = Math.max(...df.tripRequirements.map(t => t.id)) + 1;
+    df.tripRequirements.push({ id: tripId, tripType: 'SEARCH', trip: { origin: 'urn:uic:stn:0000077', destination: 'urn:uic:stn:0000002' } });
+    df.passengersList.push({ id: 999, passengers: [] });
+    df.scenarios.push({ ...own(df), code: 'SIM_NEW_38', osdmVersion: '3.8.0', tripRequirementId: tripId, passengersListId: 999 });
+    df.scenariosToRun = [...df.scenariosToRun, 'SIM_NEW_38'];
+    expect(version(df)).toBe(version(DATAFILE));
+  });
+
+  test('its own scenario, the trip it names, the first purchaser or a root key move it', () => {
+    const changes = [
+      (df) => { own(df).description += '.'; },
+      (df) => { df.tripRequirements.find(t => t.id === own(df).tripRequirementId).description += '.'; },
+      (df) => { df.purchaserList[0].purchaser[0].purchaserFirstName += 'x'; },
+      (df) => { df.systemInfoParameters = { ...df.systemInfoParameters, added: 'x' }; },
+    ];
+    for (const change of changes) {
+      const df = copy();
+      change(df);
+      expect(version(df)).not.toBe(version(DATAFILE));
+    }
+  });
+
+  test('its part holds its scenarios, what they name, the first purchaser, and not the file\'s run list', () => {
+    const part = R.providerPartOf(DATAFILE, '3.9.0');
+    expect(part.scenarios.length).toBeGreaterThan(0);
+    expect(part.scenarios.every(s => s.osdmVersion === '3.9.0')).toBe(true);
+    expect(part.scenariosToRun).toBeUndefined();
+    expect(part.purchaserList[0]).toEqual(DATAFILE.purchaserList[0]);
+    const tripIds = new Set(part.scenarios.map(s => s.tripRequirementId));
+    expect(part.tripRequirements.map(t => t.id).sort()).toEqual([...tripIds].sort());
+    expect(part.tripRequirements.length).toBeLessThan(DATAFILE.tripRequirements.length);
+  });
+
+  test('its Test Data are the trains of its own trips', () => {
+    expect(ref.testResources).toEqual(R.testResourcesFromDatafile(R.providerPartOf(DATAFILE, '3.9.0')));
+    expect(ref.testResources.length).toBeLessThan(R.testResourcesFromDatafile(DATAFILE).length);
+  });
 });

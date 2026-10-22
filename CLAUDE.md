@@ -2296,6 +2296,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
     the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;
     nothing else it sends in a sale changes.
+    **A version per provider (#912, 1.11.374 / OTST_V2.0.207):** a
+    reference's Test Data and version come from its provider's part of the
+    data file only (`providerPartOf()`: the scenarios of its OSDM version,
+    `SIM_WRONG_`/`SIM_FAULT_` included, the list entries they name,
+    `purchaserList[0]`, the other root keys but `scenariosToRun`). Before,
+    `versionOf()` hashed the whole file, so fare scenarios added for gamma
+    flagged every delta company "not up to date". The update still stores the
+    whole data file. A new resource list or a field naming an entry must be
+    added to `RESOURCE_LISTS` there, or a change to it goes unseen.
   - **Its data file is `Bruno_Collection/data_base/simulator_datafile.json`,
     the one copy** for OSCAR and for a standalone run (#593), with
     `environments/OTST_Simulator_Env.yml` and `00-Access Token/Simulator Access

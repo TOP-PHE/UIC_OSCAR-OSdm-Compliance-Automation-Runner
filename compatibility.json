@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.408",
+  "current_release": "2026.409",
   "releases": [
+    {
+      "release": "2026.409",
+      "date": "2026-10-22",
+      "server": "1.11.374",
+      "collection": "OTST_V2.0.207",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#912: a reference configuration's version and Test Data come from its provider's part of the simulator data file only, so a change made for another provider no longer flags a company \"not up to date\"; every company following a reference reads \"not up to date\" once after this release."
+      ]
+    },
     {
       "release": "2026.408",
       "date": "2026-10-22",
