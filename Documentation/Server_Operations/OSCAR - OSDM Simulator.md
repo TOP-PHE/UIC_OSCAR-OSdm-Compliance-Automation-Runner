@@ -10,7 +10,7 @@ This page is about installing it and pointing a company at it.
 
 ## 1. What you get
 
-One server that plays four providers, told apart by the first part of the path:
+One server that plays five providers, told apart by the first part of the path:
 
 | Provider | Endpoint to give OSCAR | Currency | OSDM version | Token lifetime |
 |---|---|---|---|---|
@@ -18,9 +18,10 @@ One server that plays four providers, told apart by the first part of the path:
 | `beta` | `https://<simulator-host>/beta` | CHF | 3.7.0 | 2 minutes |
 | `gamma` | `https://<simulator-host>/gamma` | CZK | 3.8.0 | 15 minutes |
 | `delta` | `https://<simulator-host>/delta` | PLN | 3.9.0 | 30 minutes |
+| `epsilon` | `https://<simulator-host>/epsilon` | SEK | 3.10.0 (in development) | 10 minutes |
 
 Each provider answers in the shapes of its own version (#833): `alpha` gives
-OSDM 3.6 answers, `beta` 3.7, `gamma` 3.8, `delta` 3.9 (#858; 3.9 changed no answer schema, so `delta` answers as `gamma` does). Below 3.8, for example, a
+OSDM 3.6 answers, `beta` 3.7, `gamma` 3.8, `delta` 3.9 (#858; 3.9 changed no answer schema, so `delta` answers as `gamma` does), `epsilon` 3.10, the version in development (#920: the branch `patches-osdm-v3.10` at the commit pinned in `osdm-dev.json`, given by `/healthz` under `development`; 3.10's changes so far add optional members only, so `epsilon` answers as `gamma` does, and serves `POST /trips-collections`). `epsilon` follows the branch: each OSDM change merged there that touches the simulator comes in a PR of its own. Below 3.8, for example, a
 fulfilment holds its documents instead of naming them, and below 3.7 an
 offer has no `inboundTripCoverage`. The simulator's tests check every answer
 against the OSDM response schema of the provider's version. Since #824 the providers offer the same functions (exchange,

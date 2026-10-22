@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.47.0] — 2026-10-22
+
+Issue #920, step 2. Simulator 0.47.0. Server and collection unchanged. A fifth provider, `epsilon`, answers in OSDM 3.10, the version in development.
+
+### Simulator 0.47.0
+- **`epsilon`** (`providers/epsilon.json`): OSDM 3.10.0, SEK and EUR when asked, identifiers `EPSILON-…`, ten-minute tokens. It has every function of the other four (#824 rule, pinned by `config.test.js`).
+  - Its profile names the OSDM branch and commit it follows (`osdmDevelopment`: `patches-osdm-v3.10` at `6770e27`), the pin of `osdm-dev.json` (#920 step 1); a test fails when the two differ. `/healthz` gives it under `development`.
+  - 3.10's changes so far add optional members only, so its answers are gamma's; every answer of the simulator's tests on `epsilon` is checked against the 3.10 response schemas.
+- **`POST /epsilon/trips-collections`** (OSDM#1487, 3.10 and later): the same answer as `trips-collection`, which 3.10 deprecates and `epsilon` still serves. Below 3.10 it stays `501`.
+- `clients.example.json` and the replay know `epsilon` (`_310` scenarios). The scenarios themselves (`_310` copies, its checklist and reference configuration) are step 3 of #920: the data-file test lists 3.10 as waiting for them.
+
+---
+
 ## [server-1.11.378] / [collection-OTST_V2.0.211] — 2026-10-22
 
 Issue #920, step 1, release 2026.413.

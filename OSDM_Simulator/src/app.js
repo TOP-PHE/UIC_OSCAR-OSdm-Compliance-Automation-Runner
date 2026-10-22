@@ -143,6 +143,16 @@ function answerError(req, res, error, asked) {
   return p.status;
 }
 
+// #920: the providers on an OSDM version in development, with the commit of
+// the specification they answer to, for /healthz.
+function developmentOf(providers) {
+  const dev = {};
+  for (const p of providers.values()) {
+    if (p.osdmDevelopment) dev[p.key] = { osdmVersion: p.osdmVersion, ...p.osdmDevelopment };
+  }
+  return Object.keys(dev).length ? { development: dev } : {};
+}
+
 function createApp({ providers, clients, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
   const allow = createRateLimiter({ perMinute: limits.requestsPerMinute, now });
 
@@ -464,6 +474,10 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (resource === 'offers' && rest.length === 0) return offerRoute(req, provider, scope);
     // #602: a provider with a trip search answers it; the others answer 501.
     if (resource === 'trips-collection' && rest.length === 0 && provider.tripsCollection) return tripCollectionRoute(req, provider, scope);
+    // #920: OSDM 3.10 names the trip search POST /trips-collections (OSDM#1487)
+    // and keeps the singular, deprecated; below 3.10 the plural is not OSDM.
+    if (resource === 'trips-collections' && rest.length === 0 && provider.tripsCollection
+      && osdmRank(provider.osdmVersion) >= osdmRank('3.10')) return tripCollectionRoute(req, provider, scope);
     if (resource === 'bookings') return bookingRoute(req, provider, scope, rest);
     // #603: a provider that issues documents answers GET /fulfillments/{id}.
     if (resource === 'fulfillments' && rest.length === 1 && provider.documents) return fulfillmentRoute(req, scope, rest[0]);
@@ -489,7 +503,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (segments.length === 1 && segments[0] === 'healthz') {
       requireMethod(req, 'GET');
       // #617: the version, so that an installed simulator can be told apart.
-      sendJson(res, 200, { status: 'ok', version: VERSION });
+      sendJson(res, 200, { status: 'ok', version: VERSION, ...developmentOf(providers) });
       return 200;
     }
     if (!allow(callerAddress(req))) {

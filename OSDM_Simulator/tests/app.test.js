@@ -134,7 +134,7 @@ test('no token, a made-up token or a token past its lifetime is refused', async 
 
 test('an unknown provider is a 404, with or without a token', async () => {
   const token = await tokenFor(sim.base, 'alpha', alphaOne);
-  for (const url of ['/epsilon/versions', '/epsilon/oauth/token', '/', '/alpha-/versions']) {
+  for (const url of ['/zeta/versions', '/zeta/oauth/token', '/', '/alpha-/versions']) {
     assert.equal((await call(sim.base, token, 'GET', url)).status, 404, url);
   }
 });
@@ -142,7 +142,11 @@ test('an unknown provider is a 404, with or without a token', async () => {
 test('the health check answers without a token and says only its status and version (#617)', async () => {
   const res = await call(sim.base, null, 'GET', '/healthz');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { status: 'ok', version: require('../package.json').version });
+  // #920: and the providers on an OSDM version in development, with the
+  // commit of the specification they answer to.
+  const dev = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'Documentation', 'Test_Coverage', 'OSDM_reference', 'osdm-dev.json'), 'utf8'));
+  assert.deepEqual(res.body, { status: 'ok', version: require('../package.json').version,
+    development: { epsilon: { osdmVersion: dev.version, branch: dev.branch, commit: dev.commit } } });
   assert.match(res.body.version, /^\d+\.\d+\.\d+$/);
   assert.equal((await call(sim.base, null, 'POST', '/healthz', {})).status, 405);
 });
