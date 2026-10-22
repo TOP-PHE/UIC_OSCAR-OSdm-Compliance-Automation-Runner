@@ -97,6 +97,7 @@ function checkProvider(key, raw) {
     ...checkPlacePreferences(raw.placePreferences, bad),
     ...checkPlaceMap(raw.placeMap, bad),
     ...checkOtherCurrencies(raw.otherCurrencies, raw.currency, bad),
+    ...checkOsdmDevelopment(raw.osdmDevelopment, bad),
     ...checkFares(raw.fares, bad),
   };
 }
@@ -125,6 +126,14 @@ function checkFares(value, bad) {
 // #781: the other currencies a provider sells in, each with its own price
 // factor: { "EUR": { "priceFactor": 1 } }. Absent: the provider answers in its
 // own currency whatever is asked, as before.
+// #920: a provider on an OSDM version in development names the branch and
+// commit of the specification it answers to.
+function checkOsdmDevelopment(dev, bad) {
+  if (dev === undefined) return {};
+  if (!dev || typeof dev !== 'object' || !isText(dev.branch, 1, 80) || !/^[0-9a-f]{40}$/.test(String(dev.commit))) throw bad('osdmDevelopment');
+  return { osdmDevelopment: { branch: dev.branch, commit: dev.commit } };
+}
+
 function checkOtherCurrencies(other, own, bad) {
   if (other === undefined) return {};
   if (!other || typeof other !== 'object' || Array.isArray(other)) throw bad('otherCurrencies');
