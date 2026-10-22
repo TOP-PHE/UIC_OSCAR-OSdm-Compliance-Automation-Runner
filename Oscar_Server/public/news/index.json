@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-fare-reservations",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "Fare sales: bicycle reservations",
+    "summary": "A fare scenario can now ask for fare reservations, a bicycle place, and OSCAR checks them from the offer to the fulfilment.",
+    "content": "Add FARE_RESERVATION to a scenario's requested offer parts and give it a passenger of type BICYCLE. From OSDM 3.8, the provider must offer the bicycle a reservation marked as a fare (distributionMode FARE_MODE), with no product. OSCAR selects these reservations in the booking, as OSDM asks, and checks that they are booked, confirmed and fulfilled with the fares. Fare reservations the request did not ask for fail.\n\nThe fulfilment of a fare reservation is made by the distributor, so a provider may answer the fulfilment read with an error or an empty fulfilment: OSCAR accepts both. The IRS 90918-1 reference and the place allocation are shown in the log.\n\nBefore OSDM 3.8 a fare reservation had another shape, which OSDM does not describe: such a scenario is not checked, and the log says so."
+  },
+  {
     "id": "2026-10-22-simulator-epsilon",
     "date": "October 22, 2026",
     "tag": "New",

@@ -1661,6 +1661,31 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   with `fareRefundFee` no copy below 3.8. **The simulator of the tests
   runs on a fixed clock** (`tests/helpers.js`, 2026-11-02T09:00Z): a test
   date must be fixed too, never "now plus N days".
+  **Fare reservations** (#255, fares 4, 1.11.381 / OTST_V2.0.214,
+  simulator 0.49.0): `FARE_RESERVATION` for a passenger of type BICYCLE;
+  from OSDM 3.8 a reservation part in `FARE_MODE` (osdm.io, handling
+  reservations), checked by `library-bruno/fareReservations.js` (V1–V12).
+  Step 01 selects the chosen offer's fare reservations
+  (`optionalReservationSelections`: OSDM books only the mandatory ones
+  unasked); `fareBooking.js` counts them as fare parts
+  (`farePartIdsOf()`, `__fareReservationIds`), never as products
+  (`productPartIdsOf(booking, offer)` leaves out FARE_MODE ones and those
+  that pair with the offer's, so a provider booking one in product mode
+  fails V1, not F4). An offer holding only fare reservations is a fare
+  offer (`hasFareParts()`), and O7 lets a bicycle held by a reservation go
+  without a fare. One defect, one check: a bicycle with a reservation in
+  product mode fails V1 only (V3 asks for a reservation, any mode). At 06b,
+  an error or an empty fulfilment is allowed (V12, osdm.io). Below 3.8:
+  one WARNING, nothing checked; `version-copies-lib.js` gives such a
+  scenario no 3.6 or 3.7 copy. Simulator: a bicycle has no fare, its place
+  is its fare (`bicyclePlacesOf()` in `fares.js`, one per bicycle and leg
+  of the section, marked by the hidden `FARE_PLACE` of `reservations.js`);
+  booked only when selected, fulfilled with the fares; variants
+  `bicycleReservationProductMode` (station `0000088`) and
+  `fare-reservation-product-mode` (last name). `displays.js` puts its own
+  `validationLogger` on the global object when loaded: a unit test that
+  watches the global logger sets it again after requiring a module that
+  loads `displays.js`.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,
@@ -2722,9 +2747,11 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
       sales/refund).
     - **#198/#199/#200** — SNCF-specific scenarios (PRM/IRT, claims,
       exchange).
-    - **All "fare" issues** (**#205, #206, #207, #242–#248, #255**) — fare
-      distribution (Shop/Book/Ticket) scenario coverage hasn't started at
-      all yet; a big, self-contained subject to come, not a small follow-up.
+    - **The fare programme (#242)** is built: offers #903–#905, booking and
+      fulfilment #906, refund #907, fare reservations #255. Open with OTST:
+      D5 (#244 case 2), D6 (the refund fee request form, provisional in
+      #907), D7 (a real provider with fare mode). The old OTST issues
+      #205–#207 and #243–#248 are closed on the maintainer's word only (D8).
   - **Explicitly reserved for the user's own review — do NOT close these:**
     **#226** (exchange → new offer request), **#227** (optional offer-request
     parameters, e.g. age vs. birth date / gender for night trains), **#221**
