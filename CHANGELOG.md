@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.378] / [collection-OTST_V2.0.211] — 2026-10-22
+
+Issue #920, step 1, release 2026.413.
+
+### Added
+- **OSDM 3.10.0 in development.** `Documentation/Test_Coverage/OSDM_reference/OSDM-online-api-v3.10.0.yml` is the branch `patches-osdm-v3.10` of the OSDM repository at commit `6770e27` (21/10/2026), bundled with `redocly bundle`; the pin is in its header and in `osdm-dev.json`. The request, response and AI reference schemas are generated for 3.10 too. 3.10 adds `POST /trips-collections` (OSDM#1487), which the collection sends from 3.10 (#904) and which is now in the request check, and changes `AccountingRef`, `BookedOffer`, `CoachDeckLayout`, `PaymentMethod` and `Problem` (new: `AccountingId`, `AlternativeSystemProposal`, `AlternativeSystemProposalScope`, `ExchangedBookedOfferRefs`). The 3.4–3.9 sets are unchanged.
+- The AI analysis quotes 3.10 for a provider declaring it, says the extract comes from a development branch (branch and commit), and still quotes the latest released version (3.9) when none is declared.
+- Checklist template V1.04: A1.2 offers OSDM 3.10 (in development).
+
+### Fixed
+- **A version is compared part by part, never as a decimal.** `parseFloat('3.10')` is 3.1, so a 3.10 provider would have got email and phone in the place OSDM used before 3.4, in the booking, the passenger update and the purchaser (`personContact.js`, `scenarioParser.js`). A test now refuses `parseFloat` on a version anywhere in the library.
+
+Checked:
+- The three generators give the committed files byte for byte before 3.10 is added, and the 3.4–3.9 sets are unchanged after.
+- `bruno-request-schema`, `osdm-references`, `osdm-response-schemas`, `provider-run-772` (the decimal test fails on the old code).
+
+---
+
 ## [server-1.11.377] / [collection-OTST_V2.0.210] — 2026-10-22
 
 Issue #906, fares phase 2, release 2026.412. Simulator 0.46.0.

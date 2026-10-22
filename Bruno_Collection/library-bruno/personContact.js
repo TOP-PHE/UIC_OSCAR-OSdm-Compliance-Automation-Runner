@@ -10,7 +10,9 @@
  */
 
 /** Whether a version takes email and phone in `detail.contact` (the booking's rule). */
-const usesContactDetail = (osdmVersion) => Number.parseFloat(osdmVersion) >= 3.4;
+// Part by part, never as a decimal: "3.10" is after "3.4" (#920).
+const { atLeast } = require('./osdmVersion.js');
+const usesContactDetail = (osdmVersion) => atLeast(osdmVersion, '3.4.0');
 
 /**
  * `detail` with its email and phone number in the place the version takes

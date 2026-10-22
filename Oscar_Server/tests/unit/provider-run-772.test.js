@@ -106,3 +106,18 @@ describe('#772 — email and phone where the version takes them', () => {
     }
   });
 });
+
+describe('#920 a version is compared part by part, never as a decimal', () => {
+  test('3.10 takes email and phone in detail.contact, like 3.4 and later', () => {
+    expect(pc.usesContactDetail('3.10')).toBe(true);
+    expect(pc.usesContactDetail('3.10.0')).toBe(true);
+    expect(pc.usesContactDetail(undefined)).toBe(false);
+  });
+
+  test('no library module reads an OSDM version with parseFloat', () => {
+    const lib = path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno');
+    const offenders = fs.readdirSync(lib).filter((f) => f.endsWith('.js'))
+      .filter((f) => /parseFloat\([^)]*[vV]ersion/.test(fs.readFileSync(path.join(lib, f), 'utf8')));
+    expect(offenders).toEqual([]);
+  });
+});

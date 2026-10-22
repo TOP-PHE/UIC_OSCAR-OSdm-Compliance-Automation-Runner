@@ -38,12 +38,13 @@ const REPO = path.resolve(__dirname, '..', '..');
 const SPEC_DIR = process.env.OSDM_SPEC_DIR
   || path.join(REPO, 'Documentation', 'Test_Coverage', 'OSDM_reference');
 const OUT = path.join(REPO, 'Bruno_Collection', 'library-bruno', 'osdmRequestSchemas.js');
-const VERSIONS = ['3.4', '3.5', '3.6', '3.7', '3.8', '3.9'];
+const VERSIONS = ['3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10'];
 
 // The endpoints OSCAR sends a body to (request files and scripts alike).
 const OPERATIONS = [
   ['POST', '/offers'],
   ['POST', '/trips-collection'],
+  ['POST', '/trips-collections'], // 3.10 (OSDM#1487); the collection sends it from 3.10 (#904)
   ['POST', '/bookings'],
   ['PATCH', '/bookings/{bookingId}/passengers/{passengerId}'],
   ['PATCH', '/bookings/{bookingId}/purchaser'],

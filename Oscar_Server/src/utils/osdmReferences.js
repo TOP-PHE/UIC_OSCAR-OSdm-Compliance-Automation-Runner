@@ -34,16 +34,23 @@ const rankOf = (v) => {
   return major * 10000 + minor * 100 + patch;
 };
 
+/** The versions quoted from a development branch (#920): { version: { branch, commit } }. */
+const developmentOf = () => data().development || {};
+
 /**
  * The specification to quote for a declared version: { version, exact }.
  * "3.8" and "3.8.0" are 3.8.0; one OSCAR has no file of takes the nearest
- * (the lower on a tie); none declared takes the latest.
+ * (the lower on a tie); none declared takes the latest released one: a
+ * version in development (#920) is quoted only when it is the nearest.
  */
 function versionFor(declared, available = Object.keys(data().versions)) {
   const sorted = [...available].sort((a, b) => rankOf(a) - rankOf(b));
   if (!sorted.length) return null;
   const text = typeof declared === 'string' ? declared.trim() : '';
-  if (!/^\d+(\.\d+){0,2}$/.test(text)) return { version: sorted.at(-1), exact: false };
+  if (!/^\d+(\.\d+){0,2}$/.test(text)) {
+    const released = sorted.filter((v) => !Object.hasOwn(developmentOf(), v));
+    return { version: (released.length ? released : sorted).at(-1), exact: false };
+  }
   const parts = text.split('.');
   while (parts.length < 3) parts.push('0');
   const wanted = parts.join('.');
@@ -106,6 +113,9 @@ function referencesFor(operations, declared) {
   const spec = data().versions[chosen.version];
   const out = { version: chosen.version, declared: typeof declared === 'string' && declared.trim() ? declared.trim() : null,
     exact: chosen.exact, operations: [], schemas: {}, cut: 0 };
+  // A specification still in development says so, with the commit it was taken at.
+  const dev = developmentOf()[chosen.version];
+  if (dev) out.development = { branch: dev.branch, commit: dev.commit };
   let chars = 0;
   const add = (name) => {
     if (Object.hasOwn(out.schemas, name) || !spec.schemas[name]) return false;
