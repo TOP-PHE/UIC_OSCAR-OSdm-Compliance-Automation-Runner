@@ -10,10 +10,6 @@
     "EUR": { "priceFactor": 1 }
   },
   "osdmVersion": "3.10.0",
-  "osdmDevelopment": {
-    "branch": "patches-osdm-v3.10",
-    "commit": "6770e2783181d44c847202921ee7f28d2edf4b67"
-  },
   "idPrefix": "EPSILON",
   "utcOffset": "+01:00",
   "tokenLifetimeSeconds": 600,

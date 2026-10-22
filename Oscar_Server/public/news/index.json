@@ -8,6 +8,14 @@
     "content": "Add FARE_RESERVATION to a scenario's requested offer parts and give it a passenger of type BICYCLE. From OSDM 3.8, the provider must offer the bicycle a reservation marked as a fare (distributionMode FARE_MODE), with no product. OSCAR selects these reservations in the booking, as OSDM asks, and checks that they are booked, confirmed and fulfilled with the fares. Fare reservations the request did not ask for fail.\n\nThe fulfilment of a fare reservation is made by the distributor, so a provider may answer the fulfilment read with an error or an empty fulfilment: OSCAR accepts both. The IRS 90918-1 reference and the place allocation are shown in the log.\n\nBefore OSDM 3.8 a fare reservation had another shape, which OSDM does not describe: such a scenario is not checked, and the log says so."
   },
   {
+    "id": "2026-10-22-osdm-312-zeta",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "OSDM 3.11 and 3.12; simulator provider zeta",
+    "summary": "OSCAR now knows OSDM 3.11, released, and 3.12, in development; the simulator's new provider zeta answers in 3.12.",
+    "content": "OSDM 3.10 and 3.11 were published by the OSDM working group on 21 October 2026, and 3.12 is being prepared. OSCAR checks requests and answers against each of these versions, and the AI analysis quotes them; 3.12 is followed at a pinned commit of the OSDM repository and named as \"in development\" wherever it is quoted.\n\nThe OSDM simulator has a sixth provider, zeta, which answers in OSDM 3.12 and sells in NOK and EUR. Every scenario written for gamma also exists for zeta (codes ending in _312). To test against it, use the endpoint https://<simulator-host>/zeta and the reference configuration simulator-zeta in Test Config. epsilon stays on OSDM 3.10.\n\nThe set-up checklist (template V1.05) now offers OSDM 3.11 and 3.12."
+  },
+  {
     "id": "2026-10-22-simulator-epsilon",
     "date": "October 22, 2026",
     "tag": "New",

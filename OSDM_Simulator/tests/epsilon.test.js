@@ -7,19 +7,16 @@
 
 'use strict';
 
-// #920: epsilon answers in OSDM 3.10, the version in development (branch
-// patches-osdm-v3.10 at the commit of osdm-dev.json). Every answer below is
+// #920: epsilon answers in OSDM 3.10 (released since 21/10/2026, #925). Every answer below is
 // checked against the 3.10 response schemas by call() (#833), so a full sale
 // on epsilon is also the proof that the simulator answers in 3.10's shapes.
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const { SECRETS, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
 const { loadProviders } = require('../src/config');
 
-const DEV = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'Documentation', 'Test_Coverage', 'OSDM_reference', 'osdm-dev.json'), 'utf8'));
 const [epsilonOne] = SECRETS.epsilon;
 const [deltaOne] = SECRETS.delta;
 
@@ -27,24 +24,12 @@ let sim;
 before(async () => { sim = await startSimulator(); });
 after(async () => { await sim.close(); });
 
-test('epsilon answers to the OSDM version in development OSCAR holds: same version, branch and commit', () => {
+test('epsilon answers to OSDM 3.10, released: it names no development branch (#925)', () => {
   const epsilon = loadProviders(path.join(__dirname, '..', 'providers')).get('epsilon');
-  assert.equal(epsilon.osdmVersion, DEV.version);
-  assert.deepEqual(epsilon.osdmDevelopment, { branch: DEV.branch, commit: DEV.commit });
+  assert.equal(epsilon.osdmVersion, '3.10.0');
+  assert.equal(epsilon.osdmDevelopment, undefined);
   assert.equal(epsilon.currency, 'SEK');
   assert.deepEqual(Object.keys(epsilon.otherCurrencies || {}), ['EUR']);
-  // The released providers name no development branch.
-  for (const [key, p] of loadProviders(path.join(__dirname, '..', 'providers'))) {
-    if (key !== 'epsilon') assert.equal(p.osdmDevelopment, undefined, key);
-  }
-});
-
-test('a profile with a development branch but no commit is refused', () => {
-  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'sim-dev-'));
-  const raw = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'providers', 'epsilon.json'), 'utf8'));
-  fs.writeFileSync(path.join(dir, 'epsilon.json'), JSON.stringify({ ...raw, osdmDevelopment: { branch: 'x', commit: 'main' } }));
-  assert.throws(() => loadProviders(dir), /osdmDevelopment/);
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('epsilon reports 3.10.0', async () => {
