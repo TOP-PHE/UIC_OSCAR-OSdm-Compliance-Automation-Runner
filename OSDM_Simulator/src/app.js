@@ -457,6 +457,16 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return preferenceAvailability(query, found(), provider);
   }
 
+  // #602: a provider with a trip search answers POST /trips-collection; the
+  // others answer 501. #920: OSDM 3.10 names it POST /trips-collections
+  // (OSDM#1487) and keeps the singular, deprecated; below 3.10 the plural is
+  // not OSDM.
+  function servesTripSearch(provider, resource) {
+    if (!provider.tripsCollection) return false;
+    if (resource === 'trips-collection') return true;
+    return resource === 'trips-collections' && osdmRank(provider.osdmVersion) >= osdmRank('3.10');
+  }
+
   async function osdmRoute(req, provider, clientId, segments) {
     const scope = `${provider.key}\n${clientId}`;
     const [resource, ...rest] = segments;
@@ -472,12 +482,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       return reductionCardCollection(provider);
     }
     if (resource === 'offers' && rest.length === 0) return offerRoute(req, provider, scope);
-    // #602: a provider with a trip search answers it; the others answer 501.
-    if (resource === 'trips-collection' && rest.length === 0 && provider.tripsCollection) return tripCollectionRoute(req, provider, scope);
-    // #920: OSDM 3.10 names the trip search POST /trips-collections (OSDM#1487)
-    // and keeps the singular, deprecated; below 3.10 the plural is not OSDM.
-    if (resource === 'trips-collections' && rest.length === 0 && provider.tripsCollection
-      && osdmRank(provider.osdmVersion) >= osdmRank('3.10')) return tripCollectionRoute(req, provider, scope);
+    if (rest.length === 0 && servesTripSearch(provider, resource)) return tripCollectionRoute(req, provider, scope);
     if (resource === 'bookings') return bookingRoute(req, provider, scope, rest);
     // #603: a provider that issues documents answers GET /fulfillments/{id}.
     if (resource === 'fulfillments' && rest.length === 1 && provider.documents) return fulfillmentRoute(req, scope, rest[0]);
