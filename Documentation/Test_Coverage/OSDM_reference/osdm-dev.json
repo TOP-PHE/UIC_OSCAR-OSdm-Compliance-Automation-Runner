@@ -1,0 +1,12 @@
+{
+  "version": "3.10.0",
+  "status": "development",
+  "repository": "https://github.com/UnionInternationalCheminsdeFer/OSDM",
+  "branch": "patches-osdm-v3.10",
+  "commit": "6770e2783181d44c847202921ee7f28d2edf4b67",
+  "commitDate": "2026-10-21",
+  "bundledAt": "2026-10-22",
+  "bundler": "@redocly/cli 2.11.1",
+  "file": "OSDM-online-api-v3.10.0.yml",
+  "issue": 920
+}

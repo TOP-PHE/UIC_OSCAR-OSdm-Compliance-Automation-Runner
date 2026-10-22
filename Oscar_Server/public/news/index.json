@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-osdm-3-10-in-development",
+    "date": "October 22, 2026",
+    "tag": "Improvement",
+    "title": "OSDM 3.10 (in development) known to OSCAR",
+    "summary": "OSCAR now holds the OSDM 3.10 specification as it stands on its development branch, ready for a simulated 3.10 provider.",
+    "content": "OSCAR checks requests and answers against the OSDM 3.10 specification under development (branch patches-osdm-v3.10, a fixed commit, updated as OSDM issues are resolved). A Test Framework or checklist may now declare 3.10. A version is also compared number by number everywhere: 3.10 had been read as 3.1 in one place."
+  },
+  {
     "id": "2026-10-22-fare-booking-fulfilment",
     "date": "October 22, 2026",
     "tag": "New",

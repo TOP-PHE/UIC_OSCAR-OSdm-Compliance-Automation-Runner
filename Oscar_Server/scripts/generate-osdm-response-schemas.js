@@ -29,7 +29,7 @@ const REPO = path.resolve(__dirname, '..', '..');
 const SPEC_DIR = process.env.OSDM_SPEC_DIR
   || path.join(REPO, 'Documentation', 'Test_Coverage', 'OSDM_reference');
 const OUT = path.join(REPO, 'OSDM_Simulator', 'tests', 'fixtures', 'osdm-response-schemas.json');
-const VERSIONS = ['3.6', '3.7', '3.8', '3.9'];
+const VERSIONS = ['3.6', '3.7', '3.8', '3.9', '3.10'];
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
 // The JSON schema of a response, through components.responses.

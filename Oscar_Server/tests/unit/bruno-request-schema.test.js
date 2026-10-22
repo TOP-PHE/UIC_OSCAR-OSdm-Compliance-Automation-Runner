@@ -81,13 +81,21 @@ describe('#736 the operation a request goes to', () => {
     expect(pickVersion('3.8.1')).toBe('3.8.0');
     expect(pickVersion('3.9.0')).toBe('3.9.0');
     expect(pickVersion('3.9.1')).toBe('3.9.0');
-    expect(pickVersion('3.10.0')).toBe('3.9.0');
+    // #920: 3.10 is after 3.9, never read as 3.1.
+    expect(pickVersion('3.10.0')).toBe('3.10.0');
+    expect(pickVersion('3.10')).toBe('3.10.0');
+    expect(pickVersion('3.11.0')).toBe('3.10.0');
     expect(pickVersion('3.6')).toBe('3.6.0');
     expect(pickVersion('3.2.0')).toBe('3.4.0');
-    expect(Object.keys(requestSchemas)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0', '3.9.0']);
+    expect(Object.keys(requestSchemas)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0', '3.9.0', '3.10.0']);
     // #858: 3.9 changed no request body OSCAR sends (only date-time formats,
     // which the generator does not keep).
     expect(requestSchemas['3.9.0']).toEqual(requestSchemas['3.8.0']);
+    // #920: 3.10 (in development) adds POST /trips-collections (OSDM#1487) and
+    // changes no other body OSCAR sends.
+    const ten = requestSchemas['3.10.0'];
+    expect(ten.operations.filter((o) => o.path === '/trips-collections')).toEqual([{ method: 'POST', path: '/trips-collections', schema: 'TripSearchCriteria' }]);
+    expect({ ...ten, operations: ten.operations.filter((o) => o.path !== '/trips-collections') }).toEqual(requestSchemas['3.9.0']);
   });
 
   test('offer-parts exists from 3.7 only', () => {
@@ -271,7 +279,7 @@ describe('#736 the glue the global after-response calls', () => {
 });
 
 describe('#736 the bundled schemas are the generator\'s output', () => {
-  test.each(['3.8.0', '3.9.0'])('the %s set is what the repository\'s OSDM file gives', (v) => {
+  test.each(['3.8.0', '3.9.0', '3.10.0'])('the %s set is what the repository\'s OSDM file gives', (v) => {
     const { forVersion } = require('../../scripts/generate-osdm-request-schemas.js');
     const yaml = require('js-yaml');
     const spec = yaml.load(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Test_Coverage',
