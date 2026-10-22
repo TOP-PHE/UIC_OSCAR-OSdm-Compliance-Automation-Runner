@@ -14,7 +14,7 @@ row in the same change as the scenario.
 
 - **Provider.** The suffix of the code names the OSDM version and so the
   provider to run it against: `_36` → `alpha` (3.6.0), `_37` → `beta`
-  (3.7.0), `_38` → `gamma` (3.8.0), `_39` → `delta` (3.9.0, #858), `_310` → `epsilon` (3.10.0 in development, #920). Since #824 every function is on all of them (a COMBINED return excepted on `alpha`: OSDM 3.6 has no `outboundTripIds`), and since #914 every `_38` scenario is copied for the other four (below).
+  (3.7.0), `_38` → `gamma` (3.8.0), `_39` → `delta` (3.9.0, #858), `_310` → `epsilon` (3.10.0, #920), `_312` → `zeta` (3.12.0 in development, #925). Since #824 every function is on all of them (a COMBINED return excepted on `alpha`: OSDM 3.6 has no `outboundTripIds`), and since #914 every `_38` scenario is copied for the other five (below).
   Run a scenario against another provider and it tests something else, or
   fails.
 - **Expected result.** Every scenario passes with **no failed check**. A
@@ -57,11 +57,11 @@ asked for is delivered — 0 document(s)"*.
 ## Every gamma scenario on every version (#914)
 
 Each `_38` scenario of the sections below also exists for `alpha` (`_36`),
-`beta` (`_37`), `delta` (`_39`) and `epsilon` (`_310`, #920), so each OSDM version is tested on
+`beta` (`_37`), `delta` (`_39`), `epsilon` (`_310`, #920) and `zeta` (`_312`, #925), so each OSDM version is tested on
 everything the simulator does. A copy is the `_38` scenario with its code,
 `osdmVersion` and description changed, and gamma's currencies replaced by
 its provider's (gamma's CZK by the provider's own, EUR by its second one:
-alpha EUR / CHF, beta CHF / EUR, delta PLN / EUR, epsilon SEK / EUR); the five providers have the
+alpha EUR / CHF, beta CHF / EUR, delta PLN / EUR, epsilon SEK / EUR, zeta NOK / EUR); the six providers have the
 same functions (#824). It tests the same thing, the simulator answers it
 the same way in the shapes of its own version (#833), and a run shows the
 same result as its `_38` row, with the differences listed below. The
@@ -82,12 +82,13 @@ their own here.
 | 3.6 (`alpha`) | `SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG` (any scenario with `productSelections`) | OSDM 3.6 has no `OfferSearchCriteria.productSelections` (3.7). |
 | 3.6 (`alpha`), 3.7 (`beta`) | `SIM_SALE_NAMED_COMPARTMENT_2ADT` (any scenario naming a compartment, `namedPlaceKind` COMPARTMENT) | `PlaceSelection.compartments` comes with 3.8. |
 | 3.9 (`delta`) | none | |
-| 3.10 (`epsilon`, #920) | none | 3.10 adds optional members only, so far. |
+| 3.10 (`epsilon`, #920) | none | 3.10 adds optional members only. |
+| 3.12 (`zeta`, #925) | none | 3.11 and 3.12 add optional members and deprecations only, so far. |
 
 **Differences from the `_38` row:** none beyond the version's own answer
 shapes (documents held by each fulfilment below 3.8; the refund receipt in
 `Booking.documents` below 3.8, #914) and the provider's currency. On
-`epsilon` (3.10) a scenario asking offers by trip id searches trips with
+`epsilon` (3.10) and `zeta` (3.12) a scenario asking offers by trip id searches trips with
 `POST /trips-collections`, the name OSDM gives that search from 3.10
 (OSDM#1487).
 

@@ -36,18 +36,18 @@ function providersDir(files) {
   return dir;
 }
 
-test('the shipped profiles load: five providers that differ where it shows', () => {
+test('the shipped profiles load: six providers that differ where it shows', () => {
   const providers = loadProviders(PROVIDERS_DIR);
-  assert.deepEqual([...providers.keys()], ['alpha', 'beta', 'delta', 'epsilon', 'gamma']);
+  assert.deepEqual([...providers.keys()], ['alpha', 'beta', 'delta', 'epsilon', 'gamma', 'zeta']);
   const all = [...providers.values()];
   for (const field of ['idPrefix', 'currency', 'name']) {
-    assert.equal(new Set(all.map((p) => p[field])).size, 5, `${field} must differ between providers`);
+    assert.equal(new Set(all.map((p) => p[field])).size, 6, `${field} must differ between providers`);
   }
-  assert.equal(new Set(all.map((p) => p.carrier.ref)).size, 5);
-  assert.equal(new Set(all.map((p) => p.tokenLifetimeSeconds)).size, 5);
+  assert.equal(new Set(all.map((p) => p.carrier.ref)).size, 6);
+  assert.equal(new Set(all.map((p) => p.tokenLifetimeSeconds)).size, 6);
   // Not every provider is on 3.8, and the collection sends and checks
   // according to the version (#614). Every function is on all four (#824).
-  assert.deepEqual(all.map((p) => p.osdmVersion), ['3.6.0', '3.7.0', '3.9.0', '3.10.0', '3.8.0']);
+  assert.deepEqual(all.map((p) => p.osdmVersion), ['3.6.0', '3.7.0', '3.9.0', '3.10.0', '3.8.0', '3.12.0']);
 });
 
 // Identity keys: what makes a provider itself. Every other key is a function,
@@ -59,7 +59,7 @@ test('alpha, beta and delta hold every function of gamma, with the same values, 
   const gamma = raw('gamma');
   const functions = Object.keys(gamma).filter((key) => !IDENTITY_KEYS.includes(key));
   assert.ok(functions.length >= 18, `gamma has ${functions.length} functions`);
-  for (const key of ['alpha', 'beta', 'delta', 'epsilon']) {
+  for (const key of ['alpha', 'beta', 'delta', 'epsilon', 'zeta']) {
     const profile = raw(key);
     for (const fn of functions) {
       assert.deepEqual(profile[fn], gamma[fn], `${key}.${fn} must equal gamma.${fn}`);
@@ -74,8 +74,9 @@ test('alpha, beta and delta hold every function of gamma, with the same values, 
   assert.deepEqual(identity(raw('gamma')), ['3.8.0', 'CZK', 'GAMMA']);
   assert.deepEqual(identity(raw('delta')), ['3.9.0', 'PLN', 'DELTA']);
   assert.deepEqual(identity(raw('epsilon')), ['3.10.0', 'SEK', 'EPSILON']);
+  assert.deepEqual(identity(raw('zeta')), ['3.12.0', 'NOK', 'ZETA']);
   // Each sells one other currency of its own, so each refuses one it does not sell.
-  for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon']) {
+  for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
     const other = Object.keys(raw(key).otherCurrencies || {});
     assert.ok(other.length > 0, `${key} sells another currency`);
     assert.ok(!other.includes(raw(key).currency), key);
@@ -166,7 +167,7 @@ test('a clients file with a weak, placeholder or misplaced entry is refused', ()
   const providers = loadProviders(PROVIDERS_DIR);
   const good = 's'.repeat(40);
   const refused = [
-    [{ zeta: [{ client_id: 'abc', client_secret: good }] }, /unknown provider/],
+    [{ eta: [{ client_id: 'abc', client_secret: good }] }, /unknown provider/],
     [{ alpha: { client_id: 'abc', client_secret: good } }, /must be a list/],
     [{ alpha: [{ client_id: 'abc', client_secret: 'short' }] }, /shorter than/],
     [{ alpha: [{ client_id: 'abc' }] }, /shorter than/],
