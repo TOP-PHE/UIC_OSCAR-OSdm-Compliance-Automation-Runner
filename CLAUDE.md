@@ -1600,6 +1600,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `trips-collections` from OSDM 3.10 (OSDM#1487). The wrong fare scenarios
   ride one-leg trips from their variant stations (trips 25–30), or the check
   would stop them.
+  **Negative fare requests** (#905, fares 1c, 1.11.376 / OTST_V2.0.209,
+  simulator 0.45.0): `expectFares: false` makes `checkFareOffers()` take
+  `checkNoFares()` first, before the "asks fares?" branch: check N (no fare,
+  FAIL) or, when the request named its parts without `FARE_*`, O14; O1–O13 do
+  not run. It ends the scenario (true) unless `bookMode` is PRODUCT, which
+  goes on with `productOffersOf()` (#207). "Domestic → no fare" is in no OSDM
+  version up to 3.11 (OSDM uses `isPartOfInternationalTrip` for VAT), so it is
+  only ever this expectation, never a rule OSCAR applies by itself (#242 D4).
+  An empty `requestedSections` list is sent as it is only by a fare request
+  (`sectionsToSend()`; `fareFieldsOf().emptySectionList`); the editor never
+  stores one. The simulator's `faresWithoutSection` variant is chosen by the
+  trip's origin (`0000086`, trip 31), the only variant without a section
+  start. #244 case 2 (section = whole trip) waits for OTST (#242 D5).
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

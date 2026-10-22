@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-fare-negative-requests",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "Negative fare requests",
+    "summary": "A scenario can now say it expects no fare, for a domestic trip, a request without a section, or fares not asked.",
+    "content": "A new scenario field, Fares expected, makes a fare scenario a negative test: set it to false and step 01 checks that the answer holds no fare, instead of grading the fares. It applies whether fares were asked or not: a request for products only must never get fares back, as OSDM says.\n\nOSDM does not say what a fare provider answers for a domestic trip or for a fare request without a section, so the expectation is yours, for your provider. A scenario that expects no fare ends after the offer step, unless its Book mode is PRODUCT: the sale then goes on with a product offer, booked and fulfilled.\n\nNothing changes for your existing scenarios."
+  },
+  {
     "id": "2026-10-22-every-scenario-every-version",
     "date": "October 22, 2026",
     "tag": "Improvement",

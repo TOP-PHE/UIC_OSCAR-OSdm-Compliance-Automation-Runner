@@ -975,6 +975,32 @@
     },
     {
       "id": 29,
+      "resource_type": "TRAIN",
+      "label": "Train 2216 0000086–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000086",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2216",
+            "departureTime": "14:20:00+01:00",
+            "arrivalTime": "15:20:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 30,
       "resource_type": "JOURNEY",
       "label": "Trip 4: 0000001–0000002, 2 legs",
       "data": {
@@ -991,7 +1017,7 @@
       }
     },
     {
-      "id": 30,
+      "id": 31,
       "resource_type": "JOURNEY",
       "label": "Trip 5: 0000001–0000002, 2 legs",
       "data": {
@@ -1008,7 +1034,7 @@
       }
     },
     {
-      "id": 31,
+      "id": 32,
       "resource_type": "JOURNEY",
       "label": "Trip 11: 0000095–0000002, 2 legs",
       "data": {
@@ -1025,7 +1051,7 @@
       }
     },
     {
-      "id": 32,
+      "id": 33,
       "resource_type": "JOURNEY",
       "label": "Trip 24: 0000001–0000002, 2 legs",
       "data": {
@@ -1141,6 +1167,10 @@
     "SIM_FARE_SPEC_1ADT_36",
     "SIM_FARE_SPEC_FREE_CHILD_36",
     "SIM_FARE_SRCH_1ADT_36",
-    "SIM_FARE_TRIPIDS_1ADT_36"
+    "SIM_FARE_TRIPIDS_1ADT_36",
+    "SIM_NHF_FARE_UNASKED_36",
+    "SIM_NHF_FARE_NO_SECTION_SRCH_36",
+    "SIM_NHF_FARE_NO_SECTION_SPEC_36",
+    "SIM_NHF_FARE_EMPTY_SECTIONS_36"
   ]
 }

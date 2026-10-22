@@ -161,10 +161,12 @@ describe('the pure helpers', () => {
       requestedSections: [{ startPlace: '8000001', endPlace: 'urn:uic:stn:8500010' }, { startPlace: 'x', endPlace: '' }],
       isPartOfInternationalTrip: 'true', desiredFareCluster: 'semi_flex', bookMode: 'fare',
     })).toEqual({
-      requestedSections: [{ startPlace: station('8000001'), endPlace: station('8500010') }],
-      isPartOfInternationalTrip: true, desiredFareCluster: 'SEMI_FLEX', bookMode: 'FARE',
+      requestedSections: [{ startPlace: station('8000001'), endPlace: station('8500010') }], emptySectionList: false,
+      isPartOfInternationalTrip: true, desiredFareCluster: 'SEMI_FLEX', bookMode: 'FARE', expectFares: null,
     });
-    expect(fares.fareFieldsOf({})).toEqual({ requestedSections: [], isPartOfInternationalTrip: null, desiredFareCluster: null, bookMode: null });
+    expect(fares.fareFieldsOf({})).toEqual({
+      requestedSections: [], emptySectionList: false, isPartOfInternationalTrip: null, desiredFareCluster: null, bookMode: null, expectFares: null,
+    });
   });
 });
 
@@ -190,6 +192,113 @@ describe('the wiring', () => {
         expect(text).toContain(`"${v}"`);
       }
     }
+  });
+});
+
+describe('the negative fare requests (#905)', () => {
+  const withoutSection = (req) => { const r = { ...req }; delete r.requestedSections; return r; };
+  const fromStation = (req, code) => {
+    const r = JSON.parse(JSON.stringify(req));
+    r.tripSpecifications[0].legs[0].timedLeg.start.stopPlaceRef = station(code);
+    return r;
+  };
+  const outcome = (req) => fares.noFareChecks(answer(req), req).map((c) => `${c.id} ${c.level} ${c.ok ? 'ok' : 'broken'}`);
+
+  test('on the simulator\'s answers: none of N1, N2 and N4 has a fare; the wrong variant fails N', () => {
+    // N1: a section, ADMISSION only: O14 says it.
+    expect(outcome(request({ start: '0000001', parts: ['ADMISSION'] }))).toEqual(['O14 FAIL ok', 'O15 INFO ok']);
+    // N2: fares asked, no section; N4: an empty list.
+    expect(outcome(withoutSection(request()))).toEqual(['N FAIL ok', 'O15 INFO ok']);
+    expect(outcome({ ...request(), requestedSections: [] })).toEqual(['N FAIL ok', 'O15 INFO ok']);
+    // A trip from the variant station gets fares all the same.
+    expect(outcome(fromStation(withoutSection(request()), '0000086'))).toEqual(['N FAIL broken', 'O15 INFO ok']);
+    // Fares not asked, given anyway: O14, not N.
+    expect(outcome(request({ start: '0000085', parts: ['ADMISSION'] }))).toEqual(['O14 FAIL broken', 'O15 INFO ok']);
+  });
+
+  test('no offer part named and fares given: N, since O14 then checks nothing', () => {
+    const req = request();
+    delete req.offerSearchCriteria;
+    const checks = fares.noFareChecks(answer(request()), req);
+    expect(checks[0]).toMatchObject({ id: 'N', ok: false });
+    expect(checks[0].message).toMatch(/6 fare\(s\) in 3 offer\(s\)/);
+  });
+
+  test('fareFieldsOf: expectFares is false only when the scenario says so; an empty list is kept apart', () => {
+    for (const value of [false, 'false']) expect(fares.fareFieldsOf({ expectFares: value }).expectFares).toBe(false);
+    for (const value of [true, 'true', '', null, undefined, 'no']) expect(fares.fareFieldsOf({ expectFares: value }).expectFares).toBeNull();
+    expect(fares.fareFieldsOf({ requestedSections: [] }).emptySectionList).toBe(true);
+    expect(fares.fareFieldsOf({ requestedSections: [{ startPlace: '', endPlace: '' }] }).emptySectionList).toBe(false);
+    expect(fares.fareFieldsOf({ requestedSections: null }).emptySectionList).toBe(false);
+  });
+
+  test('sectionsToSend: an empty list goes out with a request for fares only', () => {
+    const asks = { requestedOfferParts: ['FARE_ADMISSION'] };
+    const one = [{ startPlace: station('1'), endPlace: station('2') }];
+    expect(fares.sectionsToSend([], asks)).toEqual([]);
+    expect(fares.sectionsToSend([], { requestedOfferParts: ['ADMISSION'] })).toBeUndefined();
+    expect(fares.sectionsToSend([], null)).toBeUndefined();
+    expect(fares.sectionsToSend(null, asks)).toBeUndefined();
+    expect(fares.sectionsToSend(one, { requestedOfferParts: ['ADMISSION'] })).toBe(one);
+  });
+
+  describe('step 01: a scenario expecting no fare ends, or goes on with a product', () => {
+    const env = {};
+    const recorded = [];
+    const logged = [];
+    beforeEach(() => {
+      for (const k of Object.keys(env)) delete env[k];
+      recorded.length = 0;
+      logged.length = 0;
+      global.bru = { getEnvVar: (k) => env[k], setEnvVar: (k, v) => { env[k] = v; } };
+      global.test = (name, fn) => { try { fn(); recorded.push(`${name}: ok`); } catch (e) { recorded.push(`${name}: ${e.message}`); } };
+      global.validationLogger = (line) => logged.push(line);
+    });
+    afterAll(() => { delete global.bru; delete global.validationLogger; global.test = test; });
+    const realTest = test;
+    const runStep = (req, vars) => {
+      Object.assign(env, { OfferCollectionRequest: JSON.stringify(req), ...vars });
+      const body = answer(req);
+      return { ended: fares.checkFareOffers(body), body };
+    };
+
+    realTest('without bookMode the scenario ends; no fare check but N runs', () => {
+      const { ended } = runStep(withoutSection(request()), { expectFares: 'false' });
+      expect(ended).toBe(true);
+      expect(recorded).toEqual(['[fares N] No fare in the answer, as the scenario expects (expectFares: false): ok']);
+      expect(logged.join('\n')).toMatch(/No requested section, on purpose/);
+      expect(logged.join('\n')).not.toMatch(/\[WARNING\]/);
+    });
+
+    realTest('with bookMode PRODUCT the sale goes on, with the product offers only', () => {
+      const { ended, body } = runStep(fromStation(withoutSection(request()), '0000086'), { expectFares: 'false', bookMode: 'PRODUCT' });
+      expect(ended).toBe(false);
+      expect(recorded[0]).toMatch(/^\[fares N\] .*: 6 fare\(s\) in 3 offer\(s\)/);
+      expect(body.offers.length).toBeGreaterThan(0);
+      expect(body.offers.every((o) => !o.fares)).toBe(true);
+    });
+
+    realTest('without expectFares, a fare request without a section is still graded as before (O1 fails)', () => {
+      const { ended } = runStep(withoutSection(request()), {});
+      expect(ended).toBe(true);
+      expect(recorded[0]).toMatch(/^\[fares O1\] .*: the request asks for fares/);
+      expect(logged.join('\n')).toMatch(/\[WARNING\] \[fares\] The request asks for fares without a requested section/);
+    });
+  });
+
+  test('the wiring: the parser sets expectFares, both reset lists clear it, the request sends sections through sectionsToSend, Test Config shows it', () => {
+    const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+    expect(read('Bruno_Collection/library-bruno/scenarioParser.js')).toContain('bru.setEnvVar("expectFares", _fareFields.expectFares === false ? "false" : null);');
+    for (const file of ['Bruno_Collection/opencollection.yml', 'Bruno_Collection/library-bruno/scenarioParser.js']) {
+      expect(read(file)).toContain('"bookMode", "expectFares", "fareOfferId"');
+    }
+    expect(read('Bruno_Collection/library-bruno/requestsBuilder.js')).toContain('const requestedSections = sectionsToSend(parseEnvJson("requestedSections", null), parseEnvJson("offerSearchCriteria", null));');
+    const src = read('Oscar_Server/public/js/scenarios.js');
+    expect(src).toContain("buildSelect(idx, 'expectFares', 'Fares expected', ENUMS.expectFares,");
+    expect(src).toContain("expectFares:                       [null, 'false'],");
+    const schema = JSON.parse(read('Bruno_Collection/json_validator/datafile.schema.json'));
+    const scenarioProps = JSON.stringify(schema);
+    expect(scenarioProps).toContain('"expectFares":{');
   });
 });
 
