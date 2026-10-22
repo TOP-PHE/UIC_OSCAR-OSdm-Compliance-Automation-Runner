@@ -190,7 +190,7 @@ hand; a test fails until they are regenerated after any of the three changes.
 **Following a reference (#838, 1.11.335).** Rather than steps 3 and 4 below, a
 Test Manager of a company (or provider) made for the simulator can choose its
 reference in Test Config → *Reference configuration* (`simulator-alpha`,
-`-beta` or `-gamma`), then click *Update from the reference*. The update
+`-beta`, `-gamma`, `-delta` or `-epsilon`), then click *Update from the reference*. The update
 replaces the scenarios (the current data file stays the previous one, see
 *Restore previous file*), the Test Framework and the Test Data trains and
 journeys with the reference's, and sets the run list to the provider's; the

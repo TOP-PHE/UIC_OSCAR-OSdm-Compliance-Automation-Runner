@@ -73,10 +73,12 @@ const state = u => request(app).get('/v1/company/reference').set('Authorization'
 const link = (name, u = TM) => request(app).put('/v1/company/reference').set('Authorization', auth(u)).send({ name });
 const apply = (u = TM) => request(app).post('/v1/company/reference/apply').set('Authorization', auth(u));
 
-test('the state lists the four references and says none is followed', async () => {
+test('the state lists the five references and says none is followed', async () => {
   const res = await state(TESTER);
   expect(res.status).toBe(200);
-  expect(res.body.available.map(r => r.name)).toEqual(['simulator-alpha', 'simulator-beta', 'simulator-gamma', 'simulator-delta']);
+  expect(res.body.available.map(r => r.name)).toEqual(['simulator-alpha', 'simulator-beta', 'simulator-gamma', 'simulator-delta', 'simulator-epsilon']);
+  // #920: epsilon, the OSDM version in development.
+  expect(res.body.available[4]).toEqual({ name: 'simulator-epsilon', provider: 'epsilon', osdmVersion: '3.10.0' });
   expect(res.body.available[3]).toEqual({ name: 'simulator-delta', provider: 'delta', osdmVersion: '3.9.0' });
   expect(res.body.available[1]).toEqual({ name: 'simulator-beta', provider: 'beta', osdmVersion: '3.7.0' });
   expect(res.body).toMatchObject({ linked: null, up_to_date: false, applied_version: null });
@@ -87,7 +89,7 @@ test('a tester can neither link nor update; nothing followed is a 409; an unknow
   expect((await apply(TESTER)).status).toBe(403);
   expect((await apply()).status).toBe(409);
   expect((await link('../../etc/passwd')).status).toBe(400);
-  expect((await link('simulator-epsilon')).status).toBe(400);
+  expect((await link('simulator-zeta')).status).toBe(400);
 });
 
 test('linking says the configuration is not up to date yet', async () => {
@@ -137,8 +139,8 @@ test('a reference that moved on reads as not up to date; another reference forge
 });
 
 describe('the store', () => {
-  test('reads no name but the four, and falls back to the repository copy', () => {
-    expect(store.loadReference('simulator-epsilon')).toBeNull();
+  test('reads no name but the five, and falls back to the repository copy', () => {
+    expect(store.loadReference('simulator-zeta')).toBeNull();
     expect(store.loadReference('../reference/simulator-beta')).toBeNull();
     const saved = process.env.COLLECTION_PATH;
     process.env.COLLECTION_PATH = path.join(DIR, 'no-such-collection');

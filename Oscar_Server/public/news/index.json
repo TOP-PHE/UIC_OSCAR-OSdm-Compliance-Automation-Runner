@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-simulator-epsilon",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "OSDM simulator: epsilon, on OSDM 3.10 in development",
+    "summary": "The simulator's fifth provider, epsilon, answers in OSDM 3.10, the version the OSDM working group is preparing, and now has its scenarios and its reference configuration.",
+    "content": "epsilon follows the OSDM branch patches-osdm-v3.10 at a pinned commit, sells in SEK and EUR, and has every function of the other simulated providers. Every scenario written for gamma now also exists for epsilon (codes ending in _310).\n\nTo test against it, set up a company or a provider made for the simulator with the endpoint https://<simulator-host>/epsilon, then choose the reference configuration simulator-epsilon in Test Config and click Update from the reference. Ask your OSCAR administrator for an epsilon client id and secret.\n\nAs OSDM 3.10 changes, epsilon will follow it, one change at a time."
+  },
+  {
     "id": "2026-10-22-fare-refund",
     "date": "October 22, 2026",
     "tag": "New",
