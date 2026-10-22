@@ -61,10 +61,15 @@ function check(id, level, title, broken, explain) {
   return { id, level, title, ok: broken.length === 0, message: broken.length ? `${explain}: ${shown}${more}` : '' };
 }
 
+const byText = (a, b) => a.localeCompare(b);
+
 // Text of a value with its keys sorted, to compare two of them.
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (isObject(value)) return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
+  if (isObject(value)) {
+    const members = Object.keys(value).sort(byText).map((k) => [JSON.stringify(k), canonical(value[k])].join(':'));
+    return `{${members.join(',')}}`;
+  }
   return JSON.stringify(value);
 }
 
@@ -84,7 +89,7 @@ function productPartIdsOf(booking) {
 // names its passengers by id, the offer by external reference.
 function passengerKeysOf(fare, booking) {
   const externalRefOf = new Map(list(booking?.passengers).map((p) => [p.id, p.externalRef]));
-  return list(fare?.passengerRefs).map((ref) => String(externalRefOf.get(ref) ?? ref)).sort();
+  return list(fare?.passengerRefs).map((ref) => String(externalRefOf.get(ref) ?? ref)).sort(byText);
 }
 
 const priceText = (fare) => { const p = list(fare?.prices)[0]; return p ? `${p.amount} ${p.currency}` : ''; };
@@ -102,23 +107,13 @@ function sameSection(a, b) {
  * text sorts first, so any order of either list gives the same pairs.
  */
 function pairFares(offeredFares, booking) {
-  const booked = bookedFaresOf(booking).map((b) => ({ ...b, text: canonical(b.fare) })).sort((a, b) => a.text.localeCompare(b.text));
-  const offered = list(offeredFares).map((fare, index) => ({ fare, index, text: canonical(fare) })).sort((a, b) => a.text.localeCompare(b.text));
+  const booked = bookedFaresOf(booking).map((b) => ({ ...b, text: canonical(b.fare) })).sort((a, b) => byText(a.text, b.text));
+  const offered = list(offeredFares).map((fare, index) => ({ fare, index, text: canonical(fare) })).sort((a, b) => byText(a.text, b.text));
   const used = new Set();
   const pairs = [];
   const missing = [];
   for (const o of offered) {
-    const offeredKeys = list(o.fare.passengerRefs).map(String).sort().join('|');
-    let best = null;
-    let bestScore = 0;
-    for (const b of booked) {
-      if (used.has(b)) continue;
-      const sameId = o.fare.id != null && b.fare.id === o.fare.id;
-      const samePassengers = offeredKeys !== '' && passengerKeysOf(b.fare, booking).join('|') === offeredKeys;
-      if (!sameId && !samePassengers) continue;
-      const score = (sameId ? 8 : 0) + (samePassengers ? 4 : 0) + (sameSection(o.fare, b.fare) ? 2 : 0) + (priceText(o.fare) === priceText(b.fare) ? 1 : 0);
-      if (score > bestScore) { best = b; bestScore = score; }
-    }
+    const best = bestMatch(o.fare, booked, used, booking);
     if (best) {
       used.add(best);
       pairs.push({ offered: o.fare, booked: best.fare, path: best.path });
@@ -127,6 +122,26 @@ function pairFares(offeredFares, booking) {
     }
   }
   return { pairs, missing };
+}
+
+// The booked fare, not yet paired, that stands best for an offered one; null when none does.
+function bestMatch(offered, booked, used, booking) {
+  const offeredKeys = list(offered.passengerRefs).map(String).sort(byText).join('|');
+  let best = null;
+  let bestScore = 0;
+  for (const b of booked) {
+    const score = used.has(b) ? 0 : pairScore(offered, offeredKeys, b.fare, booking);
+    if (score > bestScore) { best = b; bestScore = score; }
+  }
+  return best;
+}
+
+// How well a booked fare stands for an offered one: 0 when it has neither its id nor its passengers.
+function pairScore(offered, offeredKeys, booked, booking) {
+  const sameId = offered.id != null && booked.id === offered.id;
+  const samePassengers = offeredKeys !== '' && passengerKeysOf(booked, booking).join('|') === offeredKeys;
+  if (!sameId && !samePassengers) return 0;
+  return (sameId ? 8 : 0) + (samePassengers ? 4 : 0) + (sameSection(offered, booked) ? 2 : 0) + (priceText(offered) === priceText(booked) ? 1 : 0);
 }
 
 // B5: the provisional price, when the booking states one.
@@ -168,7 +183,10 @@ function bookingChecks(booking, offer, stage) {
   const checks = [
     first,
     check('B2', 'FAIL', 'Every fare of the offer is in the booking (paired by id, else passengers, section and price)',
-      missing.map((m) => `offered fare ${m.fare.id ?? `[${m.index}]`}`), 'fares of the offer missing from the booking'),
+      missing.map((m) => {
+        const name = m.fare.id ?? `[${m.index}]`;
+        return `offered fare ${name}`;
+      }), 'fares of the offer missing from the booking'),
     check('B3', 'FAIL', 'Each booked fare has the members OSDM requires (Fare.required, passengerRefs)',
       booked.map(({ fare, path }) => ({ path, missing: missingFareMembers(fare) })).filter((x) => x.missing.length).map((x) => `${x.path} lacks ${x.missing.join(', ')}`),
       'members missing or empty'),
