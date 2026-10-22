@@ -72,6 +72,16 @@ const bookingDocumentBefore38 = (doc) => Object.fromEntries(Object.entries({
   id: doc.id, type: doc.type, scope: 'BOOKING', format: doc.format, content: doc.content,
 }).filter(([, v]) => v !== undefined));
 
+// #914: the booking's documents that no fulfilment names (the refund
+// receipt) go to `Booking.documents` below 3.8, scoped to the booking;
+// before, they were lost with the booking's list.
+function keepBookingDocuments(booking) {
+  if (!Array.isArray(booking.fulfillments)) return;
+  const named = new Set(booking.fulfillments.flatMap((f) => (Array.isArray(f?.fulfillmentDocumentRefs) ? f.fulfillmentDocumentRefs : [])));
+  const own = booking.fulfillmentDocuments.filter((d) => isObject(d) && !named.has(d.id)).map(bookingDocumentBefore38);
+  if (own.length) booking.documents = [...(Array.isArray(booking.documents) ? booking.documents : []), ...own];
+}
+
 // Below 3.8: each fulfilment holds the documents it names; the lists of the
 // booking and of the answer go.
 function nestDocuments(value, docs) {
@@ -84,14 +94,7 @@ function nestDocuments(value, docs) {
     else delete value.fulfillmentDocuments;
   } else if (Array.isArray(value.fulfillmentDocuments) && !('status' in value && 'bookingRef' in value)) {
     // A list that is not a fulfilment's own: the booking's or the answer's.
-    // #914: a document of the booking that no fulfilment names (the refund
-    // receipt) is a `Document` of `Booking.documents` below 3.8, scoped to
-    // the booking; before, it was lost.
-    if (Array.isArray(value.fulfillments)) {
-      const named = new Set(value.fulfillments.flatMap((f) => (Array.isArray(f?.fulfillmentDocumentRefs) ? f.fulfillmentDocumentRefs : [])));
-      const own = value.fulfillmentDocuments.filter((d) => isObject(d) && !named.has(d.id)).map(bookingDocumentBefore38);
-      if (own.length) value.documents = [...(Array.isArray(value.documents) ? value.documents : []), ...own];
-    }
+    keepBookingDocuments(value);
     delete value.fulfillmentDocuments;
   }
   for (const child of Object.values(value)) nestDocuments(child, docs);

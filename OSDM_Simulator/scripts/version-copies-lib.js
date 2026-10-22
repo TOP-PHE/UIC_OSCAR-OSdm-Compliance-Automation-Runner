@@ -114,12 +114,14 @@ function layout(value, indent) {
   if (Array.isArray(value)) {
     if (value.every((v) => v === null || typeof v !== 'object')) return JSON.stringify(value).replaceAll('","', '", "');
     if (value.length === 0) return '[]';
-    return `[\n${value.map((v) => `${pad}  ${layout(v, indent + 2)}`).join(',\n')}\n${pad}]`;
+    const items = value.map((v) => pad + '  ' + layout(v, indent + 2));
+    return `[\n${items.join(',\n')}\n${pad}]`;
   }
   if (value && typeof value === 'object') {
     const entries = Object.entries(value);
     if (entries.length === 0) return '{}';
-    return `{\n${entries.map(([k, v]) => `${pad}  ${JSON.stringify(k)}: ${layout(v, indent + 2)}`).join(',\n')}\n${pad}}`;
+    const members = entries.map(([k, v]) => pad + '  ' + JSON.stringify(k) + ': ' + layout(v, indent + 2));
+    return `{\n${members.join(',\n')}\n${pad}}`;
   }
   return JSON.stringify(value);
 }
