@@ -44,8 +44,8 @@ function loadReference(name) {
   for (const dir of dataBaseCandidates()) {
     try {
       const reference = JSON.parse(fs.readFileSync(path.join(dir, 'reference', `${name}.json`), 'utf8'));
-      const datafileText = fs.readFileSync(path.join(dir, R.DATAFILE_NAME), 'utf8');
-      return { reference, datafile: JSON.parse(datafileText), version: R.versionOf(reference, datafileText) };
+      const datafile = JSON.parse(fs.readFileSync(path.join(dir, R.DATAFILE_NAME), 'utf8'));
+      return { reference, datafile, version: R.versionOf(reference, datafile) };
     } catch {
       // Not in this copy: the next one.
     }

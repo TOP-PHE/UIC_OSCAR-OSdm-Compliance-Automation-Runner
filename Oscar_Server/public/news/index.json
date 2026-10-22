@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-reference-version-per-provider",
+    "date": "October 22, 2026",
+    "tag": "Fix",
+    "title": "Reference configurations: up to date per provider",
+    "summary": "A simulator reference is flagged 'not up to date' only when its own provider's scenarios or data change.",
+    "content": "A company following a simulator reference (simulator-alpha, -beta, -gamma, -delta) was told its configuration was not up to date whenever anything changed in the simulator's data file, even scenarios of another provider. The check now looks at the provider's own scenarios and data only. After this release, each such company is told once to update: a Test Manager clicks the update in Test Config, Reference configuration."
+  },
+  {
     "id": "2026-10-22-fare-offers-search-trip-ids",
     "date": "October 22, 2026",
     "tag": "New",

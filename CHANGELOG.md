@@ -62,6 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.374] / [collection-OTST_V2.0.207] — 2026-10-22
+
+Issue #912, release 2026.409.
+
+### Fixed
+- **A reference configuration is "not up to date" only when its own provider's part changed.** The version of a simulator reference was the sha256 of the reference and of the whole simulator data file, so fare scenarios added for gamma (#903, #904) flagged every company following `simulator-delta` on the run page, though nothing delta runs had moved. Now the version, and the reference's Test Data, come from the provider's part of the data file (`providerPartOf()`): the scenarios of its OSDM version (the deliberately wrong and fault ones included), the trips, passenger lists and other entries they name, the first purchaser (which every run reads), and the other root keys but the file's own run list.
+- The Test Data of `simulator-alpha`, `-beta` and `-delta` are now the trains of their own scenarios (2 entries each, 32 before); gamma's are unchanged. An update still stores the whole data file, with the provider's run list.
+
+**After this release, every company following a reference reads "not up to date" once**, as the reference files changed: one update by a Test Manager (Test Config → Reference configuration) clears it.
+
+Checked:
+- `reference-configuration.test.js`: a scenario, trip and passenger list added for another provider leave the version as it is; the provider's own scenario, the trip it names, the first purchaser or a root key change it (the test fails with the old whole-file version); the part and the Test Data. `company-reference.test.js` (the update).
+
+---
+
 ## [server-1.11.373] / [collection-OTST_V2.0.206] — 2026-10-22
 
 Issue #904, fares phase 1b, release 2026.408.
