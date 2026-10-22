@@ -14,7 +14,7 @@ row in the same change as the scenario.
 
 - **Provider.** The suffix of the code names the OSDM version and so the
   provider to run it against: `_36` → `alpha` (3.6.0), `_37` → `beta`
-  (3.7.0), `_38` → `gamma` (3.8.0), `_39` → `delta` (3.9.0, #858). Since #824 every function is on all of them (a COMBINED return excepted on `alpha`: OSDM 3.6 has no `outboundTripIds`).
+  (3.7.0), `_38` → `gamma` (3.8.0), `_39` → `delta` (3.9.0, #858). Since #824 every function is on all of them (a COMBINED return excepted on `alpha`: OSDM 3.6 has no `outboundTripIds`), and since #914 every `_38` scenario is copied for the other three (below).
   Run a scenario against another provider and it tests something else, or
   fails.
 - **Expected result.** Every scenario passes with **no failed check**. A
@@ -53,6 +53,39 @@ scenario: 234, 294, 314, 527 and 455 checks; 356 for the return in one offer
 on `beta` and `gamma`). Before, `alpha` and `beta` sold three unnamed offers
 and issued no documents, which showed as one warning, *"the PDF_A4 medium
 asked for is delivered — 0 document(s)"*.
+
+## Every gamma scenario on every version (#914)
+
+Each `_38` scenario of the sections below also exists for `alpha` (`_36`),
+`beta` (`_37`) and `delta` (`_39`), so each OSDM version is tested on
+everything the simulator does. A copy is the `_38` scenario with its code,
+`osdmVersion` and description changed, and gamma's currencies replaced by
+its provider's (gamma's CZK by the provider's own, EUR by its second one:
+alpha EUR / CHF, beta CHF / EUR, delta PLN / EUR); the four providers have the
+same functions (#824). It tests the same thing, the simulator answers it
+the same way in the shapes of its own version (#833), and a run shows the
+same result as its `_38` row, with the differences listed below. The
+deliberately wrong and fault scenarios are copied too, and stay out of the
+run lists like gamma's.
+
+`OSDM_Simulator/scripts/version-copies.js` appends the copies that are
+missing (`version-copies-lib.js` holds the rules), and
+`OSDM_Simulator/tests/datafile.test.js` fails until every `_38` scenario has
+them: add a scenario for gamma, then run the script. The copies have no row of
+their own here.
+
+**Not possible on a version**, so not copied:
+
+| Version | Scenarios | Why |
+|---|---|---|
+| 3.6 (`alpha`) | Every scenario with a return in one offer (`returnModel` COMBINED): `SIM_RETURN_COMBINED_1ADT`, `SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD`, `SIM_SALE_DOCUMENTS_RETURN_1ADT`, `SIM_REFUND_COMBINED_RETURN_1ADT`, `SIM_REFUND_COMBINED_INBOUND_1ADT`, `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE`, `SIM_REFUND_COMBINED_RECEIPT_1ADT`, `SIM_SALE_CARD_STUDENT_RETURN_1YTH`, `SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT`, `SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT` | OSDM 3.6 has no `outboundTripIds`, `inboundDate` or `inboundTripCoverage` (3.7). |
+| 3.6 (`alpha`) | `SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG` (any scenario with `productSelections`) | OSDM 3.6 has no `OfferSearchCriteria.productSelections` (3.7). |
+| 3.6 (`alpha`), 3.7 (`beta`) | `SIM_SALE_NAMED_COMPARTMENT_2ADT` (any scenario naming a compartment, `namedPlaceKind` COMPARTMENT) | `PlaceSelection.compartments` comes with 3.8. |
+| 3.9 (`delta`) | none | |
+
+**Differences from the `_38` row:** none beyond the version's own answer
+shapes (documents held by each fulfilment below 3.8; the refund receipt in
+`Booking.documents` below 3.8, #914) and the provider's currency.
 
 ## alpha — OSDM 3.6.0
 

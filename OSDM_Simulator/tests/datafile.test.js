@@ -19,7 +19,19 @@ const { buildTripCollection } = require('../src/osdm/trips');
 const { PROVIDERS_DIR } = require('./helpers');
 
 const collection = path.join(__dirname, '..', '..', 'Bruno_Collection');
-const datafile = require(path.join(collection, 'data_base', 'simulator_datafile.json'));
+const fullDatafile = require(path.join(collection, 'data_base', 'simulator_datafile.json'));
+const { VERSIONS, NOT_POSSIBLE, reasonNotPossible, baseOf, copyOf } = require('../scripts/version-copies-lib');
+
+// #914: every `_38` scenario has its copies for 3.6, 3.7 and 3.9, made by
+// scripts/version-copies.js and checked by their own test below. The other
+// tests read the file without them: what they pin of a gamma scenario holds
+// for its copies, which differ from it in code, version and description only.
+const sourceOf = new Map(fullDatafile.scenarios.filter((s) => s.osdmVersion === '3.8.0').map((s) => [baseOf(s.code), s]));
+const isGeneratedCopy = (s) => {
+  const source = sourceOf.get(baseOf(s.code));
+  return s.osdmVersion !== '3.8.0' && !!source && JSON.stringify(copyOf(source, s.osdmVersion)) === JSON.stringify(s);
+};
+const datafile = { ...fullDatafile, scenarios: fullDatafile.scenarios.filter((s) => !isGeneratedCopy(s)) };
 
 test('the ready-made data file is valid against the collection\'s data file schema', () => {
   // Checked with the copy of Ajv that the collection carries, so the simulator
@@ -29,15 +41,15 @@ test('the ready-made data file is valid against the collection\'s data file sche
   const Ajv = require(path.join(collection, 'json_validator', 'ajv.js'));
   const { $schema: _declared, ...schema } = require(path.join(collection, 'json_validator', 'datafile.schema.json'));
   const validate = new Ajv({ allErrors: true }).compile(schema);
-  assert.equal(validate({ ...datafile, scenarios: [{}] }), false, 'the schema must be able to refuse a file');
-  assert.equal(validate(datafile), true, JSON.stringify(validate.errors, null, 1));
+  assert.equal(validate({ ...fullDatafile, scenarios: [{}] }), false, 'the schema must be able to refuse a file');
+  assert.equal(validate(fullDatafile), true, JSON.stringify(validate.errors, null, 1));
 });
 
 test('every scenario points at entries that exist, and the run list at scenarios that exist', () => {
-  const ids = (list) => new Set(datafile[list].map((entry) => entry.id));
-  const codes = datafile.scenarios.map((s) => s.code);
+  const ids = (list) => new Set(fullDatafile[list].map((entry) => entry.id));
+  const codes = fullDatafile.scenarios.map((s) => s.code);
   assert.equal(new Set(codes).size, codes.length);
-  for (const scenario of datafile.scenarios) {
+  for (const scenario of fullDatafile.scenarios) {
     assert.ok(ids('tripRequirements').has(scenario.tripRequirementId), scenario.code);
     assert.ok(ids('passengersList').has(scenario.passengersListId), scenario.code);
     assert.ok(ids('purchaserList').has(scenario.purchaserListId), scenario.code);
@@ -58,35 +70,35 @@ test('every scenario points at entries that exist, and the run list at scenarios
   for (const code of datafile.scenariosToRun) assert.ok(codes.includes(code), code);
 });
 
-test('each provider\'s OSDM version has the same scenarios, and the run list is gamma\'s', () => {
-  // One file for the three providers (#614): a scenario asks for one version,
+test('each provider\'s OSDM version has every scenario of gamma its version can express, and the run list is gamma\'s (#914)', () => {
+  // One file for the four providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
-  // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697), the passenger limits (#699), the accented names (#703), the sales horizon (#704), the age bands (#705), the train filter (#722), the seat preferences, named and nearby places (#766), the offer search probes (#780), the currencies (#781), the fares (#903) and,
-  // with the rest of #592 and #611, the later functions are gamma's only.
+  // Since #914 every `_38` scenario is copied for 3.6, 3.7 and 3.9, but those
+  // reasonNotPossible() leaves out (the return in one offer does not exist in 3.6).
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
-  const byVersion = new Map();
-  for (const scenario of datafile.scenarios) {
-    const sale = scenario.code.replace(/_\d{2}$/, '');
-    assert.equal(scenario.code, `${sale}_${scenario.osdmVersion.slice(0, 3).replace('.', '')}`, 'the code names the version');
-    if (!byVersion.has(scenario.osdmVersion)) byVersion.set(scenario.osdmVersion, []);
-    byVersion.get(scenario.osdmVersion).push(sale);
+  assert.deepEqual([...new Set(fullDatafile.scenarios.map((s) => s.osdmVersion))].sort(), providers.map((p) => p.osdmVersion).sort());
+  const byCode = new Map(fullDatafile.scenarios.map((s) => [s.code, s]));
+  const strip = ({ code: _c, osdmVersion: _v, description: _d, ...rest }) => JSON.stringify(rest);
+  for (const scenario of fullDatafile.scenarios) {
+    assert.equal(scenario.code, `${baseOf(scenario.code)}_${scenario.osdmVersion.slice(0, 3).replace('.', '')}`, 'the code names the version');
+    if (scenario.osdmVersion === '3.8.0') continue;
+    const source = sourceOf.get(baseOf(scenario.code));
+    assert.ok(source, `${scenario.code}: no _38 scenario it is a copy of`);
+    assert.equal(strip(scenario), strip(copyOf(source, scenario.osdmVersion)), `${scenario.code} differs from the copy of ${source.code} in more than its description: run scripts/version-copies.js`);
   }
-  assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
-  const combined = 'SIM_RETURN_COMBINED_1ADT';
-  const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_CURRENCY_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER', 'SIM_SALE_SEAT_PREFERENCE', 'SIM_SALE_NAMED_', 'SIM_SALE_NEARBY_', 'SIM_OFFER_PROBE_', 'SIM_TRIP_PROBE_', 'SIM_FARE_'].some((prefix) => s.startsWith(prefix)));
-  for (const [version, sales] of byVersion) {
-    let expected = latest;
-    // delta (3.9, #858) runs beta's small set: 3.9 changed no schema OSCAR sends or reads.
-    if (version === '3.7.0' || version === '3.9.0') expected = everyVersion;
-    if (version === '3.6.0') expected = everyVersion.filter((s) => s !== combined);
-    assert.deepEqual(sales, expected, version);
+  for (const [version, { suffix }] of Object.entries(VERSIONS)) {
+    for (const [base, source] of sourceOf) {
+      const code = `${base}_${suffix}`;
+      const reason = reasonNotPossible(source, version);
+      if (reason) assert.ok(!byCode.has(code), `${code} cannot exist: ${reason}`);
+      else assert.ok(byCode.has(code), `${code} is missing: run scripts/version-copies.js`);
+    }
+    for (const base of Object.keys(NOT_POSSIBLE[version])) assert.ok(sourceOf.has(base), `${version}: ${base} is not a _38 scenario`);
   }
   const gamma = providers.find((p) => p.key === 'gamma');
   // The deliberately wrong scenarios (#611) and the injected faults (#833)
   // fail on purpose: not in the run list.
-  assert.deepEqual(datafile.scenariosToRun, datafile.scenarios
+  assert.deepEqual(fullDatafile.scenariosToRun, fullDatafile.scenarios
     .filter((s) => s.osdmVersion === gamma.osdmVersion && !s.code.startsWith('SIM_WRONG_') && !s.code.startsWith('SIM_FAULT_')).map((s) => s.code));
 });
 

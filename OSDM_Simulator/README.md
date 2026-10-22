@@ -201,4 +201,6 @@ All optional, read from the environment.
 | `src/osdm/bookings.js` | bookings, passengers, purchaser, tickets |
 | `providers/` | the provider profiles |
 | `deploy/` | compose file and reverse-proxy example |
+| `scripts/version-copies.js` | appends to the data file the `_36`, `_37` and `_39` copies of its `_38` scenarios (#914): run it after adding a scenario for gamma |
+| `scripts/replay.js` | runs the data file's scenarios with `bru` on the provider of their version and records the checks (#611) |
 | `tests/` | `node --test` |

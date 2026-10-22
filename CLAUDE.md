@@ -2305,6 +2305,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     flagged every delta company "not up to date". The update still stores the
     whole data file. A new resource list or a field naming an entry must be
     added to `RESOURCE_LISTS` there, or a change to it goes unseen.
+    **Every version runs every scenario it can express (#914, 1.11.375 /
+    OTST_V2.0.208, simulator 0.44.0):** each `_38` scenario has `_36`,
+    `_37` and `_39` copies, appended by `OSDM_Simulator/scripts/
+    version-copies.js` (rules in `version-copies-lib.js`: a copy differs in
+    code, `osdmVersion`, description and currencies: gamma's CZK / EUR become
+    the provider's own / second one; `reasonNotPossible()` leaves out, by
+    rule, a COMBINED return and `productSelections` on 3.6 and a named
+    compartment below 3.8). Every copy was replayed on its provider: the
+    WRONG / FAULT ones fail as their `_38` twins. `datafile.test.js` fails until a new `_38`
+    scenario has its copies; its other tests read the file without the
+    generated copies (`isGeneratedCopy`), and the scenarios document gives
+    them no row. An update from a reference now stores the provider's part
+    only (`configurationOf()`), so a delta company holds delta's scenarios.
+    Found on the way: below 3.8 the simulator lost the refund receipt (the
+    booking's list went, no fulfilment names it); it is a `Document` of
+    `Booking.documents` now. A standalone run renews its token when it names
+    `standalone_token_url` (`renewStandaloneToken()`, `auth.js`; the replay
+    does), since beta's two-minute tokens died in long waits.
   - **Its data file is `Bruno_Collection/data_base/simulator_datafile.json`,
     the one copy** for OSCAR and for a standalone run (#593), with
     `environments/OTST_Simulator_Env.yml` and `00-Access Token/Simulator Access

@@ -185,17 +185,21 @@ not checked.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (89 scenarios)
+### 4.1 The simulator's data file
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
 [OSCAR - OSDM Simulator scenarios](../Server_Operations/OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
-In short:
+**Every scenario written for `gamma` (`_38`) also runs on `alpha` (`_36`),
+`beta` (`_37`) and `delta` (`_39`)** (#914), but those a version cannot
+express (a return in one offer on 3.6): each OSDM version is tested on all
+the simulator does. The groups below are gamma's; the other three providers
+have the same, as copies. In short:
 
 | Group | Scenarios | Provider |
 |---|---|---|
-| Sale, two-offer return, full refund, partial refund by fulfillment | 5 per version | `alpha`, `beta`, `gamma` |
-| Return in one offer | 1 per version from 3.7 | `beta`, `gamma` |
+| Sale, two-offer return, full refund, partial refund by fulfillment | 5 | `gamma` (and its copies) |
+| Return in one offer | 1 | `gamma` (and its copies from 3.7) |
 | Refund withdrawn, refund offer only, overrule codes (4 accepted, 1 refused) | 7 | `gamma` |
 | Refunds of a return in one offer (full, inbound only, overrule code, receipt) | 4 | `gamma` |
 | Partial refund by passenger and by leg, on trips sold with one ticket per passenger or per leg | 2 | `gamma` |
