@@ -117,6 +117,14 @@ runtime:
             return;
         }
 
+        // #906: the fulfilment of a fare sale is checked by fareBooking.js, then 06b reads it.
+        if (require(bru.getEnvVar("library_base") + "fareBooking.js").checkFareFulfillmentStep(jsonData)) {
+            if (require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").armFulfillmentReads(jsonData)) {
+                bru.runner.setNextRequest("06b. GET Fulfillment");
+            }
+            return;
+        }
+
         // #253: pass the sibling FulfillmentResponse.fulfillmentDocuments[] (v3.8)
         // so each fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
         if (!jsonData || !Array.isArray(jsonData.fulfillments) || jsonData.fulfillments.length === 0) {

@@ -153,6 +153,9 @@ runtime:
         let _body = null;
         try { _body = res.getBody(); } catch (_e) { _body = null; }
 
+        // #906: the booking of a fare offer is checked by fareBooking.js, then 05.
+        if (require(bru.getEnvVar("library_base") + "fareBooking.js").checkFareBookingStep(_status, _body)) return;
+
         // #766 PR 3: a booking refused while it asked for seat preferences is
         // sent once more without them; the second answer says which was refused.
         if (require(bru.getEnvVar("library_base") + "offers.js").bookingWithoutPreferences(_status, _body)) {

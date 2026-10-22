@@ -786,6 +786,8 @@ function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
     body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS,
   });
   const offers = [...productOffers, ...fareOffers];
+  // #906: a fare offer is booked like any other, so it is remembered too.
+  for (const offer of fareOffers) remembered.push({ offer, trips, passengers, oneFulfillment: true, shortLivedMs });
   const allTrips = [...outboundTrips, ...trips];
   const problems = [...problemsOf(passengers, built.offers, collective, refusals), ...productProblems];
   const partsIgnored = fareOffers.length > 0 ? null : offerPartsIgnored(criteria);

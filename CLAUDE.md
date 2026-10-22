@@ -1613,6 +1613,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   stores one. The simulator's `faresWithoutSection` variant is chosen by the
   trip's origin (`0000086`, trip 31), the only variant without a section
   start. #244 case 2 (section = whole trip) waits for OTST (#242 D5).
+  **The fare sale** (#906, fares 2, 1.11.377 / OTST_V2.0.210, simulator
+  0.46.0): step 01 books the fare offer chosen when no FAIL-level check
+  of it failed (`fareSaleDecision()`, `__fareSale`) and routes to 02;
+  `bookMode` PRODUCT goes on with the product offers instead. 02, 05,
+  06, 07 call `library-bruno/fareBooking.js` right after their status
+  and JSON checks, and 06b's `checkFulfillmentReadStep()` does, so no
+  product validator sees a booking of fares; 02 goes straight to 05
+  (no passenger update), 07 ends the scenario (the refund is #907) and
+  keeps the fare ids in `admissionReservationAncillaryBookingPartsIds`.
+  Offered and booked fares are paired by content (`pairFares()`: id, else
+  passengers through the booking's ids, then section and price, ties by
+  text). A fulfilment naming a fare, or naming no part, is a fare
+  fulfilment. Simulator: fare offers are remembered for booking,
+  `BookedOffer.fares`, one fulfilment of fares only (no document,
+  control number or issuer; `FARE_FULFILLMENT`), variants
+  `fare-not-in-fulfillment` / `fare-fulfillment-document` by last name.
+  A `Fare` is a closed schema: a booked one gets a status and nothing of
+  an admission's confirmation (`confirmedOn` would break conformance).
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

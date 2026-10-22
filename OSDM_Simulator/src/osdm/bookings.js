@@ -44,7 +44,7 @@ function reservationOptions(part, selection, trips, provider, chosen) {
     ignoreReference: chosen.has('ignores-reference-place'),
   };
 }
-const { issueDocuments } = require('./documents');
+const { issueDocuments, attachTicket } = require('./documents');
 const variants = require('./variants');
 const persons = require('./persons');
 const ticketing = require('./ticketing');
@@ -117,8 +117,21 @@ const lifetimeOf = (booking, defaultMs) => booking[SHORT_LIVED] || defaultMs;
 const sumOf = (prices, currency) => ({ amount: prices.reduce((total, p) => total + p.amount, 0), currency, scale: 2 });
 // #781: a booking is in the currency its offers were sold in.
 const currencyOf = (booking, provider) => partsOf(booking).find((p) => p.price?.currency)?.price.currency || provider.currency;
-// Every part of a booking: its admissions and, since #601, its reservations.
-const partsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...bookedOffer.reservations]);
+// Every part of a booking: its admissions and, since #601, its reservations;
+// since #906, its fares.
+const faresOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.fares || []);
+const productPartsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...bookedOffer.reservations]);
+const partsOf = (booking) => [...productPartsOf(booking), ...faresOf(booking)];
+// A booked part's price: a fare gives a list of prices, the first one counts (#906).
+const priceOf = (part) => part.price || (Array.isArray(part.prices) ? part.prices[0] : undefined);
+// #906: a fulfilment of fares only, which OSDM gives no document, control number or issuer.
+const FARE_FULFILLMENT = Symbol('fare fulfillment');
+
+// A booked fare, made from a fare of the offer (#906): the same fare, PREBOOKED,
+// naming the booking's passengers. A Fare has no creation or deadline member.
+function fareFrom(fare, passengers) {
+  return { ...structuredClone(fare), status: 'PREBOOKED', passengerRefs: fare.passengerRefs.map((externalRef) => passengers.get(externalRef).id) };
+}
 
 // What was remembered of the offer a booking request selects. Refused when the
 // offer is unknown to this client or can no longer be booked.
@@ -201,11 +214,13 @@ function createBooking(body, findOffer, provider, nowMs) {
       summary: offer.summary,
       tripCoverage: offer.tripCoverage,
       products: offer.products,
-      admissions: offer.admissionOfferParts.map((part) => admissionFrom(part, passengers, createdOn, confirmableUntil)),
+      admissions: (offer.admissionOfferParts || []).map((part) => admissionFrom(part, passengers, createdOn, confirmableUntil)),
       reservations: reserved.map((part) => reservationFrom(part, (ref) => passengers.get(ref).id, offerTrips, createdOn, confirmableUntil,
         reservationOptions(part, selection, offerTrips, provider, chosenVariants))),
       ancillaries: [],
     };
+    // #906: an offer of fares books its fares.
+    if (Array.isArray(offer.fares) && offer.fares.length > 0) bookedOffer.fares = offer.fares.map((fare) => fareFrom(fare, passengers));
     linkReservations(bookedOffer);
     if (offer.inboundTripCoverage) bookedOffer.inboundTripCoverage = offer.inboundTripCoverage;
     bookedOffers.push(bookedOffer);
@@ -225,7 +240,7 @@ function createBooking(body, findOffer, provider, nowMs) {
   if (body.purchaser !== undefined) booking.purchaser = { detail: personDetail(body.purchaser?.detail) };
   const externalRef = text(body.externalRef);
   if (externalRef) booking.externalRef = externalRef;
-  booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), currencyOf(booking, provider));
+  booking.provisionalPrice = sumOf(partsOf(booking).map(priceOf), currencyOf(booking, provider));
   Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
   Object.defineProperty(booking, SHORT_LIVED, { value: shortLivedMs });
   // #611: a booking of offers that asked for information keeps asking while it is missing.
@@ -243,7 +258,7 @@ function createBooking(body, findOffer, provider, nowMs) {
 // one ticket per direction of a return (#594), one for a single journey.
 function admissionsByTrip(booking) {
   const groups = new Map(booking.trips.map((trip) => [trip.id, []]));
-  for (const part of partsOf(booking)) {
+  for (const part of productPartsOf(booking)) {
     const tripId = part.tripCoverage?.coveredTripId;
     if (!groups.has(tripId)) groups.set(tripId, []);
     groups.get(tripId).push(part);
@@ -276,19 +291,22 @@ function confirmBooking(booking, provider, nowMs) {
     throw new HttpError(409, 'BOOKING_EXPIRED', 'Booking expired', 'The time limit to confirm this booking has passed.');
   }
   const confirmedOn = new Date(nowMs).toISOString();
-  const admissions = partsOf(booking);
+  const admissions = productPartsOf(booking);
   for (const admission of admissions) {
     admission.status = 'FULFILLED';
     admission.confirmedOn = confirmedOn;
     delete admission.confirmableUntil;
   }
-  booking.confirmedPrice = sumOf(admissions.map((a) => a.price), currencyOf(booking, provider));
+  // #906: a fare has a status and nothing else of the confirmation.
+  const fares = faresOf(booking);
+  for (const fare of fares) fare.status = 'FULFILLED';
+  booking.confirmedPrice = sumOf(partsOf(booking).map(priceOf), currencyOf(booking, provider));
   booking.provisionalPrice = { amount: 0, currency: currencyOf(booking, provider), scale: 2 };
   delete booking.confirmationTimeLimit;
   let groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
   if (variants.has(booking, 'per-passenger')) groups = variants.groupsByPassenger(admissions);
   else if (ticketing.of(booking)) groups = ticketing.groupsOf(admissions, ticketing.of(booking));
-  booking.fulfillments = groups.map((group) => ({
+  booking.fulfillments = groups.filter((group) => group.length > 0).map((group) => ({
     id: `${provider.idPrefix}-FUL-${randomId()}`,
     status: 'FULFILLED',
     bookingRef: booking.id,
@@ -299,9 +317,31 @@ function confirmBooking(booking, provider, nowMs) {
     bookingParts: group.map((a) => ({ id: a.id, summary: a.summary })),
   }));
   // #603: the documents of the media asked for, when the provider issues them.
-  if (provider.documents) issueDocuments(booking, provider);
+  if (provider.documents) issueDocuments(booking, provider, [...booking.fulfillments]);
+  if (fares.length > 0) booking.fulfillments.push(fareFulfillmentOf(booking, fares, provider, confirmedOn));
   variants.shapeIssuedFulfillments(booking);
   return booking.fulfillments;
+}
+
+/**
+ * #906: the fulfilment of a booking's fares, a confirmation: OSDM (processes,
+ * "Remarks on the Booking Process with Fares") gives it no document, control
+ * number, issuer, continuous-service usage or links, and a fulfilment holds
+ * fares or products, never both. The distributor builds the ticket. Two wrong
+ * variants: a fare left out of `bookingParts`, a PDF ticket attached.
+ */
+function fareFulfillmentOf(booking, fares, provider, confirmedOn) {
+  const fulfillment = {
+    id: `${provider.idPrefix}-FUL-${randomId()}`,
+    status: 'FULFILLED',
+    bookingRef: booking.id,
+    createdOn: confirmedOn,
+    bookingParts: fares.map((fare) => ({ id: fare.id })),
+  };
+  Object.defineProperty(fulfillment, FARE_FULFILLMENT, { value: true });
+  if (variants.has(booking, 'fare-not-in-fulfillment')) fulfillment.bookingParts.pop();
+  if (variants.has(booking, 'fare-fulfillment-document')) attachTicket(booking, fulfillment, provider);
+  return fulfillment;
 }
 
 /**
@@ -330,7 +370,7 @@ function addOfferParts(booking, bookedOfferId, body, findOffer, provider) {
   bookedOffer.reservations.push(...added.map((part) => reservationFrom(part, passengerIdOf, found.trips, createdOn, booking.confirmationTimeLimit,
     reservationOptions(part, body, found.trips, provider, kept))));
   linkReservations(bookedOffer);
-  booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), booking.provisionalPrice.currency);
+  booking.provisionalPrice = sumOf(partsOf(booking).map(priceOf), booking.provisionalPrice.currency);
   return { bookedOffers: [bookedOffer] };
 }
 
