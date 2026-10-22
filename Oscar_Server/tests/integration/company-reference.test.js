@@ -117,7 +117,9 @@ test('the update replaces scenarios, framework and Test Data, and keeps the endp
   expect(rows).toHaveLength(BETA.testResources.length);
   const trainIds = new Set(rows.filter(r => r.resource_type === 'TRAIN').map(r => r.id));
   const journeys = rows.filter(r => r.resource_type === 'JOURNEY');
-  expect(journeys.length).toBeGreaterThan(0);
+  // #912: beta's Test Data are its own trips' trains, which make no journey;
+  // the journey ids remapped on import are tested with the configuration import (#810).
+  expect(journeys).toHaveLength(BETA.testResources.filter(r => r.resource_type === 'JOURNEY').length);
   for (const j of journeys) for (const leg of j.data.legs) expect(trainIds.has(leg.trainResourceId)).toBe(true);
 
   expect(get('SELECT api_base FROM companies WHERE id = ?', [companyId]).api_base).toBe('https://sim.example/beta');

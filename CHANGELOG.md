@@ -62,9 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.374] / [collection-OTST_V2.0.207] — 2026-10-22
+## [server-1.11.375] / [collection-OTST_V2.0.208] — 2026-10-22
 
-Issue #905, fares phase 1c, release 2026.409. Simulator 0.44.0.
+Issue #905, fares phase 1c, release 2026.410. Simulator 0.44.0.
 
 ### Simulator 0.44.0
 - **Fares without a section, on purpose wrong.** A fare request that names no section (none, or an empty list) still gets no fare, except on a trip from station `0000086` (`fares.variants.faresWithoutSection`, in every profile), where the provider prices the whole trip all the same, as one that ignores the missing section would. Chosen by the trip's origin, since that request has no section start to choose by.
@@ -77,6 +77,21 @@ Issue #905, fares phase 1c, release 2026.409. Simulator 0.44.0.
 Checked:
 - `bruno-fares.test.js`: on the simulator's own answers, N1, N2 and N4 pass and the wrong variant fails check N; step 01 ends, or goes on with the product offers only under `bookMode` PRODUCT; a fare request without a section and without `expectFares` is graded as before. Three deliberate breaks of `fares.js` (check N never failing, the empty list never sent, PRODUCT ending anyway) each make a test fail. The simulator's `fares.test.js` and `datafile.test.js`.
 - The real collection standalone on the simulator (gamma, `bru` 4.2.1, through the replay): `SIM_NHF_FARE_UNASKED_38` 71 checks (O14 passes), `SIM_NHF_FARE_NO_SECTION_SPEC_38` 71, `SIM_NHF_FARE_EMPTY_SECTIONS_38` 71 (its request carried `requestedSections: []`), `SIM_NHF_FARE_NO_SECTION_SRCH_38` 235 (check N, then the product sale booked and fulfilled), none failed; `SIM_WRONG_FARE_WITHOUT_SECTION_38` fails check N only. Fourteen earlier scenarios (the ten fare ones, a search sale, a sale by trip id, the offer-parts probe, a return) recorded on `main` and on this change compare equal.
+
+---
+
+## [server-1.11.374] / [collection-OTST_V2.0.207] — 2026-10-22
+
+Issue #912, release 2026.409.
+
+### Fixed
+- **A reference configuration is "not up to date" only when its own provider's part changed.** The version of a simulator reference was the sha256 of the reference and of the whole simulator data file, so fare scenarios added for gamma (#903, #904) flagged every company following `simulator-delta` on the run page, though nothing delta runs had moved. Now the version, and the reference's Test Data, come from the provider's part of the data file (`providerPartOf()`): the scenarios of its OSDM version (the deliberately wrong and fault ones included), the trips, passenger lists and other entries they name, the first purchaser (which every run reads), and the other root keys but the file's own run list.
+- The Test Data of `simulator-alpha`, `-beta` and `-delta` are now the trains of their own scenarios (2 entries each, 32 before); gamma's are unchanged. An update still stores the whole data file, with the provider's run list.
+
+**After this release, every company following a reference reads "not up to date" once**, as the reference files changed: one update by a Test Manager (Test Config → Reference configuration) clears it.
+
+Checked:
+- `reference-configuration.test.js`: a scenario, trip and passenger list added for another provider leave the version as it is; the provider's own scenario, the trip it names, the first purchaser or a root key change it (the test fails with the old whole-file version); the part and the Test Data. `company-reference.test.js` (the update).
 
 ---
 
