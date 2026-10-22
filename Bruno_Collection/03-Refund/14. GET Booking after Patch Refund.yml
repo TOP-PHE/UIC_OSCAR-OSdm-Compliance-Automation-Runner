@@ -66,11 +66,14 @@ runtime:
         const { isScopedRefundOnBooking, checkRefundScopeOnBooking } = require(bru.getEnvVar("library_base") + "refunds.js");
         const _scopedRefund = isScopedRefundOnBooking(jsonData.booking);
         const _afterRefund = _scopedRefund ? ["REFUNDED", "FULFILLED", "CONFIRMED"] : ["REFUNDED"];
+        // #907: a booking of fares has its own checks; the scope check below reads its fares.
+        if (!require(bru.getEnvVar("library_base") + "fareRefund.js").checkFareBookingInRefund(jsonData, "refunded")) {
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,
         _afterRefund,
         _afterRefund);
+        }
         checkRefundScopeOnBooking(jsonData.booking);
 
         displayFulFilledBooking(jsonData);

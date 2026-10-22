@@ -350,7 +350,8 @@ function flagOf(value) {
  * expected (false for a negative scenario, else null). Sections that name no
  * usable station on both ends are left out. `emptySectionList` is true when
  * the scenario holds an empty list, which a fare request then sends as it is
- * (#905 N4).
+ * (#905 N4). `fareRefundFee` (#907) is the fee OSCAR states in the refund of a
+ * CLUSTERING fare, in cents, or null.
  */
 function fareFieldsOf(scenario) {
   const raw = scenario?.requestedSections;
@@ -366,6 +367,7 @@ function fareFieldsOf(scenario) {
     desiredFareCluster: CLUSTERS.includes(cluster) ? cluster : null,
     bookMode: BOOK_MODES.has(mode) ? mode : null,
     expectFares: flagOf(scenario?.expectFares) === false ? false : null,
+    fareRefundFee: require('./fareRefund.js').feeAmountOf(scenario?.fareRefundFee),
   };
 }
 

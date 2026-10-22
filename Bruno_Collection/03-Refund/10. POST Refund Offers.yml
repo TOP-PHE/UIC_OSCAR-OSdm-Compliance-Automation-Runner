@@ -29,6 +29,10 @@ runtime:
 
         require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
+        // #907: the refund of a fare sale: the fare fulfilments in full, with the
+        // fee the scenario sets when it is the provider's (no partial refund of fares).
+        if (require(bru.getEnvVar("library_base") + "fareRefund.js").prepareFareRefundRequest()) return;
+
         // Partial refund (#218): when partialRefundByLeg or partialRefundByPax
         // is on for this scenario, resolve the OSDM RefundSpecification[]
         // payload from the booking-after-fulfillments JSON saved in 07.yml.
@@ -325,6 +329,8 @@ runtime:
           rememberRefundOffersToConfirm(jsonData.refundOffers);
           // #596: with an overrule code, the offers together refund what was paid.
           require(bru.getEnvVar("library_base") + "refunds.js").checkOverruleTotal(jsonData.refundOffers);
+          // #907: a refund of fares: cover, amounts and fee (R1–R4).
+          require(bru.getEnvVar("library_base") + "fareRefund.js").checkFareRefundOffers(jsonData.refundOffers);
 
           // Partial-refund alignment check (#218 follow-up).
           // If the scenario armed partial scope AND we didn't have to degrade,

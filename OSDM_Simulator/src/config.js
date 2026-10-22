@@ -103,10 +103,10 @@ function checkProvider(key, raw) {
 
 // #903: fare offers for a requested section. `clusters` in OSDM's spelling,
 // `freeUnderAge` the age under which a passenger travels free, and the start
-// station of each wrong variant (for `faresWithoutSection`, #905, the trip's
+// station of each variant (for `faresWithoutSection`, #905, the trip's
 // origin: that request names no section). Absent: no fare is offered.
 const FARE_CLUSTERS = new Set(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO']);
-const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection']);
+const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares']);
 function checkFares(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object') throw bad('fares');

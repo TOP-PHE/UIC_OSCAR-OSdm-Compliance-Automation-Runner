@@ -151,7 +151,8 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // refund confirms two refund offers and a partial one refunds one ticket.
   // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
   const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH'
-    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_'].some((prefix) => s.code.startsWith(prefix))
+    // #907: SIM_FARE_REFUND_ ones refund a one-way fare sale, tested with the fares below.
+    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_FARE_'].some((prefix) => s.code.startsWith(prefix))
     && !BY_SCOPE.has(s.code));
   // Some providers sell a return only as one offer: the SIM_REFUND_COMBINED_ ones refund that.
   // #781: SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38 is the full refund of a return sold in EUR.
@@ -256,6 +257,9 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     // #906: the fare fulfilment's variants, named by a passenger as the others.
     SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38: ['fare-fulfillment-document'],
     SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38: ['fare-not-in-fulfillment'],
+    // #907: the fare refund's variants.
+    SIM_WRONG_FARE_COMBINING_FEE_38: ['fare-wrong-combining-fee'],
+    SIM_WRONG_FARE_IGNORES_REFUND_FEE_38: ['fare-ignores-refund-fee'],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -647,6 +651,12 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     // #906: the fare sale of SIM_FARE_SPEC_1ADT_38, its fulfilment wrong.
     SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    // #907: refunds of fare sales; COMBINING fares from their own station.
+    SIM_FARE_REFUND_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_REFUND_FEE_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_REFUND_COMBINING_1ADT_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_COMBINING_FEE_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_IGNORES_REFUND_FEE_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
@@ -666,11 +676,16 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
   assert.deepEqual(emptyLists.map((s) => s.code), ['SIM_NHF_FARE_EMPTY_SECTIONS_38']);
   assert.deepEqual(datafile.scenarios.filter((s) => s.bookMode === 'PRODUCT').map((s) => s.code), ['SIM_NHF_FARE_NO_SECTION_SRCH_38']);
   for (const s of datafile.scenarios.filter((x) => !x.code.includes('_FARE_'))) assert.equal(s.expectFares, undefined, s.code);
-  // No other scenario starts a section at a variant station.
+  // No other scenario starts a section at a variant station; the COMBINING
+  // one (#907) is not wrong, and its two scenarios alone start there.
   const variantStations = new Set(Object.values(v));
-  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_'))) {
+  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_') && startOf(x) !== v.combiningFares)) {
     assert.ok(!variantStations.has(startOf(s)), s.code);
   }
+  assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.combiningFares).map((s) => s.code), ['SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_WRONG_FARE_COMBINING_FEE_38']);
+  // #907: the fee stated is a fare refund's, and in a REFUND scenario.
+  assert.deepEqual(datafile.scenarios.filter((s) => s.fareRefundFee != null).map((s) => [s.code, s.scenarioType, s.fareRefundFee]),
+    [['SIM_FARE_REFUND_FEE_1ADT_38', 'REFUND', 250], ['SIM_WRONG_FARE_IGNORES_REFUND_FEE_38', 'REFUND', 250]]);
   // #905: the trip from the "fares without section" station is the wrong scenario's only.
   const originOf = (t) => (t.trip ? t.trip.origin : t.legs?.[0]?.origin);
   const fromVariant = datafile.tripRequirements.filter((t) => originOf(t) === v.faresWithoutSection).map((t) => t.id);

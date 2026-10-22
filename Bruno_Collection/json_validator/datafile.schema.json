@@ -273,7 +273,7 @@
             "enum": ["BUSINESS", "FULL_FLEX", "SEMI_FLEX", "NON_FLEX", "PROMO", "", null]
           },
           "bookMode": {
-            "description": "Fares (#903, #906): book the fare offer (FARE) or a product offer (PRODUCT). Empty or null: FARE when fares are asked for. A fare offer is booked and confirmed only when no FAIL-level check of the offer step failed; the scenario then ends after the confirmation (the refund of a fare comes with #907).",
+            "description": "Fares (#903, #906): book the fare offer (FARE) or a product offer (PRODUCT). Empty or null: FARE when fares are asked for. A fare offer is booked and confirmed only when no FAIL-level check of the offer step failed; a REFUND scenario then refunds the fare fulfilments in full (#907), any other ends after the confirmation.",
             "type": ["string", "null"],
             "enum": ["FARE", "PRODUCT", "", null]
           },
@@ -281,6 +281,12 @@
             "description": "Fares (#905): false for a negative test, where the answer must hold no fare (for example a domestic trip, or a request without a section; OSDM sets no such rule, so this is the Test Manager's expectation for the provider). The scenario then ends after the offer step, or goes on with a product offer when bookMode is PRODUCT. Empty, null or true: fares are expected when they are asked with a section.",
             "type": ["boolean", "string", "null"],
             "enum": [true, false, "true", "false", "", null]
+          },
+          "fareRefundFee": {
+            "description": "Fares (#907): the refund fee OSCAR states in the refund of a CLUSTERING fare whose fee is the provider's (isProviderFee), in cents of the offer's currency. Sent as RefundSpecification.refundFee, one specification per fare fulfilment holding its fulfillmentId and the fee (provisional form, #242 D6), from OSDM 3.8; the refund offer's fee must be it. Empty or null: no fee is sent, and a CLUSTERING fee is not checked.",
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 10000000
           },
           "simulatorFaults": {
             "description": "Faults the OSDM simulator answers this scenario with (#833): a list of fault codes, or the same as text, \"offer.price-below-parts, booking.passenger-dropped\". The collection sends them in the header X-Simulator-Faults; a real provider ignores it. The codes are listed in the simulator's documentation. Empty or null: no fault.",

@@ -343,7 +343,8 @@ function isScopedRefundOnBooking(booking) {
 }
 
 // F2 (step 14): each fulfillment the confirmed refund offers held is REFUNDED,
-// and so are its booking parts; every other fulfillment and part is not.
+// and so are its booking parts (fares included, #907); every other fulfillment
+// and part is not.
 function checkRefundScopeOnBooking(booking) {
   const refunded = _readJson("__refundedFulfillmentIds", []);
   if (refunded.length === 0) {
@@ -369,8 +370,9 @@ function checkRefundScopeOnBooking(booking) {
     validationLogger("[INFO] Refund scope: a refunded fulfillment does not list its booking parts — the part-level scope check is skipped.");
     return;
   }
+  // #907: a booked fare is a booking part too (R5 of a fare refund).
   (booking.bookedOffers || []).forEach((bo) => {
-    ["admissions", "reservations", "ancillaries"].forEach((kind) => {
+    ["admissions", "reservations", "ancillaries", "fares"].forEach((kind) => {
       (bo && Array.isArray(bo[kind]) ? bo[kind] : []).forEach((part) => {
         if (!part?.id) return;
         const inScope = refundedPartIds.has(part.id);

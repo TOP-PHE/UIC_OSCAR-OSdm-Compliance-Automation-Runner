@@ -65,19 +65,24 @@ runtime:
             // #613 F6: the refund was confirmed, so the DELETE was refused (409)
             // and the refund stands: what it covered stays REFUNDED.
             const { checkRefundScopeOnBooking } = require(bru.getEnvVar("library_base") + "refunds.js");
+            // #907: a booking of fares has its own checks.
+            if (!require(bru.getEnvVar("library_base") + "fareRefund.js").checkFareBookingInRefund(jsonData, "refunded")) {
             postCreateBookingResponse(
             bru.getEnvVar("offer"),
             jsonData,
             ["REFUNDED", "FULFILLED", "CONFIRMED"],
             ["REFUNDED", "FULFILLED", "CONFIRMED"]);
+            }
             checkRefundScopeOnBooking(jsonData.booking);
         } else {
             // Refund was never confirmed (DELETE before PATCH) → parts still FULFILLED, fulfillment unchanged
+            if (!require(bru.getEnvVar("library_base") + "fareRefund.js").checkFareBookingInRefund(jsonData, "confirmed")) {
             postCreateBookingResponse(
             bru.getEnvVar("offer"),
             jsonData,
             ["FULFILLED", "CONFIRMED"],
             ["FULFILLED", "CONFIRMED"]);
+            }
         }
         displayFulFilledBooking(jsonData);
         // ── Multi-scenario: loop to next scenario or truly stop ────────────────

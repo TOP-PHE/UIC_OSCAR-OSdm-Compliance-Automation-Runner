@@ -55,6 +55,7 @@ function withCurrencies(value, from, to) {
 const NO_COMBINED_RETURN = 'OSDM 3.6 has no return in one offer (outboundTripIds and inboundDate come with 3.7).';
 const NO_PRODUCT_SELECTIONS = 'OSDM 3.6 has no OfferSearchCriteria.productSelections (3.7).';
 const NO_COMPARTMENT_SELECTION = 'OSDM before 3.8 has no PlaceSelection.compartments: a compartment cannot be named.';
+const NO_FARE_REFUND_FEE = 'OSDM before 3.8 has no RefundSpecification.refundFee: the fee of a fare cannot be stated (#907).';
 const rank = (version) => { const [a, b] = String(version).split('.').map(Number); return a * 100 + b; };
 
 // Why a `_38` scenario has no copy for `version`, or null when it has one.
@@ -65,6 +66,7 @@ function reasonNotPossible(source, version) {
   if (rank(version) < rank('3.7') && criteria.returnModel === 'COMBINED') return NO_COMBINED_RETURN;
   if (rank(version) < rank('3.7') && Array.isArray(criteria.productSelections) && criteria.productSelections.length > 0) return NO_PRODUCT_SELECTIONS;
   if (rank(version) < rank('3.8') && source?.namedPlaceKind === 'COMPARTMENT') return NO_COMPARTMENT_SELECTION;
+  if (rank(version) < rank('3.8') && source?.fareRefundFee != null) return NO_FARE_REFUND_FEE;
   const named = NOT_POSSIBLE[version] || {};
   const base = baseOf(source?.code);
   return Object.hasOwn(named, base) ? named[base] : null;

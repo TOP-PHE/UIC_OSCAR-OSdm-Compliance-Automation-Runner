@@ -162,10 +162,10 @@ describe('the pure helpers', () => {
       isPartOfInternationalTrip: 'true', desiredFareCluster: 'semi_flex', bookMode: 'fare',
     })).toEqual({
       requestedSections: [{ startPlace: station('8000001'), endPlace: station('8500010') }], emptySectionList: false,
-      isPartOfInternationalTrip: true, desiredFareCluster: 'SEMI_FLEX', bookMode: 'FARE', expectFares: null,
+      isPartOfInternationalTrip: true, desiredFareCluster: 'SEMI_FLEX', bookMode: 'FARE', expectFares: null, fareRefundFee: null,
     });
     expect(fares.fareFieldsOf({})).toEqual({
-      requestedSections: [], emptySectionList: false, isPartOfInternationalTrip: null, desiredFareCluster: null, bookMode: null, expectFares: null,
+      requestedSections: [], emptySectionList: false, isPartOfInternationalTrip: null, desiredFareCluster: null, bookMode: null, expectFares: null, fareRefundFee: null,
     });
   });
 });
@@ -326,7 +326,7 @@ describe('the Test Config fields (#903)', () => {
 
   test('the fields are drawn, the input handled before the switch, the flag shown when stored as a boolean', () => {
     expect(src).toContain('${buildFareFields(idx)}');
-    expect(src).toContain("if (inputRequestedSection(action, el)) return;\n\n  switch (action) {");
+    expect(src).toContain("if (inputRequestedSection(action, el)) return;\n  if (inputFareRefundFee(action, el)) return;\n\n  switch (action) {");
     expect(src).toContain('String(optionValue(val)) === String(optionValue(o))');
     const access = require(path.join(ROOT, 'Oscar_Server/public/js/scenario-access.js'));
     expect(access.READ_ONLY_CARD_ACTIONS).not.toContain('set-scenario-section');
