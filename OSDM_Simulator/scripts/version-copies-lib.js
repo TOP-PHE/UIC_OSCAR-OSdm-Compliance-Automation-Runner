@@ -10,7 +10,7 @@
 /**
  * version-copies-lib.js — every scenario written for gamma (OSDM 3.8, `_38`)
  * also exists for alpha (3.6, `_36`), beta (3.7, `_37`), delta (3.9, `_39`)
- * and epsilon (3.10 in development, `_310`, #920), unless the version cannot express it (#914). Pure.
+ * epsilon (3.10, `_310`, #920) and zeta (3.12 in development, `_312`, #925), unless the version cannot express it (#914). Pure.
  *
  * A copy is the `_38` scenario with its code, `osdmVersion` and description
  * changed, and gamma's currencies replaced by its provider's (CZK → its own,
@@ -26,9 +26,12 @@ const VERSIONS = Object.freeze({
   '3.6.0': { suffix: '36', provider: 'alpha' },
   '3.7.0': { suffix: '37', provider: 'beta' },
   '3.9.0': { suffix: '39', provider: 'delta' },
-  // #920: the version in development, on epsilon. Its changes so far add
-  // optional members only, so every `_38` scenario can be expressed.
+  // #920: released 3.10 on epsilon. Its changes add optional members only,
+  // so every `_38` scenario can be expressed.
   '3.10.0': { suffix: '310', provider: 'epsilon' },
+  // #925: the version in development (OSDM master), on zeta. 3.11 and 3.12
+  // add optional members and deprecations only, so far.
+  '3.12.0': { suffix: '312', provider: 'zeta' },
 });
 
 // A provider's own currency and its second one, from its profile: a copy
@@ -82,6 +85,7 @@ const NOT_POSSIBLE = Object.freeze({
   '3.7.0': Object.freeze({}),
   '3.9.0': Object.freeze({}),
   '3.10.0': Object.freeze({}),
+  '3.12.0': Object.freeze({}),
 });
 
 // `_38` and `_310` (#920): the version's major and minor.

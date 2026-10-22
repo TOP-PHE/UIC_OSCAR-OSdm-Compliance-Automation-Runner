@@ -9,8 +9,9 @@ http://www.apache.org/licenses/LICENSE-2.0
 
 /**
  * Generates OSDM_Simulator/tests/fixtures/osdm-response-schemas.json (#833):
- * the response bodies of every OSDM operation (success and error answers), for OSDM 3.6,
- * 3.7, 3.8 and 3.9, the versions of the simulator's providers (3.9: #858). The simulator's
+ * the response bodies of every OSDM operation (success and error answers), for OSDM 3.6
+ * to 3.12, the versions of the simulator's providers (3.9: #858, 3.10: #920, 3.11 and
+ * 3.12: #925). The simulator's
  * tests check its answers against the version of the provider that gives
  * them. Never hand-edit the output.
  *
@@ -29,7 +30,7 @@ const REPO = path.resolve(__dirname, '..', '..');
 const SPEC_DIR = process.env.OSDM_SPEC_DIR
   || path.join(REPO, 'Documentation', 'Test_Coverage', 'OSDM_reference');
 const OUT = path.join(REPO, 'OSDM_Simulator', 'tests', 'fixtures', 'osdm-response-schemas.json');
-const VERSIONS = ['3.6', '3.7', '3.8', '3.9', '3.10'];
+const VERSIONS = ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12'];
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
 // The JSON schema of a response, through components.responses.

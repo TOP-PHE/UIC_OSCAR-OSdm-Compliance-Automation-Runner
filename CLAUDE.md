@@ -2291,7 +2291,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `…_Simulator_epsilon.docx` (private generator `epsilon.js`), reference
     `simulator-epsilon`. The reference check of the checklist's version takes
     `3.10` as 3.10.x only, never 3.1 (`buildReference()`). A scenario suffix is
-    `suffixOfVersion()` (`310`), never `slice(0, 3)`. **Since #824 (0.34.0) the three have the same
+    `suffixOfVersion()` (`310`), never `slice(0, 3)`. **3.10 and 3.11 are released, `zeta`
+    follows 3.12 in development** (#925, 1.11.381 / simulator 0.49.0): OSDM
+    tagged and published 3.10 and 3.11 on 21/10/2026, and `master` prepares
+    3.12. `osdm-dev.json` now pins `master` (3.12.0); the 3.10 file is the
+    released one (identical, parsed, to the gh-pages bundle); 3.11 is the
+    gh-pages bundle renamed. The generators produce 3.4–3.12 (3.11 = 3.10 plus
+    optional members and the deprecated booking `requestedFulfillmentType` /
+    `preferredFulfillmentMedia`, which OSCAR does not send; 3.12 = 3.11 so
+    far). `zeta` (NOK + EUR, 5-minute tokens) carries `osdmDevelopment`, which
+    epsilon dropped; `_312` copies, checklist (template V1.05: A1.2 offers 3.11
+    and 3.12) and reference `simulator-zeta`. Unknown-provider tests use `eta`.
+    A weekly scheduled task (Monday 8:35 Paris) reports OSDM's new commits,
+    tags and issues (milestones 3.10–4.0) in French; it never acts on its own. **Since #824 (0.34.0) the three have the same
     functions**: alpha and beta hold every optional key of gamma's profile
     with the same values, and a second currency each (alpha EUR + CHF, beta
     CHF + EUR); `tests/config.test.js` pins it, so a new function goes in all

@@ -1,8 +1,9 @@
-# OSDM 3.10.0 IN DEVELOPMENT, not a release (#920).
-# Branch patches-osdm-v3.10 of UnionInternationalCheminsdeFer/OSDM, commit
-# 6770e2783181d44c847202921ee7f28d2edf4b67 (2026-10-21), bundled on 2026-10-22
-# with @redocly/cli 2.11.1 (redocly bundle specification/OSDM-online-api.yml).
-# The pin is in osdm-dev.json; move it only in a PR that regenerates the schemas.
+# OSDM 3.10.0, released (tag v3.10 of UnionInternationalCheminsdeFer/OSDM,
+# published on the OSDM site on 2026-10-21, OSDM PR #1668). Bundled from the
+# branch patches-osdm-v3.10 at commit 6770e2783181d44c847202921ee7f28d2edf4b67
+# (the tag plus the version number and build tooling) with @redocly/cli 2.11.1;
+# identical, once parsed, to specification/v3.10/OSDM-online-api-v3.10.0.bundled.yml
+# on gh-pages (#920, #925).
 openapi: 3.0.3
 info:
   title: UIC 90918-10 - OSDM

@@ -21,9 +21,9 @@ const AN = require('../../src/utils/aiAnalysis');
 const generated = require('../../src/utils/osdm-references.json');
 
 describe('#827 the generated file', () => {
-  test('it holds OSDM 3.4 to 3.10, and its 3.8, 3.9 and 3.10 are the repository\'s specifications', () => {
-    expect(Object.keys(generated.versions)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0', '3.9.0', '3.10.0']);
-    for (const v of ['3.8.0', '3.9.0', '3.10.0']) {
+  test('it holds OSDM 3.4 to 3.12, and its 3.8 to 3.12 are the repository\'s specifications', () => {
+    expect(Object.keys(generated.versions)).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0', '3.9.0', '3.10.0', '3.11.0', '3.12.0']);
+    for (const v of ['3.8.0', '3.9.0', '3.10.0', '3.11.0', '3.12.0']) {
       const spec = yaml.load(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Test_Coverage', 'OSDM_reference', `OSDM-online-api-v${v}.yml`), 'utf8'));
       expect(generated.versions[v]).toEqual(G.versionOf(spec));
     }
@@ -59,10 +59,13 @@ describe('#827 the version quoted', () => {
     expect(R.versionFor('3.0.5')).toEqual({ version: '3.4.0', exact: false });
     expect(R.versionFor('3.9')).toEqual({ version: '3.9.0', exact: true });
     expect(R.versionFor('3.10')).toEqual({ version: '3.10.0', exact: true });
-    expect(R.versionFor('3.11')).toEqual({ version: '3.10.0', exact: false });
-    // #920: none declared takes the latest released version, not the one in development.
-    expect(R.versionFor(null)).toEqual({ version: '3.9.0', exact: false });
-    expect(R.versionFor('three')).toEqual({ version: '3.9.0', exact: false });
+    expect(R.versionFor('3.11')).toEqual({ version: '3.11.0', exact: true });
+    expect(R.versionFor('3.12')).toEqual({ version: '3.12.0', exact: true });
+    expect(R.versionFor('3.13')).toEqual({ version: '3.12.0', exact: false });
+    // #920, #925: none declared takes the latest released version (3.11), not
+    // the one in development (3.12).
+    expect(R.versionFor(null)).toEqual({ version: '3.11.0', exact: false });
+    expect(R.versionFor('three')).toEqual({ version: '3.11.0', exact: false });
     expect(R.versionFor('3.5', ['3.4.0', '3.6.0'])).toEqual({ version: '3.4.0', exact: false });
   });
 });
@@ -123,7 +126,7 @@ describe('#827 the extract', () => {
   });
 });
 
-describe('#920 a specification in development', () => {
+describe('#920, #925 a specification in development (3.12 on master)', () => {
   const dev = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Test_Coverage', 'OSDM_reference', 'osdm-dev.json'), 'utf8'));
 
   test('the generated file names it, with the pinned branch and commit', () => {
@@ -140,7 +143,19 @@ describe('#920 a specification in development', () => {
   });
 
   test('an extract of it says so; a released one does not', () => {
-    expect(R.referencesFor(['POST /trips-collections'], '3.10').development).toEqual({ branch: dev.branch, commit: dev.commit });
+    expect(dev.version).toBe('3.12.0');
+    expect(R.referencesFor(['POST /trips-collections'], '3.12').development).toEqual({ branch: dev.branch, commit: dev.commit });
+    // 3.10 and 3.11 are released (#925): no development note.
+    expect(R.referencesFor(['POST /trips-collections'], '3.10').development).toBeUndefined();
+    expect(R.referencesFor(['POST /trips-collections'], '3.11').development).toBeUndefined();
     expect(R.referencesFor(['POST /offers'], '3.9').development).toBeUndefined();
+  });
+
+  test('3.10 and 3.11 are released: their files say so', () => {
+    for (const v of ['3.10.0', '3.11.0']) {
+      const head = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Test_Coverage', 'OSDM_reference', `OSDM-online-api-v${v}.yml`), 'utf8').slice(0, 600);
+      expect(head).toContain(`OSDM ${v}, released`);
+      expect(head).not.toContain('IN DEVELOPMENT');
+    }
   });
 });
