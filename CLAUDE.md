@@ -2238,7 +2238,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     changed no schema OSCAR sends or reads (the generated 3.9 sets equal
     3.8's, a test pins it); its one change is `format: date-time` on the
     search date-times, which OSCAR still sends without an offset until the
-    OSDM working group answers. **Since #824 (0.34.0) the three have the same
+    OSDM working group answers. **OSCAR knows OSDM 3.10.0 in development** (#920 PR 1,
+    1.11.378): `OSDM-online-api-v3.10.0.yml` is the branch
+    `patches-osdm-v3.10` bundled with `redocly bundle` at a **pinned
+    commit**, written in its header and in `osdm-dev.json` (same folder);
+    move the pin only in a PR that regenerates the three files. 3.10 adds
+    `POST /trips-collections` (in the request operations too) and changes
+    `AccountingRef`, `BookedOffer`, `CoachDeckLayout`, `PaymentMethod`,
+    `Problem`. `versionFor()` quotes it only when it is the nearest; none
+    declared still takes the latest *released* version, and an extract of it
+    names the branch and commit (`development`). **Never compare OSDM
+    versions as decimals**: `parseFloat('3.10')` is 3.1, which read 3.10 as
+    older than 3.4 (`personContact.js`, `scenarioParser.js`, fixed); use
+    `atLeast()` (`osdmVersion.js`), and a test refuses `parseFloat(…version`
+    in the library. Checklist template V1.04 offers 3.10 in A1.2. **Since #824 (0.34.0) the three have the same
     functions**: alpha and beta hold every optional key of gamma's profile
     with the same values, and a second currency each (alpha EUR + CHF, beta
     CHF + EUR); `tests/config.test.js` pins it, so a new function goes in all

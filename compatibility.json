@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.412",
+  "current_release": "2026.413",
   "releases": [
+    {
+      "release": "2026.413",
+      "date": "2026-10-22",
+      "server": "1.11.378",
+      "collection": "OTST_V2.0.211",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#920 step 1: OSCAR knows OSDM 3.10.0 in development (branch patches-osdm-v3.10 at a pinned commit): its request, response and reference schemas; a version is never compared as a decimal (3.10 read as 3.1 put email and phone in the pre-3.4 place); checklist template V1.04 offers 3.10."
+      ]
+    },
     {
       "release": "2026.412",
       "date": "2026-10-22",

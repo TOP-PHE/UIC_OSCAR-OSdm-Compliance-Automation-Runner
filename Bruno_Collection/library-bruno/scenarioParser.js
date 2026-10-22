@@ -1229,7 +1229,7 @@ function parseScenarioData(jsonData) {
         const purchaserSpecs = [];
         purchaserList.purchaser.forEach(function (purchaser) {
           const osdmVersion = bru.getEnvVar("osdmVersion");
-          if (Number.parseFloat(osdmVersion) >= 3.4) {
+          if (require("./personContact.js").usesContactDetail(osdmVersion)) {
             purchaserSpecs.push(new PurchaserContact(
               new DetailContact(
                 purchaser.purchaserFirstName,
@@ -1326,7 +1326,7 @@ function parseScenarioData(jsonData) {
             offerPassengerSpecs.push(offerSpec);
 
             const osdmVersion = bru.getEnvVar("osdmVersion");
-            if (Number.parseFloat(osdmVersion) >= 3.4) {
+            if (require("./personContact.js").usesContactDetail(osdmVersion)) {
               passengerSpecs.push(new PassengerSpec(
                 passenger.reference,
                 passenger.type,
@@ -1547,7 +1547,8 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
   // TripSearchCriteria must use LocalDateTime (no offset, no trailing Z)
   // for all providers except Bileto.
   const _osdmVersionRaw = bru.getEnvVar("osdmVersion");
-  const _osdmVersionForDatetime = Number.parseFloat(_osdmVersionRaw || "0");
+  const _parsedVersion = require("./osdmVersion.js").parseVersion(_osdmVersionRaw);
+  const _osdmVersionForDatetime = _parsedVersion ? `${_parsedVersion.major}.${_parsedVersion.minor}` : 0;
   let _startDateTime = toLocalDateTime(legDef.startDateTime);
 
   // Bileto exception: keep OffsetDateTime in TripSearchCriteria.
