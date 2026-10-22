@@ -70,17 +70,35 @@ test('every scenario points at entries that exist, and the run list at scenarios
   for (const code of datafile.scenariosToRun) assert.ok(codes.includes(code), code);
 });
 
+// #920: epsilon (OSDM 3.10, in development) gets its _310 scenarios in step 3
+// of the issue; until then its version has none. Remove the version from this
+// set in that step: the next test fails as soon as a 3.10 scenario exists.
+const SCENARIOS_LATER = new Set(['3.10.0']);
+
+// "3.10.0" → "310", "3.8.0" → "38": the version's major and minor, never its
+// first three characters ("3.1" would read 3.10 as 3.1).
+const suffixOfVersion = (version) => String(version).split('.').slice(0, 2).join('');
+
+test('a version waiting for its scenarios has none yet, and the suffix of 3.10 is 310 (#920)', () => {
+  for (const version of SCENARIOS_LATER) {
+    assert.ok(!fullDatafile.scenarios.some((s) => s.osdmVersion === version), `${version} has scenarios: remove it from SCENARIOS_LATER`);
+  }
+  assert.equal(suffixOfVersion('3.10.0'), '310');
+  assert.equal(suffixOfVersion('3.8.0'), '38');
+});
+
 test('each provider\'s OSDM version has every scenario of gamma its version can express, and the run list is gamma\'s (#914)', () => {
   // One file for the four providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // Since #914 every `_38` scenario is copied for 3.6, 3.7 and 3.9, but those
   // reasonNotPossible() leaves out (the return in one offer does not exist in 3.6).
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
-  assert.deepEqual([...new Set(fullDatafile.scenarios.map((s) => s.osdmVersion))].sort(), providers.map((p) => p.osdmVersion).sort());
+  const withScenarios = providers.map((p) => p.osdmVersion).filter((v) => !SCENARIOS_LATER.has(v));
+  assert.deepEqual([...new Set(fullDatafile.scenarios.map((s) => s.osdmVersion))].sort(), withScenarios.sort());
   const byCode = new Map(fullDatafile.scenarios.map((s) => [s.code, s]));
   const strip = ({ code: _c, osdmVersion: _v, description: _d, ...rest }) => JSON.stringify(rest);
   for (const scenario of fullDatafile.scenarios) {
-    assert.equal(scenario.code, `${baseOf(scenario.code)}_${scenario.osdmVersion.slice(0, 3).replace('.', '')}`, 'the code names the version');
+    assert.equal(scenario.code, `${baseOf(scenario.code)}_${suffixOfVersion(scenario.osdmVersion)}`, 'the code names the version');
     if (scenario.osdmVersion === '3.8.0') continue;
     const source = sourceOf.get(baseOf(scenario.code));
     assert.ok(source, `${scenario.code}: no _38 scenario it is a copy of`);

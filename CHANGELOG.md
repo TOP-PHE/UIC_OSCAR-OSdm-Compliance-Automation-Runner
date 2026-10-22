@@ -64,9 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.379] / [collection-OTST_V2.0.212] — 2026-10-22
 
-Issue #907, fares phase 3, release 2026.414. Simulator 0.47.0.
+Issue #907, fares phase 3, release 2026.414. Simulator 0.48.0.
 
-### Simulator 0.47.0
+### Simulator 0.48.0
 - **A booked fare is refunded.** Its fee is the one of its REFUND condition valid at the time (none valid: nothing back), and the fare and its fulfilment are REFUNDED once the refund offer is confirmed. For fares combined by CLUSTERING whose fee is the provider's (`isProviderFee`), a fee the client states in `RefundSpecification.refundFee` is the fee taken (osdm.io, constructing products from fares, "Handling After Sales"); a stated fee in another currency, negative or not in cents is refused with 400.
 - **COMBINING fares.** A section starting at station `0000087` (`fares.variants.combiningFares`, in every profile) gets fares combined by COMBINING, whose refund fee is the fare's own and depends on the date: a tenth of the price until noon (UTC) the day before travel, half of it after. Not a wrong variant.
 - Two wrong variants, named by a passenger's last name: `fare-wrong-combining-fee` (the fee of the fare's other window) and `fare-ignores-refund-fee` (the stated fee ignored).
@@ -81,6 +81,19 @@ Not covered: a partial refund of fares (a partial flag on a fare REFUND scenario
 Checked:
 - `bruno-fare-refund.test.js` (23): the simulator's CLUSTERING, stated-fee and COMBINING refunds pass; each wrong variant breaks exactly its rule; R5 through the real scope check; hand-made answers for R1–R4; the step glue, the wiring of 10, 12, 14 and 16, the reset lists and the Test Config field. Five deliberate breaks each make a test fail. The simulator suite (304), the full server suite (the one failure is the Windows-only `mcp-end-to-end.test.js`, as on `main`), both lints.
 - The real collection standalone on the simulator (`bru` 4.2.1, through the replay): the five new scenarios and their copies, 16 runs on alpha, beta, gamma and delta. The three refunds pass with no failed check and no warning (`SIM_FARE_REFUND_1ADT_*` 180 checks, `_FEE_` 181, `_COMBINING_` 179); `SIM_WRONG_FARE_IGNORES_REFUND_FEE_*` fails check R4 only; `SIM_WRONG_FARE_COMBINING_FEE_*` gives one R3 warning and fails nothing. The refund request carrying `refundFee` passes OSCAR's own OSDM 3.8 and 3.9 request check. 93 earlier runs recorded on `main` and on this change compare equal: the 17 fare scenarios on the four versions (68 runs) and 25 product refund scenarios on gamma.
+
+---
+
+## [simulator-0.47.0] — 2026-10-22
+
+Issue #920, step 2. Simulator 0.47.0. Server and collection unchanged. A fifth provider, `epsilon`, answers in OSDM 3.10, the version in development.
+
+### Simulator 0.47.0
+- **`epsilon`** (`providers/epsilon.json`): OSDM 3.10.0, SEK and EUR when asked, identifiers `EPSILON-…`, ten-minute tokens. It has every function of the other four (#824 rule, pinned by `config.test.js`).
+  - Its profile names the OSDM branch and commit it follows (`osdmDevelopment`: `patches-osdm-v3.10` at `6770e27`), the pin of `osdm-dev.json` (#920 step 1); a test fails when the two differ. `/healthz` gives it under `development`.
+  - 3.10's changes so far add optional members only, so its answers are gamma's; every answer of the simulator's tests on `epsilon` is checked against the 3.10 response schemas.
+- **`POST /epsilon/trips-collections`** (OSDM#1487, 3.10 and later): the same answer as `trips-collection`, which 3.10 deprecates and `epsilon` still serves. Below 3.10 it stays `501`.
+- `clients.example.json` and the replay know `epsilon` (`_310` scenarios). The scenarios themselves (`_310` copies, its checklist and reference configuration) are step 3 of #920: the data-file test lists 3.10 as waiting for them.
 
 ---
 

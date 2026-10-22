@@ -1633,7 +1633,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   A `Fare` is a closed schema: a booked one gets a status and nothing of
   an admission's confirmation (`confirmedOn` would break conformance).
   **The fare refund** (#907, fares 3, 1.11.379 / OTST_V2.0.212, simulator
-  0.47.0): a fare REFUND scenario goes from 07 to 10
+  0.48.0): a fare REFUND scenario goes from 07 to 10
   (`prepareFareRefund()` in `library-bruno/fareRefund.js` sets
   `fulfillmentIds`, `__bookingFulfillmentIds`, `confirmedPriceAmount` and
   `__fareRefundFulfillments`, which a product sale gets from
@@ -2281,7 +2281,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     versions as decimals**: `parseFloat('3.10')` is 3.1, which read 3.10 as
     older than 3.4 (`personContact.js`, `scenarioParser.js`, fixed); use
     `atLeast()` (`osdmVersion.js`), and a test refuses `parseFloat(…version`
-    in the library. Checklist template V1.04 offers 3.10 in A1.2. **Since #824 (0.34.0) the three have the same
+    in the library. Checklist template V1.04 offers 3.10 in A1.2. **`epsilon` answers in 3.10** (#920 step 2, simulator 0.47.0): SEK +
+    EUR, `osdmDevelopment` { branch, commit } in its profile, equal to
+    `osdm-dev.json` (a test), shown by `/healthz` under `development`; its
+    answers are gamma's (3.10 only adds optional members so far) plus `POST
+    /trips-collections` (`501` below 3.10). Its `_310` scenarios, checklist
+    and reference are step 3: until then `datafile.test.js` lists 3.10 in
+    `SCENARIOS_LATER`. A scenario suffix is `suffixOfVersion()` (`310`), never
+    `slice(0, 3)`. **Since #824 (0.34.0) the three have the same
     functions**: alpha and beta hold every optional key of gamma's profile
     with the same values, and a second currency each (alpha EUR + CHF, beta
     CHF + EUR); `tests/config.test.js` pins it, so a new function goes in all

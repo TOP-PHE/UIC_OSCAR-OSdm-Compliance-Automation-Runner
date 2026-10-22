@@ -266,7 +266,7 @@ test('a fare is refunded by its own after-sales conditions, then REFUNDED with i
   const { SECRETS, startSimulator, tokenFor, call } = require('./helpers');
   const sim = await startSimulator();
   t.after(() => sim.close());
-  for (const provider of ['alpha', 'beta', 'gamma', 'delta']) {
+  for (const provider of ['alpha', 'beta', 'gamma', 'delta', 'epsilon']) {
     const token = await tokenFor(sim.base, provider, SECRETS[provider][0]);
     // The semi-flexible fare: a quarter of its price kept.
     const { fare, booking, fulfillment } = await fareSale(sim, token, provider, { cluster: 1 });

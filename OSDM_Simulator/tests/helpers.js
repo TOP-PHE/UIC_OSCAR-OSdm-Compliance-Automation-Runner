@@ -19,10 +19,10 @@ const { responseIssues } = require('./osdm-conformance');
 
 const PROVIDERS_DIR = path.join(__dirname, '..', 'providers');
 // A provider with none of the optional functions, for the tests of a provider
-// without them (#824): alpha, beta, gamma and delta all have every function.
+// without them (#824): alpha, beta, gamma, delta and epsilon all have every function.
 const PLAIN_DIR = path.join(__dirname, 'fixtures', 'providers');
 
-// Two clients for alpha, one each for beta, gamma and delta, one for the test-only
+// Two clients for alpha, one each for beta, gamma, delta and epsilon, one for the test-only
 // plain, and one id, "same-id", that exists on alpha and beta with different
 // secrets: only the provider tells those two apart. The secrets only exist in
 // the test.
@@ -41,6 +41,9 @@ const SECRETS = {
   ],
   delta: [
     { client_id: 'delta-one', client_secret: 'd1'.repeat(24) },
+  ],
+  epsilon: [
+    { client_id: 'epsilon-one', client_secret: 'e1'.repeat(24) },
   ],
   plain: [
     { client_id: 'plain-one', client_secret: 'p1'.repeat(24) },
