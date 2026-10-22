@@ -76,7 +76,7 @@ Issue #905, fares phase 1c, release 2026.409. Simulator 0.44.0.
 
 Checked:
 - `bruno-fares.test.js`: on the simulator's own answers, N1, N2 and N4 pass and the wrong variant fails check N; step 01 ends, or goes on with the product offers only under `bookMode` PRODUCT; a fare request without a section and without `expectFares` is graded as before. Three deliberate breaks of `fares.js` (check N never failing, the empty list never sent, PRODUCT ending anyway) each make a test fail. The simulator's `fares.test.js` and `datafile.test.js`.
-- The real collection standalone on the simulator (gamma), the five new scenarios and the earlier fare scenarios: see the PR.
+- The real collection standalone on the simulator (gamma, `bru` 4.2.1, through the replay): `SIM_NHF_FARE_UNASKED_38` 71 checks (O14 passes), `SIM_NHF_FARE_NO_SECTION_SPEC_38` 71, `SIM_NHF_FARE_EMPTY_SECTIONS_38` 71 (its request carried `requestedSections: []`), `SIM_NHF_FARE_NO_SECTION_SRCH_38` 235 (check N, then the product sale booked and fulfilled), none failed; `SIM_WRONG_FARE_WITHOUT_SECTION_38` fails check N only. Fourteen earlier scenarios (the ten fare ones, a search sale, a sale by trip id, the offer-parts probe, a return) recorded on `main` and on this change compare equal.
 
 ---
 
