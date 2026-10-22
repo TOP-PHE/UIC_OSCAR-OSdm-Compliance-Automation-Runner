@@ -66,6 +66,8 @@ runtime:
         postOfferResponsePreRequest();
         // #602: offers asked for a trip of POST /trips-collection, by its id.
         await prepareOfferRequestByTripIds();
+        // #904: requested sections that do not lie inside the trip.
+        require(bru.getEnvVar("library_base") + "fares.js").prepareSectionCheck();
         // #703: negative probe, the offer request with no passenger.
         require(bru.getEnvVar("library_base") + "passengerLimit.js").prepareEmptyPassengers();
     - type: after-response
@@ -73,6 +75,14 @@ runtime:
         const { postOfferResponse } = require(bru.getEnvVar("library_base")+"offers.js");
         const { displayOfferResponse } = require(bru.getEnvVar("library_base")+"displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base")+"testCapture.js");
+
+        // #904: a requested section outside the trip is the scenario's fault;
+        // the answer is not checked.
+        if (require(bru.getEnvVar("library_base") + "fares.js").stopOnSectionsOutside()) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (requested sections outside the trip)");
+          return;
+        }
 
         // #602: the checks of POST /trips-collection and of the offers asked by
         // trip id, or the grading of the unknown trip id probe, which ends the

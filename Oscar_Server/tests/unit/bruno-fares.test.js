@@ -223,3 +223,65 @@ describe('the Test Config fields (#903)', () => {
     expect(access.READ_ONLY_CARD_ACTIONS).not.toContain('set-scenario-section');
   });
 });
+
+describe('the requested sections against the trip (#904)', () => {
+  const leg = (from, to, intermediates = []) => ({ timedLeg: {
+    start: { stopPlaceRef: station(from) }, end: { stopPlaceRef: station(to) },
+    intermediates: intermediates.map((c) => ({ stopPlaceRef: station(c) })),
+  } });
+  const sectionOf = (a, b) => [{ startPlace: station(a), endPlace: station(b) }];
+
+  test('a trip specification gives every station; a section must start on it and end after its start', () => {
+    const spec = { tripSpecifications: [{ legs: [leg('0000001', '0000004', ['0000003']), leg('0000004', '0000002')] }] };
+    expect(fares.tripStationsOf(spec)).toEqual({ stations: ['urn:uic:stn:0000001', 'urn:uic:stn:0000003', 'urn:uic:stn:0000004', 'urn:uic:stn:0000002'], complete: true });
+    expect(fares.sectionsOutsideTrip({ ...spec, requestedSections: sectionOf('0000003', '0000002') })).toEqual([]);
+    expect(fares.sectionsOutsideTrip({ ...spec, requestedSections: sectionOf('4', '2') })).toEqual([]);
+    expect(fares.sectionsOutsideTrip({ ...spec, requestedSections: sectionOf('0000080', '0000002') })[0]).toMatch(/starts at a station that is not on the trip/);
+    expect(fares.sectionsOutsideTrip({ ...spec, requestedSections: sectionOf('0000004', '0000001') })[0]).toMatch(/does not end at a station after its start/);
+  });
+
+  test('a trip chosen by id is read from its legs; none known checks nothing', () => {
+    const byId = { tripIds: ['T1'], requestedSections: sectionOf('0000001', '0000009') };
+    expect(fares.sectionsOutsideTrip(byId, [leg('0000001', '0000002')])).toHaveLength(1);
+    expect(fares.sectionsOutsideTrip(byId, [leg('0000001', '0000009')])).toEqual([]);
+    expect(fares.sectionsOutsideTrip(byId, null)).toEqual([]);
+  });
+
+  test('search criteria: only a section between two given stations in the wrong order is outside', () => {
+    const search = { tripSearchCriteria: { origin: station('0000001'), destination: station('0000002'), vias: [{ viaPlace: station('0000005') }] } };
+    expect(fares.tripStationsOf(search).complete).toBe(false);
+    expect(fares.sectionsOutsideTrip({ ...search, requestedSections: sectionOf('0000001', '0000002') })).toEqual([]);
+    expect(fares.sectionsOutsideTrip({ ...search, requestedSections: sectionOf('0000007', '0000002') })).toEqual([]);
+    expect(fares.sectionsOutsideTrip({ ...search, requestedSections: sectionOf('0000002', '0000005') })[0]).toMatch(/against the direction of the search/);
+  });
+
+  test('the trip search path follows the version: trips-collections from OSDM 3.10', () => {
+    const { tripsCollectionPath } = require('../../../Bruno_Collection/library-bruno/tripIds.js');
+    expect(['3.6.0', '3.8', '3.9.0', '', null].map(tripsCollectionPath)).toEqual(Array(5).fill('trips-collection'));
+    expect(['3.10.0', '3.11', '4.0.0'].map(tripsCollectionPath)).toEqual(Array(3).fill('trips-collections'));
+  });
+
+  test('the wiring: checked before the request is sent, graded first after it; the chosen trip kept; the flag for a specification only', () => {
+    const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const yml = read('Bruno_Collection/02-Common Requests/01. POST Get Offer.yml');
+    expect(yml.indexOf('prepareSectionCheck()')).toBeGreaterThan(yml.indexOf('await prepareOfferRequestByTripIds();'));
+    expect(yml.indexOf('stopOnSectionsOutside()')).toBeLessThan(yml.indexOf('checkOfferRequestByTripIds(res.getStatus()'));
+    const offers = read('Bruno_Collection/library-bruno/offers.js');
+    expect(offers).toContain('bru.setEnvVar("__chosenTripLegs", JSON.stringify(');
+    expect(offers).toContain('tripsCollectionPath(bru.getEnvVar("osdmVersion"))}`');
+    for (const file of ['Bruno_Collection/opencollection.yml', 'Bruno_Collection/library-bruno/scenarioParser.js']) {
+      expect(read(file)).toContain('"__fareSectionsOutside", "__chosenTripLegs"');
+    }
+    const vm = require('vm');
+    const src = read('Oscar_Server/public/js/scenarios.js');
+    const lines = src.split('\n');
+    const start = lines.findIndex((l) => l.startsWith('function fareInternationalField('));
+    const end = lines.findIndex((l, i) => i > start && l === '}');
+    const trips = { 1: { tripType: 'SEARCH' }, 2: { tripType: 'SPECIFICATION' } };
+    const ctx = { state: { scenarios: [{ tripRequirementId: 1 }, { tripRequirementId: 2 }] }, getTrip: (id) => trips[id] || {},
+      buildSelect: (idx, field) => `<${field}>`, ENUMS: {} };
+    const field = vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n')})`, ctx);
+    expect(field(0)).toBe('');
+    expect(field(1)).toBe('<isPartOfInternationalTrip>');
+  });
+});

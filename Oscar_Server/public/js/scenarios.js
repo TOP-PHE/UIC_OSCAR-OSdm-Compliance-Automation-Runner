@@ -2892,14 +2892,23 @@ function buildFareFields(idx) {
       data-action="set-scenario-section" data-end="${esc(end)}" data-idx="${esc(idx)}" data-place-lookup autocomplete="off">
   </div>`;
   return `
-        ${place('startPlace', 'Fare section start', 'Fares (#903): the stop place where the section to price starts. With its end, the offer request asks fares for that section (requestedSections), and FARE_ADMISSION in the requested offer parts asks the fares themselves. Both empty: no section.')}
+        ${place('startPlace', 'Fare section start', 'Fares (#903, #904): the stop place where the section to price starts, a station of the trip. With its end, the offer request asks fares for that section (requestedSections), whether the trip is a search, a specification or a trip id; FARE_ADMISSION in the requested offer parts asks the fares themselves. A section outside the trip stops the scenario before its answer is checked. Both empty: no section.')}
         ${place('endPlace', 'Fare section end', 'Fares (#903): the stop place where the section to price ends.')}
-        ${buildSelect(idx, 'isPartOfInternationalTrip', 'Part of an international trip', ENUMS.isPartOfInternationalTrip,
-          'Fares (#903): sent as isPartOfInternationalTrip of the trip specification. Yes when the section is one part of a trip across borders, priced by several providers. Empty: not sent.')}
+        ${fareInternationalField(idx)}
         ${buildSelect(idx, 'desiredFareCluster', 'Fare cluster', ENUMS.desiredFareCluster,
           'Fares (#903): the cluster of the fare offer to choose (BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO). None offered fails the scenario. Empty: the first fare offer.')}
         ${buildSelect(idx, 'bookMode', 'Book mode', ENUMS.bookMode,
           'Fares (#903): what the scenario books, fares or products. Booking fares comes with #906; until then a fare scenario ends after the offer step.')}`;
+}
+
+// #904: OSDM has isPartOfInternationalTrip on a trip specification only (up
+// to 3.11; OSDM#1608 asks it for search criteria), so the field is offered
+// for a scenario whose trip is a specification.
+function fareInternationalField(idx) {
+  const sc = state.scenarios[idx];
+  if (getTrip(sc?.tripRequirementId)?.tripType !== 'SPECIFICATION') return '';
+  return buildSelect(idx, 'isPartOfInternationalTrip', 'Part of an international trip', ENUMS.isPartOfInternationalTrip,
+    'Fares (#903): sent as isPartOfInternationalTrip of the trip specification. Yes when the section is one part of a trip across borders, priced by several providers. Empty: not sent.');
 }
 
 // #903: the first requested section of a scenario, as two texts.

@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -5391,6 +5391,87 @@
     {
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
+      "code": "SIM_FARE_SRCH_1ADT_38",
+      "description": "Simulated provider, fares by search criteria (#904): a search from station 0000001 to 0000002 for one adult, fares asked for the whole trip. Gamma answers one fare offer per cluster; the non-flexible one is chosen. The scenario ends after the offer step (booking a fare is #906). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000001",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_TRIPIDS_1ADT_38",
+      "description": "Simulated provider, fares by trip id (#904): POST /trips-collection from station 0000001 to 0000002, then the offers for the trip chosen, by its id, with fares asked for the section from 0000001 to 0000002 of that trip. Gamma answers one fare offer per cluster; the non-flexible one is chosen. The scenario ends after the offer step. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "offersByTripIds": "on",
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000001",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
       "code": "SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38",
       "description": "Deliberately wrong (#903): for two adults, gamma gives a fare to the first only (section starting at station 0000080). Expected: check O7 fails.",
       "scenarioType": "SALE",
@@ -5406,7 +5487,7 @@
         "deleteAncillary": false
       },
       "placeSelectionMode": null,
-      "tripRequirementId": 24,
+      "tripRequirementId": 25,
       "passengersListId": 2,
       "purchaserListId": 1,
       "requestedFulfillmentOptionsListId": 1,
@@ -5446,7 +5527,7 @@
         "deleteAncillary": false
       },
       "placeSelectionMode": null,
-      "tripRequirementId": 24,
+      "tripRequirementId": 26,
       "passengersListId": 1,
       "purchaserListId": 1,
       "requestedFulfillmentOptionsListId": 1,
@@ -5486,7 +5567,7 @@
         "deleteAncillary": false
       },
       "placeSelectionMode": null,
-      "tripRequirementId": 24,
+      "tripRequirementId": 27,
       "passengersListId": 1,
       "purchaserListId": 1,
       "requestedFulfillmentOptionsListId": 1,
@@ -5526,7 +5607,7 @@
         "deleteAncillary": false
       },
       "placeSelectionMode": null,
-      "tripRequirementId": 24,
+      "tripRequirementId": 28,
       "passengersListId": 1,
       "purchaserListId": 1,
       "requestedFulfillmentOptionsListId": 1,
@@ -5566,7 +5647,7 @@
         "deleteAncillary": false
       },
       "placeSelectionMode": null,
-      "tripRequirementId": 24,
+      "tripRequirementId": 29,
       "passengersListId": 1,
       "purchaserListId": 1,
       "requestedFulfillmentOptionsListId": 1,
@@ -5606,7 +5687,7 @@
         "deleteAncillary": false
       },
       "placeSelectionMode": null,
-      "tripRequirementId": 24,
+      "tripRequirementId": 30,
       "passengersListId": 1,
       "purchaserListId": 1,
       "requestedFulfillmentOptionsListId": 1,
@@ -6122,6 +6203,114 @@
         }
       ],
       "description": "Simulated trip for fares (#903): InterCity 103 from station 0000001 to the border station 0000004, then regional 2204 to station 0000002; a fare provider prices the section from 0000004"
+    },
+    {
+      "id": 25,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000080",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T14:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T15:20:00+01:00",
+          "vehicleNumber": "2210",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a wrong fare answer (#903, #904): regional 2210 from station 0000080, where gamma's fare variant starts, to station 0000002; the section asked lies inside it"
+    },
+    {
+      "id": 26,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000081",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T14:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T15:20:00+01:00",
+          "vehicleNumber": "2211",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a wrong fare answer (#903, #904): regional 2211 from station 0000081, where gamma's fare variant starts, to station 0000002; the section asked lies inside it"
+    },
+    {
+      "id": 27,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000082",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T14:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T15:20:00+01:00",
+          "vehicleNumber": "2212",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a wrong fare answer (#903, #904): regional 2212 from station 0000082, where gamma's fare variant starts, to station 0000002; the section asked lies inside it"
+    },
+    {
+      "id": 28,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000083",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T14:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T15:20:00+01:00",
+          "vehicleNumber": "2213",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a wrong fare answer (#903, #904): regional 2213 from station 0000083, where gamma's fare variant starts, to station 0000002; the section asked lies inside it"
+    },
+    {
+      "id": 29,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000084",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T14:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T15:20:00+01:00",
+          "vehicleNumber": "2214",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a wrong fare answer (#903, #904): regional 2214 from station 0000084, where gamma's fare variant starts, to station 0000002; the section asked lies inside it"
+    },
+    {
+      "id": 30,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000085",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T14:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T15:20:00+01:00",
+          "vehicleNumber": "2215",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a wrong fare answer (#903, #904): regional 2215 from station 0000085, where gamma's fare variant starts, to station 0000002; the section asked lies inside it"
     }
   ],
   "purchaserList": [

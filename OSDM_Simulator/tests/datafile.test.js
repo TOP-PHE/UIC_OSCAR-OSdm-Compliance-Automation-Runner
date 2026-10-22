@@ -599,13 +599,15 @@ test('the fault scenarios: one per fault of the catalogue, out of the run list (
   }
 });
 
-test('the fare scenarios: a trip specification with a section; each wrong one starts its section at the station of its variant (#903)', () => {
+test('the fare scenarios: a section inside the trip; each wrong one starts its section at the station of its variant (#903, #904)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const fareScenarios = datafile.scenarios.filter((s) => s.code.includes('_FARE_'));
   const startOf = (s) => s.requestedSections?.[0]?.startPlace;
   const expected = {
     SIM_FARE_SPEC_1ADT_38: 'urn:uic:stn:0000004',
     SIM_FARE_SPEC_FREE_CHILD_38: 'urn:uic:stn:0000004',
+    SIM_FARE_SRCH_1ADT_38: 'urn:uic:stn:0000001',
+    SIM_FARE_TRIPIDS_1ADT_38: 'urn:uic:stn:0000001',
     SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38: gamma.fares.variants.passengerWithoutFare,
     SIM_WRONG_FARE_UNKNOWN_CLUSTER_38: gamma.fares.variants.unknownCluster,
     SIM_WRONG_FARE_WIDER_CLUSTERS_38: gamma.fares.variants.widerClusters,
@@ -616,8 +618,15 @@ test('the fare scenarios: a trip specification with a section; each wrong one st
   assert.deepEqual(Object.fromEntries(fareScenarios.map((s) => [s.code, startOf(s)])), expected);
   for (const s of fareScenarios) {
     const trip = datafile.tripRequirements.find((t) => t.id === s.tripRequirementId);
-    assert.equal(trip.tripType, 'SPECIFICATION', s.code);
-    assert.equal(s.isPartOfInternationalTrip, true, s.code);
+    // #904: by search criteria and by trip id (a SEARCH trip, which carries no
+    // isPartOfInternationalTrip), the others on a trip specification.
+    const bySearch = ['SIM_FARE_SRCH_1ADT_38', 'SIM_FARE_TRIPIDS_1ADT_38'].includes(s.code);
+    assert.equal(trip.tripType, bySearch ? 'SEARCH' : 'SPECIFICATION', s.code);
+    assert.equal(s.offersByTripIds === 'on', s.code === 'SIM_FARE_TRIPIDS_1ADT_38', s.code);
+    assert.equal(s.isPartOfInternationalTrip, bySearch ? undefined : true, s.code);
+    // The section lies inside the trip: its start is a station of it.
+    const stations = trip.tripType === 'SEARCH' ? [trip.trip.origin, trip.trip.destination] : trip.legs.flatMap((l) => [l.origin, l.destination]);
+    assert.ok(stations.includes(startOf(s)) && stations.includes(s.requestedSections[0].endPlace), s.code);
     const fares = s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION');
     assert.equal(fares, s.code !== 'SIM_WRONG_FARE_UNREQUESTED_38', s.code);
   }

@@ -2616,6 +2616,7 @@ function compareGroupOfferIndividual(status, body) {
 // tripIdsExpectRejection, an id the provider never gave is sent instead.
 async function prepareOfferRequestByTripIds() {
   bru.setEnvVar("__tripIdsOutcome", null);
+  bru.setEnvVar("__chosenTripLegs", null);
   const probe = String(bru.getEnvVar("tripIdsExpectRejection")) === "true";
   if (!probe && String(bru.getEnvVar("offersByTripIds")) !== "true") return;
   const ti = require("./tripIds.js");
@@ -2631,7 +2632,7 @@ async function prepareOfferRequestByTripIds() {
     bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks: [{ name: "Trips collection: the scenario's SEARCH trip gives an origin and a destination", ok: false, message: "no tripSearchCriteria to ask the trips with" }], failed: true }));
     return;
   }
-  validationLogger(`[INFO] 🚆 Offers by trip id — POST /trips-collection: ${search.origin.stopPlaceRef} → ${search.destination.stopPlaceRef} at ${search.departureTime || search.arrivalTime}`);
+  validationLogger(`[INFO] 🚆 Offers by trip id — POST /${ti.tripsCollectionPath(bru.getEnvVar("osdmVersion"))}: ${search.origin.stopPlaceRef} → ${search.destination.stopPlaceRef} at ${search.departureTime || search.arrivalTime}`);
   const { status, body, raw } = await sendTripsCollection(search);
   const checks = ti.checkTripsCollection(status, body, search);
   const choice = status === 200 ? ti.chooseTrip(body?.trips, { vehicleNumber: bru.getEnvVar("tripVehicleNumber"), departureTime: search.departureTime }) : { trip: null };
@@ -2644,6 +2645,8 @@ async function prepareOfferRequestByTripIds() {
   }
   bru.setEnvVar("OfferCollectionRequest", JSON.stringify(ti.offerRequestByTripIds(request, choice.trip.id)));
   bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, tripId: choice.trip.id }));
+  // #904: the chosen trip's legs, against which the requested sections are checked.
+  bru.setEnvVar("__chosenTripLegs", JSON.stringify(Array.isArray(choice.trip.legs) ? choice.trip.legs : []));
   validationLogger(`[INFO] 🚆 Offers by trip id — ${body.trips.length} trip(s) answered; asking offers for ${choice.how}: ${choice.trip.id}`);
 }
 
@@ -2668,7 +2671,7 @@ async function sendTripsCollection(search) {
   try {
     const res = await new Promise((resolve, reject) => {
       bru.sendRequest({
-        url: `${bru.getEnvVar("api_base")}/trips-collection`,
+        url: `${bru.getEnvVar("api_base")}/${require("./tripIds.js").tripsCollectionPath(bru.getEnvVar("osdmVersion"))}`,
         method: "POST",
         headers: {
           "Content-Type": `application/json;version=${bru.getEnvVar("osdmVersion")}`,

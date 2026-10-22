@@ -62,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.373] / [collection-OTST_V2.0.206] — 2026-10-22
+
+Issue #904, fares phase 1b, release 2026.408.
+
+### Added
+- **Fare offers by search criteria and by trip id.** The requested sections of #903 go in the offer request whatever the trip: a search, a specification, or a trip chosen from `POST /trips-collection` and asked by its id (#602). The fare checks O1–O15 are the same. Test Config offers "Part of an international trip" for a trip specification only: OSDM has `isPartOfInternationalTrip` there only, up to 3.11 (OSDM#1608 asks it for search criteria).
+- **A requested section outside the trip is the scenario's fault.** Before the offer request, each section is set against the trip: against every station of a trip specification or of the trip chosen by id, it must start at one and end at a later one; against search criteria, whose other stops are not known before the answer, only a section between two of the stations given, the wrong way round, is outside. Such a section fails one check, "The requested sections lie inside the trip (the scenario's own data, not the provider's answer)", the answer is not checked, and the scenario ends. The request still goes out: a Bruno step cannot skip itself and still route the flow (#652).
+- **The trip search follows the version:** `POST /trips-collections` from OSDM 3.10, where `/trips-collection` is deprecated (OSDM#1487); the earlier path below.
+- Simulator data file: `SIM_FARE_SRCH_1ADT_38` and `SIM_FARE_TRIPIDS_1ADT_38` (run list). The six wrong fare scenarios now ride one-leg trips from their variant stations, so that their sections lie inside their trips. No simulator change: gamma already priced the section whatever the trip.
+
+Checked:
+- `bruno-fares.test.js` (the section check on each kind of trip, the path by version, the wiring, the editor field), the simulator's `fares.test.js` (fares by search and by trip id over HTTP) and `datafile.test.js`.
+- The real collection standalone on the simulator (gamma): `SIM_FARE_SRCH_1ADT_38` 81 checks, `SIM_FARE_TRIPIDS_1ADT_38` 88, `SIM_FARE_SPEC_1ADT_38` 81, none failed; each wrong scenario still fails or warns on its own rule only. A copy of `SIM_FARE_SPEC_1ADT_38` with its section starting off the trip failed the one new check and no fare check.
+
+---
+
 ## [server-1.11.372] / [collection-OTST_V2.0.205] — 2026-10-21
 
 Issue #903, fares phase 1a, release 2026.407. Simulator 0.43.0.
