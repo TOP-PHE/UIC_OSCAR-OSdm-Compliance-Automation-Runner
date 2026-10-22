@@ -62,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.380] / [collection-OTST_V2.0.213] — 2026-10-22
+
+Issue #920, step 3, release 2026.415. Simulator unchanged (0.48.0).
+
+### Added
+- **Scenarios for `epsilon`, OSDM 3.10 in development.** Every `_38` scenario of the simulator's data file has a `_310` copy for `epsilon` (154 scenarios, `scripts/version-copies.js`): 3.10 adds optional members only so far, so none is left out. A copy names epsilon's currencies (SEK, and EUR where gamma's names EUR).
+- **The epsilon checklist** (`Documentation/Server_Operations/Simulator checklists/OSCAR_Test_Config_Checklist_Simulator_epsilon.docx`, template V1.04) and **the reference configuration `simulator-epsilon`**: a company or provider can follow it in Test Config → Reference configuration, like the four others. The other four checklists were rebuilt for the text of their first page (five providers); their answers did not move, and neither did the other references.
+
+### Fixed
+- The reference generator compared the checklist's OSDM version with the profile's by its first characters, so a checklist declaring `3.1` passed for a `3.10.0` profile. It now takes `3.10` as 3.10.x only.
+
+### Checked
+- The 154 `_310` scenarios were replayed on a local simulator with the collection standalone and compared with their `_39` twins on `delta`: the same checks and failures for each (47,248 checks; only the deliberately wrong and fault scenarios fail, as on every version). The scenarios that search trips by id call `POST /epsilon/trips-collections`, the name OSDM gives that search from 3.10.
+
+---
+
 ## [server-1.11.379] / [collection-OTST_V2.0.212] — 2026-10-22
 
 Issue #907, fares phase 3, release 2026.414. Simulator 0.48.0.

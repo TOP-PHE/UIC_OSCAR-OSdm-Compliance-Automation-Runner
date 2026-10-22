@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.414",
+  "current_release": "2026.415",
   "releases": [
+    {
+      "release": "2026.415",
+      "date": "2026-10-22",
+      "server": "1.11.380",
+      "collection": "OTST_V2.0.213",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#920 step 3: the simulator's provider epsilon (OSDM 3.10.0 in development) has its scenarios: every _38 scenario has a _310 copy (SEK / EUR), the epsilon checklist and the simulator-epsilon reference configuration. A reference's version check reads 3.10 as 3.10.x, never 3.1. Replayed on a local simulator: the 154 _310 scenarios give the same checks and failures as their _39 twins on delta (47,248 checks; only the deliberately wrong and fault scenarios fail)."
+      ]
+    },
     {
       "release": "2026.414",
       "date": "2026-10-22",

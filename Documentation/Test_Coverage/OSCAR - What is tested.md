@@ -191,9 +191,9 @@ Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
 [OSCAR - OSDM Simulator scenarios](../Server_Operations/OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
 **Every scenario written for `gamma` (`_38`) also runs on `alpha` (`_36`),
-`beta` (`_37`) and `delta` (`_39`)** (#914), but those a version cannot
+`beta` (`_37`), `delta` (`_39`) and `epsilon` (`_310`, OSDM 3.10 in development, #920)** (#914), but those a version cannot
 express (a return in one offer on 3.6): each OSDM version is tested on all
-the simulator does. The groups below are gamma's; the other three providers
+the simulator does. The groups below are gamma's; the other four providers
 have the same, as copies. In short:
 
 | Group | Scenarios | Provider |

@@ -2285,10 +2285,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     EUR, `osdmDevelopment` { branch, commit } in its profile, equal to
     `osdm-dev.json` (a test), shown by `/healthz` under `development`; its
     answers are gamma's (3.10 only adds optional members so far) plus `POST
-    /trips-collections` (`501` below 3.10). Its `_310` scenarios, checklist
-    and reference are step 3: until then `datafile.test.js` lists 3.10 in
-    `SCENARIOS_LATER`. A scenario suffix is `suffixOfVersion()` (`310`), never
-    `slice(0, 3)`. **Since #824 (0.34.0) the three have the same
+    /trips-collections` (`501` below 3.10). **Its scenarios (#920 step 3,
+    1.11.380):** every `_38` scenario has a `_310` copy (`version-copies-lib.js`,
+    SEK / EUR; `baseOf()` strips two or three digits), checklist
+    `…_Simulator_epsilon.docx` (private generator `epsilon.js`), reference
+    `simulator-epsilon`. The reference check of the checklist's version takes
+    `3.10` as 3.10.x only, never 3.1 (`buildReference()`). A scenario suffix is
+    `suffixOfVersion()` (`310`), never `slice(0, 3)`. **Since #824 (0.34.0) the three have the same
     functions**: alpha and beta hold every optional key of gamma's profile
     with the same values, and a second currency each (alpha EUR + CHF, beta
     CHF + EUR); `tests/config.test.js` pins it, so a new function goes in all
