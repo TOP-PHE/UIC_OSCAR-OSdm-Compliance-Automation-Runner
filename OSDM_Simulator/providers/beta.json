@@ -191,7 +191,8 @@
       "overlappingFares": "urn:uic:stn:0000084",
       "unrequestedFares": "urn:uic:stn:0000085",
       "faresWithoutSection": "urn:uic:stn:0000086",
-      "combiningFares": "urn:uic:stn:0000087"
+      "combiningFares": "urn:uic:stn:0000087",
+      "bicycleReservationProductMode": "urn:uic:stn:0000088"
     }
   }
 }

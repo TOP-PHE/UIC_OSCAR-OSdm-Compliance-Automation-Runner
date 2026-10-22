@@ -32,12 +32,15 @@ http://www.apache.org/licenses/LICENSE-2.0
  *
  * Sources and levels are in #906 and #242 (D3 for F2). A fare REFUND scenario
  * goes on from 07 to the refund (#907, fareRefund.js); any other ends there.
+ * A fare reservation (a bicycle place, #255) is a fare part: its checks V1–V12
+ * are in fareReservations.js, and it is never counted among the products.
  *
  * The pure part has no Bruno globals; the glue at the bottom has.
  */
 
 const { sameStopPlace } = require('./returnJourney.js');
 const { missingFareMembers, isFareSale } = require('./fares.js');
+const fareReservations = require('./fareReservations.js');
 
 // OSDM processes: the fulfilment statuses of fares after a confirmation.
 const FARE_FULFILLMENT_STATUSES = ['CONFIRMED', 'FULFILLED'];
@@ -78,11 +81,20 @@ function bookedFaresOf(booking) {
   return list(booking?.bookedOffers).flatMap((offer, i) => list(offer.fares).map((fare, j) => ({ fare, path: `bookedOffers[${i}].fares[${j}]` })));
 }
 
-/** The ids of a booking's product parts: admissions, reservations, ancillaries. */
-function productPartIdsOf(booking) {
+/**
+ * The ids of a booking's product parts: admissions, reservations, ancillaries,
+ * but not its fare reservations (#255), which stand for those of the `offer`.
+ */
+function productPartIdsOf(booking, offer = null) {
+  const fareReservationIds = new Set(fareReservations.fareReservationIdsOf(booking, offer));
   return list(booking?.bookedOffers)
-    .flatMap((offer) => [...list(offer.admissions), ...list(offer.reservations), ...list(offer.ancillaries)])
-    .map((part) => part.id).filter(Boolean);
+    .flatMap((bookedOffer) => [...list(bookedOffer.admissions), ...list(bookedOffer.reservations), ...list(bookedOffer.ancillaries)])
+    .map((part) => part.id).filter((id) => id && !fareReservationIds.has(id));
+}
+
+/** The ids of a booking's fare parts: its fares, then its fare reservations (#255). */
+function farePartIdsOf(booking, offer) {
+  return [...bookedFaresOf(booking).map(({ fare }) => fare.id), ...fareReservations.fareReservationIdsOf(booking, offer)];
 }
 
 // The offer's references of the passengers a booked fare names: the booking
@@ -144,13 +156,13 @@ function pairScore(offered, offeredKeys, booked, booking) {
   return (sameId ? 8 : 0) + (samePassengers ? 4 : 0) + (sameSection(offered, booked) ? 2 : 0) + (priceText(offered) === priceText(booked) ? 1 : 0);
 }
 
-// B5: the provisional price, when the booking states one.
-function provisionalPriceCheck(booking, booked) {
+// B5: the provisional price, when the booking states one: the fares' and the fare reservations' prices.
+function provisionalPriceCheck(booking, booked, offer) {
   const price = booking?.provisionalPrice;
   if (!isObject(price) || price.amount == null) {
     return { id: 'B5', level: 'INFO', title: 'Provisional price', ok: true, message: 'the booking states no provisionalPrice' };
   }
-  const prices = booked.map(({ fare }) => list(fare.prices)[0]).filter(Boolean);
+  const prices = [...booked.map(({ fare }) => list(fare.prices)[0]).filter(Boolean), ...fareReservations.reservationPrices(booking, offer)];
   const sum = prices.reduce((total, p) => total + Number(p.amount), 0);
   const differs = prices.some((p) => p.currency !== price.currency) || sum !== Number(price.amount);
   return check('B5', 'WARNING', 'provisionalPrice is the sum of the booked fares\' prices', differs ? [`${price.amount} ${price.currency}, the fares add up to ${sum} ${prices[0]?.currency ?? ''}`.trim()] : [],
@@ -177,6 +189,16 @@ function statusChecks(booked, stage) {
  * Each check: { id, level: FAIL | WARNING | INFO, title, ok, message }.
  */
 function bookingChecks(booking, offer, stage) {
+  const reservationChecks = fareReservations.bookingChecks(booking, offer, stage);
+  // #255: an offer of fare reservations alone holds no fare to check.
+  if (list(offer?.fares).length === 0 && reservationChecks.length > 0) {
+    return stage === 'prebooked' ? [...reservationChecks, provisionalPriceCheck(booking, [], offer)] : reservationChecks;
+  }
+  return [...fareChecksOfBooking(booking, offer, stage), ...reservationChecks];
+}
+
+// B1–B6 on the fares of a booking.
+function fareChecksOfBooking(booking, offer, stage) {
   const booked = bookedFaresOf(booking);
   const first = check('B1', 'FAIL', 'The booking holds the fares booked (bookedOffers[].fares)', booked.length ? [] : ['no booked offer holds a fare'],
     'the booking of a fare offer holds no fare');
@@ -198,7 +220,7 @@ function bookingChecks(booking, offer, stage) {
       pairs.filter((p) => priceText(p.offered) !== priceText(p.booked)).map((p) => `${p.path}: ${priceText(p.booked) || 'none'}, offered ${priceText(p.offered) || 'none'}`),
       'prices that differ from the offer'));
   }
-  if (stage === 'prebooked') checks.push(provisionalPriceCheck(booking, booked));
+  if (stage === 'prebooked') checks.push(provisionalPriceCheck(booking, booked, offer));
   if (stage === 'prebooked' || stage === 'confirmed') checks.push(...statusChecks(booked, stage));
   return checks;
 }
@@ -238,6 +260,8 @@ function fulfillmentChecks(fulfillments, { fareIds = [], productIds = [], docume
     check('F4', 'FAIL', 'No fulfilment holds both fares and product booking parts (OSDM processes)',
       all.filter((f) => named(f).some((id) => fares.has(id)) && named(f).some((id) => products.has(id))).map(at),
       'fulfilments mixing fares and products'),
+    // #255 V6: fulfilment parts, when there are some.
+    ...[fareReservations.fulfillmentPartsNote(ofFares)].filter(Boolean),
   ];
 }
 
@@ -258,10 +282,11 @@ function confirmedBookingChecks(booking, offer) {
   const inFulfillments = new Set(fulfillments.flatMap((f) => list(f.bookingParts).map((p) => p.id)));
   return [
     ...bookingChecks(booking, offer, 'confirmed'),
-    ...fulfillmentChecks(fulfillments, { fareIds: booked.map(({ fare }) => fare.id), productIds: productPartIdsOf(booking), documents: booking?.fulfillmentDocuments }),
+    ...fulfillmentChecks(fulfillments, { fareIds: farePartIdsOf(booking, offer), productIds: productPartIdsOf(booking, offer), documents: booking?.fulfillmentDocuments }),
     check('F5', 'FAIL', 'The booking lists its fulfilments, and every booked fare is in one (bookingParts)',
       fulfillments.length === 0 ? ['the booking lists no fulfilment'] : booked.filter(({ fare }) => !inFulfillments.has(fare.id)).map(({ fare, path }) => `${path} (${fare.id})`),
       'fares in no fulfilment'),
+    ...[fareReservations.inFulfillmentCheck(booking, offer)].filter(Boolean),
     attributesCheck(booking, offer),
   ];
 }
@@ -284,8 +309,10 @@ function recordFareChecks(checks) {
 }
 
 function keepPartIds(booking) {
-  bru.setEnvVar('__fareIds', JSON.stringify(bookedFaresOf(booking).map(({ fare }) => fare.id).filter(Boolean)));
-  bru.setEnvVar('__fareProductIds', JSON.stringify(productPartIdsOf(booking)));
+  const offer = readJson('offer');
+  bru.setEnvVar('__fareIds', JSON.stringify(farePartIdsOf(booking, offer).filter(Boolean)));
+  bru.setEnvVar('__fareProductIds', JSON.stringify(productPartIdsOf(booking, offer)));
+  bru.setEnvVar('__fareReservationIds', JSON.stringify(fareReservations.fareReservationIdsOf(booking, offer)));
 }
 
 const bookingOf = (body) => (isObject(body?.booking) ? body.booking : body);
@@ -333,6 +360,10 @@ function checkFareFulfillmentStep(body) {
 /** Step 06b, for a fare sale: the checks of one fulfilment read (GET /fulfillments/{id}). */
 function fulfillmentReadChecks(body, id) {
   const fulfillment = body?.fulfillment;
+  // #255 V12: in fare mode GET /fulfillments/{id} may give an empty fulfilment.
+  if (readJson('__fareReservationIds', []).length > 0 && fareReservations.isEmptyFulfillment(fulfillment)) {
+    return [{ id: 'V12', level: 'INFO', title: '', ok: true, message: `GET /fulfillments/${id} gave an empty fulfilment, which OSDM allows for a fare reservation (${fareReservations.READ_ALLOWED})` }];
+  }
   const same = check('F1', 'FAIL', 'GET /fulfillments/{id} gives the fulfilment asked', isObject(fulfillment) && fulfillment.id === id ? [] : [`asked ${id}, got ${isObject(fulfillment) ? fulfillment.id : 'none'}`],
     'another fulfilment, or none');
   if (!isObject(fulfillment)) return [same];
@@ -344,8 +375,8 @@ function checkFareConfirmedStep(body) {
   if (!isFareSale()) return false;
   const booking = bookingOf(body);
   recordFareChecks(confirmedBookingChecks(booking, readJson('offer')));
-  // The booked fares are the parts a refund (#907) names.
-  bru.setEnvVar('admissionReservationAncillaryBookingPartsIds', bookedFaresOf(booking).map(({ fare }) => fare.id).filter(Boolean));
+  // The booked fares (and fare reservations, #255) are the parts a refund (#907) names.
+  bru.setEnvVar('admissionReservationAncillaryBookingPartsIds', farePartIdsOf(booking, readJson('offer')).filter(Boolean));
   const next = require('./fareRefund.js').prepareFareRefund(booking);
   if (next) {
     validationLogger('[INFO] [fares] Fare sale booked and confirmed: its refund comes next (#907).');
@@ -365,6 +396,6 @@ function checkFareConfirmedStep(body) {
 }
 
 module.exports = {
-  FARE_FULFILLMENT_STATUSES, bookedFaresOf, productPartIdsOf, pairFares, bookingChecks, fulfillmentChecks, confirmedBookingChecks,
+  FARE_FULFILLMENT_STATUSES, bookedFaresOf, productPartIdsOf, farePartIdsOf, pairFares, bookingChecks, fulfillmentChecks, confirmedBookingChecks,
   recordFareChecks, checkFareBookingStep, checkFarePrebookedStep, checkFareFulfillmentStep, fulfillmentReadChecks, checkFareConfirmedStep,
 };

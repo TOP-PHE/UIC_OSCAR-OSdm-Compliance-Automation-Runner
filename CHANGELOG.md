@@ -62,6 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.382] / [collection-OTST_V2.0.215] — 2026-10-22
+
+Issue #255, fares phase 4, release 2026.417. Simulator 0.50.0.
+
+### Simulator 0.50.0
+- **Fare reservations: a bicycle place.** From OSDM 3.8, `FARE_RESERVATION` asked gives each BICYCLE passenger a place on each leg of the section: a `ReservationOfferPart` marked `distributionMode: FARE_MODE`, with no product (osdm.io, handling reservations). A bicycle has no fare of its own: its place is its fare. With fare admissions asked too, every fare offer holds the places; else one offer holds them alone. Below 3.8, where the field does not exist, none is offered.
+- A place is booked when the request selects it (`optionalReservationSelections`), as OSDM books only the mandatory reservations unless asked. It is confirmed with the fares, in one fulfilment of fares, with its `placeAllocation` (`STORAGE` / `BICYCLE`).
+- Two wrong variants: a section from station `0000088` (`fares.variants.bicycleReservationProductMode`, in every profile) gives the place without `distributionMode`; a passenger named `Simvariant-Fare-Reservation-Product-Mode` gets it booked without it.
+
+### Added
+- **Fare reservations.** `FARE_RESERVATION` in the requested offer parts asks for them, for a passenger of type BICYCLE. The new `library-bruno/fareReservations.js` checks them:
+  - at 01: each bicycle has a reservation (V3), in FARE_MODE when no product reservation was asked (V1, FAIL), with no product (V2, WARNING); fare reservations not asked fail (V8, OSDM `DistributionMode`);
+  - at 02, 05 and 07: every fare reservation selected is in the booking (V9), in FARE_MODE (V1), for its passengers (V3), PREBOOKED then CONFIRMED or FULFILLED (V10); at 07 each is in a fulfilment (V11), and the place allocation (V4) and the IRS 90918-1 reference in `bookingPartCode` (V7) are told;
+  - a fare fulfilment holding them gets the F2 checks of #906 (no control number, no issuer; V5), and its fulfilment parts are told (V6);
+  - at 06b, `GET /fulfillments/{id}` may answer an error or an empty fulfilment, which osdm.io allows for a fare reservation (V12, INFO).
+- Step 01 selects the chosen offer's fare reservations for the booking (`optionalReservationSelections`). An offer holding only fare reservations is a fare offer, and a bicycle held by a reservation needs no fare (O7).
+- A scenario expecting no fare (#905) counts fare reservations too. The refund of #907 reads a fare reservation as a fare part.
+- Simulator data file: `SIM_FARE_BICYCLE_1ADT_38`, `SIM_FARE_BICYCLE_ONLY_38` (run list), `SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38`, `SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38` (not in it), trip 33, passenger lists 34 to 36, and their `_39`, `_310` and `_312` copies. No 3.6 or 3.7 copy (`version-copies-lib.js`: OSDM before 3.8 has no `distributionMode`). References regenerated.
+
+Not covered: the shape of a fare reservation before OSDM 3.8, which osdm.io does not describe (a WARNING says it is not checked); a seat reservation in fare mode for a person; the `partType` of OSDM 4.0.
+
+Checked:
+- `bruno-fare-reservations.test.js` (23): the simulator's offers and bookings pass; each wrong variant fails check V1 only; hand-made answers for V2 to V12; the step glue (01's selection, 02's part ids, 06b's allowed error and empty fulfilment); the reset lists and the copy rule. Five deliberate breaks each make a test fail. The simulator suite, the full server suite (the one failure is the Windows-only `mcp-end-to-end.test.js`, as on `main`), both lints.
+- The real collection standalone on the simulator (`bru` 4.2.1, through the replay), 12 runs: the four new scenarios on gamma, delta and epsilon. The two sales pass with no failed check and no warning (`SIM_FARE_BICYCLE_1ADT_*` 130 checks, `SIM_FARE_BICYCLE_ONLY_*` 108); `SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_*` fails V1 at 01 only, `SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_*` V1 at 02, 05 and 07 only.
+- Nothing else moved: 152 earlier runs recorded on `main` (with #924) and on this change compare equal: the 22 fare scenarios on every version they have (106 runs) and 46 reservation, place choice and refund scenarios on gamma.
+- After #925 (zeta, OSDM 3.12) was merged in: the four `_312` copies, run on zeta, give the same checks as their `_310` twins on epsilon, check by check.
+
+---
+
 ## [server-1.11.381] / [collection-OTST_V2.0.214] — 2026-10-22
 
 Issue #925, release 2026.416. Simulator 0.49.0.

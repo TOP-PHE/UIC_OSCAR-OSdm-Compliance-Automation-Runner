@@ -783,7 +783,7 @@ function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const { offers: productOffers, problems: productProblems } = selectProducts(criteria, built.offers);
   // #903: fare offers for a requested section, next to the product offers.
   const fareOffers = beyondHorizon ? [] : fareOffersOf({
-    body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS,
+    body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS, fulfillmentOptions,
   });
   const offers = [...productOffers, ...fareOffers];
   // #906: a fare offer is booked like any other, so it is remembered too.

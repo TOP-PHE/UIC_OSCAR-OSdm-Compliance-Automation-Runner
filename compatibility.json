@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.416",
+  "current_release": "2026.417",
   "releases": [
+    {
+      "release": "2026.417",
+      "date": "2026-10-22",
+      "server": "1.11.382",
+      "collection": "OTST_V2.0.215",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#255 (fares phase 4): fare reservations. FARE_RESERVATION asks for them, for a passenger of type BICYCLE: from OSDM 3.8 a reservation part in FARE_MODE with no product. Step 01 checks them (V1 fare mode, V2 no product, V3 each bicycle reserved, V8 none unasked) and selects them for the booking; they are booked and fulfilled with the fares (V9 in the booking, V10 statuses, V11 in a fulfilment of fares, V4 and V7 told). GET /fulfillments of a fare reservation may give an error or an empty fulfilment (V12). Simulator 0.50.0 gives each bicycle a place in fare mode from 3.8, with two wrong variants."
+      ]
+    },
     {
       "release": "2026.416",
       "date": "2026-10-22",

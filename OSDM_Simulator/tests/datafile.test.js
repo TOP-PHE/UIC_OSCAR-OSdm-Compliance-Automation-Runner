@@ -269,6 +269,9 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     // #907: the fare refund's variants.
     SIM_WRONG_FARE_COMBINING_FEE_38: ['fare-wrong-combining-fee'],
     SIM_WRONG_FARE_IGNORES_REFUND_FEE_38: ['fare-ignores-refund-fee'],
+    // #255: the fare reservation's variants, by the section's station and by a last name.
+    SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38: [],
+    SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38: ['fare-reservation-product-mode'],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -666,6 +669,11 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_FARE_REFUND_COMBINING_1ADT_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_COMBINING_FEE_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_IGNORES_REFUND_FEE_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    // #255: fare reservations for a bicycle, with fare admissions or alone.
+    SIM_FARE_BICYCLE_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_BICYCLE_ONLY_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, false, undefined],
+    SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38: [v.bicycleReservationProductMode, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
@@ -692,6 +700,13 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     assert.ok(!variantStations.has(startOf(s)), s.code);
   }
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.combiningFares).map((s) => s.code), ['SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_WRONG_FARE_COMBINING_FEE_38']);
+  // #255: fare reservations are asked by the four bicycle scenarios only, each with a bicycle.
+  const askReservations = datafile.scenarios.filter((s) => s.offerSearchCriteria?.requestedOfferParts?.includes('FARE_RESERVATION'));
+  assert.deepEqual(askReservations.map((s) => s.code), ['SIM_FARE_BICYCLE_1ADT_38', 'SIM_FARE_BICYCLE_ONLY_38', 'SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38', 'SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38']);
+  for (const s of askReservations) {
+    const types = datafile.passengersList.find((l) => l.id === s.passengersListId).passengers.map((p) => p.type);
+    assert.ok(types.includes('BICYCLE'), s.code);
+  }
   // #907: the fee stated is a fare refund's, and in a REFUND scenario.
   assert.deepEqual(datafile.scenarios.filter((s) => s.fareRefundFee != null).map((s) => [s.code, s.scenarioType, s.fareRefundFee]),
     [['SIM_FARE_REFUND_FEE_1ADT_38', 'REFUND', 250], ['SIM_WRONG_FARE_IGNORES_REFUND_FEE_38', 'REFUND', 250]]);
