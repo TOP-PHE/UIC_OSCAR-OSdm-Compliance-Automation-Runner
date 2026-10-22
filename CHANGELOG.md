@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.381] / [collection-OTST_V2.0.214] — 2026-10-22
+
+Issue #925, release 2026.416. Simulator 0.49.0.
+
+### Simulator 0.49.0
+- **`zeta`** (`providers/zeta.json`): OSDM 3.12.0, the version in development, NOK and EUR when asked, identifiers `ZETA-…`, five-minute tokens, every function of the other providers (#824 rule, `config.test.js`). Its profile names the OSDM branch and commit it follows (`osdmDevelopment`: `master` at `a121db9`), equal to `osdm-dev.json` (a test); `/healthz` gives it under `development`. It serves `POST /trips-collections` like epsilon. Every answer of `tests/zeta.test.js` is checked against the 3.12 response schemas.
+- **`epsilon` stays on OSDM 3.10, now released**: it no longer names a development branch, and `/healthz` no longer lists it.
+
+### Changed
+- **OSDM 3.10 and 3.11 are released, 3.12 is in development.** OSDM tagged 3.10 and 3.11 and published both on its site on 21/10/2026 (OSDM PR #1668); `master` prepares 3.12 (OSDM PR #1669). `Documentation/Test_Coverage/OSDM_reference/`: the 3.10 file is described as the released one (identical, parsed, to the published bundle); `OSDM-online-api-v3.11.0.yml` is the published bundle; `OSDM-online-api-v3.12.0.yml` is `master` at commit `a121db9` bundled with `redocly bundle`, the pin in `osdm-dev.json`. The request, response and AI reference schemas are generated for 3.4 to 3.12 (3.4 to 3.10 unchanged). 3.11 adds optional members only and deprecates the booking's `requestedFulfillmentType` and `preferredFulfillmentMedia`, which OSCAR does not send; 3.12 is 3.11 so far. A declared 3.11 or 3.12 is now quoted exactly by the AI analysis; none declared quotes 3.11, the latest released.
+
+### Added
+- **Scenarios for `zeta`**: every `_38` scenario of the simulator's data file has a `_312` copy (154, NOK / EUR, `scripts/version-copies.js`).
+- **The zeta checklist** (`OSCAR_Test_Config_Checklist_Simulator_zeta.docx`) and **the reference configuration `simulator-zeta`**. Checklist template **V1.05**: A1.2 offers OSDM 3.11 and 3.12 (in development); every copy was rebuilt and no answer moved. The other references are unchanged.
+
+### Checked
+- The 154 `_312` scenarios were replayed on a local simulator with the collection standalone and compared with their `_310` twins on `epsilon`: the same checks and failures for each (47,248 checks; only the deliberately wrong and fault scenarios fail). The trip-id scenarios call `POST /zeta/trips-collections`.
+
+---
+
 ## [server-1.11.380] / [collection-OTST_V2.0.213] — 2026-10-22
 
 Issue #920, step 3, release 2026.415. Simulator unchanged (0.48.0).

@@ -2292,7 +2292,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `simulator-epsilon`. The reference check of the checklist's version takes
     `3.10` as 3.10.x only, never 3.1 (`buildReference()`). A scenario suffix is
     `suffixOfVersion()` (`310`), never `slice(0, 3)`. **3.10 and 3.11 are released, `zeta`
-    follows 3.12 in development** (#925, 1.11.381 / simulator 0.49.0): OSDM
+    follows 3.12 in development** (#925, 1.11.381 / OTST_V2.0.214, simulator 0.49.0): OSDM
     tagged and published 3.10 and 3.11 on 21/10/2026, and `master` prepares
     3.12. `osdm-dev.json` now pins `master` (3.12.0); the 3.10 file is the
     released one (identical, parsed, to the gh-pages bundle); 3.11 is the

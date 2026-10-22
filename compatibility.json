@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.415",
+  "current_release": "2026.416",
   "releases": [
+    {
+      "release": "2026.416",
+      "date": "2026-10-22",
+      "server": "1.11.381",
+      "collection": "OTST_V2.0.214",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#925: OSDM 3.10 and 3.11 are released (tags, OSDM site 21/10/2026) and 3.12 is in development on OSDM master. OSCAR knows 3.11 (the published bundle) and 3.12 (master at a pinned commit, osdm-dev.json); the request, response and AI reference schemas run 3.4 to 3.12. The simulator gets zeta (OSDM 3.12, NOK and EUR), which follows master; epsilon stays on 3.10, now released. zeta has every _38 scenario as a _312 copy, its checklist (template V1.05: A1.2 offers 3.11 and 3.12) and the reference configuration simulator-zeta. Simulator 0.49.0."
+      ]
+    },
     {
       "release": "2026.415",
       "date": "2026-10-22",
