@@ -8,6 +8,14 @@
     "content": "A new scenario field, Fares expected, makes a fare scenario a negative test: set it to false and step 01 checks that the answer holds no fare, instead of grading the fares. It applies whether fares were asked or not: a request for products only must never get fares back, as OSDM says.\n\nOSDM does not say what a fare provider answers for a domestic trip or for a fare request without a section, so the expectation is yours, for your provider. A scenario that expects no fare ends after the offer step, unless its Book mode is PRODUCT: the sale then goes on with a product offer, booked and fulfilled.\n\nNothing changes for your existing scenarios."
   },
   {
+    "id": "2026-10-22-every-scenario-every-version",
+    "date": "October 22, 2026",
+    "tag": "Improvement",
+    "title": "Simulator: every scenario on every OSDM version",
+    "summary": "The simulator references for alpha (3.6), beta (3.7) and delta (3.9) now run every scenario gamma (3.8) runs, except what their version cannot express.",
+    "content": "A company following simulator-alpha, -beta or -delta used to run five or six scenarios. Each now runs about a hundred: every gamma scenario, copied for its OSDM version and currencies. Left out: a return in one offer and product selections on 3.6, a named compartment before 3.8. An update from a reference now stores only that provider's scenarios. After this release, a Test Manager updates once in Test Config, Reference configuration."
+  },
+  {
     "id": "2026-10-22-reference-version-per-provider",
     "date": "October 22, 2026",
     "tag": "Fix",

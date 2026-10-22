@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.410",
+  "current_release": "2026.411",
   "releases": [
+    {
+      "release": "2026.411",
+      "date": "2026-10-22",
+      "server": "1.11.376",
+      "collection": "OTST_V2.0.209",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#905 (fares phase 1c): a scenario can expect no fare (expectFares: false): step 01 checks the answer holds none, whether fares were asked or not, then ends or goes on with a product sale (bookMode PRODUCT); an empty list of requested sections is sent as it is with a fare request. Simulator 0.45.0 adds a wrong variant that prices the whole trip without a section."
+      ]
+    },
     {
       "release": "2026.410",
       "date": "2026-10-22",
@@ -11,7 +22,7 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "#905 (fares phase 1c): a scenario can expect no fare (expectFares: false): step 01 checks the answer holds none, whether fares were asked or not, then ends or goes on with a product sale (bookMode PRODUCT); an empty list of requested sections is sent as it is with a fare request. Simulator 0.44.0 adds a wrong variant that prices the whole trip without a section."
+        "#914: every simulator scenario written for gamma (OSDM 3.8) now also runs on alpha (3.6), beta (3.7) and delta (3.9), except what a version cannot express; an update from a reference stores only its provider's scenarios; simulator 0.44.0 gives the refund receipt below 3.8."
       ]
     },
     {

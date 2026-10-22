@@ -55,6 +55,18 @@ test('3.7: each fulfilment holds its documents, without the 3.8 members; the boo
   assert.equal(out.booking.fulfillmentStatus, 'FULFILLED', '3.7 has fulfillmentStatus');
 });
 
+test('below 3.8, a document no fulfilment names (the refund receipt) goes to Booking.documents (#914)', () => {
+  for (const version of ['3.6.0', '3.7.0']) {
+    const body = confirmed38();
+    body.booking.fulfillmentDocuments.push({ id: 'R1', medium: 'PDF_A4', type: 'INFORMATION', format: 'application/pdf', content: 'r' });
+    const out = shapeAnswer(body, version);
+    assert.deepEqual(out.booking.documents, [{ id: 'R1', type: 'INFORMATION', scope: 'BOOKING', format: 'application/pdf', content: 'r' }], version);
+    assert.ok(out.booking.fulfillments.every((f) => f.fulfillmentDocuments.every((d) => d.type === 'TICKET')), version);
+    // Without one, the booking gets no list.
+    assert.equal(shapeAnswer(confirmed38(), version).booking.documents, undefined, version);
+  }
+});
+
 test('3.6: no inboundTripCoverage, isIncluded, compartmentNumber or fulfillmentStatus', () => {
   const body = confirmed38();
   body.booking.bookedOffers[0].reservations = [{ placeAllocation: { reservedPlaces: [{ placeNumber: '15', compartmentNumber: '3' }] } }];
@@ -118,4 +130,26 @@ test('the checker itself: an answer of another version is refused, naming the me
   assert.deepEqual(responseIssues('3.8.0', 'POST', '/gamma/offers', 200, offers38), []);
   assert.deepEqual(responseIssues('3.6.0', 'POST', '/alpha/offers', 200, offers38), ['offers[0].inboundTripCoverage: not a member of Offer']);
   assert.equal(responseIssues('3.8.0', 'POST', '/gamma/oauth/token', 200, {}), null, 'not an OSDM operation: nothing to check');
+});
+
+test('alpha (3.6) and beta (3.7) give the refund receipt in Booking.documents, scoped to the booking (#914)', async (t) => {
+  const started = sim.clock.ms;
+  t.after(() => { sim.clock.ms = started; });
+  for (const provider of ['alpha', 'beta']) {
+    const token = await tokenFor(sim.base, provider, clientOf[provider]);
+    const offers = (await call(sim.base, token, 'POST', `/${provider}/offers`, offerRequest())).body.offers;
+    const booking = (await call(sim.base, token, 'POST', `/${provider}/bookings`, bookingRequest(offers[0]))).body.booking;
+    const base = `/${provider}/bookings/${booking.id}`;
+    const confirmed = (await call(sim.base, token, 'POST', `${base}/fulfillments`, {})).body;
+    const refund = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: confirmed.fulfillments.map((f) => f.id) })).body.refundOffers[0];
+    await call(sim.base, token, 'PATCH', `${base}/refund-offers/${refund.id}`, { status: 'CONFIRMED' });
+    sim.clock.ms += 60000;
+    // call() checks the answer against the provider's version's schema.
+    const read = (await call(sim.base, token, 'GET', base)).body.booking;
+    assert.equal(read.fulfillmentDocuments, undefined, provider);
+    const receipts = (read.documents || []).filter((d) => d.type === 'INFORMATION');
+    assert.equal(receipts.length, 1, provider);
+    assert.equal(receipts[0].scope, 'BOOKING', provider);
+    assert.ok(read.fulfillments.every((f) => (f.fulfillmentDocuments || []).every((d) => d.type !== 'INFORMATION')), provider);
+  }
 });

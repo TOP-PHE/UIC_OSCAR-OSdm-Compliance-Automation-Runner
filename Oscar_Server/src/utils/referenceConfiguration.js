@@ -28,7 +28,8 @@
  *    legs, and the run list of the provider's version. Only the provider's
  *    part of it counts (`providerPartOf()`, #912): the scenarios of its OSDM
  *    version and what they name, so that a scenario or trip added for
- *    another provider changes neither its Test Data nor its version.
+ *    another provider changes neither its Test Data nor its version, and
+ *    an update stores that part only (#914).
  *
  * The reference does not copy the scenarios: it names the data file, and
  * `configurationOf()` puts the two together, in the full-configuration
@@ -346,11 +347,13 @@ function versionOf(reference, datafile) {
 }
 
 /**
- * The full configuration (#810) a company is updated with: the data file
- * with the provider's run list, the framework and the Test Data.
+ * The full configuration (#810) a company is updated with: its provider's
+ * part of the data file (#914: no other provider's scenarios) with the
+ * provider's run list, the framework and the Test Data.
  */
 function configurationOf(reference, datafile, { version, at } = {}) {
   const meta = reference[REFERENCE_KEY];
+  const part = providerPartOf(datafile, meta.osdmVersion);
   return {
     [CONFIGURATION_KEY]: {
       format: CONFIGURATION_FORMAT,
@@ -360,7 +363,7 @@ function configurationOf(reference, datafile, { version, at } = {}) {
       exported_at: at || new Date().toISOString(),
       reference: { name: meta.name, version: version || null },
     },
-    datafile: { ...datafile, scenariosToRun: [...reference.scenariosToRun] },
+    datafile: { ...part, scenariosToRun: [...reference.scenariosToRun] },
     framework: reference.framework,
     testResources: reference.testResources,
   };

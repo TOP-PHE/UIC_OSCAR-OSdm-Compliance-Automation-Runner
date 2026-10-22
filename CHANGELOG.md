@@ -62,21 +62,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.375] / [collection-OTST_V2.0.208] — 2026-10-22
+## [server-1.11.376] / [collection-OTST_V2.0.209] — 2026-10-22
 
-Issue #905, fares phase 1c, release 2026.410. Simulator 0.44.0.
+Issue #905, fares phase 1c, release 2026.411. Simulator 0.45.0.
 
-### Simulator 0.44.0
+### Simulator 0.45.0
 - **Fares without a section, on purpose wrong.** A fare request that names no section (none, or an empty list) still gets no fare, except on a trip from station `0000086` (`fares.variants.faresWithoutSection`, in every profile), where the provider prices the whole trip all the same, as one that ignores the missing section would. Chosen by the trip's origin, since that request has no section start to choose by.
 
 ### Added
 - **Negative fare requests.** A scenario can say it expects no fare: `expectFares: false` (Test Config: "Fares expected"). Step 01 then checks that the answer holds none (check N, a FAIL) instead of grading fares, whether fares were asked or not; when the request named its offer parts without `FARE_*`, check O14 says it. The scenario ends after the offer step, or goes on with a product sale when `bookMode` is PRODUCT (#207: a domestic trip sells its product). OSDM gives fares only when they are asked; it says nothing of a domestic trip or of a fare request without a section, so that expectation is the Test Manager's for their provider (#242 D4). The case of a section equal to the whole trip (#244 case 2) waits for OTST (#242 D5).
 - **An empty list of requested sections is sent as it is** when the scenario holds one and asks for fares (#905 N4); a scenario without sections sends none, as before. Test Config never writes an empty list.
-- Simulator data file: `SIM_NHF_FARE_UNASKED_38`, `SIM_NHF_FARE_NO_SECTION_SRCH_38`, `SIM_NHF_FARE_NO_SECTION_SPEC_38`, `SIM_NHF_FARE_EMPTY_SECTIONS_38` (run list) and `SIM_WRONG_FARE_WITHOUT_SECTION_38` (not in it), on trips 24, 1 and the new trip 31.
+- Simulator data file: `SIM_NHF_FARE_UNASKED_38`, `SIM_NHF_FARE_NO_SECTION_SRCH_38`, `SIM_NHF_FARE_NO_SECTION_SPEC_38`, `SIM_NHF_FARE_EMPTY_SECTIONS_38` (run list) and `SIM_WRONG_FARE_WITHOUT_SECTION_38` (not in it), on trips 24, 1 and the new trip 31, with their `_36`, `_37` and `_39` copies (#914, `version-copies.js`).
 
 Checked:
 - `bruno-fares.test.js`: on the simulator's own answers, N1, N2 and N4 pass and the wrong variant fails check N; step 01 ends, or goes on with the product offers only under `bookMode` PRODUCT; a fare request without a section and without `expectFares` is graded as before. Three deliberate breaks of `fares.js` (check N never failing, the empty list never sent, PRODUCT ending anyway) each make a test fail. The simulator's `fares.test.js` and `datafile.test.js`.
 - The real collection standalone on the simulator (gamma, `bru` 4.2.1, through the replay): `SIM_NHF_FARE_UNASKED_38` 71 checks (O14 passes), `SIM_NHF_FARE_NO_SECTION_SPEC_38` 71, `SIM_NHF_FARE_EMPTY_SECTIONS_38` 71 (its request carried `requestedSections: []`), `SIM_NHF_FARE_NO_SECTION_SRCH_38` 235 (check N, then the product sale booked and fulfilled), none failed; `SIM_WRONG_FARE_WITHOUT_SECTION_38` fails check N only. Fourteen earlier scenarios (the ten fare ones, a search sale, a sale by trip id, the offer-parts probe, a return) recorded on `main` and on this change compare equal.
+- After #914, the five scenarios and their `_36`, `_37` and `_39` copies replayed on alpha, beta, gamma and delta (simulator 0.45.0): each copy gives its `_38` twin's count, no failed check outside `SIM_WRONG_FARE_WITHOUT_SECTION_*`, which fails check N only on each version, and no warning.
+
+---
+
+## [server-1.11.375] / [collection-OTST_V2.0.208] — 2026-10-22
+
+Issue #914, release 2026.410. Simulator 0.44.0.
+
+### Simulator 0.44.0
+- **The refund receipt below OSDM 3.8.** A booking document that no fulfilment names (the refund receipt) was dropped when the answer was shaped for 3.6 or 3.7, so `14b. GET Booking Refund Receipt` never saw it on alpha and beta. It is now a `Document` of `Booking.documents` (scope BOOKING), as those versions define it.
+
+### Added
+- **Every version runs every scenario it can express.** Each `_38` scenario of the simulator data file (gamma) now has a `_36` (alpha), `_37` (beta) and `_39` (delta) copy: 130, 141 and 142 copies, the deliberately wrong and fault ones included (they stay out of the run lists). A copy differs from its source in code, `osdmVersion`, description and currencies (gamma's CZK becomes the provider's own, EUR its second one). Left out, by rule: a return in one offer (COMBINED) and `productSelections` on 3.6, a named compartment below 3.8 (`PlaceSelection.compartments` comes with 3.8). `OSDM_Simulator/scripts/version-copies.js` appends missing copies, and `datafile.test.js` fails until a new gamma scenario has them.
+- The reference configurations' run lists: alpha 99 scenarios (5 before), beta 110 (6), delta 111 (6), gamma 111.
+- **A standalone run renews its token** when it names `standalone_token_url` (`renewStandaloneToken()`, `auth.js`), at most once a minute; the replay does. beta's two-minute tokens ran out during the refund-receipt and expiry waits.
+
+### Changed
+- **An update from a reference stores its provider's part of the data file only** (`configurationOf()`): a company following `simulator-delta` holds delta's scenarios and the entries they name, not every provider's.
+
+**After this release, every company following a reference reads "not up to date" once**: one update by a Test Manager (Test Config → Reference configuration) clears it.
+
+Checked:
+- Every copy replayed on its provider with the real collection (`replay.js record after`): no failed check outside the WRONG / FAULT scenarios, which fail as their `_38` twins (amounts aside). The failures found on the way were fixed (receipt, token, currency) or became an exclusion rule.
+- `datafile.test.js` (copies equal `copyOf()` of their source, every possible copy present), `version-shapes.test.js` (receipt in `Booking.documents` on alpha and beta), `bruno-standalone-token.test.js`, `reference-configuration.test.js`, `company-reference.test.js`.
 
 ---
 

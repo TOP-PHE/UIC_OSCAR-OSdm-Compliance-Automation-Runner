@@ -73,7 +73,12 @@ describe.each(R.PROVIDERS)('the reference of %s', (provider) => {
     const read = B.readConfiguration(conf);
     expect(read.refusal).toBeUndefined();
     expect(read.configuration.datafile.scenariosToRun).toEqual(stored.scenariosToRun);
-    expect(read.configuration.datafile.scenarios).toHaveLength(DATAFILE.scenarios.length);
+    // #914: the provider's scenarios only, every one of its version, with what they name.
+    const part = R.providerPartOf(DATAFILE, profile.osdmVersion);
+    expect(read.configuration.datafile.scenarios.map(s => s.code)).toEqual(part.scenarios.map(s => s.code));
+    expect(read.configuration.datafile.scenarios.every(s => s.osdmVersion === profile.osdmVersion)).toBe(true);
+    expect(read.configuration.datafile.tripRequirements).toEqual(part.tripRequirements);
+    for (const code of stored.scenariosToRun) expect(part.scenarios.some(s => s.code === code)).toBe(true);
     expect(conf[B.CONFIGURATION_KEY].reference).toEqual({ name: R.referenceName(provider), version: expect.stringMatching(/^[0-9a-f]{64}$/) });
     expect(DATAFILE.scenariosToRun).not.toBe(read.configuration.datafile.scenariosToRun);
   });
@@ -189,11 +194,13 @@ describe('a version per provider (#912)', () => {
     expect(part.purchaserList[0]).toEqual(DATAFILE.purchaserList[0]);
     const tripIds = new Set(part.scenarios.map(s => s.tripRequirementId));
     expect(part.tripRequirements.map(t => t.id).sort()).toEqual([...tripIds].sort());
-    expect(part.tripRequirements.length).toBeLessThan(DATAFILE.tripRequirements.length);
+    // A trip no scenario of the version names stays out (#914: every trip of gamma's is named by delta's copies too).
+    const df = copy();
+    df.tripRequirements.push({ id: 9999, tripType: 'SEARCH', trip: { origin: 'urn:uic:stn:0000077', destination: 'urn:uic:stn:0000002' } });
+    expect(R.providerPartOf(df, '3.9.0').tripRequirements.some(t => t.id === 9999)).toBe(false);
   });
 
   test('its Test Data are the trains of its own trips', () => {
     expect(ref.testResources).toEqual(R.testResourcesFromDatafile(R.providerPartOf(DATAFILE, '3.9.0')));
-    expect(ref.testResources.length).toBeLessThan(R.testResourcesFromDatafile(DATAFILE).length);
   });
 });
