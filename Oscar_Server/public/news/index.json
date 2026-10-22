@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-fare-offers-search-trip-ids",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "Fare offers by search and by trip id",
+    "summary": "Fares can be asked for a section of a searched trip or of a trip chosen by id, not only of a trip specification.",
+    "content": "The fare section of a scenario now works with every kind of trip: search criteria, a trip specification, or a trip chosen from the provider's trip search and asked by its id. Before the request, OSCAR checks that the section lies inside the trip; a section that does not is reported as a fault of the scenario, not of the provider, and the answer is not checked."
+  },
+  {
     "id": "2026-10-21-fare-offers",
     "date": "October 21, 2026",
     "tag": "New",

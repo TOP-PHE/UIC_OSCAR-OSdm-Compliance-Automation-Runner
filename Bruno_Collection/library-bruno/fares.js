@@ -335,6 +335,82 @@ function fareFieldsOf(scenario) {
   };
 }
 
+// ── The requested sections against the trip (#904) ─────────────────────────
+
+// A PlaceRef as its id text: a StopPlaceRef, or a board/alight point holding one.
+function placeOf(point) {
+  if (typeof point === 'string') return point;
+  if (!isObject(point)) return null;
+  if (typeof point.stopPlaceRef === 'string') return point.stopPlaceRef;
+  if (isObject(point.stopPlaceRef)) return placeOf(point.stopPlaceRef);
+  return typeof point.id === 'string' ? point.id : null;
+}
+
+// The stations of legs, in order: each leg's start, its intermediate stops, its end.
+function stationsOfLegs(legs) {
+  const out = [];
+  for (const leg of list(legs)) {
+    const timed = leg?.timedLeg || leg?.transferLeg || leg?.continuousLeg || leg;
+    for (const point of [timed?.start, ...list(timed?.intermediates), timed?.end]) {
+      const station = placeOf(point);
+      if (station && !(out.length && sameStopPlace(out.at(-1), station))) out.push(station);
+    }
+  }
+  return out;
+}
+
+/**
+ * The stations the trip of an offer request gives, in order, and whether
+ * they are all of the trip's (`complete`): a trip specification and a trip
+ * chosen by id give every leg; search criteria only the origin, the vias and
+ * the destination. null when the request names no trip.
+ */
+function tripStationsOf(request, chosenTripLegs) {
+  if (list(request?.tripIds).length > 0) {
+    const stations = stationsOfLegs(chosenTripLegs);
+    return stations.length ? { stations, complete: true } : null;
+  }
+  if (list(request?.tripSpecifications).length > 0) {
+    const stations = stationsOfLegs(list(request.tripSpecifications).flatMap((t) => list(t?.legs)));
+    return stations.length ? { stations, complete: true } : null;
+  }
+  const criteria = request?.tripSearchCriteria;
+  if (!isObject(criteria)) return null;
+  const stations = [criteria.origin, ...list(criteria.vias).map((v) => v?.viaPlace), criteria.destination].map(placeOf).filter(Boolean);
+  return stations.length ? { stations, complete: false } : null;
+}
+
+const indexIn = (stations, station, from = 0) => stations.findIndex((s, i) => i >= from && sameStopPlace(s, station));
+
+/**
+ * The requested sections that do not lie inside the trip, as sentences ([]
+ * when all do). Against a complete list of stations a section must start at
+ * one of them and end at a later one. Against search criteria, whose other
+ * stops are not known before the answer, only a section between two of the
+ * stations given, in the wrong order, is outside.
+ */
+function sectionsOutsideTrip(request, chosenTripLegs) {
+  const trip = tripStationsOf(request, chosenTripLegs);
+  if (!trip) return [];
+  const shown = trip.stations.join(', ');
+  const out = [];
+  list(request?.requestedSections).forEach((section, i) => {
+    const start = placeOf(section?.startPlace);
+    const end = placeOf(section?.endPlace);
+    if (!start || !end) return;
+    const name = `requestedSections[${i}] ${start} - ${end}`;
+    const at = indexIn(trip.stations, start);
+    const to = at < 0 ? -1 : indexIn(trip.stations, end, at + 1);
+    if (trip.complete) {
+      if (at < 0) out.push(`${name} starts at a station that is not on the trip (${shown})`);
+      else if (to < 0) out.push(`${name} does not end at a station after its start on the trip (${shown})`);
+      return;
+    }
+    if (at >= 0 && to < 0 && indexIn(trip.stations, end) >= 0) out.push(`${name} runs against the direction of the search (${shown})`);
+  });
+  return out;
+}
+
 /** The offers that hold products (or no fares): what the product checks look at. */
 function productOffersOf(response) {
   return list(response?.offers).filter((o) => list(o.fares).length === 0 || list(o.products).length || list(o.admissionOfferParts).length);
@@ -392,7 +468,30 @@ function checkFareOffers(body) {
   return true;
 }
 
+/**
+ * Step 01's before-request (#904): the requested sections that do not lie
+ * inside the trip are kept for the after-response, which fails the scenario
+ * on them before reading the answer: a broken scenario is not the
+ * provider's failure. The trip chosen by id comes from `__chosenTripLegs`.
+ */
+function prepareSectionCheck() {
+  const request = readJson('OfferCollectionRequest') || {};
+  const outside = asksFares(request) ? sectionsOutsideTrip(request, readJson('__chosenTripLegs')) : [];
+  bru.setEnvVar('__fareSectionsOutside', outside.length ? JSON.stringify(outside) : null);
+  for (const line of outside) validationLogger(`[ERROR] [fares] The scenario's own data: ${line}. The answer will not be checked.`);
+}
+
+/** Step 01's after-response, first: true when the scenario stops on its sections. */
+function stopOnSectionsOutside() {
+  const outside = list(readJson('__fareSectionsOutside'));
+  if (outside.length === 0) return false;
+  test('[fares] The requested sections lie inside the trip (the scenario\'s own data, not the provider\'s answer)', () => {
+    throw new Error(outside.join('; '));
+  });
+  return true;
+}
+
 module.exports = {
   CLUSTERS, COMBINATION_MODELS, stopPlaceRefOf, fareFieldsOf, asksFares, typesAsked, fareChecks, unaskedFaresCheck, chooseFareOffer,
-  coverageOfPassenger, productOffersOf, checkFareOffers,
+  coverageOfPassenger, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip, prepareSectionCheck, stopOnSectionsOutside,
 };

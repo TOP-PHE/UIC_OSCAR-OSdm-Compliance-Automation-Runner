@@ -146,6 +146,15 @@ function checkTripsCollection(status, body, request) {
 }
 
 /** The offer request asking for one trip by id instead of searching. */
+/**
+ * The path of the trip search (#904): `trips-collections` from OSDM 3.10,
+ * where `trips-collection` is deprecated (OSDM#1487), else `trips-collection`.
+ */
+function tripsCollectionPath(version) {
+  const [major, minor] = String(version || '').split('.').map(Number);
+  return major > 3 || (major === 3 && minor >= 10) ? 'trips-collections' : 'trips-collection';
+}
+
 function offerRequestByTripIds(request, tripId) {
   const out = { ...request, tripIds: [tripId] };
   delete out.tripSearchCriteria;
@@ -241,6 +250,6 @@ function describeRawAnswer(text, contentType) {
 }
 
 module.exports = {
-  UNKNOWN_TRIP_ID, tripsCollectionRequest, vehicleNumbersOf, chooseTrip, checkTripsCollection, offerRequestByTripIds, checkOffersForTrip,
+  UNKNOWN_TRIP_ID, tripsCollectionRequest, tripsCollectionPath, vehicleNumbersOf, chooseTrip, checkTripsCollection, offerRequestByTripIds, checkOffersForTrip,
   coveredTripsOf, describeTripsAnswer, describeRawAnswer,
 };

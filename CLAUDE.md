@@ -1585,6 +1585,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Config: `buildFareFields()`; the section input is handled before the input
   switch (`inputRequestedSection()`), and `buildSelect` compares as text so a
   boolean stored flag shows.
+  **Search criteria and trip ids** (#904, fares 1b, 1.11.373 / OTST_V2.0.206):
+  the same request member goes with a SEARCH trip and with `offersByTripIds`
+  (`offerRequestByTripIds()` keeps it); `isPartOfInternationalTrip` stays a
+  trip specification's (OSDM up to 3.11; OSDM#1608), so the editor offers it
+  for those only (`fareInternationalField()`). **A section outside the trip
+  is the scenario's fault**: 01's before-request keeps
+  `sectionsOutsideTrip()` (against every station of a specification or of the
+  trip chosen by id, `__chosenTripLegs`; against a search's origin, vias and
+  destination only a reversed section) in `__fareSectionsOutside`, and the
+  after-response fails one check naming the scenario's data before reading the
+  answer. The request still goes out: a step cannot skip itself and route
+  (#652). The trip search path is `tripsCollectionPath()` (`tripIds.js`):
+  `trips-collections` from OSDM 3.10 (OSDM#1487). The wrong fare scenarios
+  ride one-leg trips from their variant stations (trips 25–30), or the check
+  would stop them.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

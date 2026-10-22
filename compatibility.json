@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.407",
+  "current_release": "2026.408",
   "releases": [
+    {
+      "release": "2026.408",
+      "date": "2026-10-22",
+      "server": "1.11.373",
+      "collection": "OTST_V2.0.206",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#904 (fares phase 1b): fare offers asked with search criteria and by trip id, not only on a trip specification; a requested section outside the trip fails the scenario as its own data before the answer is read; the trip search goes to /trips-collections from OSDM 3.10."
+      ]
+    },
     {
       "release": "2026.407",
       "date": "2026-10-21",

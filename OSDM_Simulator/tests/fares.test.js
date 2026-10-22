@@ -134,3 +134,25 @@ test('the wrong variants, chosen by the section start station, each break one ru
   // Each variant answer is still OSDM-shaped.
   for (const start of ['0000080', '0000081', '0000082', '0000083', '0000084']) checkConformance('POST', '/gamma/offers', 200, build(fareRequest({ start })));
 });
+
+// #904: the fares follow the section whichever way the trip is given.
+test('fares by search criteria and by trip id, over HTTP', async (t) => {
+  const { SECRETS, startSimulator, tokenFor, call, offerRequest } = require('./helpers');
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
+  const section = { startPlace: station('0000001'), endPlace: station('0000002') };
+  const asked = { requestedSections: [section], offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } };
+  const bySearch = await call(sim.base, token, 'POST', '/gamma/offers', offerRequest(asked));
+  assert.equal(bySearch.status, 200);
+  assert.equal(fareOffers(bySearch.body).length, 3);
+  for (const offer of fareOffers(bySearch.body)) assert.deepEqual(offer.fares[0].coveredSection, section);
+
+  const { trips } = (await call(sim.base, token, 'POST', '/gamma/trips-collection', offerRequest().tripSearchCriteria)).body;
+  const byId = offerRequest({ ...asked, tripIds: [trips[1].id] });
+  delete byId.tripSearchCriteria;
+  const res = await call(sim.base, token, 'POST', '/gamma/offers', byId);
+  assert.equal(res.status, 200);
+  assert.equal(fareOffers(res.body).length, 3);
+  assert.equal(fareOffers(res.body)[0].fares[0].travelValidityConstraint.validTravelDates.from.slice(0, 10), trips[1].startTime.slice(0, 10));
+});
