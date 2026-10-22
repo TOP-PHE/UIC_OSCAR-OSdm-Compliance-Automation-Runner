@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.379] / [collection-OTST_V2.0.212] — 2026-10-22
+
+Issue #907, fares phase 3, release 2026.414. Simulator 0.47.0.
+
+### Simulator 0.47.0
+- **A booked fare is refunded.** Its fee is the one of its REFUND condition valid at the time (none valid: nothing back), and the fare and its fulfilment are REFUNDED once the refund offer is confirmed. For fares combined by CLUSTERING whose fee is the provider's (`isProviderFee`), a fee the client states in `RefundSpecification.refundFee` is the fee taken (osdm.io, constructing products from fares, "Handling After Sales"); a stated fee in another currency, negative or not in cents is refused with 400.
+- **COMBINING fares.** A section starting at station `0000087` (`fares.variants.combiningFares`, in every profile) gets fares combined by COMBINING, whose refund fee is the fare's own and depends on the date: a tenth of the price until noon (UTC) the day before travel, half of it after. Not a wrong variant.
+- Two wrong variants, named by a passenger's last name: `fare-wrong-combining-fee` (the fee of the fare's other window) and `fare-ignores-refund-fee` (the stated fee ignored).
+
+### Added
+- **The refund of a fare.** A fare scenario of type REFUND goes on from 07 to the refund steps and refunds the fare fulfilments in full. The refund steps keep their own checks; `library-bruno/fareRefund.js` adds, at 10: R1 the refund offers cover every fare fulfilment asked; R2 each gives back and keeps what its fares cost (refundableAmount + refundFee); R3 for COMBINING fares, the fee is the one their after-sales conditions give at the time of the refund offer (WARNING; osdm.io: the distributor "must obey" it); R4 for CLUSTERING fares whose fee is the provider's, the fee OSCAR states is the refund offer's fee. At 14, R5: the fares of the refunded fulfilments are REFUNDED with them, every other fulfilment unchanged (`checkRefundScopeOnBooking()` reads fares among the booking parts). Steps 12, 14 and 16 check a booking of fares with the fare checks instead of the product ones.
+- **New scenario field `fareRefundFee`** (Test Config: "Fare refund fee (cents)", shown on REFUND scenarios): the fee for the refund of a CLUSTERING fare, in cents of the offer's currency. It is sent as `RefundSpecification.refundFee`, which exists from OSDM 3.8, as one specification per fare fulfilment holding its `fulfillmentId` and the fee. That request form is provisional (#242 D6, open with OTST). A set fee is not sent for COMBINING fares, for a fare that gives the fee to the distributor (`isProviderFee: false`), for mixed models, or below OSDM 3.8; a WARNING says why.
+- Simulator data file: `SIM_FARE_REFUND_1ADT_38`, `SIM_FARE_REFUND_FEE_1ADT_38`, `SIM_FARE_REFUND_COMBINING_1ADT_38` (run list), `SIM_WRONG_FARE_COMBINING_FEE_38`, `SIM_WRONG_FARE_IGNORES_REFUND_FEE_38` (not in it), trip 32, passenger lists 32 and 33, and their copies. A scenario that states a fee has no 3.6 or 3.7 copy (`version-copies-lib.js`). References regenerated.
+
+Not covered: a partial refund of fares (a partial flag on a fare REFUND scenario is warned and the refund is full), the exchange of fares (a fare EXCHANGE scenario ends at 07 with a WARNING), the VAT split the provider adds to a stated fee.
+
+Checked:
+- `bruno-fare-refund.test.js` (23): the simulator's CLUSTERING, stated-fee and COMBINING refunds pass; each wrong variant breaks exactly its rule; R5 through the real scope check; hand-made answers for R1–R4; the step glue, the wiring of 10, 12, 14 and 16, the reset lists and the Test Config field. Five deliberate breaks each make a test fail. The simulator suite (304), the full server suite (the one failure is the Windows-only `mcp-end-to-end.test.js`, as on `main`), both lints.
+- The real collection standalone on the simulator (`bru` 4.2.1, through the replay): the five new scenarios and their copies, 16 runs on alpha, beta, gamma and delta. The three refunds pass with no failed check and no warning (`SIM_FARE_REFUND_1ADT_*` 180 checks, `_FEE_` 181, `_COMBINING_` 179); `SIM_WRONG_FARE_IGNORES_REFUND_FEE_*` fails check R4 only; `SIM_WRONG_FARE_COMBINING_FEE_*` gives one R3 warning and fails nothing. The refund request carrying `refundFee` passes OSCAR's own OSDM 3.8 and 3.9 request check. 93 earlier runs recorded on `main` and on this change compare equal: the 17 fare scenarios on the four versions (68 runs) and 25 product refund scenarios on gamma.
+
+---
+
 ## [server-1.11.378] / [collection-OTST_V2.0.211] — 2026-10-22
 
 Issue #920, step 1, release 2026.413.

@@ -343,3 +343,35 @@ describe('the wiring', () => {
     }
   });
 });
+
+describe('the Test Config field (#907)', () => {
+  const vm = require('node:vm');
+  const source = fs.readFileSync(path.join(ROOT, 'Oscar_Server/public/js/scenarios.js'), 'utf8');
+  function loadFunction(name, context) {
+    const lines = source.split('\n');
+    const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
+    const end = lines.findIndex((l, i) => i > start && l === '}');
+    return vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n')})`, context);
+  }
+  const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  test('drawn on a REFUND scenario only, with the fee stored', () => {
+    const state = { scenarios: [{ scenarioType: 'REFUND', fareRefundFee: 250 }, { scenarioType: 'SALE' }, { scenarioType: 'REFUND' }] };
+    const field = loadFunction('fareRefundFeeField', { state, esc, String });
+    expect(field(0)).toContain('data-action="set-scenario-fare-refund-fee" data-idx="0"');
+    expect(field(0)).toContain('value="250"');
+    expect(field(0)).toContain('Fare refund fee (cents)');
+    expect(field(1)).toBe('');
+    expect(field(2)).toContain('value=""');
+    expect(source).toContain('${fareRefundFeeField(idx)}');
+  });
+
+  test('typing keeps a whole number of cents, clears on empty, ignores the rest', () => {
+    const set = [];
+    const input = loadFunction('inputFareRefundFee', { setScenarioField: (...a) => set.push(a), Number });
+    const el = (value) => ({ value, dataset: { idx: '3' } });
+    expect(input('set-scenario-section', el('1'))).toBe(false);
+    for (const v of ['250', ' 0 ', '', '2.5', '-1', 'abc', '10000001']) expect(input('set-scenario-fare-refund-fee', el(v))).toBe(true);
+    expect(set).toEqual([[3, 'fareRefundFee', 250], [3, 'fareRefundFee', 0], [3, 'fareRefundFee', null]]);
+  });
+});
