@@ -187,7 +187,8 @@
       "widerClusters": "urn:uic:stn:0000082",
       "sectionGap": "urn:uic:stn:0000083",
       "overlappingFares": "urn:uic:stn:0000084",
-      "unrequestedFares": "urn:uic:stn:0000085"
+      "unrequestedFares": "urn:uic:stn:0000085",
+      "faresWithoutSection": "urn:uic:stn:0000086"
     }
   }
 }

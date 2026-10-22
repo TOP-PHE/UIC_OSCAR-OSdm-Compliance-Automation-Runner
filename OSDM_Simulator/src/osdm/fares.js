@@ -18,12 +18,15 @@
  * conditions, the TCOs involved and the section covered. A passenger younger
  * than `freeUnderAge` on the day of travel travels free: a fare priced 0.
  *
- * Without `FARE_*` in the request, or without a section, there is no fare.
+ * Without `FARE_*` in the request, or without a section (none, or an empty
+ * list), there is no fare.
  *
  * The wrong answers, for the negative checks of the collection, are chosen by
  * the section's start station (offers are anonymous, so a passenger's last
  * name cannot choose them as at booking): `fares.variants` maps a variant to
- * its station.
+ * its station. One variant is asked without a section (#905): a trip from
+ * the `faresWithoutSection` station gets fares for the whole trip all the
+ * same, as a provider that ignores the missing section would give.
  */
 
 const crypto = require('node:crypto');
@@ -108,6 +111,18 @@ function variantOf(section, rules) {
   return entry ? entry[0] : null;
 }
 
+// #905: the whole trip as the section, for a request that names none, when
+// the trip leaves from the `faresWithoutSection` station. null otherwise.
+function wholeTripWithoutSection(trips, rules) {
+  const station = rules.variants?.faresWithoutSection;
+  const first = trips[0];
+  if (!station || first?.origin?.stopPlaceRef !== station || !first.destination?.stopPlaceRef) return null;
+  return {
+    startPlace: { objectType: 'StopPlaceRef', stopPlaceRef: first.origin.stopPlaceRef },
+    endPlace: { objectType: 'StopPlaceRef', stopPlaceRef: first.destination.stopPlaceRef },
+  };
+}
+
 // One fare of one passenger for [from, to] of the section.
 function fareOf({ passenger, from, to, cluster, clusters, day, priceCents, provider }) {
   const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
@@ -170,15 +185,17 @@ function applyClusterVariant(fare, variant) {
 /**
  * The fare offers of a request: [] unless the provider sells fares, the
  * request asks for them and names a section (or the section starts at the
- * "unrequested fares" variant station).
+ * "unrequested fares" variant station, or the trip leaves from the "fares
+ * without section" one).
  */
 function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, lifetimeMs }) {
   checkInternationalFlags(body);
   const rules = provider.fares;
   const sections = sectionsOf(body);
-  if (!rules || sections.length === 0 || trips.length === 0) return [];
-  const section = sections[0];
-  const variant = variantOf(section, rules);
+  if (!rules || trips.length === 0) return [];
+  const section = sections[0] || wholeTripWithoutSection(trips, rules);
+  if (!section) return [];
+  const variant = sections.length ? variantOf(section, rules) : null;
   if (!asksFares(criteria) && variant !== 'unrequestedFares') return [];
   const day = trips[0].startTime.slice(0, 10);
   const seed = hashOf(`${section.startPlace.stopPlaceRef}|${section.endPlace.stopPlaceRef}`);

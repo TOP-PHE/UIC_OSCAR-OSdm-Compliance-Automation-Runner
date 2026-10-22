@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.374] / [collection-OTST_V2.0.207] — 2026-10-22
+
+Issue #905, fares phase 1c, release 2026.409. Simulator 0.44.0.
+
+### Simulator 0.44.0
+- **Fares without a section, on purpose wrong.** A fare request that names no section (none, or an empty list) still gets no fare, except on a trip from station `0000086` (`fares.variants.faresWithoutSection`, in every profile), where the provider prices the whole trip all the same, as one that ignores the missing section would. Chosen by the trip's origin, since that request has no section start to choose by.
+
+### Added
+- **Negative fare requests.** A scenario can say it expects no fare: `expectFares: false` (Test Config: "Fares expected"). Step 01 then checks that the answer holds none (check N, a FAIL) instead of grading fares, whether fares were asked or not; when the request named its offer parts without `FARE_*`, check O14 says it. The scenario ends after the offer step, or goes on with a product sale when `bookMode` is PRODUCT (#207: a domestic trip sells its product). OSDM gives fares only when they are asked; it says nothing of a domestic trip or of a fare request without a section, so that expectation is the Test Manager's for their provider (#242 D4). The case of a section equal to the whole trip (#244 case 2) waits for OTST (#242 D5).
+- **An empty list of requested sections is sent as it is** when the scenario holds one and asks for fares (#905 N4); a scenario without sections sends none, as before. Test Config never writes an empty list.
+- Simulator data file: `SIM_NHF_FARE_UNASKED_38`, `SIM_NHF_FARE_NO_SECTION_SRCH_38`, `SIM_NHF_FARE_NO_SECTION_SPEC_38`, `SIM_NHF_FARE_EMPTY_SECTIONS_38` (run list) and `SIM_WRONG_FARE_WITHOUT_SECTION_38` (not in it), on trips 24, 1 and the new trip 31.
+
+Checked:
+- `bruno-fares.test.js`: on the simulator's own answers, N1, N2 and N4 pass and the wrong variant fails check N; step 01 ends, or goes on with the product offers only under `bookMode` PRODUCT; a fare request without a section and without `expectFares` is graded as before. Three deliberate breaks of `fares.js` (check N never failing, the empty list never sent, PRODUCT ending anyway) each make a test fail. The simulator's `fares.test.js` and `datafile.test.js`.
+- The real collection standalone on the simulator (gamma), the five new scenarios and the earlier fare scenarios: see the PR.
+
+---
+
 ## [server-1.11.373] / [collection-OTST_V2.0.206] — 2026-10-22
 
 Issue #904, fares phase 1b, release 2026.408.

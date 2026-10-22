@@ -135,6 +135,33 @@ test('the wrong variants, chosen by the section start station, each break one ru
   for (const start of ['0000080', '0000081', '0000082', '0000083', '0000084']) checkConformance('POST', '/gamma/offers', 200, build(fareRequest({ start })));
 });
 
+// #905: a request naming no section gets no fare, except on a trip from the
+// `faresWithoutSection` station, where gamma prices the whole trip all the same.
+test('without a section, fares only on a trip from the faresWithoutSection station, for the whole trip', () => {
+  const fromVariant = ({ sections, parts } = {}) => {
+    const req = fareRequest({ sections, parts });
+    req.tripSpecifications[0].legs[0].timedLeg.start.stopPlaceRef = station('0000086');
+    if (sections === undefined) delete req.requestedSections;
+    return req;
+  };
+  for (const req of [fromVariant(), fromVariant({ sections: [] })]) {
+    const offers = fareOffers(build(req));
+    assert.equal(offers.length, 3);
+    for (const offer of offers) {
+      assert.deepEqual(offer.fares.map((f) => [f.coveredSection.startPlace.stopPlaceRef, f.coveredSection.endPlace.stopPlaceRef]),
+        [['urn:uic:stn:0000086', 'urn:uic:stn:0000002']]);
+    }
+    checkConformance('POST', '/gamma/offers', 200, build(req));
+  }
+  // Not asked, no fare; and from any other station, no section gives none.
+  assert.equal(fareOffers(build(fromVariant({ parts: ['ADMISSION'] }))).length, 0);
+  const elsewhere = fareRequest();
+  delete elsewhere.requestedSections;
+  assert.equal(fareOffers(build(elsewhere)).length, 0);
+  // A section from that station is priced as asked, as any other.
+  assert.equal(fareOffers(build(fromVariant({ sections: [{ startPlace: station('0000086'), endPlace: station('0000002') }] }))).length, 3);
+});
+
 // #904: the fares follow the section whichever way the trip is given.
 test('fares by search criteria and by trip id, over HTTP', async (t) => {
   const { SECRETS, startSimulator, tokenFor, call, offerRequest } = require('./helpers');

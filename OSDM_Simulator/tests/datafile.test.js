@@ -239,6 +239,8 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_FARE_SECTION_GAP_38: [],
     SIM_WRONG_FARE_OVERLAP_38: [],
     SIM_WRONG_FARE_UNREQUESTED_38: [],
+    // #905: chosen by its trip's origin, the request naming no section.
+    SIM_WRONG_FARE_WITHOUT_SECTION_38: [],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -599,40 +601,60 @@ test('the fault scenarios: one per fault of the catalogue, out of the run list (
   }
 });
 
-test('the fare scenarios: a section inside the trip; each wrong one starts its section at the station of its variant (#903, #904)', () => {
+test('the fare scenarios: a section inside the trip; each wrong one starts its section, or its trip, at the station of its variant (#903, #904, #905)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const v = gamma.fares.variants;
   const fareScenarios = datafile.scenarios.filter((s) => s.code.includes('_FARE_'));
   const startOf = (s) => s.requestedSections?.[0]?.startPlace;
+  const tripOf = (s) => datafile.tripRequirements.find((t) => t.id === s.tripRequirementId);
+  // Per scenario: the section's start, the trip's type, isPartOfInternationalTrip,
+  // whether FARE_ADMISSION is asked, and expectFares. By search criteria and by
+  // trip id (#904) the trip is a SEARCH, which carries no international flag.
+  // The negative requests (#905) expect no fare: N1 asks for ADMISSION only, N2
+  // names no section (by search, going on to a product sale, #207; on a
+  // specification sent as domestic), N4 sends an empty list.
   const expected = {
-    SIM_FARE_SPEC_1ADT_38: 'urn:uic:stn:0000004',
-    SIM_FARE_SPEC_FREE_CHILD_38: 'urn:uic:stn:0000004',
-    SIM_FARE_SRCH_1ADT_38: 'urn:uic:stn:0000001',
-    SIM_FARE_TRIPIDS_1ADT_38: 'urn:uic:stn:0000001',
-    SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38: gamma.fares.variants.passengerWithoutFare,
-    SIM_WRONG_FARE_UNKNOWN_CLUSTER_38: gamma.fares.variants.unknownCluster,
-    SIM_WRONG_FARE_WIDER_CLUSTERS_38: gamma.fares.variants.widerClusters,
-    SIM_WRONG_FARE_SECTION_GAP_38: gamma.fares.variants.sectionGap,
-    SIM_WRONG_FARE_OVERLAP_38: gamma.fares.variants.overlappingFares,
-    SIM_WRONG_FARE_UNREQUESTED_38: gamma.fares.variants.unrequestedFares,
+    SIM_FARE_SPEC_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_SPEC_FREE_CHILD_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_SRCH_1ADT_38: ['urn:uic:stn:0000001', 'SEARCH', undefined, true, undefined],
+    SIM_FARE_TRIPIDS_1ADT_38: ['urn:uic:stn:0000001', 'SEARCH', undefined, true, undefined],
+    SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38: [v.passengerWithoutFare, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_UNKNOWN_CLUSTER_38: [v.unknownCluster, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_WIDER_CLUSTERS_38: [v.widerClusters, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_SECTION_GAP_38: [v.sectionGap, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_OVERLAP_38: [v.overlappingFares, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_UNREQUESTED_38: [v.unrequestedFares, 'SPECIFICATION', true, false, undefined],
+    SIM_NHF_FARE_UNASKED_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, false, false],
+    SIM_NHF_FARE_NO_SECTION_SRCH_38: [undefined, 'SEARCH', undefined, true, false],
+    SIM_NHF_FARE_NO_SECTION_SPEC_38: [undefined, 'SPECIFICATION', false, true, false],
+    SIM_NHF_FARE_EMPTY_SECTIONS_38: [undefined, 'SPECIFICATION', true, true, false],
+    SIM_WRONG_FARE_WITHOUT_SECTION_38: [undefined, 'SPECIFICATION', false, true, false],
   };
-  assert.deepEqual(Object.fromEntries(fareScenarios.map((s) => [s.code, startOf(s)])), expected);
+  const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
+    startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
+  ]]));
+  assert.deepEqual(found, expected);
   for (const s of fareScenarios) {
-    const trip = datafile.tripRequirements.find((t) => t.id === s.tripRequirementId);
-    // #904: by search criteria and by trip id (a SEARCH trip, which carries no
-    // isPartOfInternationalTrip), the others on a trip specification.
-    const bySearch = ['SIM_FARE_SRCH_1ADT_38', 'SIM_FARE_TRIPIDS_1ADT_38'].includes(s.code);
-    assert.equal(trip.tripType, bySearch ? 'SEARCH' : 'SPECIFICATION', s.code);
     assert.equal(s.offersByTripIds === 'on', s.code === 'SIM_FARE_TRIPIDS_1ADT_38', s.code);
-    assert.equal(s.isPartOfInternationalTrip, bySearch ? undefined : true, s.code);
-    // The section lies inside the trip: its start is a station of it.
+    if (!startOf(s)) continue;
+    // The section lies inside the trip: its start and end are stations of it.
+    const trip = tripOf(s);
     const stations = trip.tripType === 'SEARCH' ? [trip.trip.origin, trip.trip.destination] : trip.legs.flatMap((l) => [l.origin, l.destination]);
     assert.ok(stations.includes(startOf(s)) && stations.includes(s.requestedSections[0].endPlace), s.code);
-    const fares = s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION');
-    assert.equal(fares, s.code !== 'SIM_WRONG_FARE_UNREQUESTED_38', s.code);
   }
+  // #905: the empty list is N4's only, a product booked N2's by search only,
+  // and no scenario but a fare one says what fares it expects.
+  const emptyLists = datafile.scenarios.filter((s) => Array.isArray(s.requestedSections) && s.requestedSections.length === 0);
+  assert.deepEqual(emptyLists.map((s) => s.code), ['SIM_NHF_FARE_EMPTY_SECTIONS_38']);
+  assert.deepEqual(datafile.scenarios.filter((s) => s.bookMode === 'PRODUCT').map((s) => s.code), ['SIM_NHF_FARE_NO_SECTION_SRCH_38']);
+  for (const s of datafile.scenarios.filter((x) => !x.code.includes('_FARE_'))) assert.equal(s.expectFares, undefined, s.code);
   // No other scenario starts a section at a variant station.
-  const variantStations = new Set(Object.values(gamma.fares.variants));
+  const variantStations = new Set(Object.values(v));
   for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_'))) {
     assert.ok(!variantStations.has(startOf(s)), s.code);
   }
+  // #905: the trip from the "fares without section" station is the wrong scenario's only.
+  const originOf = (t) => (t.trip ? t.trip.origin : t.legs?.[0]?.origin);
+  const fromVariant = datafile.tripRequirements.filter((t) => originOf(t) === v.faresWithoutSection).map((t) => t.id);
+  assert.deepEqual(datafile.scenarios.filter((s) => fromVariant.includes(s.tripRequirementId)).map((s) => s.code), ['SIM_WRONG_FARE_WITHOUT_SECTION_38']);
 });

@@ -357,6 +357,16 @@ Fare offers for a requested section (fares phase 1a). The trip is trip 24, a spe
 | `SIM_WRONG_FARE_OVERLAP_38` | Section from station 0000084. Deliberately wrong. | Two fares per passenger, the second over the start of the section again. | A WARNING of check O8 (overlap) at 01; no failed check. |
 | `SIM_WRONG_FARE_UNREQUESTED_38` | `ADMISSION` asked, section from station 0000085. Deliberately wrong. | Fare offers added to the product offers. | Check O14 fails at 01; the sale goes on with the product offers. |
 
+**Negative fare requests (#905).** Each of these sets `expectFares: false`: the answer must hold no fare. OSDM gives fares only when the offer part type list asks for them (N1); what a provider answers to a fare request without a section, on a domestic trip, is the Test Manager's expectation, not an OSDM rule (#242 D4). A scenario that expects no fare ends after the offer step, unless it books a product (`bookMode` PRODUCT). The case of a section equal to the whole trip (#244 case 2) waits for OTST's answer (#242 D5).
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_NHF_FARE_UNASKED_38` | N1: trip 24 with the section from 0000004, `ADMISSION` asked only. | Product offers only. | Check O14 passes; no failed check; the scenario ends at 01. |
+| `SIM_NHF_FARE_NO_SECTION_SRCH_38` | N2 and #207: a domestic search from 0000001 to 0000002, `ADMISSION` and `FARE_ADMISSION` asked, no section; `bookMode` PRODUCT. | Product offers only. | Check N passes; the sale goes on with a product offer, booked and fulfilled; no failed check. |
+| `SIM_NHF_FARE_NO_SECTION_SPEC_38` | N2: trip 24 sent as domestic (`isPartOfInternationalTrip: false`), `FARE_ADMISSION` asked, no section. | Product offers, and `FARE_ADMISSION` alone reported as ignored (`PARAMETER_NOT_SUPPORTED`). | Check N passes; no failed check; the scenario ends at 01. |
+| `SIM_NHF_FARE_EMPTY_SECTIONS_38` | N4: trip 24, `FARE_ADMISSION` asked, `requestedSections` sent as an empty list. | As above: an empty list names no section. | Check N passes; no failed check; the scenario ends at 01. |
+| `SIM_WRONG_FARE_WITHOUT_SECTION_38` | `FARE_ADMISSION` asked without a section on trip 31, from station 0000086 (`fares.variants.faresWithoutSection`). Deliberately wrong. | Fare offers for the whole trip all the same. | Check N fails at 01; the scenario ends there. |
+
 ### Deliberately wrong answers (#611)
 
 Each of these makes one validator family fail on purpose, so that its FAIL path runs. They are not in the data file's run list. The offer one uses the trip from station `0000098` (`variants.wrongOffersFrom`); the others a passenger list naming the variant.

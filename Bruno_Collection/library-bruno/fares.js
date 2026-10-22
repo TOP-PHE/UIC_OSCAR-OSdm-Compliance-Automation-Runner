@@ -30,8 +30,15 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   O14 fares that were not asked                             FAIL
  *   O15 products and fares counted                            INFO
  *
+ * A negative scenario (#905) sets `expectFares: false`: the answer must hold
+ * no fare (N, FAIL), whether fares were asked or not; O1 to O13 are then not
+ * checked. OSDM says nothing of a domestic trip or of a request without a
+ * section: the expectation is the Test Manager's for their provider (#242 D4).
+ *
+ *   N   no fare, as the scenario expects                      FAIL
+ *
  * Booking a fare is phase 2 (#906): until then a fare scenario ends after
- * step 01. Sources and levels are in #903 and #242.
+ * step 01. Sources and levels are in #903, #905 and #242.
  *
  * The pure part has no Bruno globals; the glue at the bottom has.
  */
@@ -291,6 +298,21 @@ function unaskedFaresCheck(response, request) {
 }
 
 /**
+ * The checks of a scenario that expects no fare (#905). When the request
+ * named its offer parts without FARE_* or ALL, O14 says it already; otherwise
+ * (fares asked, or no offer part named) check N does. O15 counts the offers.
+ */
+function noFareChecks(response, request) {
+  const unasked = unaskedFaresCheck(response, request);
+  const fares = faresOf(response).length;
+  const offers = fareOffersOf(response).length;
+  const none = unasked || check('N', 'FAIL', 'No fare in the answer, as the scenario expects (expectFares: false)',
+    fares ? [`${fares} fare(s) in ${offers} offer(s)`] : [],
+    'fares though the scenario expects none (the Test Manager\'s expectation for this provider, #242 D4)');
+  return [none, countCheck(response)];
+}
+
+/**
  * The fare offer a scenario books: the first holding fares, of the cluster
  * asked when one is. null when none fits.
  */
@@ -311,28 +333,49 @@ function stopPlaceRefOf(value) {
   return null;
 }
 
+// A yes/no field of the data file: true, false, or null when not given.
+function flagOf(value) {
+  const text = String(value);
+  if (text === 'true') return true;
+  if (text === 'false') return false;
+  return null;
+}
+
 /**
- * The fare fields of a scenario (#903): the requested sections as OSDM
+ * The fare fields of a scenario (#903, #905): the requested sections as OSDM
  * Sections, the international flag (true, false or null), the cluster to
- * book and the booking mode (null when not named). Sections that name no
- * usable station on both ends are left out.
+ * book, the booking mode (null when not named) and whether fares are
+ * expected (false for a negative scenario, else null). Sections that name no
+ * usable station on both ends are left out. `emptySectionList` is true when
+ * the scenario holds an empty list, which a fare request then sends as it is
+ * (#905 N4).
  */
 function fareFieldsOf(scenario) {
-  const requestedSections = list(scenario?.requestedSections)
+  const raw = scenario?.requestedSections;
+  const requestedSections = list(raw)
     .map((s) => ({ startPlace: stopPlaceRefOf(s?.startPlace), endPlace: stopPlaceRefOf(s?.endPlace) }))
     .filter((s) => s.startPlace && s.endPlace);
-  const flag = String(scenario?.isPartOfInternationalTrip);
-  let international = null;
-  if (flag === 'true') international = true;
-  else if (flag === 'false') international = false;
   const cluster = String(scenario?.desiredFareCluster || '').toUpperCase();
   const mode = String(scenario?.bookMode || '').toUpperCase();
   return {
     requestedSections,
-    isPartOfInternationalTrip: international,
+    emptySectionList: Array.isArray(raw) && raw.length === 0,
+    isPartOfInternationalTrip: flagOf(scenario?.isPartOfInternationalTrip),
     desiredFareCluster: CLUSTERS.includes(cluster) ? cluster : null,
     bookMode: BOOK_MODES.has(mode) ? mode : null,
+    expectFares: flagOf(scenario?.expectFares) === false ? false : null,
   };
+}
+
+/**
+ * The requested sections an offer request carries: the scenario's sections;
+ * an empty list only when the scenario holds one and the request asks for
+ * fares (#905 N4); else none (undefined).
+ */
+function sectionsToSend(requestedSections, offerSearchCriteria) {
+  if (!Array.isArray(requestedSections)) return undefined;
+  if (requestedSections.length > 0) return requestedSections;
+  return asksFares({ offerSearchCriteria }) ? [] : undefined;
 }
 
 // ── The requested sections against the trip (#904) ─────────────────────────
@@ -435,12 +478,34 @@ function record(c) {
 }
 
 /**
- * Step 01, after a 200. A request that asks for fares has its fares checked
- * and ends here (booking a fare is #906): true. Otherwise only O14 is
- * checked, and the answer goes on without its fare-only offers: false.
+ * Step 01, after a 200, for a scenario that expects no fare (#905): check N
+ * (or O14) and the count. The answer goes on without its fare-only offers.
+ * The scenario ends here (true) unless it books a product (bookMode
+ * PRODUCT), whose sale then goes on (false).
+ */
+function checkNoFares(body, request) {
+  if (asksFares(request) && list(request.requestedSections).length === 0) {
+    validationLogger('[INFO] [fares] No requested section, on purpose: the scenario expects no fare (#905).');
+  }
+  for (const c of noFareChecks(body, request)) record(c);
+  if (fareOffersOf(body).length > 0 && Array.isArray(body?.offers)) body.offers = productOffersOf(body);
+  if (bru.getEnvVar('bookMode') === 'PRODUCT') {
+    validationLogger('[INFO] [fares] The scenario expects no fare and books a product: the sale goes on with the product offers.');
+    return false;
+  }
+  validationLogger('[INFO] [fares] The scenario expects no fare: it ends after the offer step.');
+  return true;
+}
+
+/**
+ * Step 01, after a 200. A scenario that expects no fare is checkNoFares().
+ * A request that asks for fares has its fares checked and ends here (booking
+ * a fare is #906): true. Otherwise only O14 is checked, and the answer goes
+ * on without its fare-only offers: false.
  */
 function checkFareOffers(body) {
   const request = readJson('OfferCollectionRequest') || {};
+  if (String(bru.getEnvVar('expectFares')) === 'false') return checkNoFares(body, request);
   if (!asksFares(request)) {
     const unasked = unaskedFaresCheck(body, request);
     if (unasked) record(unasked);
@@ -492,6 +557,7 @@ function stopOnSectionsOutside() {
 }
 
 module.exports = {
-  CLUSTERS, COMBINATION_MODELS, stopPlaceRefOf, fareFieldsOf, asksFares, typesAsked, fareChecks, unaskedFaresCheck, chooseFareOffer,
-  coverageOfPassenger, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip, prepareSectionCheck, stopOnSectionsOutside,
+  CLUSTERS, COMBINATION_MODELS, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, typesAsked, fareChecks, unaskedFaresCheck,
+  noFareChecks, chooseFareOffer, coverageOfPassenger, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip,
+  prepareSectionCheck, stopOnSectionsOutside,
 };
