@@ -148,6 +148,9 @@ describe('the framework from the checklist', () => {
     expect(() => R.buildReference({ provider: 'alpha', profile: { osdmVersion: '3.8.0' }, answers: { 'fw.osdmVersion=3.6': true }, datafile: DATAFILE }))
       .toThrow(/3\.6.*3\.8\.0/);
     expect(() => R.buildReference({ provider: 'delta', profile: {}, answers: {}, datafile: DATAFILE })).toThrow(/delta/);
+    // #920: 3.1 is not 3.10, though "3.10.0" starts with "3.1".
+    expect(() => R.buildReference({ provider: 'epsilon', profile: { osdmVersion: '3.10.0' }, answers: { 'fw.osdmVersion=3.1': true }, datafile: DATAFILE }))
+      .toThrow(/3\.1.*3\.10\.0/);
   });
 });
 

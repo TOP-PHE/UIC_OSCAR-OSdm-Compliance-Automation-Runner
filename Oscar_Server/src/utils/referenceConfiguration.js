@@ -41,7 +41,7 @@ const { CONFIGURATION_KEY, CONFIGURATION_FORMAT } = require('./configurationBund
 
 const REFERENCE_KEY = '__oscarReference';
 const REFERENCE_FORMAT = 1;
-const PROVIDERS = Object.freeze(['alpha', 'beta', 'gamma', 'delta']);
+const PROVIDERS = Object.freeze(['alpha', 'beta', 'gamma', 'delta', 'epsilon']);
 const DATAFILE_NAME = 'simulator_datafile.json';
 const referenceName = provider => `simulator-${provider}`;
 
@@ -316,7 +316,10 @@ function buildReference({ provider, profile, answers, datafile }) {
   if (!PROVIDERS.includes(provider)) throw new Error(`Unknown simulated provider ${provider}.`);
   const framework = frameworkFromChecklist(answers);
   const osdmVersion = String(profile?.osdmVersion || '');
-  if (!osdmVersion.startsWith(String(framework.osdmVersion))) {
+  // "3.10" names 3.10.0, never 3.1.x (#920): the declared version is the
+  // profile's or its major.minor followed by a dot.
+  const declared = String(framework.osdmVersion);
+  if (osdmVersion !== declared && !osdmVersion.startsWith(`${declared}.`)) {
     throw new Error(`${provider}: the checklist declares OSDM ${framework.osdmVersion}, the simulator's profile ${osdmVersion}.`);
   }
   framework.osdmVersion = osdmVersion;

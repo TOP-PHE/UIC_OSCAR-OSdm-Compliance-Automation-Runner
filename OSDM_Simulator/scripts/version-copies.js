@@ -9,7 +9,7 @@
 
 /**
  * version-copies.js — appends to the simulator's data file the `_36`, `_37`
- * and `_39` copies of its `_38` scenarios that are missing (#914):
+ * `_39` and `_310` copies of its `_38` scenarios that are missing (#914, #920):
  *
  *   node scripts/version-copies.js
  *

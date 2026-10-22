@@ -1500,6 +1500,7 @@ this section is how a Test Manager uses it.
 | `beta` | 3.7.0 | `https://<simulator-host>/beta` |
 | `gamma` | 3.8.0 | `https://<simulator-host>/gamma` |
 | `delta` | 3.9.0 | `https://<simulator-host>/delta` |
+| `epsilon` | 3.10.0, in development (follows the OSDM branch `patches-osdm-v3.10`) | `https://<simulator-host>/epsilon` |
 
 All of them offer the same functions; each answers in the shapes of its own
 OSDM version. Ask your OSCAR administrator for the simulator's address and
@@ -1517,7 +1518,8 @@ Data.
    `https://<simulator-host>/<provider>/oauth/token`, their client id and
    secret, scope empty.
 2. **Test Config → 🔗 Reference configuration** (since 1.11.335): choose
-   `simulator-alpha`, `simulator-beta`, `simulator-gamma` or `simulator-delta`, then
+   `simulator-alpha`, `simulator-beta`, `simulator-gamma`, `simulator-delta` or
+   `simulator-epsilon`, then
    **Update from the reference**. OSCAR fills in the scenarios, the Test
    Framework, the Test Data and the run list of that provider. The endpoint
    and the credentials are not touched; the replaced data file can be got
