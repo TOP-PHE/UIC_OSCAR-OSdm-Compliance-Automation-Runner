@@ -179,7 +179,11 @@ function checkOffersForTrip(body, tripId) {
   const offers = listOf(body?.offers);
   const other = offers.map((o) => ({ id: o?.offerId, trips: coveredTripsOf(o) }))
     .filter((o) => o.trips.some((t) => t !== tripId));
-  const unknown = offers.filter((o) => coveredTripsOf(o).length === 0).length;
+  // #906: an offer of fares only names no trip (OSDM TripCoverage: "not used
+  // for fares"); the fares say what they cover. It is not counted here.
+  const fareOnly = (o) => listOf(o?.fares).length > 0
+    && ['admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts'].every((k) => listOf(o?.[k]).length === 0);
+  const unknown = offers.filter((o) => coveredTripsOf(o).length === 0 && !fareOnly(o)).length;
   const checks = [{
     name: `Offers by trip id: every offer covers the trip asked (${tripId})`,
     ok: other.length === 0,

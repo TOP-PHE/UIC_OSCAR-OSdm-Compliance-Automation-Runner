@@ -91,7 +91,13 @@ function checkFulfillmentReadStep(status, body) {
     for (const p of Array.isArray(body?.problems) ? body.problems : []) {
       validationLogger(`[INFO] GET /fulfillments/${id}: the provider says ${p?.code ?? '?'} — ${p?.detail || p?.title || ''}`);
     }
-    record(fd.checkFulfillmentRead(body, id, parseEnvJson('__fulfillmentDocHolders', {}) || {}));
+    // #906: a fare fulfilment has no document to check; its own checks instead.
+    if (require('./fares.js').isFareSale()) {
+      const fareBooking = require('./fareBooking.js');
+      fareBooking.recordFareChecks(fareBooking.fulfillmentReadChecks(body, id));
+    } else {
+      record(fd.checkFulfillmentRead(body, id, parseEnvJson('__fulfillmentDocHolders', {}) || {}));
+    }
   }
   const rest = ids.slice(1);
   bru.setEnvVar('__fulfillmentsToRead', JSON.stringify(rest));

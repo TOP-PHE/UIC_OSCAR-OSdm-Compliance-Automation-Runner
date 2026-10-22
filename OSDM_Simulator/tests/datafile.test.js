@@ -253,6 +253,9 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_FARE_UNREQUESTED_38: [],
     // #905: chosen by its trip's origin, the request naming no section.
     SIM_WRONG_FARE_WITHOUT_SECTION_38: [],
+    // #906: the fare fulfilment's variants, named by a passenger as the others.
+    SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38: ['fare-fulfillment-document'],
+    SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38: ['fare-not-in-fulfillment'],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -641,6 +644,9 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_NHF_FARE_NO_SECTION_SPEC_38: [undefined, 'SPECIFICATION', false, true, false],
     SIM_NHF_FARE_EMPTY_SECTIONS_38: [undefined, 'SPECIFICATION', true, true, false],
     SIM_WRONG_FARE_WITHOUT_SECTION_38: [undefined, 'SPECIFICATION', false, true, false],
+    // #906: the fare sale of SIM_FARE_SPEC_1ADT_38, its fulfilment wrong.
+    SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,

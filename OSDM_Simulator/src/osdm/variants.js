@@ -36,8 +36,12 @@
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
  *   wrong-exchange-amount   amountToBePaid one cent off its identity
+ *   fare-not-in-fulfillment the fare fulfilment leaves the last fare out of
+ *                           its bookingParts (#906)
+ *   fare-fulfillment-document the fare fulfilment carries a PDF ticket, which
+ *                           OSDM gives a fare fulfilment none of (#906)
  *
- * The four "wrong-" variants are deliberately wrong: each must make a check of
+ * The four "wrong-" variants and the two "fare-" ones are deliberately wrong: each must make a check of
  * the collection fail. The offers of a trip from `variants.wrongOffersFrom`
  * are wrong too (minimalPrice one cent off), for the offer validators.
  */
@@ -46,6 +50,7 @@ const PREFIX = 'simvariant-';
 const NAMES = new Set([
   'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount',
+  'fare-not-in-fulfillment', 'fare-fulfillment-document',
 ]);
 
 const VARIANTS = Symbol('variants');

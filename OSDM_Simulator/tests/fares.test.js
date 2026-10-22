@@ -183,3 +183,63 @@ test('fares by search criteria and by trip id, over HTTP', async (t) => {
   assert.equal(fareOffers(res.body).length, 3);
   assert.equal(fareOffers(res.body)[0].fares[0].travelValidityConstraint.validTravelDates.from.slice(0, 10), trips[1].startTime.slice(0, 10));
 });
+
+// #906: a fare offer is booked like any other offer, and confirmed by a
+// fulfilment of its own: no document, control number or issuer (OSDM
+// processes, "Remarks on the Booking Process with Fares").
+test('a fare offer is booked and confirmed, on every provider, in its version\'s shapes', async (t) => {
+  const { SECRETS, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  const section = { startPlace: station('0000001'), endPlace: station('0000002') };
+  const asked = { requestedSections: [section], offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } };
+  for (const provider of ['alpha', 'beta', 'gamma', 'delta']) {
+    const token = await tokenFor(sim.base, provider, SECRETS[provider][0]);
+    const offers = (await call(sim.base, token, 'POST', `/${provider}/offers`, offerRequest(asked))).body;
+    const offer = fareOffers(offers)[0];
+    const booked = await call(sim.base, token, 'POST', `/${provider}/bookings`, bookingRequest(offer));
+    assert.equal(booked.status, 200, provider);
+    const booking = booked.body.booking;
+    const [bookedOffer] = booking.bookedOffers;
+    assert.deepEqual(bookedOffer.fares.map((f) => f.id), offer.fares.map((f) => f.id), provider);
+    assert.deepEqual(bookedOffer.fares.map((f) => f.status), ['PREBOOKED'], provider);
+    assert.deepEqual(bookedOffer.fares[0].passengerRefs, [booking.passengers[0].id], provider);
+    assert.deepEqual(bookedOffer.admissions, [], provider);
+    assert.equal(booking.provisionalPrice.amount, offer.fares[0].prices[0].amount, provider);
+
+    const confirmed = await call(sim.base, token, 'POST', `/${provider}/bookings/${booking.id}/fulfillments`, {});
+    assert.equal(confirmed.status, 200, provider);
+    const [fulfillment] = confirmed.body.fulfillments;
+    assert.equal(confirmed.body.fulfillments.length, 1, provider);
+    assert.deepEqual(Object.keys(fulfillment).sort(), ['bookingParts', 'bookingRef', 'createdOn', 'id', 'status'], provider);
+    assert.deepEqual(fulfillment.bookingParts, [{ id: offer.fares[0].id }], provider);
+    assert.equal(confirmed.body.fulfillmentDocuments, undefined, provider);
+    const read = (await call(sim.base, token, 'GET', `/${provider}/bookings/${booking.id}`)).body.booking;
+    assert.deepEqual(read.bookedOffers[0].fares.map((f) => f.status), ['FULFILLED'], provider);
+    assert.equal(read.confirmedPrice.amount, offer.fares[0].prices[0].amount, provider);
+    const one = await call(sim.base, token, 'GET', `/${provider}/fulfillments/${fulfillment.id}`);
+    assert.equal(one.status, 200, provider);
+  }
+});
+
+test('the two wrong fare fulfilments: a fare left out of bookingParts, a PDF ticket attached (#906)', async (t) => {
+  const { SECRETS, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
+  const sim = await startSimulator();
+  t.after(() => sim.close());
+  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
+  const two = [{ externalRef: '00001', type: 'PERSON', dateOfBirth: '1990-01-15' }, { externalRef: '00002', type: 'PERSON', dateOfBirth: '1985-06-01' }];
+  const asked = { requestedSections: [{ startPlace: station('0000001'), endPlace: station('0000002') }], offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] }, anonymousPassengerSpecifications: two };
+  const confirmWith = async (variant) => {
+    const offer = fareOffers((await call(sim.base, token, 'POST', '/gamma/offers', offerRequest(asked))).body)[0];
+    const request = bookingRequest(offer);
+    request.passengerSpecifications[1].detail.lastName = `Simvariant-${variant}`;
+    const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+    return { offer, booking, answer: (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body };
+  };
+  const left = await confirmWith('fare-not-in-fulfillment');
+  assert.equal(left.offer.fares.length, 2);
+  assert.deepEqual(left.answer.fulfillments[0].bookingParts, [{ id: left.offer.fares[0].id }]);
+  const ticket = await confirmWith('fare-fulfillment-document');
+  assert.equal(ticket.answer.fulfillments[0].fulfillmentDocumentRefs.length, 1);
+  assert.equal(ticket.answer.fulfillmentDocuments[0].id, ticket.answer.fulfillments[0].fulfillmentDocumentRefs[0]);
+});

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.411",
+  "current_release": "2026.412",
   "releases": [
+    {
+      "release": "2026.412",
+      "date": "2026-10-22",
+      "server": "1.11.377",
+      "collection": "OTST_V2.0.210",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#906 (fares phase 2): a fare offer that passed its offer checks is booked and confirmed: the booking holds the fares offered (paired by content), the fare fulfilment is a confirmation with no document, control number or issuer, and every fare is in it; the scenario ends after 07 (the refund of a fare is #907). Simulator 0.46.0 books fare offers, confirms them with a fulfilment of fares, and has two wrong fare fulfilments."
+      ]
+    },
     {
       "release": "2026.411",
       "date": "2026-10-22",

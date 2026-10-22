@@ -64,16 +64,20 @@ const documentOf = (provider, medium, controlNumber) => ({
   ...(controlNumber ? { controlNumber } : {}),
 });
 
-/** On confirmation: the booking's documents, and each fulfilment's references to them. */
-function issueDocuments(booking, provider) {
+/**
+ * On confirmation: the booking's documents, and each fulfilment's references
+ * to them. `fulfillments` are those that get documents: a fare fulfilment
+ * gets none (#906).
+ */
+function issueDocuments(booking, provider, fulfillments = booking.fulfillments) {
   const documents = [];
   for (const medium of mediaOf(booking, provider)) {
     if (MEDIA[medium].perBooking) {
       const merged = documentOf(provider, medium);
       documents.push(merged);
-      for (const fulfillment of booking.fulfillments) fulfillment.fulfillmentDocumentRefs = [...listOf(fulfillment.fulfillmentDocumentRefs), merged.id];
+      for (const fulfillment of fulfillments) fulfillment.fulfillmentDocumentRefs = [...listOf(fulfillment.fulfillmentDocumentRefs), merged.id];
     } else {
-      for (const fulfillment of booking.fulfillments) {
+      for (const fulfillment of fulfillments) {
         const own = documentOf(provider, medium, fulfillment.controlNumber);
         documents.push(own);
         fulfillment.fulfillmentDocumentRefs = [...listOf(fulfillment.fulfillmentDocumentRefs), own.id];
@@ -81,6 +85,13 @@ function issueDocuments(booking, provider) {
     }
   }
   if (documents.length > 0) booking.fulfillmentDocuments = documents;
+}
+
+/** #906, variant `fare-fulfillment-document`: a PDF ticket a fare fulfilment should not have. */
+function attachTicket(booking, fulfillment, provider) {
+  const ticket = documentOf(provider, 'PDF_A4');
+  booking.fulfillmentDocuments = [...listOf(booking.fulfillmentDocuments), ticket];
+  fulfillment.fulfillmentDocumentRefs = [...listOf(fulfillment.fulfillmentDocumentRefs), ticket.id];
 }
 
 /**
@@ -124,4 +135,4 @@ function showRefundReceipt(booking, provider, nowMs) {
   }];
 }
 
-module.exports = { issueDocuments, fulfillmentWithDocuments, noteRefund, showRefundReceipt, MEDIA };
+module.exports = { issueDocuments, attachTicket, fulfillmentWithDocuments, noteRefund, showRefundReceipt, MEDIA };

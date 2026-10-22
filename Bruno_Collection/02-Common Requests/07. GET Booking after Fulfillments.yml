@@ -104,6 +104,8 @@ runtime:
             return;
         }
         if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking after Fulfillments")) return;
+        // #906: a confirmed booking of fares is checked by fareBooking.js; the scenario ends there.
+        if (require(bru.getEnvVar("library_base") + "fareBooking.js").checkFareConfirmedStep(jsonData)) return;
         // #250: this is the GET /bookings AFTER POST /fulfillments — require the
         // booking to embed the generated fulfillments (5th arg = requireFulfillments).
         postCreateBookingResponse(

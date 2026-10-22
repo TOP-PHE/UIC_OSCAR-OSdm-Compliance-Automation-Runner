@@ -273,7 +273,7 @@
             "enum": ["BUSINESS", "FULL_FLEX", "SEMI_FLEX", "NON_FLEX", "PROMO", "", null]
           },
           "bookMode": {
-            "description": "Fares (#903, used from #906): book the fare offer (FARE) or a product offer (PRODUCT). Empty or null: FARE when fares are asked for.",
+            "description": "Fares (#903, #906): book the fare offer (FARE) or a product offer (PRODUCT). Empty or null: FARE when fares are asked for. A fare offer is booked and confirmed only when no FAIL-level check of the offer step failed; the scenario then ends after the confirmation (the refund of a fare comes with #907).",
             "type": ["string", "null"],
             "enum": ["FARE", "PRODUCT", "", null]
           },

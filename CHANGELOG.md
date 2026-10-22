@@ -62,6 +62,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.377] / [collection-OTST_V2.0.210] — 2026-10-22
+
+Issue #906, fares phase 2, release 2026.412. Simulator 0.46.0.
+
+### Simulator 0.46.0
+- **A fare offer is booked and confirmed.** Fare offers are kept for booking like the others; a booking of one holds its fares in `BookedOffer.fares` (PREBOOKED, naming the booking's passengers), its `provisionalPrice` their sum. The confirmation makes them FULFILLED and gives one fulfilment of fares only, holding `id`, `status`, `bookingRef`, `createdOn` and `bookingParts`: no document, control number or issuer, which OSDM gives a fare fulfilment none of (processes, "Remarks on the Booking Process with Fares"). A booking of fares and products would get one fulfilment for each.
+- Two wrong variants, named by a passenger's last name: `fare-not-in-fulfillment` (the last fare left out of `bookingParts`), `fare-fulfillment-document` (a PDF ticket on the fare fulfilment).
+
+### Added
+- **The fare sale.** A fare offer that passed every FAIL-level check of the offer step is booked and confirmed (`bookMode` FARE, or empty): step 01 routes to 02, and 02, 05, 06, 06b and 07 run the fare checks of `library-bruno/fareBooking.js` instead of the product ones. B1 the booking holds fares; B2 every offered fare has its booked fare, paired by content (id, else passengers, section and price), never by position; B3 the members OSDM requires; B4 the offered price; B5 `provisionalPrice` the sum of the fares (WARNING); B6 PREBOOKED, then CONFIRMED or FULFILLED. F1 a fare fulfilment is CONFIRMED or FULFILLED; F2 a document, control number, issuer, continuous-service usage or links on it is a WARNING (#242 D3); F3 it names the parts it covers; F4 no fulfilment holds fares and products together; F5 every booked fare is in a fulfilment; F6 the regional constraint, travel validity and passenger constraints are the offer's (WARNING). The scenario ends after 07; the refund of a fare is #907. Passenger updates (03, 04) are not part of a fare sale.
+- **`bookMode` PRODUCT with fares asked** goes on with a product sale instead of ending after the offer step.
+- Simulator data file: `SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38` and `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38` (not in the run list, passenger lists 30 and 31) and their copies. The fare scenarios of the run list are now booked and confirmed; so are the wrong ones that only warn at 01 (`SIM_WRONG_FARE_UNKNOWN_CLUSTER_`, `_WIDER_CLUSTERS_`, `_OVERLAP_`); those that fail at 01 still end there.
+
+### Fixed
+- **Offers by trip id: an offer of fares only no longer counts as naming no trip** (`tripIds.js`). OSDM's `TripCoverage` is not used for fares; `SIM_FARE_TRIPIDS_1ADT_38` gave a false WARNING since #904.
+
+Checked:
+- The real collection standalone on the simulator (`bru` 4.2.1, through the replay): the 17 fare scenarios and their copies on alpha, beta, gamma and delta, 68 runs. The four sales are booked and confirmed with no failed check and no warning (`SIM_FARE_SPEC_1ADT_38` 117 checks, 80 before; `_FREE_CHILD_` 116; `_SRCH_` 117; `_TRIPIDS_` 124, no longer warning). `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*` fails check F5 only; `SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_*` gives F2 warnings at 06, 06b and 07 and fails nothing (two per step from 3.8, where the ticket is referenced; one below, where the fulfilment holds it). The wrong offer scenarios fail or warn as before; those that only warn now go on to the confirmation. Every copy gives its `_38` twin's count.
+
+---
+
 ## [server-1.11.376] / [collection-OTST_V2.0.209] — 2026-10-22
 
 Issue #905, fares phase 1c, release 2026.411. Simulator 0.45.0.

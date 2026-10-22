@@ -20401,6 +20401,326 @@
         "offerMode": null,
         "requestedOfferParts": ["FARE_ADMISSION"]
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38",
+      "description": "Deliberately wrong (#906): the fare sale of SIM_FARE_SPEC_1ADT_38, booked by a passenger named Simvariant-Fare-Fulfillment-Document (passenger list 30): gamma confirms it with a fare fulfilment carrying a PDF ticket, which OSDM gives a fare fulfilment none of. Expected: WARNINGs of check F2 at 06, 06b and 07; no failed check.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 30,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38",
+      "description": "Deliberately wrong (#906): the fare sale of trip 24 for two adults, the first named Simvariant-Fare-Not-In-Fulfillment (passenger list 31): gamma confirms it with a fare fulfilment whose bookingParts leave the second fare out. Expected: check F5 fails at 07.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 31,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_36",
+      "description": "Deliberately wrong (#906): the fare sale of SIM_FARE_SPEC_1ADT_38, booked by a passenger named Simvariant-Fare-Fulfillment-Document (passenger list 30): gamma confirms it with a fare fulfilment carrying a PDF ticket, which OSDM gives a fare fulfilment none of. Expected: WARNINGs of check F2 at 06, 06b and 07; no failed check. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 30,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_NOT_IN_FULFILLMENT_36",
+      "description": "Deliberately wrong (#906): the fare sale of trip 24 for two adults, the first named Simvariant-Fare-Not-In-Fulfillment (passenger list 31): gamma confirms it with a fare fulfilment whose bookingParts leave the second fare out. Expected: check F5 fails at 07. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 31,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_37",
+      "description": "Deliberately wrong (#906): the fare sale of SIM_FARE_SPEC_1ADT_38, booked by a passenger named Simvariant-Fare-Fulfillment-Document (passenger list 30): gamma confirms it with a fare fulfilment carrying a PDF ticket, which OSDM gives a fare fulfilment none of. Expected: WARNINGs of check F2 at 06, 06b and 07; no failed check. OSDM 3.7.0, for beta (a copy of SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 30,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_NOT_IN_FULFILLMENT_37",
+      "description": "Deliberately wrong (#906): the fare sale of trip 24 for two adults, the first named Simvariant-Fare-Not-In-Fulfillment (passenger list 31): gamma confirms it with a fare fulfilment whose bookingParts leave the second fare out. Expected: check F5 fails at 07. OSDM 3.7.0, for beta (a copy of SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 31,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_39",
+      "description": "Deliberately wrong (#906): the fare sale of SIM_FARE_SPEC_1ADT_38, booked by a passenger named Simvariant-Fare-Fulfillment-Document (passenger list 30): gamma confirms it with a fare fulfilment carrying a PDF ticket, which OSDM gives a fare fulfilment none of. Expected: WARNINGs of check F2 at 06, 06b and 07; no failed check. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 30,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_NOT_IN_FULFILLMENT_39",
+      "description": "Deliberately wrong (#906): the fare sale of trip 24 for two adults, the first named Simvariant-Fare-Not-In-Fulfillment (passenger list 31): gamma confirms it with a fare fulfilment whose bookingParts leave the second fare out. Expected: check F5 fails at 07. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 31,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -22623,6 +22943,61 @@
           "updateFirstName": "Noah",
           "updatePhoneNumber": "+33199000016",
           "updateEmail": "noah.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Fare-Fulfillment-Document",
+          "phoneNumber": "+33199000003",
+          "email": "variant.fare-fulfillment-document@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Fare-Not-In-Fulfillment",
+          "phoneNumber": "+33199000003",
+          "email": "variant.fare-not-in-fulfillment@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
           "type": "PERSON"
         }
       ]

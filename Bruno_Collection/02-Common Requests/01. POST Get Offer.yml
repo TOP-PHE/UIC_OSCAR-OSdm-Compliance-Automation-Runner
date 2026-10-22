@@ -175,7 +175,12 @@ runtime:
         // #903: fare offers. A request asking for fares has them checked here
         // and ends (booking a fare comes with #906); otherwise fares that were
         // not asked are a failure, and fare-only offers leave the product checks.
+        // #906: a fare offer that passed its checks is booked: straight to 02.
         if (require(bru.getEnvVar("library_base") + "fares.js").checkFareOffers(jsonData)) {
+          if (require(bru.getEnvVar("library_base") + "fares.js").isFareSale()) {
+            bru.runner.setNextRequest("02. POST Create Booking");
+            return;
+          }
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
           loopbackOrStop("POST Get Offer (fare offers)");
           return;

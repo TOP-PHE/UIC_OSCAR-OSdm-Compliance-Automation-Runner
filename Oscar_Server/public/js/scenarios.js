@@ -2900,7 +2900,7 @@ function buildFareFields(idx) {
         ${buildSelect(idx, 'desiredFareCluster', 'Fare cluster', ENUMS.desiredFareCluster,
           'Fares (#903): the cluster of the fare offer to choose (BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO). None offered fails the scenario. Empty: the first fare offer.')}
         ${buildSelect(idx, 'bookMode', 'Book mode', ENUMS.bookMode,
-          'Fares (#903): what the scenario books, fares or products. Booking fares comes with #906; until then a fare scenario ends after the offer step. PRODUCT with "Fares expected" false: the sale goes on with a product offer (#905).')}
+          'Fares (#903, #906): what the scenario books, fares or products. FARE (or empty): the fare offer chosen is booked and confirmed, then the scenario ends (the refund of a fare comes with #907); it is not booked when a check of the offer step failed. PRODUCT: the sale goes on with a product offer, also when Fares expected is false (#905).')}
         ${buildSelect(idx, 'expectFares', 'Fares expected', ENUMS.expectFares,
           'Fares (#905): false for a negative test, where the answer must hold no fare: a domestic trip, a request without a section, or fares not asked. OSDM sets no such rule, so this is your expectation for this provider. The scenario then ends after the offer step, unless Book mode is PRODUCT. Empty: fares are expected when asked with a section.')}`;
 }

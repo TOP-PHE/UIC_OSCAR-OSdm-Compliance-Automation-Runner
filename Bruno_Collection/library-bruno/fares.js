@@ -37,8 +37,10 @@ http://www.apache.org/licenses/LICENSE-2.0
  *
  *   N   no fare, as the scenario expects                      FAIL
  *
- * Booking a fare is phase 2 (#906): until then a fare scenario ends after
- * step 01. Sources and levels are in #903, #905 and #242.
+ * A fare offer that passed every FAIL-level check is booked and confirmed
+ * (#906, `fareBooking.js`: step 01 sets `__fareSale` and routes to 02);
+ * with `bookMode` PRODUCT the sale goes on with a product offer instead.
+ * Sources and levels are in #903, #905, #906 and #242.
  *
  * The pure part has no Bruno globals; the glue at the bottom has.
  */
@@ -92,7 +94,7 @@ function check(id, level, title, broken, explain) {
   return { id, level, title, ok: broken.length === 0, message: broken.length ? `${explain}: ${shown}${more}` : '' };
 }
 
-function missingMembers(fare) {
+function missingFareMembers(fare) {
   return REQUIRED.filter((key) => {
     const v = fare?.[key];
     if (v === undefined || v === null || v === '') return true;
@@ -236,7 +238,7 @@ function fareChecks(response, request, { travelDay } = {}) {
   return [
     first,
     check('O2', 'FAIL', 'Each fare has the members OSDM requires (Fare.required, passengerRefs)',
-      all.map(({ fare, path }) => ({ path, missing: missingMembers(fare) })).filter((x) => x.missing.length).map((x) => `${x.path} lacks ${x.missing.join(', ')}`),
+      all.map(({ fare, path }) => ({ path, missing: missingFareMembers(fare) })).filter((x) => x.missing.length).map((x) => `${x.path} lacks ${x.missing.join(', ')}`),
       'members missing or empty'),
     check('O3', 'FAIL', `Each fare is of a type asked (${types.join(', ') || 'none'})`,
       all.filter(({ fare }) => !types.includes(fare?.type)).map(({ fare, path }) => `${path}.type = ${JSON.stringify(fare?.type)}`),
@@ -518,7 +520,8 @@ function checkFareOffers(body) {
   if (list(request.requestedSections).length === 0) {
     validationLogger('[WARNING] [fares] The request asks for fares without a requested section; OSDM asks for one when trips are given (processes).');
   }
-  for (const c of fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') })) record(c);
+  const checks = fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') });
+  for (const c of checks) record(c);
   const desired = bru.getEnvVar('desiredFareCluster') || null;
   const chosen = chooseFareOffer(body, desired);
   if (desired) {
@@ -526,11 +529,41 @@ function checkFareOffers(body) {
       if (!chosen) throw new Error(`no fare offer has the reference cluster ${desired}`);
     });
   }
-  if (chosen) {
-    bru.setEnvVar('fareOfferId', chosen.offerId);
-    validationLogger(`[INFO] [fares] Fare offer chosen: ${chosen.offerId} (${list(chosen.fares).length} fare(s)). Booking a fare comes with #906; the scenario ends after the offer step.`);
+  if (chosen) bru.setEnvVar('fareOfferId', chosen.offerId);
+  // #906: a product booked although fares were asked: the sale goes on with the product offers.
+  if (bru.getEnvVar('bookMode') === 'PRODUCT') {
+    if (Array.isArray(body?.offers)) body.offers = productOffersOf(body);
+    validationLogger('[INFO] [fares] The scenario books a product (bookMode PRODUCT): the sale goes on with the product offers.');
+    return false;
   }
+  // #906: the fare offer chosen is booked, unless a FAIL-level check of it failed.
+  const decision = fareSaleDecision(checks, chosen);
+  if (decision.book) {
+    bru.setEnvVar('__fareSale', 'true');
+    bru.setEnvVar('offer', chosen);
+    bru.setEnvVar('offerId', chosen.offerId);
+  }
+  validationLogger(`[INFO] [fares] ${decision.reason}`);
   return true;
+}
+
+/**
+ * #906: whether the fare offer chosen is booked: there is one, and no check of
+ * the offer step that OSDM states as a rule failed. Booking an offer whose
+ * fares broke one would test nothing reliable.
+ */
+function fareSaleDecision(checks, chosen) {
+  if (!chosen) return { book: false, reason: 'No fare offer chosen: the scenario ends after the offer step.' };
+  const failed = list(checks).filter((c) => c.level === 'FAIL' && !c.ok).map((c) => c.id);
+  if (failed.length > 0) {
+    return { book: false, reason: `Fare offer ${chosen.offerId} is not booked: the offer step failed ${[...new Set(failed)].join(', ')}. The scenario ends here.` };
+  }
+  return { book: true, reason: `Fare offer chosen: ${chosen.offerId} (${list(chosen.fares).length} fare(s)). It is booked next (#906).` };
+}
+
+/** #906: the scenario is booking a fare offer (step 01 decided it). */
+function isFareSale() {
+  return bru.getEnvVar('__fareSale') === 'true';
 }
 
 /**
@@ -557,7 +590,7 @@ function stopOnSectionsOutside() {
 }
 
 module.exports = {
-  CLUSTERS, COMBINATION_MODELS, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, typesAsked, fareChecks, unaskedFaresCheck,
+  CLUSTERS, COMBINATION_MODELS, missingFareMembers, fareSaleDecision, isFareSale, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, typesAsked, fareChecks, unaskedFaresCheck,
   noFareChecks, chooseFareOffer, coverageOfPassenger, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip,
   prepareSectionCheck, stopOnSectionsOutside,
 };

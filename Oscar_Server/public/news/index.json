@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-22-fare-booking-fulfilment",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "Fare sales: booking and fulfilment",
+    "summary": "A fare offer is now booked and confirmed, and the fare fulfilment is checked as OSDM describes it.",
+    "content": "A fare scenario no longer ends after the offer step. When the fare offer chosen passed every check of the offer step, OSCAR books it and confirms the booking. The booking must hold the fares offered, at their price, with the members OSDM requires; the fulfilment of fares is a confirmation: it names the fares it covers and carries no ticket, control number or issuer, since the distributor builds the ticket. A document or control number on it is reported as a warning.\n\nA fare offer whose checks failed at the offer step is not booked. Book mode PRODUCT now goes on with a product sale. The refund of a fare comes next.\n\nNothing to change in your scenarios: fare scenarios that ended after the offer step now run to the confirmation."
+  },
+  {
     "id": "2026-10-22-fare-negative-requests",
     "date": "October 22, 2026",
     "tag": "New",
