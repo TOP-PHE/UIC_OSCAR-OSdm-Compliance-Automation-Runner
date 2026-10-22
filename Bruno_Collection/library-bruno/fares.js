@@ -530,25 +530,11 @@ function checkFareOffers(body) {
   if (String(bru.getEnvVar('expectFares')) === 'false') return checkNoFares(body, request);
   // #255: fare reservations that were not asked.
   const unaskedReservations = fareReservations.unaskedReservationsCheck(body, request);
-  if (!asksFares(request)) {
-    const unasked = unaskedFaresCheck(body, request);
-    if (unasked) record(unasked);
-    if (unaskedReservations) record(unaskedReservations);
-    if (fareOffersOf(body).length > 0 && Array.isArray(body?.offers)) {
-      body.offers = productOffersOf(body);
-      validationLogger('[INFO] [fares] Offers holding fares only are left out of the product checks.');
-    }
-    return false;
-  }
+  if (!asksFares(request)) return checkUnaskedFares(body, request, unaskedReservations);
   if (list(request.requestedSections).length === 0) {
     validationLogger('[WARNING] [fares] The request asks for fares without a requested section; OSDM asks for one when trips are given (processes).');
   }
-  const checks = [
-    // A request for fare reservations alone checks no fare, unless the answer holds some.
-    ...(asksFareProducts(request) || faresOf(body).length > 0 ? fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') }) : [countCheck(body)]),
-    ...fareReservations.offerChecks(body, request, { osdmVersion: bru.getEnvVar('osdmVersion') }),
-    ...(unaskedReservations ? [unaskedReservations] : []),
-  ];
+  const checks = offerStepChecks(body, request, unaskedReservations);
   for (const c of checks) record(c);
   const desired = bru.getEnvVar('desiredFareCluster') || null;
   const chosen = chooseFareOffer(body, desired);
@@ -566,19 +552,48 @@ function checkFareOffers(body) {
   }
   // #906: the fare offer chosen is booked, unless a FAIL-level check of it failed.
   const decision = fareSaleDecision(checks, chosen);
-  if (decision.book) {
-    bru.setEnvVar('__fareSale', 'true');
-    bru.setEnvVar('offer', chosen);
-    bru.setEnvVar('offerId', chosen.offerId);
-    // #255: OSDM books only the mandatory reservations unless selected.
-    const selections = fareReservations.selectionsFor(chosen);
-    if (selections.length > 0) {
-      bru.setEnvVar('optionalReservationSelections', JSON.stringify(selections));
-      validationLogger(`[INFO] [fares] ${selections.length} fare reservation(s) of the offer selected for the booking (optionalReservationSelections).`);
-    }
-  }
+  if (decision.book) bookFareOffer(chosen);
   validationLogger(`[INFO] [fares] ${decision.reason}`);
   return true;
+}
+
+// Step 01 when the request asks for no fare: only O14 and V8 are checked, and
+// the answer goes on without its fare-only offers (false: the sale goes on).
+function checkUnaskedFares(body, request, unaskedReservations) {
+  const unasked = unaskedFaresCheck(body, request);
+  if (unasked) record(unasked);
+  if (unaskedReservations) record(unaskedReservations);
+  if (fareOffersOf(body).length > 0 && Array.isArray(body?.offers)) {
+    body.offers = productOffersOf(body);
+    validationLogger('[INFO] [fares] Offers holding fares only are left out of the product checks.');
+  }
+  return false;
+}
+
+// The checks of step 01 for a request that asks for fares. A request for fare
+// reservations alone checks no fare, unless the answer holds some (#255).
+function offerStepChecks(body, request, unaskedReservations) {
+  const fareRules = asksFareProducts(request) || faresOf(body).length > 0
+    ? fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') })
+    : [countCheck(body)];
+  return [
+    ...fareRules,
+    ...fareReservations.offerChecks(body, request, { osdmVersion: bru.getEnvVar('osdmVersion') }),
+    ...(unaskedReservations ? [unaskedReservations] : []),
+  ];
+}
+
+// #906: the fare offer chosen is the one booked. #255: OSDM books only the
+// mandatory reservations unless they are selected, so its fare reservations are.
+function bookFareOffer(chosen) {
+  bru.setEnvVar('__fareSale', 'true');
+  bru.setEnvVar('offer', chosen);
+  bru.setEnvVar('offerId', chosen.offerId);
+  const selections = fareReservations.selectionsFor(chosen);
+  if (selections.length > 0) {
+    bru.setEnvVar('optionalReservationSelections', JSON.stringify(selections));
+    validationLogger(`[INFO] [fares] ${selections.length} fare reservation(s) of the offer selected for the booking (optionalReservationSelections).`);
+  }
 }
 
 /**
