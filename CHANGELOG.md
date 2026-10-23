@@ -93,6 +93,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.387] / [collection-OTST_V2.0.217] — 2026-10-23
+
+Issue #941, release 2026.422. Data only: no server or collection code changes.
+
+### Added
+- **Three negative fare scenarios on the simulator** (#244 case 3, #246 cases 1 and 3). Each sets `expectFares: false`: check N passes and the scenario ends after the offer step.
+  - `SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38`: a search with `requestedSections` sent as an empty list.
+  - `SIM_NHF_FARE_NO_SECTION_TRIPIDS_38`: offers by trip id for a domestic trip, no section.
+  - `SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38`: offers by trip id, an empty list.
+  - Their copies for OSDM 3.6, 3.7, 3.9, 3.10 and 3.12 (`version-copies.js`). All 18 were run with the real collection on the simulator: no failed check.
+- The six reference configurations are regenerated, the scenarios document has the three rows, and `datafile.test.js` knows the new scenarios.
+
+---
+
 ## [server-1.11.386] / [collection-OTST_V2.0.216] — 2026-10-23
 
 Issue #936, part A of #935, release 2026.421. Simulator unchanged.

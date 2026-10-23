@@ -660,6 +660,10 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_NHF_FARE_NO_SECTION_SPEC_38: [undefined, 'SPECIFICATION', false, true, false],
     SIM_NHF_FARE_EMPTY_SECTIONS_38: [undefined, 'SPECIFICATION', true, true, false],
     SIM_WRONG_FARE_WITHOUT_SECTION_38: [undefined, 'SPECIFICATION', false, true, false],
+    // #244 case 3 and #246 cases 1 and 3: N2 and N4 by search and by trip id.
+    SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38: [undefined, 'SEARCH', undefined, true, false],
+    SIM_NHF_FARE_NO_SECTION_TRIPIDS_38: [undefined, 'SEARCH', undefined, true, false],
+    SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38: [undefined, 'SEARCH', undefined, true, false],
     // #906: the fare sale of SIM_FARE_SPEC_1ADT_38, its fulfilment wrong.
     SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
@@ -680,17 +684,18 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
   ]]));
   assert.deepEqual(found, expected);
   for (const s of fareScenarios) {
-    assert.equal(s.offersByTripIds === 'on', s.code === 'SIM_FARE_TRIPIDS_1ADT_38', s.code);
+    assert.equal(s.offersByTripIds === 'on', s.code.includes('_TRIPIDS_'), s.code);
     if (!startOf(s)) continue;
     // The section lies inside the trip: its start and end are stations of it.
     const trip = tripOf(s);
     const stations = trip.tripType === 'SEARCH' ? [trip.trip.origin, trip.trip.destination] : trip.legs.flatMap((l) => [l.origin, l.destination]);
     assert.ok(stations.includes(startOf(s)) && stations.includes(s.requestedSections[0].endPlace), s.code);
   }
-  // #905: the empty list is N4's only, a product booked N2's by search only,
-  // and no scenario but a fare one says what fares it expects.
+  // #905: the empty list is N4's only (on each form of request), a product
+  // booked N2's by search only, and no scenario but a fare one says what fares
+  // it expects.
   const emptyLists = datafile.scenarios.filter((s) => Array.isArray(s.requestedSections) && s.requestedSections.length === 0);
-  assert.deepEqual(emptyLists.map((s) => s.code), ['SIM_NHF_FARE_EMPTY_SECTIONS_38']);
+  assert.deepEqual(emptyLists.map((s) => s.code), ['SIM_NHF_FARE_EMPTY_SECTIONS_38', 'SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38', 'SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38']);
   assert.deepEqual(datafile.scenarios.filter((s) => s.bookMode === 'PRODUCT').map((s) => s.code), ['SIM_NHF_FARE_NO_SECTION_SRCH_38']);
   for (const s of datafile.scenarios.filter((x) => !x.code.includes('_FARE_'))) assert.equal(s.expectFares, undefined, s.code);
   // No other scenario starts a section at a variant station; the COMBINING
