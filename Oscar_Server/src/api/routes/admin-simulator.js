@@ -20,6 +20,7 @@
  * POST   /v1/admin/simulator/accounts/:provider/:clientId/reset-secret — a new secret, once
  * GET    /v1/admin/simulator/audit                            — the simulator's audit
  * GET    /v1/admin/simulator/stats?days=1|7|30|90|365         — what each account did, per provider and per day
+ * GET    /v1/admin/simulator/runs?days=1|7|30|90|365          — the test sets OSCAR sent to the simulator, per provider and user (#930 PR 4)
  *
  * Administrators only. The simulator is called by services/simulatorAdmin.js,
  * naming the administrator; every change is in OSCAR's audit too. Answers are
@@ -31,6 +32,8 @@ const rateLimit = require('express-rate-limit');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { auditLog } = require('../helpers/shared');
 const S = require('../../services/simulatorAdmin');
+const { all } = require('../../db/db');
+const { summarise } = require('../../utils/simulatorRuns');
 
 const router = express.Router();
 
@@ -237,6 +240,27 @@ router.get('/stats', async (req, res) => {
   } catch (err) {
     return failed(res, err);
   }
+});
+
+// #930 PR 4: OSCAR's own runs to the simulator. Nothing is asked of the
+// simulator: the runs, their sets and their failed checks are OSCAR's.
+router.get('/runs', (req, res) => {
+  const days = req.query.days === undefined ? 30 : Number(req.query.days);
+  if (!PERIODS.has(days)) return problem(res, 400, 'The period is 1, 7, 30, 90 or 365 days.');
+  const url = S.configView().url;
+  if (!url) return problem(res, 409, 'No simulator is set up yet: enter its address and key first.');
+  const { from, to } = periodOf(days);
+  // Only runs whose endpoint starts with the simulator's origin are read;
+  // summarise() then keeps those under its address exactly.
+  const rows = all(
+    `SELECT r.id, r.api_base_used, r.batch_id, u.email,
+            (SELECT COUNT(*) FROM run_assertions a WHERE a.run_id = r.id AND a.passed = 0) AS failed_checks
+       FROM runs r JOIN users u ON u.id = r.user_id
+      WHERE r.queued_at >= ? AND r.status != 'DELETED'
+        AND instr(lower(r.api_base_used), ?) = 1`,
+    [`${from} 00:00:00`, new URL(url).origin]
+  );
+  return res.json({ days, from, to, providers: summarise(rows, url) });
 });
 
 module.exports = router;

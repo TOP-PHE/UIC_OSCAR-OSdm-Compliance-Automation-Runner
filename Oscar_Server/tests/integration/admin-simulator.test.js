@@ -81,6 +81,7 @@ beforeAll(async () => {
 afterAll(async () => {
   run("DELETE FROM server_config WHERE key LIKE 'SIMULATOR_ADMIN_%'");
   run('DELETE FROM auth_events WHERE user_id = ?', [adminId]);
+  run('DELETE FROM runs WHERE user_id = ?', [adminId]);
   run('DELETE FROM users WHERE id = ?', [adminId]);
   run('DELETE FROM companies WHERE id = ?', [companyId]);
   await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
@@ -110,6 +111,8 @@ test('before a set-up, nothing is saved and every call says so', async () => {
   const res = await asAdmin(request(app).get('/v1/admin/simulator/accounts'));
   expect(res.status).toBe(409);
   expect(res.body.detail).toMatch(/No simulator is set up/);
+  const runs = await asAdmin(request(app).get('/v1/admin/simulator/runs'));
+  expect(runs.status).toBe(409);
 });
 
 test('a wrong key, a wrong address or a bad value is tried and not saved', async () => {
@@ -196,6 +199,39 @@ test('the statistics: what each account did, field by field; a period not offere
     const bad = await asAdmin(request(app).get(`/v1/admin/simulator/stats?days=${days}`));
     expect([days, bad.status]).toEqual([days, 400]);
   }
+});
+
+// A run of OSCAR's, its suite, request and checks: `failed` of them failed.
+function seedRun({ apiBase, batchId, failed, queuedAt = null }) {
+  const id = crypto.randomUUID();
+  run(`INSERT INTO runs (id, company_id, user_id, status, api_base_used, batch_id, scenario_code, queued_at)
+       VALUES (?, ?, ?, 'COMPLETED', ?, ?, 'SIM_X_38', COALESCE(?, datetime('now')))`, [id, companyId, adminId, apiBase, batchId, queuedAt]);
+  const suite = run(`INSERT INTO run_suites (run_id, company_id, suite_name) VALUES (?, ?, 's')`, [id, companyId]).lastInsertRowid;
+  const reqId = run(`INSERT INTO run_requests (suite_id, run_id, company_id, request_name) VALUES (?, ?, ?, 'r')`, [suite, id, companyId]).lastInsertRowid;
+  for (let i = 0; i < failed + 1; i += 1) {
+    run(`INSERT INTO run_assertions (request_id, suite_id, run_id, company_id, assertion_key, assertion_name, passed)
+         VALUES (?, ?, ?, ?, ?, 'check', ?)`, [reqId, suite, id, companyId, `k${i}`, i < failed ? 0 : 1]);
+  }
+}
+
+test('the test sets OSCAR sent to the simulator: per provider and user, from OSCAR\'s own runs', async () => {
+  seedRun({ apiBase: `${base}/gamma`, batchId: 'batch-1', failed: 0 });
+  seedRun({ apiBase: `${base}/gamma`, batchId: 'batch-1', failed: 2 });
+  seedRun({ apiBase: `${base}/beta`, batchId: 'batch-2', failed: 1 });
+  seedRun({ apiBase: 'https://provider.example.com/osdm', batchId: 'batch-3', failed: 5 });
+  seedRun({ apiBase: `${base}/gamma`, batchId: 'batch-old', failed: 1, queuedAt: '2020-01-01 00:00:00' });
+  const res = await asAdmin(request(app).get('/v1/admin/simulator/runs?days=7'));
+  expect(res.status).toBe(200);
+  expect(res.headers['cache-control']).toBe('no-store');
+  expect(res.body.providers).toEqual([
+    { provider: 'beta', totals: { sets: 1, scenarios: 1, scenariosPerSet: 1, scenariosFailed: 1, failedChecks: 1 },
+      users: [{ email: ADMIN_EMAIL, sets: 1, scenarios: 1, scenariosPerSet: 1, scenariosFailed: 1, failedChecks: 1 }] },
+    { provider: 'gamma', totals: { sets: 1, scenarios: 2, scenariosPerSet: 2, scenariosFailed: 1, failedChecks: 2 },
+      users: [{ email: ADMIN_EMAIL, sets: 1, scenarios: 2, scenariosPerSet: 2, scenariosFailed: 1, failedChecks: 2 }] },
+  ]);
+  expect(JSON.stringify(res.body)).not.toContain('SIM_X_38');
+  expect((await asAdmin(request(app).get('/v1/admin/simulator/runs?days=3'))).status).toBe(400);
+  expect((await request(app).get('/v1/admin/simulator/runs')).status).toBe(401);
 });
 
 test('the simulator\'s refusals come back with their status; bad values never reach it', async () => {

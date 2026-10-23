@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-23-simulator-test-sets",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "Test sets run on the OSDM simulator",
+    "summary": "The simulator's statistics now show, per provider and user, how many test sets were run from OSCAR, their scenarios and the checks that failed.",
+    "content": "In Admin → OSDM Simulator, the Statistics tab now starts with the test sets run from OSCAR against the simulator. For each simulated provider, it shows per user: the sets run, the scenarios they held, the average number of scenarios per set, the scenarios with at least one failed check, and the failed checks.\n\nThese figures come from OSCAR's own results, for the period chosen at the top of the tab. Below them, the requests the simulator itself counted are unchanged."
+  },
+  {
     "id": "2026-10-23-simulator-statistics",
     "date": "October 23, 2026",
     "tag": "New",

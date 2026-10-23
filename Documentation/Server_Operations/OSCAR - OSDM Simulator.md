@@ -406,6 +406,11 @@ answers in error; OSCAR shows them under Admin → OSDM Simulator → Statistics
 They are in `deploy/data/stats.json` (counts only), kept 400 days unless
 `SIM_STATS_RETENTION_DAYS` says otherwise. A simulator without a data folder
 counts nothing.
+Above them, the same tab shows the test sets run from OSCAR on the
+simulator (#930 PR 4), per provider and user: sets, scenarios, scenarios with
+a failed check and failed checks. They come from OSCAR's own results: a run
+counts when its company's endpoint is under the simulator address saved on
+that page, so give companies that address exactly (same scheme and host).
 
 **Moving an installed simulator to a data folder** (installed before 0.51.0).
 The automatic update only restarts the container, which keeps the compose

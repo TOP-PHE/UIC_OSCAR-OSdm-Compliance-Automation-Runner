@@ -142,6 +142,32 @@ function statsNode(doc, stats) {
   return el(doc, 'div', {}, [period, ...(stats.providers || []).map((p) => statsProviderNode(doc, p))]);
 }
 
+// #930 PR 4: the test sets OSCAR sent to the simulator, per provider and user.
+const RUN_COLUMNS = [
+  ['sets', 'Sets'], ['scenarios', 'Scenarios'], ['scenariosPerSet', 'Scenarios per set'],
+  ['scenariosFailed', 'Scenarios failed'], ['failedChecks', 'Failed checks'],
+];
+
+function runsRow(doc, label, counts, strong) {
+  const cells = RUN_COLUMNS.map(([key]) => el(doc, 'td', { class: 'num', text: String(counts?.[key] ?? 0) }));
+  const name = strong ? el(doc, 'strong', { text: label }) : el(doc, 'span', { text: label });
+  return el(doc, 'tr', {}, [el(doc, 'td', {}, [name]), ...cells]);
+}
+
+function runsNode(doc, body) {
+  const providers = body.providers || [];
+  if (providers.length === 0) return el(doc, 'div', { class: 'empty', text: 'No test set was run on the simulator in this period.' });
+  return el(doc, 'div', {}, providers.map((p) => {
+    const head = el(doc, 'tr', {}, [el(doc, 'th', { text: 'User' }), ...RUN_COLUMNS.map(([, t]) => el(doc, 'th', { class: 'num', text: t }))]);
+    const rows = (p.users || []).map((u) => runsRow(doc, u.email || '(unknown user)', u, false));
+    rows.push(runsRow(doc, 'Total', p.totals, true));
+    return el(doc, 'div', { class: 'card' }, [
+      el(doc, 'div', { class: 'provider-head' }, [el(doc, 'h3', {}, [el(doc, 'code', { text: p.provider })])]),
+      el(doc, 'div', { class: 'table-wrap' }, [el(doc, 'table', {}, [el(doc, 'thead', {}, [head]), el(doc, 'tbody', {}, rows)])]),
+    ]);
+  }));
+}
+
 function auditNode(doc, entries) {
   if (!entries.length) return el(doc, 'div', { class: 'empty', text: 'Nothing yet.' });
   const head = el(doc, 'tr', {}, ['When', 'Who', 'What'].map((t) => el(doc, 'th', { text: t })));
@@ -195,9 +221,17 @@ function auditNode(doc, entries) {
     box.replaceChildren(auditNode(document, (await res.json()).entries || []));
   }
 
+  async function loadRuns(days) {
+    const box = document.getElementById('runs');
+    const res = await fetch(BASE + '/runs?days=' + encodeURIComponent(days));
+    if (!res.ok) { showEmpty(box, await readError(res, 'Could not read the test sets.')); return; }
+    box.replaceChildren(runsNode(document, await res.json()));
+  }
+
   async function loadStats() {
     const box = document.getElementById('stats');
     const days = document.getElementById('stats-days').value;
+    loadRuns(days).catch(reportError);
     const res = await fetch(BASE + '/stats?days=' + encodeURIComponent(days));
     if (!res.ok) { showEmpty(box, await readError(res, 'Could not read the statistics.')); return; }
     box.replaceChildren(statsNode(document, await res.json()));
