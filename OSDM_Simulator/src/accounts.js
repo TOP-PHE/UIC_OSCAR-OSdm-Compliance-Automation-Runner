@@ -70,7 +70,7 @@ function writeAtomically(file, text) {
 // start, as a wrong clients file does.
 function readAccountsFile(file, providers) {
   const raw = readJson(file, 'the accounts file');
-  if (!raw || raw.format !== FORMAT || !raw.providers || typeof raw.providers !== 'object' || Array.isArray(raw.providers)) {
+  if (raw?.format !== FORMAT || !raw.providers || typeof raw.providers !== 'object' || Array.isArray(raw.providers)) {
     throw new ConfigError(`the accounts file is not an accounts file of format ${FORMAT} (${file})`);
   }
   const accounts = new Map();
@@ -103,6 +103,26 @@ function importClientsFile(file, providers, at) {
     accounts.set(key, byId);
   }
   return accounts;
+}
+
+// The accounts file's text.
+function serialise(state) {
+  const out = {};
+  for (const [key, byId] of [...state].sort(([a], [b]) => a.localeCompare(b))) {
+    out[key] = [...byId].map(([clientId, a]) => ({
+      clientId, secretSha256: a.digest.toString('hex'), createdAt: a.createdAt,
+    }));
+  }
+  return `${JSON.stringify({ format: FORMAT, providers: out }, null, 2)}\n`;
+}
+
+// The next free "<provider>.<kind>NN", in the naming of make-clients.js.
+function nextId(key, kind, byId) {
+  for (let n = 1; n <= MAX_ACCOUNTS_PER_PROVIDER; n += 1) {
+    const id = `${key}.${kind}${String(n).padStart(2, '0')}`;
+    if (!byId.has(id)) return id;
+  }
+  throw new AccountError(409, 'TOO_MANY_ACCOUNTS', 'No free account name is left for this provider.');
 }
 
 /**
@@ -148,16 +168,6 @@ function createAccounts({ dataDir, providers, clientsFile, now = Date.now, log =
     clients.set(key, new Map([...byId].map(([id, a]) => [id, a.digest])));
   }
 
-  function serialise(state) {
-    const out = {};
-    for (const [key, byId] of [...state].sort(([a], [b]) => a.localeCompare(b))) {
-      out[key] = [...byId].map(([clientId, a]) => ({
-        clientId, secretSha256: a.digest.toString('hex'), createdAt: a.createdAt,
-      }));
-    }
-    return `${JSON.stringify({ format: FORMAT, providers: out }, null, 2)}\n`;
-  }
-
   // A change is written first, then applied: a write that fails changes nothing.
   function commit(key, byId) {
     const next = new Map(accounts);
@@ -186,15 +196,6 @@ function createAccounts({ dataDir, providers, clientsFile, now = Date.now, log =
     const byId = providerOf(key);
     if (typeof clientId !== 'string' || !byId.has(clientId)) throw new AccountError(404, 'UNKNOWN_ACCOUNT', 'No such account.');
     return byId;
-  }
-
-  // The next free "<provider>.<kind>NN", in the naming of make-clients.js.
-  function nextId(key, kind, byId) {
-    for (let n = 1; n <= MAX_ACCOUNTS_PER_PROVIDER; n += 1) {
-      const id = `${key}.${kind}${String(n).padStart(2, '0')}`;
-      if (!byId.has(id)) return id;
-    }
-    throw new AccountError(409, 'TOO_MANY_ACCOUNTS', 'No free account name is left for this provider.');
   }
 
   /** Every provider with its accounts, sorted by client id. No secret, no digest. */

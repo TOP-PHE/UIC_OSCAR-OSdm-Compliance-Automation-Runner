@@ -69,6 +69,15 @@ function createFailureCounter(limit, now) {
   };
 }
 
+// A request's body: JSON, or nothing.
+async function jsonBody(req) {
+  const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  const raw = await readBody(req, MAX_ACCOUNT_BODY);
+  if (raw.length === 0) return {};
+  if (type !== 'application/json') throw new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', 'The body must be JSON');
+  return parseJsonObject(raw);
+}
+
 /** Is this the SHA-256 of an administration key, as `SIM_ADMIN_KEY_SHA256` holds it? */
 const isKeyDigest = (value) => typeof value === 'string' && SHA256_HEX.test(value);
 
@@ -98,14 +107,6 @@ function createAdmin({ keySha256, accounts, now = Date.now }) {
       throw new HttpError(400, 'ADMIN_ACTOR', 'X-Admin-Actor must name the administrator', 'Printable ASCII, 1 to 120 characters.');
     }
     return actor;
-  }
-
-  async function jsonBody(req) {
-    const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
-    const raw = await readBody(req, MAX_ACCOUNT_BODY);
-    if (raw.length === 0) return {};
-    if (type !== 'application/json') throw new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', 'The body must be JSON');
-    return parseJsonObject(raw);
   }
 
   // The change a request asks for, as a function; or the answer of a read.
