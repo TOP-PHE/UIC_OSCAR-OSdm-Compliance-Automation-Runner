@@ -23,7 +23,8 @@
  *    the framework, over the editor's defaults (`DEFAULT_FRAMEWORK`, the
  *    page's `emptyFramework()`, pinned by a test);
  *  - the simulator's profile (`OSDM_Simulator/providers/<provider>.json`):
- *    the exact OSDM version;
+ *    the exact OSDM version, and the distribution modes (#936: fares when
+ *    the profile has them);
  *  - the data file: one train per trip leg, one journey per trip of several
  *    legs, and the run list of the provider's version. Only the provider's
  *    part of it counts (`providerPartOf()`, #912): the scenarios of its OSDM
@@ -55,6 +56,7 @@ const ANCILLARY_TYPES = Object.freeze(['PAYMENT_VOUCHER', 'PRODUCT_ACCESS', 'MER
 function defaultFramework() {
   return {
     osdmVersion: '3.4',
+    distributionModes: ['PRODUCT'],
     concurrentSessionLimit: 1,
     salesFlows: ['SALE'],
     iropsCodes: { refund: [...IROPS_MANDATORY], exchange: [...IROPS_MANDATORY] },
@@ -85,7 +87,7 @@ function defaultFramework() {
 // (`fw.<path>`). Paths not listed here stop the generator: a new question of
 // the checklist must be placed here first.
 const LIST_PATHS = new Set([
-  'passengerTypes', 'offerRequestForms', 'returnModels', 'offerCriteria.flexibilities',
+  'distributionModes', 'passengerTypes', 'offerRequestForms', 'returnModels', 'offerCriteria.flexibilities',
   'offerSearchOptions.offerModes', 'offerSearchOptions.requestedOfferParts', 'offerSearchOptions.travelClasses',
   'offerSearchOptions.serviceClassTypes', 'offerSearchOptions.productTags', 'offerSearchOptions.productSelections', 'tripSearchParameters', 'fulfillment.types', 'fulfillment.media', 'salesFlows', 'partialRefundScopes',
   'iropsCodes.refund', 'iropsCodes.exchange', 'placeSelectionFlows', 'placeSelection.supportedModes', 'ancillaries',
@@ -323,6 +325,9 @@ function buildReference({ provider, profile, answers, datafile }) {
     throw new Error(`${provider}: the checklist declares OSDM ${framework.osdmVersion}, the simulator's profile ${osdmVersion}.`);
   }
   framework.osdmVersion = osdmVersion;
+  // #936: a simulated provider sells products, and fares when its profile
+  // has them (every one since #903). The checklist does not ask yet (#938).
+  framework.distributionModes = profile?.fares ? ['PRODUCT', 'FARE'] : ['PRODUCT'];
   return {
     [REFERENCE_KEY]: {
       format: REFERENCE_FORMAT,

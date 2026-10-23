@@ -1799,9 +1799,24 @@ const TRIP_PARAMETER_TEXT = {
 };
 const PARTIAL_REFUND_SCOPE_OF = { partialRefundByFulfillment: 'fulfillment', partialRefundByLeg: 'leg', partialRefundByPax: 'passenger' };
 
+// #936: how a provider distributes (Test Framework › Distribution).
+const DISTRIBUTION_MODE_TEXT = { PRODUCT: 'product-based', FARE: 'fare-based' };
+
+// #936: a sale in a distribution mode the Test Framework does not declare
+// (distributionMode:<MODE>). Its own function, so that featureNotDeclaredWarning
+// stays under Sonar's complexity limit. null for any other entry.
+function distributionModeWarning(scenario, field) {
+  if (typeof field !== 'string' || !field.startsWith('distributionMode:')) return null;
+  const mode = field.slice('distributionMode:'.length);
+  const text = DISTRIBUTION_MODE_TEXT[mode] || mode;
+  return `[WARNING] Scenario "${scenario.code}" is a ${text} sale (${mode}), which the Test Framework does not declare (Distribution). The run will proceed; a provider that does not sell this way may answer no offer, or refuse the request. Declare the mode in the Test Framework, or take the scenario out of the run list.`;
+}
+
 // The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
 // scenario arms that the Test Framework does not declare (#218, #619, #713).
 function featureNotDeclaredWarning(scenario, field) {
+  const distribution = distributionModeWarning(scenario, field);
+  if (distribution) return distribution;
   // #766: a place chosen in a way the framework does not declare.
   if (typeof field === 'string' && field.startsWith('placeSelectionBy:')) {
     const flow = field.slice('placeSelectionBy:'.length);

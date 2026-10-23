@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-23-distribution-modes",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "Product-based, fare-based or both",
+    "summary": "The Test Framework now says how the provider sells: products, fares, or both. OSCAR offers the reference scenarios of those modes only.",
+    "content": "Test Config › Test Framework has a new Distribution section, right after the OSDM version. Tick Product-based when the provider sells products and issues the tickets, Fare-based when it sells fares for a section and the distributor builds the ticket, or both.\n\nCopy scenarios then offers only the reference scenarios of the modes ticked. A scenario of another mode still runs, with a warning in its log. A framework that names no mode is product-based, so nothing changes until you tick Fare-based.\n\nReference scenarios for fares come next (#937), then the set-up checklist with a Product and a Fare chapter (#938)."
+  },
+  {
     "id": "2026-10-23-simulator-test-sets",
     "date": "October 23, 2026",
     "tag": "New",

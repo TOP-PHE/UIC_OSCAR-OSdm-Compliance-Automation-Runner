@@ -9,6 +9,10 @@
   },
   "framework": {
     "osdmVersion": "3.9.0",
+    "distributionModes": [
+      "PRODUCT",
+      "FARE"
+    ],
     "concurrentSessionLimit": 3,
     "salesFlows": [
       "SALE",

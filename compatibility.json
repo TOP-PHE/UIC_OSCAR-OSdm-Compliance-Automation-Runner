@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.420",
+  "current_release": "2026.421",
   "releases": [
+    {
+      "release": "2026.421",
+      "date": "2026-10-23",
+      "server": "1.11.386",
+      "collection": "OTST_V2.0.216",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#936 (part A of #935): the Test Framework says how the provider sells, product-based, fare-based or both (distributionModes; none named = product-based). The scenario catalogue offers only the reference scenarios of the modes declared; a scenario of another mode runs with a [WARNING] (distributionMode). A framework save naming no mode, or an unknown one, is refused. The simulator references declare both modes. Simulator unchanged."
+      ]
+    },
     {
       "release": "2026.420",
       "date": "2026-10-23",

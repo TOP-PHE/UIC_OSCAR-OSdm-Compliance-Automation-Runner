@@ -281,6 +281,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     any journey. **The "Tick all" box sits in the scenario list**: anything
     reading the list's checkboxes must select `data-copy-action="toggle-code"`,
     or it reads the box's value `on` as a code (#802, 1.11.317).
+  - **Distribution modes** (#936, part A of #935, 1.11.386 / OTST_V2.0.216):
+    `distributionModes` in the framework (`PRODUCT`, `FARE`, one or both;
+    absent = product only, decision E1; `[]` or an unknown mode is a 400 at
+    the three framework writers, `distributionModesProblem()`). A scenario's
+    modes are `distributionModesOf()` (`utils/distributionModes.js`, pure):
+    FARE when it asks a `FARE_*` part or sets `expectFares: false`, PRODUCT
+    when it asks no fare or books the product (`bookMode: PRODUCT`).
+    `SIM_WRONG_FARE_UNREQUESTED_*` asks products only, so it is a product
+    sale. Warning `distributionMode:<MODE>` from `annotateDatafile()`; the
+    collection's text is `distributionModeWarning()` (`scenarioParser.js`),
+    kept out of `featureNotDeclaredWarning()` for Sonar's complexity limit.
+    The catalogue's `missingFor()` names the mode first. Editor: 🧭
+    Distribution after the OSDM version (`FW_DISTRIBUTION_MODES`, pinned to
+    the server's list; `clickDistributionMode()` before the click switch;
+    the last mode cannot be unticked). The simulator references take both
+    modes from the profile (`fares`) until the checklist asks (#938).
   - **AI analysis of results** (#801; PR 1 = 1.11.318, access only; per
     provider since 1.11.320). Two locks, no switch: a Test Manager's
     `ai_access_request`, **one row per (company or provider, user)**, naming

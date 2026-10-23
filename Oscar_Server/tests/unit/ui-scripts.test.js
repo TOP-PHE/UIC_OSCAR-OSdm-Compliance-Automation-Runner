@@ -1223,3 +1223,69 @@ describe('#733 the place lookup offers Test Data stop places first', () => {
     expect(failure({}, 400)).toBe('Places download failed: HTTP 400');
   });
 });
+
+describe('js/scenarios.js — the Distribution section (#936)', () => {
+  const page = 'js/scenarios.js';
+  const escHtml = require('../../public/js/esc.js').esc;
+  const lines = read(page).split('\n');
+  const start = lines.indexOf('const FW_DISTRIBUTION_MODES = [');
+  const FW_DISTRIBUTION_MODES = vm.runInNewContext(
+    lines.slice(start, lines.indexOf('];', start) + 1).join('\n').replace('const FW_DISTRIBUTION_MODES = ', ''));
+  const fwDistributionModes = loadFunction(page, 'fwDistributionModes', { FW_DISTRIBUTION_MODES });
+  const toggledDistributionModes = loadFunction(page, 'toggledDistributionModes', { FW_DISTRIBUTION_MODES, fwDistributionModes });
+
+  test('the page\'s modes are the server\'s', () => {
+    const { DISTRIBUTION_MODES } = require('../../src/utils/distributionModes');
+    expect(FW_DISTRIBUTION_MODES.map(([mode]) => mode)).toEqual([...DISTRIBUTION_MODES]);
+  });
+
+  test('nothing declared reads as product only, as on the server', () => {
+    const { declaredDistributionModes } = require('../../src/utils/distributionModes');
+    for (const fw of [{}, { distributionModes: [] }, { distributionModes: ['FARE', 'PRODUCT'] }, { distributionModes: ['X'] }, null]) {
+      expect(fwDistributionModes(fw)).toEqual(declaredDistributionModes(fw));
+    }
+  });
+
+  test('a click adds or removes a mode, in order, and never leaves none', () => {
+    expect(toggledDistributionModes({}, 'FARE')).toEqual(['PRODUCT', 'FARE']);
+    expect(toggledDistributionModes({ distributionModes: ['FARE'] }, 'PRODUCT')).toEqual(['PRODUCT', 'FARE']);
+    expect(toggledDistributionModes({ distributionModes: ['PRODUCT', 'FARE'] }, 'PRODUCT')).toEqual(['FARE']);
+    expect(toggledDistributionModes({}, 'PRODUCT')).toBeNull();
+    expect(toggledDistributionModes({ distributionModes: ['FARE'] }, 'FARE')).toBeNull();
+  });
+
+  test('the section: one option per mode, selected when declared', () => {
+    const panel = loadFunction(page, 'distributionPanelHtml', { FW_DISTRIBUTION_MODES, fwDistributionModes, esc: escHtml });
+    const html = panel({});
+    expect(html).toContain('🧭 Distribution');
+    expect(html).toContain('class="aftersales-opt selected" data-action="fw-distribution-mode" data-val="PRODUCT"');
+    expect(html).toContain('class="aftersales-opt" data-action="fw-distribution-mode" data-val="FARE"');
+    expect(panel({ distributionModes: ['PRODUCT', 'FARE'] }).match(/aftersales-opt selected/g)).toHaveLength(2);
+  });
+
+  test('a click on the last mode changes nothing and says why; another is saved', () => {
+    const saved = [];
+    const note = { textContent: '' };
+    const options = ['PRODUCT', 'FARE'].map((val) => ({ dataset: { val }, cls: new Set(), classList: { toggle(c, on) { if (on) this.owner.cls.add(c); else this.owner.cls.delete(c); } } }));
+    for (const o of options) o.classList.owner = o;
+    const wizData = { framework: {} };
+    const document = { getElementById: () => note, querySelectorAll: () => options };
+    const click = loadFunction(page, 'clickDistributionMode', { wizData, document, toggledDistributionModes, saveFrameworkDebounced: () => saved.push(1) });
+    expect(click('fw-pill', options[0])).toBe(false);
+    expect(click('fw-distribution-mode', options[0])).toBe(true);
+    expect(wizData.framework.distributionModes).toBeUndefined();
+    expect(note.textContent).toContain('at least one mode');
+    expect(saved).toHaveLength(0);
+    expect(click('fw-distribution-mode', options[1])).toBe(true);
+    expect(wizData.framework.distributionModes).toEqual(['PRODUCT', 'FARE']);
+    expect([...options[1].cls]).toEqual(['selected']);
+    expect(note.textContent).toBe('');
+    expect(saved).toHaveLength(1);
+  });
+
+  test('the click is handled before the click switch, and the section is drawn after the OSDM version', () => {
+    const source = read(page);
+    expect(source).toContain('if (clickDistributionMode(action, el)) return;');
+    expect(source.indexOf('${distributionPanelHtml(fw)}')).toBeGreaterThan(source.indexOf('data-action="wiz-osdm-version"'));
+  });
+});

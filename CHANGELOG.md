@@ -62,6 +62,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.386] / [collection-OTST_V2.0.216] — 2026-10-23
+
+Issue #936, part A of #935, release 2026.421. Simulator unchanged.
+
+### Added
+- **The distribution mode in the Test Framework** (`distributionModes`: `PRODUCT`, `FARE`, one or both). A framework that names none is product-based (decision E1 of #935), so every company keeps its scenarios and its catalogue.
+- **A scenario's modes** are read from the scenario (`utils/distributionModes.js`, pure):
+  - fare-based when it asks a `FARE_*` offer part, or expects no fare (`expectFares: false`, #905);
+  - product-based when it asks no fare, or books the product (`bookMode: PRODUCT`, #207).
+- **The catalogue** offers only the reference scenarios of the modes declared: `requirementsOf()` names the modes, and `missingFor()` says "fare-based distribution (Distribution)" first. With no mode named, the 73 entries are offered as before.
+- **The run**: a scenario of a mode not declared gets the warning `distributionMode:<MODE>`, which the collection writes as a `[WARNING]` naming the mode and the Test Framework section. Never a failure.
+- **Test Config › Test Framework › 🧭 Distribution**, after the OSDM version: two options, Product-based and Fare-based. The last one ticked cannot be unticked.
+- **The saves refuse a list that names no mode or an unknown one, with a 400**: the Test Framework save, the checklist apply and the configuration import, as for the OSDM version.
+- **The simulator references declare both modes**, taken from each provider's profile (fares since #903) until the checklist asks (#938). `fw.distributionModes` is read from a checklist that answers it.
+
+Checked:
+- `distribution-modes.test.js` (16):
+  - the rule on every simulator scenario;
+  - the warnings with no mode, fare only and both;
+  - the catalogue with no mode named, product, and fare only;
+  - the collection's text;
+  - the references and their run lists, which get no warning.
+- The route refuses `[]` and an unknown mode, and takes one, both, or none named.
+- `ui-scripts.test.js`: the page's modes are the server's, the toggle, the section, and the click on the last mode.
+- Six deliberate breaks (the rule, the warning, the catalogue, the toggle, the route, the collection's text) each make a test fail.
+
+---
+
 ## [server-1.11.385] / [collection-OTST_V2.0.215] — 2026-10-23
 
 Issue #930, PR 4, release 2026.420. Collection and simulator unchanged.

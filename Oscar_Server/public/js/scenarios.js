@@ -311,6 +311,69 @@ function fwTogglePartialScope(el, scope) {
   el.classList.toggle('selected', !on);
 }
 
+// #936: how a provider sells, product-based, fare-based or both. Kept in sync
+// with utils/distributionModes.js (DISTRIBUTION_MODES), pinned by
+// ui-scripts.test.js. No list means product only, so a first click starts
+// from it; the last mode cannot be unticked.
+const FW_DISTRIBUTION_MODES = [
+  ['PRODUCT', '🎫 Product-based', 'The provider sells products and issues the tickets'],
+  ['FARE', '🧩 Fare-based', 'The provider sells fares for a requested section; the distributor builds the ticket'],
+];
+
+// #936: the modes a framework declares, product only when it names none.
+function fwDistributionModes(fw) {
+  const raw = Array.isArray(fw?.distributionModes) ? fw.distributionModes : [];
+  const declared = FW_DISTRIBUTION_MODES.map(([m]) => m).filter(m => raw.includes(m));
+  return declared.length > 0 ? declared : ['PRODUCT'];
+}
+
+// #936: the modes after a click on one, in order; null when none would be left.
+function toggledDistributionModes(fw, mode) {
+  const list = fwDistributionModes(fw);
+  const next = list.includes(mode) ? list.filter(m => m !== mode) : [...list, mode];
+  if (next.length === 0) return null;
+  return FW_DISTRIBUTION_MODES.map(([m]) => m).filter(m => next.includes(m));
+}
+
+// #936: the framework editor's Distribution section.
+function distributionPanelHtml(fw) {
+  const modes = fwDistributionModes(fw);
+  const options = FW_DISTRIBUTION_MODES.map(([mode, label, hint]) => `
+        <div class="aftersales-opt${modes.includes(mode) ? ' selected' : ''}" data-action="fw-distribution-mode" data-val="${esc(mode)}">
+          <div class="aftersales-opt-label">${esc(label)}</div>
+          <div class="aftersales-opt-desc">${esc(hint)}</div>
+        </div>`).join('');
+  return `
+  <div class="fw-section">
+    <div class="fw-section-head open" data-action="fw-toggle">🧭 Distribution<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body open">
+      <div style="font-size:12px;color:#546e7a;margin-bottom:8px">How the provider sells: one mode or both. The scenario catalogue offers the reference scenarios of the modes ticked; a scenario of another mode runs with a warning.</div>
+      <div class="aftersales-options">${options}</div>
+      <div id="fw-distribution-note" style="color:#e65100;font-size:12px;margin-top:6px"></div>
+    </div>
+  </div>`;
+}
+
+// #936: a click on a distribution mode, handled before the click switch
+// (Sonar S1479) like clickFwList(). True when the click was this one.
+function clickDistributionMode(action, el) {
+  if (action !== 'fw-distribution-mode') return false;
+  const fw = wizData.framework;
+  const next = toggledDistributionModes(fw, el.dataset.val);
+  const note = document.getElementById('fw-distribution-note');
+  if (!next) {
+    if (note) note.textContent = 'A provider sells in at least one mode: tick the other one first.';
+    return true;
+  }
+  fw.distributionModes = next;
+  for (const opt of document.querySelectorAll('[data-action="fw-distribution-mode"]')) {
+    opt.classList.toggle('selected', next.includes(opt.dataset.val));
+  }
+  if (note) note.textContent = '';
+  saveFrameworkDebounced();
+  return true;
+}
+
 // #748: how a provider takes an offer request. Kept in sync with
 // frameworkGating.js (OFFER_REQUEST_FORMS, offerRequestFormDeclared()).
 const FW_OFFER_REQUEST_FORMS = [
@@ -4534,6 +4597,7 @@ const WIZ_PAX_TO_OSDM_TYPE = {
 function emptyFramework() {
   return {
     osdmVersion:   '3.4',
+    distributionModes: ['PRODUCT'],   // #936
     concurrentSessionLimit: 1,
     salesFlows:    ['SALE'],
     iropsCodes:    { refund: [...WIZ_IROPS_MANDATORY], exchange: [...WIZ_IROPS_MANDATORY] },
@@ -4688,6 +4752,7 @@ function renderWizardStep1() {
       </div>
     </div>
   </div>
+${distributionPanelHtml(fw)}
 
   <!-- Concurrent Session Limit -->
   <div class="fw-section">
@@ -7981,6 +8046,7 @@ document.body.addEventListener('click', function(e) {
   if (isLockedControl(el)) { e.preventDefault(); return; }
   const action = el.dataset.action;
   if (clickFwList(action, el)) return;   // #887, before the switch (Sonar S1479)
+  if (clickDistributionMode(action, el)) return;   // #936, likewise
 
   switch (action) {
     // ── Static / section actions ──────────────────────────────────────────────
