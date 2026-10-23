@@ -28,6 +28,7 @@
 const { ageRangesOf } = require('./scenarioCatalogue');
 const { declaredCards, passengersWithCard } = require('./reductionCards');
 const { declaredProducts, declaredGroupProducts } = require('./namedProducts');
+const { fareClusterFor, freeUnderAgeOf } = require('./fareDeclarations');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -136,7 +137,17 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
   } else if (out.desiredFlexibility) {
     out.desiredFlexibility = saleFlexibility(out.desiredFlexibility, framework);
   }
+  adaptFareScenario(out, framework, toCheck);
   return { scenario: out, toComplete, toCheck };
+}
+
+// #937: a fare scenario chooses a cluster the provider declares, and its
+// section is moved onto the chosen trip by the copy (fareSections.js).
+function adaptFareScenario(out, framework, toCheck) {
+  if (out.desiredFareCluster) out.desiredFareCluster = fareClusterFor(out.desiredFareCluster, framework);
+  if (Array.isArray(out.requestedSections) && out.requestedSections.length) {
+    toCheck.push('the provider must sell fares for the section asked on the chosen trip (requestedSections)');
+  }
 }
 
 // #699: a passenger list of `count` passengers made from `source`: its own
@@ -198,8 +209,10 @@ function adaptCatalogueDatafile(catalogueFile, entries, frameworkConfig) {
     if (entry.tripAs === 'SPECIFICATION') {
       toCheck.push('the chosen train must have its number and operator code in Test Data: a trip specification names both');
     }
+    // #937: the fares the provider gives on the chosen trip decide the model.
+    if (entry.combinationModel) toCheck.push(`the provider's fares on the chosen trip must be combined by ${entry.combinationModel}`);
     // #759: the trip id comes from the provider's own trip search.
-    if (entry.tripAs === 'TRIP_IDS') {
+    if (entry.tripAs === 'TRIP_IDS' || (!entry.tripAs && ARMED.has(scenario.offersByTripIds))) {
       toCheck.push('the provider\'s POST /trips-collection must list a trip for the chosen train\'s stations and time');
     }
     // #709: a provider without the passenger update gets none.
@@ -337,6 +350,11 @@ function withCurrencies(datafile, entries) {
 // Nothing when the framework does not declare it (the entry then cannot be
 // copied).
 function applyLimit(limit, scenario, source, fw, { ownList, toCheck, toComplete }) {
+  // #937: the free child, apart so the chain stays under Sonar's limit.
+  if (limit === 'FREE_CHILD') {
+    applyFreeChildLimit(source, fw, ownList);
+    return;
+  }
   if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
     applyHorizonLimit(limit, scenario, fw);
   } else if (limit === 'AGE_RANGES') {
@@ -352,6 +370,25 @@ function applyLimit(limit, scenario, source, fw, { ownList, toCheck, toComplete 
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
   }
+}
+
+// #937: the free child is one year under the declared age; nothing without one.
+function applyFreeChildLimit(source, fw, ownList) {
+  const age = freeUnderAgeOf(fw);
+  if (age) ownList(freeChildPassengers(source?.passengers, age));
+}
+
+// #937: the source's passengers, the child (an age on the day of travel) one
+// year under the age the framework declares free, never below 0.
+function freeChildPassengers(source, age) {
+  return arr(source).filter(isObj).map((p) => {
+    const out = structuredClone(p);
+    if (Number.isInteger(out.bornYearsBeforeTravel)) {
+      out.bornYearsBeforeTravel = Math.max(0, age - 1);
+      delete out.bornDaysAfter;
+    }
+    return out;
+  });
 }
 
 // #704: the last day of the sales horizon, or the day after.

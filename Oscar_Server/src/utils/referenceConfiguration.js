@@ -328,6 +328,9 @@ function buildReference({ provider, profile, answers, datafile }) {
   // #936: a simulated provider sells products, and fares when its profile
   // has them (every one since #903). The checklist does not ask yet (#938).
   framework.distributionModes = profile?.fares ? ['PRODUCT', 'FARE'] : ['PRODUCT'];
+  // #937: what it sells in fares, from the same profile.
+  const fares = require('./fareDeclarations').referenceFares(profile);
+  if (fares) framework.fares = fares;
   return {
     [REFERENCE_KEY]: {
       format: REFERENCE_FORMAT,

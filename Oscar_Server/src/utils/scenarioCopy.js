@@ -39,6 +39,7 @@ const {
 } = require('./frameworkGating');
 const TripApply = require('../../public/js/trip-apply');
 const { idAllocator } = require('./datafileOwnership');
+const { mappedSections } = require('./fareSections');
 
 const arr = v => (Array.isArray(v) ? v : []);
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -224,6 +225,11 @@ function copiedEntry(ctx, list, sourceEntry, build) {
   return ctx.entryIds.get(key);
 }
 
+// #937: a fare section names stations of the trip, now the target's.
+function moveSections(copy, fromTrip, toTrip) {
+  if (Array.isArray(copy.requestedSections)) copy.requestedSections = mappedSections(copy.requestedSections, fromTrip, toTrip);
+}
+
 // `sc` re-pointed at copies of its entries in the target, or null (errors recorded).
 function copiedScenario(ctx, sc) {
   const { source, errors } = ctx;
@@ -235,6 +241,7 @@ function copiedScenario(ctx, sc) {
   const copy = clone(sc);
   for (const k of Object.keys(copy)) if (k.startsWith('__')) delete copy[k];
   copy.tripRequirementId = tripId;
+  moveSections(copy, tripEntry, findById(ctx.out.tripRequirements, tripId));
 
   for (const [field, list] of COPIED_LISTS) {
     if (copy[field] == null) continue;
