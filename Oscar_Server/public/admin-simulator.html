@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!--
+Copyright [2026] [International Union of Railways (UIC)]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR — OSDM Simulator</title>
+<link rel="stylesheet" href="/css/oscar-banner.css">
+<link rel="stylesheet" href="/css/oscar-page.css">
+<style>
+.container{max-width:1000px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;color:#78909c;text-transform:uppercase;letter-spacing:.4px;padding:8px 6px;border-bottom:2px solid #eceff1}
+td{padding:8px 6px;border-bottom:1px solid #f1f3f4;vertical-align:middle}
+td.actions{text-align:right;white-space:nowrap}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-danger{background:#c62828;color:#fff}
+.btn-danger:hover{background:#8e0000}
+.muted{font-size:12px;color:#90a4ae}
+.empty{padding:18px;text-align:center;color:#90a4ae;font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:2px solid #eceff1;margin:0 0 10px}
+.tab{padding:8px 14px;color:#607d8b;text-decoration:none;border-bottom:3px solid transparent;margin-bottom:-2px;font-weight:600}
+.tab.active{color:#1a237e;border-bottom-color:#1a237e}
+.provider-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.add-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.add-row input{flex:1 1 200px;min-width:0}
+.add-row select,.add-row button{flex:0 0 auto;width:auto}
+.key-box{display:flex;gap:10px;align-items:center;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px;margin:10px 0}
+.key-box code{flex:1;font-family:Consolas,monospace;font-size:13px;word-break:break-all;color:#37474f}
+.table-wrap{overflow-x:auto}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <script src="/js/banner.js"></script>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'admin-simulator');</script>
+</header>
+
+<div class="container">
+  <h2>🧪 OSDM Simulator</h2>
+  <div id="msg" class="msg"></div>
+
+  <div class="card">
+    <h3>Connection</h3>
+    <p class="muted" style="font-size:13px;color:#546e7a;line-height:1.6">
+      OSCAR manages the simulator's accounts by calling its administration API with a key. The key is drawn on the
+      simulator's host (<code>openssl rand -hex 32</code>), which keeps only its SHA-256 in <code>SIM_ADMIN_KEY_SHA256</code>.
+      OSCAR keeps it encrypted and never shows it again. Address and key are tried before they are saved.
+    </p>
+    <div class="row">
+      <div class="field">
+        <label for="sim-url">Simulator address</label>
+        <input type="url" id="sim-url" maxlength="300" placeholder="https://simulator.example.org">
+      </div>
+      <div class="field">
+        <label for="sim-key">Administration key</label>
+        <input type="password" id="sim-key" maxlength="512" autocomplete="off" placeholder="leave empty to keep the saved key">
+      </div>
+    </div>
+    <button class="btn btn-primary" data-action="save-config">Try and save</button>
+    <button class="btn btn-secondary" data-action="remove-config">Forget</button>
+    <span class="muted" id="config-state"></span>
+  </div>
+
+  <div class="card">
+    <nav class="tabs" aria-label="Sections">
+      <a href="#accounts" class="tab" data-tab="accounts">Accounts</a>
+      <a href="#stats" class="tab" data-tab="stats">Statistics</a>
+      <a href="#audit" class="tab" data-tab="audit">Audit</a>
+    </nav>
+    <p class="muted" id="accounts-help">One account per OSCAR account keeps their bookings apart. A new secret is shown once: copy it then.
+      A deleted account, and the old secret of a reset one, stop working at once; the other accounts and their bookings stay.</p>
+    <div id="stats-help" style="display:none">
+      <p class="muted">What each account did on the simulator, counted by the simulator itself: tokens asked, OSDM requests, offers asked, bookings made and confirmed, refunds and exchanges confirmed, answers in error. Requests whose account is not known (no token, a refused one) are counted on the provider's line.</p>
+      <label for="stats-days">Period</label>
+      <select id="stats-days">
+        <option value="1">Today</option>
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="365">Last 365 days</option>
+      </select>
+    </div>
+    <p class="muted" id="audit-help" style="display:none">The last 200 changes and refused keys, newest first, as the simulator keeps them.</p>
+  </div>
+
+  <section id="accounts-view">
+    <div id="new-secret" style="display:none"></div>
+    <div id="providers"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section id="stats-view" style="display:none">
+    <h3>Test sets run from OSCAR</h3>
+    <p class="muted">The runs OSCAR sent to this simulator, counted from OSCAR's own results: sets started (one click on Run), scenarios run, scenarios with at least one failed check, and failed checks.</p>
+    <div id="runs"><div class="empty">Loading…</div></div>
+    <h3>Requests seen by the simulator</h3>
+    <div id="stats"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section id="audit-view" style="display:none">
+    <div class="card">
+      <div class="table-wrap" id="audit"><div class="empty">Loading…</div></div>
+    </div>
+  </section>
+</div>
+
+<script src="/js/admin-simulator.js"></script>
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+</body>
+</html>

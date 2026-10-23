@@ -277,6 +277,7 @@
         { href: '/admin.html?tab=activity',  label: 'Server Activity',  page: 'admin-activity'  },
         { href: '/admin.html?tab=config',    label: 'Server Config',    page: 'admin-config'    },
         { href: '/admin-dashboard.html',     label: 'Admin Dashboard',  page: 'admin-dashboard' },
+        { href: '/admin-simulator.html',     label: 'OSDM Simulator',   page: 'admin-simulator' },
         { href: '/report-builder.html',      label: 'Report Builder',   page: 'report-builder'  },
       ];
     } else if (isCertif) {

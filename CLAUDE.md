@@ -281,6 +281,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     any journey. **The "Tick all" box sits in the scenario list**: anything
     reading the list's checkboxes must select `data-copy-action="toggle-code"`,
     or it reads the box's value `on` as a code (#802, 1.11.317).
+  - **Distribution modes** (#936, part A of #935, 1.11.386 / OTST_V2.0.216):
+    `distributionModes` in the framework (`PRODUCT`, `FARE`, one or both;
+    absent = product only, decision E1; `[]` or an unknown mode is a 400 at
+    the three framework writers, `distributionModesProblem()`). A scenario's
+    modes are `distributionModesOf()` (`utils/distributionModes.js`, pure):
+    FARE when it asks a `FARE_*` part or sets `expectFares: false`, PRODUCT
+    when it asks no fare or books the product (`bookMode: PRODUCT`).
+    `SIM_WRONG_FARE_UNREQUESTED_*` asks products only, so it is a product
+    sale. Warning `distributionMode:<MODE>` from `annotateDatafile()`; the
+    collection's text is `distributionModeWarning()` (`scenarioParser.js`):
+    `featureNotDeclaredWarning()` is that `||` `capabilityWarning()` (the
+    other entries), so each stays under Sonar's complexity limit of 15.
+    The catalogue's `missingFor()` names the mode first. Editor: 🧭
+    Distribution after the OSDM version (`FW_DISTRIBUTION_MODES`, pinned to
+    the server's list; `clickDistributionMode()` before the click switch;
+    the last mode cannot be unticked). The simulator references take both
+    modes from the profile (`fares`) until the checklist asks (#938).
   - **AI analysis of results** (#801; PR 1 = 1.11.318, access only; per
     provider since 1.11.320). Two locks, no switch: a Test Manager's
     `ai_access_request`, **one row per (company or provider, user)**, naming
@@ -1613,6 +1630,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   stores one. The simulator's `faresWithoutSection` variant is chosen by the
   trip's origin (`0000086`, trip 31), the only variant without a section
   start. #244 case 2 (section = whole trip) waits for OTST (#242 D5).
+  #941 (1.11.387, data only) adds N2/N4 by the other forms: an empty list by
+  search, no section and an empty list by trip id (`SIM_NHF_FARE_*_SRCH_38` /
+  `_TRIPIDS_38`); `datafile.test.js` ties `offersByTripIds` to `_TRIPIDS_` in
+  the code.
   **The fare sale** (#906, fares 2, 1.11.377 / OTST_V2.0.210, simulator
   0.46.0): step 01 books the fare offer chosen when no FAIL-level check
   of it failed (`fareSaleDecision()`, `__fareSale`) and routes to 02;
@@ -1661,6 +1682,31 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   with `fareRefundFee` no copy below 3.8. **The simulator of the tests
   runs on a fixed clock** (`tests/helpers.js`, 2026-11-02T09:00Z): a test
   date must be fixed too, never "now plus N days".
+  **Fare reservations** (#255, fares 4, 1.11.382 / OTST_V2.0.215,
+  simulator 0.50.0): `FARE_RESERVATION` for a passenger of type BICYCLE;
+  from OSDM 3.8 a reservation part in `FARE_MODE` (osdm.io, handling
+  reservations), checked by `library-bruno/fareReservations.js` (V1–V12).
+  Step 01 selects the chosen offer's fare reservations
+  (`optionalReservationSelections`: OSDM books only the mandatory ones
+  unasked); `fareBooking.js` counts them as fare parts
+  (`farePartIdsOf()`, `__fareReservationIds`), never as products
+  (`productPartIdsOf(booking, offer)` leaves out FARE_MODE ones and those
+  that pair with the offer's, so a provider booking one in product mode
+  fails V1, not F4). An offer holding only fare reservations is a fare
+  offer (`hasFareParts()`), and O7 lets a bicycle held by a reservation go
+  without a fare. One defect, one check: a bicycle with a reservation in
+  product mode fails V1 only (V3 asks for a reservation, any mode). At 06b,
+  an error or an empty fulfilment is allowed (V12, osdm.io). Below 3.8:
+  one WARNING, nothing checked; `version-copies-lib.js` gives such a
+  scenario no 3.6 or 3.7 copy. Simulator: a bicycle has no fare, its place
+  is its fare (`bicyclePlacesOf()` in `fares.js`, one per bicycle and leg
+  of the section, marked by the hidden `FARE_PLACE` of `reservations.js`);
+  booked only when selected, fulfilled with the fares; variants
+  `bicycleReservationProductMode` (station `0000088`) and
+  `fare-reservation-product-mode` (last name). `displays.js` puts its own
+  `validationLogger` on the global object when loaded: a unit test that
+  watches the global logger sets it again after requiring a module that
+  loads `displays.js`.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,
@@ -2432,6 +2478,53 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     run's variables back into the environment file** (secret variables
     excepted): check its size before committing it; #593's first push carried
     918 lines of run state.
+  - **Accounts in a data folder, and an administration API** (#930, PR 1 =
+    simulator 0.51.0). With `SIM_DATA_DIR` (`deploy/data` in the compose
+    file) the accounts are `accounts.json` (SHA-256 of each secret, made from
+    `clients.json` on the first start only) and `src/accounts.js` changes the
+    `clients` Map *in place*, so `app.js` reads it as before. A token carries
+    `s`, 16 hex of its secret's digest (`secretTag()`): a reset or a
+    delete-and-re-add refuses the old tokens without a clock. `/admin/api/`
+    (`src/admin.js`) has **one caller, the OSCAR server** (maintainer
+    decision: OSCAR's administrators manage the simulator, no login of its
+    own): `Authorization: Bearer <key>`, the simulator holding only
+    `SIM_ADMIN_KEY_SHA256` (`deploy/.env`), `X-Admin-Actor` = the OSCAR
+    administrator, kept in `audit.log` (never a secret). A first version with
+    its own sign-in, sessions, CSRF and `make-admin.js` was dropped before
+    merge. Without the key there is no `/admin` (404). The automatic update
+    only restarts the container, so an installed simulator gets the data
+    folder and the key at its next `up -d`, which needs `deploy/data` made
+    first (owner 1000): Docker would make it as root and the start would
+    stop. PR 3–4 are the statistics.
+    **PR 2 (1.11.383): OSCAR's page**, *Admin → OSDM Simulator*
+    (`admin-simulator.html`, routes `/v1/admin/simulator/…`, administrators
+    only). `services/simulatorAdmin.js` is the one place OSCAR calls the
+    simulator: address in `server_config` (`SIMULATOR_ADMIN_URL`), key
+    encrypted (`SIMULATOR_ADMIN_KEY_ENC`) and sent only to the address it was
+    saved with (`SIMULATOR_ADMIN_KEY_URL`, `keyRefusal()`), tried before it is
+    saved (accounts list, else 422): what is tried is written as `…_PENDING_…`
+    and read back from the database, never passed from the request to
+    `fetch` (CodeQL's SSRF rule stopped the first version), then removed; urlPolicy, `redirect: 'manual'`, 15 s,
+    256 KB, key masked. The route file is mounted before `/v1/admin`. Its
+    integration test runs the real simulator code from `OSDM_Simulator/src`
+    on a loopback port, so a change to the simulator's API fails there.
+    **PR 3 (1.11.384 / simulator 0.52.0): statistics.** `src/stats.js`
+    counts each request per UTC day, provider and account from method, path
+    and status only (`countersOf()`), in `<data>/stats.json` (flushed each
+    minute and on close, `SIM_STATS_RETENTION_DAYS`); a wrong secret or token
+    names no known account and counts as the provider's `unidentified`.
+    `GET /admin/api/stats?from&to`, OSCAR `GET /v1/admin/simulator/stats?days=`
+    (1/7/30/90/365, `statsView()` counter by counter) and the page's
+    Statistics tab. **A secret is never shown again** (only its SHA-256 is
+    kept, on purpose): to hand one over, give a new one.
+    **PR 4 (1.11.385): the test sets, from OSCAR's own runs.** `GET
+    /v1/admin/simulator/runs?days=` reads `runs` (+ failed `run_assertions`)
+    whose `api_base_used` is under the saved simulator address
+    (`utils/simulatorRuns.js` `providerOfBase()`: same origin, the next
+    segment is the provider); sets = distinct `batch_id`. Nothing is added to
+    a run's requests, so no provider gets a header it does not know. Counts
+    only, per provider and user e-mail (the admin dashboard already lists
+    submitters by e-mail).
   - **`node --test` takes a glob, not a directory**, on Node 22 and later
     (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
     destination directory. Sonar's coverage run starts from the repository root
@@ -2734,9 +2827,11 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
       sales/refund).
     - **#198/#199/#200** — SNCF-specific scenarios (PRM/IRT, claims,
       exchange).
-    - **All "fare" issues** (**#205, #206, #207, #242–#248, #255**) — fare
-      distribution (Shop/Book/Ticket) scenario coverage hasn't started at
-      all yet; a big, self-contained subject to come, not a small follow-up.
+    - **The fare programme (#242)** is built: offers #903–#905, booking and
+      fulfilment #906, refund #907, fare reservations #255. Open with OTST:
+      D5 (#244 case 2), D6 (the refund fee request form, provisional in
+      #907), D7 (a real provider with fare mode). The old OTST issues
+      #205–#207 and #243–#248 are closed on the maintainer's word only (D8).
   - **Explicitly reserved for the user's own review — do NOT close these:**
     **#226** (exchange → new offer request), **#227** (optional offer-request
     parameters, e.g. age vs. birth date / gender for night trains), **#221**

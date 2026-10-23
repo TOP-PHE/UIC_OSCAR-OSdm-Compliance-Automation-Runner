@@ -187,6 +187,8 @@ function requirementsOf(scenario, datafile) {
     purchaserAfterBooking: require('./undeclaredSteps').purchaserAfterBooking(scenario),
     // #780 PR B: the trip search parameters its search sends.
     tripSearchParameters: require('./tripSearchParameters').tripSearchParametersOf(scenario, datafile),
+    // #936: product-based, fare-based, or both.
+    distributionModes: require('./distributionModes').distributionModesOf(scenario, datafile),
   };
 }
 
@@ -220,10 +222,20 @@ function missingFor(requirements, framework) {
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
   return [
+    ...distributionMissing(requirements, fw),
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
     ...stepsMissing(requirements, fw), ...tripParametersMissing(requirements, fw),
   ];
+}
+
+// #936: a distribution mode the framework does not declare, as a sentence.
+// Named first: a fare scenario offered to a product-only provider is out of
+// scope, whatever else it lacks.
+function distributionMissing(requirements, fw) {
+  const { distributionModeDeclared, DISTRIBUTION_MODE_TEXT } = require('./distributionModes');
+  return arr(requirements.distributionModes).filter((mode) => !distributionModeDeclared(fw, mode))
+    .map((mode) => `${DISTRIBUTION_MODE_TEXT[mode]} distribution (Distribution)`);
 }
 
 // #780 PR B: the trip search parameters a framework does not take, as sentences.

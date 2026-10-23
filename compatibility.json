@@ -1,8 +1,74 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.416",
+  "current_release": "2026.422",
   "releases": [
+    {
+      "release": "2026.422",
+      "date": "2026-10-23",
+      "server": "1.11.387",
+      "collection": "OTST_V2.0.217",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#941: three negative fare scenarios on the simulator: an empty section list by search, no section and an empty list by trip id, with expectFares false; copies for every version. No code change: check N is the same for every form of request. Closes the gaps of #244 and #246 (case 2 still waits for D5)."
+      ]
+    },
+    {
+      "release": "2026.421",
+      "date": "2026-10-23",
+      "server": "1.11.386",
+      "collection": "OTST_V2.0.216",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#936 (part A of #935): the Test Framework says how the provider sells, product-based, fare-based or both (distributionModes; none named = product-based). The scenario catalogue offers only the reference scenarios of the modes declared; a scenario of another mode runs with a [WARNING] (distributionMode). A framework save naming no mode, or an unknown one, is refused. The simulator references declare both modes. Simulator unchanged."
+      ]
+    },
+    {
+      "release": "2026.420",
+      "date": "2026-10-23",
+      "server": "1.11.385",
+      "collection": "OTST_V2.0.215",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#930 PR 4: Admin → OSDM Simulator → Statistics also shows the test sets OSCAR sent to the simulator, per provider and user: sets run, scenarios, scenarios per set, scenarios with a failed check, failed checks. Counted from OSCAR's own runs; nothing more is sent to the simulator or to any provider. Collection and simulator unchanged."
+      ]
+    },
+    {
+      "release": "2026.419",
+      "date": "2026-10-23",
+      "server": "1.11.384",
+      "collection": "OTST_V2.0.215",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#930 PR 3: Admin → OSDM Simulator has a Statistics tab: per provider and account, tokens, OSDM requests, offers, bookings, confirmations, refunds, exchanges and answers in error, over 1 to 365 days. Counted by the simulator (0.52.0), per UTC day, in its data folder. Collection unchanged."
+      ]
+    },
+    {
+      "release": "2026.418",
+      "date": "2026-10-23",
+      "server": "1.11.383",
+      "collection": "OTST_V2.0.215",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#930 PR 2: OSCAR's administrators manage the OSDM simulator's accounts from Admin → OSDM Simulator (list, add, new secret, delete, the simulator's audit). The OSCAR server calls the simulator's administration API (simulator 0.51.0) with a key kept encrypted; the simulator keeps only its SHA-256. Collection unchanged."
+      ]
+    },
+    {
+      "release": "2026.417",
+      "date": "2026-10-22",
+      "server": "1.11.382",
+      "collection": "OTST_V2.0.215",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#255 (fares phase 4): fare reservations. FARE_RESERVATION asks for them, for a passenger of type BICYCLE: from OSDM 3.8 a reservation part in FARE_MODE with no product. Step 01 checks them (V1 fare mode, V2 no product, V3 each bicycle reserved, V8 none unasked) and selects them for the booking; they are booked and fulfilled with the fares (V9 in the booking, V10 statuses, V11 in a fulfilment of fares, V4 and V7 told). GET /fulfillments of a fare reservation may give an error or an empty fulfilment (V12). Simulator 0.50.0 gives each bicycle a place in fare mode from 3.8, with two wrong variants."
+      ]
+    },
     {
       "release": "2026.416",
       "date": "2026-10-22",

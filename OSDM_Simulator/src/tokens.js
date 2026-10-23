@@ -24,12 +24,15 @@ function createTokenService({ key = crypto.randomBytes(32), now = Date.now } = {
   const sign = (payload) => crypto.createHmac('sha256', key).update(payload).digest('base64url');
 
   // `faults` (#833): the faults every request with this token is answered with.
-  function issue(provider, clientId, lifetimeSeconds, faults = []) {
+  // `secretTag` (#930): a few characters of the digest of the secret the token
+  // was asked with, so that a new secret ends the tokens of the old one.
+  function issue(provider, clientId, lifetimeSeconds, faults = [], secretTag = '') {
     const payload = Buffer.from(JSON.stringify({
       p: provider,
       c: clientId,
       e: Math.floor(now() / 1000) + lifetimeSeconds,
       ...(faults.length ? { f: faults } : {}),
+      ...(secretTag ? { s: secretTag } : {}),
       // Two tokens issued in the same second for the same client still differ.
       n: crypto.randomBytes(6).toString('base64url'),
     })).toString('base64url');
@@ -55,7 +58,8 @@ function createTokenService({ key = crypto.randomBytes(32), now = Date.now } = {
     if (!claims || typeof claims.p !== 'string' || typeof claims.c !== 'string' || typeof claims.e !== 'number') return null;
     if (claims.e <= Math.floor(now() / 1000)) return null;
     const faults = Array.isArray(claims.f) ? claims.f.filter((f) => typeof f === 'string') : [];
-    return { provider: claims.p, clientId: claims.c, expiresAt: claims.e, faults };
+    const secretTag = typeof claims.s === 'string' ? claims.s : '';
+    return { provider: claims.p, clientId: claims.c, expiresAt: claims.e, faults, secretTag };
   }
 
   return { issue, verify };

@@ -76,32 +76,55 @@ function readNextFulfillment() {
 function checkFulfillmentReadStep(status, body) {
   const ids = parseEnvJson('__fulfillmentsToRead', []) || [];
   const id = ids[0];
-  if (status !== 200) {
-    const { classifySystemInfoStatus } = require('./osdmCompliance.js');
-    const cls = classifySystemInfoStatus(status, 'Fulfillment', body);
-    if (cls.outcome === 'skip') {
-      if (cls.log) validationLogger(cls.log);
-      test(`HTTP response status — not implemented by this provider (auto-detected): 06b. GET Fulfillment returns ${status}`, () => {});
-      bru.setEnvVar('__fulfillmentsToRead', JSON.stringify([]));
-      return AFTER_READS;
-    }
-    test(`HTTP response status — expected 200, actual: ${status}`, () => { throw new Error(cls.message || `HTTP ${status} received, expected 200`); });
-  } else {
-    test('HTTP response status — expected 200, actual: 200', () => {});
-    for (const p of Array.isArray(body?.problems) ? body.problems : []) {
-      validationLogger(`[INFO] GET /fulfillments/${id}: the provider says ${p?.code ?? '?'} — ${p?.detail || p?.title || ''}`);
-    }
-    // #906: a fare fulfilment has no document to check; its own checks instead.
-    if (require('./fares.js').isFareSale()) {
-      const fareBooking = require('./fareBooking.js');
-      fareBooking.recordFareChecks(fareBooking.fulfillmentReadChecks(body, id));
-    } else {
-      record(fd.checkFulfillmentRead(body, id, parseEnvJson('__fulfillmentDocHolders', {}) || {}));
-    }
+  if (status === 200) {
+    checkFulfillmentAnswer(body, id);
+  } else if (!checkFulfillmentNotRead(status, body, id)) {
+    bru.setEnvVar('__fulfillmentsToRead', JSON.stringify([]));
+    return AFTER_READS;
   }
   const rest = ids.slice(1);
   bru.setEnvVar('__fulfillmentsToRead', JSON.stringify(rest));
   return rest.length > 0 ? READ_STEP : AFTER_READS;
+}
+
+// 06b answered 200: the fulfillment and its documents.
+function checkFulfillmentAnswer(body, id) {
+  test('HTTP response status — expected 200, actual: 200', () => {});
+  for (const p of Array.isArray(body?.problems) ? body.problems : []) {
+    validationLogger(`[INFO] GET /fulfillments/${id}: the provider says ${p?.code ?? '?'} — ${p?.detail || p?.title || ''}`);
+  }
+  // #906: a fare fulfilment has no document to check; its own checks instead.
+  if (require('./fares.js').isFareSale()) {
+    const fareBooking = require('./fareBooking.js');
+    fareBooking.recordFareChecks(fareBooking.fulfillmentReadChecks(body, id));
+  } else {
+    record(fd.checkFulfillmentRead(body, id, parseEnvJson('__fulfillmentDocHolders', {}) || {}));
+  }
+}
+
+// 06b answered another status. False when the provider does not implement the
+// read: no other fulfillment is read then. True otherwise.
+function checkFulfillmentNotRead(status, body, id) {
+  if (fareReservationRead()) {
+    // #255 V12: in fare mode the client makes the fulfilment; an error is allowed.
+    validationLogger(`[INFO] [fares V12] GET /fulfillments/${id} answered ${status}, which OSDM allows for a fare reservation (${require('./fareReservations.js').READ_ALLOWED}).`);
+    test(`HTTP response status — 06b. GET Fulfillment returns ${status}, allowed for a fare reservation (OSDM handling reservations)`, () => {});
+    return true;
+  }
+  const { classifySystemInfoStatus } = require('./osdmCompliance.js');
+  const cls = classifySystemInfoStatus(status, 'Fulfillment', body);
+  if (cls.outcome === 'skip') {
+    if (cls.log) validationLogger(cls.log);
+    test(`HTTP response status — not implemented by this provider (auto-detected): 06b. GET Fulfillment returns ${status}`, () => {});
+    return false;
+  }
+  test(`HTTP response status — expected 200, actual: ${status}`, () => { throw new Error(cls.message || `HTTP ${status} received, expected 200`); });
+  return true;
+}
+
+// #255: the read of a fulfilment in a fare sale that holds fare reservations.
+function fareReservationRead() {
+  return require('./fares.js').isFareSale() && (parseEnvJson('__fareReservationIds', []) || []).length > 0;
 }
 
 // ── 07 ──────────────────────────────────────────────────────────────────────

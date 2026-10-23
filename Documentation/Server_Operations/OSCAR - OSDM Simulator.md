@@ -93,6 +93,23 @@ treats every client of a provider alike. Give each OSCAR account a client of
 its own: two accounts that share one see each other's bookings on the
 simulator.
 
+The data folder (#930) keeps the accounts from the first start on, imported
+from `clients.json`, with the audit of their changes. It belongs to the
+container's user, and to it only. Then draw the administration key: OSCAR's
+administrators manage the accounts from OSCAR, whose server calls the
+simulator with this key. The simulator keeps only its SHA-256, in `.env` next
+to the compose file (git ignores it); the key itself goes into OSCAR (*Admin →
+OSDM Simulator*, OSCAR 1.11.383 or later) and is then needed nowhere else:
+
+```bash
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+install -d -m 700 -o 1000 -g 1000 data
+KEY=$(openssl rand -hex 32)
+printf 'SIM_ADMIN_KEY_SHA256=%s\n' "$(printf %s "$KEY" | sha256sum | cut -d' ' -f1)" > .env && chmod 600 .env
+echo "$KEY"      # copy it into OSCAR now; it is kept nowhere on this host
+unset KEY
+```
+
 Start the simulator and check it from the host:
 
 ```bash
@@ -357,12 +374,59 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 | Update the simulator | automatic on a new version, once set up (see below); by hand: `git -C /opt/osdm-simulator pull && docker compose restart` |
 | See which version runs | `curl -s https://<simulator-host>/healthz` (`"version"`), or the first line of `docker compose logs` (`OSDM simulator <version> listening on …`) |
 | Replace all clients and secrets | see below |
-| Add a client | add an entry to `clients.json` in the deploy folder (an id of the same form, a secret of 32 characters or more), `docker compose restart` |
+| Add, delete a client, give it a new secret | from OSCAR (*Admin → OSDM Simulator*), while it runs (below); `clients.json` is read on the first start only |
+| Change the administration key | draw a new one as in section 3 (it replaces `.env`), `docker compose up -d`, and enter it in OSCAR |
 | Clear every booking and end every token | `docker compose restart` |
 | Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
 
-A restart clears everything: bookings are kept in memory only, and the key that
-signs the tokens is drawn at start-up.
+A restart clears the bookings and the tokens: they are kept in memory only, and the key that signs the tokens is drawn at
+start-up. The accounts stay: they are in the data folder.
+
+**Accounts while it runs** (#930). OSCAR's administrators add, delete or
+reset them from OSCAR, in *Admin → OSDM Simulator*. The first time, enter the
+simulator's address (`https://<simulator-host>`) and the key drawn in section
+3, and press *Try and save*: OSCAR asks the simulator for its accounts with
+that key, and saves address and key only if it answers. A new secret is shown once: hand it over then. A
+deleted account, and the old secret of a reset one, are refused at once,
+tokens included; the other accounts and their bookings are not touched. Each
+change is a line of `deploy/data/audit.log`, with the OSCAR administrator who
+asked. The API is called by the OSCAR server only: to keep it to that server,
+fill in the `allow` / `deny` lines of the `/admin/` location in the nginx site
+with the OSCAR server's address (a site set up before 0.51.0 has no such
+location; add the block of `nginx-osdm-simulator.conf.example`). By hand, from
+the host, with the key in `KEY`:
+
+```bash
+curl -s -H "Authorization: Bearer $KEY" -H 'X-Admin-Actor: <your-name>' http://127.0.0.1:3002/admin/api/accounts
+```
+
+**Statistics** (0.52.0). The simulator counts, per day, provider and account,
+the tokens, requests, offers, bookings, confirmations, refunds, exchanges and
+answers in error; OSCAR shows them under Admin → OSDM Simulator → Statistics.
+They are in `deploy/data/stats.json` (counts only), kept 400 days unless
+`SIM_STATS_RETENTION_DAYS` says otherwise. A simulator without a data folder
+counts nothing.
+Above them, the same tab shows the test sets run from OSCAR on the
+simulator (#930 PR 4), per provider and user: sets, scenarios, scenarios with
+a failed check and failed checks. They come from OSCAR's own results: a run
+counts when its company's endpoint is under the simulator address saved on
+that page, so give companies that address exactly (same scheme and host).
+
+**Moving an installed simulator to a data folder** (installed before 0.51.0).
+The automatic update only restarts the container, which keeps the compose
+settings it was made with: until `up -d`, the simulator reads `clients.json`
+as before and the administration API answers `404`. Make the data folder and
+the key as in section 3, then:
+
+```bash
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+docker compose up -d          # re-creates the container: bookings and tokens are lost
+docker compose logs | grep Imported   # "Imported N accounts from /run/osdm-simulator/clients.json"
+```
+
+The ids and secrets in use stay the same. Create the folder before any `docker
+compose up -d`, the load test's included: without it Docker makes one that
+user 1000 cannot write, and the simulator stops at start.
 
 **Automatic update** (#617). Each simulator version is tagged
 `simulator-<version>`, with a GitHub release whose notes come from the
@@ -384,6 +448,7 @@ install -m 0755 /opt/osdm-simulator/OSDM_Simulator/deploy/update.sh /usr/local/s
 useradd --create-home --shell /bin/sh simdeploy && usermod -aG docker simdeploy
 chown -R simdeploy /opt/osdm-simulator
 chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json   # the container's user reads it
+chown -R 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data          # and writes its data folder (#930)
 # 3. A key pair; the private half goes to GitHub, the public half here,
 #    restricted to the one command.
 ssh-keygen -t ed25519 -N '' -C simulator-deploy -f /root/simulator-deploy
@@ -399,8 +464,8 @@ file), `SIMULATOR_KNOWN_HOSTS` (the `ssh-keyscan` line),
 `SIMULATOR_SSH_TARGET` (`simdeploy@<simulator-host>`), `SIMULATOR_URL`
 (`https://<simulator-host>`). Start the workflow by hand once and watch it: it
 must end with "The simulator reports <version>". The checkout must belong to
-`simdeploy` (step 2), or `git pull` fails; `clients.json` stays with user
-1000, or the container cannot read it.
+`simdeploy` (step 2), or `git pull` fails; `clients.json` and `data/` stay
+with user 1000, or the container cannot read or write them.
 
 **Replacing all clients and secrets**, for instance to move a simulator
 installed before the `provider.role` ids to them. The script never replaces a
@@ -494,4 +559,9 @@ requests").
 | 429 | more than 50 requests a second from one address (nginx), or 3,000 a minute (the simulator, `SIM_REQUESTS_PER_MINUTE`); for a load test see "Load test of OSCAR" in section 7 |
 | The container restarts in a loop, its log says "not started: the clients file cannot be read" | `clients.json` is missing from the deploy folder, or not readable by user 1000 (`chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json`) |
 | On the host, a command answers `No such file or directory` about `clients.json`, or `docker compose` answers `no configuration file provided: not found` | the command was run from another folder than the deploy one, which is where a new session starts. `cd /opt/osdm-simulator/OSDM_Simulator/deploy` first. |
+| The container restarts in a loop, its log says "not started: the data folder does not exist" or "cannot be written by this user" | `deploy/data` is missing, or Docker made it as root: `install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data` (or `chown 1000:1000` it), then `docker compose up -d` |
+| The administration answers `404` | no key (`.env` missing, or made after the last `up -d`), or the container runs without the data folder (made before 0.51.0): see "Moving an installed simulator to a data folder" in section 7 |
+| The administration answers `401` | OSCAR holds another key than the one whose SHA-256 is in `.env` |
+| The administration answers `429` | 10 wrong keys from that address in 15 minutes: wait, and correct the key in OSCAR |
+| The administration answers `403` (nginx) | the `allow` lines of the `/admin/` location do not name the OSCAR server's address |
 | A booking made a while ago answers 404 | bookings are dropped after one hour, when a client has more than 200 of them, and at every restart |

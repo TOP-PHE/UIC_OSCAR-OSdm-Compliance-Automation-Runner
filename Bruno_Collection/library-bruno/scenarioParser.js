@@ -118,7 +118,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults", "requestedSections", "isPartOfInternationalTrip", "desiredFareCluster", "bookMode", "expectFares", "fareOfferId", "__fareSale", "__fareIds", "__fareProductIds", "fareRefundFee", "__fareRefundFulfillments", "__fareRefundFeesSent", "__fareSectionsOutside", "__chosenTripLegs",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults", "requestedSections", "isPartOfInternationalTrip", "desiredFareCluster", "bookMode", "expectFares", "fareOfferId", "__fareSale", "__fareIds", "__fareProductIds", "fareRefundFee", "__fareRefundFulfillments", "__fareRefundFeesSent", "__fareReservationIds", "__fareSectionsOutside", "__chosenTripLegs",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -1799,9 +1799,29 @@ const TRIP_PARAMETER_TEXT = {
 };
 const PARTIAL_REFUND_SCOPE_OF = { partialRefundByFulfillment: 'fulfillment', partialRefundByLeg: 'leg', partialRefundByPax: 'passenger' };
 
+// #936: how a provider distributes (Test Framework › Distribution).
+const DISTRIBUTION_MODE_TEXT = { PRODUCT: 'product-based', FARE: 'fare-based' };
+
+// #936: a sale in a distribution mode the Test Framework does not declare
+// (distributionMode:<MODE>). null for any other entry.
+function distributionModeWarning(scenario, field) {
+  if (typeof field !== 'string' || !field.startsWith('distributionMode:')) return null;
+  const mode = field.slice('distributionMode:'.length);
+  const text = DISTRIBUTION_MODE_TEXT[mode] || mode;
+  return `[WARNING] Scenario "${scenario.code}" is a ${text} sale (${mode}), which the Test Framework does not declare (Distribution). The run will proceed; a provider that does not sell this way may answer no offer, or refuse the request. Declare the mode in the Test Framework, or take the scenario out of the run list.`;
+}
+
 // The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
-// scenario arms that the Test Framework does not declare (#218, #619, #713).
+// scenario arms that the Test Framework does not declare (#218, #619, #713),
+// or a distribution mode it does not declare (#936). Two functions, so that
+// each stays under Sonar's complexity limit.
 function featureNotDeclaredWarning(scenario, field) {
+  return distributionModeWarning(scenario, field) || capabilityWarning(scenario, field);
+}
+
+// The [WARNING] for a capability the scenario uses and the Test Framework
+// does not declare.
+function capabilityWarning(scenario, field) {
   // #766: a place chosen in a way the framework does not declare.
   if (typeof field === 'string' && field.startsWith('placeSelectionBy:')) {
     const flow = field.slice('placeSelectionBy:'.length);

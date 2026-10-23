@@ -269,6 +269,9 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     // #907: the fare refund's variants.
     SIM_WRONG_FARE_COMBINING_FEE_38: ['fare-wrong-combining-fee'],
     SIM_WRONG_FARE_IGNORES_REFUND_FEE_38: ['fare-ignores-refund-fee'],
+    // #255: the fare reservation's variants, by the section's station and by a last name.
+    SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38: [],
+    SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38: ['fare-reservation-product-mode'],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -657,6 +660,10 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_NHF_FARE_NO_SECTION_SPEC_38: [undefined, 'SPECIFICATION', false, true, false],
     SIM_NHF_FARE_EMPTY_SECTIONS_38: [undefined, 'SPECIFICATION', true, true, false],
     SIM_WRONG_FARE_WITHOUT_SECTION_38: [undefined, 'SPECIFICATION', false, true, false],
+    // #244 case 3 and #246 cases 1 and 3: N2 and N4 by search and by trip id.
+    SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38: [undefined, 'SEARCH', undefined, true, false],
+    SIM_NHF_FARE_NO_SECTION_TRIPIDS_38: [undefined, 'SEARCH', undefined, true, false],
+    SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38: [undefined, 'SEARCH', undefined, true, false],
     // #906: the fare sale of SIM_FARE_SPEC_1ADT_38, its fulfilment wrong.
     SIM_WRONG_FARE_FULFILLMENT_DOCUMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
@@ -666,23 +673,29 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_FARE_REFUND_COMBINING_1ADT_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_COMBINING_FEE_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_IGNORES_REFUND_FEE_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    // #255: fare reservations for a bicycle, with fare admissions or alone.
+    SIM_FARE_BICYCLE_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_BICYCLE_ONLY_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, false, undefined],
+    SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38: [v.bicycleReservationProductMode, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
   ]]));
   assert.deepEqual(found, expected);
   for (const s of fareScenarios) {
-    assert.equal(s.offersByTripIds === 'on', s.code === 'SIM_FARE_TRIPIDS_1ADT_38', s.code);
+    assert.equal(s.offersByTripIds === 'on', s.code.includes('_TRIPIDS_'), s.code);
     if (!startOf(s)) continue;
     // The section lies inside the trip: its start and end are stations of it.
     const trip = tripOf(s);
     const stations = trip.tripType === 'SEARCH' ? [trip.trip.origin, trip.trip.destination] : trip.legs.flatMap((l) => [l.origin, l.destination]);
     assert.ok(stations.includes(startOf(s)) && stations.includes(s.requestedSections[0].endPlace), s.code);
   }
-  // #905: the empty list is N4's only, a product booked N2's by search only,
-  // and no scenario but a fare one says what fares it expects.
+  // #905: the empty list is N4's only (on each form of request), a product
+  // booked N2's by search only, and no scenario but a fare one says what fares
+  // it expects.
   const emptyLists = datafile.scenarios.filter((s) => Array.isArray(s.requestedSections) && s.requestedSections.length === 0);
-  assert.deepEqual(emptyLists.map((s) => s.code), ['SIM_NHF_FARE_EMPTY_SECTIONS_38']);
+  assert.deepEqual(emptyLists.map((s) => s.code), ['SIM_NHF_FARE_EMPTY_SECTIONS_38', 'SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38', 'SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38']);
   assert.deepEqual(datafile.scenarios.filter((s) => s.bookMode === 'PRODUCT').map((s) => s.code), ['SIM_NHF_FARE_NO_SECTION_SRCH_38']);
   for (const s of datafile.scenarios.filter((x) => !x.code.includes('_FARE_'))) assert.equal(s.expectFares, undefined, s.code);
   // No other scenario starts a section at a variant station; the COMBINING
@@ -692,6 +705,13 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     assert.ok(!variantStations.has(startOf(s)), s.code);
   }
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.combiningFares).map((s) => s.code), ['SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_WRONG_FARE_COMBINING_FEE_38']);
+  // #255: fare reservations are asked by the four bicycle scenarios only, each with a bicycle.
+  const askReservations = datafile.scenarios.filter((s) => s.offerSearchCriteria?.requestedOfferParts?.includes('FARE_RESERVATION'));
+  assert.deepEqual(askReservations.map((s) => s.code), ['SIM_FARE_BICYCLE_1ADT_38', 'SIM_FARE_BICYCLE_ONLY_38', 'SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38', 'SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38']);
+  for (const s of askReservations) {
+    const types = datafile.passengersList.find((l) => l.id === s.passengersListId).passengers.map((p) => p.type);
+    assert.ok(types.includes('BICYCLE'), s.code);
+  }
   // #907: the fee stated is a fare refund's, and in a REFUND scenario.
   assert.deepEqual(datafile.scenarios.filter((s) => s.fareRefundFee != null).map((s) => [s.code, s.scenarioType, s.fareRefundFee]),
     [['SIM_FARE_REFUND_FEE_1ADT_38', 'REFUND', 250], ['SIM_WRONG_FARE_IGNORES_REFUND_FEE_38', 'REFUND', 250]]);

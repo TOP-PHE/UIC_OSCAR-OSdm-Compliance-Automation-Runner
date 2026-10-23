@@ -22,7 +22,7 @@ const path = require('node:path');
 
 const PROVIDER_KEY = /^[a-z][a-z0-9-]{1,30}$/;
 // Names the router keeps for itself; a provider cannot take them.
-const RESERVED_KEYS = new Set(['healthz']);
+const RESERVED_KEYS = new Set(['healthz', 'admin']);
 const MIN_SECRET_LENGTH = 32;
 // Printable ASCII without the colon: a client id travels in a Basic header as
 // "id:secret", and a colon in it would shift the split.
@@ -107,7 +107,7 @@ function checkProvider(key, raw) {
 // station of each variant (for `faresWithoutSection`, #905, the trip's
 // origin: that request names no section). Absent: no fare is offered.
 const FARE_CLUSTERS = new Set(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO']);
-const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares']);
+const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares', 'bicycleReservationProductMode']);
 function checkFares(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object') throw bad('fares');
@@ -470,6 +470,15 @@ function intFromEnv(env, name, fallback, min, max) {
   return n;
 }
 
+function adminKeyOf(env) {
+  const value = env.SIM_ADMIN_KEY_SHA256;
+  if (value === undefined || value === '') return null;
+  const hex = String(value).trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(hex)) throw new ConfigError('SIM_ADMIN_KEY_SHA256 must be the SHA-256 of the key, 64 hex characters');
+  if (!env.SIM_DATA_DIR) throw new ConfigError('SIM_ADMIN_KEY_SHA256 needs SIM_DATA_DIR: the accounts the API changes are kept there');
+  return hex;
+}
+
 /** Settings read from the environment, with their defaults. */
 function loadSettings(env, baseDir) {
   return {
@@ -477,6 +486,14 @@ function loadSettings(env, baseDir) {
     port: intFromEnv(env, 'SIM_PORT', 3002, 0, 65535),
     providersDir: env.SIM_PROVIDERS_DIR || path.join(baseDir, 'providers'),
     clientsFile: env.SIM_CLIENTS_FILE || path.join(baseDir, 'clients.json'),
+    // #930: with a data folder, the accounts are kept there and an
+    // administrator changes them while the simulator runs.
+    dataDir: env.SIM_DATA_DIR || null,
+    // The hex SHA-256 of the key the OSCAR server calls the administration
+    // API with; none = the API is closed.
+    adminKeySha256: adminKeyOf(env),
+    // How long the usage statistics are kept (#930 PR 3).
+    statsRetentionDays: intFromEnv(env, 'SIM_STATS_RETENTION_DAYS', 400, 7, 3660),
     // Behind a reverse proxy the caller's address is in X-Forwarded-For.
     trustProxy: env.SIM_TRUST_PROXY === '1',
     limits: {
@@ -489,4 +506,4 @@ function loadSettings(env, baseDir) {
   };
 }
 
-module.exports = { ConfigError, loadProviders, loadClients, clientMatches, loadSettings, checkProvider, MIN_SECRET_LENGTH };
+module.exports = { ConfigError, loadProviders, loadClients, clientMatches, loadSettings, checkProvider, clientsOf, readJson, CLIENT_ID, MIN_SECRET_LENGTH };

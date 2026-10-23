@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -32342,6 +32342,1270 @@
         "offerMode": null,
         "requestedOfferParts": ["FARE_ADMISSION"]
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_1ADT_38",
+      "description": "Simulated provider, fares (#255): one adult and a bicycle on trip 24, fare admissions and fare reservations asked for the section from 0000004 to 0000002 (passenger list 34). Gamma gives the adult a fare and the bicycle a place on the leg of the section, a ReservationOfferPart in FARE_MODE with no product. The first fare offer is chosen; its fare reservation is selected (optionalReservationSelections), booked and confirmed with the fare in one fulfilment of fares. Checks V1, V3, V9 to V11. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        { "startPlace": "urn:uic:stn:0000004", "endPlace": "urn:uic:stn:0000002" }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION","FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ONLY_38",
+      "description": "Simulated provider, fares (#255): a bicycle alone (passenger list 35), fare reservations only asked: gamma answers one offer holding the bicycle place, in FARE_MODE, and no fare. It is booked and confirmed with a fulfilment of fares. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 35,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        { "startPlace": "urn:uic:stn:0000004", "endPlace": "urn:uic:stn:0000002" }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38",
+      "description": "Deliberately wrong (#255): the request of SIM_FARE_BICYCLE_1ADT_38 for a section from station 0000088 (gamma's variant), on trip 33: the bicycle place comes without distributionMode, so in product mode. Expected: check V1 fails at 01, and the fare offer is not booked. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 33,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        { "startPlace": "urn:uic:stn:0000088", "endPlace": "urn:uic:stn:0000002" }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION","FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38",
+      "description": "Deliberately wrong (#255): the fare sale of SIM_FARE_BICYCLE_1ADT_38, the adult named Simvariant-Fare-Reservation-Product-Mode (passenger list 36): gamma books the bicycle place without distributionMode. Expected: check V1 fails at 02, 05 and 07; nothing else fails. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 36,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        { "startPlace": "urn:uic:stn:0000004", "endPlace": "urn:uic:stn:0000002" }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION","FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_1ADT_39",
+      "description": "Simulated provider, fares (#255): one adult and a bicycle on trip 24, fare admissions and fare reservations asked for the section from 0000004 to 0000002 (passenger list 34). Gamma gives the adult a fare and the bicycle a place on the leg of the section, a ReservationOfferPart in FARE_MODE with no product. The first fare offer is chosen; its fare reservation is selected (optionalReservationSelections), booked and confirmed with the fare in one fulfilment of fares. Checks V1, V3, V9 to V11. OSDM 3.9.0, for delta (a copy of SIM_FARE_BICYCLE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ONLY_39",
+      "description": "Simulated provider, fares (#255): a bicycle alone (passenger list 35), fare reservations only asked: gamma answers one offer holding the bicycle place, in FARE_MODE, and no fare. It is booked and confirmed with a fulfilment of fares. OSDM 3.9.0, for delta (a copy of SIM_FARE_BICYCLE_ONLY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 35,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_39",
+      "description": "Deliberately wrong (#255): the request of SIM_FARE_BICYCLE_1ADT_38 for a section from station 0000088 (gamma's variant), on trip 33: the bicycle place comes without distributionMode, so in product mode. Expected: check V1 fails at 01, and the fare offer is not booked. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 33,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000088",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_39",
+      "description": "Deliberately wrong (#255): the fare sale of SIM_FARE_BICYCLE_1ADT_38, the adult named Simvariant-Fare-Reservation-Product-Mode (passenger list 36): gamma books the bicycle place without distributionMode. Expected: check V1 fails at 02, 05 and 07; nothing else fails. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 36,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_1ADT_310",
+      "description": "Simulated provider, fares (#255): one adult and a bicycle on trip 24, fare admissions and fare reservations asked for the section from 0000004 to 0000002 (passenger list 34). Gamma gives the adult a fare and the bicycle a place on the leg of the section, a ReservationOfferPart in FARE_MODE with no product. The first fare offer is chosen; its fare reservation is selected (optionalReservationSelections), booked and confirmed with the fare in one fulfilment of fares. Checks V1, V3, V9 to V11. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_BICYCLE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ONLY_310",
+      "description": "Simulated provider, fares (#255): a bicycle alone (passenger list 35), fare reservations only asked: gamma answers one offer holding the bicycle place, in FARE_MODE, and no fare. It is booked and confirmed with a fulfilment of fares. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_BICYCLE_ONLY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 35,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_310",
+      "description": "Deliberately wrong (#255): the request of SIM_FARE_BICYCLE_1ADT_38 for a section from station 0000088 (gamma's variant), on trip 33: the bicycle place comes without distributionMode, so in product mode. Expected: check V1 fails at 01, and the fare offer is not booked. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 33,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000088",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_310",
+      "description": "Deliberately wrong (#255): the fare sale of SIM_FARE_BICYCLE_1ADT_38, the adult named Simvariant-Fare-Reservation-Product-Mode (passenger list 36): gamma books the bicycle place without distributionMode. Expected: check V1 fails at 02, 05 and 07; nothing else fails. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 36,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_1ADT_312",
+      "description": "Simulated provider, fares (#255): one adult and a bicycle on trip 24, fare admissions and fare reservations asked for the section from 0000004 to 0000002 (passenger list 34). Gamma gives the adult a fare and the bicycle a place on the leg of the section, a ReservationOfferPart in FARE_MODE with no product. The first fare offer is chosen; its fare reservation is selected (optionalReservationSelections), booked and confirmed with the fare in one fulfilment of fares. Checks V1, V3, V9 to V11. OSDM 3.12.0, for zeta (a copy of SIM_FARE_BICYCLE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ONLY_312",
+      "description": "Simulated provider, fares (#255): a bicycle alone (passenger list 35), fare reservations only asked: gamma answers one offer holding the bicycle place, in FARE_MODE, and no fare. It is booked and confirmed with a fulfilment of fares. OSDM 3.12.0, for zeta (a copy of SIM_FARE_BICYCLE_ONLY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 35,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_312",
+      "description": "Deliberately wrong (#255): the request of SIM_FARE_BICYCLE_1ADT_38 for a section from station 0000088 (gamma's variant), on trip 33: the bicycle place comes without distributionMode, so in product mode. Expected: check V1 fails at 01, and the fare offer is not booked. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 33,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000088",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_312",
+      "description": "Deliberately wrong (#255): the fare sale of SIM_FARE_BICYCLE_1ADT_38, the adult named Simvariant-Fare-Reservation-Product-Mode (passenger list 36): gamma books the bicycle place without distributionMode. Expected: check V1 fails at 02, 05 and 07; nothing else fails. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 36,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_RESERVATION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38",
+      "description": "Negative fare request (#244 case 3): a search from station 0000001 to 0000002 with FARE_ADMISSION and requestedSections sent as an empty list, which names no section. Gamma answers no fare. Expected: check N passes; the scenario ends after the offer step. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38",
+      "description": "Negative fare request (#246 case 1): POST /trips-collection from station 0000001 to 0000002 (a domestic trip), then the offers for the trip chosen, by its id, with FARE_ADMISSION and no section. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38",
+      "description": "Negative fare request (#246 case 3): the offers for a trip chosen by its id, with FARE_ADMISSION and requestedSections sent as an empty list. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_36",
+      "description": "Negative fare request (#244 case 3): a search from station 0000001 to 0000002 with FARE_ADMISSION and requestedSections sent as an empty list, which names no section. Gamma answers no fare. Expected: check N passes; the scenario ends after the offer step. OSDM 3.6.0, for alpha (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_36",
+      "description": "Negative fare request (#246 case 1): POST /trips-collection from station 0000001 to 0000002 (a domestic trip), then the offers for the trip chosen, by its id, with FARE_ADMISSION and no section. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.6.0, for alpha (a copy of SIM_NHF_FARE_NO_SECTION_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_36",
+      "description": "Negative fare request (#246 case 3): the offers for a trip chosen by its id, with FARE_ADMISSION and requestedSections sent as an empty list. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.6.0, for alpha (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_37",
+      "description": "Negative fare request (#244 case 3): a search from station 0000001 to 0000002 with FARE_ADMISSION and requestedSections sent as an empty list, which names no section. Gamma answers no fare. Expected: check N passes; the scenario ends after the offer step. OSDM 3.7.0, for beta (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_37",
+      "description": "Negative fare request (#246 case 1): POST /trips-collection from station 0000001 to 0000002 (a domestic trip), then the offers for the trip chosen, by its id, with FARE_ADMISSION and no section. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.7.0, for beta (a copy of SIM_NHF_FARE_NO_SECTION_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_37",
+      "description": "Negative fare request (#246 case 3): the offers for a trip chosen by its id, with FARE_ADMISSION and requestedSections sent as an empty list. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.7.0, for beta (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_39",
+      "description": "Negative fare request (#244 case 3): a search from station 0000001 to 0000002 with FARE_ADMISSION and requestedSections sent as an empty list, which names no section. Gamma answers no fare. Expected: check N passes; the scenario ends after the offer step. OSDM 3.9.0, for delta (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_39",
+      "description": "Negative fare request (#246 case 1): POST /trips-collection from station 0000001 to 0000002 (a domestic trip), then the offers for the trip chosen, by its id, with FARE_ADMISSION and no section. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.9.0, for delta (a copy of SIM_NHF_FARE_NO_SECTION_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_39",
+      "description": "Negative fare request (#246 case 3): the offers for a trip chosen by its id, with FARE_ADMISSION and requestedSections sent as an empty list. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.9.0, for delta (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_310",
+      "description": "Negative fare request (#244 case 3): a search from station 0000001 to 0000002 with FARE_ADMISSION and requestedSections sent as an empty list, which names no section. Gamma answers no fare. Expected: check N passes; the scenario ends after the offer step. OSDM 3.10.0, for epsilon (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_310",
+      "description": "Negative fare request (#246 case 1): POST /trips-collection from station 0000001 to 0000002 (a domestic trip), then the offers for the trip chosen, by its id, with FARE_ADMISSION and no section. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.10.0, for epsilon (a copy of SIM_NHF_FARE_NO_SECTION_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_310",
+      "description": "Negative fare request (#246 case 3): the offers for a trip chosen by its id, with FARE_ADMISSION and requestedSections sent as an empty list. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.10.0, for epsilon (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_312",
+      "description": "Negative fare request (#244 case 3): a search from station 0000001 to 0000002 with FARE_ADMISSION and requestedSections sent as an empty list, which names no section. Gamma answers no fare. Expected: check N passes; the scenario ends after the offer step. OSDM 3.12.0, for zeta (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_312",
+      "description": "Negative fare request (#246 case 1): POST /trips-collection from station 0000001 to 0000002 (a domestic trip), then the offers for the trip chosen, by its id, with FARE_ADMISSION and no section. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.12.0, for zeta (a copy of SIM_NHF_FARE_NO_SECTION_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_312",
+      "description": "Negative fare request (#246 case 3): the offers for a trip chosen by its id, with FARE_ADMISSION and requestedSections sent as an empty list. Gamma answers no fare. Expected: the trip id checks and check N pass; the scenario ends after the offer step. OSDM 3.12.0, for zeta (a copy of SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "offersByTripIds": "on",
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [],
+      "expectFares": false,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -32981,6 +34245,24 @@
         }
       ],
       "description": "Simulated trip for fares combined by COMBINING (#907): regional 2217 from station 0000087, where gamma's COMBINING fares start, to station 0000002; the section asked lies inside it"
+    },
+    {
+      "id": 33,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000088",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T14:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T15:20:00+01:00",
+          "vehicleNumber": "2218",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a wrong fare reservation (#255): regional 2218 from station 0000088, where gamma's bicycle places come in product mode, to station 0000002; the section asked lies inside it"
     }
   ],
   "purchaserList": [
@@ -34678,6 +35960,78 @@
           "updatePhoneNumber": "+33199000004",
           "updateEmail": "samuel.sample@example.org",
           "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Example",
+          "phoneNumber": "+33199000003",
+          "email": "sam.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Example",
+          "phoneNumber": "+33199000003",
+          "email": "sam.example@example.org",
+          "type": "BICYCLE"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Example",
+          "phoneNumber": "+33199000003",
+          "email": "sam.example@example.org",
+          "type": "BICYCLE"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Fare-Reservation-Product-Mode",
+          "phoneNumber": "+33199000003",
+          "email": "variant.fare-reservation-product-mode@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Example",
+          "phoneNumber": "+33199000003",
+          "email": "sam.example@example.org",
+          "type": "BICYCLE"
         }
       ]
     }

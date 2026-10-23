@@ -62,6 +62,7 @@ const NO_COMBINED_RETURN = 'OSDM 3.6 has no return in one offer (outboundTripIds
 const NO_PRODUCT_SELECTIONS = 'OSDM 3.6 has no OfferSearchCriteria.productSelections (3.7).';
 const NO_COMPARTMENT_SELECTION = 'OSDM before 3.8 has no PlaceSelection.compartments: a compartment cannot be named.';
 const NO_FARE_REFUND_FEE = 'OSDM before 3.8 has no RefundSpecification.refundFee: the fee of a fare cannot be stated (#907).';
+const NO_FARE_RESERVATION = 'OSDM before 3.8 has no distributionMode: a fare reservation cannot be told from a product one (#255; osdm.io, handling reservations).';
 const rank = (version) => { const [a, b] = String(version).split('.').map(Number); return a * 100 + b; };
 
 // Why a `_38` scenario has no copy for `version`, or null when it has one.
@@ -73,6 +74,7 @@ function reasonNotPossible(source, version) {
   if (rank(version) < rank('3.7') && Array.isArray(criteria.productSelections) && criteria.productSelections.length > 0) return NO_PRODUCT_SELECTIONS;
   if (rank(version) < rank('3.8') && source?.namedPlaceKind === 'COMPARTMENT') return NO_COMPARTMENT_SELECTION;
   if (rank(version) < rank('3.8') && source?.fareRefundFee != null) return NO_FARE_REFUND_FEE;
+  if (rank(version) < rank('3.8') && Array.isArray(criteria.requestedOfferParts) && criteria.requestedOfferParts.includes('FARE_RESERVATION')) return NO_FARE_RESERVATION;
   const named = NOT_POSSIBLE[version] || {};
   const base = baseOf(source?.code);
   return Object.hasOwn(named, base) ? named[base] : null;

@@ -62,6 +62,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.387] / [collection-OTST_V2.0.217] — 2026-10-23
+
+Issue #941, release 2026.422. Data only: no server or collection code changes.
+
+### Added
+- **Three negative fare scenarios on the simulator** (#244 case 3, #246 cases 1 and 3). Each sets `expectFares: false`: check N passes and the scenario ends after the offer step.
+  - `SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38`: a search with `requestedSections` sent as an empty list.
+  - `SIM_NHF_FARE_NO_SECTION_TRIPIDS_38`: offers by trip id for a domestic trip, no section.
+  - `SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38`: offers by trip id, an empty list.
+  - Their copies for OSDM 3.6, 3.7, 3.9, 3.10 and 3.12 (`version-copies.js`). All 18 were run with the real collection on the simulator: no failed check.
+- The six reference configurations are regenerated, the scenarios document has the three rows, and `datafile.test.js` knows the new scenarios.
+
+---
+
+## [server-1.11.386] / [collection-OTST_V2.0.216] — 2026-10-23
+
+Issue #936, part A of #935, release 2026.421. Simulator unchanged.
+
+### Added
+- **The distribution mode in the Test Framework** (`distributionModes`: `PRODUCT`, `FARE`, one or both). A framework that names none is product-based (decision E1 of #935), so every company keeps its scenarios and its catalogue.
+- **A scenario's modes** are read from the scenario (`utils/distributionModes.js`, pure):
+  - fare-based when it asks a `FARE_*` offer part, or expects no fare (`expectFares: false`, #905);
+  - product-based when it asks no fare, or books the product (`bookMode: PRODUCT`, #207).
+- **The catalogue** offers only the reference scenarios of the modes declared: `requirementsOf()` names the modes, and `missingFor()` says "fare-based distribution (Distribution)" first. With no mode named, the 73 entries are offered as before.
+- **The run**: a scenario of a mode not declared gets the warning `distributionMode:<MODE>`, which the collection writes as a `[WARNING]` naming the mode and the Test Framework section. Never a failure.
+- **Test Config › Test Framework › 🧭 Distribution**, after the OSDM version: two options, Product-based and Fare-based. The last one ticked cannot be unticked.
+- **The saves refuse a list that names no mode or an unknown one, with a 400**: the Test Framework save, the checklist apply and the configuration import, as for the OSDM version.
+- **The simulator references declare both modes**, taken from each provider's profile (fares since #903) until the checklist asks (#938). `fw.distributionModes` is read from a checklist that answers it.
+
+Checked:
+- `distribution-modes.test.js` (16):
+  - the rule on every simulator scenario;
+  - the warnings with no mode, fare only and both;
+  - the catalogue with no mode named, product, and fare only;
+  - the collection's text;
+  - the references and their run lists, which get no warning.
+- The route refuses `[]` and an unknown mode, and takes one, both, or none named.
+- `ui-scripts.test.js`: the page's modes are the server's, the toggle, the section, and the click on the last mode.
+- Six deliberate breaks (the rule, the warning, the catalogue, the toggle, the route, the collection's text) each make a test fail.
+
+---
+
+## [server-1.11.385] / [collection-OTST_V2.0.215] — 2026-10-23
+
+Issue #930, PR 4, release 2026.420. Collection and simulator unchanged.
+
+### Added
+- **Admin → OSDM Simulator → Statistics: the test sets run from OSCAR.** For each simulator provider, one line per user and a total:
+  - sets run (one click on Run, a batch);
+  - scenarios run, and scenarios per set;
+  - scenarios with at least one failed check, and failed checks.
+  Same period choice as the simulator's counts (today to 365 days), drawn as text only.
+- **Route `GET /v1/admin/simulator/runs?days=`** (administrators). It reads OSCAR's own runs, with nothing asked of the simulator: a run went there when the endpoint it used is under the simulator's address saved on the page, and the provider is the next path segment (`utils/simulatorRuns.js`, pure). Counts only: no scenario code, check text or endpoint is answered. Without a saved address it answers 409.
+- Nothing is added to the requests of a run, so no provider receives anything more.
+
+---
+
+## [server-1.11.384] / [collection-OTST_V2.0.215] — 2026-10-23
+
+Issue #930, PR 3, release 2026.419. Simulator 0.52.0. Collection unchanged; the statistics need this simulator.
+
+### Added
+- **Admin → OSDM Simulator → Statistics.** Per provider, one line per account and its totals:
+  - tokens issued, OSDM requests, offers asked, bookings made and confirmed, refunds and exchanges confirmed, answers 4xx and 5xx;
+  - a line for the requests of no known account (no token, a refused one, a wrong secret).
+  The period is today, or the last 7, 30, 90 or 365 days (UTC). Drawn as text only.
+- **Route `GET /v1/admin/simulator/stats?days=`** (administrators). A period not offered is a 400 before any call; the answer is built counter by counter.
+
+### Simulator 0.52.0
+- **Usage counted per UTC day, provider and account** (`src/stats.js`), from each request's method, path and status: nothing else is kept (no path, body, header, address or time of day). Kept in `<data>/stats.json`, written at most once a minute and when the simulator stops, for `SIM_STATS_RETENTION_DAYS` days (default 400). The administration is not counted.
+- **`GET /admin/api/stats?from=&to=`** (YYYY-MM-DD, at most 400 days; the last 30 by default): per provider its accounts, unidentified requests and totals, and per day the totals. A bad period is `400 BAD_PERIOD`.
+- Without a data folder nothing is counted. A statistics file that is not valid stops the start with a message.
+
+---
+
+## [server-1.11.383] / [collection-OTST_V2.0.215] — 2026-10-23
+
+Issue #930, PR 2, release 2026.418. Collection unchanged. Needs simulator 0.51.0 or later on the simulator's host, with its data folder and administration key.
+
+### Added
+- **Admin → OSDM Simulator** (`admin-simulator.html`, `public/js/admin-simulator.js`). OSCAR's administrators manage the simulator's accounts per provider:
+  - list, add (a client id, or the next `<provider>.tstNN` / `tstmgrNN`), give a new secret, delete;
+  - the simulator's audit.
+  A new secret is shown once, with Copy and Done.
+- **Routes `/v1/admin/simulator/…`** (`routes/admin-simulator.js`), for administrators only, with 60 calls a minute and `no-store`:
+  - `config` (GET / PUT / DELETE);
+  - `accounts` (list, add, delete, `reset-secret`);
+  - `audit`.
+  Provider and client id are checked before any call. Answers are built field by field. Each change is also in OSCAR's audit, never a secret.
+- **`services/simulatorAdmin.js`**, the one place OSCAR calls the simulator:
+  - It keeps the simulator's address in `server_config`, and the key encrypted with `ENCRYPTION_KEY`. The key is never returned.
+  - The key is tried before it is saved: the accounts list must answer, else 422 "Not saved".
+  - The key goes only to the address it was saved with; a new address needs the key typed again.
+  - Each call goes through `urlPolicy.js`, with `redirect: 'manual'`, 15 s, 256 KB at most, and the key masked in any message.
+  - Each call names the administrator (`X-Admin-Actor`), which the simulator keeps in its own audit.
+
+---
+
+## [simulator-0.51.0] — 2026-10-23
+
+Issue #930, PR 1. Simulator 0.51.0. Server and collection unchanged. The accounts of each provider are kept in a data folder and changed while the simulator runs, through an administration API that the OSCAR server calls with a key. OSCAR's page is PR 2.
+
+### Simulator 0.51.0
+- **A data folder** (`SIM_DATA_DIR`, `deploy/data` in the compose file): `accounts.json` holds each account's client id, creation date and the SHA-256 of its secret, never the secret. On the first start it is made from `clients.json`, which is not read again. Without `SIM_DATA_DIR` nothing changes. A folder that is missing or not writable stops the start with a message.
+- **The administration API**, `/admin/api/` (`src/admin.js`): list of the accounts per provider, add (an id given, or the next `<provider>.tst|tstmgrNN`), delete, reset the secret, audit. A new secret is answered once.
+  - A deleted account and the old secret of a reset one are refused at once, their tokens included: a token carries 16 hex characters of its secret's digest. The other accounts' tokens and bookings stay.
+- **Its one caller is the OSCAR server**, whose administrators manage the simulator: no sign-in, session or cookie on the simulator.
+  - The server sends `Authorization: Bearer <key>`. The simulator holds only the key's SHA-256, `SIM_ADMIN_KEY_SHA256` (in `deploy/.env`); without it the API answers `404`.
+  - `X-Admin-Actor` names the OSCAR administrator who asked, and the audit keeps it.
+  - 10 wrong keys from one address in 15 minutes give `429`.
+- **The audit**: every change, and every refused key, is a line of `audit.log` with time, who, what, provider and client id; it never holds a secret.
+- `admin` cannot be a provider key. The nginx example has an `/admin/` location with a rate limit of its own and room for the OSCAR server's address as the only one allowed.
+
+---
+
+## [server-1.11.382] / [collection-OTST_V2.0.215] — 2026-10-22
+
+Issue #255, fares phase 4, release 2026.417. Simulator 0.50.0.
+
+### Simulator 0.50.0
+- **Fare reservations: a bicycle place.** From OSDM 3.8, `FARE_RESERVATION` asked gives each BICYCLE passenger a place on each leg of the section: a `ReservationOfferPart` marked `distributionMode: FARE_MODE`, with no product (osdm.io, handling reservations). A bicycle has no fare of its own: its place is its fare. With fare admissions asked too, every fare offer holds the places; else one offer holds them alone. Below 3.8, where the field does not exist, none is offered.
+- A place is booked when the request selects it (`optionalReservationSelections`), as OSDM books only the mandatory reservations unless asked. It is confirmed with the fares, in one fulfilment of fares, with its `placeAllocation` (`STORAGE` / `BICYCLE`).
+- Two wrong variants: a section from station `0000088` (`fares.variants.bicycleReservationProductMode`, in every profile) gives the place without `distributionMode`; a passenger named `Simvariant-Fare-Reservation-Product-Mode` gets it booked without it.
+
+### Added
+- **Fare reservations.** `FARE_RESERVATION` in the requested offer parts asks for them, for a passenger of type BICYCLE. The new `library-bruno/fareReservations.js` checks them:
+  - at 01: each bicycle has a reservation (V3), in FARE_MODE when no product reservation was asked (V1, FAIL), with no product (V2, WARNING); fare reservations not asked fail (V8, OSDM `DistributionMode`);
+  - at 02, 05 and 07: every fare reservation selected is in the booking (V9), in FARE_MODE (V1), for its passengers (V3), PREBOOKED then CONFIRMED or FULFILLED (V10); at 07 each is in a fulfilment (V11), and the place allocation (V4) and the IRS 90918-1 reference in `bookingPartCode` (V7) are told;
+  - a fare fulfilment holding them gets the F2 checks of #906 (no control number, no issuer; V5), and its fulfilment parts are told (V6);
+  - at 06b, `GET /fulfillments/{id}` may answer an error or an empty fulfilment, which osdm.io allows for a fare reservation (V12, INFO).
+- Step 01 selects the chosen offer's fare reservations for the booking (`optionalReservationSelections`). An offer holding only fare reservations is a fare offer, and a bicycle held by a reservation needs no fare (O7).
+- A scenario expecting no fare (#905) counts fare reservations too. The refund of #907 reads a fare reservation as a fare part.
+- Simulator data file: `SIM_FARE_BICYCLE_1ADT_38`, `SIM_FARE_BICYCLE_ONLY_38` (run list), `SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38`, `SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38` (not in it), trip 33, passenger lists 34 to 36, and their `_39`, `_310` and `_312` copies. No 3.6 or 3.7 copy (`version-copies-lib.js`: OSDM before 3.8 has no `distributionMode`). References regenerated.
+
+Not covered: the shape of a fare reservation before OSDM 3.8, which osdm.io does not describe (a WARNING says it is not checked); a seat reservation in fare mode for a person; the `partType` of OSDM 4.0.
+
+Checked:
+- `bruno-fare-reservations.test.js` (23): the simulator's offers and bookings pass; each wrong variant fails check V1 only; hand-made answers for V2 to V12; the step glue (01's selection, 02's part ids, 06b's allowed error and empty fulfilment); the reset lists and the copy rule. Five deliberate breaks each make a test fail. The simulator suite, the full server suite (the one failure is the Windows-only `mcp-end-to-end.test.js`, as on `main`), both lints.
+- The real collection standalone on the simulator (`bru` 4.2.1, through the replay), 12 runs: the four new scenarios on gamma, delta and epsilon. The two sales pass with no failed check and no warning (`SIM_FARE_BICYCLE_1ADT_*` 130 checks, `SIM_FARE_BICYCLE_ONLY_*` 108); `SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_*` fails V1 at 01 only, `SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_*` V1 at 02, 05 and 07 only.
+- Nothing else moved: 152 earlier runs recorded on `main` (with #924) and on this change compare equal: the 22 fare scenarios on every version they have (106 runs) and 46 reservation, place choice and refund scenarios on gamma.
+- After #925 (zeta, OSDM 3.12) was merged in: the four `_312` copies, run on zeta, give the same checks as their `_310` twins on epsilon, check by check.
+
+---
+
 ## [server-1.11.381] / [collection-OTST_V2.0.214] — 2026-10-22
 
 Issue #925, release 2026.416. Simulator 0.49.0.

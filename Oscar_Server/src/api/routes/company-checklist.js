@@ -47,6 +47,7 @@ const { frameworkConfigOf, testResourcesOf, storeFramework, storeTestData } = re
 const CL = require('../../utils/checklistAnswers');
 const CC = require('../../utils/checklistConfiguration');
 const { isOsdmVersion } = require('../../utils/osdmVersion');
+const { distributionModesProblem } = require('../../utils/distributionModes');
 const CS = require('../../utils/checklistScenarios');
 const { applyCopy } = require('../../utils/scenarioCopy');
 const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
@@ -281,6 +282,9 @@ router.post('/checklists/:id/apply', limiter, guard, async (req, res) => {
   if (version != null && version !== '' && !isOsdmVersion(version)) {
     return problem(res, 400, 'Bad Request', `The checklist names the OSDM version "${String(version).slice(0, 40)}", which is not a version. Nothing was changed.`);
   }
+  // #936: the distribution modes, as the Test Framework route checks them.
+  const modesProblem = distributionModesProblem(proposedFramework.distributionModes);
+  if (modesProblem) return problem(res, 400, 'Bad Request', `${modesProblem} Nothing was changed.`);
   let testDataOutcome;
   try {
     db.transaction(() => {

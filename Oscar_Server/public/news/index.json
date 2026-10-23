@@ -1,5 +1,53 @@
 [
   {
+    "id": "2026-10-23-fare-negative-requests",
+    "date": "October 23, 2026",
+    "tag": "Improved",
+    "title": "More negative fare requests on the simulator",
+    "summary": "The simulator's data file now tests a request asking fares without a section by trip id, and with an empty section list by search and by trip id.",
+    "content": "A fare provider answers fares only for a section the request names. The simulator's data file already checked that a request without a section, or with an empty section list, gets no fare when it goes by trip specification, and when it goes by search without a section.\n\nIt now does the same for the other forms: an empty section list by search, and both cases by trip id. The scenarios are in the reference configurations of every simulated provider."
+  },
+  {
+    "id": "2026-10-23-distribution-modes",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "Product-based, fare-based or both",
+    "summary": "The Test Framework now says how the provider sells: products, fares, or both. OSCAR offers the reference scenarios of those modes only.",
+    "content": "Test Config › Test Framework has a new Distribution section, right after the OSDM version. Tick Product-based when the provider sells products and issues the tickets, Fare-based when it sells fares for a section and the distributor builds the ticket, or both.\n\nCopy scenarios then offers only the reference scenarios of the modes ticked. A scenario of another mode still runs, with a warning in its log. A framework that names no mode is product-based, so nothing changes until you tick Fare-based.\n\nReference scenarios for fares come next (#937), then the set-up checklist with a Product and a Fare chapter (#938)."
+  },
+  {
+    "id": "2026-10-23-simulator-test-sets",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "Test sets run on the OSDM simulator",
+    "summary": "The simulator's statistics now show, per provider and user, how many test sets were run from OSCAR, their scenarios and the checks that failed.",
+    "content": "In Admin → OSDM Simulator, the Statistics tab now starts with the test sets run from OSCAR against the simulator. For each simulated provider, it shows per user: the sets run, the scenarios they held, the average number of scenarios per set, the scenarios with at least one failed check, and the failed checks.\n\nThese figures come from OSCAR's own results, for the period chosen at the top of the tab. Below them, the requests the simulator itself counted are unchanged."
+  },
+  {
+    "id": "2026-10-23-simulator-statistics",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "How the OSDM simulator is used",
+    "summary": "Admin → OSDM Simulator shows, per provider and account, how many tokens, offers, bookings, refunds and exchanges each account made, and its errors.",
+    "content": "The OSDM simulator now counts what each of its accounts does. In Admin → OSDM Simulator, the Statistics tab shows, per provider, one line per account: tokens issued, OSDM requests, offers asked, bookings made and confirmed, refunds and exchanges confirmed, and answers in error. Requests that name no known account are counted on a line of their own.\n\nChoose today or the last 7, 30, 90 or 365 days. The simulator keeps only these counts, per day: no request, body or address."
+  },
+  {
+    "id": "2026-10-23-simulator-accounts",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "The OSDM simulator's accounts, managed from OSCAR",
+    "summary": "Administrators add, delete and renew the simulator's client accounts from Admin → OSDM Simulator, without touching the simulator's host.",
+    "content": "The OSDM simulator's client accounts can now be managed from OSCAR. In Admin → OSDM Simulator, an administrator sees every simulated provider with its accounts, adds one, gives one a new secret or deletes one. A change takes effect at once: the bookings and tokens of the other accounts stay. A new secret is shown once, to be handed over then.\n\nThe page also shows the simulator's audit: who added, renewed or deleted which account, and when.\n\nTo connect it, enter the simulator's address and its administration key once; the key is drawn on the simulator's host and OSCAR keeps it encrypted."
+  },
+  {
+    "id": "2026-10-22-fare-reservations",
+    "date": "October 22, 2026",
+    "tag": "New",
+    "title": "Fare sales: bicycle reservations",
+    "summary": "A fare scenario can now ask for fare reservations, a bicycle place, and OSCAR checks them from the offer to the fulfilment.",
+    "content": "Add FARE_RESERVATION to a scenario's requested offer parts and give it a passenger of type BICYCLE. From OSDM 3.8, the provider must offer the bicycle a reservation marked as a fare (distributionMode FARE_MODE), with no product. OSCAR selects these reservations in the booking, as OSDM asks, and checks that they are booked, confirmed and fulfilled with the fares. Fare reservations the request did not ask for fail.\n\nThe fulfilment of a fare reservation is made by the distributor, so a provider may answer the fulfilment read with an error or an empty fulfilment: OSCAR accepts both. The IRS 90918-1 reference and the place allocation are shown in the log.\n\nBefore OSDM 3.8 a fare reservation had another shape, which OSDM does not describe: such a scenario is not checked, and the log says so."
+  },
+  {
     "id": "2026-10-22-osdm-312-zeta",
     "date": "October 22, 2026",
     "tag": "New",

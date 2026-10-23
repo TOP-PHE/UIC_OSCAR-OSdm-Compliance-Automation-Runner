@@ -72,12 +72,17 @@ function fareSummary(fare) {
   };
 }
 
+// #255: a fare reservation as a fare to refund: its price, no combination model (R3 and R4 then check nothing).
+const reservationAsFare = (r) => ({ id: r.id, prices: isObject(r.price) ? [r.price] : [], afterSalesCondition: { conditions: list(r.afterSalesConditions) } });
+
 /**
  * The fare fulfilments of a confirmed booking: [{ fulfillmentId, fares }], one
- * per fulfilment naming a booked fare, each fare as fareSummary() gives it.
+ * per fulfilment naming a booked fare or fare reservation (#255), each as
+ * fareSummary() gives it.
  */
 function fareFulfillmentsOf(booking) {
-  const fares = new Map(list(booking?.bookedOffers).flatMap((o) => list(o.fares)).filter((f) => f.id != null).map((f) => [f.id, f]));
+  const reservations = list(booking?.bookedOffers).flatMap((o) => list(o.reservations)).filter((r) => r.distributionMode === 'FARE_MODE').map(reservationAsFare);
+  const fares = new Map([...list(booking?.bookedOffers).flatMap((o) => list(o.fares)), ...reservations].filter((f) => f.id != null).map((f) => [f.id, f]));
   return list(booking?.fulfillments)
     .map((f) => ({ fulfillmentId: f.id, fares: list(f.bookingParts).map((p) => fares.get(p?.id)).filter(Boolean).map(fareSummary) }))
     .filter((f) => f.fulfillmentId != null && f.fares.length > 0);
