@@ -290,8 +290,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     when it asks no fare or books the product (`bookMode: PRODUCT`).
     `SIM_WRONG_FARE_UNREQUESTED_*` asks products only, so it is a product
     sale. Warning `distributionMode:<MODE>` from `annotateDatafile()`; the
-    collection's text is `distributionModeWarning()` (`scenarioParser.js`),
-    kept out of `featureNotDeclaredWarning()` for Sonar's complexity limit.
+    collection's text is `distributionModeWarning()` (`scenarioParser.js`):
+    `featureNotDeclaredWarning()` is that `||` `capabilityWarning()` (the
+    other entries), so each stays under Sonar's complexity limit of 15.
     The catalogue's `missingFor()` names the mode first. Editor: 🧭
     Distribution after the OSDM version (`FW_DISTRIBUTION_MODES`, pinned to
     the server's list; `clickDistributionMode()` before the click switch;
