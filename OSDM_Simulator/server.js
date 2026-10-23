@@ -22,6 +22,8 @@ const { ConfigError, loadProviders, loadClients, loadSettings } = require('./src
 const { createTokenService } = require('./src/tokens');
 const { createStore } = require('./src/store');
 const { createApp } = require('./src/app');
+const { createAccounts } = require('./src/accounts');
+const { createAdmin } = require('./src/admin');
 const { version } = require('./package.json');
 
 // What came from the caller is reduced to printable ASCII before it is
@@ -32,17 +34,40 @@ function logLine(entry) {
   const parts = [new Date().toISOString(), printable(entry.method), printable(entry.path), entry.status, `${entry.ms}ms`];
   if (entry.provider) parts.push(`provider=${printable(entry.provider)}`);
   if (entry.client) parts.push(`client=${printable(entry.client)}`);
+  if (entry.auditError) {
+    console.error(`${parts[0]} the audit line could not be written: ${printable(entry.auditError)}`);
+    return;
+  }
   console.log(parts.join(' '));
   if (entry.error) console.error(entry.error);
+}
+
+// Without a data folder, the clients file as before: read once, never changed.
+// With one (#930), the accounts kept there, made from the clients file on the
+// first start, and the administration API when its key is set.
+function accountsOf(settings, providers) {
+  if (!settings.dataDir) return { clients: loadClients(settings.clientsFile, providers), accounts: null, admin: null };
+  const accounts = createAccounts({ dataDir: settings.dataDir, providers, clientsFile: settings.clientsFile, log: logLine });
+  if (accounts.count() === 0 && !settings.adminKeySha256) {
+    throw new ConfigError(`the data folder holds no account, there is no clients file to start from, and no administration key to add one (${settings.dataDir})`);
+  }
+  if (accounts.imported !== null) console.log(`Imported ${accounts.imported} accounts from ${settings.clientsFile} into ${settings.dataDir}`);
+  if (!settings.adminKeySha256) {
+    console.log('No administration key (SIM_ADMIN_KEY_SHA256): the administration API is closed.');
+    return { clients: accounts.clients, accounts, admin: null };
+  }
+  return { clients: accounts.clients, accounts, admin: createAdmin({ keySha256: settings.adminKeySha256, accounts }) };
 }
 
 function start(env = process.env, baseDir = __dirname) {
   const settings = loadSettings(env, baseDir);
   const providers = loadProviders(settings.providersDir);
-  const clients = loadClients(settings.clientsFile, providers);
+  const { clients, accounts, admin } = accountsOf(settings, providers);
   const app = createApp({
     providers,
     clients,
+    accounts,
+    admin,
     tokens: createTokenService(),
     store: createStore({
       limits: { offer: settings.limits.offersPerClient, trip: settings.limits.offersPerClient, booking: settings.limits.bookingsPerClient, fulfillment: settings.limits.offersPerClient, idempotency: settings.limits.offersPerClient },

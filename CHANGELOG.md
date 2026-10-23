@@ -62,6 +62,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.51.0] — 2026-10-23
+
+Issue #930, PR 1. Simulator 0.51.0. Server and collection unchanged. The accounts of each provider are kept in a data folder and changed while the simulator runs, through an administration API that the OSCAR server calls with a key. OSCAR's page is PR 2.
+
+### Simulator 0.51.0
+- **A data folder** (`SIM_DATA_DIR`, `deploy/data` in the compose file): `accounts.json` holds each account's client id, creation date and the SHA-256 of its secret, never the secret. On the first start it is made from `clients.json`, which is not read again. Without `SIM_DATA_DIR` nothing changes. A folder that is missing or not writable stops the start with a message.
+- **The administration API**, `/admin/api/` (`src/admin.js`): list of the accounts per provider, add (an id given, or the next `<provider>.tst|tstmgrNN`), delete, reset the secret, audit. A new secret is answered once.
+  - A deleted account and the old secret of a reset one are refused at once, their tokens included: a token carries 16 hex characters of its secret's digest. The other accounts' tokens and bookings stay.
+- **Its one caller is the OSCAR server**, whose administrators manage the simulator: no sign-in, session or cookie on the simulator.
+  - The server sends `Authorization: Bearer <key>`. The simulator holds only the key's SHA-256, `SIM_ADMIN_KEY_SHA256` (in `deploy/.env`); without it the API answers `404`.
+  - `X-Admin-Actor` names the OSCAR administrator who asked, and the audit keeps it.
+  - 10 wrong keys from one address in 15 minutes give `429`.
+- **The audit**: every change, and every refused key, is a line of `audit.log` with time, who, what, provider and client id; it never holds a secret.
+- `admin` cannot be a provider key. The nginx example has an `/admin/` location with a rate limit of its own and room for the OSCAR server's address as the only one allowed.
+
+---
+
 ## [server-1.11.382] / [collection-OTST_V2.0.215] — 2026-10-22
 
 Issue #255, fares phase 4, release 2026.417. Simulator 0.50.0.

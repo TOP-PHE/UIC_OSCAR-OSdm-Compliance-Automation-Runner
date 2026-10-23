@@ -70,6 +70,9 @@ Bruno_Collection/Dev working documents/
 # ── OSDM simulator ──────────────────────────────────────────────────────
 # The clients file holds the simulated providers' client secrets.
 OSDM_Simulator/**/clients.json
+# The accounts, administrators and audit of a simulator (#930).
+OSDM_Simulator/data/
+OSDM_Simulator/deploy/data/
 # A host's own compose settings, such as raised limits for a load test (#676).
 OSDM_Simulator/deploy/docker-compose.override.yml
 OSDM_Simulator/replay/

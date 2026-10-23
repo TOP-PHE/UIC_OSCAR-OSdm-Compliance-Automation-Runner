@@ -2457,6 +2457,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     run's variables back into the environment file** (secret variables
     excepted): check its size before committing it; #593's first push carried
     918 lines of run state.
+  - **Accounts in a data folder, and an administration API** (#930, PR 1 =
+    simulator 0.51.0). With `SIM_DATA_DIR` (`deploy/data` in the compose
+    file) the accounts are `accounts.json` (SHA-256 of each secret, made from
+    `clients.json` on the first start only) and `src/accounts.js` changes the
+    `clients` Map *in place*, so `app.js` reads it as before. A token carries
+    `s`, 16 hex of its secret's digest (`secretTag()`): a reset or a
+    delete-and-re-add refuses the old tokens without a clock. `/admin/api/`
+    (`src/admin.js`) has **one caller, the OSCAR server** (maintainer
+    decision: OSCAR's administrators manage the simulator, no login of its
+    own): `Authorization: Bearer <key>`, the simulator holding only
+    `SIM_ADMIN_KEY_SHA256` (`deploy/.env`), `X-Admin-Actor` = the OSCAR
+    administrator, kept in `audit.log` (never a secret). A first version with
+    its own sign-in, sessions, CSRF and `make-admin.js` was dropped before
+    merge. Without the key there is no `/admin` (404). The automatic update
+    only restarts the container, so an installed simulator gets the data
+    folder and the key at its next `up -d`, which needs `deploy/data` made
+    first (owner 1000): Docker would make it as root and the start would
+    stop. PR 2 is OSCAR's page, PR 3–4 the statistics.
   - **`node --test` takes a glob, not a directory**, on Node 22 and later
     (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
     destination directory. Sonar's coverage run starts from the repository root

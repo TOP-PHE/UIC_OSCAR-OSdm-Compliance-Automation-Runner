@@ -163,7 +163,10 @@ function servesTripSearch(provider, resource) {
   return resource === 'trips-collections' && osdmRank(provider.osdmVersion) >= osdmRank('3.10');
 }
 
-function createApp({ providers, clients, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
+// `accounts` and `admin` (#930) are there only with a data folder: then
+// `clients` is the accounts' own Map, which an administrator changes while
+// the simulator runs.
+function createApp({ providers, clients, accounts = null, admin = null, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
   const allow = createRateLimiter({ perMinute: limits.requestsPerMinute, now });
 
   function callerAddress(req) {
@@ -192,6 +195,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       return 401;
     }
     seen.client = id;
+    accounts?.noteToken(provider.key, id);
     if (params.grant_type !== 'client_credentials') {
       oauthError(res, 400, 'unsupported_grant_type', 'Only client_credentials is supported.');
       return 400;
@@ -206,7 +210,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       return 400;
     }
     sendJson(res, 200, {
-      access_token: tokens.issue(provider.key, id, provider.tokenLifetimeSeconds, tokenFaults),
+      access_token: tokens.issue(provider.key, id, provider.tokenLifetimeSeconds, tokenFaults, accounts?.secretTag(provider.key, id) || ''),
       token_type: 'Bearer',
       expires_in: provider.tokenLifetimeSeconds,
     }, { Pragma: 'no-cache' });
@@ -217,7 +221,10 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
   function authenticate(req, provider) {
     // Checked whatever the header holds: what is not a token of ours is null.
     const claims = tokens.verify(bearerToken(req.headers.authorization));
-    const known = claims?.provider === provider.key && clients.get(provider.key)?.has(claims.clientId);
+    const known = claims?.provider === provider.key && clients.get(provider.key)?.has(claims.clientId)
+      // #930: a token asked with a secret since reset, or of an account deleted
+      // and made again, is refused.
+      && (!accounts || accounts.tokenAccepted(provider.key, claims.clientId, claims.secretTag));
     if (!known) {
       throw new HttpError(401, 'UNAUTHORIZED', 'Authentication required',
         'A valid access token issued for this provider is required.', { 'WWW-Authenticate': 'Bearer' });
@@ -513,6 +520,10 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     }
     if (!allow(callerAddress(req))) {
       throw new HttpError(429, 'TOO_MANY_REQUESTS', 'Too many requests', undefined, { 'Retry-After': '60' });
+    }
+    if (segments[0] === 'admin') {
+      if (!admin) throw notFound();
+      return admin.handle(req, res, segments.slice(1), seen, callerAddress(req));
     }
     const provider = providers.get(segments[0]);
     if (!provider) throw notFound();
