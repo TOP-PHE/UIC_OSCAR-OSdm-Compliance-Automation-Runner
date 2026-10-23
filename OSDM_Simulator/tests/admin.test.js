@@ -23,9 +23,19 @@ const { createTokenService } = require('../src/tokens');
 const { createStore } = require('../src/store');
 const { createApp } = require('../src/app');
 const { start } = require('../server');
-const { changeAdmins } = require('../scripts/make-admin');
+const { changeAdmins, main } = require('../scripts/make-admin');
 
 const providers = loadProviders(PROVIDERS_DIR);
+
+// A file's mode and text, read through one descriptor.
+function modeAndText(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    return { mode: fs.fstatSync(fd).mode & 0o777, text: fs.readFileSync(fd, 'utf8') };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
 const PASSWORD = 'correct-horse-battery-staple-0123';
 
 async function writeAdmins(dir, list) {
@@ -97,9 +107,9 @@ test('the first start with a data folder imports the clients file: digests only,
   const total = Object.values(REAL_SECRETS).reduce((n, list) => n + list.length, 0);
   assert.equal(accounts.imported, total);
   assert.equal(accounts.count(), total);
-  const text = fs.readFileSync(path.join(dataDir, ACCOUNTS_FILE), 'utf8');
+  const { mode, text } = modeAndText(path.join(dataDir, ACCOUNTS_FILE));
   for (const list of Object.values(REAL_SECRETS)) for (const c of list) assert.equal(text.includes(c.client_secret), false);
-  assert.equal(fs.statSync(path.join(dataDir, ACCOUNTS_FILE)).mode & 0o777, 0o600);
+  assert.equal(mode, 0o600);
   assert.deepEqual(accounts.auditTail().map((e) => e.action), ['imported_clients_file']);
   // The next start reads the data folder and leaves the clients file alone,
   // even when it has changed since.
@@ -374,12 +384,14 @@ test('the administrators are read at each sign-in: one added runs at once, one r
   const sim = await startWithData();
   try {
     const ada = await signIn(sim.base);
-    const password = await changeAdmins(sim.dataDir, 'add', 'bob');
+    const password = 'bob-password-0123456789';
+    await changeAdmins(sim.dataDir, 'add', 'bob', password);
     const bob = await signIn(sim.base, 'bob', password);
     await changeAdmins(sim.dataDir, 'remove', 'ada');
     assert.equal((await request(sim.base, 'GET', '/admin/api/accounts', { cookie: ada.cookie })).status, 401);
     assert.equal((await request(sim.base, 'GET', '/admin/api/accounts', { cookie: bob.cookie })).status, 200);
-    const newPassword = await changeAdmins(sim.dataDir, 'reset', 'bob');
+    const newPassword = 'bob-new-password-0123456789';
+    await changeAdmins(sim.dataDir, 'reset', 'bob', newPassword);
     assert.equal((await request(sim.base, 'POST', '/admin/api/login', { body: { name: 'bob', password } })).status, 401);
     await signIn(sim.base, 'bob', newPassword);
   } finally {
@@ -437,18 +449,38 @@ test('passwords are kept as scrypt digests that only the password matches', asyn
   assert.notEqual(await hashPassword(PASSWORD), stored);
 });
 
-test('make-admin refuses a bad name, a second add, a reset or removal of no one; it writes for its owner only', async () => {
+test('make-admin refuses a bad name or password, a second add, a reset or removal of no one; it writes for its owner only', async () => {
   const dir = path.join(tempDir(), 'data');
-  await assert.rejects(changeAdmins(dir, 'add', 'x'), /A name is/);
-  await assert.rejects(changeAdmins(dir, 'add', '../etc'), /A name is/);
-  const password = await changeAdmins(dir, 'add', 'ada');
-  assert.match(password, /^[A-Za-z0-9_-]{32}$/);
-  await assert.rejects(changeAdmins(dir, 'add', 'ada'), /already an administrator/);
-  await assert.rejects(changeAdmins(dir, 'reset', 'bob'), /not an administrator/);
+  await assert.rejects(changeAdmins(dir, 'add', 'x', PASSWORD), /A name is/);
+  await assert.rejects(changeAdmins(dir, 'add', '../etc', PASSWORD), /A name is/);
+  await assert.rejects(changeAdmins(dir, 'add', 'ada', 'short'), /16 to 200 characters/);
+  await assert.rejects(changeAdmins(dir, 'add', 'ada', undefined), /16 to 200 characters/);
+  await changeAdmins(dir, 'add', 'ada', PASSWORD);
+  await assert.rejects(changeAdmins(dir, 'add', 'ada', PASSWORD), /already an administrator/);
+  await assert.rejects(changeAdmins(dir, 'reset', 'bob', PASSWORD), /not an administrator/);
   await assert.rejects(changeAdmins(dir, 'remove', 'bob'), /not an administrator/);
-  const file = path.join(dir, 'admins.json');
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-  assert.equal(fs.readFileSync(file, 'utf8').includes(password), false);
-  assert.equal(await changeAdmins(dir, 'remove', 'ada'), null);
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).admins, []);
+  const { mode, text } = modeAndText(path.join(dir, 'admins.json'));
+  assert.equal(mode, 0o600);
+  assert.equal(text.includes(PASSWORD), false);
+  await changeAdmins(dir, 'remove', 'ada');
+  assert.deepEqual(JSON.parse(modeAndText(path.join(dir, 'admins.json')).text).admins, []);
+});
+
+test('make-admin reads the password from its input and never writes it out', async (t) => {
+  const { Readable, PassThrough } = require('node:stream');
+  const printed = [];
+  t.mock.method(console, 'log', (line) => printed.push(line));
+  t.mock.method(console, 'error', (line) => printed.push(line));
+  const output = new PassThrough();
+  output.on('data', (c) => printed.push(String(c)));
+  const dirs = { local: path.join(tempDir(), 'local'), deploy: path.join(tempDir(), 'deploy') };
+  assert.equal(await main(['deploy', 'add', 'ada'], { input: Readable.from([`${PASSWORD}\nignored\n`]), output, dirs }), 0);
+  assert.equal(printed.join('\n').includes(PASSWORD), false);
+  const stored = JSON.parse(fs.readFileSync(path.join(dirs.deploy, 'admins.json'), 'utf8')).admins;
+  assert.equal(await passwordMatches(stored.find((a) => a.name === 'ada').password, PASSWORD), true);
+  assert.equal(fs.existsSync(dirs.local), false);
+  assert.equal(await main(['local', 'add', 'bob'], { input: Readable.from(['short\n']), output, dirs }), 1);
+  assert.equal(await main(['deploy', 'remove', 'ada'], { output, dirs }), 0);
+  assert.equal(await main(['local', 'add'], { output, dirs }), 1);
+  assert.equal(await main(['/tmp', 'add', 'ada'], { output, dirs }), 1);
 });

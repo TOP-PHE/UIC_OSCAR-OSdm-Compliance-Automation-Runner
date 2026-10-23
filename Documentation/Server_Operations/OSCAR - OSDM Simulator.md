@@ -96,11 +96,12 @@ simulator.
 The data folder (#930) keeps the accounts from the first start on, imported
 from `clients.json`, with the administrators and the audit of their changes.
 It belongs to the container's user, and to it only. Then define yourself as
-an administrator; the password is printed once:
+an administrator. The script asks for your password twice (16 characters or
+more) and does not show it; it is kept as a digest only:
 
 ```bash
 install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data
-docker run --rm --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
+docker run --rm -it --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
   node scripts/make-admin.js deploy add <your-name>
 ```
 
@@ -369,7 +370,7 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 | See which version runs | `curl -s https://<simulator-host>/healthz` (`"version"`), or the first line of `docker compose logs` (`OSDM simulator <version> listening on …`) |
 | Replace all clients and secrets | see below |
 | Add, delete a client, give it a new secret | the administration API, while it runs (below); `clients.json` is read on the first start only |
-| Add, reset or remove an administrator | `docker run --rm --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim node scripts/make-admin.js deploy add\|reset\|remove <name>`; no restart |
+| Add, reset or remove an administrator | `docker run --rm -it --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim node scripts/make-admin.js deploy add\|reset\|remove <name>`; no restart |
 | Clear every booking and end every token | `docker compose restart` |
 | Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
 
@@ -414,7 +415,7 @@ as before and the administration API answers `404`.
 ```bash
 cd /opt/osdm-simulator/OSDM_Simulator/deploy
 install -d -m 700 -o 1000 -g 1000 data
-docker run --rm --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
+docker run --rm -it --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
   node scripts/make-admin.js deploy add <your-name>
 docker compose up -d          # re-creates the container: bookings and tokens are lost
 docker compose logs | grep Imported   # "Imported N accounts from /run/osdm-simulator/clients.json"

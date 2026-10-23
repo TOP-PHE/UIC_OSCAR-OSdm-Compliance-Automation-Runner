@@ -2465,7 +2465,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `s`, 16 hex of its secret's digest (`secretTag()`): a reset or a
     delete-and-re-add refuses the old tokens without a clock. `/admin/api/`
     (`src/admin.js`): administrators only from `scripts/make-admin.js` on the
-    host (scrypt, `admins.json` read at each sign-in), cookie
+    host, which asks the password and never prints it (CodeQL's clear-text
+    logging stopped a version that drew and printed one; scrypt,
+    `admins.json` read at each sign-in), cookie
     `__Host-sim_admin`, CSRF header and Origin check on every change, failed
     sign-ins counted per address and name, `audit.log` without secrets.
     Without `SIM_DATA_DIR` there is no `/admin` (404) and nothing is written.

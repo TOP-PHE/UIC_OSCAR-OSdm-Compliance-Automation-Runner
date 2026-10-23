@@ -169,14 +169,16 @@ Administrators are names and passwords in `<data>/admins.json`, written on the
 host only:
 
 ```
-node scripts/make-admin.js local add ada      # prints a password, once
-node scripts/make-admin.js local reset ada    # a new password
+node scripts/make-admin.js local add ada      # asks the password, twice, not shown
+node scripts/make-admin.js local reset ada    # a new password, asked the same way
 node scripts/make-admin.js local remove ada
 ```
 
 `local` writes into `data/` next to `server.js` (run with
 `SIM_DATA_DIR=./data`), `deploy` into `deploy/data/`, the compose file's data
-folder; git ignores both. The file holds scrypt digests and is read at each
+folder; git ignores both. A password is 16 to 200 characters; from a pipe,
+its first line is read, once. It is never written out: the file holds scrypt
+digests, and is read at each
 sign-in, so a change needs no restart, and a removed administrator's session
 ends at its next request.
 
