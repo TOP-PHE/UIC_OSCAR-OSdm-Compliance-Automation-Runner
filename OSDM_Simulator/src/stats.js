@@ -86,6 +86,23 @@ function readStatsFile(file) {
   return raw.days;
 }
 
+// Add one day's counts into the per-provider sums; returns the day's total.
+function addDay(perProvider, byProvider) {
+  const total = zero();
+  for (const [key, b] of Object.entries(byProvider)) {
+    const target = perProvider.get(key);
+    if (!target) continue;
+    addInto(target.unidentified, b.unidentified);
+    addInto(total, b.unidentified);
+    for (const [client, counters] of Object.entries(b.clients)) {
+      if (!target.clients.has(client)) target.clients.set(client, zero());
+      addInto(target.clients.get(client), counters);
+      addInto(total, counters);
+    }
+  }
+  return total;
+}
+
 function checkPeriod(from, to) {
   const valid = (d) => DAY.test(d || '') && !Number.isNaN(Date.parse(d));
   if (!valid(from) || !valid(to) || from > to) throw new RangeError('from and to are days, YYYY-MM-DD, from not after to');
@@ -142,23 +159,6 @@ function createStats({ dataDir, providers, now = Date.now, retentionDays = 400, 
    * provider, its accounts and its unidentified requests, and per day the
    * totals. Throws a RangeError for dates that are not valid.
    */
-  // Add one day's counts into the per-provider sums; returns the day's total.
-  function addDay(perProvider, byProvider) {
-    const total = zero();
-    for (const [key, b] of Object.entries(byProvider)) {
-      const target = perProvider.get(key);
-      if (!target) continue;
-      addInto(target.unidentified, b.unidentified);
-      addInto(total, b.unidentified);
-      for (const [client, counters] of Object.entries(b.clients)) {
-        if (!target.clients.has(client)) target.clients.set(client, zero());
-        addInto(target.clients.get(client), counters);
-        addInto(total, counters);
-      }
-    }
-    return total;
-  }
-
   function query({ from, to }) {
     checkPeriod(from, to);
     const perProvider = new Map([...providers.keys()].map((k) => [k, { unidentified: zero(), clients: new Map() }]));
