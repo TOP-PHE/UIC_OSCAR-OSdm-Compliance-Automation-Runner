@@ -108,6 +108,40 @@ function auditWhat(e) {
   return verb;
 }
 
+// #930 PR 3: the statistics' columns, in the simulator's names.
+const STATS_COLUMNS = [
+  ['tokens', 'Tokens'], ['requests', 'Requests'], ['offers', 'Offers'], ['bookings', 'Bookings'],
+  ['confirmations', 'Confirmed'], ['refunds', 'Refunds'], ['exchanges', 'Exchanges'],
+  ['clientErrors', '4xx'], ['serverErrors', '5xx'],
+];
+
+const anyCount = (c) => STATS_COLUMNS.some(([key]) => (c?.[key] || 0) > 0);
+
+function statsRow(doc, label, counters, strong) {
+  const cells = STATS_COLUMNS.map(([key]) => el(doc, 'td', { class: 'num', text: String(counters?.[key] || 0) }));
+  const name = strong ? el(doc, 'strong', { text: label }) : el(doc, 'code', { text: label });
+  return el(doc, 'tr', {}, [el(doc, 'td', {}, [name]), ...cells]);
+}
+
+function statsProviderNode(doc, p) {
+  const head = el(doc, 'tr', {}, [el(doc, 'th', { text: 'Account' }), ...STATS_COLUMNS.map(([, t]) => el(doc, 'th', { class: 'num', text: t }))]);
+  const rows = (p.accounts || []).map((a) => statsRow(doc, a.clientId, a, false));
+  if (anyCount(p.unidentified)) rows.push(statsRow(doc, 'account not known', p.unidentified, true));
+  rows.push(statsRow(doc, 'Total', p.totals, true));
+  const body = (p.accounts || []).length || anyCount(p.unidentified)
+    ? el(doc, 'div', { class: 'table-wrap' }, [el(doc, 'table', {}, [el(doc, 'thead', {}, [head]), el(doc, 'tbody', {}, rows)])])
+    : el(doc, 'div', { class: 'empty', text: 'Not used in this period.' });
+  return el(doc, 'div', { class: 'card' }, [
+    el(doc, 'div', { class: 'provider-head' }, [el(doc, 'h3', {}, [el(doc, 'code', { text: p.provider }), ' ' + (p.name || '')])]),
+    body,
+  ]);
+}
+
+function statsNode(doc, stats) {
+  const period = el(doc, 'p', { class: 'muted', text: 'From ' + (stats.from || '?') + ' to ' + (stats.to || '?') + ' (UTC days).' });
+  return el(doc, 'div', {}, [period, ...(stats.providers || []).map((p) => statsProviderNode(doc, p))]);
+}
+
 function auditNode(doc, entries) {
   if (!entries.length) return el(doc, 'div', { class: 'empty', text: 'Nothing yet.' });
   const head = el(doc, 'tr', {}, ['When', 'Who', 'What'].map((t) => el(doc, 'th', { text: t })));
@@ -159,6 +193,14 @@ function auditNode(doc, entries) {
     const res = await fetch(BASE + '/audit');
     if (!res.ok) { showEmpty(box, await readError(res, 'Could not read the audit.')); return; }
     box.replaceChildren(auditNode(document, (await res.json()).entries || []));
+  }
+
+  async function loadStats() {
+    const box = document.getElementById('stats');
+    const days = document.getElementById('stats-days').value;
+    const res = await fetch(BASE + '/stats?days=' + encodeURIComponent(days));
+    if (!res.ok) { showEmpty(box, await readError(res, 'Could not read the statistics.')); return; }
+    box.replaceChildren(statsNode(document, await res.json()));
   }
 
   async function saveConfig() {
@@ -230,13 +272,14 @@ function auditNode(doc, entries) {
   }
 
   function showTab(name) {
-    const tab = name === 'audit' ? 'audit' : 'accounts';
-    document.getElementById('accounts-view').style.display = tab === 'accounts' ? '' : 'none';
-    document.getElementById('audit-view').style.display = tab === 'audit' ? '' : 'none';
-    document.getElementById('accounts-help').style.display = tab === 'accounts' ? '' : 'none';
-    document.getElementById('audit-help').style.display = tab === 'audit' ? '' : 'none';
-    for (const el of document.querySelectorAll('[data-tab]')) el.classList.toggle('active', el.dataset.tab === tab);
+    const tab = ['audit', 'stats'].includes(name) ? name : 'accounts';
+    for (const view of ['accounts', 'stats', 'audit']) {
+      document.getElementById(view + '-view').style.display = tab === view ? '' : 'none';
+      document.getElementById(view + '-help').style.display = tab === view ? '' : 'none';
+    }
+    for (const link of document.querySelectorAll('[data-tab]')) link.classList.toggle('active', link.dataset.tab === tab);
     if (tab === 'audit') loadAudit().catch(reportError);
+    if (tab === 'stats') loadStats().catch(reportError);
   }
 
   document.addEventListener('click', (e) => {
@@ -251,6 +294,7 @@ function auditNode(doc, entries) {
     else if (action === 'copy') copy().catch(reportError);
     else if (action === 'hide-secret') hideSecret();
   });
+  document.getElementById('stats-days').addEventListener('change', () => loadStats().catch(reportError));
   window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
 
   showTab(location.hash.slice(1));

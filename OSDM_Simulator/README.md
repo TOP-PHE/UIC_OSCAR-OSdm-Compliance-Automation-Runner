@@ -177,6 +177,15 @@ sign-in, session or cookie on the simulator.
 | `DELETE /admin/api/accounts/<provider>/<clientId>` | deletes it |
 | `POST /admin/api/accounts/<provider>/<clientId>/reset-secret` | a new secret, answered once |
 | `GET /admin/api/audit` | the last 200 lines of `<data>/audit.log`, newest first: time, who, what, provider, client id; never a secret |
+| `GET /admin/api/stats?from=YYYY-MM-DD&to=YYYY-MM-DD` | what each account did, per provider (accounts, requests of no known account, totals) and per day: tokens, requests, offers, bookings, confirmations, refunds, exchanges, 4xx and 5xx answers; the last 30 days by default, at most 400 (0.52.0) |
+
+**Statistics** (0.52.0, `src/stats.js`). With a data folder, each request is
+counted per UTC day, provider and account, from its method, path and status
+alone: no path, body, header, address or time of day is kept. A refused token
+or a wrong secret names no known account and is counted for the provider only;
+the administration is not counted. They are kept in `<data>/stats.json`,
+written at most once a minute and when the simulator stops, for
+`SIM_STATS_RETENTION_DAYS` days.
 
 Every request carries `Authorization: Bearer <key>` and `X-Admin-Actor`, the
 OSCAR administrator who asked (printable text, at most 120 characters), which
@@ -214,6 +223,7 @@ All optional, read from the environment.
 | `SIM_PORT` | `3002` | port |
 | `SIM_CLIENTS_FILE` | `./clients.json` | the clients file |
 | `SIM_DATA_DIR` | none | the data folder of the accounts and their audit (#930); without it, the clients file only |
+| `SIM_STATS_RETENTION_DAYS` | `400` | days of statistics kept in the data folder (7 to 3660) |
 | `SIM_ADMIN_KEY_SHA256` | none | the SHA-256 (hex) of the key the OSCAR server calls the administration API with (#930); needs `SIM_DATA_DIR`; without it, `/admin` is `404` |
 | `SIM_PROVIDERS_DIR` | `./providers` | the provider profiles |
 | `SIM_TRUST_PROXY` | off | `1` behind a reverse proxy: the caller's address is the last one in `X-Forwarded-For` |
@@ -232,6 +242,7 @@ All optional, read from the environment.
 | `src/config.js` | reading and checking the profiles, the clients file and the settings |
 | `src/tokens.js` | issuing and checking tokens |
 | `src/accounts.js` | the accounts of a data folder, their changes and the audit (#930) |
+| `src/stats.js` | the usage counted per day, provider and account (#930) |
 | `src/admin.js` | the administration API: the key, the actor, the account routes (#930) |
 | `src/store.js` | the bounded, per-client memory |
 | `src/osdm/offers.js` | the answer to `POST /offers` |

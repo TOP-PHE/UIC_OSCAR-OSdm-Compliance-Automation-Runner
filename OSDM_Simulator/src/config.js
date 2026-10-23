@@ -492,6 +492,8 @@ function loadSettings(env, baseDir) {
     // The hex SHA-256 of the key the OSCAR server calls the administration
     // API with; none = the API is closed.
     adminKeySha256: adminKeyOf(env),
+    // How long the usage statistics are kept (#930 PR 3).
+    statsRetentionDays: intFromEnv(env, 'SIM_STATS_RETENTION_DAYS', 400, 7, 3660),
     // Behind a reverse proxy the caller's address is in X-Forwarded-For.
     trustProxy: env.SIM_TRUST_PROXY === '1',
     limits: {

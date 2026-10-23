@@ -34,6 +34,7 @@ const { createAdmin } = require(path.join(SIM, 'admin'));
 const { createTokenService } = require(path.join(SIM, 'tokens'));
 const { createStore } = require(path.join(SIM, 'store'));
 const { createApp } = require(path.join(SIM, 'app'));
+const { createStats } = require(path.join(SIM, 'stats'));
 
 const app = buildAppWithRoute('/v1/admin/simulator', '../../src/api/routes/admin-simulator');
 const companyId = crypto.randomUUID();
@@ -56,11 +57,13 @@ beforeAll(async () => {
   fs.mkdirSync(dataDir);
   const providers = loadProviders(path.join(SIM, '..', 'providers'));
   const accounts = createAccounts({ dataDir, providers, clientsFile });
+  const stats = createStats({ dataDir, providers, flushMs: 0 });
   const simApp = createApp({
+    stats,
     providers,
     clients: accounts.clients,
     accounts,
-    admin: createAdmin({ keySha256: crypto.createHash('sha256').update(KEY).digest('hex'), accounts }),
+    admin: createAdmin({ keySha256: crypto.createHash('sha256').update(KEY).digest('hex'), accounts, stats }),
     tokens: createTokenService(),
     store: createStore({ limits: { offer: 50, trip: 50, booking: 5, fulfillment: 50, idempotency: 50 }, ttlMs: 3600000 }),
     limits: { bodyBytes: 65536, offersPerClient: 50, bookingsPerClient: 5, ttlSeconds: 3600, requestsPerMinute: 10000 },
@@ -172,6 +175,27 @@ test('the simulator\'s audit names the OSCAR administrator; OSCAR\'s audit has t
   expect(ours).toContain('simulator_account_added:gamma/gamma.audit');
   expect(JSON.stringify(ours)).not.toContain(added.body.clientSecret);
   expect(JSON.stringify(all("SELECT * FROM auth_events WHERE event_type LIKE 'simulator_%'"))).not.toContain(KEY);
+});
+
+test('the statistics: what each account did, field by field; a period not offered is refused before the simulator', async () => {
+  expect(await simulatorToken('gamma-one', SECRET)).toBe(200);
+  expect(await simulatorToken('gamma-one', 'wrong'.repeat(10))).toBe(401);
+  const res = await asAdmin(request(app).get('/v1/admin/simulator/stats?days=7'));
+  expect(res.status).toBe(200);
+  expect(res.headers['cache-control']).toBe('no-store');
+  expect(res.body.days).toBe(7);
+  expect(res.body.to).toBe(new Date().toISOString().slice(0, 10));
+  const gamma = res.body.providers.find((p) => p.provider === 'gamma');
+  const one = gamma.accounts.find((a) => a.clientId === 'gamma-one');
+  expect(one.tokens).toBeGreaterThanOrEqual(1);
+  // A wrong secret names no account the simulator knows: the provider's line.
+  expect(gamma.unidentified.clientErrors).toBeGreaterThanOrEqual(1);
+  expect(Object.keys(one).sort()).toEqual(['bookings', 'clientErrors', 'clientId', 'confirmations', 'exchanges', 'offers', 'refunds', 'requests', 'serverErrors', 'tokens']);
+  expect(res.body.daily.length).toBe(1);
+  for (const days of ['2', 'abc', '-1', '1000']) {
+    const bad = await asAdmin(request(app).get(`/v1/admin/simulator/stats?days=${days}`));
+    expect([days, bad.status]).toEqual([days, 400]);
+  }
 });
 
 test('the simulator\'s refusals come back with their status; bad values never reach it', async () => {

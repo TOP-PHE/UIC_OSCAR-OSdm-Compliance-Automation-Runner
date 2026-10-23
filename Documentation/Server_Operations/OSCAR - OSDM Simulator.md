@@ -400,6 +400,13 @@ the host, with the key in `KEY`:
 curl -s -H "Authorization: Bearer $KEY" -H 'X-Admin-Actor: <your-name>' http://127.0.0.1:3002/admin/api/accounts
 ```
 
+**Statistics** (0.52.0). The simulator counts, per day, provider and account,
+the tokens, requests, offers, bookings, confirmations, refunds, exchanges and
+answers in error; OSCAR shows them under Admin → OSDM Simulator → Statistics.
+They are in `deploy/data/stats.json` (counts only), kept 400 days unless
+`SIM_STATS_RETENTION_DAYS` says otherwise. A simulator without a data folder
+counts nothing.
+
 **Moving an installed simulator to a data folder** (installed before 0.51.0).
 The automatic update only restarts the container, which keeps the compose
 settings it was made with: until `up -d`, the simulator reads `clients.json`

@@ -2487,6 +2487,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     256 KB, key masked. The route file is mounted before `/v1/admin`. Its
     integration test runs the real simulator code from `OSDM_Simulator/src`
     on a loopback port, so a change to the simulator's API fails there.
+    **PR 3 (1.11.384 / simulator 0.52.0): statistics.** `src/stats.js`
+    counts each request per UTC day, provider and account from method, path
+    and status only (`countersOf()`), in `<data>/stats.json` (flushed each
+    minute and on close, `SIM_STATS_RETENTION_DAYS`); a wrong secret or token
+    names no known account and counts as the provider's `unidentified`.
+    `GET /admin/api/stats?from&to`, OSCAR `GET /v1/admin/simulator/stats?days=`
+    (1/7/30/90/365, `statsView()` counter by counter) and the page's
+    Statistics tab. **A secret is never shown again** (only its SHA-256 is
+    kept, on purpose): to hand one over, give a new one. PR 4 (sets and
+    errors per run) needs the collection to say which batch a request is of.
   - **`node --test` takes a glob, not a directory**, on Node 22 and later
     (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
     destination directory. Sonar's coverage run starts from the repository root

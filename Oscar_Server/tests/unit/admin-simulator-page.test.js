@@ -62,6 +62,16 @@ const providerNode = lift('providerNode', { el, accountRow });
 const secretNode = lift('secretNode', { el });
 const auditWhat = lift('auditWhat', { AUDIT_WHAT });
 const auditNode = lift('auditNode', { el, whenText, auditWhat });
+const STATS_COLUMNS = (() => {
+  const lines = SOURCE.split('\n');
+  const start = lines.findIndex(l => l.startsWith('const STATS_COLUMNS'));
+  const end = lines.findIndex((l, i) => i > start && l === '];');
+  return vm.runInNewContext(`${lines.slice(start, end + 1).join('\n')}\nSTATS_COLUMNS`);
+})();
+const anyCount = (c) => STATS_COLUMNS.some(([key]) => (c?.[key] || 0) > 0);
+const statsRow = lift('statsRow', { el, String, STATS_COLUMNS });
+const statsProviderNode = lift('statsProviderNode', { el, statsRow, anyCount, STATS_COLUMNS });
+const statsNode = lift('statsNode', { el, statsProviderNode });
 
 const GAMMA = {
   provider: 'gamma', name: 'Gamma <Rail>', osdmVersion: '3.8.0',
@@ -116,6 +126,32 @@ test('the audit says who did what, in words', () => {
   expect(all(table, (n) => n.tag === 'b')).toEqual([]);
   expect(textOf(table)).toContain('deleted beta/beta.x');
   expect(textOf(auditNode(fakeDoc, []))).toBe('Nothing yet.');
+});
+
+test('the statistics show one table per provider: its accounts, the requests of no known account, the total', () => {
+  const zero = Object.fromEntries(STATS_COLUMNS.map(([k]) => [k, 0]));
+  const stats = {
+    from: '2026-10-17', to: '2026-10-23',
+    providers: [
+      { provider: 'gamma', name: 'Gamma', totals: { ...zero, tokens: 3, requests: 9, offers: 2, clientErrors: 2 },
+        unidentified: { ...zero, clientErrors: 1, requests: 1 },
+        accounts: [{ clientId: 'gamma<b>', ...zero, tokens: 3, requests: 8, offers: 2, clientErrors: 1 }] },
+      { provider: 'beta', name: 'Beta', totals: zero, unidentified: zero, accounts: [] },
+    ],
+  };
+  const node = statsNode(fakeDoc, stats);
+  const text = textOf(node);
+  expect(text).toContain('From 2026-10-17 to 2026-10-23');
+  expect(text).toContain('Not used in this period.');
+  const rows = all(node, (n) => n.tag === 'tr').map((r) => r.children.map(textOf));
+  expect(rows[0]).toEqual(['Account', 'Tokens', 'Requests', 'Offers', 'Bookings', 'Confirmed', 'Refunds', 'Exchanges', '4xx', '5xx']);
+  expect(rows[1]).toEqual(['gamma<b>', '3', '8', '2', '0', '0', '0', '0', '1', '0']);
+  expect(rows[2]).toEqual(['account not known', '0', '1', '0', '0', '0', '0', '0', '1', '0']);
+  expect(rows[3]).toEqual(['Total', '3', '9', '2', '0', '0', '0', '0', '2', '0']);
+  expect(all(node, (n) => n.tag === 'b')).toEqual([]);
+  // Every counter the route passes on has its column.
+  const passed = Object.keys(require('../../src/api/routes/admin-simulator').views.statsView({ providers: [{ provider: 'gamma', accounts: [] }] }, 1).providers[0].totals);
+  expect(STATS_COLUMNS.map(([k]) => k)).toEqual(passed);
 });
 
 test('the page sets no HTML from data: no innerHTML at all', () => {

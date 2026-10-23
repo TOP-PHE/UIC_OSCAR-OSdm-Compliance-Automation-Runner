@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-23-simulator-statistics",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "How the OSDM simulator is used",
+    "summary": "Admin → OSDM Simulator shows, per provider and account, how many tokens, offers, bookings, refunds and exchanges each account made, and its errors.",
+    "content": "The OSDM simulator now counts what each of its accounts does. In Admin → OSDM Simulator, the Statistics tab shows, per provider, one line per account: tokens issued, OSDM requests, offers asked, bookings made and confirmed, refunds and exchanges confirmed, and answers in error. Requests that name no known account are counted on a line of their own.\n\nChoose today or the last 7, 30, 90 or 365 days. The simulator keeps only these counts, per day: no request, body or address."
+  },
+  {
     "id": "2026-10-23-simulator-accounts",
     "date": "October 23, 2026",
     "tag": "New",
