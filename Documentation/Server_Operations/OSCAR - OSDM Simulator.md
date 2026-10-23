@@ -94,15 +94,20 @@ its own: two accounts that share one see each other's bookings on the
 simulator.
 
 The data folder (#930) keeps the accounts from the first start on, imported
-from `clients.json`, with the administrators and the audit of their changes.
-It belongs to the container's user, and to it only. Then define yourself as
-an administrator. The script asks for your password twice (16 characters or
-more) and does not show it; it is kept as a digest only:
+from `clients.json`, with the audit of their changes. It belongs to the
+container's user, and to it only. Then draw the administration key: OSCAR's
+administrators manage the accounts from OSCAR, whose server calls the
+simulator with this key. The simulator keeps only its SHA-256, in `.env` next
+to the compose file (git ignores it); the key itself goes into OSCAR (*Admin →
+Simulator*, #930 PR 2) and is then needed nowhere else:
 
 ```bash
-install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data
-docker run --rm -it --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
-  node scripts/make-admin.js deploy add <your-name>
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+install -d -m 700 -o 1000 -g 1000 data
+KEY=$(openssl rand -hex 32)
+printf 'SIM_ADMIN_KEY_SHA256=%s\n' "$(printf %s "$KEY" | sha256sum | cut -d' ' -f1)" > .env && chmod 600 .env
+echo "$KEY"      # copy it into OSCAR now; it is kept nowhere on this host
+unset KEY
 ```
 
 Start the simulator and check it from the host:
@@ -369,54 +374,37 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 | Update the simulator | automatic on a new version, once set up (see below); by hand: `git -C /opt/osdm-simulator pull && docker compose restart` |
 | See which version runs | `curl -s https://<simulator-host>/healthz` (`"version"`), or the first line of `docker compose logs` (`OSDM simulator <version> listening on …`) |
 | Replace all clients and secrets | see below |
-| Add, delete a client, give it a new secret | the administration API, while it runs (below); `clients.json` is read on the first start only |
-| Add, reset or remove an administrator | `docker run --rm -it --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim node scripts/make-admin.js deploy add\|reset\|remove <name>`; no restart |
+| Add, delete a client, give it a new secret | from OSCAR (*Admin → Simulator*), while it runs (below); `clients.json` is read on the first start only |
+| Change the administration key | draw a new one as in section 3 (it replaces `.env`), `docker compose up -d`, and enter it in OSCAR |
 | Clear every booking and end every token | `docker compose restart` |
 | Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
 
-A restart clears the bookings, the tokens and the administrators' sessions:
-they are kept in memory only, and the key that signs the tokens is drawn at
+A restart clears the bookings and the tokens: they are kept in memory only, and the key that signs the tokens is drawn at
 start-up. The accounts stay: they are in the data folder.
 
-**Accounts while it runs** (#930). Sign in, then add, delete or reset. A
-new secret is answered once: hand it over then. A deleted account, and the
-old secret of a reset one, are refused at once, tokens included; the other
-accounts and their bookings are not touched. Each change is a line of
-`deploy/data/audit.log`, with the administrator's name. From any machine,
-with the name and password of `make-admin.js` in `ADMIN` and `PASS`:
+**Accounts while it runs** (#930). OSCAR's administrators add, delete or
+reset them from OSCAR. A new secret is shown once: hand it over then. A
+deleted account, and the old secret of a reset one, are refused at once,
+tokens included; the other accounts and their bookings are not touched. Each
+change is a line of `deploy/data/audit.log`, with the OSCAR administrator who
+asked. The API is called by the OSCAR server only: to keep it to that server,
+fill in the `allow` / `deny` lines of the `/admin/` location in the nginx site
+with the OSCAR server's address (a site set up before 0.51.0 has no such
+location; add the block of `nginx-osdm-simulator.conf.example`). By hand, from
+the host, with the key in `KEY`:
 
 ```bash
-SIM=https://<simulator-host>
-J=$(mktemp)
-curl -s -c "$J" -H 'Content-Type: application/json' \
-  -d "{\"name\":\"$ADMIN\",\"password\":\"$PASS\"}" "$SIM/admin/api/login" > "$J.login"
-CSRF=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['csrfToken'])" "$J.login")
-curl -s -b "$J" "$SIM/admin/api/accounts"                                    # the list
-curl -s -b "$J" -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' \
-  -d '{"kind":"tst"}' "$SIM/admin/api/accounts/zeta"                         # zeta.tstNN and its secret
-curl -s -b "$J" -H "X-CSRF-Token: $CSRF" -X POST "$SIM/admin/api/accounts/zeta/zeta.tst04/reset-secret"
-curl -s -b "$J" -H "X-CSRF-Token: $CSRF" -X DELETE "$SIM/admin/api/accounts/zeta/zeta.tst04"
-curl -s -b "$J" "$SIM/admin/api/audit"
-rm -f "$J" "$J.login"
+curl -s -H "Authorization: Bearer $KEY" -H 'X-Admin-Actor: <your-name>' http://127.0.0.1:3002/admin/api/accounts
 ```
-
-The page that does the same is PR 2 of #930. To keep the administration to
-known addresses, fill in the `allow` / `deny` lines of the `/admin/` location
-in the nginx site. A site set up before 0.51.0 has no such location: its
-`location /` removes cookies, so sign-in works but every next request answers
-`401`. Add the `/admin/` block of `nginx-osdm-simulator.conf.example` to it
-and reload nginx.
 
 **Moving an installed simulator to a data folder** (installed before 0.51.0).
 The automatic update only restarts the container, which keeps the compose
 settings it was made with: until `up -d`, the simulator reads `clients.json`
-as before and the administration API answers `404`.
+as before and the administration API answers `404`. Make the data folder and
+the key as in section 3, then:
 
 ```bash
 cd /opt/osdm-simulator/OSDM_Simulator/deploy
-install -d -m 700 -o 1000 -g 1000 data
-docker run --rm -it --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
-  node scripts/make-admin.js deploy add <your-name>
 docker compose up -d          # re-creates the container: bookings and tokens are lost
 docker compose logs | grep Imported   # "Imported N accounts from /run/osdm-simulator/clients.json"
 ```
@@ -557,7 +545,8 @@ requests").
 | The container restarts in a loop, its log says "not started: the clients file cannot be read" | `clients.json` is missing from the deploy folder, or not readable by user 1000 (`chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json`) |
 | On the host, a command answers `No such file or directory` about `clients.json`, or `docker compose` answers `no configuration file provided: not found` | the command was run from another folder than the deploy one, which is where a new session starts. `cd /opt/osdm-simulator/OSDM_Simulator/deploy` first. |
 | The container restarts in a loop, its log says "not started: the data folder does not exist" or "cannot be written by this user" | `deploy/data` is missing, or Docker made it as root: `install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data` (or `chown 1000:1000` it), then `docker compose up -d` |
-| The administration answers `404` | the container runs without the data folder (made before 0.51.0, or with an old compose file): see "Moving an installed simulator to a data folder" in section 7 |
-| Sign-in works, the next request answers `401` "Sign in first" | nginx removes the cookie: the site has no `/admin/` location (section 7), or the request went over `http` (the cookie is `Secure`) |
-| Sign-in answers `429` | 10 failed sign-ins from that address, or 20 for that name, in 15 minutes: wait |
+| The administration answers `404` | no key (`.env` missing, or made after the last `up -d`), or the container runs without the data folder (made before 0.51.0): see "Moving an installed simulator to a data folder" in section 7 |
+| The administration answers `401` | OSCAR holds another key than the one whose SHA-256 is in `.env` |
+| The administration answers `429` | 10 wrong keys from that address in 15 minutes: wait, and correct the key in OSCAR |
+| The administration answers `403` (nginx) | the `allow` lines of the `/admin/` location do not name the OSCAR server's address |
 | A booking made a while ago answers 404 | bookings are dropped after one hour, when a client has more than 200 of them, and at every restart |

@@ -21,7 +21,9 @@
 # and the data folder, writable by that user only (#930):
 #   install -d -m 700 -o 1000 -g 1000 data
 # The accounts are kept there from the first start on (imported from
-# clients.json), with the administrators and the audit of their changes.
+# clients.json), with the audit of their changes. The OSCAR server changes them
+# through the administration API, with a key whose SHA-256 is in ./.env
+# (SIM_ADMIN_KEY_SHA256, see the operations page); without it the API is closed.
 
 services:
   osdm-simulator:
@@ -41,6 +43,7 @@ services:
       SIM_TRUST_PROXY: "1"
       SIM_CLIENTS_FILE: /run/osdm-simulator/clients.json
       SIM_DATA_DIR: /var/lib/osdm-simulator
+      SIM_ADMIN_KEY_SHA256: ${SIM_ADMIN_KEY_SHA256:-}
     ports:
       - "127.0.0.1:3002:3002"
     volumes:

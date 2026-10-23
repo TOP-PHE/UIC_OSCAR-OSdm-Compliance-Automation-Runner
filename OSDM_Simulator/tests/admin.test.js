@@ -7,25 +7,29 @@
 
 'use strict';
 
-// #930: the accounts kept in a data folder and the administration API that
-// changes them while the simulator runs.
+// #930: the accounts kept in a data folder, and the administration API the
+// OSCAR server calls with its key to change them while the simulator runs.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const { SECRETS, REAL_SECRETS, PROVIDERS_DIR, tempDir, writeClientsFile, basic, call, offerRequest, bookingRequest } = require('./helpers');
-const { ConfigError, loadProviders } = require('../src/config');
+const { ConfigError, loadProviders, loadSettings } = require('../src/config');
 const { createAccounts, ACCOUNTS_FILE, AUDIT_FILE } = require('../src/accounts');
-const { createAdmin, hashPassword, passwordMatches, COOKIE } = require('../src/admin');
+const { createAdmin } = require('../src/admin');
 const { createTokenService } = require('../src/tokens');
 const { createStore } = require('../src/store');
 const { createApp } = require('../src/app');
 const { start } = require('../server');
-const { changeAdmins, main } = require('../scripts/make-admin');
 
 const providers = loadProviders(PROVIDERS_DIR);
+// The key the OSCAR server holds; the simulator only its digest.
+const KEY = 'k'.repeat(20) + crypto.randomBytes(16).toString('hex');
+const KEY_SHA256 = crypto.createHash('sha256').update(KEY).digest('hex');
+const ACTOR = 'admin@oscar.example';
 
 // A file's mode and text, read through one descriptor.
 function modeAndText(file) {
@@ -36,17 +40,9 @@ function modeAndText(file) {
     fs.closeSync(fd);
   }
 }
-const PASSWORD = 'correct-horse-battery-staple-0123';
 
-async function writeAdmins(dir, list) {
-  const admins = [];
-  for (const [name, password] of list) admins.push({ name, password: await hashPassword(password) });
-  fs.writeFileSync(path.join(dir, 'admins.json'), JSON.stringify({ format: 1, admins }));
-}
-
-// A simulator on a data folder, with an administrator "ada", and its clock.
-async function startWithData({ dataDir = tempDir(), clientsFile = writeClientsFile(REAL_SECRETS), admins = [['ada', PASSWORD]] } = {}) {
-  if (admins.length) await writeAdmins(dataDir, admins);
+// A simulator on a data folder with the administration key, and its clock.
+async function startWithData({ dataDir = tempDir(), clientsFile = writeClientsFile(REAL_SECRETS) } = {}) {
   const clock = { ms: Date.parse('2026-11-02T09:00:00Z') };
   const now = () => clock.ms;
   const accounts = createAccounts({ dataDir, providers, clientsFile, now });
@@ -55,7 +51,7 @@ async function startWithData({ dataDir = tempDir(), clientsFile = writeClientsFi
     providers,
     clients: accounts.clients,
     accounts,
-    admin: createAdmin({ dataDir, accounts, now }),
+    admin: createAdmin({ keySha256: KEY_SHA256, accounts, now }),
     tokens: createTokenService({ now }),
     store: createStore({ limits: { offer: 50, trip: 50, booking: 5, fulfillment: 50, idempotency: 50 }, ttlMs: 3600000, now }),
     limits,
@@ -72,21 +68,15 @@ async function startWithData({ dataDir = tempDir(), clientsFile = writeClientsFi
   };
 }
 
-async function request(base, method, url, { cookie, csrf, body, headers = {} } = {}) {
+// An administration request; `key: null` sends none, `actor: null` no actor.
+async function request(base, method, url, { key = KEY, actor = ACTOR, body, headers = {} } = {}) {
   const h = { ...headers };
-  if (cookie) h.Cookie = cookie;
-  if (csrf) h['X-CSRF-Token'] = csrf;
+  if (key !== null) h.Authorization = `Bearer ${key}`;
+  if (actor !== null) h['X-Admin-Actor'] = actor;
   if (body !== undefined) h['Content-Type'] = 'application/json';
   const res = await fetch(base + url, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
   return { status: res.status, headers: res.headers, body: text ? JSON.parse(text) : undefined };
-}
-
-async function signIn(base, name = 'ada', password = PASSWORD) {
-  const res = await request(base, 'POST', '/admin/api/login', { body: { name, password } });
-  assert.equal(res.status, 200, JSON.stringify(res.body));
-  const cookie = res.headers.get('set-cookie').split(';')[0];
-  return { cookie, csrf: res.body.csrfToken, setCookie: res.headers.get('set-cookie') };
 }
 
 async function tokenWith(base, provider, id, secret) {
@@ -140,17 +130,26 @@ test('an accounts file that is wrong stops the start', () => {
   }
 });
 
-test('with a data folder the server needs accounts or an administrator, and names what it did', async (t) => {
+test('with a data folder the server needs accounts or the key, and names what it did', async (t) => {
   const empty = tempDir();
-  assert.throws(() => start({ SIM_PORT: '0', SIM_DATA_DIR: empty, SIM_CLIENTS_FILE: path.join(empty, 'none.json') }), /no account and no administrator/);
-  const dataDir = tempDir();
-  await writeAdmins(dataDir, [['ada', PASSWORD]]);
+  assert.throws(() => start({ SIM_PORT: '0', SIM_DATA_DIR: empty, SIM_CLIENTS_FILE: path.join(empty, 'none.json') }), /no account/);
   const lines = [];
   t.mock.method(console, 'log', (line) => lines.push(line));
-  const server = start({ SIM_PORT: '0', SIM_DATA_DIR: dataDir, SIM_CLIENTS_FILE: writeClientsFile(REAL_SECRETS) });
+  const keyed = start({ SIM_PORT: '0', SIM_DATA_DIR: empty, SIM_CLIENTS_FILE: path.join(empty, 'none.json'), SIM_ADMIN_KEY_SHA256: KEY_SHA256 });
+  await new Promise((resolve) => keyed.on('listening', resolve));
+  keyed.close();
+  const server = start({ SIM_PORT: '0', SIM_DATA_DIR: tempDir(), SIM_CLIENTS_FILE: writeClientsFile(REAL_SECRETS) });
   await new Promise((resolve) => server.on('listening', resolve));
   server.close();
   assert.ok(lines.some((l) => /^Imported \d+ accounts from /.test(l)), lines.join('\n'));
+  assert.ok(lines.some((l) => /administration API is closed/.test(l)), lines.join('\n'));
+});
+
+test('the key setting is the SHA-256 of the key, and it needs a data folder', () => {
+  assert.equal(loadSettings({ SIM_DATA_DIR: '/d', SIM_ADMIN_KEY_SHA256: KEY_SHA256.toUpperCase() }, '/b').adminKeySha256, KEY_SHA256);
+  assert.equal(loadSettings({}, '/b').adminKeySha256, null);
+  assert.throws(() => loadSettings({ SIM_DATA_DIR: '/d', SIM_ADMIN_KEY_SHA256: KEY }, '/b'), /64 hex characters/);
+  assert.throws(() => loadSettings({ SIM_ADMIN_KEY_SHA256: KEY_SHA256 }, '/b'), /needs SIM_DATA_DIR/);
 });
 
 test('"admin" cannot be a provider key', () => {
@@ -158,83 +157,70 @@ test('"admin" cannot be a provider key', () => {
   assert.throws(() => checkProvider('admin', {}), /not a usable provider key/);
 });
 
-test('without a data folder there is no administration API: /admin is a 404 like any unknown path', async () => {
+test('without the key there is no administration API: /admin is a 404 like any unknown path', async () => {
   const { startSimulator } = require('./helpers');
   const sim = await startSimulator();
   try {
-    assert.equal((await request(sim.base, 'POST', '/admin/api/login', { body: { name: 'ada', password: PASSWORD } })).status, 404);
+    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts')).status, 404);
   } finally {
     await sim.close();
   }
 });
 
-test('a sign-in gives a strict session cookie and a CSRF token; a wrong one gives neither', async () => {
+test('only the key opens the API; an OSDM token does not, and the key does not open the OSDM API', async () => {
   const sim = await startWithData();
   try {
-    for (const body of [{ name: 'ada', password: 'wrong' }, { name: 'nobody', password: PASSWORD }, {}, { name: ['ada'], password: PASSWORD }]) {
-      const refused = await request(sim.base, 'POST', '/admin/api/login', { body });
-      assert.equal(refused.status, 401);
-      assert.equal(refused.headers.get('set-cookie'), null);
+    for (const key of [null, '', 'wrong', `${KEY}x`, KEY.slice(1), KEY_SHA256]) {
+      const res = await request(sim.base, 'GET', '/admin/api/accounts', { key });
+      assert.equal(res.status, 401, String(key));
+      assert.equal(res.body.code, 'ADMIN_KEY_REFUSED');
     }
-    const { cookie, csrf, setCookie } = await signIn(sim.base);
-    assert.match(setCookie, new RegExp(`^${COOKIE}=[A-Za-z0-9_-]{43}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800$`));
-    assert.match(csrf, /^[A-Za-z0-9_-]{43}$/);
-    const session = await request(sim.base, 'GET', '/admin/api/session', { cookie });
-    assert.deepEqual(session.body, { name: 'ada', csrfToken: csrf });
-    assert.equal((await request(sim.base, 'GET', '/admin/api/session')).status, 401);
-    assert.equal((await request(sim.base, 'GET', '/admin/api/session', { cookie: `${COOKIE}=forged` })).status, 401);
-    // A JSON body only: a form post from another site cannot sign in.
-    const form = await fetch(`${sim.base}/admin/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'name=ada' });
-    assert.equal(form.status, 415);
-  } finally {
-    await sim.close();
-  }
-});
-
-test('an OSDM token does not open the administration API, and a session does not open the OSDM API', async () => {
-  const sim = await startWithData();
-  try {
     const { token } = await tokenWith(sim.base, 'alpha', SECRETS.alpha[0].client_id, SECRETS.alpha[0].client_secret);
-    const res = await fetch(`${sim.base}/admin/api/accounts`, { headers: { Authorization: `Bearer ${token}` } });
-    assert.equal(res.status, 401);
-    const { cookie } = await signIn(sim.base);
-    assert.equal((await request(sim.base, 'GET', '/alpha/versions', { cookie })).status, 401);
+    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts', { key: token })).status, 401);
+    assert.equal((await versions(sim.base, 'alpha', KEY)).status, 401);
+    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts')).status, 200);
   } finally {
     await sim.close();
   }
 });
 
-test('failed sign-ins are limited per address: the eleventh is refused even with the right password', async () => {
+test('a request names its administrator in printable text', async () => {
   const sim = await startWithData();
   try {
-    for (let i = 0; i < 10; i += 1) {
-      assert.equal((await request(sim.base, 'POST', '/admin/api/login', { body: { name: `x${i}x`, password: 'wrong' } })).status, 401);
+    for (const actor of [null, '', 'a'.repeat(121), 'line\u00e9']) {
+      const res = await request(sim.base, 'GET', '/admin/api/accounts', { actor });
+      assert.equal(res.status, 400, JSON.stringify(actor));
+      assert.equal(res.body.code, 'ADMIN_ACTOR');
     }
-    const blocked = await request(sim.base, 'POST', '/admin/api/login', { body: { name: 'ada', password: PASSWORD } });
+  } finally {
+    await sim.close();
+  }
+});
+
+test('wrong keys are limited per address: after ten, the right key is refused for 15 minutes', async () => {
+  const sim = await startWithData();
+  try {
+    for (let i = 0; i < 10; i += 1) assert.equal((await request(sim.base, 'GET', '/admin/api/accounts', { key: `wrong${i}` })).status, 401);
+    const blocked = await request(sim.base, 'GET', '/admin/api/accounts');
     assert.equal(blocked.status, 429);
     assert.equal(blocked.headers.get('retry-after'), '900');
     sim.clock.ms += 15 * 60 * 1000;
-    await signIn(sim.base);
+    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts')).status, 200);
   } finally {
     await sim.close();
   }
 });
 
-test('a change needs the session\'s CSRF token and this origin', async () => {
+test('a body is JSON: a form post is refused', async () => {
   const sim = await startWithData();
   try {
-    const { cookie, csrf } = await signIn(sim.base);
-    assert.equal((await request(sim.base, 'POST', '/admin/api/accounts/alpha', { cookie, body: {} })).status, 403);
-    assert.equal((await request(sim.base, 'POST', '/admin/api/accounts/alpha', { cookie, csrf: 'x'.repeat(43), body: {} })).status, 403);
-    const foreign = await request(sim.base, 'POST', '/admin/api/accounts/alpha', { cookie, csrf, body: {}, headers: { Origin: 'https://elsewhere.example' } });
-    assert.equal(foreign.status, 403);
-    assert.equal(foreign.body.code, 'FOREIGN_ORIGIN');
-    assert.equal((await request(sim.base, 'DELETE', `/admin/api/accounts/alpha/${SECRETS.alpha[0].client_id}`, { cookie })).status, 403);
-    assert.equal((await request(sim.base, 'POST', '/admin/api/logout', { cookie })).status, 403);
-    // Nothing changed.
-    assert.equal(sim.accounts.count(), Object.values(REAL_SECRETS).reduce((n, l) => n + l.length, 0));
-    const same = await request(sim.base, 'POST', '/admin/api/accounts/alpha', { cookie, csrf, body: {}, headers: { Origin: sim.base } });
-    assert.equal(same.status, 201);
+    const res = await fetch(`${sim.base}/admin/api/accounts/alpha`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, 'X-Admin-Actor': ACTOR, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'clientId=alpha.form',
+    });
+    assert.equal(res.status, 415);
+    assert.equal(sim.accounts.clients.get('alpha').has('alpha.form'), false);
   } finally {
     await sim.close();
   }
@@ -243,9 +229,8 @@ test('a change needs the session\'s CSRF token and this origin', async () => {
 test('the accounts list names every provider and account, never a secret or a digest', async () => {
   const sim = await startWithData();
   try {
-    const { cookie } = await signIn(sim.base);
     await tokenWith(sim.base, 'beta', SECRETS.beta[0].client_id, SECRETS.beta[0].client_secret);
-    const { body } = await request(sim.base, 'GET', '/admin/api/accounts', { cookie });
+    const { body } = await request(sim.base, 'GET', '/admin/api/accounts');
     assert.deepEqual(body.providers.map((p) => p.provider), [...providers.keys()]);
     const beta = body.providers.find((p) => p.provider === 'beta');
     assert.equal(beta.osdmVersion, '3.7.0');
@@ -263,8 +248,7 @@ test('the accounts list names every provider and account, never a secret or a di
 test('an added account works at once; its secret is answered once and stored as a digest', async () => {
   const sim = await startWithData();
   try {
-    const { cookie, csrf } = await signIn(sim.base);
-    const named = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { cookie, csrf, body: { clientId: 'gamma.partner' } });
+    const named = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { body: { clientId: 'gamma.partner' } });
     assert.equal(named.status, 201);
     assert.equal(named.body.clientId, 'gamma.partner');
     assert.match(named.body.clientSecret, /^[0-9a-f]{64}$/);
@@ -272,9 +256,9 @@ test('an added account works at once; its secret is answered once and stored as 
     assert.equal(status, 200);
     assert.equal((await versions(sim.base, 'gamma', token)).status, 200);
     // Named in the make-clients.js way when no id is given.
-    const t1 = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { cookie, csrf, body: {} });
-    const m1 = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { cookie, csrf, body: { kind: 'tstmgr' } });
-    const t2 = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { cookie, csrf });
+    const t1 = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { body: {} });
+    const m1 = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { body: { kind: 'tstmgr' } });
+    const t2 = await request(sim.base, 'POST', '/admin/api/accounts/gamma');
     assert.deepEqual([t1.body.clientId, m1.body.clientId, t2.body.clientId], ['gamma.tst01', 'gamma.tstmgr01', 'gamma.tst02']);
     // Kept across a restart, as digests.
     const text = fs.readFileSync(path.join(sim.dataDir, ACCOUNTS_FILE), 'utf8');
@@ -289,7 +273,6 @@ test('an added account works at once; its secret is answered once and stored as 
 test('an account that cannot be made is refused, and nothing is written', async () => {
   const sim = await startWithData();
   try {
-    const { cookie, csrf } = await signIn(sim.base);
     const before = fs.readFileSync(path.join(sim.dataDir, ACCOUNTS_FILE), 'utf8');
     const cases = [
       ['/admin/api/accounts/alpha', { clientId: 'alpha-one' }, 409, 'ACCOUNT_EXISTS'],
@@ -301,12 +284,12 @@ test('an account that cannot be made is refused, and nothing is written', async 
       ['/admin/api/accounts/plain', {}, 404, 'UNKNOWN_PROVIDER'],
     ];
     for (const [url, body, status, code] of cases) {
-      const res = await request(sim.base, 'POST', url, { cookie, csrf, body });
+      const res = await request(sim.base, 'POST', url, { body });
       assert.equal(res.status, status, `${url} ${JSON.stringify(body)}`);
       assert.equal(res.body.code, code);
     }
-    assert.equal((await request(sim.base, 'DELETE', '/admin/api/accounts/alpha/nobody', { cookie, csrf })).status, 404);
-    assert.equal((await request(sim.base, 'POST', '/admin/api/accounts/alpha/nobody/reset-secret', { cookie, csrf })).status, 404);
+    assert.equal((await request(sim.base, 'DELETE', '/admin/api/accounts/alpha/nobody')).status, 404);
+    assert.equal((await request(sim.base, 'POST', '/admin/api/accounts/alpha/nobody/reset-secret')).status, 404);
     assert.equal(fs.readFileSync(path.join(sim.dataDir, ACCOUNTS_FILE), 'utf8'), before);
   } finally {
     await sim.close();
@@ -316,13 +299,12 @@ test('an account that cannot be made is refused, and nothing is written', async 
 test('a reset secret ends the old secret and its tokens; the other accounts and their bookings stay', async () => {
   const sim = await startWithData();
   try {
-    const { cookie, csrf } = await signIn(sim.base);
     const [one, two] = SECRETS.alpha;
     const oldToken = (await tokenWith(sim.base, 'alpha', one.client_id, one.client_secret)).token;
     const otherToken = (await tokenWith(sim.base, 'alpha', two.client_id, two.client_secret)).token;
     const offers = (await call(sim.base, otherToken, 'POST', '/alpha/offers', offerRequest())).body.offers;
     const booking = (await call(sim.base, otherToken, 'POST', '/alpha/bookings', bookingRequest(offers[0]))).body.booking;
-    const reset = await request(sim.base, 'POST', `/admin/api/accounts/alpha/${one.client_id}/reset-secret`, { cookie, csrf });
+    const reset = await request(sim.base, 'POST', `/admin/api/accounts/alpha/${one.client_id}/reset-secret`);
     assert.equal(reset.status, 200);
     assert.notEqual(reset.body.clientSecret, one.client_secret);
     // Same clock millisecond: the tag of the secret, not the time, ends the old token.
@@ -340,84 +322,39 @@ test('a reset secret ends the old secret and its tokens; the other accounts and 
 test('a deleted account loses its tokens, and an account made again with its id does not get them back', async () => {
   const sim = await startWithData();
   try {
-    const { cookie, csrf } = await signIn(sim.base);
     const { client_id: id, client_secret: secret } = SECRETS.gamma[0];
     const token = (await tokenWith(sim.base, 'gamma', id, secret)).token;
-    const deleted = await request(sim.base, 'DELETE', `/admin/api/accounts/gamma/${id}`, { cookie, csrf });
+    const deleted = await request(sim.base, 'DELETE', `/admin/api/accounts/gamma/${id}`);
     assert.deepEqual(deleted.body, { provider: 'gamma', clientId: id, deleted: true });
     assert.equal((await versions(sim.base, 'gamma', token)).status, 401);
     assert.equal((await tokenWith(sim.base, 'gamma', id, secret)).status, 401);
-    const again = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { cookie, csrf, body: { clientId: id } });
+    const again = await request(sim.base, 'POST', '/admin/api/accounts/gamma', { body: { clientId: id } });
     assert.equal(again.status, 201);
     assert.equal((await versions(sim.base, 'gamma', token)).status, 401);
     // The same id on another provider is another account, untouched.
     const beta = await tokenWith(sim.base, 'beta', 'same-id', SECRETS.beta[1].client_secret);
-    await request(sim.base, 'DELETE', '/admin/api/accounts/alpha/same-id', { cookie, csrf });
+    await request(sim.base, 'DELETE', '/admin/api/accounts/alpha/same-id');
     assert.equal((await versions(sim.base, 'beta', beta.token)).status, 200);
   } finally {
     await sim.close();
   }
 });
 
-test('every change is in the audit, with who made it, and no secret', async () => {
+test('every change is in the audit, with the OSCAR administrator who asked, and no secret', async () => {
   const sim = await startWithData();
   try {
-    const { cookie, csrf } = await signIn(sim.base);
-    await request(sim.base, 'POST', '/admin/api/login', { body: { name: 'ada', password: 'wrong' } });
-    const added = await request(sim.base, 'POST', '/admin/api/accounts/beta', { cookie, csrf, body: { clientId: 'beta.new' } });
-    const reset = await request(sim.base, 'POST', '/admin/api/accounts/beta/beta.new/reset-secret', { cookie, csrf });
-    await request(sim.base, 'DELETE', '/admin/api/accounts/beta/beta.new', { cookie, csrf });
-    const { body } = await request(sim.base, 'GET', '/admin/api/audit', { cookie });
+    await request(sim.base, 'GET', '/admin/api/accounts', { key: 'wrong' });
+    const added = await request(sim.base, 'POST', '/admin/api/accounts/beta', { body: { clientId: 'beta.new' } });
+    const reset = await request(sim.base, 'POST', '/admin/api/accounts/beta/beta.new/reset-secret', { actor: 'other@oscar.example' });
+    await request(sim.base, 'DELETE', '/admin/api/accounts/beta/beta.new');
+    const { body } = await request(sim.base, 'GET', '/admin/api/audit');
     assert.deepEqual(body.entries.map((e) => [e.action, e.by]), [
-      ['account_deleted', 'ada'], ['secret_reset', 'ada'], ['account_added', 'ada'],
-      ['sign_in_refused', 'ada'], ['signed_in', 'ada'], ['imported_clients_file', 'system'],
+      ['account_deleted', ACTOR], ['secret_reset', 'other@oscar.example'], ['account_added', ACTOR],
+      ['admin_key_refused', '?'], ['imported_clients_file', 'system'],
     ]);
     assert.equal(body.entries[0].clientId, 'beta.new');
     const text = fs.readFileSync(path.join(sim.dataDir, AUDIT_FILE), 'utf8');
-    for (const s of [added.body.clientSecret, reset.body.clientSecret, PASSWORD, 'wrong']) assert.equal(text.includes(s), false);
-  } finally {
-    await sim.close();
-  }
-});
-
-test('the administrators are read at each sign-in: one added runs at once, one removed is signed out', async () => {
-  const sim = await startWithData();
-  try {
-    const ada = await signIn(sim.base);
-    const password = 'bob-password-0123456789';
-    await changeAdmins(sim.dataDir, 'add', 'bob', password);
-    const bob = await signIn(sim.base, 'bob', password);
-    await changeAdmins(sim.dataDir, 'remove', 'ada');
-    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts', { cookie: ada.cookie })).status, 401);
-    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts', { cookie: bob.cookie })).status, 200);
-    const newPassword = 'bob-new-password-0123456789';
-    await changeAdmins(sim.dataDir, 'reset', 'bob', newPassword);
-    assert.equal((await request(sim.base, 'POST', '/admin/api/login', { body: { name: 'bob', password } })).status, 401);
-    await signIn(sim.base, 'bob', newPassword);
-  } finally {
-    await sim.close();
-  }
-});
-
-test('a session ends after 30 idle minutes, after 8 hours in any case, and at sign-out', async () => {
-  const sim = await startWithData();
-  try {
-    let s = await signIn(sim.base);
-    sim.clock.ms += 29 * 60 * 1000;
-    assert.equal((await request(sim.base, 'GET', '/admin/api/session', { cookie: s.cookie })).status, 200);
-    sim.clock.ms += 31 * 60 * 1000;
-    assert.equal((await request(sim.base, 'GET', '/admin/api/session', { cookie: s.cookie })).status, 401);
-    s = await signIn(sim.base);
-    for (let i = 0; i < 17; i += 1) {
-      sim.clock.ms += 29 * 60 * 1000;
-      await request(sim.base, 'GET', '/admin/api/session', { cookie: s.cookie });
-    }
-    assert.equal((await request(sim.base, 'GET', '/admin/api/session', { cookie: s.cookie })).status, 401);
-    s = await signIn(sim.base);
-    const out = await request(sim.base, 'POST', '/admin/api/logout', { cookie: s.cookie, csrf: s.csrf });
-    assert.equal(out.status, 200);
-    assert.match(out.headers.get('set-cookie'), /Max-Age=0/);
-    assert.equal((await request(sim.base, 'GET', '/admin/api/session', { cookie: s.cookie })).status, 401);
+    for (const s of [added.body.clientSecret, reset.body.clientSecret, KEY]) assert.equal(text.includes(s), false);
   } finally {
     await sim.close();
   }
@@ -426,61 +363,13 @@ test('a session ends after 30 idle minutes, after 8 hours in any case, and at si
 test('the routes answer 404 and 405 like the rest of the simulator', async () => {
   const sim = await startWithData();
   try {
-    const { cookie, csrf } = await signIn(sim.base);
-    assert.equal((await request(sim.base, 'GET', '/admin', { cookie })).status, 404);
-    assert.equal((await request(sim.base, 'GET', '/admin/api/nothing', { cookie })).status, 404);
-    assert.equal((await request(sim.base, 'GET', '/admin/api/login')).status, 405);
-    assert.equal((await request(sim.base, 'PUT', '/admin/api/accounts', { cookie, csrf })).status, 405);
-    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts/alpha/alpha-one/reset-secret', { cookie })).status, 405);
-    assert.equal((await request(sim.base, 'POST', '/admin/api/accounts/alpha/alpha-one/other', { cookie, csrf })).status, 404);
+    assert.equal((await request(sim.base, 'GET', '/admin')).status, 404);
+    assert.equal((await request(sim.base, 'GET', '/admin/api/nothing')).status, 404);
+    assert.equal((await request(sim.base, 'PUT', '/admin/api/accounts')).status, 405);
+    assert.equal((await request(sim.base, 'GET', '/admin/api/accounts/alpha/alpha-one/reset-secret')).status, 405);
+    assert.equal((await request(sim.base, 'POST', '/admin/api/accounts/alpha/alpha-one/other')).status, 404);
   } finally {
     await sim.close();
   }
 });
 
-test('passwords are kept as scrypt digests that only the password matches', async () => {
-  const stored = await hashPassword(PASSWORD);
-  assert.match(stored, /^scrypt:16384:8:1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/);
-  assert.equal(stored.includes(PASSWORD), false);
-  assert.equal(await passwordMatches(stored, PASSWORD), true);
-  assert.equal(await passwordMatches(stored, `${PASSWORD}x`), false);
-  assert.equal(await passwordMatches(undefined, PASSWORD), false);
-  assert.equal(await passwordMatches('scrypt:1:1:1:AAAA:AAAA', PASSWORD), false);
-  assert.notEqual(await hashPassword(PASSWORD), stored);
-});
-
-test('make-admin refuses a bad name or password, a second add, a reset or removal of no one; it writes for its owner only', async () => {
-  const dir = path.join(tempDir(), 'data');
-  await assert.rejects(changeAdmins(dir, 'add', 'x', PASSWORD), /A name is/);
-  await assert.rejects(changeAdmins(dir, 'add', '../etc', PASSWORD), /A name is/);
-  await assert.rejects(changeAdmins(dir, 'add', 'ada', 'short'), /16 to 200 characters/);
-  await assert.rejects(changeAdmins(dir, 'add', 'ada', undefined), /16 to 200 characters/);
-  await changeAdmins(dir, 'add', 'ada', PASSWORD);
-  await assert.rejects(changeAdmins(dir, 'add', 'ada', PASSWORD), /already an administrator/);
-  await assert.rejects(changeAdmins(dir, 'reset', 'bob', PASSWORD), /not an administrator/);
-  await assert.rejects(changeAdmins(dir, 'remove', 'bob'), /not an administrator/);
-  const { mode, text } = modeAndText(path.join(dir, 'admins.json'));
-  assert.equal(mode, 0o600);
-  assert.equal(text.includes(PASSWORD), false);
-  await changeAdmins(dir, 'remove', 'ada');
-  assert.deepEqual(JSON.parse(modeAndText(path.join(dir, 'admins.json')).text).admins, []);
-});
-
-test('make-admin reads the password from its input and never writes it out', async (t) => {
-  const { Readable, PassThrough } = require('node:stream');
-  const printed = [];
-  t.mock.method(console, 'log', (line) => printed.push(line));
-  t.mock.method(console, 'error', (line) => printed.push(line));
-  const output = new PassThrough();
-  output.on('data', (c) => printed.push(String(c)));
-  const dirs = { local: path.join(tempDir(), 'local'), deploy: path.join(tempDir(), 'deploy') };
-  assert.equal(await main(['deploy', 'add', 'ada'], { input: Readable.from([`${PASSWORD}\nignored\n`]), output, dirs }), 0);
-  assert.equal(printed.join('\n').includes(PASSWORD), false);
-  const stored = JSON.parse(fs.readFileSync(path.join(dirs.deploy, 'admins.json'), 'utf8')).admins;
-  assert.equal(await passwordMatches(stored.find((a) => a.name === 'ada').password, PASSWORD), true);
-  assert.equal(fs.existsSync(dirs.local), false);
-  assert.equal(await main(['local', 'add', 'bob'], { input: Readable.from(['short\n']), output, dirs }), 1);
-  assert.equal(await main(['deploy', 'remove', 'ada'], { output, dirs }), 0);
-  assert.equal(await main(['local', 'add'], { output, dirs }), 1);
-  assert.equal(await main(['/tmp', 'add', 'ada'], { output, dirs }), 1);
-});

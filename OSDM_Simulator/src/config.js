@@ -470,6 +470,15 @@ function intFromEnv(env, name, fallback, min, max) {
   return n;
 }
 
+function adminKeyOf(env) {
+  const value = env.SIM_ADMIN_KEY_SHA256;
+  if (value === undefined || value === '') return null;
+  const hex = String(value).trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(hex)) throw new ConfigError('SIM_ADMIN_KEY_SHA256 must be the SHA-256 of the key, 64 hex characters');
+  if (!env.SIM_DATA_DIR) throw new ConfigError('SIM_ADMIN_KEY_SHA256 needs SIM_DATA_DIR: the accounts the API changes are kept there');
+  return hex;
+}
+
 /** Settings read from the environment, with their defaults. */
 function loadSettings(env, baseDir) {
   return {
@@ -480,6 +489,9 @@ function loadSettings(env, baseDir) {
     // #930: with a data folder, the accounts are kept there and an
     // administrator changes them while the simulator runs.
     dataDir: env.SIM_DATA_DIR || null,
+    // The hex SHA-256 of the key the OSCAR server calls the administration
+    // API with; none = the API is closed.
+    adminKeySha256: adminKeyOf(env),
     // Behind a reverse proxy the caller's address is in X-Forwarded-For.
     trustProxy: env.SIM_TRUST_PROXY === '1',
     limits: {

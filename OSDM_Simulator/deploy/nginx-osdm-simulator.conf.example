@@ -14,7 +14,7 @@
 # OSCAR's runs of one company come from one address: keep this well above what
 # a batch of parallel runs sends (about 3 requests a second per run).
 limit_req_zone $binary_remote_addr zone=osdm_simulator:10m rate=50r/s;
-# The administration (#930): a person, not a batch of runs.
+# The administration (#930): the OSCAR server, a few requests at a time.
 limit_req_zone $binary_remote_addr zone=osdm_simulator_admin:1m rate=5r/s;
 
 server {
@@ -39,9 +39,8 @@ server {
         proxy_read_timeout 30s;
     }
 
-    # The administration API (#930). It signs in with a session cookie, which
-    # the location above removes; this one passes it on. To keep it to known
-    # addresses, uncomment and fill in:
+    # The administration API (#930). Its one caller is the OSCAR server; to
+    # keep it to that server, uncomment and put the OSCAR server's address:
     #   allow 203.0.113.10;
     #   deny  all;
     location /admin/ {
