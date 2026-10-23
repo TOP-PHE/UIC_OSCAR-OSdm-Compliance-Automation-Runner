@@ -137,13 +137,17 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
   } else if (out.desiredFlexibility) {
     out.desiredFlexibility = saleFlexibility(out.desiredFlexibility, framework);
   }
-  // #937: a fare scenario chooses a cluster the provider declares, and its
-  // section is moved onto the chosen trip by the copy (fareSections.js).
+  adaptFareScenario(out, framework, toCheck);
+  return { scenario: out, toComplete, toCheck };
+}
+
+// #937: a fare scenario chooses a cluster the provider declares, and its
+// section is moved onto the chosen trip by the copy (fareSections.js).
+function adaptFareScenario(out, framework, toCheck) {
   if (out.desiredFareCluster) out.desiredFareCluster = fareClusterFor(out.desiredFareCluster, framework);
   if (Array.isArray(out.requestedSections) && out.requestedSections.length) {
     toCheck.push('the provider must sell fares for the section asked on the chosen trip (requestedSections)');
   }
-  return { scenario: out, toComplete, toCheck };
 }
 
 // #699: a passenger list of `count` passengers made from `source`: its own
@@ -346,6 +350,11 @@ function withCurrencies(datafile, entries) {
 // Nothing when the framework does not declare it (the entry then cannot be
 // copied).
 function applyLimit(limit, scenario, source, fw, { ownList, toCheck, toComplete }) {
+  // #937: the free child, apart so the chain stays under Sonar's limit.
+  if (limit === 'FREE_CHILD') {
+    applyFreeChildLimit(source, fw, ownList);
+    return;
+  }
   if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
     applyHorizonLimit(limit, scenario, fw);
   } else if (limit === 'AGE_RANGES') {
@@ -357,13 +366,16 @@ function applyLimit(limit, scenario, source, fw, { ownList, toCheck, toComplete 
     applyProductLimit(scenario, fw, toComplete);
   } else if (limit === 'GROUP_TARIFF' || limit === 'OVER_GROUP_SIZE') {
     applyGroupLimit(limit, scenario, source, fw, { ownList, toComplete });
-  } else if (limit === 'FREE_CHILD') {
-    const age = freeUnderAgeOf(fw);
-    if (age) ownList(freeChildPassengers(source?.passengers, age));
   } else if (limit) {
     const max = maxPassengersOf(fw);
     if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
   }
+}
+
+// #937: the free child is one year under the declared age; nothing without one.
+function applyFreeChildLimit(source, fw, ownList) {
+  const age = freeUnderAgeOf(fw);
+  if (age) ownList(freeChildPassengers(source?.passengers, age));
 }
 
 // #937: the source's passengers, the child (an age on the day of travel) one

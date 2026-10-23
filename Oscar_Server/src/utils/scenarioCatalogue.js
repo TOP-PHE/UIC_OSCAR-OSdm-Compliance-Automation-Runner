@@ -121,10 +121,14 @@ function entryProblems(e, at, scenarios, codes) {
   if (String(e.source).startsWith('SIM_FAULT_')) problems.push(`${at}.source asks the simulator for faults (#833)`);
   if (e.limit !== undefined && !LIMITS.includes(e.limit)) problems.push(`${at}.limit "${e.limit}" is not one of ${LIMITS.join(', ')}`);
   if (e.probe !== undefined && !PROBES.includes(e.probe)) problems.push(`${at}.probe "${e.probe}" is not one of ${PROBES.join(', ')}`);
-  // #937: the fare combination model the source's fares come in, when it matters.
-  if (e.combinationModel !== undefined && !COMBINATION_MODELS.includes(e.combinationModel)) problems.push(`${at}.combinationModel "${e.combinationModel}" is not one of ${COMBINATION_MODELS.join(', ')}`);
-  problems.push(...needsProblems(e.needs, at));
+  problems.push(...combinationModelProblems(e, at), ...needsProblems(e.needs, at));
   return problems;
+}
+
+// #937: the fare combination model the source's fares come in, when it matters.
+function combinationModelProblems(e, at) {
+  if (e.combinationModel === undefined || COMBINATION_MODELS.includes(e.combinationModel)) return [];
+  return [`${at}.combinationModel "${e.combinationModel}" is not one of ${COMBINATION_MODELS.join(', ')}`];
 }
 
 // The problems of an entry's `needs` (#681): there, and only known keys.
@@ -230,28 +234,32 @@ function missingFor(requirements, framework) {
   if (requirements.returnModel && Array.isArray(fw.returnModels) && !fw.returnModels.includes(requirements.returnModel)) {
     missing.push(`return model ${requirements.returnModel}`);
   }
-  const minimum = minimumVersionOf(requirements);
-  if (minimum && !versionAtLeast(fw.osdmVersion, minimum[0], minimum[1])) missing.push(`OSDM ${minimum[2]} or later`);
+  missing.push(...versionMissing(requirements, fw));
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
-  const distribution = distributionMissing(requirements, fw);
   return [
-    ...distribution,
-    // #937: the fare declarations matter once the provider sells fares.
-    ...(distribution.length ? [] : fareMissing(requirements.fares, fw)),
+    ...distributionMissing(requirements, fw),
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
     ...stepsMissing(requirements, fw), ...tripParametersMissing(requirements, fw),
   ];
 }
 
+// The OSDM version the requirements need and the framework is below, as a sentence.
+function versionMissing(requirements, fw) {
+  const minimum = minimumVersionOf(requirements);
+  return minimum && !versionAtLeast(fw.osdmVersion, minimum[0], minimum[1]) ? [`OSDM ${minimum[2]} or later`] : [];
+}
+
 // #936: a distribution mode the framework does not declare, as a sentence.
 // Named first: a fare scenario offered to a product-only provider is out of
-// scope, whatever else it lacks.
+// scope, whatever else it lacks. #937: the fare declarations it lacks come
+// next, once the provider sells fares.
 function distributionMissing(requirements, fw) {
   const { distributionModeDeclared, DISTRIBUTION_MODE_TEXT } = require('./distributionModes');
-  return arr(requirements.distributionModes).filter((mode) => !distributionModeDeclared(fw, mode))
+  const modes = arr(requirements.distributionModes).filter((mode) => !distributionModeDeclared(fw, mode))
     .map((mode) => `${DISTRIBUTION_MODE_TEXT[mode]} distribution (Distribution)`);
+  return modes.length ? modes : fareMissing(requirements.fares, fw);
 }
 
 // #780 PR B: the trip search parameters a framework does not take, as sentences.
