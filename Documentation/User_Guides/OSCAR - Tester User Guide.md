@@ -549,6 +549,7 @@ anything — it defines the menu that scenario authoring is limited to.
 
 | Capability | Field | What it means / gates |
 |---|---|---|
+| **Distribution** | 🧭 *Distribution* (`distributionModes`) | **Product‑based**, **fare‑based**, or both (issue #936). A framework that names none is product‑based. The scenario catalogue offers only the reference scenarios of the modes ticked, and a scenario of another mode runs with a warning. The last mode cannot be unticked. |
 | **Ticket types** | `rail.ticketTypes` | `IRT`, `NRT_OPTIONAL_RESERVATION`, … Declaring a reservation‑bearing type is what makes **place selection** available to scenarios. |
 | **Graphical seat map?** | **Seat Selection** → *“Does the system offer a graphical seat map?”* (`placeSelection.seatMap`) | Tick if travellers can pick a specific seat. Off ⇒ scenarios cannot pick seats at all. |
 | **Supported seat‑selection modes** | the pills revealed under the box (`placeSelection.supportedModes`) | Tick **🪑 Seat map at offer** and/or **➕ Add reservation to a booking** — declare the one(s) this vendor actually supports. A scenario's mode picker (§4.6) offers **exactly** these and nothing else. |

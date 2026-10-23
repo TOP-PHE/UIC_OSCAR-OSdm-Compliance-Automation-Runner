@@ -139,6 +139,20 @@ describe('test-framework — PUT create/update + GET', () => {
     expect((await put('3.8')).status).toBe(200);
   });
 
+  // #936: product-based, fare-based or both; never none.
+  test('400 for distribution modes that are none or not modes; one or both pass, absent passes', async () => {
+    const put = (distributionModes) => request(app).put('/v1/company/test-framework')
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ config: { profile: 'OTST', salesFlows: ['sale'], _salesFlowsMigratedAt: '2026-01-01T00:00:00.000Z', distributionModes } });
+    const empty = await put([]);
+    expect(empty.status).toBe(400);
+    expect(empty.body.detail).toContain('one or both');
+    expect((await put(['PRODUCT', 'TICKET'])).body.detail).toContain('"TICKET", which is not a mode');
+    expect((await put(['FARE'])).status).toBe(200);
+    expect((await put(['PRODUCT', 'FARE'])).status).toBe(200);
+    expect((await put(undefined)).status).toBe(200);
+  });
+
   test('200 GET returns the decrypted config for a tester', async () => {
     const res = await request(app).get('/v1/company/test-framework')
       .set('Authorization', `Bearer ${makeToken('company_user', testerId)}`);

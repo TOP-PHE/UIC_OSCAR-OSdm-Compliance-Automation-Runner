@@ -447,6 +447,10 @@ function datafileScenarioWarnings(sc, framework, datafile) {
   for (const name of tripSearchParametersOf(sc, datafile)) {
     if (!tripSearchParameterDeclared(framework, name)) warnings.push(`tripParameter:${name}`);
   }
+  // #936: a sale in a distribution mode the framework does not declare.
+  for (const mode of require('./distributionModes').undeclaredDistributionModes(sc, framework, datafile)) {
+    warnings.push(`distributionMode:${mode}`);
+  }
   return warnings;
 }
 
@@ -456,7 +460,8 @@ function datafileScenarioWarnings(sc, framework, datafile) {
  * one whose offer request form is not declared `offerRequestBy:<form>` (#748),
  * one whose place selection flow is not declared `placeSelectionBy:<flow>` (#766),
  * one per offer search option value not declared `offerOption:<key>=<value>` (#780),
- * one per trip search parameter not declared `tripParameter:<NAME>` (#780 PR B).
+ * one per trip search parameter not declared `tripParameter:<NAME>` (#780 PR B),
+ * one per distribution mode not declared `distributionMode:<MODE>` (#936).
  * Removes the field when there are no warnings (avoids stale annotations
  * surviving a framework change).
  *
