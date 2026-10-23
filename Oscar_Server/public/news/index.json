@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-23-simulator-accounts",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "The OSDM simulator's accounts, managed from OSCAR",
+    "summary": "Administrators add, delete and renew the simulator's client accounts from Admin → OSDM Simulator, without touching the simulator's host.",
+    "content": "The OSDM simulator's client accounts can now be managed from OSCAR. In Admin → OSDM Simulator, an administrator sees every simulated provider with its accounts, adds one, gives one a new secret or deletes one. A change takes effect at once: the bookings and tokens of the other accounts stay. A new secret is shown once, to be handed over then.\n\nThe page also shows the simulator's audit: who added, renewed or deleted which account, and when.\n\nTo connect it, enter the simulator's address and its administration key once; the key is drawn on the simulator's host and OSCAR keeps it encrypted."
+  },
+  {
     "id": "2026-10-22-fare-reservations",
     "date": "October 22, 2026",
     "tag": "New",

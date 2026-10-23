@@ -598,6 +598,7 @@ app.use('/v1/company',         require('./api/routes/company-api-keys'));
 app.use('/v1/company',         require('./api/routes/company-run-shares'));
 app.use('/v1/runs',            require('./api/routes/runs'));
 app.use('/v1/reports',         require('./api/routes/reports'));
+app.use('/v1/admin/simulator', require('./api/routes/admin-simulator'));   // the OSDM simulator's accounts (#930)
 app.use('/v1/admin',           require('./api/routes/admin'));
 app.use('/v1/api',             require('./api/routes/api'));   // read-only, by API key (#503)
 
