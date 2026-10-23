@@ -37,7 +37,7 @@ function providerOfBase(apiBase, simulatorUrl) {
   if (typeof apiBase !== 'string' || typeof simulatorUrl !== 'string') return null;
   const base = parse(apiBase.trim());
   const sim = parse(simulatorUrl);
-  if (!base || !sim || base.origin !== sim.origin) return null;
+  if (!sim || base?.origin !== sim.origin) return null;
   const prefix = `${trimSlashes(sim.pathname)}/`;
   if (!base.pathname.startsWith(prefix)) return null;
   const provider = base.pathname.slice(prefix.length).split('/')[0];
