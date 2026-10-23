@@ -2481,7 +2481,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     simulator: address in `server_config` (`SIMULATOR_ADMIN_URL`), key
     encrypted (`SIMULATOR_ADMIN_KEY_ENC`) and sent only to the address it was
     saved with (`SIMULATOR_ADMIN_KEY_URL`, `keyRefusal()`), tried before it is
-    saved (accounts list, else 422), urlPolicy, `redirect: 'manual'`, 15 s,
+    saved (accounts list, else 422): what is tried is written as `…_PENDING_…`
+    and read back from the database, never passed from the request to
+    `fetch` (CodeQL's SSRF rule stopped the first version), then removed; urlPolicy, `redirect: 'manual'`, 15 s,
     256 KB, key masked. The route file is mounted before `/v1/admin`. Its
     integration test runs the real simulator code from `OSDM_Simulator/src`
     on a loopback port, so a change to the simulator's API fails there.

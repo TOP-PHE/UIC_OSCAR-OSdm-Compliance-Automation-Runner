@@ -30,6 +30,11 @@ const URL_KEY = 'SIMULATOR_ADMIN_URL';
 const KEY_KEY = 'SIMULATOR_ADMIN_KEY_ENC';
 // The address the stored key was saved with: it goes there and nowhere else.
 const KEY_URL_KEY = 'SIMULATOR_ADMIN_KEY_URL';
+// An address and key being tried, before they are saved. Every call reads its
+// address and key from server_config, the ones being tried included.
+const PENDING_URL_KEY = 'SIMULATOR_ADMIN_PENDING_URL';
+const PENDING_KEY_KEY = 'SIMULATOR_ADMIN_PENDING_KEY_ENC';
+const ALL_KEYS = [URL_KEY, KEY_KEY, KEY_URL_KEY, PENDING_URL_KEY, PENDING_KEY_KEY];
 const TIMEOUT_MS = 15000;
 const MAX_ANSWER_BYTES = 256 * 1024;
 const MIN_KEY = 32;
@@ -69,8 +74,8 @@ function configView() {
   return { url: url || null, keySet: Boolean(configValue(KEY_KEY)) && configValue(KEY_URL_KEY) === url };
 }
 
-function storedKey() {
-  const enc = configValue(KEY_KEY);
+function storedKey(column = KEY_KEY) {
+  const enc = configValue(column);
   if (!enc) return null;
   try { return decrypt(enc); } catch { return null; }
 }
@@ -120,24 +125,29 @@ function refusalText(status, body) {
  * for a 2xx answer, or throws a SimulatorError whose status is the one OSCAR
  * answers with (the simulator's own 4xx, else 502).
  */
-async function call({ method, path, body, actor, url = configValue(URL_KEY), key = undefined }) {
+// The address and key a call uses: the saved ones, or (`pending`) the ones being tried.
+function target(pending) {
+  if (pending) return { url: configValue(PENDING_URL_KEY), secret: storedKey(PENDING_KEY_KEY) };
+  const url = configValue(URL_KEY);
   if (!url) throw new SimulatorError(409, 'No simulator is set up yet: enter its address and key first.');
-  let secret = key;
-  if (secret === undefined) {
-    const refused = keyRefusal(url);
-    if (refused) throw new SimulatorError(409, refused);
-    secret = storedKey();
-    if (!secret) throw new SimulatorError(409, 'No key is saved for the simulator: enter it first.');
-  }
-  const target = `${url}/admin/api/${path}`;
-  const refusal = await usableUrlRefusal(target, 'simulator address');
+  const refused = keyRefusal(url);
+  if (refused) throw new SimulatorError(409, refused);
+  const secret = storedKey();
+  if (!secret) throw new SimulatorError(409, 'No key is saved for the simulator: enter it first.');
+  return { url, secret };
+}
+
+async function call({ method, path, body, actor, pending = false }) {
+  const { url, secret } = target(pending);
+  const address = `${url}/admin/api/${path}`;
+  const refusal = await usableUrlRefusal(address, 'simulator address');
   if (refusal) throw new SimulatorError(422, refusal);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let res;
   let text;
   try {
-    res = await fetch(target, {
+    res = await fetch(address, {
       method,
       headers: {
         Authorization: `Bearer ${secret}`,
@@ -186,11 +196,15 @@ async function saveConfig({ url: rawUrl, key: rawKey }, actor) {
       throw new SimulatorError(400, `The key is ${MIN_KEY} to ${MAX_KEY} characters, without spaces.`);
     }
   }
+  setConfig(PENDING_URL_KEY, url, actor);
+  setConfig(PENDING_KEY_KEY, encrypt(key), actor);
   try {
-    await call({ method: 'GET', path: 'accounts', actor, url, key });
+    await call({ method: 'GET', path: 'accounts', actor, pending: true });
   } catch (err) {
     if (err instanceof SimulatorError) throw new SimulatorError(422, `Not saved: ${err.detail}`);
     throw err;
+  } finally {
+    run('DELETE FROM server_config WHERE key IN (?, ?)', [PENDING_URL_KEY, PENDING_KEY_KEY]);
   }
   setConfig(URL_KEY, url, actor);
   setConfig(KEY_KEY, encrypt(key), actor);
@@ -199,7 +213,7 @@ async function saveConfig({ url: rawUrl, key: rawKey }, actor) {
 }
 
 function removeConfig() {
-  run('DELETE FROM server_config WHERE key IN (?, ?, ?)', [URL_KEY, KEY_KEY, KEY_URL_KEY]);
+  run(`DELETE FROM server_config WHERE key IN (${ALL_KEYS.map(() => '?').join(', ')})`, ALL_KEYS);
 }
 
 module.exports = { call, saveConfig, removeConfig, configView, normaliseUrl, SimulatorError, URL_KEY, KEY_KEY, KEY_URL_KEY };

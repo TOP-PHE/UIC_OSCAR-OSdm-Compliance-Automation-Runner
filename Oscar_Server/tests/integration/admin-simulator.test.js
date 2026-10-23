@@ -121,6 +121,8 @@ test('a wrong key, a wrong address or a bad value is tried and not saved', async
     expect((await asAdmin(request(app).put('/v1/admin/simulator/config')).send(body)).status).toBe(400);
   }
   expect((await asAdmin(request(app).get('/v1/admin/simulator/config'))).body).toEqual({ url: null, keySet: false });
+  // Nothing of what was tried stays behind.
+  expect(get("SELECT COUNT(*) AS n FROM server_config WHERE key LIKE 'SIMULATOR_ADMIN_%'").n).toBe(0);
 });
 
 test('the right key is saved encrypted and never returned', async () => {

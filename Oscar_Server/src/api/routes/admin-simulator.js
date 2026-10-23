@@ -32,9 +32,9 @@ const { auditLog } = require('../helpers/shared');
 const S = require('../../services/simulatorAdmin');
 
 const router = express.Router();
-router.use(requireAuth, requireRole('administrator'));
 
-// Each request is one call to another host: a limit of its own.
+// Each request is one call to another host: a limit of its own, counted before
+// anything else is done.
 const simulatorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -43,6 +43,7 @@ const simulatorLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many simulator requests in a minute. Wait a moment.' },
 });
 router.use(simulatorLimiter);
+router.use(requireAuth, requireRole('administrator'));
 router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 // The simulator's own rules (config.js there): a provider key and a client id.
