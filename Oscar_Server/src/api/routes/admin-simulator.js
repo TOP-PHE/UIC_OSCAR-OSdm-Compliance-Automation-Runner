@@ -19,6 +19,7 @@
  * DELETE /v1/admin/simulator/accounts/:provider/:clientId     — delete it
  * POST   /v1/admin/simulator/accounts/:provider/:clientId/reset-secret — a new secret, once
  * GET    /v1/admin/simulator/audit                            — the simulator's audit
+ * GET    /v1/admin/simulator/stats?days=1|7|30|90|365         — what each account did, per provider and per day
  *
  * Administrators only. The simulator is called by services/simulatorAdmin.js,
  * naming the administrator; every change is in OSCAR's audit too. Answers are
@@ -191,5 +192,52 @@ router.get('/audit', async (req, res) => {
   }
 });
 
+// #930 PR 3: the counters the simulator keeps, as it names them.
+const COUNTERS = ['tokens', 'requests', 'offers', 'bookings', 'confirmations', 'refunds', 'exchanges', 'clientErrors', 'serverErrors'];
+const PERIODS = new Set([1, 7, 30, 90, 365]);
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+const countersOf = (v) => Object.fromEntries(COUNTERS.map((c) => [c, Number.isInteger(v?.[c]) && v[c] >= 0 ? v[c] : 0]));
+
+// The statistics, member by member.
+function statsView(body, days) {
+  const providers = Array.isArray(body?.providers) ? body.providers : [];
+  return {
+    days,
+    from: DAY.test(body?.from || '') ? body.from : null,
+    to: DAY.test(body?.to || '') ? body.to : null,
+    providers: providers.filter((p) => typeof p?.provider === 'string' && PROVIDER.test(p.provider)).map((p) => ({
+      provider: p.provider,
+      name: text(p.name, 80),
+      totals: countersOf(p.totals),
+      unidentified: countersOf(p.unidentified),
+      accounts: (Array.isArray(p.accounts) ? p.accounts : [])
+        .filter((a) => typeof a?.clientId === 'string' && CLIENT_ID.test(a.clientId))
+        .map((a) => ({ clientId: a.clientId, ...countersOf(a) })),
+    })),
+    daily: (Array.isArray(body?.daily) ? body.daily : [])
+      .filter((d) => DAY.test(d?.day || ''))
+      .map((d) => ({ day: d.day, ...countersOf(d) })),
+  };
+}
+
+// The last `days` days, today (UTC) included.
+function periodOf(days, now = Date.now()) {
+  const day = (ms) => new Date(ms).toISOString().slice(0, 10);
+  return { from: day(now - (days - 1) * 86400000), to: day(now) };
+}
+
+router.get('/stats', async (req, res) => {
+  const days = req.query.days === undefined ? 30 : Number(req.query.days);
+  try {
+    if (!PERIODS.has(days)) throw new S.SimulatorError(400, 'The period is 1, 7, 30, 90 or 365 days.');
+    const { from, to } = periodOf(days);
+    const answer = await S.call({ method: 'GET', path: `stats?from=${from}&to=${to}`, actor: actorOf(req) });
+    return res.json(statsView(answer.body, days));
+  } catch (err) {
+    return failed(res, err);
+  }
+});
+
 module.exports = router;
-module.exports.views = { accountsView, secretView, auditView };
+module.exports.views = { accountsView, secretView, auditView, statsView, periodOf };

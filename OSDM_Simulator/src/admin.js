@@ -85,7 +85,7 @@ const isKeyDigest = (value) => typeof value === 'string' && SHA256_HEX.test(valu
  * `keySha256`: the hex SHA-256 of the key. `accounts`: the data folder's
  * accounts (accounts.js).
  */
-function createAdmin({ keySha256, accounts, now = Date.now }) {
+function createAdmin({ keySha256, accounts, stats = null, now = Date.now }) {
   if (!isKeyDigest(keySha256)) throw new Error('createAdmin needs the SHA-256 of the key, in hex');
   const expected = Buffer.from(keySha256, 'hex');
   const failures = createFailureCounter(FAILURES_PER_ADDRESS, now);
@@ -138,6 +138,25 @@ function createAdmin({ keySha256, accounts, now = Date.now }) {
     throw notFound();
   }
 
+  // GET /admin/api/stats?from=YYYY-MM-DD&to=YYYY-MM-DD (#930 PR 3): the last
+  // 30 days without them.
+  function statsRoute(req, res) {
+    requireMethod(req, 'GET');
+    const query = new URL(req.url, 'https://simulator.invalid').searchParams;
+    const today = new Date(now()).toISOString().slice(0, 10);
+    const from = query.get('from') || new Date(now() - 29 * 86400000).toISOString().slice(0, 10);
+    const to = query.get('to') || today;
+    let answer;
+    try {
+      answer = stats.query({ from, to });
+    } catch (error) {
+      if (error instanceof RangeError) throw new HttpError(400, 'BAD_PERIOD', 'The period is not valid', error.message);
+      throw error;
+    }
+    sendJson(res, 200, answer);
+    return 200;
+  }
+
   /** `/admin/...`: `rest` is the path after `admin`. Returns the status sent. */
   async function handle(req, res, rest, seen, address) {
     const [area, what, ...more] = rest;
@@ -149,6 +168,7 @@ function createAdmin({ keySha256, accounts, now = Date.now }) {
       sendJson(res, 200, { entries: accounts.auditTail(200) });
       return 200;
     }
+    if (what === 'stats' && more.length === 0 && stats) return statsRoute(req, res);
     if (what !== 'accounts') throw notFound();
     try {
       return await accountsRoute(req, res, actor, more);

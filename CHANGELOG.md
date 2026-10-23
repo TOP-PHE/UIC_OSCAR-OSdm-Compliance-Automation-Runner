@@ -62,6 +62,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.384] / [collection-OTST_V2.0.215] — 2026-10-23
+
+Issue #930, PR 3, release 2026.419. Simulator 0.52.0. Collection unchanged; the statistics need this simulator.
+
+### Added
+- **Admin → OSDM Simulator → Statistics.** Per provider, one line per account and its totals:
+  - tokens issued, OSDM requests, offers asked, bookings made and confirmed, refunds and exchanges confirmed, answers 4xx and 5xx;
+  - a line for the requests of no known account (no token, a refused one, a wrong secret).
+  The period is today, or the last 7, 30, 90 or 365 days (UTC). Drawn as text only.
+- **Route `GET /v1/admin/simulator/stats?days=`** (administrators). A period not offered is a 400 before any call; the answer is built counter by counter.
+
+### Simulator 0.52.0
+- **Usage counted per UTC day, provider and account** (`src/stats.js`), from each request's method, path and status: nothing else is kept (no path, body, header, address or time of day). Kept in `<data>/stats.json`, written at most once a minute and when the simulator stops, for `SIM_STATS_RETENTION_DAYS` days (default 400). The administration is not counted.
+- **`GET /admin/api/stats?from=&to=`** (YYYY-MM-DD, at most 400 days; the last 30 by default): per provider its accounts, unidentified requests and totals, and per day the totals. A bad period is `400 BAD_PERIOD`.
+- Without a data folder nothing is counted. A statistics file that is not valid stops the start with a message.
+
+---
+
 ## [server-1.11.383] / [collection-OTST_V2.0.215] — 2026-10-23
 
 Issue #930, PR 2, release 2026.418. Collection unchanged. Needs simulator 0.51.0 or later on the simulator's host, with its data folder and administration key.

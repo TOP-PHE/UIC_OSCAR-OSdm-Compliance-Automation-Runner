@@ -166,7 +166,7 @@ function servesTripSearch(provider, resource) {
 // `accounts` and `admin` (#930) are there only with a data folder: then
 // `clients` is the accounts' own Map, which an administrator changes while
 // the simulator runs.
-function createApp({ providers, clients, accounts = null, admin = null, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
+function createApp({ providers, clients, accounts = null, admin = null, stats = null, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
   const allow = createRateLimiter({ perMinute: limits.requestsPerMinute, now });
 
   function callerAddress(req) {
@@ -528,6 +528,7 @@ function createApp({ providers, clients, accounts = null, admin = null, tokens, 
     const provider = providers.get(segments[0]);
     if (!provider) throw notFound();
     seen.provider = provider.key;
+    seen.segments = segments.slice(1);
     if (segments.length === 3 && segments[1] === 'oauth' && segments[2] === 'token') {
       return tokenEndpoint(req, res, provider, seen);
     }
@@ -577,6 +578,8 @@ function createApp({ providers, clients, accounts = null, admin = null, tokens, 
       client: seen.client,
       error: failure,
     });
+    // #930: counted per day and account, for the administrators' statistics.
+    if (stats && seen.segments) stats.record({ provider: seen.provider, client: seen.client, method: req.method, segments: seen.segments, status });
   };
 }
 

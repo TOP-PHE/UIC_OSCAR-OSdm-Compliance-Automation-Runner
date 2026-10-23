@@ -35,6 +35,7 @@ td.actions{text-align:right;white-space:nowrap}
 .key-box{display:flex;gap:10px;align-items:center;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px;margin:10px 0}
 .key-box code{flex:1;font-family:Consolas,monospace;font-size:13px;word-break:break-all;color:#37474f}
 .table-wrap{overflow-x:auto}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -75,16 +76,32 @@ td.actions{text-align:right;white-space:nowrap}
   <div class="card">
     <nav class="tabs" aria-label="Sections">
       <a href="#accounts" class="tab" data-tab="accounts">Accounts</a>
+      <a href="#stats" class="tab" data-tab="stats">Statistics</a>
       <a href="#audit" class="tab" data-tab="audit">Audit</a>
     </nav>
     <p class="muted" id="accounts-help">One account per OSCAR account keeps their bookings apart. A new secret is shown once: copy it then.
       A deleted account, and the old secret of a reset one, stop working at once; the other accounts and their bookings stay.</p>
+    <div id="stats-help" style="display:none">
+      <p class="muted">What each account did on the simulator, counted by the simulator itself: tokens asked, OSDM requests, offers asked, bookings made and confirmed, refunds and exchanges confirmed, answers in error. Requests whose account is not known (no token, a refused one) are counted on the provider's line.</p>
+      <label for="stats-days">Period</label>
+      <select id="stats-days">
+        <option value="1">Today</option>
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="365">Last 365 days</option>
+      </select>
+    </div>
     <p class="muted" id="audit-help" style="display:none">The last 200 changes and refused keys, newest first, as the simulator keeps them.</p>
   </div>
 
   <section id="accounts-view">
     <div id="new-secret" style="display:none"></div>
     <div id="providers"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section id="stats-view" style="display:none">
+    <div id="stats"><div class="empty">Loading…</div></div>
   </section>
 
   <section id="audit-view" style="display:none">
