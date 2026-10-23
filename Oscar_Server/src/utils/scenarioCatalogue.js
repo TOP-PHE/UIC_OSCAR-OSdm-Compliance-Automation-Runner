@@ -39,8 +39,9 @@
 
 const {
   scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT, OFFER_REQUEST_FORMS,
-  placeSelectionFlowOf, placeSelectionFlowDeclared, PLACE_SELECTION_TEXT,
+  placeSelectionFlowOf, placeSelectionFlowDeclared, PLACE_SELECTION_TEXT, scenarioOfferCriteria,
 } = require('./frameworkGating');
+const { fareRequirementsOf, fareMissing, freeUnderAgeOf, versionAtLeast, COMBINATION_MODELS } = require('./fareDeclarations');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const { declaredCards } = require('./reductionCards');
@@ -74,7 +75,9 @@ const HORIZON_LIMITS = new Set(['SALES_HORIZON', 'OVER_SALES_HORIZON']);
 // declares (GROUP_TARIFF), and one asking it for one passenger more than the
 // first group product's maximum (OVER_GROUP_SIZE).
 const GROUP_LIMITS = new Set(['GROUP_TARIFF', 'OVER_GROUP_SIZE']);
-const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES', 'REDUCTION_CARDS', 'NAMED_PRODUCTS', ...GROUP_LIMITS];
+// #937: one whose child is under the age the Test Framework declares free in
+// fares (FREE_CHILD), and so travels on a fare priced 0.
+const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES', 'REDUCTION_CARDS', 'NAMED_PRODUCTS', ...GROUP_LIMITS, 'FREE_CHILD'];
 // #780: an entry that stands for the offer search probes (`probe`
 // "OFFER_OPTIONS"): it comes once per option value the Test Framework
 // declares, each asking for that value alone. Per option: the framework key,
@@ -118,6 +121,8 @@ function entryProblems(e, at, scenarios, codes) {
   if (String(e.source).startsWith('SIM_FAULT_')) problems.push(`${at}.source asks the simulator for faults (#833)`);
   if (e.limit !== undefined && !LIMITS.includes(e.limit)) problems.push(`${at}.limit "${e.limit}" is not one of ${LIMITS.join(', ')}`);
   if (e.probe !== undefined && !PROBES.includes(e.probe)) problems.push(`${at}.probe "${e.probe}" is not one of ${PROBES.join(', ')}`);
+  // #937: the fare combination model the source's fares come in, when it matters.
+  if (e.combinationModel !== undefined && !COMBINATION_MODELS.includes(e.combinationModel)) problems.push(`${at}.combinationModel "${e.combinationModel}" is not one of ${COMBINATION_MODELS.join(', ')}`);
   problems.push(...needsProblems(e.needs, at));
   return problems;
 }
@@ -165,10 +170,15 @@ function salesFlowsOf(scenario) {
   return flows;
 }
 
-const versionAtLeast = (version, major, minor) => {
-  const [a, b] = String(version || '').split('.').map((n) => Number.parseInt(n, 10));
-  return Number.isInteger(a) && Number.isInteger(b) && (a > major || (a === major && b >= minor));
-};
+// The OSDM version a set of requirements asks for at least (#937: fares too),
+// as [major, minor, text], or null.
+function minimumVersionOf(requirements) {
+  const versions = [requirements.minOsdmVersion, requirements.fares?.minOsdmVersion]
+    .filter((v) => typeof v === 'string')
+    .map((v) => [...v.split('.').map((n) => Number.parseInt(n, 10)), v]);
+  versions.sort((x, y) => (y[0] - x[0]) || (y[1] - x[1]));
+  return versions[0] || null;
+}
 
 /** What a reference scenario needs the Test Framework to declare. */
 function requirementsOf(scenario, datafile) {
@@ -189,6 +199,8 @@ function requirementsOf(scenario, datafile) {
     tripSearchParameters: require('./tripSearchParameters').tripSearchParametersOf(scenario, datafile),
     // #936: product-based, fare-based, or both.
     distributionModes: require('./distributionModes').distributionModesOf(scenario, datafile),
+    // #937: what its fares need declared under `fares`.
+    fares: fareRequirementsOf(scenario, scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts),
   };
 }
 
@@ -218,11 +230,15 @@ function missingFor(requirements, framework) {
   if (requirements.returnModel && Array.isArray(fw.returnModels) && !fw.returnModels.includes(requirements.returnModel)) {
     missing.push(`return model ${requirements.returnModel}`);
   }
-  if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
+  const minimum = minimumVersionOf(requirements);
+  if (minimum && !versionAtLeast(fw.osdmVersion, minimum[0], minimum[1])) missing.push(`OSDM ${minimum[2]} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
+  const distribution = distributionMissing(requirements, fw);
   return [
-    ...distributionMissing(requirements, fw),
+    ...distribution,
+    // #937: the fare declarations matter once the provider sells fares.
+    ...(distribution.length ? [] : fareMissing(requirements.fares, fw)),
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
     ...stepsMissing(requirements, fw), ...tripParametersMissing(requirements, fw),
@@ -446,6 +462,9 @@ function limitNeedsText(needs, limit) {
       : 'the first group product the Test Framework declares, by its code, for a group of its sizes';
     return [first, ...needsText({ ...needs, providerValues: values, tariff: undefined, passengers: undefined })];
   }
+  if (limit === 'FREE_CHILD') {
+    return ['a child one year under the age the Test Framework declares free in fares', ...needsText({ ...needs, passengers: undefined })];
+  }
   if (limit === 'NAMED_PRODUCTS') {
     const values = arr(needs?.providerValues).filter((v) => v !== 'expectedProduct');
     return ['the first product the Test Framework declares, by its code, in its flexibility', ...needsText({ ...needs, providerValues: values, tariff: undefined })];
@@ -637,6 +656,10 @@ function baseEntries(catalogue, simulator, framework) {
     if (entry.limit === 'NAMED_PRODUCTS') requirements.namedProducts = true;
     if (GROUP_LIMITS.has(entry.limit)) requirements.groupProducts = true;
     if (entry.limit === 'OVER_GROUP_SIZE') requirements.groupProductMax = true;
+    // #937: the entry's model and free age; a fare scenario keeps its form,
+    // whose sections are its trip's stations.
+    requirements.fares = fareRequirementsOf(scenario, scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts, entry);
+    if (requirements.distributionModes.includes('FARE')) requirements.offerRequest = { ...requirements.offerRequest, convertible: false };
     // #780: the offer search probes keep their search: they test the options, not the form.
     if (entry.probe) requirements.offerRequest = { ...requirements.offerRequest, convertible: false };
     return {
@@ -651,12 +674,13 @@ function baseEntries(catalogue, simulator, framework) {
       needsText: entry.limit ? limitNeedsText(entry.needs, entry.limit) : needsText(entry.needs),
       ...(entry.limit ? { limit: entry.limit } : {}),
       ...(entry.probe ? { probe: entry.probe } : {}),
+      ...(entry.combinationModel ? { combinationModel: entry.combinationModel } : {}),
     };
   });
 }
 
 module.exports = {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
-  dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, ageRangesOf, NEEDS_KEYS, LIMITS,
+  dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, ageRangesOf, freeUnderAgeOf, NEEDS_KEYS, LIMITS,
   OFFER_OPTION_PROBES, declaredOptionValues, undeclaredOptionValue,
 };

@@ -47,6 +47,7 @@ const { datafileVersion, etag, staleSaveRefusal } = require('../../utils/datafil
 const { schemaProblems, loadDatafileSchema } = require('../../utils/datafileSchema');
 const { isOsdmVersion } = require('../../utils/osdmVersion');
 const { distributionModesProblem } = require('../../utils/distributionModes');
+const { fareDeclarationsProblem } = require('../../utils/fareDeclarations');
 const configurationBundle = require('../../utils/configurationBundle');
 const referenceConfiguration = require('../../utils/referenceConfiguration');
 const referenceStore = require('../../utils/referenceStore');
@@ -767,8 +768,8 @@ function importPartsRefusal(configuration, choices, companyId) {
     if (version != null && version !== '' && !isOsdmVersion(version)) {
       return { status: 400, detail: `The configuration's Test Framework names the OSDM version "${String(version).slice(0, 40)}", which is not a version: digits and dots, such as 3.8 or 3.0.5. Nothing was changed.` };
     }
-    // #936: the distribution modes, as the Test Framework route checks them.
-    const modesProblem = distributionModesProblem(configuration.framework.distributionModes);
+    // #936 / #937: the distribution modes and fare declarations, as the Test Framework route checks them.
+    const modesProblem = distributionModesProblem(configuration.framework.distributionModes) || fareDeclarationsProblem(configuration.framework.fares);
     if (modesProblem) return { status: 400, detail: `The configuration's Test Framework: ${modesProblem} Nothing was changed.` };
   }
   return null;

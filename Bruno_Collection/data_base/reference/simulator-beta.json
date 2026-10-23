@@ -247,7 +247,25 @@
         "minPassengers": 2,
         "maxPassengers": 5
       }
-    ]
+    ],
+    "fares": {
+      "clusters": [
+        "FULL_FLEX",
+        "SEMI_FLEX",
+        "NON_FLEX"
+      ],
+      "combinationModels": [
+        "CLUSTERING",
+        "COMBINING"
+      ],
+      "statedRefundFee": false,
+      "reservations": [],
+      "salesFlows": [
+        "SALE",
+        "REFUND_FULL"
+      ],
+      "freeUnderAge": 6
+    }
   },
   "testResources": [
     {

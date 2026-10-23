@@ -39,6 +39,7 @@ const {
 } = require('./frameworkGating');
 const TripApply = require('../../public/js/trip-apply');
 const { idAllocator } = require('./datafileOwnership');
+const { mappedSections } = require('./fareSections');
 
 const arr = v => (Array.isArray(v) ? v : []);
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -235,6 +236,10 @@ function copiedScenario(ctx, sc) {
   const copy = clone(sc);
   for (const k of Object.keys(copy)) if (k.startsWith('__')) delete copy[k];
   copy.tripRequirementId = tripId;
+  // #937: a fare section names stations of the trip, now the target's.
+  if (Array.isArray(copy.requestedSections)) {
+    copy.requestedSections = mappedSections(copy.requestedSections, tripEntry, findById(ctx.out.tripRequirements, tripId));
+  }
 
   for (const [field, list] of COPIED_LISTS) {
     if (copy[field] == null) continue;
