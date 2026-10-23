@@ -153,6 +153,50 @@ it has no colon.
 
 Only a SHA-256 digest of each secret is kept in memory.
 
+## Accounts kept in a data folder, and the administration API (#930)
+
+With `SIM_DATA_DIR` set, the accounts are kept in `<data>/accounts.json`,
+digests only, and an administrator changes them while the simulator runs. On
+the first start that file does not exist yet: it is made from the clients
+file, which is never read again (one `imported_clients_file` line in the
+audit). A deleted account loses its tokens at once, and a reset secret ends
+the old secret and every token asked with it: each token carries 16 hex
+characters of the digest of its secret, so the bookings and tokens of the
+other accounts stay. Without `SIM_DATA_DIR` nothing changes: the clients file
+is read once and the administration API answers `404`.
+
+Administrators are names and passwords in `<data>/admins.json`, written on the
+host only:
+
+```
+node scripts/make-admin.js local add ada      # prints a password, once
+node scripts/make-admin.js local reset ada    # a new password
+node scripts/make-admin.js local remove ada
+```
+
+`local` writes into `data/` next to `server.js` (run with
+`SIM_DATA_DIR=./data`), `deploy` into `deploy/data/`, the compose file's data
+folder; git ignores both. The file holds scrypt digests and is read at each
+sign-in, so a change needs no restart, and a removed administrator's session
+ends at its next request.
+
+| Request | What it does |
+|---|---|
+| `POST /admin/api/login` `{ name, password }` | a session cookie `__Host-sim_admin` (HttpOnly, Secure, SameSite=Strict) and `csrfToken`; 10 failed sign-ins from one address (20 for one name) in 15 minutes give `429` |
+| `GET /admin/api/session` | the name signed in and the CSRF token again |
+| `POST /admin/api/logout` | ends the session |
+| `GET /admin/api/accounts` | every provider with its accounts: client id, created, last token since the start; never a secret or digest |
+| `POST /admin/api/accounts/<provider>` `{ clientId }` or `{ kind: "tst" \| "tstmgr" }` | a new account, named `<provider>.<kind>NN` when no id is given; answers its `clientSecret`, once |
+| `DELETE /admin/api/accounts/<provider>/<clientId>` | deletes it |
+| `POST /admin/api/accounts/<provider>/<clientId>/reset-secret` | a new secret, answered once |
+| `GET /admin/api/audit` | the last 200 lines of `<data>/audit.log`, newest first: time, who, what, provider, client id; never a secret |
+
+A request that changes something carries `X-CSRF-Token`, and one whose
+`Origin` is another site is refused. A session ends after 30 idle minutes, 8
+hours in any case, and at every restart (sessions are kept in memory). An
+OSDM token does not open these routes, and a session does not open the OSDM
+ones. `admin` cannot be a provider key.
+
 ## Rules it keeps
 
 - **A token belongs to one provider and one client.** Used on another provider
@@ -161,9 +205,10 @@ Only a SHA-256 digest of each secret is kept in memory.
 - **What a client created, only that client reads.** Another client of the same
   provider, or the same client id on another provider, gets `404`, the same
   answer as for a booking that never existed.
-- **Nothing is written to disk and nothing is requested from outside.** State
-  is in memory; a restart clears it and ends every token (the signing key is
-  drawn at start-up).
+- **Nothing is requested from outside, and only the accounts are written to
+  disk** (with a data folder, #930). Offers and bookings are in memory; a
+  restart clears them and ends every token (the signing key is drawn at
+  start-up).
 - **Memory is bounded.** Each client keeps at most a fixed number of offers and
   bookings, the oldest is dropped first, and everything expires after the time
   to live. The clients are a fixed list, so the total is bounded too.
@@ -181,6 +226,7 @@ All optional, read from the environment.
 | `SIM_HOST` | `127.0.0.1` | address to listen on |
 | `SIM_PORT` | `3002` | port |
 | `SIM_CLIENTS_FILE` | `./clients.json` | the clients file |
+| `SIM_DATA_DIR` | none | the data folder of the accounts, administrators and audit (#930); without it, the clients file only and no administration API |
 | `SIM_PROVIDERS_DIR` | `./providers` | the provider profiles |
 | `SIM_TRUST_PROXY` | off | `1` behind a reverse proxy: the caller's address is the last one in `X-Forwarded-For` |
 | `SIM_MAX_BODY_BYTES` | `262144` | largest request body |
@@ -197,6 +243,9 @@ All optional, read from the environment.
 | `src/app.js` | routing, authentication, request limit, log line |
 | `src/config.js` | reading and checking the profiles, the clients file and the settings |
 | `src/tokens.js` | issuing and checking tokens |
+| `src/accounts.js` | the accounts of a data folder, their changes and the audit (#930) |
+| `src/admin.js` | the administration API: sign-in, session, CSRF, account routes (#930) |
+| `scripts/make-admin.js` | the administrators, on the host (#930) |
 | `src/store.js` | the bounded, per-client memory |
 | `src/osdm/offers.js` | the answer to `POST /offers` |
 | `src/osdm/bookings.js` | bookings, passengers, purchaser, tickets |

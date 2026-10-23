@@ -15,7 +15,9 @@ const { createStore } = require('../src/store');
 test('a token says which provider and client it was issued for', () => {
   const tokens = createTokenService({ now: () => 1000000 });
   const claims = tokens.verify(tokens.issue('alpha', 'client-1', 60));
-  assert.deepEqual(claims, { provider: 'alpha', clientId: 'client-1', expiresAt: 1060, faults: [] });
+  assert.deepEqual(claims, { provider: 'alpha', clientId: 'client-1', expiresAt: 1060, faults: [], secretTag: '' });
+  // #930: the tag of the secret it was asked with, when there is one.
+  assert.equal(tokens.verify(tokens.issue('alpha', 'client-1', 60, [], '0123abcd0123abcd')).secretTag, '0123abcd0123abcd');
 });
 
 test('two tokens issued in the same second are different', () => {

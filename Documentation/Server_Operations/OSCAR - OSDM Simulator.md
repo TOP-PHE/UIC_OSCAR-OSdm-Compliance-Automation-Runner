@@ -93,6 +93,17 @@ treats every client of a provider alike. Give each OSCAR account a client of
 its own: two accounts that share one see each other's bookings on the
 simulator.
 
+The data folder (#930) keeps the accounts from the first start on, imported
+from `clients.json`, with the administrators and the audit of their changes.
+It belongs to the container's user, and to it only. Then define yourself as
+an administrator; the password is printed once:
+
+```bash
+install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data
+docker run --rm --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
+  node scripts/make-admin.js deploy add <your-name>
+```
+
 Start the simulator and check it from the host:
 
 ```bash
@@ -357,12 +368,61 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 | Update the simulator | automatic on a new version, once set up (see below); by hand: `git -C /opt/osdm-simulator pull && docker compose restart` |
 | See which version runs | `curl -s https://<simulator-host>/healthz` (`"version"`), or the first line of `docker compose logs` (`OSDM simulator <version> listening on …`) |
 | Replace all clients and secrets | see below |
-| Add a client | add an entry to `clients.json` in the deploy folder (an id of the same form, a secret of 32 characters or more), `docker compose restart` |
+| Add, delete a client, give it a new secret | the administration API, while it runs (below); `clients.json` is read on the first start only |
+| Add, reset or remove an administrator | `docker run --rm --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim node scripts/make-admin.js deploy add\|reset\|remove <name>`; no restart |
 | Clear every booking and end every token | `docker compose restart` |
 | Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
 
-A restart clears everything: bookings are kept in memory only, and the key that
-signs the tokens is drawn at start-up.
+A restart clears the bookings, the tokens and the administrators' sessions:
+they are kept in memory only, and the key that signs the tokens is drawn at
+start-up. The accounts stay: they are in the data folder.
+
+**Accounts while it runs** (#930). Sign in, then add, delete or reset. A
+new secret is answered once: hand it over then. A deleted account, and the
+old secret of a reset one, are refused at once, tokens included; the other
+accounts and their bookings are not touched. Each change is a line of
+`deploy/data/audit.log`, with the administrator's name. From any machine,
+with the name and password of `make-admin.js` in `ADMIN` and `PASS`:
+
+```bash
+SIM=https://<simulator-host>
+J=$(mktemp)
+curl -s -c "$J" -H 'Content-Type: application/json' \
+  -d "{\"name\":\"$ADMIN\",\"password\":\"$PASS\"}" "$SIM/admin/api/login" > "$J.login"
+CSRF=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['csrfToken'])" "$J.login")
+curl -s -b "$J" "$SIM/admin/api/accounts"                                    # the list
+curl -s -b "$J" -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' \
+  -d '{"kind":"tst"}' "$SIM/admin/api/accounts/zeta"                         # zeta.tstNN and its secret
+curl -s -b "$J" -H "X-CSRF-Token: $CSRF" -X POST "$SIM/admin/api/accounts/zeta/zeta.tst04/reset-secret"
+curl -s -b "$J" -H "X-CSRF-Token: $CSRF" -X DELETE "$SIM/admin/api/accounts/zeta/zeta.tst04"
+curl -s -b "$J" "$SIM/admin/api/audit"
+rm -f "$J" "$J.login"
+```
+
+The page that does the same is PR 2 of #930. To keep the administration to
+known addresses, fill in the `allow` / `deny` lines of the `/admin/` location
+in the nginx site. A site set up before 0.51.0 has no such location: its
+`location /` removes cookies, so sign-in works but every next request answers
+`401`. Add the `/admin/` block of `nginx-osdm-simulator.conf.example` to it
+and reload nginx.
+
+**Moving an installed simulator to a data folder** (installed before 0.51.0).
+The automatic update only restarts the container, which keeps the compose
+settings it was made with: until `up -d`, the simulator reads `clients.json`
+as before and the administration API answers `404`.
+
+```bash
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+install -d -m 700 -o 1000 -g 1000 data
+docker run --rm --user 1000:1000 -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
+  node scripts/make-admin.js deploy add <your-name>
+docker compose up -d          # re-creates the container: bookings and tokens are lost
+docker compose logs | grep Imported   # "Imported N accounts from /run/osdm-simulator/clients.json"
+```
+
+The ids and secrets in use stay the same. Create the folder before any `docker
+compose up -d`, the load test's included: without it Docker makes one that
+user 1000 cannot write, and the simulator stops at start.
 
 **Automatic update** (#617). Each simulator version is tagged
 `simulator-<version>`, with a GitHub release whose notes come from the
@@ -384,6 +444,7 @@ install -m 0755 /opt/osdm-simulator/OSDM_Simulator/deploy/update.sh /usr/local/s
 useradd --create-home --shell /bin/sh simdeploy && usermod -aG docker simdeploy
 chown -R simdeploy /opt/osdm-simulator
 chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json   # the container's user reads it
+chown -R 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data          # and writes its data folder (#930)
 # 3. A key pair; the private half goes to GitHub, the public half here,
 #    restricted to the one command.
 ssh-keygen -t ed25519 -N '' -C simulator-deploy -f /root/simulator-deploy
@@ -399,8 +460,8 @@ file), `SIMULATOR_KNOWN_HOSTS` (the `ssh-keyscan` line),
 `SIMULATOR_SSH_TARGET` (`simdeploy@<simulator-host>`), `SIMULATOR_URL`
 (`https://<simulator-host>`). Start the workflow by hand once and watch it: it
 must end with "The simulator reports <version>". The checkout must belong to
-`simdeploy` (step 2), or `git pull` fails; `clients.json` stays with user
-1000, or the container cannot read it.
+`simdeploy` (step 2), or `git pull` fails; `clients.json` and `data/` stay
+with user 1000, or the container cannot read or write them.
 
 **Replacing all clients and secrets**, for instance to move a simulator
 installed before the `provider.role` ids to them. The script never replaces a
@@ -494,4 +555,8 @@ requests").
 | 429 | more than 50 requests a second from one address (nginx), or 3,000 a minute (the simulator, `SIM_REQUESTS_PER_MINUTE`); for a load test see "Load test of OSCAR" in section 7 |
 | The container restarts in a loop, its log says "not started: the clients file cannot be read" | `clients.json` is missing from the deploy folder, or not readable by user 1000 (`chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json`) |
 | On the host, a command answers `No such file or directory` about `clients.json`, or `docker compose` answers `no configuration file provided: not found` | the command was run from another folder than the deploy one, which is where a new session starts. `cd /opt/osdm-simulator/OSDM_Simulator/deploy` first. |
+| The container restarts in a loop, its log says "not started: the data folder does not exist" or "cannot be written by this user" | `deploy/data` is missing, or Docker made it as root: `install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data` (or `chown 1000:1000` it), then `docker compose up -d` |
+| The administration answers `404` | the container runs without the data folder (made before 0.51.0, or with an old compose file): see "Moving an installed simulator to a data folder" in section 7 |
+| Sign-in works, the next request answers `401` "Sign in first" | nginx removes the cookie: the site has no `/admin/` location (section 7), or the request went over `http` (the cookie is `Secure`) |
+| Sign-in answers `429` | 10 failed sign-ins from that address, or 20 for that name, in 15 minutes: wait |
 | A booking made a while ago answers 404 | bookings are dropped after one hour, when a client has more than 200 of them, and at every restart |

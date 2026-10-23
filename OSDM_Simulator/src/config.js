@@ -22,7 +22,7 @@ const path = require('node:path');
 
 const PROVIDER_KEY = /^[a-z][a-z0-9-]{1,30}$/;
 // Names the router keeps for itself; a provider cannot take them.
-const RESERVED_KEYS = new Set(['healthz']);
+const RESERVED_KEYS = new Set(['healthz', 'admin']);
 const MIN_SECRET_LENGTH = 32;
 // Printable ASCII without the colon: a client id travels in a Basic header as
 // "id:secret", and a colon in it would shift the split.
@@ -477,6 +477,9 @@ function loadSettings(env, baseDir) {
     port: intFromEnv(env, 'SIM_PORT', 3002, 0, 65535),
     providersDir: env.SIM_PROVIDERS_DIR || path.join(baseDir, 'providers'),
     clientsFile: env.SIM_CLIENTS_FILE || path.join(baseDir, 'clients.json'),
+    // #930: with a data folder, the accounts are kept there and an
+    // administrator changes them while the simulator runs.
+    dataDir: env.SIM_DATA_DIR || null,
     // Behind a reverse proxy the caller's address is in X-Forwarded-For.
     trustProxy: env.SIM_TRUST_PROXY === '1',
     limits: {
@@ -489,4 +492,4 @@ function loadSettings(env, baseDir) {
   };
 }
 
-module.exports = { ConfigError, loadProviders, loadClients, clientMatches, loadSettings, checkProvider, MIN_SECRET_LENGTH };
+module.exports = { ConfigError, loadProviders, loadClients, clientMatches, loadSettings, checkProvider, clientsOf, readJson, CLIENT_ID, MIN_SECRET_LENGTH };

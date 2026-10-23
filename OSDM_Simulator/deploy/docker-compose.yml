@@ -18,6 +18,10 @@
 #
 # Before the first start, create ./clients.json (see the operations page) and
 # make it readable by the container's user:  chown 1000:1000 clients.json
+# and the data folder, writable by that user only (#930):
+#   install -d -m 700 -o 1000 -g 1000 data
+# The accounts are kept there from the first start on (imported from
+# clients.json), with the administrators and the audit of their changes.
 
 services:
   osdm-simulator:
@@ -36,11 +40,13 @@ services:
       # address it saw to X-Forwarded-For.
       SIM_TRUST_PROXY: "1"
       SIM_CLIENTS_FILE: /run/osdm-simulator/clients.json
+      SIM_DATA_DIR: /var/lib/osdm-simulator
     ports:
       - "127.0.0.1:3002:3002"
     volumes:
       - ..:/simulator:ro
       - ./clients.json:/run/osdm-simulator/clients.json:ro
+      - ./data:/var/lib/osdm-simulator
     read_only: true
     cap_drop:
       - ALL
