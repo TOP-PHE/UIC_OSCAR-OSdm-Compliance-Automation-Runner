@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.421",
+  "current_release": "2026.422",
   "releases": [
+    {
+      "release": "2026.422",
+      "date": "2026-10-23",
+      "server": "1.11.387",
+      "collection": "OTST_V2.0.217",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#941: three negative fare scenarios on the simulator: an empty section list by search, no section and an empty list by trip id, with expectFares false; copies for every version. No code change: check N is the same for every form of request. Closes the gaps of #244 and #246 (case 2 still waits for D5)."
+      ]
+    },
     {
       "release": "2026.421",
       "date": "2026-10-23",

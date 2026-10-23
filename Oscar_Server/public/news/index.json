@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-23-fare-negative-requests",
+    "date": "October 23, 2026",
+    "tag": "Improved",
+    "title": "More negative fare requests on the simulator",
+    "summary": "The simulator's data file now tests a request asking fares without a section by trip id, and with an empty section list by search and by trip id.",
+    "content": "A fare provider answers fares only for a section the request names. The simulator's data file already checked that a request without a section, or with an empty section list, gets no fare when it goes by trip specification, and when it goes by search without a section.\n\nIt now does the same for the other forms: an empty section list by search, and both cases by trip id. The scenarios are in the reference configurations of every simulated provider."
+  },
+  {
     "id": "2026-10-23-distribution-modes",
     "date": "October 23, 2026",
     "tag": "New",

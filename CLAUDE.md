@@ -1630,6 +1630,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   stores one. The simulator's `faresWithoutSection` variant is chosen by the
   trip's origin (`0000086`, trip 31), the only variant without a section
   start. #244 case 2 (section = whole trip) waits for OTST (#242 D5).
+  #941 (1.11.387, data only) adds N2/N4 by the other forms: an empty list by
+  search, no section and an empty list by trip id (`SIM_NHF_FARE_*_SRCH_38` /
+  `_TRIPIDS_38`); `datafile.test.js` ties `offersByTripIds` to `_TRIPIDS_` in
+  the code.
   **The fare sale** (#906, fares 2, 1.11.377 / OTST_V2.0.210, simulator
   0.46.0): step 01 books the fare offer chosen when no FAIL-level check
   of it failed (`fareSaleDecision()`, `__fareSale`) and routes to 02;
