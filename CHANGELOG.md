@@ -81,6 +81,9 @@ Issue #937 (part B of #935), release 2026.423.
 - **Test Config**: a Fares panel under Distribution, shown when Fare-based is ticked (clusters, models, reservations, sales flows, the stated fee, the free age).
 - **References**: each simulated provider declares its fares from its profile (clusters and free age; both models; refunds; from OSDM 3.8, the stated fee and the bicycle reservation).
 
+### Security
+- `body-parser` 2.4.0 (and `qs` 6.16.1) through Express, for GHSA-27r3-jxmh-p828 (denial of service by trailing bytes after a compressed body), published while this release was in review: `npm audit fix`, lockfile only.
+
 ### Not in this release
 - A run's warning for an undeclared fare feature (the catalogue's rule only).
 - The checklist questions for fares (#938).
