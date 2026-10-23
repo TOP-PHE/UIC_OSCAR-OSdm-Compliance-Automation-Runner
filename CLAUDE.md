@@ -2474,7 +2474,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     only restarts the container, so an installed simulator gets the data
     folder and the key at its next `up -d`, which needs `deploy/data` made
     first (owner 1000): Docker would make it as root and the start would
-    stop. PR 2 is OSCAR's page, PR 3–4 the statistics.
+    stop. PR 3–4 are the statistics.
+    **PR 2 (1.11.383): OSCAR's page**, *Admin → OSDM Simulator*
+    (`admin-simulator.html`, routes `/v1/admin/simulator/…`, administrators
+    only). `services/simulatorAdmin.js` is the one place OSCAR calls the
+    simulator: address in `server_config` (`SIMULATOR_ADMIN_URL`), key
+    encrypted (`SIMULATOR_ADMIN_KEY_ENC`) and sent only to the address it was
+    saved with (`SIMULATOR_ADMIN_KEY_URL`, `keyRefusal()`), tried before it is
+    saved (accounts list, else 422): what is tried is written as `…_PENDING_…`
+    and read back from the database, never passed from the request to
+    `fetch` (CodeQL's SSRF rule stopped the first version), then removed; urlPolicy, `redirect: 'manual'`, 15 s,
+    256 KB, key masked. The route file is mounted before `/v1/admin`. Its
+    integration test runs the real simulator code from `OSDM_Simulator/src`
+    on a loopback port, so a change to the simulator's API fails there.
   - **`node --test` takes a glob, not a directory**, on Node 22 and later
     (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
     destination directory. Sonar's coverage run starts from the repository root

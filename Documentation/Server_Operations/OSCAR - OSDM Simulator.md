@@ -99,7 +99,7 @@ container's user, and to it only. Then draw the administration key: OSCAR's
 administrators manage the accounts from OSCAR, whose server calls the
 simulator with this key. The simulator keeps only its SHA-256, in `.env` next
 to the compose file (git ignores it); the key itself goes into OSCAR (*Admin →
-Simulator*, #930 PR 2) and is then needed nowhere else:
+OSDM Simulator*, OSCAR 1.11.383 or later) and is then needed nowhere else:
 
 ```bash
 cd /opt/osdm-simulator/OSDM_Simulator/deploy
@@ -374,7 +374,7 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 | Update the simulator | automatic on a new version, once set up (see below); by hand: `git -C /opt/osdm-simulator pull && docker compose restart` |
 | See which version runs | `curl -s https://<simulator-host>/healthz` (`"version"`), or the first line of `docker compose logs` (`OSDM simulator <version> listening on …`) |
 | Replace all clients and secrets | see below |
-| Add, delete a client, give it a new secret | from OSCAR (*Admin → Simulator*), while it runs (below); `clients.json` is read on the first start only |
+| Add, delete a client, give it a new secret | from OSCAR (*Admin → OSDM Simulator*), while it runs (below); `clients.json` is read on the first start only |
 | Change the administration key | draw a new one as in section 3 (it replaces `.env`), `docker compose up -d`, and enter it in OSCAR |
 | Clear every booking and end every token | `docker compose restart` |
 | Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
@@ -383,7 +383,10 @@ A restart clears the bookings and the tokens: they are kept in memory only, and 
 start-up. The accounts stay: they are in the data folder.
 
 **Accounts while it runs** (#930). OSCAR's administrators add, delete or
-reset them from OSCAR. A new secret is shown once: hand it over then. A
+reset them from OSCAR, in *Admin → OSDM Simulator*. The first time, enter the
+simulator's address (`https://<simulator-host>`) and the key drawn in section
+3, and press *Try and save*: OSCAR asks the simulator for its accounts with
+that key, and saves address and key only if it answers. A new secret is shown once: hand it over then. A
 deleted account, and the old secret of a reset one, are refused at once,
 tokens included; the other accounts and their bookings are not touched. Each
 change is a line of `deploy/data/audit.log`, with the OSCAR administrator who

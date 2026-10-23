@@ -62,6 +62,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.383] / [collection-OTST_V2.0.215] — 2026-10-23
+
+Issue #930, PR 2, release 2026.418. Collection unchanged. Needs simulator 0.51.0 or later on the simulator's host, with its data folder and administration key.
+
+### Added
+- **Admin → OSDM Simulator** (`admin-simulator.html`, `public/js/admin-simulator.js`). OSCAR's administrators manage the simulator's accounts per provider:
+  - list, add (a client id, or the next `<provider>.tstNN` / `tstmgrNN`), give a new secret, delete;
+  - the simulator's audit.
+  A new secret is shown once, with Copy and Done.
+- **Routes `/v1/admin/simulator/…`** (`routes/admin-simulator.js`), for administrators only, with 60 calls a minute and `no-store`:
+  - `config` (GET / PUT / DELETE);
+  - `accounts` (list, add, delete, `reset-secret`);
+  - `audit`.
+  Provider and client id are checked before any call. Answers are built field by field. Each change is also in OSCAR's audit, never a secret.
+- **`services/simulatorAdmin.js`**, the one place OSCAR calls the simulator:
+  - It keeps the simulator's address in `server_config`, and the key encrypted with `ENCRYPTION_KEY`. The key is never returned.
+  - The key is tried before it is saved: the accounts list must answer, else 422 "Not saved".
+  - The key goes only to the address it was saved with; a new address needs the key typed again.
+  - Each call goes through `urlPolicy.js`, with `redirect: 'manual'`, 15 s, 256 KB at most, and the key masked in any message.
+  - Each call names the administrator (`X-Admin-Actor`), which the simulator keeps in its own audit.
+
+---
+
 ## [simulator-0.51.0] — 2026-10-23
 
 Issue #930, PR 1. Simulator 0.51.0. Server and collection unchanged. The accounts of each provider are kept in a data folder and changed while the simulator runs, through an administration API that the OSCAR server calls with a key. OSCAR's page is PR 2.

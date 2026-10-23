@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.417",
+  "current_release": "2026.418",
   "releases": [
+    {
+      "release": "2026.418",
+      "date": "2026-10-23",
+      "server": "1.11.383",
+      "collection": "OTST_V2.0.215",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#930 PR 2: OSCAR's administrators manage the OSDM simulator's accounts from Admin → OSDM Simulator (list, add, new secret, delete, the simulator's audit). The OSCAR server calls the simulator's administration API (simulator 0.51.0) with a key kept encrypted; the simulator keeps only its SHA-256. Collection unchanged."
+      ]
+    },
     {
       "release": "2026.417",
       "date": "2026-10-22",
