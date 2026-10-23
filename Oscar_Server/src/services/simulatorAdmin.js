@@ -65,7 +65,9 @@ function normaliseUrl(raw) {
   let url;
   try { url = new URL(raw.trim()); } catch { return null; }
   if (url.username || url.password || url.search || url.hash) return null;
-  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+  let path = url.pathname;
+  while (path.endsWith('/')) path = path.slice(0, -1);
+  return `${url.origin}${path}`;
 }
 
 /** What the page may know of the set-up: the address, and whether a key is saved. */
@@ -111,20 +113,22 @@ function failureText(err) {
   return 'The simulator could not be reached.';
 }
 
+// The simulator's own words in a Problem: its detail, else its title.
+function saidIn(body) {
+  if (typeof body?.detail === 'string') return body.detail;
+  if (typeof body?.title === 'string') return body.title;
+  return '';
+}
+
 // What a refusal of the simulator means for the administrator.
 function refusalText(status, body) {
   if (status === 401) return 'The simulator refused the key: the key saved in OSCAR is not the one whose SHA-256 the simulator holds.';
   if (status === 404 && body?.code === 'NOT_FOUND') return 'The simulator has no administration API at this address: check the address, its data folder and its key (SIM_ADMIN_KEY_SHA256).';
   if (status === 429) return 'The simulator refuses this server for 15 minutes after 10 wrong keys.';
-  const said = typeof body?.detail === 'string' ? body.detail : (typeof body?.title === 'string' ? body.title : '');
+  const said = saidIn(body);
   return said ? `The simulator answered ${status}: ${said.slice(0, 300)}` : `The simulator answered ${status}.`;
 }
 
-/**
- * One call to the simulator's administration API. Returns { status, body }
- * for a 2xx answer, or throws a SimulatorError whose status is the one OSCAR
- * answers with (the simulator's own 4xx, else 502).
- */
 // The address and key a call uses: the saved ones, or (`pending`) the ones being tried.
 function target(pending) {
   if (pending) return { url: configValue(PENDING_URL_KEY), secret: storedKey(PENDING_KEY_KEY) };
@@ -137,17 +141,12 @@ function target(pending) {
   return { url, secret };
 }
 
-async function call({ method, path, body, actor, pending = false }) {
-  const { url, secret } = target(pending);
-  const address = `${url}/admin/api/${path}`;
-  const refusal = await usableUrlRefusal(address, 'simulator address');
-  if (refusal) throw new SimulatorError(422, refusal);
+// One request: the status and the text of the answer, read up to the cap.
+async function send(address, { method, body, actor, secret }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  let res;
-  let text;
   try {
-    res = await fetch(address, {
+    const res = await fetch(address, {
       method,
       headers: {
         Authorization: `Bearer ${secret}`,
@@ -159,22 +158,40 @@ async function call({ method, path, body, actor, pending = false }) {
       redirect: 'manual',
       signal: controller.signal,
     });
-    text = await readCapped(res);
+    return { status: res.status, text: await readCapped(res) };
   } catch (err) {
     if (err instanceof SimulatorError) throw err;
     throw new SimulatorError(502, failureText(err));
   } finally {
     clearTimeout(timer);
   }
+}
+
+// The answer's body, or the SimulatorError it means.
+function judge({ status, text }, secret) {
   let parsed;
   try { parsed = text ? JSON.parse(mask(text, secret)) : undefined; } catch { parsed = undefined; }
-  if (res.status >= 300 && res.status < 400) throw new SimulatorError(502, 'The simulator answered with a redirect, which OSCAR does not follow.');
-  if (res.status < 200 || res.status >= 300) {
-    const status = [400, 404, 409].includes(res.status) && parsed?.code !== 'NOT_FOUND' ? res.status : 502;
-    throw new SimulatorError(status, mask(refusalText(res.status, parsed), secret));
+  if (status >= 300 && status < 400) throw new SimulatorError(502, 'The simulator answered with a redirect, which OSCAR does not follow.');
+  if (status < 200 || status >= 300) {
+    const passed = [400, 404, 409].includes(status) && parsed?.code !== 'NOT_FOUND';
+    throw new SimulatorError(passed ? status : 502, mask(refusalText(status, parsed), secret));
   }
-  if (parsed === undefined || parsed === null || typeof parsed !== 'object') throw new SimulatorError(502, 'The simulator answered with something that is not JSON.');
-  return { status: res.status, body: parsed };
+  if (parsed === null || typeof parsed !== 'object') throw new SimulatorError(502, 'The simulator answered with something that is not JSON.');
+  return parsed;
+}
+
+/**
+ * One call to the simulator's administration API. Returns { status, body }
+ * for a 2xx answer, or throws a SimulatorError whose status is the one OSCAR
+ * answers with (the simulator's own 4xx, else 502).
+ */
+async function call({ method, path, body, actor, pending = false }) {
+  const { url, secret } = target(pending);
+  const address = `${url}/admin/api/${path}`;
+  const refusal = await usableUrlRefusal(address, 'simulator address');
+  if (refusal) throw new SimulatorError(422, refusal);
+  const answer = await send(address, { method, body, actor, secret });
+  return { status: answer.status, body: judge(answer, secret) };
 }
 
 /**

@@ -1,4 +1,4 @@
-/* global esc, parseServerTs */  // esc.js, nav.js
+/* global parseServerTs */  // nav.js
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,10 @@
  * typed. A new secret is shown once, in the box above the providers, and is
  * gone after a reload.
  *
- * whenText(), providerHtml(), secretHtml(), auditHtml() and auditWhat() are
- * pure top-level functions, lifted by the page test; the rest is wiring.
+ * Everything an answer holds is drawn as text, through the DOM, never as
+ * HTML. whenText(), el(), accountRow(), providerNode(), secretNode(),
+ * auditWhat() and auditNode() are top-level functions, lifted by the page
+ * test with a small stand-in document; the rest is wiring.
  */
 
 function whenText(value) {
@@ -28,37 +30,66 @@ function whenText(value) {
   return String(value);
 }
 
-function providerHtml(p) {
-  const rows = (p.accounts || []).map((a) => '<tr>'
-    + '<td><code>' + esc(a.clientId) + '</code></td>'
-    + '<td>' + esc(whenText(a.createdAt)) + '</td>'
-    + '<td>' + esc(a.lastTokenAt ? whenText(a.lastTokenAt) : 'none since the start') + '</td>'
-    + '<td class="actions">'
-    + '<button class="btn btn-secondary btn-sm" data-action="reset" data-provider="' + esc(p.provider) + '" data-client="' + esc(a.clientId) + '">New secret</button> '
-    + '<button class="btn btn-danger btn-sm" data-action="delete" data-provider="' + esc(p.provider) + '" data-client="' + esc(a.clientId) + '">Delete</button>'
-    + '</td></tr>').join('');
-  const table = rows
-    ? '<div class="table-wrap"><table><thead><tr><th>Client id</th><th>Created</th><th>Last token</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-    : '<div class="empty">No account.</div>';
-  return '<div class="card">'
-    + '<div class="provider-head"><h3><code>' + esc(p.provider) + '</code> ' + esc(p.name || '') + '</h3>'
-    + '<span class="muted">OSDM ' + esc(p.osdmVersion || '?') + ' · ' + (p.accounts || []).length + ' accounts</span></div>'
-    + table
-    + '<div class="add-row">'
-    + '<label class="muted" for="add-id-' + esc(p.provider) + '">New account</label>'
-    + '<input type="text" id="add-id-' + esc(p.provider) + '" maxlength="64" placeholder="client id, or empty for the next number">'
-    + '<select id="add-kind-' + esc(p.provider) + '" aria-label="Kind of account"><option value="tst">tester (tstNN)</option><option value="tstmgr">Test Manager (tstmgrNN)</option></select>'
-    + '<button class="btn btn-primary btn-sm" data-action="add" data-provider="' + esc(p.provider) + '">Add</button>'
-    + '</div></div>';
+// One element: `props` are attributes (`text` is its text), `children` nodes
+// or text. Nothing is ever parsed as HTML: an answer's text stays text.
+function el(doc, tag, props, children) {
+  const node = doc.createElement(tag);
+  for (const [name, value] of Object.entries(props || {})) {
+    if (name === 'text') node.textContent = String(value);
+    else node.setAttribute(name, String(value));
+  }
+  for (const child of children || []) {
+    node.appendChild(typeof child === 'string' ? doc.createTextNode(child) : child);
+  }
+  return node;
 }
 
-function secretHtml(created) {
-  return '<div class="card"><p><strong>Copy this secret now: it is shown only once.</strong> The simulator keeps only a fingerprint of it, '
-    + 'and nobody can show it again. Lost, it is reset.</p>'
-    + '<p>Account <code>' + esc(created.clientId) + '</code> on <code>' + esc(created.provider) + '</code>:</p>'
-    + '<div class="key-box"><code id="new-secret-value">' + esc(created.clientSecret) + '</code>'
-    + '<button class="btn btn-secondary btn-sm" data-action="copy">Copy</button>'
-    + '<button class="btn btn-secondary btn-sm" data-action="hide-secret">Done</button></div></div>';
+function accountRow(doc, provider, a) {
+  const action = (name, label, cls) => el(doc, 'button', { class: 'btn btn-sm ' + cls, 'data-action': name, 'data-provider': provider, 'data-client': a.clientId, text: label });
+  return el(doc, 'tr', {}, [
+    el(doc, 'td', {}, [el(doc, 'code', { text: a.clientId })]),
+    el(doc, 'td', { text: whenText(a.createdAt) }),
+    el(doc, 'td', { text: a.lastTokenAt ? whenText(a.lastTokenAt) : 'none since the start' }),
+    el(doc, 'td', { class: 'actions' }, [action('reset', 'New secret', 'btn-secondary'), ' ', action('delete', 'Delete', 'btn-danger')]),
+  ]);
+}
+
+function providerNode(doc, p) {
+  const accounts = p.accounts || [];
+  const head = el(doc, 'tr', {}, ['Client id', 'Created', 'Last token', ''].map((t) => el(doc, 'th', { text: t })));
+  const table = accounts.length
+    ? el(doc, 'div', { class: 'table-wrap' }, [el(doc, 'table', {}, [el(doc, 'thead', {}, [head]), el(doc, 'tbody', {}, accounts.map((a) => accountRow(doc, p.provider, a)))])])
+    : el(doc, 'div', { class: 'empty', text: 'No account.' });
+  const kinds = el(doc, 'select', { id: 'add-kind-' + p.provider, 'aria-label': 'Kind of account' }, [
+    el(doc, 'option', { value: 'tst', text: 'tester (tstNN)' }),
+    el(doc, 'option', { value: 'tstmgr', text: 'Test Manager (tstmgrNN)' }),
+  ]);
+  return el(doc, 'div', { class: 'card' }, [
+    el(doc, 'div', { class: 'provider-head' }, [
+      el(doc, 'h3', {}, [el(doc, 'code', { text: p.provider }), ' ' + (p.name || '')]),
+      el(doc, 'span', { class: 'muted', text: 'OSDM ' + (p.osdmVersion || '?') + ' · ' + accounts.length + ' accounts' }),
+    ]),
+    table,
+    el(doc, 'div', { class: 'add-row' }, [
+      el(doc, 'label', { class: 'muted', for: 'add-id-' + p.provider, text: 'New account' }),
+      el(doc, 'input', { type: 'text', id: 'add-id-' + p.provider, maxlength: '64', placeholder: 'client id, or empty for the next number' }),
+      kinds,
+      el(doc, 'button', { class: 'btn btn-primary btn-sm', 'data-action': 'add', 'data-provider': p.provider, text: 'Add' }),
+    ]),
+  ]);
+}
+
+function secretNode(doc, created) {
+  return el(doc, 'div', { class: 'card' }, [
+    el(doc, 'p', {}, [el(doc, 'strong', { text: 'Copy this secret now: it is shown only once.' }),
+      ' The simulator keeps only a fingerprint of it, and nobody can show it again. Lost, it is reset.']),
+    el(doc, 'p', {}, ['Account ', el(doc, 'code', { text: created.clientId }), ' on ', el(doc, 'code', { text: created.provider }), ':']),
+    el(doc, 'div', { class: 'key-box' }, [
+      el(doc, 'code', { id: 'new-secret-value', text: created.clientSecret }),
+      el(doc, 'button', { class: 'btn btn-secondary btn-sm', 'data-action': 'copy', text: 'Copy' }),
+      el(doc, 'button', { class: 'btn btn-secondary btn-sm', 'data-action': 'hide-secret', text: 'Done' }),
+    ]),
+  ]);
 }
 
 const AUDIT_WHAT = {
@@ -77,11 +108,13 @@ function auditWhat(e) {
   return verb;
 }
 
-function auditHtml(entries) {
-  if (!entries.length) return '<div class="empty">Nothing yet.</div>';
-  return '<table><thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead><tbody>'
-    + entries.map((e) => '<tr><td>' + esc(whenText(e.at)) + '</td><td>' + esc(e.by || '?') + '</td><td>' + esc(auditWhat(e)) + '</td></tr>').join('')
-    + '</tbody></table>';
+function auditNode(doc, entries) {
+  if (!entries.length) return el(doc, 'div', { class: 'empty', text: 'Nothing yet.' });
+  const head = el(doc, 'tr', {}, ['When', 'Who', 'What'].map((t) => el(doc, 'th', { text: t })));
+  const rows = entries.map((e) => el(doc, 'tr', {}, [
+    el(doc, 'td', { text: whenText(e.at) }), el(doc, 'td', { text: e.by || '?' }), el(doc, 'td', { text: auditWhat(e) }),
+  ]));
+  return el(doc, 'table', {}, [el(doc, 'thead', {}, [head]), el(doc, 'tbody', {}, rows)]);
 }
 
 (function () {
@@ -102,6 +135,7 @@ function auditHtml(entries) {
     return d.detail || d.title || fallback;
   }
   function reportError(e) { showMsg(e?.message || 'Something went wrong.', false); }
+  function showEmpty(box, text) { box.replaceChildren(el(document, 'div', { class: 'empty', text })); }
 
   async function loadConfig() {
     const res = await fetch(BASE + '/config');
@@ -114,16 +148,17 @@ function auditHtml(entries) {
 
   async function loadAccounts() {
     const res = await fetch(BASE + '/accounts');
-    if (!res.ok) { providers.innerHTML = '<div class="empty">' + esc(await readError(res, 'Could not read the accounts.')) + '</div>'; return; }
-    const data = await res.json();
-    providers.innerHTML = (data.providers || []).map(providerHtml).join('') || '<div class="empty">The simulator has no provider.</div>';
+    if (!res.ok) { showEmpty(providers, await readError(res, 'Could not read the accounts.')); return; }
+    const list = (await res.json()).providers || [];
+    if (list.length === 0) { showEmpty(providers, 'The simulator has no provider.'); return; }
+    providers.replaceChildren(...list.map((p) => providerNode(document, p)));
   }
 
   async function loadAudit() {
     const box = document.getElementById('audit');
     const res = await fetch(BASE + '/audit');
-    if (!res.ok) { box.innerHTML = '<div class="empty">' + esc(await readError(res, 'Could not read the audit.')) + '</div>'; return; }
-    box.innerHTML = auditHtml((await res.json()).entries || []);
+    if (!res.ok) { showEmpty(box, await readError(res, 'Could not read the audit.')); return; }
+    box.replaceChildren(auditNode(document, (await res.json()).entries || []));
   }
 
   async function saveConfig() {
@@ -146,12 +181,12 @@ function auditHtml(entries) {
     if (!res.ok) { showMsg(await readError(res, 'Not removed.'), false); return; }
     showMsg('The address and key are forgotten.', true);
     await loadConfig();
-    providers.innerHTML = '<div class="empty">Not set up.</div>';
+    showEmpty(providers, 'Not set up.');
   }
 
   function showSecret(created) {
     const box = document.getElementById('new-secret');
-    box.innerHTML = secretHtml(created);
+    box.replaceChildren(secretNode(document, created));
     box.style.display = 'block';
     box.scrollIntoView({ behavior: 'smooth' });
   }
@@ -190,7 +225,7 @@ function auditHtml(entries) {
 
   function hideSecret() {
     const box = document.getElementById('new-secret');
-    box.innerHTML = '';
+    box.replaceChildren();
     box.style.display = 'none';
   }
 
@@ -221,7 +256,7 @@ function auditHtml(entries) {
   showTab(location.hash.slice(1));
   loadConfig().then((cfg) => {
     if (cfg?.keySet) return loadAccounts();
-    providers.innerHTML = '<div class="empty">Enter the simulator\'s address and key above.</div>';
+    showEmpty(providers, 'Enter the simulator\'s address and key above.');
     return null;
   }).catch(reportError);
 })();
