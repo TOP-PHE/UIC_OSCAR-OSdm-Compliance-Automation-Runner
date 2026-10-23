@@ -2495,8 +2495,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `GET /admin/api/stats?from&to`, OSCAR `GET /v1/admin/simulator/stats?days=`
     (1/7/30/90/365, `statsView()` counter by counter) and the page's
     Statistics tab. **A secret is never shown again** (only its SHA-256 is
-    kept, on purpose): to hand one over, give a new one. PR 4 (sets and
-    errors per run) needs the collection to say which batch a request is of.
+    kept, on purpose): to hand one over, give a new one.
+    **PR 4 (1.11.385): the test sets, from OSCAR's own runs.** `GET
+    /v1/admin/simulator/runs?days=` reads `runs` (+ failed `run_assertions`)
+    whose `api_base_used` is under the saved simulator address
+    (`utils/simulatorRuns.js` `providerOfBase()`: same origin, the next
+    segment is the provider); sets = distinct `batch_id`. Nothing is added to
+    a run's requests, so no provider gets a header it does not know. Counts
+    only, per provider and user e-mail (the admin dashboard already lists
+    submitters by e-mail).
   - **`node --test` takes a glob, not a directory**, on Node 22 and later
     (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
     destination directory. Sonar's coverage run starts from the repository root

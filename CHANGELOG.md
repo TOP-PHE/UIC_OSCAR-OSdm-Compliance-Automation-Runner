@@ -62,6 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.385] / [collection-OTST_V2.0.215] — 2026-10-23
+
+Issue #930, PR 4, release 2026.420. Collection and simulator unchanged.
+
+### Added
+- **Admin → OSDM Simulator → Statistics: the test sets run from OSCAR.** For each simulator provider, one line per user and a total:
+  - sets run (one click on Run, a batch);
+  - scenarios run, and scenarios per set;
+  - scenarios with at least one failed check, and failed checks.
+  Same period choice as the simulator's counts (today to 365 days), drawn as text only.
+- **Route `GET /v1/admin/simulator/runs?days=`** (administrators). It reads OSCAR's own runs, with nothing asked of the simulator: a run went there when the endpoint it used is under the simulator's address saved on the page, and the provider is the next path segment (`utils/simulatorRuns.js`, pure). Counts only: no scenario code, check text or endpoint is answered. Without a saved address it answers 409.
+- Nothing is added to the requests of a run, so no provider receives anything more.
+
+---
+
 ## [server-1.11.384] / [collection-OTST_V2.0.215] — 2026-10-23
 
 Issue #930, PR 3, release 2026.419. Simulator 0.52.0. Collection unchanged; the statistics need this simulator.

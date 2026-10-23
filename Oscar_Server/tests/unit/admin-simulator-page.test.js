@@ -72,6 +72,14 @@ const anyCount = (c) => STATS_COLUMNS.some(([key]) => (c?.[key] || 0) > 0);
 const statsRow = lift('statsRow', { el, String, STATS_COLUMNS });
 const statsProviderNode = lift('statsProviderNode', { el, statsRow, anyCount, STATS_COLUMNS });
 const statsNode = lift('statsNode', { el, statsProviderNode });
+const RUN_COLUMNS = (() => {
+  const lines = SOURCE.split('\n');
+  const start = lines.findIndex(l => l.startsWith('const RUN_COLUMNS'));
+  const end = lines.findIndex((l, i) => i > start && l === '];');
+  return vm.runInNewContext(`${lines.slice(start, end + 1).join('\n')}\nRUN_COLUMNS`);
+})();
+const runsRow = lift('runsRow', { el, String, RUN_COLUMNS });
+const runsNode = lift('runsNode', { el, runsRow, RUN_COLUMNS });
 
 const GAMMA = {
   provider: 'gamma', name: 'Gamma <Rail>', osdmVersion: '3.8.0',
@@ -152,6 +160,22 @@ test('the statistics show one table per provider: its accounts, the requests of 
   // Every counter the route passes on has its column.
   const passed = Object.keys(require('../../src/api/routes/admin-simulator').views.statsView({ providers: [{ provider: 'gamma', accounts: [] }] }, 1).providers[0].totals);
   expect(STATS_COLUMNS.map(([k]) => k)).toEqual(passed);
+});
+
+test('the test sets show one table per provider: its users and the total, from the route\'s counts', () => {
+  const counts = { sets: 2, scenarios: 3, scenariosPerSet: 1.5, scenariosFailed: 1, failedChecks: 4 };
+  const node = runsNode(fakeDoc, { providers: [{ provider: 'gamma', totals: counts, users: [{ email: 'tester<b>@x', ...counts }] }] });
+  const rows = all(node, (n) => n.tag === 'tr').map((r) => r.children.map(textOf));
+  expect(rows).toEqual([
+    ['User', 'Sets', 'Scenarios', 'Scenarios per set', 'Scenarios failed', 'Failed checks'],
+    ['tester<b>@x', '2', '3', '1.5', '1', '4'],
+    ['Total', '2', '3', '1.5', '1', '4'],
+  ]);
+  expect(all(node, (n) => n.tag === 'b')).toEqual([]);
+  expect(textOf(runsNode(fakeDoc, { providers: [] }))).toBe('No test set was run on the simulator in this period.');
+  const { summarise } = require('../../src/utils/simulatorRuns');
+  const keys = Object.keys(summarise([{ id: 'r', api_base_used: 'https://s.example/gamma', email: 'x' }], 'https://s.example')[0].totals);
+  expect(RUN_COLUMNS.map(([k]) => k)).toEqual(keys);
 });
 
 test('the page sets no HTML from data: no innerHTML at all', () => {

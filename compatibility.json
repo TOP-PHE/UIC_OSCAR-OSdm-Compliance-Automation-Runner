@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.419",
+  "current_release": "2026.420",
   "releases": [
+    {
+      "release": "2026.420",
+      "date": "2026-10-23",
+      "server": "1.11.385",
+      "collection": "OTST_V2.0.215",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#930 PR 4: Admin → OSDM Simulator → Statistics also shows the test sets OSCAR sent to the simulator, per provider and user: sets run, scenarios, scenarios per set, scenarios with a failed check, failed checks. Counted from OSCAR's own runs; nothing more is sent to the simulator or to any provider. Collection and simulator unchanged."
+      ]
+    },
     {
       "release": "2026.419",
       "date": "2026-10-23",
