@@ -51,6 +51,11 @@ secrets of the simulated providers, which you generate below.
 
 ## 3. Install
 
+Before anything is installed, set the host up as
+[`OSCAR - Server Hardening.md`](OSCAR%20-%20Server%20Hardening.md) says: SSH by
+key only and no root login, a firewall, fail2ban and security updates. Its
+section 2 is the checklist to run once the simulator is up.
+
 As root on the simulator host. Do not run `umask 077` first: the container runs
 as an unprivileged user and has to read the checkout.
 

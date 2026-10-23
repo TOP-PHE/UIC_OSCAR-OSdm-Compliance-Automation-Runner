@@ -72,19 +72,38 @@ This produces two files:
 Append the public key to `ubuntu`'s `authorized_keys`, restricted via
 `command=` so a leaked private key can only run the refresh script.
 
+The key runs a **copy** of the script installed outside the checkout, never
+the checkout's own file. The script `git pull`s the checkout it lives in, so
+with the checkout's file as the command, any change to it merged into `main`
+would be run by the next deploy as `ubuntu`, who has `sudo`. With a copy, a
+merge cannot change what the key runs; the script logs a `NOTE` when the
+checkout's version differs from the installed one, and you copy it again by
+hand after reading it.
+
 On the VPS as `ubuntu`:
 
 ```bash
+# The copy the key runs, outside the checkout (repeat after reading a new version)
+sudo install -m 0755 -o root -g root /opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh /usr/local/sbin/oscar-refresh-collection
+
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 # Paste the contents of oscar-deploy-key.pub between the quotes below,
 # then prefix it with the command= clause that pins it to the script.
-echo 'command="/opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh",no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ssh-ed25519 AAAA... github-actions-oscar-deploy' >> ~/.ssh/authorized_keys
+echo 'command="/usr/local/sbin/oscar-refresh-collection",no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ssh-ed25519 AAAA... github-actions-oscar-deploy' >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
-chmod +x /opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh
 ```
 
 Now even if someone gets the private key, they cannot get a shell — only
-that one script runs.
+that one script runs, and a merge to `main` cannot change it.
+
+**Moving an existing VPS to the installed copy:** run the `install` line
+above, then edit the deploy key's line in `~/.ssh/authorized_keys` so that
+`command="…"` names `/usr/local/sbin/oscar-refresh-collection` (keep the
+rest of the line). Check it with
+`grep -o '^command="[^"]*"' ~/.ssh/authorized_keys`, then re-run the
+*Refresh · Bruno collection on production VPS* workflow by hand (Actions →
+Run workflow): it must end green. The other server settings that go with it
+are in `OSCAR - Server Hardening.md`.
 
 ### 5. Add the secrets to GitHub
 

@@ -8,10 +8,18 @@
 
 # refresh-collection.sh — Pulls the monorepo from origin/main on the VPS.
 #
-# Invoked exclusively by the refresh-collection.yml CI workflow over SSH.
-# The matching authorized_keys entry on the VPS pins the deploy key to this
-# script via command="...refresh-collection.sh", so a leaked key cannot get
+# Invoked exclusively by the refresh-collection.yml and promote-release.yml
+# CI workflows over SSH. The matching authorized_keys entry on the VPS pins
+# the deploy key to this script via command="...", so a leaked key cannot get
 # a shell or run any other command.
+#
+# Installed once, by hand, OUTSIDE the checkout, as
+# /usr/local/sbin/oscar-refresh-collection (see auto-deploy-setup.md, step 4,
+# and "OSCAR - Server Hardening.md"), and that copy is the key's command. The
+# script pulls the checkout it lives in: run from the checkout, a merge to
+# main would change what the deploy key runs, as the `ubuntu` user, who has
+# sudo. Re-copy it by hand only after reading it; when the checkout's version
+# differs from the installed one, the script says so in its log.
 #
 # Behaviour:
 #   - Fast-forwards the local clone to origin/main.
@@ -23,8 +31,21 @@ set -euo pipefail
 
 REPO=/opt/OSCAR
 LOG_TAG=oscar-deploy
+CHECKOUT_COPY="$REPO/OSCAR_Deploy/scripts/refresh-collection.sh"
+# Resolved before the `cd` below: $0 may be a relative path.
+SELF=$(readlink -f "$0")
 
 log() { logger -t "$LOG_TAG" -- "$1"; printf '%s\n' "$1"; }
+
+# Says, after the pull, whether the installed copy is still the checkout's.
+note_installed_copy() {
+  if [ "$SELF" = "$(readlink -f "$CHECKOUT_COPY" || true)" ]; then
+    log "NOTE: running from the checkout; install the copy outside it (auto-deploy-setup.md, step 4)."
+  elif ! cmp -s "$SELF" "$CHECKOUT_COPY"; then
+    log "NOTE: $CHECKOUT_COPY differs from the installed $SELF; read it, then copy it by hand."
+  fi
+}
+trap note_installed_copy EXIT
 
 cd "$REPO"
 
