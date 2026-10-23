@@ -35,9 +35,10 @@ function trimSlashes(path) {
 /** The simulator provider an endpoint names, or null when it is not under the simulator's address. */
 function providerOfBase(apiBase, simulatorUrl) {
   if (typeof apiBase !== 'string' || typeof simulatorUrl !== 'string') return null;
-  const base = parse(apiBase.trim());
   const sim = parse(simulatorUrl);
-  if (!sim || base?.origin !== sim.origin) return null;
+  if (sim === null) return null;
+  const base = parse(apiBase.trim());
+  if (base?.origin !== sim.origin) return null;
   const prefix = `${trimSlashes(sim.pathname)}/`;
   if (!base.pathname.startsWith(prefix)) return null;
   const provider = base.pathname.slice(prefix.length).split('/')[0];
