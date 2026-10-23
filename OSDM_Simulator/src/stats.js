@@ -45,23 +45,26 @@ function addInto(target, counters) {
  * What a request counts for, from its method, its path after the provider and
  * its status: the counter names to add one to.
  */
+// What a successful OSDM request did: offers, bookings, confirmations, refunds, exchanges.
+function saleCounterOf(method, [resource, id, part, partId]) {
+  if (resource === 'offers') return method === 'POST' && id === undefined ? 'offers' : null;
+  if (resource !== 'bookings') return null;
+  if (id === undefined) return method === 'POST' ? 'bookings' : null;
+  const key = `${method} ${part}${partId === undefined ? '' : '/id'}`;
+  return { 'POST fulfillments': 'confirmations', 'PATCH refund-offers/id': 'refunds', 'POST exchange-operations': 'exchanges' }[key] || null;
+}
+
 function countersOf({ method, segments, status }) {
   const out = [];
   if (status >= 500) out.push('serverErrors');
   else if (status >= 400) out.push('clientErrors');
-  const [resource, id, part, partId] = segments;
-  if (resource === 'oauth') {
+  if (segments[0] === 'oauth') {
     if (status === 200) out.push('tokens');
     return out;
   }
   out.push('requests');
-  if (status < 200 || status >= 300) return out;
-  if (method === 'POST' && resource === 'offers' && id === undefined) out.push('offers');
-  if (resource !== 'bookings') return out;
-  if (method === 'POST' && id === undefined) out.push('bookings');
-  if (method === 'POST' && part === 'fulfillments' && partId === undefined) out.push('confirmations');
-  if (method === 'PATCH' && part === 'refund-offers' && partId !== undefined) out.push('refunds');
-  if (method === 'POST' && part === 'exchange-operations' && partId === undefined) out.push('exchanges');
+  const sale = status >= 200 && status < 300 ? saleCounterOf(method, segments) : null;
+  if (sale) out.push(sale);
   return out;
 }
 
@@ -81,6 +84,12 @@ function readStatsFile(file) {
     if (!ok) throw new ConfigError(`the statistics file holds a day that is not valid (${file})`);
   }
   return raw.days;
+}
+
+function checkPeriod(from, to) {
+  const valid = (d) => DAY.test(d || '') && !Number.isNaN(Date.parse(d));
+  if (!valid(from) || !valid(to) || from > to) throw new RangeError('from and to are days, YYYY-MM-DD, from not after to');
+  if ((Date.parse(to) - Date.parse(from)) / 86400000 >= MAX_RANGE_DAYS) throw new RangeError(`at most ${MAX_RANGE_DAYS} days`);
 }
 
 /** Statistics of a data folder. `flushMs` 0: written only by flush(). */
@@ -133,29 +142,28 @@ function createStats({ dataDir, providers, now = Date.now, retentionDays = 400, 
    * provider, its accounts and its unidentified requests, and per day the
    * totals. Throws a RangeError for dates that are not valid.
    */
-  function query({ from, to }) {
-    if (!DAY.test(from || '') || !DAY.test(to || '') || Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to)) || from > to) {
-      throw new RangeError('from and to are days, YYYY-MM-DD, from not after to');
-    }
-    if ((Date.parse(to) - Date.parse(from)) / 86400000 >= MAX_RANGE_DAYS) throw new RangeError(`at most ${MAX_RANGE_DAYS} days`);
-    const perProvider = new Map([...providers.keys()].map((k) => [k, { unidentified: zero(), clients: new Map() }]));
-    const daily = [];
-    for (const day of Object.keys(days).sort()) {
-      if (day < from || day > to) continue;
-      const total = zero();
-      for (const [key, b] of Object.entries(days[day])) {
-        const target = perProvider.get(key);
-        if (!target) continue;
-        addInto(target.unidentified, b.unidentified);
-        addInto(total, b.unidentified);
-        for (const [client, counters] of Object.entries(b.clients)) {
-          if (!target.clients.has(client)) target.clients.set(client, zero());
-          addInto(target.clients.get(client), counters);
-          addInto(total, counters);
-        }
+  // Add one day's counts into the per-provider sums; returns the day's total.
+  function addDay(perProvider, byProvider) {
+    const total = zero();
+    for (const [key, b] of Object.entries(byProvider)) {
+      const target = perProvider.get(key);
+      if (!target) continue;
+      addInto(target.unidentified, b.unidentified);
+      addInto(total, b.unidentified);
+      for (const [client, counters] of Object.entries(b.clients)) {
+        if (!target.clients.has(client)) target.clients.set(client, zero());
+        addInto(target.clients.get(client), counters);
+        addInto(total, counters);
       }
-      daily.push({ day, ...total });
     }
+    return total;
+  }
+
+  function query({ from, to }) {
+    checkPeriod(from, to);
+    const perProvider = new Map([...providers.keys()].map((k) => [k, { unidentified: zero(), clients: new Map() }]));
+    const daily = Object.keys(days).filter((day) => day >= from && day <= to).sort((a, b) => a.localeCompare(b))
+      .map((day) => ({ day, ...addDay(perProvider, days[day]) }));
     return {
       from,
       to,
