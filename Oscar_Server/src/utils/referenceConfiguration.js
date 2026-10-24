@@ -148,18 +148,25 @@ function questionsOf(answers, unplaced = null) {
   return questions;
 }
 
+// The list a list question puts at its place, or null for nothing.
+function listAnswer(path, ticks) {
+  if (NOTHING_WHEN_EMPTY.has(path) && ticks.length === 0) return null;
+  return { value: ALWAYS_IN[path] ? [...new Set([...ALWAYS_IN[path], ...ticks])] : ticks };
+}
+
+// The number a number question puts at its place, or null for nothing.
+function numberAnswer(text) {
+  const n = Number(text);
+  return text !== null && text !== '' && Number.isFinite(n) ? { value: n } : null;
+}
+
 // What one answered question puts at its place: { value } or null for nothing.
 function answerAt(path, ticks, text) {
-  if (LIST_PATHS.has(path)) {
-    if (NOTHING_WHEN_EMPTY.has(path) && ticks.length === 0) return null;
-    return { value: ALWAYS_IN[path] ? [...new Set([...ALWAYS_IN[path], ...ticks])] : ticks };
-  }
-  if (YES_NO_PATHS.has(path)) return ticks.length ? { value: ticks[0] === 'YES' } : null;
-  if (ONE_PATHS.has(path)) return ticks.length ? { value: ticks[0] } : null;
-  if (NUMBER_PATHS.has(path) || AGE_RANGE.test(path)) {
-    const n = Number(text);
-    return text !== null && text !== '' && Number.isFinite(n) ? { value: n } : null;
-  }
+  if (LIST_PATHS.has(path)) return listAnswer(path, ticks);
+  const one = ticks.length ? ticks[0] : null;
+  if (YES_NO_PATHS.has(path)) return one === null ? null : { value: one === 'YES' };
+  if (ONE_PATHS.has(path)) return one === null ? null : { value: one };
+  if (NUMBER_PATHS.has(path) || AGE_RANGE.test(path)) return numberAnswer(text);
   if (path === 'currencies.sold') return { value: (text || '').split(/[\s,]+/).filter(Boolean) };
   if (path === 'currencies.default') return text ? { value: text } : null;
   return null;
