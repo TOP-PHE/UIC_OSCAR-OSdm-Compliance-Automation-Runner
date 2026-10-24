@@ -62,6 +62,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.389] / [collection-OTST_V2.0.218] — 2026-10-24
+
+Issue #938 (part C of #935), release 2026.424. The collection does not change.
+
+### Changed
+- **Set-up checklist template V01.06** (generated in the private repository):
+  - **Part A**, for every provider: A1 access, with **A1.3 the distribution modes** (`fw.distributionModes`: product-based, fare-based); A2 load; A3 passengers; **A4 the offer request forms** (the former A4.1, for both modes); **A5 the known limitations** (the former A9).
+  - **Chapter P**, product-based: the former A4.2–A8, as P1–P5.
+  - **Chapter F**, fare-based, new: F1 clusters, F2 combination models, F3 a refund fee stated by the distributor (YES / NO), F4 fare reservations (bicycle), F5 sales flows on fares, F6 the age under which a fare is free (`fw.fares.*`); F7 what `GET /fulfillments/{id}` answers for fares, F8 domestic trips (#242 D4), F9 a section equal to the whole trip (#242 D5) (`info.fares.*`).
+  - Part B: B<n>.9, the stations where a fare section may start or end (`svcN.sectionPoints`).
+  - The Annex has the new rows. Tags did not change: a copy of V01.05 or earlier imports as before.
+- **File names `OSCAR_Checklist_<NAME>_Vxx.yy.docx`**: `TEMPLATE` (in `Documentation/User_Guides/`, replacing `OSCAR_Test_Config_Checklist.docx`), `Simulator-<provider>` (in `Documentation/Server_Operations/Simulator checklists/`). The template keeps its three latest versions (V01.06, and V1.05 and V1.04 as published); every copy keeps its latest only. Code and tests find a file with `checklistFile(folder, name)` (`utils/checklistFiles.js`).
+- **The import reads A1.3 and chapter F** (`frameworkFromChecklist()`): no distribution tick declares nothing (product only), the sale of fares always counts, YES / NO is a boolean. The simulator references take them from their checklists, and the simulator's profile only checks them; the references' text is unchanged.
+- The Tester User Guide and *OSCAR - OSDM Simulator* link the new files (all six simulator copies now).
+
+### Security
+- `multer` 2.5.0 (GHSA-q7qp-rjg7-q26m, a pending asynchronous fileFilter after request teardown) and `nodemailer` 10.1.7 (GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w, GHSA-85x2-q946-cp5h, addressparser), published while this release was in review. `multer`'s range moves from `~2.4.0` to `~2.5.0`; `nodemailer` stays within `~10.1.1`.
+- The Bruno CLI's image scan (Trivy) found `@azure/msal-node` 6.0.1 (CVE-2026-109461) and `undici` 7.30.0 (CVE-2026-109869) under `@usebruno/cli` 4.2.1. Two `overrides` in `Oscar_Server/bruno-cli/package.json`: `@azure/msal-node` `^7.1.0` (no 6.x is fixed; `@azure/identity` 4.14 still asks `^6`, and loads with 7.1.1) and `undici` `^7.30.1`. `bru` 4.2.1 runs the collection as before: a sale and a fare refund on the simulator gave their catalogue checks (234, 180), none failed.
+
+### Tests
+- `checklist-files.test.js`: the helper; at most three template versions; one copy per simulator provider, on the latest version; no file under the old name; every link a document gives to a checklist file reaches it; A1.3 and chapter F read from every simulator copy; a copy without them imports as before.
+- The simulator alpha checklist stays under the AI context's 20k characters (`cut` 0): chapter F's comments are a few words, and four long comments were shortened.
+
+---
+
 ## [server-1.11.388] / [collection-OTST_V2.0.218] — 2026-10-23
 
 Issue #937 (part B of #935), release 2026.423.

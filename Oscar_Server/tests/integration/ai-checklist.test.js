@@ -37,8 +37,8 @@ const tmId = uuidv4();
 const otherTmId = uuidv4();
 const testerId = uuidv4();
 const BASE = '/v1/company/ai-analysis';
-const ALPHA = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Server_Operations', 'Simulator checklists',
-  'OSCAR_Test_Config_Checklist_Simulator_alpha.docx'));
+const ALPHA = fs.readFileSync(require('../../src/utils/checklistFiles').checklistFile(
+  path.join(__dirname, '..', '..', '..', 'Documentation', 'Server_Operations', 'Simulator checklists'), 'Simulator-alpha'));
 
 function token(role, uid, cid = companyId) {
   return `Bearer ${jwt.sign({ sub: uid, email: `${role}-${uid.slice(0, 4)}@ai-cl.com`, companyId: cid, role },
@@ -78,13 +78,13 @@ describe('#827 PR A importing', () => {
   test('a filled checklist: its answers are kept encrypted, never the API Config or contact ones', async () => {
     const res = await upload(tm(), ALPHA, 'Alpha <filled>.docx');
     expect(res.status).toBe(200);
-    expect(res.body.checklist).toMatchObject({ fileName: 'Alpha <filled>.docx', answers: 304, cut: 0 });
+    expect(res.body.checklist).toMatchObject({ fileName: 'Alpha <filled>.docx', answers: 321, cut: 0 });
     expect(res.body.checklist.sent['info.pastDeparture']).toEqual(['REFUSED']);
     const row = get('SELECT * FROM provider_checklist WHERE company_id = ?', [companyId]);
-    expect(row.answer_count).toBe(304);
+    expect(row.answer_count).toBe(321);
     expect(row.answers_enc).not.toContain('pastDeparture');
     expect(JSON.stringify(res.body)).not.toContain('simulator-host');
-    expect(get("SELECT COUNT(*) AS n FROM auth_events WHERE event_type = 'provider_checklist_imported:304'").n).toBe(1);
+    expect(get("SELECT COUNT(*) AS n FROM auth_events WHERE event_type = 'provider_checklist_imported:321'").n).toBe(1);
   });
 
   test('per company or provider: the provider has none until one is imported for it', async () => {
@@ -100,7 +100,7 @@ describe('#827 PR A importing', () => {
     const empty = await upload(tm(), buildZip([{ name: 'word/document.xml', data: '<w:document/>' }]));
     expect(empty.body.detail).toContain('No answer found');
     expect((await request(app).post(`${BASE}/checklist`).set('Authorization', tm())).status).toBe(400);
-    expect(get('SELECT answer_count FROM provider_checklist WHERE company_id = ?', [companyId]).answer_count).toBe(304);
+    expect(get('SELECT answer_count FROM provider_checklist WHERE company_id = ?', [companyId]).answer_count).toBe(321);
   });
 
   test('the preview tells the model the checklist and the declared version', async () => {
