@@ -18,12 +18,12 @@
  * Absent = none declared: the catalogue's named-product scenario cannot be
  * copied.
  *
- * A checklist (#795) gives them in question A4.18: `data.products=YES` or
+ * A checklist (#795) gives them in question P1.17 (A4.18 before V01.06): `data.products=YES` or
  * `=NO`, and the table `data.product.<n>.code` / `.name` / `.flexibility`.
  *
  * PR 3: `groupProducts` lists the group tariffs the same way, each with the
  * group sizes it takes (`minPassengers`, `maxPassengers`, 1 to 99, optional).
- * Checklist A4.19: `data.groupProducts=YES` / `=NO` and the table
+ * Checklist P1.18 (A4.19 before V01.06): `data.groupProducts=YES` / `=NO` and the table
  * `data.groupProduct.<n>.code` / `.name` / `.flexibility` / `.min` / `.max`.
  */
 
@@ -106,13 +106,13 @@ function rowsFromChecklist(answers, question, tag, fields) {
   return [...rows.keys()].sort((x, y) => x - y).map((n) => rows.get(n));
 }
 
-/** The products a checklist's A4.18 declares, or null when it is not answered. */
+/** The products a checklist's P1.17 declares, or null when it is not answered. */
 function productsFromChecklist(answers) {
   const rows = rowsFromChecklist(answers, 'products', 'product', ['code', 'name', 'flexibility']);
   return rows && declaredProducts({ products: rows });
 }
 
-/** PR 3: the group products a checklist's A4.19 declares, or null. */
+/** PR 3: the group products a checklist's P1.18 declares, or null. */
 function groupProductsFromChecklist(answers) {
   const rows = rowsFromChecklist(answers, 'groupProducts', 'groupProduct', ['code', 'name', 'flexibility', 'min', 'max']);
   return rows && declaredGroupProducts({ groupProducts: rows });

@@ -46,8 +46,8 @@ const tmId = uuidv4();
 const otherTmId = uuidv4();
 const testerId = uuidv4();
 const BASE = '/v1/company/checklists';
-const sheet = name => fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Documentation', 'Server_Operations', 'Simulator checklists',
-  `OSCAR_Test_Config_Checklist_Simulator_${name}.docx`));
+const sheet = name => fs.readFileSync(require('../../src/utils/checklistFiles').checklistFile(
+  path.join(__dirname, '..', '..', '..', 'Documentation', 'Server_Operations', 'Simulator checklists'), `Simulator-${name}`));
 const ALPHA = sheet('alpha');
 const GAMMA = sheet('gamma');
 

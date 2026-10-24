@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-24-checklist-v0106",
+    "date": "October 24, 2026",
+    "tag": "Improved",
+    "title": "Set-up checklist V01.06: a chapter for products, a chapter for fares",
+    "summary": "The provider's set-up checklist now asks how the provider distributes, and has a chapter for product-based and a chapter for fare-based providers.",
+    "content": "Question A1.3 asks whether the provider sells products, fares or both. A product-based provider fills chapter P (offers, booking, after-sales, seats, transport modes); a fare-based provider fills chapter F (fare clusters, how fares are combined, fare refunds and their fee, the bicycle fare reservation, the age under which a fare is free). Imported in Test Config, the answers set the Test Framework's distribution and fare declarations.\n\nThe file is now named OSCAR_Checklist_TEMPLATE_V01.06.docx. A checklist filled in on an earlier version still imports as before."
+  },
+  {
     "id": "2026-10-23-fare-reference-scenarios",
     "date": "October 23, 2026",
     "tag": "New",

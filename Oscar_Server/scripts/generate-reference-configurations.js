@@ -24,12 +24,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const R = require('../src/utils/referenceConfiguration');
 const { answersOfDocx } = require('../src/utils/checklistAnswers');
+const { checklistFile } = require('../src/utils/checklistFiles');
 
 const REPO = path.resolve(__dirname, '..', '..');
 const OUT_DIR = path.join(REPO, 'Bruno_Collection', 'data_base', 'reference');
 
 function referenceOf(provider) {
-  const checklist = path.join(REPO, 'Documentation', 'Server_Operations', 'Simulator checklists', `OSCAR_Test_Config_Checklist_Simulator_${provider}.docx`);
+  const checklist = checklistFile(path.join(REPO, 'Documentation', 'Server_Operations', 'Simulator checklists'), `Simulator-${provider}`);
   const read = answersOfDocx(fs.readFileSync(checklist));
   if (read.refusal) throw new Error(`${provider}: ${read.refusal}`);
   return R.buildReference({

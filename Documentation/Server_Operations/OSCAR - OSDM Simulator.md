@@ -192,10 +192,14 @@ without a token answers 401, and an unknown provider answers 404.
 Every setting of this section and the next, for each provider (API Config,
 Test Framework, Test Data, the special stop places and the scenarios that fail
 on purpose), is in that provider's pre-filled set-up checklist (#819):
-[alpha](Simulator%20checklists/OSCAR_Test_Config_Checklist_Simulator_alpha.docx),
-[beta](Simulator%20checklists/OSCAR_Test_Config_Checklist_Simulator_beta.docx),
-[gamma](Simulator%20checklists/OSCAR_Test_Config_Checklist_Simulator_gamma.docx).
-They are generated with the provider checklists' generator (kept in the
+[alpha](Simulator%20checklists/OSCAR_Checklist_Simulator-alpha_V01.06.docx),
+[beta](Simulator%20checklists/OSCAR_Checklist_Simulator-beta_V01.06.docx),
+[gamma](Simulator%20checklists/OSCAR_Checklist_Simulator-gamma_V01.06.docx),
+[delta](Simulator%20checklists/OSCAR_Checklist_Simulator-delta_V01.06.docx),
+[epsilon](Simulator%20checklists/OSCAR_Checklist_Simulator-epsilon_V01.06.docx),
+[zeta](Simulator%20checklists/OSCAR_Checklist_Simulator-zeta_V01.06.docx).
+Each name carries the template version (`V01.06`), so these links change with
+it (a test fails on a link to a file that is not there). They are generated with the provider checklists' generator (kept in the
 private repository), never edited by hand.
 
 **The reference configurations (#838).** The repository holds, for each
