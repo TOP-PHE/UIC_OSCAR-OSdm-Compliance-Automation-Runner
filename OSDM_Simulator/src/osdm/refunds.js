@@ -35,10 +35,10 @@ const { noteRefund } = require('./documents');
 const { lifetimeOf, currencyOf, partsOf, priceOf } = require('./bookings');
 const variants = require('./variants');
 const ticketing = require('./ticketing');
+const afterSales = require('./afterSales');
 
 const REFUND_OFFER_LIFETIME_MS = 30 * 60 * 1000;
 const MAX_FULFILLMENT_IDS = 20;
-const SEMI_FLEXIBLE_FEE_SHARE = 0.25;
 
 const bad = (detail) => new HttpError(400, 'VALIDATION_ERROR', 'The refund request is not valid', detail);
 const conflict = (detail) => new HttpError(409, 'CONFLICT', 'Conflict', detail);
@@ -69,7 +69,7 @@ function refundOfPart(part, overruled, booking, nowMs) {
   if (overruled) return { fee, refundable: amount };
   if (isFare(part)) fee = fareFee(part, booking, nowMs);
   else if (part.refundable === 'NO') fee = amount;
-  else if (part.refundable === 'WITH_CONDITION') fee = Math.round(amount * SEMI_FLEXIBLE_FEE_SHARE);
+  else if (part.refundable === 'WITH_CONDITION') fee = afterSales.feeOf(amount);
   return { fee, refundable: amount - fee };
 }
 

@@ -233,6 +233,35 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   }
 }
 
+// #950: the parts of the selected offer, the booking's at the time of sale,
+// when the exchange gives up the whole booking; null (with the reason logged)
+// otherwise, since those parts are then not the ones exchanged.
+function exchangedOfferParts() {
+  const read = (name, fallback) => {
+    const raw = bru.getEnvVar(name);
+    if (raw == null || raw === "") return fallback;
+    if (typeof raw !== "string") return raw;
+    try { return JSON.parse(raw); } catch { return fallback; }
+  };
+  const offer = read("offer", null);
+  const parts = offer && typeof offer === "object" ? [
+    offer.admissionOfferParts || [],
+    offer.reservationOfferParts || [],
+    offer.ancillaryOfferParts || [],
+  ].flat().filter(Boolean) : [];
+  if (parts.length === 0) {
+    validationLogger("[INFO] Exchange fee schedule-consistency skipped \u2014 no selected offer with parts in the environment, so the conditions of the parts given up are not known.");
+    return null;
+  }
+  const asked = read("requestExchangeOffersBodyData", {})?.fulfillmentIds;
+  const booking = read("__bookingFulfillmentIds", []);
+  if (Array.isArray(asked) && Array.isArray(booking) && booking.some((id) => !asked.includes(id))) {
+    validationLogger(`[INFO] Exchange fee schedule-consistency skipped \u2014 the exchange gives up fulfillments [${asked.join(", ")}] of [${booking.join(", ")}], and the selected offer's parts are those of the whole booking.`);
+    return null;
+  }
+  return parts;
+}
+
 // Function to validate exchange fees are consistent with after-sales conditions
 function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
   validationLogger("[DEBUG] \u27a4 validateExchangeFeesConsistentWithAfterSalesConditions");
@@ -260,13 +289,16 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
     return;
   }
 
-  const { expectedRefundForParts } = require("./afterSalesRules.js");
-  const parts = [
-    exchangeOffer.admissionOfferParts || [],
-    exchangeOffer.reservationOfferParts || [],
-    exchangeOffer.ancillaryOfferParts || [],
-  ].flat();
+  // #950: the fee is that of the parts given up (OSDM's ExchangeBreakdownItem
+  // names bookingPartIds and their exchangeFee), so their EXCHANGE schedule is
+  // the one sold with them: the selected offer's, as the refund reads it. The
+  // new offer's conditions are for exchanging the new parts later. They were
+  // read here before, which no answer showed until a provider sold an
+  // exchangeable product under conditions.
+  const parts = exchangedOfferParts();
+  if (!parts) return;
 
+  const { expectedRefundForParts } = require("./afterSalesRules.js");
   // expectedRefundForParts threads the action through effectiveRefundability;
   // its .expectedFee is the sum of the active-window fee over value-bearing parts
   // (price > 0) \u2014 exactly what the declared EXCHANGE schedule charges right now.

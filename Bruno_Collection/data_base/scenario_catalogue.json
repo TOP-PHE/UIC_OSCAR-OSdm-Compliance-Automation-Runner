@@ -150,7 +150,7 @@
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
       "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",
-      "checks": 531,
+      "checks": 611,
       "needs": {
         "trip": "SEARCH",
         "return": "SEPARATE",
@@ -238,7 +238,7 @@
       "code": "NHF_REFUND_OVERRULE_CODE_REFUSED",
       "source": "SIM_REFUND_OVERRULE_REFUSED_38",
       "purpose": "A refund with an overrule code the provider does not accept must be refused.",
-      "checks": 320,
+      "checks": 361,
       "needs": {
         "trip": "SEARCH",
         "return": "SEPARATE",
@@ -310,7 +310,7 @@
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation of a return sold as one offer: refund with an overrule code, everything back and no fee.",
-      "checks": 599,
+      "checks": 758,
       "needs": {
         "trip": "SEARCH",
         "return": "COMBINED",
@@ -397,7 +397,7 @@
       "code": "OTST_SALE_GROUP_TARIFF",
       "source": "SIM_GROUP_6ADT_38",
       "purpose": "Group sale in the COLLECTIVE mode with the first group product the Test Framework declares, by its code, for a group of its sizes: one collective admission for the whole group, every passenger in appliedPassengerTypes, and the group compared with the same passengers alone.",
-      "checks": 458,
+      "checks": 498,
       "limit": "GROUP_TARIFF",
       "needs": {
         "trip": "SEARCH",
@@ -817,7 +817,7 @@
       "code": "OTST_OFFER_OPTION_COMBINATIONS",
       "source": "SIM_OFFER_PROBE_COMBINATION_38",
       "purpose": "Offer search combinations: offers asked with two or more declared option values together, drawn at random from the Test Framework's seed (the same seed, the same combinations); an option no offer keeps to, or that the provider ignores, fails.",
-      "checks": 120,
+      "checks": 121,
       "probe": "OFFER_COMBINATIONS",
       "needs": {
         "trip": "SEARCH",
