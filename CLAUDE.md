@@ -2628,6 +2628,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `OTST_REFUND_PARTIAL_PASSENGER_2ADT` / `_LEG_1ADT`. A variant (last name)
     cannot be a reference scenario's source: the copy would send that name
     to the provider.
+  - **A semi-flexible part states its conditions** (#950, 0.53.0):
+    `src/osdm/afterSales.js` gives WITH_CONDITION parts one REFUND and one
+    EXCHANGE condition (a quarter of the price, no window), on offer parts
+    (`afterSalesConditions`) and booked parts (`afterSaleConditions`); the
+    refund and the exchange take their fee from it. That showed a collection
+    defect: **an exchange fee is held to the schedule of the parts given up**
+    (the selected offer's, `exchangedOfferParts()` in `exchanges.js`), never
+    the new offer's, and not at all for a partial exchange. **A full replay
+    no longer fits in a 2-hour background task** (all versions, ~900
+    scenarios): record the `_38` ones and those *Checks by scenario* names,
+    before and after, with the codes on the command line.
   - **Its version is visible and released on its own** (#617, 0.15.0):
     `/healthz` returns `{status, version}`; a version change on `main` tags
     `simulator-<version>` with a GitHub release whose notes

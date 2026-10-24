@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-24-exchange-fee-schedule",
+    "date": "October 24, 2026",
+    "tag": "Fixed",
+    "title": "Exchange fee checked against the conditions of the ticket given up",
+    "summary": "OSCAR now checks an exchange fee against the after-sales conditions of the ticket being exchanged, as OSDM defines it, not against those of the new ticket.",
+    "content": "When a provider states the after-sales conditions of its products, OSCAR compares the exchange fee it asks with the conditions of the parts given up. It used to read the conditions of the new offer, which only say what a later exchange of the new ticket would cost. An exchange of a part of the booking is not compared.\n\nThe OSDM simulator now states the refund and exchange conditions of its semi-flexible tariff, so the scenarios that sell it no longer carry the warning that the conditions are missing."
+  },
+  {
     "id": "2026-10-24-simulator-fare-offer-parts",
     "date": "October 24, 2026",
     "tag": "Fixed",
