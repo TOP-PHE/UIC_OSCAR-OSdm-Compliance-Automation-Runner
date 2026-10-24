@@ -255,7 +255,7 @@ function exchangedOfferParts() {
   }
   const asked = read("requestExchangeOffersBodyData", {})?.fulfillmentIds;
   const booking = read("__bookingFulfillmentIds", []);
-  if (Array.isArray(asked) && Array.isArray(booking) && booking.length > 0 && booking.some((id) => !asked.includes(id))) {
+  if (Array.isArray(asked) && Array.isArray(booking) && booking.some((id) => !asked.includes(id))) {
     validationLogger(`[INFO] Exchange fee schedule-consistency skipped \u2014 the exchange gives up fulfillments [${asked.join(", ")}] of [${booking.join(", ")}], and the selected offer's parts are those of the whole booking.`);
     return null;
   }
