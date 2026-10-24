@@ -1,8 +1,30 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.422",
+  "current_release": "2026.424",
   "releases": [
+    {
+      "release": "2026.424",
+      "date": "2026-10-24",
+      "server": "1.11.389",
+      "collection": "OTST_V2.0.218",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#938 (part C of #935): set-up checklist template V01.06: a common Part A (A1.3 distribution modes, A4 offer request forms, A5 limitations), chapter P (the former A4.2–A8) and chapter F (fare clusters, combination models, stated refund fee, bicycle fare reservation, fare sales flows, free age, and three information questions); file names OSCAR_Checklist_<NAME>_Vxx.yy.docx found by checklistFile(). The import reads A1.3 and chapter F; the simulator references take them from their checklists. Tags unchanged: earlier copies import as before."
+      ]
+    },
+    {
+      "release": "2026.423",
+      "date": "2026-10-23",
+      "server": "1.11.388",
+      "collection": "OTST_V2.0.218",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#937 (part B of #935): fare declarations in the Test Framework (fares: clusters, combination models, stated refund fee, bicycle reservation, refund of fares, free age), checked by the three framework writers; 16 fare reference scenarios in the catalogue, offered when FARE is declared and what they use is declared; a copy asks a declared cluster, gives the free child its age, and moves the requested section onto the chosen trip. Editor: Fares panel under Distribution. References declare their fares from the profile."
+      ]
+    },
     {
       "release": "2026.422",
       "date": "2026-10-23",

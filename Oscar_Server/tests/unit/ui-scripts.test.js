@@ -1123,7 +1123,7 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
     // Handled before the change switch (Sonar S1479 caps its cases).
-    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;");
+    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;");
     const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
     expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
     expect(fn).toContain("const value = paxAgeValue(field, el.value);");
@@ -1255,7 +1255,7 @@ describe('js/scenarios.js — the Distribution section (#936)', () => {
   });
 
   test('the section: one option per mode, selected when declared', () => {
-    const panel = loadFunction(page, 'distributionPanelHtml', { FW_DISTRIBUTION_MODES, fwDistributionModes, esc: escHtml });
+    const panel = loadFunction(page, 'distributionPanelHtml', { FW_DISTRIBUTION_MODES, fwDistributionModes, esc: escHtml, faresPanelHtml: () => '' });
     const html = panel({});
     expect(html).toContain('🧭 Distribution');
     expect(html).toContain('class="aftersales-opt selected" data-action="fw-distribution-mode" data-val="PRODUCT"');
@@ -1287,5 +1287,95 @@ describe('js/scenarios.js — the Distribution section (#936)', () => {
     const source = read(page);
     expect(source).toContain('if (clickDistributionMode(action, el)) return;');
     expect(source.indexOf('${distributionPanelHtml(fw)}')).toBeGreaterThan(source.indexOf('data-action="wiz-osdm-version"'));
+  });
+});
+
+describe('js/scenarios.js — the Fares panel (#937)', () => {
+  const page = 'js/scenarios.js';
+  const escHtml = require('../../public/js/esc.js').esc;
+  const lines = read(page).split('\n');
+  const constant = (name) => {
+    const start = lines.indexOf(`const ${name} = {`);
+    return vm.runInNewContext(`(${lines.slice(start, lines.indexOf('};', start) + 1).join('\n').replace(`const ${name} = `, '').replace(/;$/, '')})`);
+  };
+  const FW_FARE_LISTS = constant('FW_FARE_LISTS');
+  const FW_FARE_LABELS = constant('FW_FARE_LABELS');
+  const FW_FARE_MAX_FREE_AGE = 30;
+  const fares = require('../../src/utils/fareDeclarations');
+  const fwFareList = loadFunction(page, 'fwFareList', { FW_FARE_LISTS });
+  const toggledFareList = loadFunction(page, 'toggledFareList', { FW_FARE_LISTS, fwFareList });
+  const fareAgeOf = loadFunction(page, 'fareAgeOf', { FW_FARE_MAX_FREE_AGE });
+
+  test('the page\'s lists and age limit are the server\'s', () => {
+    expect(FW_FARE_LISTS.clusters.values).toEqual([...fares.FARE_CLUSTERS]);
+    expect(FW_FARE_LISTS.combinationModels.values).toEqual([...fares.COMBINATION_MODELS]);
+    expect(FW_FARE_LISTS.reservations.values).toEqual([...fares.FARE_RESERVATIONS]);
+    expect(FW_FARE_LISTS.salesFlows.values).toEqual([...fares.FARE_SALES_FLOWS]);
+    expect(Object.keys(FW_FARE_LISTS).every((k) => fares.FARE_KEYS.includes(k))).toBe(true);
+    expect(read(page)).toContain(`const FW_FARE_MAX_FREE_AGE = ${fares.MAX_FREE_UNDER_AGE};`);
+  });
+
+  test('a list absent reads as on the server', () => {
+    expect(fwFareList({}, 'clusters')).toEqual(fares.declaredFareClusters({}));
+    expect(fwFareList({}, 'reservations')).toEqual([]);
+    expect(fwFareList({}, 'salesFlows')).toEqual(['SALE']);
+    expect(fwFareList({ fares: { combinationModels: ['COMBINING'] } }, 'combinationModels')).toEqual(['COMBINING']);
+  });
+
+  test('a click adds or removes a value, in order; SALE stays', () => {
+    expect(toggledFareList({}, 'clusters', 'PROMO')).toEqual(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX']);
+    expect(toggledFareList({ fares: { clusters: ['NON_FLEX'] } }, 'clusters', 'FULL_FLEX')).toEqual(['FULL_FLEX', 'NON_FLEX']);
+    expect(toggledFareList({}, 'salesFlows', 'REFUND_FULL')).toEqual(['SALE', 'REFUND_FULL']);
+    expect(toggledFareList({}, 'salesFlows', 'SALE')).toEqual(['SALE']);
+    for (const key of Object.keys(FW_FARE_LISTS)) {
+      const fw = { fares: { [key]: toggledFareList({}, key, FW_FARE_LISTS[key].values[1] || FW_FARE_LISTS[key].values[0]) } };
+      expect(fares.fareDeclarationsProblem(fw.fares)).toBeNull();
+    }
+  });
+
+  test('the free age keeps a whole number 1 to 30 only', () => {
+    expect(fareAgeOf('6')).toBe(6);
+    expect(fareAgeOf(' 12 ')).toBe(12);
+    for (const bad of ['', '0', '31', '6.5', '-1', 'x', null]) expect(fareAgeOf(bad)).toBeNull();
+    expect(fares.fareDeclarationsProblem({ freeUnderAge: fareAgeOf('6') })).toBeNull();
+  });
+
+  test('the panel is hidden unless FARE is declared, and shows what is declared', () => {
+    const fwDistributionModes = loadFunction(page, 'fwDistributionModes', { FW_DISTRIBUTION_MODES: [['PRODUCT'], ['FARE']] });
+    const panel = loadFunction(page, 'faresPanelHtml', { FW_FARE_LISTS, FW_FARE_LABELS, FW_FARE_MAX_FREE_AGE, fwFareList, fwDistributionModes, esc: escHtml });
+    expect(panel({})).toContain('id="fw-fares-panel" style="margin-top:10px;border-top:1px solid #e0e0e0;padding-top:8px" hidden');
+    const html = panel({ distributionModes: ['FARE'], fares: { clusters: ['NON_FLEX'], statedRefundFee: true, freeUnderAge: 6 } });
+    expect(html).not.toContain(' hidden>');
+    expect(html).toContain('class="pill selected" data-action="fw-fare-pill" data-key="clusters" data-val="NON_FLEX"');
+    expect(html).toContain('class="pill" data-action="fw-fare-pill" data-key="clusters" data-val="PROMO"');
+    expect(html).toContain('class="pill selected" data-action="fw-fare-fee"');
+    expect(html).toContain('value="6"');
+    expect(html).toContain('<label for="fw-fare-free-age">');
+  });
+
+  test('a click and the age are saved, handled before their switches', () => {
+    const saved = [];
+    const opt = { dataset: { key: 'clusters', val: 'PROMO' }, classList: { toggle() {} } };
+    const wizData = { framework: {} };
+    const document = { querySelectorAll: () => [opt] };
+    const click = loadFunction(page, 'clickFarePanel', { wizData, document, FW_FARE_LISTS, toggledFareList, saveFrameworkDebounced: () => saved.push(1) });
+    expect(click('fw-pill', opt)).toBe(false);
+    expect(click('fw-fare-pill', opt)).toBe(true);
+    expect(wizData.framework.fares.clusters).toEqual(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX']);
+    expect(click('fw-fare-fee', { classList: { toggle() {} } })).toBe(true);
+    expect(wizData.framework.fares.statedRefundFee).toBe(true);
+    const change = loadFunction(page, 'changeFareAge', { wizData, fareAgeOf, saveFrameworkDebounced: () => saved.push(1) });
+    const input = { value: '7' };
+    expect(change('fw-fare-free-age', input)).toBe(true);
+    expect(wizData.framework.fares.freeUnderAge).toBe(7);
+    input.value = 'x';
+    change('fw-fare-free-age', input);
+    expect(wizData.framework.fares.freeUnderAge).toBeUndefined();
+    expect(input.value).toBe('');
+    expect(saved).toHaveLength(4);
+    const source = read(page);
+    expect(source).toContain('if (clickFarePanel(action, el)) return;');
+    expect(source).toContain('changeFareAge(action, el) ||');
+    expect(source).toContain('${faresPanelHtml(fw)}');
   });
 });

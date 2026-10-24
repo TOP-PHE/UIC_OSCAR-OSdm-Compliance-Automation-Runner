@@ -92,9 +92,13 @@ const LIST_PATHS = new Set([
   'offerSearchOptions.serviceClassTypes', 'offerSearchOptions.productTags', 'offerSearchOptions.productSelections', 'tripSearchParameters', 'fulfillment.types', 'fulfillment.media', 'salesFlows', 'partialRefundScopes',
   'iropsCodes.refund', 'iropsCodes.exchange', 'placeSelectionFlows', 'placeSelection.supportedModes', 'ancillaries',
   'rail.subModes', 'rail.ticketTypes',
+  // #938: chapter F.
+  'fares.clusters', 'fares.combinationModels', 'fares.reservations', 'fares.salesFlows',
 ]);
 const ONE_PATHS = new Set(['osdmVersion', 'mandatoryReservationForm']);
-const NUMBER_PATHS = new Set(['concurrentSessionLimit', 'maxPassengers', 'salesHorizonDays']);
+const NUMBER_PATHS = new Set(['concurrentSessionLimit', 'maxPassengers', 'salesHorizonDays', 'fares.freeUnderAge']);
+// #938: a question of one tick YES / NO that the framework keeps as true / false.
+const YES_NO_PATHS = new Set(['fares.statedRefundFee']);
 const AGE_RANGE = /^passengerAgeRanges\.([A-Z_]+)\.(min|max)$/;
 const TEXT_PATHS = new Set(['currencies.sold', 'currencies.default']);
 
@@ -108,7 +112,12 @@ function setPath(target, path, value) {
   node[parts.at(-1)] = value;
 }
 
-const known = path => LIST_PATHS.has(path) || ONE_PATHS.has(path) || NUMBER_PATHS.has(path) || TEXT_PATHS.has(path) || AGE_RANGE.test(path);
+const known = path => LIST_PATHS.has(path) || ONE_PATHS.has(path) || NUMBER_PATHS.has(path) || TEXT_PATHS.has(path)
+  || YES_NO_PATHS.has(path) || AGE_RANGE.test(path);
+// #938: lists with a value every answer keeps (the sale of fares), and lists
+// that say nothing when nothing is ticked (no distribution mode = product only).
+const ALWAYS_IN = { 'iropsCodes.refund': IROPS_MANDATORY, 'iropsCodes.exchange': IROPS_MANDATORY, 'fares.salesFlows': ['SALE'] };
+const NOTHING_WHEN_EMPTY = new Set(['distributionModes']);
 
 /**
  * The checklist's `fw.*` answers ({ tag: true | text }, as answersOfDocx
@@ -139,16 +148,25 @@ function questionsOf(answers, unplaced = null) {
   return questions;
 }
 
+// The list a list question puts at its place, or null for nothing.
+function listAnswer(path, ticks) {
+  if (NOTHING_WHEN_EMPTY.has(path) && ticks.length === 0) return null;
+  return { value: ALWAYS_IN[path] ? [...new Set([...ALWAYS_IN[path], ...ticks])] : ticks };
+}
+
+// The number a number question puts at its place, or null for nothing.
+function numberAnswer(text) {
+  const n = Number(text);
+  return text !== null && text !== '' && Number.isFinite(n) ? { value: n } : null;
+}
+
 // What one answered question puts at its place: { value } or null for nothing.
 function answerAt(path, ticks, text) {
-  if (LIST_PATHS.has(path)) {
-    return { value: path.startsWith('iropsCodes.') ? [...new Set([...IROPS_MANDATORY, ...ticks])] : ticks };
-  }
-  if (ONE_PATHS.has(path)) return ticks.length ? { value: ticks[0] } : null;
-  if (NUMBER_PATHS.has(path) || AGE_RANGE.test(path)) {
-    const n = Number(text);
-    return text !== null && text !== '' && Number.isFinite(n) ? { value: n } : null;
-  }
+  if (LIST_PATHS.has(path)) return listAnswer(path, ticks);
+  const one = ticks.length ? ticks[0] : null;
+  if (YES_NO_PATHS.has(path)) return one === null ? null : { value: one === 'YES' };
+  if (ONE_PATHS.has(path)) return one === null ? null : { value: one };
+  if (NUMBER_PATHS.has(path) || AGE_RANGE.test(path)) return numberAnswer(text);
   if (path === 'currencies.sold') return { value: (text || '').split(/[\s,]+/).filter(Boolean) };
   if (path === 'currencies.default') return text ? { value: text } : null;
   return null;
@@ -173,10 +191,10 @@ function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) 
   // #887: A3.7, the reduction cards the provider accepts.
   const cards = require('./reductionCards').cardsFromChecklist(answers);
   if (cards) framework.reductionCards = cards;
-  // #887 PR 2: A4.18, the products the provider sells.
+  // #887 PR 2: P1.17 (A4.18 before V01.06), the products the provider sells.
   const products = require('./namedProducts').productsFromChecklist(answers);
   if (products) framework.products = products;
-  // PR 3: A4.19, the group products.
+  // PR 3: P1.18 (A4.19 before V01.06), the group products.
   const groups = require('./namedProducts').groupProductsFromChecklist(answers);
   if (groups) framework.groupProducts = groups;
   return framework;
@@ -199,7 +217,7 @@ function withPassengerUpdateScope(framework, answers) {
 }
 
 /**
- * #899: question A5.1 (`data.purchaser`, one tick) says when the provider
+ * #899: question P2.1 (A5.1 before V01.06) (`data.purchaser`, one tick) says when the provider
  * takes the purchaser. AT_BOOKING (required in the booking) and NOT_NEEDED
  * mean none after the booking (`purchaserAfterBooking: false`); LATER_ALLOWED
  * is what an absent key says. No tick leaves the framework as it is.
@@ -313,6 +331,20 @@ function runListFor(datafile, osdmVersion) {
     .map(s => s.code);
 }
 
+// #938: what a simulated provider's checklist declares in A1.3 and chapter F
+// must be what its profile sells (referenceFares(), #937).
+function checkFaresAgainstProfile(provider, framework, profile) {
+  const modes = profile?.fares ? ['PRODUCT', 'FARE'] : ['PRODUCT'];
+  const declared = Array.isArray(framework.distributionModes) ? framework.distributionModes : ['PRODUCT'];
+  if (JSON.stringify(declared) !== JSON.stringify(modes)) {
+    throw new Error(`${provider}: the checklist declares the distribution modes ${declared.join(', ')}, the simulator's profile ${modes.join(', ')}.`);
+  }
+  const expected = require('./fareDeclarations').referenceFares(profile);
+  if (JSON.stringify(framework.fares) !== JSON.stringify(expected)) {
+    throw new Error(`${provider}: the checklist's chapter F declares ${JSON.stringify(framework.fares)}, the simulator's profile ${JSON.stringify(expected)}.`);
+  }
+}
+
 /** The reference of one provider, as stored in the repository. */
 function buildReference({ provider, profile, answers, datafile }) {
   if (!PROVIDERS.includes(provider)) throw new Error(`Unknown simulated provider ${provider}.`);
@@ -325,9 +357,13 @@ function buildReference({ provider, profile, answers, datafile }) {
     throw new Error(`${provider}: the checklist declares OSDM ${framework.osdmVersion}, the simulator's profile ${osdmVersion}.`);
   }
   framework.osdmVersion = osdmVersion;
-  // #936: a simulated provider sells products, and fares when its profile
-  // has them (every one since #903). The checklist does not ask yet (#938).
-  framework.distributionModes = profile?.fares ? ['PRODUCT', 'FARE'] : ['PRODUCT'];
+  // #938: the distribution modes (A1.3) and the fares (chapter F) are the
+  // checklist's; the profile only checks them, as it checks the version.
+  checkFaresAgainstProfile(provider, framework, profile);
+  // Last, where 1.11.388 wrote it: the stored text, and so its version, stays.
+  const { fares } = framework;
+  delete framework.fares;
+  framework.fares = fares;
   return {
     [REFERENCE_KEY]: {
       format: REFERENCE_FORMAT,

@@ -19,7 +19,7 @@ const CL = require('../../src/utils/checklistAnswers');
 const { buildZip, readZipEntry, ZipError } = require('../../src/utils/zip');
 
 const CHECKLISTS = path.join(__dirname, '..', '..', '..', 'Documentation', 'Server_Operations', 'Simulator checklists');
-const alpha = () => fs.readFileSync(path.join(CHECKLISTS, 'OSCAR_Test_Config_Checklist_Simulator_alpha.docx'));
+const alpha = () => fs.readFileSync(require('../../src/utils/checklistFiles').checklistFile(CHECKLISTS, 'Simulator-alpha'));
 
 // A one-entry ZIP whose entry is deflated (buildZip only stores).
 function deflatedZip(name, data) {
@@ -83,11 +83,11 @@ describe('#827 reading the answers', () => {
   test('the simulator\'s alpha checklist reads back every answer it was filled with', () => {
     const xml = readZipEntry(alpha(), 'word/document.xml').toString('utf8');
     const all = CL.answersOfXml(xml);
-    expect(Object.keys(all)).toHaveLength(316);
+    expect(Object.keys(all)).toHaveLength(333);
     expect(all['fw.osdmVersion=3.6']).toBe(true);
     expect(all['api.baseUrl']).toBe('https://<simulator-host>/alpha');
     const { answers } = CL.answersOfDocx(alpha());
-    expect(Object.keys(answers)).toHaveLength(304);
+    expect(Object.keys(answers)).toHaveLength(321);
     expect(Object.keys(answers).some((k) => k.startsWith('api.') || k.startsWith('meta.'))).toBe(false);
   });
 

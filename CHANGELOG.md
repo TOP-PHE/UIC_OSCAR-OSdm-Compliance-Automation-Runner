@@ -62,6 +62,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.389] / [collection-OTST_V2.0.218] — 2026-10-24
+
+Issue #938 (part C of #935), release 2026.424. The collection does not change.
+
+### Changed
+- **Set-up checklist template V01.06** (generated in the private repository):
+  - **Part A**, for every provider: A1 access, with **A1.3 the distribution modes** (`fw.distributionModes`: product-based, fare-based); A2 load; A3 passengers; **A4 the offer request forms** (the former A4.1, for both modes); **A5 the known limitations** (the former A9).
+  - **Chapter P**, product-based: the former A4.2–A8, as P1–P5.
+  - **Chapter F**, fare-based, new: F1 clusters, F2 combination models, F3 a refund fee stated by the distributor (YES / NO), F4 fare reservations (bicycle), F5 sales flows on fares, F6 the age under which a fare is free (`fw.fares.*`); F7 what `GET /fulfillments/{id}` answers for fares, F8 domestic trips (#242 D4), F9 a section equal to the whole trip (#242 D5) (`info.fares.*`).
+  - Part B: B<n>.9, the stations where a fare section may start or end (`svcN.sectionPoints`).
+  - The Annex has the new rows. Tags did not change: a copy of V01.05 or earlier imports as before.
+- **File names `OSCAR_Checklist_<NAME>_Vxx.yy.docx`**: `TEMPLATE` (in `Documentation/User_Guides/`, replacing `OSCAR_Test_Config_Checklist.docx`), `Simulator-<provider>` (in `Documentation/Server_Operations/Simulator checklists/`). The template keeps its three latest versions (V01.06, and V1.05 and V1.04 as published); every copy keeps its latest only. Code and tests find a file with `checklistFile(folder, name)` (`utils/checklistFiles.js`).
+- **The import reads A1.3 and chapter F** (`frameworkFromChecklist()`): no distribution tick declares nothing (product only), the sale of fares always counts, YES / NO is a boolean. The simulator references take them from their checklists, and the simulator's profile only checks them; the references' text is unchanged.
+- The Tester User Guide and *OSCAR - OSDM Simulator* link the new files (all six simulator copies now).
+
+### Security
+- `multer` 2.5.0 (GHSA-q7qp-rjg7-q26m, a pending asynchronous fileFilter after request teardown) and `nodemailer` 10.1.7 (GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w, GHSA-85x2-q946-cp5h, addressparser), published while this release was in review. `multer`'s range moves from `~2.4.0` to `~2.5.0`; `nodemailer` stays within `~10.1.1`.
+- The Bruno CLI's image scan (Trivy) found `@azure/msal-node` 6.0.1 (CVE-2026-109461) and `undici` 7.30.0 (CVE-2026-109869) under `@usebruno/cli` 4.2.1. Two `overrides` in `Oscar_Server/bruno-cli/package.json`: `@azure/msal-node` `^7.1.0` (no 6.x is fixed; `@azure/identity` 4.14 still asks `^6`, and loads with 7.1.1) and `undici` `^7.30.1`. `bru` 4.2.1 runs the collection as before: a sale and a fare refund on the simulator gave their catalogue checks (234, 180), none failed.
+
+### Tests
+- `checklist-files.test.js`: the helper; at most three template versions; one copy per simulator provider, on the latest version; no file under the old name; every link a document gives to a checklist file reaches it; A1.3 and chapter F read from every simulator copy; a copy without them imports as before.
+- The simulator alpha checklist stays under the AI context's 20k characters (`cut` 0): chapter F's comments are a few words, and four long comments were shortened.
+
+---
+
+## [server-1.11.388] / [collection-OTST_V2.0.218] — 2026-10-23
+
+Issue #937 (part B of #935), release 2026.423.
+
+### Added
+- **Fare declarations in the Test Framework** (`fares`, `utils/fareDeclarations.js`). They matter once the framework declares the fare-based distribution (#936). Each key absent keeps a meaning:
+  - `clusters` (BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO): absent = every cluster;
+  - `combinationModels` (CLUSTERING, COMBINING): absent = either;
+  - `statedRefundFee` (the provider takes `RefundSpecification.refundFee`, OSDM 3.8): absent = no;
+  - `reservations` (BICYCLE, OSDM 3.8): absent = none;
+  - `salesFlows` (SALE, REFUND_FULL): absent = SALE only;
+  - `freeUnderAge` (1 to 30): absent = not declared.
+  An unknown key or value is refused (400) by the Test Framework save, the checklist apply and the configuration import, so a typo is never read as "not declared".
+- **16 fare reference scenarios in the catalogue** (`OTST_FARE_…`, `NHF_FARE_…`), from the simulator's fare scenarios: sale by specification, search and trip id, a free child, the negative requests (no fare asked, no section, an empty list, by every form), a product sale after a refused fare request, refunds (no fee, a stated fee, COMBINING), a bicycle with its fare reservation, a bicycle alone. Their checks come from a replay with the real collection on the simulator.
+- **What a fare entry needs is checked** (`fareRequirementsOf()`, `fareMissing()`): a refund needs REFUND_FULL in `fares.salesFlows`; a stated fee needs `statedRefundFee` and OSDM 3.8; a fare reservation needs BICYCLE and OSDM 3.8; the COMBINING entry needs COMBINING; the free child needs `freeUnderAge` (catalogue `limit` `FREE_CHILD`). These sentences come only when the framework declares FARE; before that, the distribution is the one thing said. `missingFor()` reads any minimum OSDM version (it read 3.7 only).
+- **The copy of a fare entry**: the fare cluster is its own when declared, else the most flexible declared; the free child is one year under the declared age, in a passenger list of its own; the requested section is moved onto the chosen trip by position (`utils/fareSections.js`): the whole trip stays the whole trip, a section from a station inside it to the destination becomes the new trip's last leg. A fare entry keeps its form of request: no `_SPEC` or `_TRIPID` twin.
+- **Test Config**: a Fares panel under Distribution, shown when Fare-based is ticked (clusters, models, reservations, sales flows, the stated fee, the free age).
+- **References**: each simulated provider declares its fares from its profile (clusters and free age; both models; refunds; from OSDM 3.8, the stated fee and the bicycle reservation).
+
+### Security
+- `body-parser` 2.4.0 (and `qs` 6.16.1) through Express, for GHSA-27r3-jxmh-p828 (denial of service by trailing bytes after a compressed body), published while this release was in review: `npm audit fix`, lockfile only.
+
+### Not in this release
+- A run's warning for an undeclared fare feature (the catalogue's rule only).
+- The checklist questions for fares (#938).
+
+---
+
 ## [server-1.11.387] / [collection-OTST_V2.0.217] — 2026-10-23
 
 Issue #941, release 2026.422. Data only: no server or collection code changes.

@@ -28,6 +28,7 @@ const { applyFrameworkMigration, needsFrameworkMigration } = require('../../util
 const log = require('../../utils/logger');
 const { isOsdmVersion } = require('../../utils/osdmVersion');
 const { distributionModesProblem } = require('../../utils/distributionModes');
+const { fareDeclarationsProblem } = require('../../utils/fareDeclarations');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
@@ -126,8 +127,8 @@ router.put('/test-framework', (req, res) => {
   if (version != null && version !== '' && !isOsdmVersion(version)) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: `The OSDM version "${String(version).slice(0, 40)}" is not a version: digits and dots, such as 3.8 or 3.0.5.` });
   }
-  // #936: product-based, fare-based or both; never none.
-  const modesProblem = distributionModesProblem(configPayload.distributionModes);
+  // #936: product-based, fare-based or both; never none. #937: what it sells in fares.
+  const modesProblem = distributionModesProblem(configPayload.distributionModes) || fareDeclarationsProblem(configPayload.fares);
   if (modesProblem) return res.status(400).json({ status: 400, title: 'Bad Request', detail: modesProblem });
   const configJson = colEncrypt(JSON.stringify(configPayload));
   const existing = get('SELECT id FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);

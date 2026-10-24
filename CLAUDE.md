@@ -298,6 +298,48 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the server's list; `clickDistributionMode()` before the click switch;
     the last mode cannot be unticked). The simulator references take both
     modes from the profile (`fares`) until the checklist asks (#938).
+    **Fare declarations** (#937, part B, 1.11.388 / OTST_V2.0.218): `fares`
+    in the framework (`utils/fareDeclarations.js`, pure): `clusters`,
+    `combinationModels`, `statedRefundFee`, `reservations` (BICYCLE),
+    `salesFlows` (SALE, REFUND_FULL), `freeUnderAge`; absent = every cluster,
+    either model, no fee, none, SALE only, not declared. An unknown key is a
+    400 at the three writers (`fareDeclarationsProblem()`, after
+    `distributionModesProblem()` with `||`). The catalogue's 16 `…FARE…`
+    entries need what `fareRequirementsOf()` reads (entry `combinationModel`,
+    `limit` `FREE_CHILD`); `fareMissing()` speaks only once FARE is declared;
+    `missingFor()` takes the highest `minOsdmVersion` (`minimumVersionOf()`).
+    A fare entry is never convertible (its sections name its trip). The copy:
+    `fareClusterFor()`, `freeChildPassengers()` (age − 1), and
+    `mappedSections()` (`utils/fareSections.js`) in `copiedScenario()`: ends by
+    position, an inner station becomes the last before the destination, a
+    one-leg trip takes the whole trip, a station not on the trip is left as
+    it is. Editor: `faresPanelHtml()` in the Distribution section, hidden
+    without FARE; `clickFarePanel()` / `changeFareAge()` before their
+    switches; `FW_FARE_LISTS` pinned by `ui-scripts.test.js`. References:
+    `referenceFares(profile)`. No run-time warning for undeclared fare
+    features yet.
+    **The checklist asks them** (#938, part C, 1.11.389): template V01.06,
+    a common Part A (A1.3 `fw.distributionModes`; A4 the offer request forms;
+    A5 the limitations, the former A9), chapter P (the former A4.2–A8, P1–P5)
+    and chapter F (F1–F6 `fw.fares.*`, F7–F9 `info.fares.*`); B<n>.9
+    `svcN.sectionPoints`. Tags did not change. `frameworkFromChecklist()`
+    reads them: `fares.statedRefundFee` is YES / NO (`YES_NO_PATHS`), the
+    sale of fares always counts (`ALWAYS_IN`), no distribution tick says
+    nothing (`NOTHING_WHEN_EMPTY`: an empty list would be a 400). A
+    simulator reference takes A1.3 and chapter F from its checklist; the
+    profile only checks them (`checkFaresAgainstProfile()`), and `fares` is
+    moved last so the stored text, and its version, did not move.
+    **File names are `OSCAR_Checklist_<NAME>_Vxx.yy.docx`** (`TEMPLATE`,
+    `Simulator-<provider>`, a provider's short name): find one with
+    `checklistFile(folder, name)` (`utils/checklistFiles.js`, highest
+    version; a copy found twice throws), never by a fixed name. The template
+    keeps three versions in `Documentation/User_Guides/`, every copy its
+    latest only (`build-all.sh` removes the others); `checklist-files.test.js`
+    fails on a fourth template and on a document linking a checklist file
+    that is not there, so the links of the Tester User Guide and *OSCAR - OSDM
+    Simulator* change with each version. The simulator alpha checklist sits
+    just under the AI context's 20k again: chapter F's comments were kept to
+    a few words, and four long comments shortened (`cut` 0).
   - **AI analysis of results** (#801; PR 1 = 1.11.318, access only; per
     provider since 1.11.320). Two locks, no switch: a Test Manager's
     `ai_access_request`, **one row per (company or provider, user)**, naming
@@ -2757,7 +2799,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Bruno_Collection/data_base/simulator_datafile.json` | the simulator's data file, two sale scenarios per OSDM version (#614), the one copy for OSCAR and for a standalone run (#593); `OSDM_Simulator/tests/datafile.test.js` keeps it valid and answerable |
 | `Bruno_Collection/README.md` | running the collection standalone (Bruno desktop and `bru run`), against the simulator's `gamma` (#593) |
 | `Documentation/Server_Operations/OSCAR - OSDM Simulator.md` | installing the simulator on its own host and pointing a company at it |
-| `Documentation/User_Guides/OSCAR_Test_Config_Checklist.docx` | questions to a provider before its first run (Part A the whole provider, Part B one sheet per service, Part C journeys with changes) and an annex giving where each answer goes in OSCAR (#746). Since v2 (#795) every answer is a Word content control tagged with its answer name (`fw.…`, `api.…`, `data.…`, `info.…`), so a filled-in copy can be read back; it is generated from the sources kept in the private repository (`analysis/checklist-generator`), never edited by hand. Add the question and its annex row when a setting is added or moves. **Versioned since V1.03 (20/10/2026)**: `version.js` there holds the version and its history (title page, page header, a "Template versions" table after the Annex, custom property `OSCAR checklist template`); bump it with every change to a question, option, tag or the Annex, then `build-all.sh` rebuilds this file, the four simulator copies and the providers' copies with their answers |
+| `Documentation/User_Guides/OSCAR_Checklist_TEMPLATE_Vxx.yy.docx` | questions to a provider before its first run (Part A every provider, chapter P product-based, chapter F fare-based since V01.06 / #938, Part B one sheet per service, Part C journeys with changes; found by `checklistFile()`) and an annex giving where each answer goes in OSCAR (#746). Since v2 (#795) every answer is a Word content control tagged with its answer name (`fw.…`, `api.…`, `data.…`, `info.…`), so a filled-in copy can be read back; it is generated from the sources kept in the private repository (`analysis/checklist-generator`), never edited by hand. Add the question and its annex row when a setting is added or moves. **Versioned since V1.03 (20/10/2026)**: `version.js` there holds the version and its history (title page, page header, a "Template versions" table after the Annex, custom property `OSCAR checklist template`); bump it with every change to a question, option, tag or the Annex, then `build-all.sh` rebuilds this file, the four simulator copies and the providers' copies with their answers |
 | `Documentation/Test_Coverage/OSCAR - What is tested.md` | what a run tests: the simulator per provider, what each Bruno step checks, the reference scenarios with scope, needs and checks (#640) |
 | `Documentation/Test_Coverage/OSCAR - Checks by scenario.md` | generated by `replay.js describe`: every check of every step, and each scenario's distinctive checks (#640) |
 | `Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md` | every scenario of the simulator's data file: what it tests, what the simulator answers, the expected result and warnings (#603); pinned to the data file by `OSDM_Simulator/tests/datafile.test.js` |

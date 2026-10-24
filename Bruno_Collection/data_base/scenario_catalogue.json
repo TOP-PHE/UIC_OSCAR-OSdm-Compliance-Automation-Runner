@@ -891,6 +891,180 @@
         "trip": "SEARCH",
         "passengers": 1
       }
+    },
+    {
+      "code": "OTST_FARE_SPEC_1ADT",
+      "source": "SIM_FARE_SPEC_1ADT_38",
+      "checks": 117,
+      "purpose": "Fare sale for one adult by trip specification: fares asked for the last leg's section, one fare offer per cluster checked (fares, passengers, section coverage, conditions), the fare offer of the chosen cluster booked and fulfilled as fares.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_SRCH_1ADT",
+      "source": "SIM_FARE_SRCH_1ADT_38",
+      "checks": 117,
+      "purpose": "Fare sale for one adult by search criteria: fares asked for the whole trip, the fare offers checked, the fare offer of the chosen cluster booked and fulfilled as fares.",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_TRIPIDS_1ADT",
+      "source": "SIM_FARE_TRIPIDS_1ADT_38",
+      "checks": 124,
+      "purpose": "Fare sale for one adult by trip id: POST /trips-collection, then the fares of the trip chosen, by its id, for the whole trip; the fare offer of the chosen cluster booked and fulfilled as fares.",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_FREE_CHILD",
+      "source": "SIM_FARE_SPEC_FREE_CHILD_38",
+      "checks": 116,
+      "limit": "FREE_CHILD",
+      "purpose": "Fare sale for an adult and a child one year under the age the Test Framework declares free: every passenger has a fare, the child's priced 0.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 2
+      }
+    },
+    {
+      "code": "NHF_FARE_UNASKED",
+      "source": "SIM_NHF_FARE_UNASKED_38",
+      "checks": 71,
+      "purpose": "Negative fare request: a section named but only ADMISSION asked; a fare in the answer fails (fares are given only when asked). The scenario ends after the offer.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_FARE_NO_SECTION",
+      "source": "SIM_NHF_FARE_NO_SECTION_SPEC_38",
+      "checks": 71,
+      "purpose": "Negative fare request: FARE_ADMISSION asked by trip specification without a section; a fare in the answer fails. The scenario ends after the offer.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_FARE_EMPTY_SECTIONS",
+      "source": "SIM_NHF_FARE_EMPTY_SECTIONS_38",
+      "checks": 71,
+      "purpose": "Negative fare request: FARE_ADMISSION asked by trip specification with an empty list of sections; a fare in the answer fails. The scenario ends after the offer.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_FARE_PRODUCT_ONLY",
+      "source": "SIM_NHF_FARE_NO_SECTION_SRCH_38",
+      "checks": 235,
+      "purpose": "Negative fare request, then a product sale: a search asking ADMISSION and FARE_ADMISSION without a section; a fare in the answer fails, and the sale goes on with a product offer, booked and fulfilled.",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_FARE_EMPTY_SECTIONS_SRCH",
+      "source": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38",
+      "checks": 71,
+      "purpose": "Negative fare request: FARE_ADMISSION asked by search criteria with an empty list of sections; a fare in the answer fails. The scenario ends after the offer.",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_FARE_NO_SECTION_TRIPIDS",
+      "source": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38",
+      "checks": 78,
+      "purpose": "Negative fare request: FARE_ADMISSION asked by trip id without a section; a fare in the answer fails. The scenario ends after the offer.",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_FARE_EMPTY_SECTIONS_TRIPIDS",
+      "source": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38",
+      "checks": 78,
+      "purpose": "Negative fare request: FARE_ADMISSION asked by trip id with an empty list of sections; a fare in the answer fails. The scenario ends after the offer.",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_REFUND_1ADT",
+      "source": "SIM_FARE_REFUND_1ADT_38",
+      "checks": 180,
+      "purpose": "Fare sale refunded in full, no fee stated: the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_REFUND_FEE_1ADT",
+      "source": "SIM_FARE_REFUND_FEE_1ADT_38",
+      "checks": 181,
+      "purpose": "Fare sale refunded in full with a refund fee stated by OSCAR (RefundSpecification.refundFee, OSDM 3.8): the refund offer keeps the fee stated, CLUSTERING fares.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_REFUND_COMBINING_1ADT",
+      "source": "SIM_FARE_REFUND_COMBINING_1ADT_38",
+      "checks": 179,
+      "combinationModel": "COMBINING",
+      "purpose": "Fare sale of fares combined by COMBINING, refunded in full: the fee is the fare's own, from its refund conditions at the time of the refund offer.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_BICYCLE_1ADT",
+      "source": "SIM_FARE_BICYCLE_1ADT_38",
+      "checks": 130,
+      "purpose": "Fare sale for an adult and a bicycle (OSDM 3.8): the adult's fare and the bicycle's fare reservation in fare mode, selected, booked and fulfilled with the fare.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 2
+      }
+    },
+    {
+      "code": "OTST_FARE_BICYCLE_ONLY",
+      "source": "SIM_FARE_BICYCLE_ONLY_38",
+      "checks": 108,
+      "purpose": "Fare reservation alone for a bicycle (OSDM 3.8): an offer holding the bicycle place in fare mode and no fare, booked and fulfilled as fares.",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 1
+      }
     }
   ]
 }

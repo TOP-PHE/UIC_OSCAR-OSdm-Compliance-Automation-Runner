@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-24-checklist-v0106",
+    "date": "October 24, 2026",
+    "tag": "Improved",
+    "title": "Set-up checklist V01.06: a chapter for products, a chapter for fares",
+    "summary": "The provider's set-up checklist now asks how the provider distributes, and has a chapter for product-based and a chapter for fare-based providers.",
+    "content": "Question A1.3 asks whether the provider sells products, fares or both. A product-based provider fills chapter P (offers, booking, after-sales, seats, transport modes); a fare-based provider fills chapter F (fare clusters, how fares are combined, fare refunds and their fee, the bicycle fare reservation, the age under which a fare is free). Imported in Test Config, the answers set the Test Framework's distribution and fare declarations.\n\nThe file is now named OSCAR_Checklist_TEMPLATE_V01.06.docx. A checklist filled in on an earlier version still imports as before."
+  },
+  {
+    "id": "2026-10-23-fare-reference-scenarios",
+    "date": "October 23, 2026",
+    "tag": "New",
+    "title": "Fare reference scenarios and fare declarations",
+    "summary": "A fare-based provider can now declare what it sells in fares in its Test Framework, and copy 16 fare reference scenarios from the catalogue.",
+    "content": "Once the Test Framework declares the fare-based distribution, a Fares panel asks what the provider sells: its fare clusters, how its fares combine (CLUSTERING or COMBINING), whether it refunds fares, whether it takes a refund fee the distributor states, whether it sells a bicycle's fare reservation, and the age under which a fare is free.\n\nCopy scenarios then offers 16 fare reference scenarios: fare sales by trip specification, by search and by trip id, a free child, negative requests, refunds and a bicycle. A scenario that needs something not declared is greyed out with the reason. When a scenario is copied, its fare cluster is one the provider sells, and its requested section is moved onto the trip chosen from your Test Data."
+  },
+  {
     "id": "2026-10-23-fare-negative-requests",
     "date": "October 23, 2026",
     "tag": "Improved",

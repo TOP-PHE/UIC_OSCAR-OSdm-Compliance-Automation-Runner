@@ -349,7 +349,7 @@ function distributionPanelHtml(fw) {
     <div class="fw-section-body open">
       <div style="font-size:12px;color:#546e7a;margin-bottom:8px">How the provider sells: one mode or both. The scenario catalogue offers the reference scenarios of the modes ticked; a scenario of another mode runs with a warning.</div>
       <div class="aftersales-options">${options}</div>
-      <div id="fw-distribution-note" style="color:#e65100;font-size:12px;margin-top:6px"></div>
+      <div id="fw-distribution-note" style="color:#e65100;font-size:12px;margin-top:6px"></div>${faresPanelHtml(fw)}
     </div>
   </div>`;
 }
@@ -369,7 +369,104 @@ function clickDistributionMode(action, el) {
   for (const opt of document.querySelectorAll('[data-action="fw-distribution-mode"]')) {
     opt.classList.toggle('selected', next.includes(opt.dataset.val));
   }
+  // #937: what the provider sells in fares is asked only of a fare provider.
+  const fares = document.getElementById('fw-fares-panel');
+  if (fares) fares.hidden = !next.includes('FARE');
   if (note) note.textContent = '';
+  saveFrameworkDebounced();
+  return true;
+}
+
+// #937: what a fare provider declares under `fares`. Kept in sync with
+// utils/fareDeclarations.js, pinned by ui-scripts.test.js. A list absent
+// means: every cluster, either model, no reservation, SALE only; the first
+// click on a list starts from that meaning.
+const FW_FARE_LISTS = {
+  clusters: { values: ['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO'], absent: 'all' },
+  combinationModels: { values: ['CLUSTERING', 'COMBINING'], absent: 'all' },
+  reservations: { values: ['BICYCLE'], absent: [] },
+  salesFlows: { values: ['SALE', 'REFUND_FULL'], absent: ['SALE'] },
+};
+const FW_FARE_LABELS = {
+  clusters: 'Fare clusters', combinationModels: 'Combination models',
+  reservations: 'Fare reservations (OSDM 3.8)', salesFlows: 'Sales flows on fares',
+};
+const FW_FARE_MAX_FREE_AGE = 30;
+
+// #937: a list of `fares` as declared, its absent meaning when not a list.
+function fwFareList(fw, key) {
+  const spec = FW_FARE_LISTS[key];
+  const raw = fw?.fares?.[key];
+  if (!Array.isArray(raw)) return spec.absent === 'all' ? [...spec.values] : [...spec.absent];
+  return spec.values.filter(v => raw.includes(v));
+}
+
+// #937: the list after a click on one value; SALE stays (a fare is sold first).
+function toggledFareList(fw, key, value) {
+  if (key === 'salesFlows' && value === 'SALE') return fwFareList(fw, key);
+  const list = fwFareList(fw, key);
+  const next = list.includes(value) ? list.filter(v => v !== value) : [...list, value];
+  return FW_FARE_LISTS[key].values.filter(v => next.includes(v));
+}
+
+// #937: the age typed, as stored: a whole number 1 to 30, else none.
+function fareAgeOf(text) {
+  const t = String(text ?? '').trim();
+  if (!/^\d{1,2}$/.test(t)) return null;
+  const n = Number.parseInt(t, 10);
+  return n >= 1 && n <= FW_FARE_MAX_FREE_AGE ? n : null;
+}
+
+// #937: the Fares panel, under Distribution, hidden unless FARE is ticked.
+function faresPanelHtml(fw) {
+  const lists = Object.keys(FW_FARE_LISTS).map(key => {
+    const on = fwFareList(fw, key);
+    const pills = FW_FARE_LISTS[key].values.map(v => `<div class="pill${on.includes(v) ? ' selected' : ''}" data-action="fw-fare-pill" data-key="${esc(key)}" data-val="${esc(v)}">${esc(v.replaceAll('_', ' '))}</div>`).join('');
+    return `<div class="fw-subsection-label">${esc(FW_FARE_LABELS[key])}</div><div class="pill-group">${pills}</div>`;
+  }).join('');
+  const fee = fw?.fares?.statedRefundFee === true;
+  const age = Number.isInteger(fw?.fares?.freeUnderAge) ? String(fw.fares.freeUnderAge) : '';
+  return `
+      <div id="fw-fares-panel" style="margin-top:10px;border-top:1px solid #e0e0e0;padding-top:8px"${fwDistributionModes(fw).includes('FARE') ? '' : ' hidden'}>
+        <div style="font-size:13px;font-weight:600">🧩 Fares</div>
+        <div style="font-size:12px;color:#546e7a;margin:4px 0 6px">What the provider sells in fares. The fare reference scenarios of the catalogue are offered for what is ticked here.</div>
+        ${lists}
+        <div class="pill-group"><div class="pill${fee ? ' selected' : ''}" data-action="fw-fare-fee">Takes a refund fee the distributor states (RefundSpecification.refundFee, OSDM 3.8)</div></div>
+        <div style="margin:6px 0;font-size:12px"><label for="fw-fare-free-age">A fare is free under the age of</label>
+          <input id="fw-fare-free-age" data-action="fw-fare-free-age" type="number" min="1" max="${FW_FARE_MAX_FREE_AGE}" step="1" value="${esc(age)}" style="width:60px"> years (empty: not declared)</div>
+      </div>`;
+}
+
+// #937: a click in the Fares panel, before the click switch. True when it was one.
+function clickFarePanel(action, el) {
+  if (action !== 'fw-fare-pill' && action !== 'fw-fare-fee') return false;
+  const fw = wizData.framework;
+  fw.fares = fw.fares && typeof fw.fares === 'object' ? fw.fares : {};
+  if (action === 'fw-fare-fee') {
+    fw.fares.statedRefundFee = fw.fares.statedRefundFee !== true;
+    el.classList.toggle('selected', fw.fares.statedRefundFee);
+  } else {
+    const key = el.dataset.key;
+    if (!FW_FARE_LISTS[key]) return true;
+    const next = toggledFareList(fw, key, el.dataset.val);
+    fw.fares[key] = next;
+    for (const opt of document.querySelectorAll(`[data-action="fw-fare-pill"][data-key="${key}"]`)) {
+      opt.classList.toggle('selected', next.includes(opt.dataset.val));
+    }
+  }
+  saveFrameworkDebounced();
+  return true;
+}
+
+// #937: the free age typed, before the change switch. True when it was it.
+function changeFareAge(action, el) {
+  if (action !== 'fw-fare-free-age') return false;
+  const fw = wizData.framework;
+  fw.fares = fw.fares && typeof fw.fares === 'object' ? fw.fares : {};
+  const age = fareAgeOf(el.value);
+  if (age === null) delete fw.fares.freeUnderAge;
+  else fw.fares.freeUnderAge = age;
+  el.value = age === null ? '' : String(age);
   saveFrameworkDebounced();
   return true;
 }
@@ -4061,7 +4158,7 @@ function fwProductsHtml(fw) {
     hint: 'the product code as the offers give it, a name, and its flexibility (FULL_FLEXIBLE, SEMI_FLEXIBLE or NON_FLEXIBLE)',
     none: 'None declared: the catalogue\'s named-product scenario cannot be copied.',
     add: '+ Add a product',
-    help: 'The copy of the catalogue\'s named-product scenario sells the first one listed here, by its code and in its flexibility. A provider\'s checklist (question A4.18) fills this list on import.',
+    help: 'The copy of the catalogue\'s named-product scenario sells the first one listed here, by its code and in its flexibility. A provider\'s checklist (question P1.17) fills this list on import.',
   });
 }
 
@@ -4071,7 +4168,7 @@ function fwGroupProductsHtml(fw) {
     hint: 'the code as the offers give it, a name, its flexibility, and the group sizes it takes (min and max passengers)',
     none: 'None declared: the catalogue\'s group tariff scenarios cannot be copied.',
     add: '+ Add a group product',
-    help: 'The copies of the catalogue\'s group scenarios ask, in the COLLECTIVE mode, for the first group product listed here for a group of its sizes, and for one passenger more than the first maximum given (refused, or offered without that product). A provider\'s checklist (question A4.19) fills this list on import.',
+    help: 'The copies of the catalogue\'s group scenarios ask, in the COLLECTIVE mode, for the first group product listed here for a group of its sizes, and for one passenger more than the first maximum given (refused, or offered without that product). A provider\'s checklist (question P1.18) fills this list on import.',
   });
 }
 
@@ -8047,6 +8144,7 @@ document.body.addEventListener('click', function(e) {
   const action = el.dataset.action;
   if (clickFwList(action, el)) return;   // #887, before the switch (Sonar S1479)
   if (clickDistributionMode(action, el)) return;   // #936, likewise
+  if (clickFarePanel(action, el)) return;   // #937, likewise
 
   switch (action) {
     // ── Static / section actions ──────────────────────────────────────────────
@@ -8607,7 +8705,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
 
   switch (action) {
     case 'file-upload':
