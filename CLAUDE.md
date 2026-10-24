@@ -340,6 +340,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Simulator* change with each version. The simulator alpha checklist sits
     just under the AI context's 20k again: chapter F's comments were kept to
     a few words, and four long comments shortened (`cut` 0).
+    **A reference declares what its run list asks** (#949, 1.11.390):
+    P1.11 ticks FARE_ADMISSION on every simulator and FARE_RESERVATION from
+    3.8; `reference-configuration.test.js` fails when a scenario of a
+    reference's run list gets any "not declared" warning from its framework.
   - **AI analysis of results** (#801; PR 1 = 1.11.318, access only; per
     provider since 1.11.320). Two locks, no switch: a Test Manager's
     `ai_access_request`, **one row per (company or provider, user)**, naming
