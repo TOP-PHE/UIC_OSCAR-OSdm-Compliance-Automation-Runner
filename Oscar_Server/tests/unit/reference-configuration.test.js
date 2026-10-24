@@ -49,6 +49,17 @@ describe.each(R.PROVIDERS)('the reference of %s', (provider) => {
     expect(storedOf(provider)).toBe(textOf(referenceOf(provider)));
   });
 
+  test('declares everything its run list asks: no scenario of it is warned (#949)', () => {
+    const datafile = structuredClone(DATAFILE);
+    require('../../src/utils/frameworkGating').annotateDatafile(datafile, stored.framework);
+    const run = new Set(stored.scenariosToRun);
+    const warned = datafile.scenarios
+      .filter(s => run.has(s.code) && s.__featureNotDeclaredWarnings)
+      .map(s => `${s.code}: ${s.__featureNotDeclaredWarnings.join(', ')}`);
+    expect(run.size).toBeGreaterThan(100);
+    expect(warned).toEqual([]);
+  });
+
   test('agrees with the simulator: version, currencies, return models', () => {
     const fw = stored.framework;
     expect(fw.osdmVersion).toBe(profile.osdmVersion);

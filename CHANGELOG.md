@@ -93,6 +93,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.390] / [collection-OTST_V2.0.219] — 2026-10-24
+
+Issue #949, release 2026.425. Only the simulator references change in the collection.
+
+### Fixed
+- **The simulator references declare the fare offer parts** (`offerSearchOptions.requestedOfferParts`). The six simulator checklists (V01.06, #938) declared fares in A1.3 and chapter F, but question P1.11 still ticked ADMISSION only, so every fare scenario of a reference's run list (12 on alpha and beta, 16 on the others) carried an `offerOption:requestedOfferParts=FARE_…` warning. P1.11 now ticks FARE_ADMISSION on every simulator, and FARE_RESERVATION from OSDM 3.8 (gamma, delta, epsilon, zeta; OSDM 3.6 and 3.7 have no fare reservation, #255). The checklists were rebuilt (template unchanged) and the references regenerated. A company following a simulator reference sees it not up to date: update it in Test Config.
+
+### Tests
+- `reference-configuration.test.js`: no scenario of a reference's own run list gets a "not declared" warning from its framework, so a declaration left behind fails CI.
+
+---
+
 ## [server-1.11.389] / [collection-OTST_V2.0.218] — 2026-10-24
 
 Issue #938 (part C of #935), release 2026.424. The collection does not change.

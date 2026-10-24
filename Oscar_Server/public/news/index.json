@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-24-simulator-fare-offer-parts",
+    "date": "October 24, 2026",
+    "tag": "Fixed",
+    "title": "Simulator references declare the fare offer parts",
+    "summary": "The simulator reference configurations now declare the fare offer parts their fare scenarios ask, so those scenarios no longer carry a 'not declared' warning.",
+    "content": "The fare scenarios of the simulator ask for fare admissions, and on OSDM 3.8 and later also fare reservations, but the simulator references declared admissions only among the offer parts that can be asked. Each fare scenario was therefore warned as asking something not declared. The references and the simulator checklists now declare them.\n\nIf your company follows a simulator reference, Test Config shows it is not up to date: update it to take the change."
+  },
+  {
     "id": "2026-10-24-checklist-v0106",
     "date": "October 24, 2026",
     "tag": "Improved",
