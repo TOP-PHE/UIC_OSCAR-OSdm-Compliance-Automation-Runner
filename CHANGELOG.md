@@ -77,6 +77,9 @@ Issue #938 (part C of #935), release 2026.424. The collection does not change.
 - **The import reads A1.3 and chapter F** (`frameworkFromChecklist()`): no distribution tick declares nothing (product only), the sale of fares always counts, YES / NO is a boolean. The simulator references take them from their checklists, and the simulator's profile only checks them; the references' text is unchanged.
 - The Tester User Guide and *OSCAR - OSDM Simulator* link the new files (all six simulator copies now).
 
+### Security
+- `multer` 2.5.0 (GHSA-q7qp-rjg7-q26m, a pending asynchronous fileFilter after request teardown) and `nodemailer` 10.1.7 (GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w, GHSA-85x2-q946-cp5h, addressparser), published while this release was in review. `multer`'s range moves from `~2.4.0` to `~2.5.0`; `nodemailer` stays within `~10.1.1`.
+
 ### Tests
 - `checklist-files.test.js`: the helper; at most three template versions; one copy per simulator provider, on the latest version; no file under the old name; every link a document gives to a checklist file reaches it; A1.3 and chapter F read from every simulator copy; a copy without them imports as before.
 - The simulator alpha checklist stays under the AI context's 20k characters (`cut` 0): chapter F's comments are a few words, and four long comments were shortened.
