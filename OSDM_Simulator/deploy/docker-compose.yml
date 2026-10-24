@@ -27,7 +27,13 @@
 
 services:
   osdm-simulator:
-    image: node:22-slim
+    # Named by digest as well as by tag, the same image as OSCAR's Dockerfile
+    # (#545): two installs of the same commit start from the same image.
+    # tests/deploy.test.js keeps the two digests equal, so a Dependabot bump of
+    # the Dockerfile's digest moves this one in the same pull request. An
+    # installed simulator takes a new digest at its next `docker compose up -d`
+    # (the automatic update only restarts the container).
+    image: node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
     container_name: osdm-simulator
     # The image's unprivileged "node" user.
     user: "1000:1000"
