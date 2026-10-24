@@ -588,6 +588,11 @@ No server restart is needed — the CLI is invoked as an external process for ea
 
 ### 11.4 Upgrading on VPS (Production)
 
+> **The host itself** (SSH by key only, no root login, firewall, fail2ban,
+> security updates, the deploy key's installed script) is set and checked as
+> [`OSCAR - Server Hardening.md`](OSCAR%20-%20Server%20Hardening.md) says. Its
+> section 2 is a checklist worth running after any change to the server.
+
 #### OSCAR Server
 
 If Git authentication fails because the token is invalid, follow this token sync procedure first.

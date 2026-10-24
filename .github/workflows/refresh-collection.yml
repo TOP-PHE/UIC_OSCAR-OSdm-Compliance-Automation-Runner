@@ -58,8 +58,10 @@ jobs:
       - name: Trigger collection refresh on VPS
         # The remote command is intentionally trivial — the locked-down
         # authorized_keys entry on the VPS forces it to run a single script
-        # regardless of what we type here. See Server_Operations/auto-deploy-setup.md.
-        run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh"
+        # regardless of what we type here: the installed copy of
+        # refresh-collection.sh, outside the checkout. See
+        # Documentation/Server_Operations/auto-deploy-setup.md, step 4.
+        run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/usr/local/sbin/oscar-refresh-collection"
 
       - name: Summary
         run: |

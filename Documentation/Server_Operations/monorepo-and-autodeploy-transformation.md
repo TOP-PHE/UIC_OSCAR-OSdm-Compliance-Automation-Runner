@@ -307,8 +307,10 @@ Trigger: push to `main` touching only `Bruno_Collection/**`.
 
 Action:
 1. Loads `SSH_DEPLOY_KEY` and `SSH_KNOWN_HOSTS` secrets
-2. SSHes as `ubuntu@oscar.uic.org` and invokes
-   `/opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh`
+2. SSHes as `ubuntu@oscar.uic.org`; the key's forced command runs
+   `/usr/local/sbin/oscar-refresh-collection`, a copy of
+   `OSCAR_Deploy/scripts/refresh-collection.sh` installed outside the
+   checkout (`auto-deploy-setup.md`, step 4)
 
 The script does a `git pull --ff-only`, refuses if the working tree is
 dirty, logs every transition to `journalctl -t oscar-deploy`. Server is
@@ -391,8 +393,8 @@ maintainer commits .bru changes to main
    ↓
 GitHub Actions: refresh-collection.yml
    ↓ ssh -i ~SSH_DEPLOY_KEY ubuntu@oscar.uic.org
-   ↓ command="…/refresh-collection.sh" forces invocation of just the script
-ssh-server runs refresh-collection.sh
+   ↓ command="/usr/local/sbin/oscar-refresh-collection" forces just the script
+ssh-server runs the installed copy of refresh-collection.sh
    ↓ git pull --ff-only origin main
 new .bru files now sit in /opt/OSCAR/Bruno_Collection/
    ↓ bind-mount makes them visible at /collection inside the container
@@ -405,7 +407,7 @@ The deploy key is **pinned to the refresh script** in
 `~ubuntu/.ssh/authorized_keys`:
 
 ```
-command="/opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh",
+command="/usr/local/sbin/oscar-refresh-collection",
   no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding
 ssh-ed25519 AAAA... github-actions-deploy
 ```
@@ -413,7 +415,9 @@ ssh-ed25519 AAAA... github-actions-deploy
 If the private key leaks (it lives only in GitHub Actions secrets,
 encrypted at rest, never logged), the worst case is someone forces a
 git-pull on the VPS — they cannot get a shell, cannot port-forward,
-cannot transfer files.
+cannot transfer files. The command is a copy installed outside the
+checkout, so a change to the script merged into `main` does not change
+what the key runs until someone copies it again by hand.
 
 The `refresh-collection.sh` script itself further refuses to run when
 the working tree is dirty (avoids silently overwriting manual edits)
