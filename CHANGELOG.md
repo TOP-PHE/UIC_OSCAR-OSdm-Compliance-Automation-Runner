@@ -79,6 +79,7 @@ Issue #938 (part C of #935), release 2026.424. The collection does not change.
 
 ### Security
 - `multer` 2.5.0 (GHSA-q7qp-rjg7-q26m, a pending asynchronous fileFilter after request teardown) and `nodemailer` 10.1.7 (GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w, GHSA-85x2-q946-cp5h, addressparser), published while this release was in review. `multer`'s range moves from `~2.4.0` to `~2.5.0`; `nodemailer` stays within `~10.1.1`.
+- The Bruno CLI's image scan (Trivy) found `@azure/msal-node` 6.0.1 (CVE-2026-109461) and `undici` 7.30.0 (CVE-2026-109869) under `@usebruno/cli` 4.2.1. Two `overrides` in `Oscar_Server/bruno-cli/package.json`: `@azure/msal-node` `^7.1.0` (no 6.x is fixed; `@azure/identity` 4.14 still asks `^6`, and loads with 7.1.1) and `undici` `^7.30.1`. `bru` 4.2.1 runs the collection as before: a sale and a fare refund on the simulator gave their catalogue checks (234, 180), none failed.
 
 ### Tests
 - `checklist-files.test.js`: the helper; at most three template versions; one copy per simulator provider, on the latest version; no file under the old name; every link a document gives to a checklist file reaches it; A1.3 and chapter F read from every simulator copy; a copy without them imports as before.
