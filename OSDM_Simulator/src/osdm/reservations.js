@@ -33,6 +33,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const placeMap = require('./placeMap');
+const afterSales = require('./afterSales');
 
 // The price of a reservation per passenger, in hundredths, before the
 // provider's price factor.
@@ -114,6 +115,9 @@ function reservationsOfDirection(trip, { passengers, tariff, provider, createdOn
       availableFulfillmentOptions: fulfillmentOptions,
       supportedPlaceSelectionFlows: ['AUTOMATIC_PLACE_SELECTION'],
     };
+    // #950: the conditions a WITH_CONDITION reservation promises.
+    const conditions = afterSales.conditionsOf(part);
+    if (conditions) part.afterSalesConditions = conditions;
     // #766 PR 3: a reservation on a trip with a place map takes the manual flows.
     if (placeMap.placeMapOfTrip(trip, provider)) part.supportedPlaceSelectionFlows.push('AUTOMATIC_PLACE_SELECTION_NEARBY', 'MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'MANUAL_PLACE_SELECTION_WITH_FEE');
     const prefs = preferencesOfTrip(trip, provider);
@@ -304,6 +308,9 @@ function reservationFrom(part, passengerIdOf, trips, createdOn, confirmableUntil
       tripLegCoverage: { tripId, legId },
     },
   };
+  // #950: the conditions of what was charged.
+  const conditions = afterSales.conditionsOf(reservation);
+  if (conditions) reservation.afterSaleConditions = conditions;
   if (isFarePlace(part)) Object.defineProperty(reservation, FARE_PLACE, { value: true });
   return reservation;
 }
