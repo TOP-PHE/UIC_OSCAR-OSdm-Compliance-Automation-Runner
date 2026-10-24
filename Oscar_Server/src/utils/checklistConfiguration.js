@@ -58,7 +58,7 @@ function frameworkOfChecklist(answers, current) {
   const unplaced = new Set();
   const framework = RC.frameworkFromChecklist(answers, { base: isObject(current) ? current : null, unplaced });
 
-  // A8.3, other modes: urban transport and shared mobility, as the editor has
+  // P5.3 (A8.3 before V01.06), other modes: urban transport and shared mobility, as the editor has
   // them (WIZ_PT_SUBMODES, WIZ_SHARED_SUBMODES). Ferry cannot be declared.
   if (unplaced.has('otherModes')) {
     unplaced.delete('otherModes');

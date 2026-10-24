@@ -372,13 +372,22 @@ Test Manager shares with them.
 #### Step 1. Send the blank checklist to the provider
 
 The blank checklist is
-[`OSCAR_Test_Config_Checklist.docx`](OSCAR_Test_Config_Checklist.docx), next
-to this guide. It asks the provider, in business terms, what their system does:
-- **Part A** covers the whole provider: OSDM version, passenger types and
-  ages, reduction cards, products, sales and after-sales flows, seat selection,
-  fulfilment, currencies, limits.
+[`OSCAR_Checklist_TEMPLATE_V01.06.docx`](OSCAR_Checklist_TEMPLATE_V01.06.docx),
+next to this guide. Its version is in its name (`Vxx.yy`); the folder keeps
+the two versions before it too, for a provider who already has one. It asks
+the provider, in business terms, what their system does:
+- **Part A** is for every provider: access, OSDM version, how the provider
+  distributes (A1.3: product-based, fare-based or both), load, passenger
+  types and ages, reduction cards, how offers can be requested, known limits.
+- **Chapter P** is for a product-based provider: offers, products,
+  currencies, booking and fulfilment, sales and after-sales flows, seat
+  selection, transport modes.
+- **Chapter F** is for a fare-based provider: fare clusters, how fares are
+  combined, fare refunds and their fee, the bicycle fare reservation, the
+  age under which a fare is free.
 - **Part B** has one sheet per service: the route, the trains and their times,
-  days, classes, accommodations and reservations.
+  days, classes, accommodations and reservations, and for fares the stations
+  where a section may start or end.
 - **Part C** covers the journeys with changes that the provider sells.
 
 The provider answers **in the boxes**: text in the text boxes, ticks in the

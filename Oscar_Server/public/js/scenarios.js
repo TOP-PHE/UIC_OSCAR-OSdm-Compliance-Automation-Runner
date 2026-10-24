@@ -4158,7 +4158,7 @@ function fwProductsHtml(fw) {
     hint: 'the product code as the offers give it, a name, and its flexibility (FULL_FLEXIBLE, SEMI_FLEXIBLE or NON_FLEXIBLE)',
     none: 'None declared: the catalogue\'s named-product scenario cannot be copied.',
     add: '+ Add a product',
-    help: 'The copy of the catalogue\'s named-product scenario sells the first one listed here, by its code and in its flexibility. A provider\'s checklist (question A4.18) fills this list on import.',
+    help: 'The copy of the catalogue\'s named-product scenario sells the first one listed here, by its code and in its flexibility. A provider\'s checklist (question P1.17) fills this list on import.',
   });
 }
 
@@ -4168,7 +4168,7 @@ function fwGroupProductsHtml(fw) {
     hint: 'the code as the offers give it, a name, its flexibility, and the group sizes it takes (min and max passengers)',
     none: 'None declared: the catalogue\'s group tariff scenarios cannot be copied.',
     add: '+ Add a group product',
-    help: 'The copies of the catalogue\'s group scenarios ask, in the COLLECTIVE mode, for the first group product listed here for a group of its sizes, and for one passenger more than the first maximum given (refused, or offered without that product). A provider\'s checklist (question A4.19) fills this list on import.',
+    help: 'The copies of the catalogue\'s group scenarios ask, in the COLLECTIVE mode, for the first group product listed here for a group of its sizes, and for one passenger more than the first maximum given (refused, or offered without that product). A provider\'s checklist (question P1.18) fills this list on import.',
   });
 }
 
