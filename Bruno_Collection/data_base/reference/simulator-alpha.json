@@ -149,7 +149,8 @@
         "COLLECTIVE"
       ],
       "requestedOfferParts": [
-        "ADMISSION"
+        "ADMISSION",
+        "FARE_ADMISSION"
       ],
       "travelClasses": [
         "FIRST",

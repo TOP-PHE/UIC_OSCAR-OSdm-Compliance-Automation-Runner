@@ -102,9 +102,10 @@ jobs:
 
       - name: Refresh host repo on VPS
         # The remote authorized_keys entry forces the locked-down
-        # refresh-collection.sh script regardless of the command we send,
+        # refresh-collection.sh script (its installed copy, outside the
+        # checkout) regardless of the command we send,
         # so this is safe to run from any workflow holding the deploy key.
-        run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh"
+        run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/usr/local/sbin/oscar-refresh-collection"
 
       - name: Summary
         run: |

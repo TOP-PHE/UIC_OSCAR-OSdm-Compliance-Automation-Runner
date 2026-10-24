@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.424",
+  "current_release": "2026.425",
   "releases": [
+    {
+      "release": "2026.425",
+      "date": "2026-10-24",
+      "server": "1.11.390",
+      "collection": "OTST_V2.0.219",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#949: the simulator references and checklists declare the fare offer parts their fare scenarios ask (FARE_ADMISSION on every provider, FARE_RESERVATION from OSDM 3.8), so no scenario of a reference's run list is warned. Companies following a simulator reference see it not up to date and update."
+      ]
+    },
     {
       "release": "2026.424",
       "date": "2026-10-24",

@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Deployment hardening, OSCAR and simulator hosts.** Deployment files and
+  documentation only: no server, collection or simulator code change, nothing
+  to release; each item takes effect when it is applied on the host.
+  - `OSCAR_Deploy/docker-compose.yml`: the `oscar` container gets
+    `cap_drop: ALL`, `no-new-privileges` and `pids_limit: 2048` (it already
+    ran as the unprivileged `node` user). Checked with the real server and
+    Bruno CLI 4.2.1 under those limits: `/health` 200, and two whole scenarios
+    against the simulator gave the same checks as without them (294 and 527,
+    none failed). Applied by the next `docker compose up -d`.
+  - The deploy key's command is a copy of `refresh-collection.sh` installed
+    outside the checkout (`/usr/local/sbin/oscar-refresh-collection`), as the
+    simulator's already was (#617): the script pulls the checkout it lives in,
+    so a merge to `main` could change what the key runs as `ubuntu`. The
+    script logs a `NOTE` while the checkout's version differs from the
+    installed one. Steps in `auto-deploy-setup.md`, step 4; until the host is
+    moved, the key keeps running the checkout's script as before.
+  - `OSDM_Simulator/deploy/docker-compose.yml`: `node:22-slim` named by
+    digest, the digest of OSCAR's Dockerfile; `OSDM_Simulator/tests/deploy.test.js`
+    keeps the two equal and the container's privileges as they are.
+  - New `Documentation/Server_Operations/OSCAR - Server Hardening.md`: the
+    host checklist (SSH by key only and no root login, firewall, fail2ban,
+    security updates, deploy keys, who is root through `sudo` and `docker`)
+    and how to set it without locking oneself out.
+  - Left open on purpose: `watchtower` and `autoheal` mount the Docker socket,
+    and `watchtower` runs `:latest`. Replacing `watchtower` changes how a
+    release reaches production, so it is a change of its own. The `oscar`
+    container's root file system stays writable until every place Bruno and
+    the server write is listed.
+
 ### Fixed
 
 - **The test suites no longer leave their temporary files behind on Windows,
@@ -59,6 +90,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Installation and use: `Documentation/Server_Operations/OSCAR - OSDM
     Simulator.md`. Linted and tested in the required CI job, analysed by Sonar
     with its own coverage report.
+
+---
+
+## [server-1.11.390] / [collection-OTST_V2.0.219] — 2026-10-24
+
+Issue #949, release 2026.425. Only the simulator references change in the collection.
+
+### Fixed
+- **The simulator references declare the fare offer parts** (`offerSearchOptions.requestedOfferParts`). The six simulator checklists (V01.06, #938) declared fares in A1.3 and chapter F, but question P1.11 still ticked ADMISSION only, so every fare scenario of a reference's run list (12 on alpha and beta, 16 on the others) carried an `offerOption:requestedOfferParts=FARE_…` warning. P1.11 now ticks FARE_ADMISSION on every simulator, and FARE_RESERVATION from OSDM 3.8 (gamma, delta, epsilon, zeta; OSDM 3.6 and 3.7 have no fare reservation, #255). The checklists were rebuilt (template unchanged) and the references regenerated. A company following a simulator reference sees it not up to date: update it in Test Config.
+
+### Tests
+- `reference-configuration.test.js`: no scenario of a reference's own run list gets a "not declared" warning from its framework, so a declaration left behind fails CI.
 
 ---
 

@@ -150,7 +150,9 @@
         "COLLECTIVE"
       ],
       "requestedOfferParts": [
-        "ADMISSION"
+        "ADMISSION",
+        "FARE_ADMISSION",
+        "FARE_RESERVATION"
       ],
       "travelClasses": [
         "FIRST",
