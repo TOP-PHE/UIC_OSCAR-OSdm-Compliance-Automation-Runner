@@ -208,51 +208,75 @@ describe('validateExchangeOfferResponse', () => {
   });
 });
 
-describe('validateExchangeFeesConsistentWithAfterSalesConditions (#396)', () => {
+describe('validateExchangeFeesConsistentWithAfterSalesConditions (#396, #950)', () => {
   const window = (fee, currency = 'EUR') => ({
     condition: 'EXCHANGE', afterSaleFee: price(fee, currency), validFrom: '2000-01-01T00:00:00Z', validUntil: '2099-01-01T00:00:00Z',
   });
   const part = (amount, conditions) => ({ id: 'a1', price: price(amount), afterSalesConditions: conditions });
   const check = (r) => named(r, 'Exchange fee matches the active EXCHANGE schedule')[0];
+  // #950: the schedule is that of the parts sold (the selected offer), never the new offer's.
+  const sold = (admissionOfferParts, reservationOfferParts = []) => {
+    envStore.offer = JSON.stringify({ offerId: 'O1', admissionOfferParts, reservationOfferParts });
+  };
+  const validate = (o) => run(() => exchanges.validateExchangeFeesConsistentWithAfterSalesConditions(o));
 
-  test('a fee equal to the active windows\' fees passes', () => {
-    const r = run(() => exchanges.validateExchangeFeesConsistentWithAfterSalesConditions(offer({
-      exchangeFee: price(15), admissionOfferParts: [part(100, [window(10)])], reservationOfferParts: [part(20, [window(5)])],
-    })));
+  test('a fee equal to the active windows\' fees of the parts sold passes', () => {
+    sold([part(100, [window(10)])], [part(20, [window(5)])]);
+    const r = validate(offer({ exchangeFee: price(15) }));
     expect(check(r).ok).toBe(true);
     expect(logged(r, 'INFO', 'schedule decode OK')).toBe(true);
   });
 
   test('another fee fails, naming both', () => {
-    const r = run(() => exchanges.validateExchangeFeesConsistentWithAfterSalesConditions(offer({
-      exchangeFee: price(12), admissionOfferParts: [part(100, [window(10)])],
-    })));
+    sold([part(100, [window(10)])]);
+    const r = validate(offer({ exchangeFee: price(12) }));
     expect(check(r).ok).toBe(false);
     expect(check(r).message).toContain('charges 10 right now');
     expect(check(r).message).toContain("exchangeFee is 12");
   });
 
-  test('nothing is checked: no numeric fee, an overrule code sent, no decodable schedule, another currency', () => {
+  test('the new offer\'s conditions are not the fee\'s: a flexible sale exchanged for a product sold under conditions owes nothing', () => {
+    sold([part(100, [window(0)])]);
+    const r = validate(offer({ exchangeFee: price(0), admissionOfferParts: [part(200, [window(50)])] }));
+    expect(check(r).ok).toBe(true);
+    expect(check(r).name).toContain('= active-window fee 0');
+  });
+
+  test('nothing is checked: no numeric fee, an overrule code sent, no parts sold known, a part of the booking only, no decodable schedule, another currency', () => {
+    sold([part(100, [window(10)])]);
     const cases = [
       [offer({ exchangeFee: undefined }), 'no numeric exchangeFee'],
-      [offer({ exchangeFee: price(12), admissionOfferParts: [part(100, [])] }), 'not schedule-decodable'],
-      [offer({ exchangeFee: price(10, 'CHF'), admissionOfferParts: [part(100, [window(10)])] }), 'differs from the schedule currency'],
+      [offer({ exchangeFee: price(10, 'CHF') }), 'differs from the schedule currency'],
     ];
     for (const [o, text] of cases) {
-      const r = run(() => exchanges.validateExchangeFeesConsistentWithAfterSalesConditions(o));
+      const r = validate(o);
       expect(check(r)).toBeUndefined();
       expect(r.logs.some((l) => l.includes(text))).toBe(true);
     }
+    sold([part(100, [])]);
+    expect(validate(offer({ exchangeFee: price(12) })).logs.some((l) => l.includes('not schedule-decodable'))).toBe(true);
+    delete envStore.offer;
+    let r = validate(offer({ exchangeFee: price(12) }));
+    expect(check(r)).toBeUndefined();
+    expect(logged(r, 'INFO', 'no selected offer with parts')).toBe(true);
+    sold([part(100, [window(10)])]);
+    envStore.__bookingFulfillmentIds = '["F1","F2"]';
+    envStore.requestExchangeOffersBodyData = { fulfillmentIds: ['F2'] };
+    r = validate(offer({ exchangeFee: price(12) }));
+    expect(check(r)).toBeUndefined();
+    expect(logged(r, 'INFO', 'gives up fulfillments [F2] of [F1, F2]')).toBe(true);
+    envStore.requestExchangeOffersBodyData = JSON.stringify({ fulfillmentIds: ['F2', 'F1'] });
+    expect(check(validate(offer({ exchangeFee: price(10) }))).ok).toBe(true);
     envStore.overruleCode = 'STRIKE';
-    const r = run(() => exchanges.validateExchangeFeesConsistentWithAfterSalesConditions(offer({ exchangeFee: price(12), admissionOfferParts: [part(100, [window(10)])] })));
+    r = validate(offer({ exchangeFee: price(12) }));
     expect(check(r)).toBeUndefined();
     expect(logged(r, 'INFO', 'an overruleCode (STRIKE) was sent')).toBe(true);
   });
 
   test('"null" sent as the overrule code counts as none', () => {
     envStore.overruleCode = 'null';
-    const r = run(() => exchanges.validateExchangeFeesConsistentWithAfterSalesConditions(offer({ exchangeFee: price(10), admissionOfferParts: [part(100, [window(10)])] })));
-    expect(check(r).ok).toBe(true);
+    sold([part(100, [window(10)])]);
+    expect(check(validate(offer({ exchangeFee: price(10) }))).ok).toBe(true);
   });
 });
 
