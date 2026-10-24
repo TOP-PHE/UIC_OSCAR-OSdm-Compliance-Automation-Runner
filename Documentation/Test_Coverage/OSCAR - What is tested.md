@@ -223,7 +223,7 @@ have the same, as copies. In short:
 | Fare reservations (#255): a bicycle place with a fare admission, and alone; two wrong answers (not in the run list) | 2 + 2 | `gamma` |
 | Negative fare requests (#905): fares not asked, no section (by search, then a product sale; on a specification sent as domestic), an empty list of sections; one wrong answer (not in the run list) | 4 + 1 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (50)
+### 4.2 The reference scenarios of the catalogue (89)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -325,6 +325,34 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_EXCHANGE_CURRENCY` | Currencies (#781): one per currency declared (`OTST_EXCHANGE_CURRENCY_EUR`…), a ticket sold in it and exchanged; exchange offers in another currency fail. | EXCHANGE_FULL, the currencies sold | 389 | `SIM_CURRENCY_EUR_EXCHANGE_1ADT_38` |
 | `OTST_SALE_DEFAULT_CURRENCY` | Currencies (#781): no currency asked, the offers must be in the default currency the Test Framework declares. | the default currency | 234 | `SIM_CURRENCY_DEFAULT_1ADT_38` |
 | `NHF_CURRENCY_NOT_SOLD` | Currencies (#781): offers asked in a common currency not declared; a refusal or no offer passes, offers in that currency fail, and the scenario ends after the offer. | the currencies sold | 71 | `SIM_NHF_CURRENCY_NOT_SOLD_38` |
+
+#### Fares (#937)
+
+Offered only to a Test Framework that declares the fare-based distribution
+(Distribution, #936); what it sells in fares is declared under Fares. A copy
+asks a fare cluster the framework declares (its own, else the most flexible
+declared), and moves the requested section onto the chosen trip by position:
+the whole trip stays the whole trip, a section from a station inside it to the
+destination becomes the new trip's last leg.
+
+| Code | Scope | Needs declared | Checks | Source |
+|---|---|---|---|---|
+| `OTST_FARE_SPEC_1ADT` | Fare sale for one adult by trip specification: fares asked for the last leg's section, one fare offer per cluster checked (fares, passengers, section coverage, conditions), the fare offer of the chosen cluster booked and fulfilled as fares. | the fare-based distribution | 117 | `SIM_FARE_SPEC_1ADT_38` |
+| `OTST_FARE_SRCH_1ADT` | Fare sale for one adult by search criteria: fares asked for the whole trip, the fare offers checked, the fare offer of the chosen cluster booked and fulfilled as fares. | the fare-based distribution | 117 | `SIM_FARE_SRCH_1ADT_38` |
+| `OTST_FARE_TRIPIDS_1ADT` | Fare sale for one adult by trip id: POST /trips-collection, then the fares of the trip chosen, by its id, for the whole trip; the fare offer of the chosen cluster booked and fulfilled as fares. | the fare-based distribution | 124 | `SIM_FARE_TRIPIDS_1ADT_38` |
+| `OTST_FARE_FREE_CHILD` | Fare sale for an adult and a child one year under the age the Test Framework declares free: every passenger has a fare, the child's priced 0. | the fare-based distribution, the age under which a fare is free | 116 | `SIM_FARE_SPEC_FREE_CHILD_38` |
+| `NHF_FARE_UNASKED` | Negative fare request: a section named but only ADMISSION asked; a fare in the answer fails (fares are given only when asked). The scenario ends after the offer. | the fare-based distribution | 71 | `SIM_NHF_FARE_UNASKED_38` |
+| `NHF_FARE_NO_SECTION` | Negative fare request: FARE_ADMISSION asked by trip specification without a section; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 71 | `SIM_NHF_FARE_NO_SECTION_SPEC_38` |
+| `NHF_FARE_EMPTY_SECTIONS` | Negative fare request: FARE_ADMISSION asked by trip specification with an empty list of sections; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 71 | `SIM_NHF_FARE_EMPTY_SECTIONS_38` |
+| `NHF_FARE_PRODUCT_ONLY` | Negative fare request, then a product sale: a search asking ADMISSION and FARE_ADMISSION without a section; a fare in the answer fails, and the sale goes on with a product offer, booked and fulfilled. | both distributions (product and fare) | 235 | `SIM_NHF_FARE_NO_SECTION_SRCH_38` |
+| `NHF_FARE_EMPTY_SECTIONS_SRCH` | Negative fare request: FARE_ADMISSION asked by search criteria with an empty list of sections; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 71 | `SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38` |
+| `NHF_FARE_NO_SECTION_TRIPIDS` | Negative fare request: FARE_ADMISSION asked by trip id without a section; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 78 | `SIM_NHF_FARE_NO_SECTION_TRIPIDS_38` |
+| `NHF_FARE_EMPTY_SECTIONS_TRIPIDS` | Negative fare request: FARE_ADMISSION asked by trip id with an empty list of sections; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 78 | `SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38` |
+| `OTST_FARE_REFUND_1ADT` | Fare sale refunded in full, no fee stated: the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED. | the fare-based distribution, a refund of fares | 180 | `SIM_FARE_REFUND_1ADT_38` |
+| `OTST_FARE_REFUND_FEE_1ADT` | Fare sale refunded in full with a refund fee stated by OSCAR (RefundSpecification.refundFee, OSDM 3.8): the refund offer keeps the fee stated, CLUSTERING fares. | the fare-based distribution, a refund of fares, a stated refund fee, OSDM 3.8 | 181 | `SIM_FARE_REFUND_FEE_1ADT_38` |
+| `OTST_FARE_REFUND_COMBINING_1ADT` | Fare sale of fares combined by COMBINING, refunded in full: the fee is the fare's own, from its refund conditions at the time of the refund offer. | the fare-based distribution, a refund of fares, COMBINING | 179 | `SIM_FARE_REFUND_COMBINING_1ADT_38` |
+| `OTST_FARE_BICYCLE_1ADT` | Fare sale for an adult and a bicycle (OSDM 3.8): the adult's fare and the bicycle's fare reservation in fare mode, selected, booked and fulfilled with the fare. | the fare-based distribution, a bicycle fare reservation, passenger type BICYCLE, OSDM 3.8 | 130 | `SIM_FARE_BICYCLE_1ADT_38` |
+| `OTST_FARE_BICYCLE_ONLY` | Fare reservation alone for a bicycle (OSDM 3.8): an offer holding the bicycle place in fare mode and no fare, booked and fulfilled as fares. | the fare-based distribution, a bicycle fare reservation, passenger type BICYCLE, OSDM 3.8 | 108 | `SIM_FARE_BICYCLE_ONLY_38` |
 
 The expiry probes wait 40 minutes on a real provider (the catalogue sets
 their `…MaxWaitMinutes`); on the simulator their deadlines are one minute.

@@ -103,7 +103,7 @@ describe('requirements and the golden rule', () => {
     const r = requirementsOf({ scenarioType: 'SALE', passengersListId: 1, offerSearchCriteria: { returnOffsetDays: 2, returnModel: 'COMBINED' } }, df);
     expect(r).toEqual({ salesFlows: ['SALE'], partialRefundScopes: [], returnModel: 'COMBINED', minOsdmVersion: '3.7', passengerTypes: ['YOUTH'],
       offerRequest: { form: 'SEARCH', convertible: false }, placeSelectionFlow: null, purchaserAfterBooking: false, tripSearchParameters: [],
-      distributionModes: ['PRODUCT'] });
+      distributionModes: ['PRODUCT'], fares: {} });
     expect(missingFor(r, { salesFlows: ['SALE'], returnModels: ['SEPARATE'], osdmVersion: '3.6.0', passengerTypes: ['ADULT'] }))
       .toEqual(['return model COMBINED', 'OSDM 3.7 or later', 'passenger type YOUTH']);
     expect(missingFor(r, { config: { salesFlows: ['SALE'], returnModels: ['COMBINED'], osdmVersion: '3.8.0', passengerTypes: ['YOUTH'] } })).toEqual([]);

@@ -93,6 +93,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.388] / [collection-OTST_V2.0.218] — 2026-10-23
+
+Issue #937 (part B of #935), release 2026.423.
+
+### Added
+- **Fare declarations in the Test Framework** (`fares`, `utils/fareDeclarations.js`). They matter once the framework declares the fare-based distribution (#936). Each key absent keeps a meaning:
+  - `clusters` (BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO): absent = every cluster;
+  - `combinationModels` (CLUSTERING, COMBINING): absent = either;
+  - `statedRefundFee` (the provider takes `RefundSpecification.refundFee`, OSDM 3.8): absent = no;
+  - `reservations` (BICYCLE, OSDM 3.8): absent = none;
+  - `salesFlows` (SALE, REFUND_FULL): absent = SALE only;
+  - `freeUnderAge` (1 to 30): absent = not declared.
+  An unknown key or value is refused (400) by the Test Framework save, the checklist apply and the configuration import, so a typo is never read as "not declared".
+- **16 fare reference scenarios in the catalogue** (`OTST_FARE_…`, `NHF_FARE_…`), from the simulator's fare scenarios: sale by specification, search and trip id, a free child, the negative requests (no fare asked, no section, an empty list, by every form), a product sale after a refused fare request, refunds (no fee, a stated fee, COMBINING), a bicycle with its fare reservation, a bicycle alone. Their checks come from a replay with the real collection on the simulator.
+- **What a fare entry needs is checked** (`fareRequirementsOf()`, `fareMissing()`): a refund needs REFUND_FULL in `fares.salesFlows`; a stated fee needs `statedRefundFee` and OSDM 3.8; a fare reservation needs BICYCLE and OSDM 3.8; the COMBINING entry needs COMBINING; the free child needs `freeUnderAge` (catalogue `limit` `FREE_CHILD`). These sentences come only when the framework declares FARE; before that, the distribution is the one thing said. `missingFor()` reads any minimum OSDM version (it read 3.7 only).
+- **The copy of a fare entry**: the fare cluster is its own when declared, else the most flexible declared; the free child is one year under the declared age, in a passenger list of its own; the requested section is moved onto the chosen trip by position (`utils/fareSections.js`): the whole trip stays the whole trip, a section from a station inside it to the destination becomes the new trip's last leg. A fare entry keeps its form of request: no `_SPEC` or `_TRIPID` twin.
+- **Test Config**: a Fares panel under Distribution, shown when Fare-based is ticked (clusters, models, reservations, sales flows, the stated fee, the free age).
+- **References**: each simulated provider declares its fares from its profile (clusters and free age; both models; refunds; from OSDM 3.8, the stated fee and the bicycle reservation).
+
+### Security
+- `body-parser` 2.4.0 (and `qs` 6.16.1) through Express, for GHSA-27r3-jxmh-p828 (denial of service by trailing bytes after a compressed body), published while this release was in review: `npm audit fix`, lockfile only.
+
+### Not in this release
+- A run's warning for an undeclared fare feature (the catalogue's rule only).
+- The checklist questions for fares (#938).
+
+---
+
 ## [server-1.11.387] / [collection-OTST_V2.0.217] — 2026-10-23
 
 Issue #941, release 2026.422. Data only: no server or collection code changes.

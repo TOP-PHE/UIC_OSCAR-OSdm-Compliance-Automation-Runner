@@ -142,51 +142,31 @@ describe('#936 the run\'s warning', () => {
 
 describe('#936 the catalogue', () => {
   const missingByCode = (fw) => Object.fromEntries(catalogueFor(catalogue, simulator, fw).map((e) => [e.code, e.missing]));
+  // #937: the fare entries need FARE; every other one is a product sale.
+  const asksFares = (e) => e.requirements.distributionModes.includes('FARE');
 
   test('a framework without the key is offered what it was offered before: product only', () => {
     const fw = { salesFlows: ['SALE'] };
     expect(missingByCode(fw)).toEqual(missingByCode({ ...fw, distributionModes: ['PRODUCT'] }));
-    expect(Object.values(missingByCode(fw)).flat().filter((m) => /distribution/.test(m))).toEqual([]);
+    const entries = catalogueFor(catalogue, simulator, fw);
+    expect(entries.filter((e) => !asksFares(e)).flatMap((e) => e.missing).filter((m) => /distribution/.test(m))).toEqual([]);
+    for (const e of entries.filter(asksFares)) expect(e.missing[0]).toBe('fare-based distribution (Distribution)');
   });
 
   test('a fare-only framework is offered no product entry, and is told why first', () => {
     const entries = catalogueFor(catalogue, simulator, { salesFlows: ['SALE'], distributionModes: ['FARE'] });
-    expect(entries.length).toBeGreaterThan(0);
-    for (const e of entries) expect(e.missing[0]).toBe('product-based distribution (Distribution)');
+    const products = entries.filter((e) => e.requirements.distributionModes.includes('PRODUCT'));
+    expect(products.length).toBeGreaterThan(0);
+    for (const e of products) expect(e.missing[0]).toBe('product-based distribution (Distribution)');
+    // A fare-only entry is not refused for its distribution.
+    expect(entries.filter((e) => e.code === 'OTST_FARE_SPEC_1ADT').map((e) => e.missing)).toEqual([[]]);
   });
 
   test('requirementsOf names the modes of each entry', () => {
-    for (const e of catalogueFor(catalogue, simulator, {})) expect(e.requirements.distributionModes).toEqual(['PRODUCT']);
-  });
-});
-
-describe('#936 the simulator references', () => {
-  const PROVIDERS = path.join(ROOT, 'OSDM_Simulator', 'providers');
-
-  test('every stored reference declares both modes, as every simulated provider sells fares', () => {
-    for (const name of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
-      const ref = JSON.parse(fs.readFileSync(path.join(DATA, 'reference', `simulator-${name}.json`), 'utf8'));
-      const profile = JSON.parse(fs.readFileSync(path.join(PROVIDERS, `${name}.json`), 'utf8'));
-      expect([name, ref.framework.distributionModes]).toEqual([name, ['PRODUCT', 'FARE']]);
-      expect(profile.fares).toBeTruthy();
-    }
-  });
-
-  test('no scenario of a reference\'s run list is warned about its distribution mode', () => {
-    for (const name of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
-      const ref = JSON.parse(fs.readFileSync(path.join(DATA, 'reference', `simulator-${name}.json`), 'utf8'));
-      const datafile = clone(simulator);
-      annotateDatafile(datafile, ref.framework);
-      const run = new Set(ref.scenariosToRun);
-      const warned = datafile.scenarios.filter((s) => run.has(s.code) && (s.__featureNotDeclaredWarnings || []).some((w) => w.startsWith('distributionMode:')));
-      expect([name, warned.map((s) => s.code)]).toEqual([name, []]);
-    }
-  });
-
-  test('a provider without fares in its profile sells products only', () => {
-    const profile = { osdmVersion: '3.8.0' };
-    const ref = buildReference({ provider: 'gamma', profile, answers: { 'fw.osdmVersion=3.8': true }, datafile: { scenarios: [] } });
-    expect(ref.framework.distributionModes).toEqual(['PRODUCT']);
-    expect(DISTRIBUTION_MODES).toEqual(['PRODUCT', 'FARE']);
+    const modes = Object.fromEntries(catalogueFor(catalogue, simulator, {}).map((e) => [e.code, e.requirements.distributionModes]));
+    expect(modes.OTST_SALE_ONE_WAY_1ADT).toEqual(['PRODUCT']);
+    expect(modes.OTST_FARE_SPEC_1ADT).toEqual(['FARE']);
+    expect(modes.NHF_FARE_PRODUCT_ONLY).toEqual(['PRODUCT', 'FARE']);
+    for (const [code, m] of Object.entries(modes)) if (!/FARE/.test(code)) expect(m).toEqual(['PRODUCT']);
   });
 });

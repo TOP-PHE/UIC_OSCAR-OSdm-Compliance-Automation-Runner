@@ -298,6 +298,26 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the server's list; `clickDistributionMode()` before the click switch;
     the last mode cannot be unticked). The simulator references take both
     modes from the profile (`fares`) until the checklist asks (#938).
+    **Fare declarations** (#937, part B, 1.11.388 / OTST_V2.0.218): `fares`
+    in the framework (`utils/fareDeclarations.js`, pure): `clusters`,
+    `combinationModels`, `statedRefundFee`, `reservations` (BICYCLE),
+    `salesFlows` (SALE, REFUND_FULL), `freeUnderAge`; absent = every cluster,
+    either model, no fee, none, SALE only, not declared. An unknown key is a
+    400 at the three writers (`fareDeclarationsProblem()`, after
+    `distributionModesProblem()` with `||`). The catalogue's 16 `…FARE…`
+    entries need what `fareRequirementsOf()` reads (entry `combinationModel`,
+    `limit` `FREE_CHILD`); `fareMissing()` speaks only once FARE is declared;
+    `missingFor()` takes the highest `minOsdmVersion` (`minimumVersionOf()`).
+    A fare entry is never convertible (its sections name its trip). The copy:
+    `fareClusterFor()`, `freeChildPassengers()` (age − 1), and
+    `mappedSections()` (`utils/fareSections.js`) in `copiedScenario()`: ends by
+    position, an inner station becomes the last before the destination, a
+    one-leg trip takes the whole trip, a station not on the trip is left as
+    it is. Editor: `faresPanelHtml()` in the Distribution section, hidden
+    without FARE; `clickFarePanel()` / `changeFareAge()` before their
+    switches; `FW_FARE_LISTS` pinned by `ui-scripts.test.js`. References:
+    `referenceFares(profile)`. No run-time warning for undeclared fare
+    features yet.
   - **AI analysis of results** (#801; PR 1 = 1.11.318, access only; per
     provider since 1.11.320). Two locks, no switch: a Test Manager's
     `ai_access_request`, **one row per (company or provider, user)**, naming
