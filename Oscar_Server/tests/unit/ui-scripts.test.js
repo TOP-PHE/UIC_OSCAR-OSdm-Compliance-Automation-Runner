@@ -1438,7 +1438,7 @@ describe('the Report Builder offer request options section', () => {
         all: { count: 2, status: 200, result: 'toString' },
       },
     });
-    expect(out).not.toMatch(/<(b|i|x|script)>/);
+    for (const tag of ['<b>', '<i>', '<x>', '<script>']) expect(out.includes(tag)).toBe(false);
     expect(out).toContain('NOT answered — &#60;i&#62;');
     expect(out).toContain('<td>Error</td><td>Declared</td>');
     expect(out).toContain('a + b: HTTP 200, Supported, kept to');
