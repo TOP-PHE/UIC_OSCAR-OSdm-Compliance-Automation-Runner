@@ -1385,8 +1385,8 @@ describe('the offer request options settings', () => {
   const run = (value, action, stored) => {
     const wizData = { framework: stored === undefined ? {} : { offerOptionDiscovery: stored } };
     let saved = 0;
-    const offerOptionCeilingOf = loadFunction('js/scenarios.js', 'offerOptionCeilingOf');
-    const change = loadFunction('js/scenarios.js', 'changeOfferOptionDiscovery', { wizData, offerOptionCeilingOf, saveFrameworkDebounced: () => { saved += 1; } });
+    const applyOfferOptionCeiling = loadFunction('js/scenarios.js', 'applyOfferOptionCeiling');
+    const change = loadFunction('js/scenarios.js', 'changeOfferOptionDiscovery', { wizData, applyOfferOptionCeiling, saveFrameworkDebounced: () => { saved += 1; } });
     const el = { value };
     const handled = change(action, el);
     return { handled, fw: wizData.framework, saved, el };

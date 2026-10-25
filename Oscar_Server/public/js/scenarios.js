@@ -4212,11 +4212,21 @@ function fwOfferOptionsHtml(fw) {
       <div style="margin-top:14px">${promotion}</div>`;
 }
 
-// The ceiling typed: a number from 3 to 200, '' to clear it, null when refused.
-function offerOptionCeilingOf(raw) {
-  if (raw === '') return '';
+// The ceiling typed into `settings` (changed in place): a number from 3 to
+// 200 is kept, an empty field clears it. False when the text is refused,
+// and the field then shows the stored value again.
+function applyOfferOptionCeiling(settings, el) {
+  const raw = el.value.trim();
   const n = Number(raw);
-  return Number.isInteger(n) && n >= 3 && n <= 200 ? n : null;
+  if (raw === '') {
+    delete settings.maxRequests;
+  } else if (Number.isInteger(n) && n >= 3 && n <= 200) {
+    settings.maxRequests = n;
+  } else {
+    el.value = Number.isInteger(settings.maxRequests) ? settings.maxRequests : '';
+    return false;
+  }
+  return true;
 }
 
 // The two settings of the offer request options scenario; true when handled.
@@ -4224,17 +4234,12 @@ function changeOfferOptionDiscovery(action, el) {
   if (action !== 'fw-option-max-requests' && action !== 'fw-option-invalid-values') return false;
   const fw = wizData.framework;
   const settings = { ...fw.offerOptionDiscovery };
-  if (action === 'fw-option-invalid-values') {
-    if (el.value === 'skip') settings.invalidValues = 'skip';
-    else delete settings.invalidValues;
+  if (action === 'fw-option-max-requests') {
+    if (!applyOfferOptionCeiling(settings, el)) return true;
+  } else if (el.value === 'skip') {
+    settings.invalidValues = 'skip';
   } else {
-    const ceiling = offerOptionCeilingOf(el.value.trim());
-    if (ceiling === null) {
-      el.value = Number.isInteger(settings.maxRequests) ? settings.maxRequests : '';
-      return true;
-    }
-    if (ceiling === '') delete settings.maxRequests;
-    else settings.maxRequests = ceiling;
+    delete settings.invalidValues;
   }
   if (Object.keys(settings).length > 0) fw.offerOptionDiscovery = settings;
   else delete fw.offerOptionDiscovery;
