@@ -59,7 +59,11 @@ function columnName(index) {
 function sheetName(name, used) {
   const base = String(name || 'Sheet').replaceAll(/[:\\/?*[\]]/g, ' ').trim().slice(0, 31) || 'Sheet';
   let candidate = base;
-  for (let n = 2; used.has(candidate.toLowerCase()); n += 1) candidate = `${base.slice(0, 28)} ${n}`;
+  let n = 2;
+  while (used.has(candidate.toLowerCase())) {
+    candidate = `${base.slice(0, 28)} ${n}`;
+    n += 1;
+  }
   used.add(candidate.toLowerCase());
   return candidate;
 }
@@ -71,13 +75,19 @@ function cellXml(value, ref, style) {
   return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xmlText(value)}</t></is></c>`;
 }
 
+// One row of cells, row number r (1-based), each cell in the style given.
+function rowXml(cells, r, style) {
+  const inner = cells.map((v, i) => cellXml(v, columnName(i) + r, style)).join('');
+  return `<row r="${r}">${inner}</row>`;
+}
+
 function sheetXml(sheet) {
   const columns = sheet.columns || [];
   const rows = (sheet.rows || []).slice(0, MAX_ROWS);
   const last = columnName(Math.max(columns.length, 1) - 1);
   const cols = columns.map((c, i) => `<col min="${i + 1}" max="${i + 1}" width="${Number(c.width) || 14}" customWidth="1"/>`).join('');
-  const header = `<row r="1">${columns.map((c, i) => cellXml(c.title, `${columnName(i)}1`, 1)).join('')}</row>`;
-  const body = rows.map((row, r) => `<row r="${r + 2}">${row.map((v, i) => cellXml(v, `${columnName(i)}${r + 2}`, 2)).join('')}</row>`).join('');
+  const header = rowXml(columns.map((c) => c.title), 1, 1);
+  const body = rows.map((row, r) => rowXml(row, r + 2, 2)).join('');
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
     + '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
@@ -100,6 +110,15 @@ const STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
   + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
   + '</styleSheet>';
 
+// The workbook's name for a sheet's filter range (Excel writes it, and reads
+// the filter from it).
+function filterName(sheet, index) {
+  const lastColumn = columnName(Math.max((sheet.columns || []).length, 1) - 1);
+  const lastRow = Math.min((sheet.rows || []).length, MAX_ROWS) + 1;
+  const name = xmlText(sheet.name).replaceAll("'", "''");
+  return `<definedName name="_xlnm._FilterDatabase" localSheetId="${index}" hidden="1">'${name}'!$A$1:$${lastColumn}$${lastRow}</definedName>`;
+}
+
 /** The .xlsx file of the sheets, as a Buffer. */
 function workbook(sheets) {
   const used = new Set();
@@ -121,7 +140,7 @@ function workbook(sheets) {
     + `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${ns}"><sheets>`
     + list.map((s, i) => `<sheet name="${xmlText(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')
     + '</sheets>'
-    + `<definedNames>${list.map((s, i) => `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${xmlText(s.name).replaceAll("'", "''")}'!$A$1:$${columnName(Math.max((s.columns || []).length, 1) - 1)}$${Math.min((s.rows || []).length, MAX_ROWS) + 1}</definedName>`).join('')}</definedNames>`
+    + `<definedNames>${list.map(filterName).join('')}</definedNames>`
     + '</workbook>';
   const bookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'

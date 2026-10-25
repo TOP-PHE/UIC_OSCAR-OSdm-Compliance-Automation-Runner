@@ -107,7 +107,8 @@ function warningLinesOf(latest) {
       let text = '';
       try { text = colDecrypt(row.message) || ''; } catch { text = ''; }
       const code = codeOf.get(row.run_id);
-      (out[code] ||= []).push(...String(text).split('\n').filter((l) => l.includes('[WARNING]')));
+      if (!out[code]) out[code] = [];
+      out[code].push(...String(text).split('\n').filter((l) => l.includes('[WARNING]')));
     }
   }
   return out;
