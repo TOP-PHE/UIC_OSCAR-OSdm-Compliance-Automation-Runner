@@ -400,6 +400,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
         </table>
       </div>
     </div>
+    <div class="card" id="offer-options-card" style="display:none">
+      <div class="card-title">Offer Request Options</div>
+      <div class="card-body" id="offer-options-body"></div>
+    </div>
     <div class="card">
       <div class="card-title">Breakdown by Domain</div>
       <div class="card-body">
@@ -759,6 +763,7 @@ function renderReport() {
     + '<div class="summary-stat rate"><div class="val">' + rate + '%</div><div class="lbl">Pass Rate</div></div>';
 
   renderCapabilityMatrix(reportData.capability_matrix || []);
+  renderOfferOptions(reportData.offer_options || []);
   renderBreakdown('domain-breakdown', reportData.by_domain || [], 'domain');
   renderBreakdown('category-breakdown', reportData.by_category || [], 'category');
   renderAssertions(reportData.suites || []);
@@ -1031,6 +1036,67 @@ function renderCapabilityMatrix(rows) {
   }).join('');
 }
 
+/* ── Offer request options (#227) ──────────────────────────────────────────
+ * One table per run of the offer request options scenario: what the provider
+ * did with each optional member of the offer request, sent alone, then the
+ * combinations and every supported option at once.
+ */
+var OFFER_OPTION_RESULTS = {
+  'honoured': 'Supported, kept to', 'accepted': 'Supported (nothing to check)',
+  'ignored-said': 'Ignored, said', 'ignored-silent': 'Ignored, not said',
+  'no-offer-said': 'No offer, said', 'no-offer-silent': 'No offer, not said',
+  'invalid-said': 'Made-up value refused or said', 'invalid-silent': 'Made-up value taken without a word',
+  'refused': 'Refused', 'not-implemented': 'Not implemented', 'error': 'Error',
+  'not-tested': 'Not tested', 'not-reached': 'Not reached (request budget)'
+};
+
+function offerOptionResultLabel(result) {
+  return Object.hasOwn(OFFER_OPTION_RESULTS, result) ? OFFER_OPTION_RESULTS[result] : String(result || '');
+}
+
+function offerOptionDeclaredLabel(declared) {
+  if (declared === true) return 'Declared';
+  if (declared === false) return 'Declared not supported';
+  return '';
+}
+
+function offerOptionRunHtml(entry) {
+  var r = entry.report || {};
+  var mandatory = '';
+  if (r.mandatory) {
+    mandatory = r.mandatory.ok ? 'answered' : 'NOT answered';
+    if (r.mandatory.message) mandatory += ' — ' + r.mandatory.message;
+  }
+  var rows = (r.options || []).map(function(o) {
+    var value = o.value != null ? String(o.value) : '';
+    if (value && o.source) value += ' (' + o.source + ')';
+    return '<tr><td>' + escHtml(o.option) + '</td><td>' + escHtml(value) + '</td>'
+      + '<td>' + (o.status != null ? escHtml(o.status) : '-') + '</td>'
+      + '<td>' + escHtml(offerOptionResultLabel(o.result)) + '</td>'
+      + '<td>' + escHtml(offerOptionDeclaredLabel(o.declared)) + '</td>'
+      + '<td>' + escHtml(o.message || '') + '</td></tr>';
+  }).join('');
+  var requests = (r.combinations || []).map(function(c) {
+    return '<li>' + escHtml((c.options || []).join(' + ')) + ': HTTP ' + escHtml(c.status) + ', ' + escHtml(offerOptionResultLabel(c.result)) + (c.message ? ' — ' + escHtml(c.message) : '') + '</li>';
+  });
+  if (r.all) requests.push('<li>Every supported option (' + escHtml(r.all.count) + '): HTTP ' + escHtml(r.all.status) + ', ' + escHtml(offerOptionResultLabel(r.all.result)) + (r.all.message ? ' — ' + escHtml(r.all.message) : '') + '</li>');
+  return '<div style="margin-bottom:18px">'
+    + '<div style="font-size:13px;color:#37474f;line-height:1.6;margin-bottom:8px"><strong>' + escHtml(entry.scenario_code || entry.run_id) + '</strong>'
+    + ' &middot; OSDM ' + escHtml(r.version || '?') + ' &middot; ' + escHtml(r.used) + ' of ' + escHtml(r.budget) + ' request(s) &middot; seed ' + escHtml(r.seed)
+    + '<br>Mandatory members only: ' + escHtml(mandatory) + '</div>'
+    + '<table class="cap-table"><thead><tr><th>Option</th><th>Value sent</th><th>HTTP</th><th>Result</th><th>Test Framework</th><th>Detail</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>'
+    + (requests.length ? '<ul style="font-size:12px;color:#37474f;margin:8px 0 0 18px">' + requests.join('') + '</ul>' : '')
+    + '</div>';
+}
+
+function renderOfferOptions(list) {
+  var card = document.getElementById('offer-options-card');
+  if (!Array.isArray(list) || list.length === 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('offer-options-body').innerHTML = list.map(offerOptionRunHtml).join('');
+}
+
 /* Render a context blob (refund mode, flexibility filter, pax count, …) as
  * a row of small chips under the endpoint label. A handful of keys get
  * highlight classes so the eye catches them; everything else falls back to
@@ -1160,6 +1226,23 @@ function exportCSV() {
         r.http_status != null ? String(r.http_status) : '',
         r.vendor_capability || 'UNKNOWN'
       ]);
+    });
+    rows.push([]);
+  }
+
+  // #227: the offer request options, one row per option and run.
+  if (Array.isArray(reportData.offer_options) && reportData.offer_options.length) {
+    rows.push(
+      ['--- OFFER REQUEST OPTIONS ---'],
+      ['Scenario','Option','Value sent','Source','HTTP Status','Result','Test Framework','Detail']
+    );
+    reportData.offer_options.forEach(function(entry) {
+      ((entry.report || {}).options || []).forEach(function(o) {
+        rows.push([
+          entry.scenario_code || entry.run_id || '', o.option || '', o.value != null ? String(o.value) : '', o.source || '',
+          o.status != null ? String(o.status) : '', o.result || '', offerOptionDeclaredLabel(o.declared), o.message || ''
+        ]);
+      });
     });
     rows.push([]);
   }

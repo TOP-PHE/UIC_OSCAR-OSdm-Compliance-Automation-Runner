@@ -372,7 +372,7 @@ Test Manager shares with them.
 #### Step 1. Send the blank checklist to the provider
 
 The blank checklist is
-[`OSCAR_Checklist_TEMPLATE_V01.06.docx`](OSCAR_Checklist_TEMPLATE_V01.06.docx),
+[`OSCAR_Checklist_TEMPLATE_V01.07.docx`](OSCAR_Checklist_TEMPLATE_V01.07.docx),
 next to this guide. Its version is in its name (`Vxx.yy`); the folder keeps
 the two versions before it too, for a provider who already has one. It asks
 the provider, in business terms, what their system does:

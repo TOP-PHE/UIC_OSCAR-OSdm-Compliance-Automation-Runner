@@ -184,6 +184,8 @@ const STACK_FRAME_WITH_PARENS = /^\s*at\s+(?:\S[^\s(]*\(|\S+\s+\().*:\d+:\d+\)\s
 // Bruno CLI request row: "<folder>/<request name> (<status text>)", with either
 // slash. The request name is everything up to the whitespace before the first
 // "(", written so the pattern cannot backtrack over that whitespace.
+const OFFER_OPTIONS_MARK = '🧭';
+
 const FOLDER_REQUEST_ROW = /^([^()\\/]+)[\\/]([^()]*[^()\s]|\s)\s+\(([^)]+)\)/;
 
 // #336 (v1.11.113): infer the actual log level from the line content
@@ -344,6 +346,10 @@ class LogParser {
         if (m) httpStatus = Number.parseInt(m[1], 10);
       } else if (/^\[runner\]/i.test(trimmed)) {
         category = 'system';
+      } else if (hasLevelTag && trimmed.includes(OFFER_OPTIONS_MARK)) {
+        // #227 part 3: the offer request options report, read back by the
+        // Report Builder (utils/offerOptionReport.js) through this category.
+        category = 'offer_options';
       } else if (/401|token|auth|oauth|login/i.test(trimmed)) {
         category = 'auth';
         const m = trimmed.match(/\b(401)\b/);

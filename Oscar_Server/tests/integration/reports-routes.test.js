@@ -564,6 +564,40 @@ describe('reports — POST /configured', () => {
   });
 });
 
+// #227 part 3: the offer request options report, read back from the log lines
+// the runner files under category 'offer_options'.
+describe('reports — POST /configured, offer request options', () => {
+  test('a run that ran the discovery gets its report; others none', async () => {
+    const lines = [
+      '[INFO] 🧭 Offer request options (#227) — OSDM 3.8.0, budget 30 request(s), 4 used, seed 7.',
+      '[INFO] 🧭 Phase 1, mandatory members only: answered — 3 offer(s)',
+      '[INFO] 🧭   promotionCodes [declared] = [{"code":"SIM-PROMO-10"}] (declared): HTTP 200, accepted',
+      '[INFO] 🧭   embed: HTTP 500, error — Internal error',
+    ];
+    for (const line of lines) {
+      run(`INSERT INTO run_events (run_id, level, message, category, event_kind) VALUES (?, 'info', ?, 'offer_options', 'log')`, [runA, colEncrypt(line)]);
+    }
+    try {
+      const res = await request(app).post('/v1/reports/configured')
+        .set('Authorization', `Bearer ${makeToken('company_user')}`)
+        .send({ run_ids: [runA], filters: {} });
+      expect(res.status).toBe(200);
+      expect(res.body.offer_options).toHaveLength(1);
+      const [entry] = res.body.offer_options;
+      expect(entry.run_id).toBe(runA);
+      expect(entry.counts).toEqual({ accepted: 1, error: 1 });
+      expect(entry.report.options[0]).toMatchObject({ option: 'promotionCodes', declared: true, status: 200, source: 'declared', result: 'accepted' });
+      expect(entry.report.options[1]).toMatchObject({ option: 'embed', status: 500, result: 'error', message: 'Internal error' });
+    } finally {
+      run(`DELETE FROM run_events WHERE run_id = ? AND category = 'offer_options'`, [runA]);
+    }
+    const none = await request(app).post('/v1/reports/configured')
+      .set('Authorization', `Bearer ${makeToken('company_user')}`)
+      .send({ run_ids: [runA], filters: {} });
+    expect(none.body.offer_options).toEqual([]);
+  });
+});
+
 // ── Request messages ──────────────────────────────────────────────────────────
 describe('reports — GET /requests/:id/messages', () => {
   test('400 for a non-numeric request id', async () => {

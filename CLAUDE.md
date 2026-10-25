@@ -282,8 +282,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     supported one declared unsupported an INFO line. Editor: under the
     tariff section (`fwOfferOptionsHtml()`, `changeOfferOptionDiscovery()`
     before the change switch; the code lists are `FW_LISTS` `corporate` /
-    `promotion`). Left for PR 3: the checklist question, the Report
-    Builder section.
+    `promotion`).
+    **PR 3 (1.11.394): checklist and Report Builder.** Template V01.07:
+    A2.5 `fw.offerOptionDiscovery.maxRequests`, P1.19 / P1.20 the
+    `data.corporateCode.<n>.code|issuer` / `data.promotionCode.<n>.code`
+    tables, P1.21 `fw.offerOptionDiscovery.invalidValues` (random / skip);
+    `withOfferOptionChecklist()` drops what the writers would refuse (a
+    ceiling outside 3–200, a code over 60 characters or holding `{{`). The
+    simulators declare promotion code `SIM-PROMO-10`, no corporate code. The
+    scenario's requests are not in Bruno's results, so **the report reaches
+    the server through its log**: the runner files a tagged line holding 🧭
+    under `run_events.category = 'offer_options'`, and
+    `utils/offerOptionReport.js` `reportOf()` reads `reportLines()`' text
+    back (`offer-option-report.test.js` runs the collection's own
+    `reportLines()` over 300 drawn reports: change both or neither).
+    `POST /v1/reports/configured` answers `offer_options` (run, scenario,
+    counts, report); the page's *Offer Request Options* card and the CSV's
+    section show it. Runs from before 1.11.394 have no such lines.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.428",
+  "current_release": "2026.429",
   "releases": [
+    {
+      "release": "2026.429",
+      "date": "2026-10-25",
+      "server": "1.11.394",
+      "collection": "OTST_V2.0.223",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#227 PR 3: checklist template V01.07 asks the scenario's ceiling (A2.5), the provider's corporate and promotion codes (P1.19, P1.20) and what to do with an option no value is declared for (P1.21), read on import; the Report Builder shows the offer request options report of each run (and exports it to CSV), read back from the run's log. Collection: the simulator references declare promotion code SIM-PROMO-10 and no corporate code."
+      ]
+    },
     {
       "release": "2026.428",
       "date": "2026-10-25",

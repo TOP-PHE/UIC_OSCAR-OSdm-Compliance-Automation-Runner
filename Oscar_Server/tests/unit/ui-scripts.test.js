@@ -1418,3 +1418,38 @@ describe('the offer request options settings', () => {
     expect(html).toContain('<list promotionCodes>');
   });
 });
+
+// #227 part 3: the Report Builder's offer request options section.
+describe('the Report Builder offer request options section', () => {
+  const page = 'report-builder.html';
+  const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.codePointAt(0)};`);
+  const OFFER_OPTION_RESULTS = { honoured: 'Supported, kept to', error: 'Error' };
+  const offerOptionResultLabel = loadFunction(page, 'offerOptionResultLabel', { OFFER_OPTION_RESULTS });
+  const offerOptionDeclaredLabel = loadFunction(page, 'offerOptionDeclaredLabel');
+  const html = loadFunction(page, 'offerOptionRunHtml', { escHtml, offerOptionResultLabel, offerOptionDeclaredLabel });
+
+  test('every text of the report is escaped, and results and declarations are named', () => {
+    const out = html({
+      scenario_code: 'SIM_<b>',
+      report: {
+        version: '3.8.0', used: 5, budget: 30, seed: 7, mandatory: { ok: false, message: '<i>none</i>' },
+        options: [{ option: 'embed<x>', value: '"v"', source: 'random', status: 500, result: 'error', declared: true, message: '<script>' }],
+        combinations: [{ options: ['a', 'b'], status: 200, result: 'honoured' }],
+        all: { count: 2, status: 200, result: 'toString' },
+      },
+    });
+    for (const tag of ['<b>', '<i>', '<x>', '<script>']) expect(out.includes(tag)).toBe(false);
+    expect(out).toContain('NOT answered — &#60;i&#62;');
+    expect(out).toContain('<td>Error</td><td>Declared</td>');
+    expect(out).toContain('a + b: HTTP 200, Supported, kept to');
+    expect(out).toContain('Every supported option (2): HTTP 200, toString');
+    expect(offerOptionDeclaredLabel(false)).toBe('Declared not supported');
+    expect(offerOptionDeclaredLabel(undefined)).toBe('');
+  });
+
+  test('the section is drawn after the capability matrix and exported to the CSV', () => {
+    const source = read(page);
+    expect(source).toContain('renderOfferOptions(reportData.offer_options || []);');
+    expect(source).toContain("['--- OFFER REQUEST OPTIONS ---'],");
+  });
+});

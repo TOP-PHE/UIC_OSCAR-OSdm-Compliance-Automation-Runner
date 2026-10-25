@@ -28,6 +28,7 @@ const { requireAuth, isPlatformRole } = require('../middleware/auth');
 // administrator → null (operations role only), certifier → only runs the
 // test_manager explicitly shared, tester/test_manager → own company.
 const { canUserSeeRun } = require('../helpers/run-access');
+const { reportOf, countsOf } = require('../../utils/offerOptionReport');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
 const { compareRuns } = require('../../reports/diff');
 
@@ -191,6 +192,32 @@ router.get('/comparisons/:id', (req, res) => {
     ...JSON.parse(row.diff_json)
   });
 });
+
+// #227 part 3: the offer request options report of each run that ran the
+// discovery, read back from its log (the runner files those lines under
+// category 'offer_options').
+function offerOptionReportsOf(runIds) {
+  const placeholders = runIds.map(() => '?').join(',');
+  const optionRows = all(
+    `SELECT run_id, message FROM run_events
+     WHERE run_id IN (${placeholders}) AND category = 'offer_options'
+     ORDER BY id ASC LIMIT 5000`,
+    [...runIds]
+  );
+  const linesByRun = new Map();
+  for (const row of optionRows) {
+    if (!linesByRun.has(row.run_id)) linesByRun.set(row.run_id, []);
+    linesByRun.get(row.run_id).push(colDecrypt(row.message));
+  }
+  if (linesByRun.size === 0) return [];
+  const scenarioOf = new Map(all(`SELECT id, scenario_code FROM runs WHERE id IN (${placeholders})`, [...runIds]).map(r => [r.id, r.scenario_code]));
+  const reports = [];
+  for (const [runId, lines] of linesByRun) {
+    const report = reportOf(lines);
+    if (report) reports.push({ run_id: runId, scenario_code: scenarioOf.get(runId) || null, counts: countsOf(report), report });
+  }
+  return reports;
+}
 
 // ── POST /v1/reports/configured ───────────────────────────────────────────────
 // Generates a filtered assertion report for selected runs.
@@ -427,6 +454,8 @@ router.post('/configured', (req, res) => {
   });
   const capability_matrix = Object.values(capMatrix);
 
+  const offer_options = offerOptionReportsOf(run_ids);
+
   return res.json({
     title: title || 'OSDM Conformance Report',
     generated_at: new Date().toISOString(),
@@ -438,6 +467,7 @@ router.post('/configured', (req, res) => {
     suites,
     events,
     capability_matrix,
+    offer_options,
     assertions
   });
 });
