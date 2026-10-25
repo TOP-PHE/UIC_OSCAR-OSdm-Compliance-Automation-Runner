@@ -194,13 +194,38 @@ function scenarioHash(scenario) {
 
 // ── Runs and the coverage ───────────────────────────────────────────────────
 
+// A failed check that stops the scenario short of its goal (#956 part 4): a
+// status the step did not expect, a script that broke, a prerequisite
+// missing. Any other failed check (a field, a structure, a consistency) is a
+// defect of a flow that went through.
+const BLOCKING_CATEGORIES = new Set(['http_status', 'script_error', 'prerequisite']);
+const MAX_CHECK_TEXT = 300;
+
 /**
- * The result of one run: passed / failed, from its checks (a run whose
- * Bruno stopped with no check counts as failed).
+ * What a run's failed checks say, from its failed check rows in order
+ * ({ request_name, assertion_name, category, severity }): { blocking, step,
+ * check } of the first blocking one, else of the first one; null when none.
+ */
+function failureOf(rows) {
+  const list = arr(rows).filter(isObj);
+  if (list.length === 0) return null;
+  const isBlocking = (r) => BLOCKING_CATEGORIES.has(r.category) || r.severity === 'critical';
+  const first = list.find(isBlocking) || list[0];
+  return {
+    blocking: isBlocking(first),
+    step: typeof first.request_name === 'string' ? first.request_name : null,
+    check: String(first.assertion_name ?? '').slice(0, MAX_CHECK_TEXT),
+  };
+}
+
+/**
+ * The result of one run, from its checks: passed; failed when a failed check
+ * blocked it (or when its failures were not read, or Bruno stopped with no
+ * check); defects when every failed check let the flow go through.
  */
 function resultOf(run) {
   if (!run) return 'never-run';
-  if (run.failed > 0) return 'failed';
+  if (run.failed > 0) return run.failure?.blocking === false ? 'defects' : 'failed';
   if (run.total > 0) return 'passed';
   return run.status === 'COMPLETED' ? 'passed' : 'failed';
 }
@@ -222,6 +247,7 @@ function scenarioEntry(scenario, run, context) {
       id: run.id, at: run.completed_at || run.queued_at, passed: run.total - run.failed, failed: run.failed,
       serverVersion: run.server_version || null, collectionVersion: run.collection_version || null,
     };
+    if (run.failure) Object.assign(entry.run, { blocking: run.failure.blocking, failedStep: run.failure.step, failedCheck: run.failure.check });
   }
   return entry;
 }
@@ -229,8 +255,7 @@ function scenarioEntry(scenario, run, context) {
 // The state of one function from its scenarios.
 function stateOf(scenarios) {
   if (scenarios.length === 0) return 'not-covered';
-  if (scenarios.some((s) => s.result === 'failed')) return 'failed';
-  if (scenarios.some((s) => s.result === 'passed')) return 'passed';
+  for (const state of ['failed', 'defects', 'passed']) if (scenarios.some((s) => s.result === state)) return state;
   return 'never-run';
 }
 
@@ -269,7 +294,7 @@ function coverageOf({ framework, datafile, runs = {}, findings = [], collectionV
   return {
     summary: {
       declared: functions.length, covered: functions.length - count('not-covered'),
-      passed: count('passed'), failed: count('failed'), neverRun: count('never-run'), notCovered: count('not-covered'),
+      passed: count('passed'), withDefects: count('defects'), failed: count('failed'), neverRun: count('never-run'), notCovered: count('not-covered'),
       toRunAgain: functions.filter((f) => f.toRunAgain).length, latestRunAt: dates.at(-1) || null,
     },
     functions,
@@ -305,6 +330,6 @@ function latestRunsOf(rows) {
 }
 
 module.exports = {
-  declaredFunctions, functionsOf, scenarioHash, coverageOf, latestRunsOf, resultOf, toRunAgain,
+  declaredFunctions, functionsOf, scenarioHash, coverageOf, latestRunsOf, resultOf, toRunAgain, failureOf, stateOf,
   scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf, SALES_FLOW_TEXT, OPTION_TEXT,
 };

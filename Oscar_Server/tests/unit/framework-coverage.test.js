@@ -107,7 +107,7 @@ describe('the coverage', () => {
     expect(row('currency:CHF').scenarios[0].run).toMatchObject({ id: 'r2', passed: 7, failed: 3, collectionVersion: 'V0' });
     expect(row('salesFlow:REFUND_FULL').state).toBe('never-run');
     expect(row('salesFlow:EXCHANGE_FULL').state).toBe('not-covered');
-    expect(c.summary).toEqual({ declared: 6, covered: 5, passed: 1, failed: 3, neverRun: 1, notCovered: 1, toRunAgain: 3, latestRunAt: '2026-10-21 08:00:00' });
+    expect(c.summary).toEqual({ declared: 6, covered: 5, passed: 1, withDefects: 0, failed: 3, neverRun: 1, notCovered: 1, toRunAgain: 3, latestRunAt: '2026-10-21 08:00:00' });
   });
 
   test('a changed scenario is to run again; a run that recorded nothing says nothing', () => {
@@ -123,6 +123,22 @@ describe('the coverage', () => {
     const c = C.coverageOf({ framework, datafile: df });
     expect(c.notDeclared).toEqual([{ code: 'X', warnings: ['currency:PLN'] }]);
     expect(df.scenarios[0].__featureNotDeclaredWarnings).toBeUndefined();
+  });
+
+  test('a failure is blocking only when it stops the flow (#956 part 4)', () => {
+    const check = (category, extra = {}) => ({ request_name: '07. GET Booking', assertion_name: `x ${category}`, category, ...extra });
+    expect(C.failureOf([])).toBeNull();
+    expect(C.failureOf([check('field_validation'), check('response_structure')])).toEqual({ blocking: false, step: '07. GET Booking', check: 'x field_validation' });
+    expect(C.failureOf([check('field_validation'), { ...check('http_status'), request_name: '02. POST Booking' }]))
+      .toEqual({ blocking: true, step: '02. POST Booking', check: 'x http_status' });
+    for (const c of ['script_error', 'prerequisite']) expect(C.failureOf([check(c)]).blocking).toBe(true);
+    expect(C.failureOf([check('business_logic', { severity: 'critical' })]).blocking).toBe(true);
+    expect(C.failureOf([check('business_logic', { assertion_name: 'y'.repeat(400) })]).check).toHaveLength(300);
+    expect(C.resultOf({ failed: 2, total: 9, failure: { blocking: false } })).toBe('defects');
+    expect(C.resultOf({ failed: 2, total: 9, failure: { blocking: true } })).toBe('failed');
+    expect(C.resultOf({ failed: 2, total: 9 })).toBe('failed');
+    expect(C.stateOf([{ result: 'passed' }, { result: 'defects' }])).toBe('defects');
+    expect(C.stateOf([{ result: 'defects' }, { result: 'failed' }])).toBe('failed');
   });
 
   test('results of a run, and the latest finished run per scenario', () => {

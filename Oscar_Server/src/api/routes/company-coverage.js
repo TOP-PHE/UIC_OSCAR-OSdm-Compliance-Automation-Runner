@@ -35,7 +35,7 @@ const { frameworkConfigOf } = require('../helpers/configurationStore');
 const { viewForTester } = require('../../utils/datafileOwnership');
 const { getRunSelection } = require('../../utils/runSelections');
 const { currentCollectionVersion } = require('../../utils/versionInfo');
-const { coverageOf, latestRunsOf } = require('../../utils/frameworkCoverage');
+const { coverageOf, latestRunsOf, failureOf } = require('../../utils/frameworkCoverage');
 const { coverageMatrixOf } = require('../../utils/coverageMatrix');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const log = require('../../utils/logger').child({ module: 'company-coverage' });
@@ -52,12 +52,30 @@ const DEFAULT_DAYS = 365;
 const MAX_DAYS = 3650;
 const MAX_RUNS = 20000;
 const MAX_WARNING_EVENTS = 20000;
+const MAX_FAILED_CHECKS = 50000;
 
 // The window of runs read, in days: a whole number from 1 to 3650.
 function daysOf(raw) {
   if (raw === undefined) return DEFAULT_DAYS;
   const n = typeof raw === 'string' && /^\d{1,4}$/.test(raw) ? Number(raw) : Number.NaN;
   return Number.isInteger(n) && n >= 1 && n <= MAX_DAYS ? n : null;
+}
+
+// The failed checks of the runs, by run, in order, with their step.
+function failedChecksOf(ids) {
+  const byRun = new Map();
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const rows = all(`SELECT a.run_id, a.assertion_name, a.category, a.severity, q.request_name
+                        FROM run_assertions a JOIN run_requests q ON q.id = a.request_id
+                       WHERE a.passed = 0 AND a.run_id IN (${chunk.map(() => '?').join(',')})
+                       ORDER BY a.id ASC LIMIT ${MAX_FAILED_CHECKS}`, chunk);
+    for (const row of rows) {
+      if (!byRun.has(row.run_id)) byRun.set(row.run_id, []);
+      byRun.get(row.run_id).push(row);
+    }
+  }
+  return byRun;
 }
 
 // The latest finished run of each scenario of the company within the window,
@@ -88,6 +106,8 @@ function latestRuns(companyId, days) {
     run.total = c ? Number(c.total) : 0;
     run.failed = c ? Number(c.failed) : 0;
   }
+  const failures = failedChecksOf(ids);
+  for (const run of Object.values(latest)) run.failure = failureOf(failures.get(run.id));
   return latest;
 }
 

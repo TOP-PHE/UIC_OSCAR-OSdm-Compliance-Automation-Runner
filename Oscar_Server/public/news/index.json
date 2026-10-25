@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-25-coverage-blocking-or-defect",
+    "date": "October 25, 2026",
+    "tag": "Changed",
+    "title": "Coverage: blocking failures, defects, and which scenarios to look at",
+    "summary": "A flow is no longer Failed for a small defect: only a failure that stops a scenario fails it, and the scenarios to look at are listed with a link to their run.",
+    "content": "A scenario whose failed checks let its flow go through (a field, a structure, a price consistency) now reads Passed with defects. A scenario is Failed when a step answered a status it should not, its script broke or a prerequisite was missing. Each line of the coverage says how many of its scenarios passed, and lists those that did not, blocked first, with their first failed step and a link to the run.\n\nUnder a refund or an exchange, only what the after-sale itself tests is listed (the partial refund scope, the IROPS code): the trip, passengers and currency belong to the sale before it."
+  },
+  {
     "id": "2026-10-25-coverage-by-flow-and-element",
     "date": "October 25, 2026",
     "tag": "Added",

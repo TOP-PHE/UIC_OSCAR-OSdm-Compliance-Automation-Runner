@@ -171,6 +171,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .cov-passed{background:#e8f5e9;color:#2e7d32}
 .cov-failed{background:#ffebee;color:#c62828}
 .cov-never-run{background:#fff3e0;color:#bf360c}
+.cov-defects{background:#fff8e1;color:#7a4f01}
+.cov-failed-list a{color:#0d47a1}
 .cov-not-covered{background:#eceff1;color:#546e7a}
 .cov-not-declared,.cov-declared-not-supported{background:#ede7f6;color:#4527a0}
 .cov-provider{color:#bf360c}
@@ -1884,7 +1886,7 @@ document.getElementById('logs-content').addEventListener('click', function(e) {
  * certifiers, whom the route refuses.
  */
 const COVERAGE_STATES = {
-  passed: 'Passed', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario',
+  passed: 'Passed', defects: 'Passed with defects', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario',
   'not-declared': 'Not supported (not declared)', 'declared-not-supported': 'Not supported (declared)'
 };
 const COVERAGE_DECLARATIONS = {
@@ -1911,7 +1913,7 @@ function coverageSummaryText(summary, days) {
   var s = summary || {};
   var parts = [
     s.declared + ' function(s) declared', s.covered + ' with a scenario', s.passed + ' passed',
-    s.failed + ' failed', s.neverRun + ' never run', s.notCovered + ' without a scenario',
+    (s.withDefects || 0) + ' passed with defects', s.failed + ' failed', s.neverRun + ' never run', s.notCovered + ' without a scenario',
     s.toRunAgain + ' to run again'
   ];
   var latest = s.latestRunAt ? 'latest run ' + s.latestRunAt : 'no run';
@@ -1957,7 +1959,25 @@ function coverageNotDeclaredHtml(list) {
 
 function coverageCountsText(c) {
   var n = c || {};
-  return (n.scenarios || 0) + ' scenario(s): ' + (n.passed || 0) + ' passed, ' + (n.failed || 0) + ' failed, ' + (n.neverRun || 0) + ' never run';
+  return (n.passed || 0) + ' of ' + (n.scenarios || 0) + ' scenario(s) passed (' + (n.withDefects || 0) + ' with defects, '
+    + (n.failed || 0) + ' failed, ' + (n.neverRun || 0) + ' never run)';
+}
+
+// A run id read from the answer, put in a link only when it is a UUID.
+function coverageRunIdOf(id) {
+  return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : '';
+}
+
+// The scenarios of a row that did not pass, blocked first, each linked to its run.
+function coverageFailedHtml(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<ul class="cov-list cov-failed-list">' + list.map(function(f) {
+    var id = coverageRunIdOf(f.runId);
+    var name = id ? '<a href="/run-detail.html?id=' + encodeURIComponent(id) + '">' + escHtml(f.code) + '</a>' : escHtml(f.code);
+    var where = f.step ? ' at ' + f.step : '';
+    var check = f.check ? ' — ' + f.check : '';
+    return '<li>' + name + ': <strong>' + escHtml(coverageStateLabel(f.result)) + '</strong>' + escHtml(where + check) + '</li>';
+  }).join('') + '</ul>';
 }
 
 function coverageProviderText(n) {
@@ -1973,7 +1993,7 @@ function coverageMatrixRowHtml(r, flowCell) {
     + (r.toRunAgain ? '<br><small>to run again</small>' : '')
     + (r.providerNotSupported ? '<br><small class="cov-provider">' + escHtml(coverageProviderText(r.providerNotSupported)) + '</small>' : '') + '</td>'
     + '<td>' + escHtml(coverageDeclarationLabel(r.declaration)) + '</td>'
-    + '<td>' + escHtml(coverageCountsText(r.counts))
+    + '<td>' + escHtml(coverageCountsText(r.counts)) + coverageFailedHtml(r.failedScenarios)
     + (codes ? '<details><summary>Scenarios</summary><ul class="cov-list">' + codes + '</ul></details>' : '') + '</td>'
     + '<td>' + (findings ? '<ul class="cov-list">' + findings + '</ul>' : '-') + '</td></tr>';
 }
@@ -2010,11 +2030,12 @@ function mdCell(value) {
 
 function coverageMarkdown(data, title) {
   var lines = ['# Test Framework coverage — ' + mdCell(title), '', mdCell(coverageSummaryText(data.summary, data.days)),
-    '', '## By flow and element', '', '| Flow | Element tested | Result | Test Framework | Scenarios |', '|---|---|---|---|---|'];
+    '', '## By flow and element', '', '| Flow | Element tested | Result | Test Framework | Scenarios | Not passed |', '|---|---|---|---|---|---|'];
   for (const r of data.matrix || []) {
     var result = coverageStateLabel(r.result) + (r.toRunAgain ? ', to run again' : '')
       + (r.providerNotSupported ? ', ' + coverageProviderText(r.providerNotSupported) : '');
-    lines.push('| ' + [r.flowLabel, r.group + ': ' + r.label, result, coverageDeclarationLabel(r.declaration), coverageCountsText(r.counts)].map(mdCell).join(' | ') + ' |');
+    var notPassed = (r.failedScenarios || []).map(function(f) { return f.code + ' (' + coverageStateLabel(f.result) + (f.step ? ' at ' + f.step : '') + ')'; }).join('; ');
+    lines.push('| ' + [r.flowLabel, r.group + ': ' + r.label, result, coverageDeclarationLabel(r.declaration), coverageCountsText(r.counts), notPassed].map(mdCell).join(' | ') + ' |');
   }
   lines.push('', '# By function declared');
   var group = null;

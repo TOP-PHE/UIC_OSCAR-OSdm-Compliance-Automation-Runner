@@ -93,6 +93,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.398] / [collection-OTST_V2.0.223] — 2026-10-25
+
+Issue #956 (part 4), release 2026.433, from the maintainer's look at 2026.432.
+
+### Changed
+- **A failed scenario is blocking or not.** A row read Failed as soon as one of its scenarios failed a single check, which made a flow of 14 scenarios with 7 small defects look broken. Now each run's failed checks are read (`failureOf()`, `utils/frameworkCoverage.js`):
+  - **blocking**: a failed check of category `http_status`, `script_error` or `prerequisite`, or of severity critical. The scenario did not reach its goal, and its result stays Failed.
+  - **defects**: any other failed check (a field, a structure, a consistency). The flow went through, and the result is **Passed with defects**.
+  - A run whose failed checks were not read still counts as Failed.
+- **A row's result**: Failed when one of its scenarios is blocked, Passed with defects when some have defects only, Passed otherwise. The same rule applies to the view by declared function and to the summary, which now counts "passed with defects".
+- **Each row says "X of N scenario(s) passed"** (with defects, failed, never run), and **lists the scenarios not passed**, blocked first. Each is linked to its run (`/run-detail.html?id=`, the link written only for a UUID), with its first failed step and check. The Excel sheet "By flow and element" gains the columns "Passed with defects" and "Scenarios not passed". "By scenario" gains "First failed step", "First failed check" and "Run id". The Markdown export gains a "Not passed" column.
+- **An after-sale flow lists only what the after-sale tests**: its partial refund scope and IROPS code, plus its "every scenario" row. The trip, passengers, currency and offer request form of a refund or exchange scenario belong to the sale before it, and listing them under the refund read as if the refund tested them. They stay listed in the scenario's own row.
+
+### Tests
+- `framework-coverage.test.js`: what blocks and what does not, and the results of a run and of a row.
+- `coverage-matrix.test.js`: after-sale rows, a row with defects only, and a blocked scenario listed first.
+- `coverage-routes.test.js`: a run's first failed step read from its checks.
+- `ui-scripts.test.js`: the ratio, the list of scenarios not passed (links only for a UUID, every text escaped), and the Markdown.
+- Three mutations make these tests fail: nothing blocking, every element under an after-sale flow, and a link for an id that is not a UUID.
+
+---
+
 ## [server-1.11.397] / [collection-OTST_V2.0.223] — 2026-10-25
 
 Issue #956 (part 3), release 2026.432.

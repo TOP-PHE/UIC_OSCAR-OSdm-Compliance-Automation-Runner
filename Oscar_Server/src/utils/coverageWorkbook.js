@@ -24,6 +24,14 @@ const yesNo = (v) => {
   if (v === false) return 'No';
   return '';
 };
+// "CODE: Failed at <step> (<check>)", one line per scenario not passed.
+function failedLine(f) {
+  let line = f.code + ': ' + resultText(f.result);
+  if (f.step) line += ' at ' + f.step;
+  if (f.check) line += ' (' + f.check + ')';
+  return line;
+}
+const failedText = (list) => arr(list).map(failedLine).join('\n');
 const findingsText = (list) => arr(list).map((f) => `${f.title} (${f.category}, ${f.status})`).join('\n');
 
 function summarySheet(report, { title, generatedAt }) {
@@ -32,7 +40,7 @@ function summarySheet(report, { title, generatedAt }) {
     ['Company or provider', title], ['Generated', generatedAt], ['Runs read', `the last ${report.days} day(s)`],
     ['Collection version now', report.collectionVersion || ''], ['Test Framework stored', yesNo(report.framework)],
     ['Data file stored', yesNo(report.datafile)], ['Functions declared', s.declared], ['With a scenario', s.covered],
-    ['Passed', s.passed], ['Failed', s.failed], ['Never run', s.neverRun], ['Without a scenario', s.notCovered],
+    ['Passed', s.passed], ['Passed with defects', s.withDefects ?? 0], ['Failed', s.failed], ['Never run', s.neverRun], ['Without a scenario', s.notCovered],
     ['To run again', s.toRunAgain], ['Latest run', s.latestRunAt || ''],
   ];
   return { name: 'Summary', columns: [{ title: 'Item', width: 26 }, { title: 'Value', width: 60 }], rows };
@@ -44,14 +52,14 @@ function matrixSheet(report) {
     columns: [
       { title: 'Flow', width: 18 }, { title: 'Element group', width: 22 }, { title: 'Element tested', width: 42 },
       { title: 'Result', width: 26 }, { title: 'Test Framework', width: 20 }, { title: 'Scenarios', width: 10 },
-      { title: 'Passed', width: 9 }, { title: 'Failed', width: 9 }, { title: 'Never run', width: 10 },
+      { title: 'Passed', width: 9 }, { title: 'Passed with defects', width: 12 }, { title: 'Failed', width: 9 }, { title: 'Never run', width: 10 },
       { title: 'To run again', width: 12 }, { title: 'Provider says not supported (scenarios)', width: 18 },
-      { title: 'Open findings', width: 40 }, { title: 'Scenario codes', width: 60 },
+      { title: 'Open findings', width: 40 }, { title: 'Scenarios not passed', width: 70 }, { title: 'Scenario codes', width: 60 },
     ],
     rows: arr(report.matrix).map((r) => [
       r.flowLabel, r.group, r.label, resultText(r.result), DECLARATION_TEXT[r.declaration] || r.declaration || '',
-      r.counts?.scenarios ?? 0, r.counts?.passed ?? 0, r.counts?.failed ?? 0, r.counts?.neverRun ?? 0,
-      yesNo(r.toRunAgain), r.providerNotSupported ?? 0, findingsText(r.findings), arr(r.scenarios).join('\n'),
+      r.counts?.scenarios ?? 0, r.counts?.passed ?? 0, r.counts?.withDefects ?? 0, r.counts?.failed ?? 0, r.counts?.neverRun ?? 0,
+      yesNo(r.toRunAgain), r.providerNotSupported ?? 0, findingsText(r.findings), failedText(r.failedScenarios), arr(r.scenarios).join('\n'),
     ]),
   };
 }
@@ -62,12 +70,14 @@ function scenarioSheet(report) {
     columns: [
       { title: 'Scenario', width: 40 }, { title: 'Description', width: 60 }, { title: 'Flow', width: 18 },
       { title: 'Elements tested', width: 50 }, { title: 'Result', width: 12 }, { title: 'Checks passed', width: 12 },
-      { title: 'Checks failed', width: 12 }, { title: 'Latest run', width: 20 }, { title: 'To run again', width: 12 },
+      { title: 'Checks failed', width: 12 }, { title: 'First failed step', width: 30 }, { title: 'First failed check', width: 60 },
+      { title: 'Latest run', width: 20 }, { title: 'Run id', width: 38 }, { title: 'To run again', width: 12 },
       { title: 'Not declared (warnings)', width: 30 }, { title: 'Provider says not supported', width: 60 },
     ],
     rows: arr(report.scenarios).map((s) => [
       s.code, s.description, s.flowLabel, arr(s.elements).join('\n'), resultText(s.result),
-      s.run ? s.run.passed : null, s.run ? s.run.failed : null, s.run?.at || '', yesNo(s.toRunAgain),
+      s.run ? s.run.passed : null, s.run ? s.run.failed : null, s.run?.failedStep || '', s.run?.failedCheck || '',
+      s.run?.at || '', s.run?.id || '', yesNo(s.toRunAgain),
       arr(s.notDeclared).join('\n'), arr(s.providerNotSupported).join('\n'),
     ]),
   };

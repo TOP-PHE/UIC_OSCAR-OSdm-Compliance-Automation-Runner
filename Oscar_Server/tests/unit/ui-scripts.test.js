@@ -1475,7 +1475,9 @@ describe('the Report Builder coverage section', () => {
   const coverageFindingText = loadFunction(page, 'coverageFindingText');
   const coverageCountsText = loadFunction(page, 'coverageCountsText');
   const coverageProviderText = loadFunction(page, 'coverageProviderText');
-  const helpers = { escHtml, coverageStateLabel, coverageDeclarationLabel, coverageScenarioText, coverageFindingText, coverageSummaryText, coverageCountsText, coverageProviderText };
+  const coverageRunIdOf = loadFunction(page, 'coverageRunIdOf');
+  const coverageFailedHtml = loadFunction(page, 'coverageFailedHtml', { escHtml, coverageRunIdOf, coverageStateLabel, encodeURIComponent });
+  const helpers = { escHtml, coverageStateLabel, coverageDeclarationLabel, coverageScenarioText, coverageFindingText, coverageSummaryText, coverageCountsText, coverageProviderText, coverageFailedHtml };
   const coverageRowsHtml = loadFunction(page, 'coverageRowsHtml', helpers);
   const coverageNotDeclaredHtml = loadFunction(page, 'coverageNotDeclaredHtml', helpers);
   const coverageMatrixRowHtml = loadFunction(page, 'coverageMatrixRowHtml', helpers);
@@ -1495,7 +1497,9 @@ describe('the Report Builder coverage section', () => {
     ],
     matrix: [
       { flow: 'SALE', flowLabel: 'Sale <s>', group: 'Whole flow', label: 'Sale (every scenario)', result: 'failed', declaration: 'declared', toRunAgain: true,
-        counts: { scenarios: 2, passed: 1, failed: 1, neverRun: 0 }, scenarios: ['S_<i>', 'T'], findings: [{ title: 'F <z>', category: 'open', status: 'open' }] },
+        counts: { scenarios: 2, passed: 1, withDefects: 0, failed: 1, neverRun: 0 }, scenarios: ['S_<i>', 'T'],
+        failedScenarios: [{ code: 'S_<i>', result: 'failed', runId: '0f0e8a2c-1b3d-4e5f-8a9b-0c1d2e3f4a5b', step: '02. POST <b>', check: 'Status <x>' },
+          { code: 'T', result: 'defects', runId: 'not-a-uuid"><script>' }], findings: [{ title: 'F <z>', category: 'open', status: 'open' }] },
       { flow: 'SALE', flowLabel: 'Sale <s>', group: 'Currencies', label: 'PLN <c>', result: 'not-declared', declaration: 'not-declared', toRunAgain: false,
         counts: { scenarios: 1, passed: 1, failed: 0, neverRun: 0 }, scenarios: ['T'], findings: [] },
       { flow: 'REFUND_FULL', flowLabel: 'Full refund', group: 'Whole flow', label: 'Full refund (every scenario)', result: 'passed', providerNotSupported: 1, declaration: 'every-value',
@@ -1519,7 +1523,11 @@ describe('the Report Builder coverage section', () => {
     expect(out).toContain('cov-not-declared">Not supported (not declared)');
     expect(out).toContain('cov-passed">Passed</span><br><small class="cov-provider">the provider says &#34;not supported&#34; in 1 scenario(s)</small>');
     expect(out).toContain('<td>Every value declared</td>');
-    expect(out).toContain('2 scenario(s): 1 passed, 1 failed, 0 never run<details><summary>Scenarios</summary><ul class="cov-list"><li>S_&#60;i&#62;</li><li>T</li>');
+    expect(out).toContain('1 of 2 scenario(s) passed (0 with defects, 1 failed, 0 never run)<ul class="cov-list cov-failed-list">'
+      + '<li><a href="/run-detail.html?id=0f0e8a2c-1b3d-4e5f-8a9b-0c1d2e3f4a5b">S_&#60;i&#62;</a>: <strong>Failed</strong> at 02. POST &#60;b&#62; — Status &#60;x&#62;</li>'
+      + '<li>T: <strong>Passed with defects</strong></li></ul><details><summary>Scenarios</summary>');
+    expect(coverageRunIdOf('javascript:alert(1)')).toBe('');
+    expect(coverageFailedHtml([])).toBe('');
   });
 
   test('by function: every text escaped; a group heads its rows once', () => {
@@ -1536,7 +1544,8 @@ describe('the Report Builder coverage section', () => {
   test('the Markdown keeps one row per element and per function, whatever the texts hold', () => {
     const md = coverageMarkdown(answer, 'Gamma | test');
     expect(md.startsWith('# Test Framework coverage — Gamma \\| test\n')).toBe(true);
-    expect(md).toContain('| Sale \\<s> | Currencies: PLN \\<c> | Not supported (not declared) | Not declared | 1 scenario(s): 1 passed, 0 failed, 0 never run |');
+    expect(md).toContain('| Sale \\<s> | Currencies: PLN \\<c> | Not supported (not declared) | Not declared | 1 of 1 scenario(s) passed (0 with defects, 0 failed, 0 never run) |  |');
+    expect(md).toContain('S_\\<i> (Failed at 02. POST \\<b>); T (Passed with defects)');
     expect(md).toContain('| Sale \\| \\<b> | Failed, to run again | S_\\<i>: Failed (7 passed, 3 failed, 2026-10-24), to run again | Refused by \\<x> (provider_deviation, open, S_\\<i>) |');
     expect(md).toContain('| Full refund | No scenario |  |  |');
     expect(md).toContain('- X\\<y>: currency:PLN');

@@ -596,6 +596,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `DECLARATION_TEXT`. `GET /coverage/download` answers an .xlsx made by
     `utils/xlsxWorkbook.js` (hand-written OOXML over `zip.js`, inline strings
     only, so no cell is a formula; checked with openpyxl).
+    **PR 4 (1.11.398): blocking or not.** `failureOf()` reads a run's failed
+    checks (`run_assertions` + step): blocking = category `http_status` /
+    `script_error` / `prerequisite` or severity critical, else the run is
+    `defects` ("Passed with defects"); unread failures count as failed.
+    `stateOf()` (shared by both views): failed > defects > passed > never
+    run. Rows carry `counts.withDefects` and `failedScenarios` (blocked first,
+    run id, first failed step and check); the page links a run only for a
+    UUID (`coverageRunIdOf()`). **Under an after-sale flow only
+    `partialRefund:` and `overrule:` elements are rows** (`shownUnder()`): the
+    trip, passengers and currency of a refund belong to the sale before it.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
