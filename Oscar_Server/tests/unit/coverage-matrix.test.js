@@ -80,6 +80,25 @@ describe('the coverage by flow and element', () => {
     expect(m.scenarios.find((s) => s.code === 'SALE_CHF').notDeclared).toContain('currency:CHF');
   });
 
+  test('under an after-sale flow, only what the after-sale tests', () => {
+    const refundRows = m.matrix.filter((r) => r.flow === 'REFUND_FULL').map((r) => r.label);
+    expect(refundRows).toEqual(['Full refund (every scenario)']);
+    const partial = M.coverageMatrixOf({ framework, datafile: datafile([{ code: 'P', scenarioType: 'REFUND', partialRefundByLeg: true, overruleCode: 'STRIKE', tripRequirementId: 1, passengersListId: 1 }]) });
+    expect(partial.matrix.filter((r) => r.flow === 'REFUND_IROPS').map((r) => r.label)).toEqual(['Refund for irregular operations (IROPS) (every scenario)', 'By leg', 'STRIKE']);
+    expect(partial.scenarios[0].elements).toEqual(expect.arrayContaining(['Adult', 'By leg']));
+  });
+
+  test('a row with only defects passes with defects; a blocked scenario fails it, listed first', () => {
+    const failing = (id, blocking) => ({ ...run(id, 2), failure: { blocking, step: '07. GET Booking', check: 'a field' } });
+    const two = [scenarios[0], { ...scenarios[0], code: 'SALE_TWO' }];
+    const defects = M.coverageMatrixOf({ framework, datafile: datafile(two), runs: { SALE_OK: failing('r1', false), SALE_TWO: run('r2') } });
+    expect(defects.matrix[0]).toMatchObject({ result: 'defects', counts: { scenarios: 2, passed: 1, withDefects: 1, failed: 0 },
+      failedScenarios: [{ code: 'SALE_OK', result: 'defects', runId: 'r1', step: '07. GET Booking', check: 'a field' }] });
+    const blocked = M.coverageMatrixOf({ framework, datafile: datafile(two), runs: { SALE_OK: failing('r1', false), SALE_TWO: failing('r2', true) } });
+    expect(blocked.matrix[0]).toMatchObject({ result: 'failed', counts: { withDefects: 1, failed: 1 } });
+    expect(blocked.matrix[0].failedScenarios.map((f) => f.code)).toEqual(['SALE_TWO', 'SALE_OK']);
+  });
+
   test('the warning names and the provider lines read', () => {
     expect([...M.warnedElements(['currency:CHF', 'offerOption:travelClasses=FIRST', 'placeSelectionBy:X', 'partialRefundByLeg', 'passengerUpdate'], new Set())])
       .toEqual(['currency:CHF', 'offerOption:travelClasses:FIRST', 'placeSelection:X', null]);

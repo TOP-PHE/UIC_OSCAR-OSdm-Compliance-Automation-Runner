@@ -43,7 +43,7 @@ const { currenciesOf } = require('./currencies');
 const { declarationsOf } = require('./offerOptionDiscovery');
 const { TRIP_SEARCH_PARAMETER_TEXT } = require('./tripSearchParameters');
 const {
-  declaredFunctions, functionsOf, scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf,
+  declaredFunctions, functionsOf, scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf, stateOf,
   SALES_FLOW_TEXT, OPTION_TEXT,
 } = require('./frameworkCoverage');
 
@@ -57,7 +57,7 @@ const FLOW_ORDER = ['SALE', 'REFUND_FULL', 'REFUND_PARTIAL', 'REFUND_IROPS', 'EX
 const WHOLE_FLOW = 'Whole flow';
 const LIMIT_TEXT = { maxPassengers: 'Passenger limit', salesHorizon: 'Sales horizon', ageRanges: 'Passenger age ranges' };
 const RESULT_TEXT = Object.freeze({
-  passed: 'Passed', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario',
+  passed: 'Passed', defects: 'Passed with defects', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario',
   'not-declared': 'Not supported (not declared)', 'declared-not-supported': 'Not supported (declared)',
 });
 const MAX_REFUSAL_LINES = 5;
@@ -175,12 +175,20 @@ function warnedElements(warnings, ids) {
   return out;
 }
 
+// A row's result: failed when one of its scenarios was blocked, passed with
+// defects when some failed checks let every flow go through, else passed.
 function resultOfRow(warned, entries) {
-  if (warned) return 'not-declared';
-  if (entries.length === 0) return 'not-covered';
-  const ran = entries.filter((e) => e.result !== 'never-run');
-  if (ran.some((e) => e.result === 'failed')) return 'failed';
-  return ran.length > 0 ? 'passed' : 'never-run';
+  return warned ? 'not-declared' : stateOf(entries);
+}
+
+// The scenarios of a row that failed, blocked ones first: what to look at.
+function failedScenariosOf(entries) {
+  return entries.filter((e) => e.result === 'failed' || e.result === 'defects')
+    .map((e) => ({
+      code: e.code, result: e.result, runId: e.run?.id || null,
+      step: e.run?.failedStep || null, check: e.run?.failedCheck || null,
+    }))
+    .sort((a, b) => (a.result === b.result ? 0 : Number(a.result === 'defects') - Number(b.result === 'defects')));
 }
 
 // What the framework says the provider does not do: one row each, no scenario.
@@ -193,7 +201,7 @@ function declaredNotSupportedRows(fw) {
   }
   return rows.map((r) => ({
     flow: 'SALE', flowLabel: flowLabel('SALE'), ...r, declaration: 'declared-not-supported', result: 'declared-not-supported',
-    scenarios: [], counts: { scenarios: 0, passed: 0, failed: 0, neverRun: 0 }, providerNotSupported: 0, toRunAgain: false, findings: [],
+    scenarios: [], counts: { scenarios: 0, passed: 0, withDefects: 0, failed: 0, neverRun: 0 }, failedScenarios: [], providerNotSupported: 0, toRunAgain: false, findings: [],
   }));
 }
 
@@ -207,8 +215,10 @@ function rowOf(flow, element, cell, context) {
     scenarios: cell.codes,
     counts: {
       scenarios: entries.length, passed: entries.filter((e) => e.result === 'passed').length,
+      withDefects: entries.filter((e) => e.result === 'defects').length,
       failed: entries.filter((e) => e.result === 'failed').length, neverRun: entries.filter((e) => e.result === 'never-run').length,
     },
+    failedScenarios: failedScenariosOf(entries),
     toRunAgain: entries.some((e) => e.toRunAgain === true),
     findings: context.findings.filter((f) => codes.has(f.scenario_code)).map((f) => ({ id: f.id, title: f.title, category: f.category, status: f.status, scenarioCode: f.scenario_code })),
   };
@@ -219,6 +229,15 @@ const flowRank = (f) => { const i = FLOW_ORDER.indexOf(f); return i === -1 ? FLO
 function compareRows(a, b) {
   return flowRank(a.flow) - flowRank(b.flow) || a.flow.localeCompare(b.flow)
     || groupRank(a.group) - groupRank(b.group) || a.label.localeCompare(b.label);
+}
+
+// Under an after-sale flow, only what the after-sale itself tests (its
+// partial refund scope, its IROPS code): the trip, passengers, currency… of
+// such a scenario belong to the sale before it, and listing them under the
+// refund read as if the refund tested them.
+const AFTER_SALE_ELEMENTS = ['partialRefund:', 'overrule:'];
+function shownUnder(flow, id) {
+  return flow === 'SALE' || AFTER_SALE_ELEMENTS.some((p) => id.startsWith(p));
 }
 
 // One cell per (flow, element): its scenarios, group, label, declaration and
@@ -241,7 +260,7 @@ function cellsOf(exercised, fw, declaredRows) {
       return { group: WHOLE_FLOW, label: `${flowLabel(item.flow)} (every scenario)`, declaration, warned: declaration === 'not-declared' };
     });
     for (const id of item.ids) {
-      if (id.startsWith('salesFlow:')) continue;
+      if (id.startsWith('salesFlow:') || !shownUnder(item.flow, id)) continue;
       add(item.flow, id, item, () => ({ ...describe(id, declaredRows), declaration: declarationOf(id, fw, declaredIds) }));
     }
   }

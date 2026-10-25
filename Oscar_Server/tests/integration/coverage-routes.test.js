@@ -120,6 +120,18 @@ describe('GET /v1/company/coverage', () => {
       .toEqual(['the provider answers 501 (Not Implemented), so the probe could not be run.']);
   });
 
+  test('a failed run says its first failed step and whether it blocked the flow', async () => {
+    const failed = addRun(ids.D, 'SHARED_SALE', 'FAILED', 0, { at: '2026-10-25 09:00:00' });
+    const suite = get('SELECT id FROM run_suites WHERE run_id = ?', [failed]).id;
+    const req = run('INSERT INTO run_requests (suite_id, run_id, company_id, request_name) VALUES (?, ?, ?, ?)', [suite, failed, ids.D, '02. POST Booking']).lastInsertRowid;
+    run(`INSERT INTO run_assertions (request_id, suite_id, run_id, company_id, assertion_key, assertion_name, type, category, passed)
+         VALUES (?, ?, ?, ?, 'kx', 'Status code is 200', 'test', 'http_status', 0)`, [req, suite, failed, ids.D]);
+    const res = await request(app).get('/v1/company/coverage').set(as('TM'));
+    const sale = res.body.matrix.find((r) => r.flow === 'SALE' && r.element === null);
+    expect(sale).toMatchObject({ result: 'failed', failedScenarios: [{ code: 'SHARED_SALE', result: 'failed', runId: failed, step: '02. POST Booking', check: 'Status code is 200' }] });
+    run('DELETE FROM runs WHERE id = ?', [failed]);
+  });
+
   test('the workbook is the same report, for members only', async () => {
     const res = await request(app).get('/v1/company/coverage/download?days=30').set(as('TM'))
       .buffer(true).parse((r, done) => { const parts = []; r.on('data', (c) => parts.push(c)); r.on('end', () => done(null, Buffer.concat(parts))); });

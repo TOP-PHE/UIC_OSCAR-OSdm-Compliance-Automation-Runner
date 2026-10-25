@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.432",
+  "current_release": "2026.433",
   "releases": [
+    {
+      "release": "2026.433",
+      "date": "2026-10-25",
+      "server": "1.11.398",
+      "collection": "OTST_V2.0.223",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#956 PR 4: the coverage grades a failed scenario as blocking or not (a status, script or prerequisite failure stops the flow; other failed checks are defects), rows read \"passed with defects\" when nothing blocked, show \"X of N scenarios passed\", list the scenarios not passed with their first failed step and a link to the run, and an after-sale flow lists only what the after-sale tests."
+      ]
+    },
     {
       "release": "2026.432",
       "date": "2026-10-25",
