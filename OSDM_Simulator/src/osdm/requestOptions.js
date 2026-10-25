@@ -26,11 +26,11 @@ function presentIn(body, member) {
   const [head, tail] = member.split('.');
   if (!tail) return body?.[head] !== undefined;
   if (head === 'passenger') return (body?.anonymousPassengerSpecifications || []).some((p) => p && p[tail] !== undefined);
-  return body?.[head] && typeof body[head] === 'object' && body[head][tail] !== undefined;
+  return typeof body?.[head] === 'object' && body[head]?.[tail] !== undefined;
 }
 
 function without(body, member) {
-  const copy = JSON.parse(JSON.stringify(body));
+  const copy = structuredClone(body);
   const [head, tail] = member.split('.');
   if (!tail) {
     delete copy[head];
@@ -57,6 +57,18 @@ const ignoredProblem = (member) => ({
   pointers: [{ requestPointer: pointerOf(member) }],
 });
 
+function refusalOf(member, behaviour, body, options) {
+  if (behaviour === 'not-implemented') return new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', `This provider does not implement '${member}' in an offer request.`);
+  if (behaviour === 'error') return new HttpError(500, 'INTERNAL_ERROR', 'Internal error', 'The offer request could not be handled.');
+  if (behaviour !== 'refuse-unknown') return null;
+  const unknown = (body.promotionCodes || []).map((c) => c?.code).find((c) => !options.promotionCodes.includes(c));
+  if (unknown === undefined) return null;
+  return new HttpError(400, 'PROMOTION_CODE_UNKNOWN', 'Promotion code unknown', `The promotion code "${unknown}" is not known.`);
+}
+
+const NO_OFFER = new Set(['no-offer-said', 'no-offer-silent']);
+const IGNORED = new Set(['ignore-silent', 'ignore-said']);
+
 /**
  * The request as the provider reads it, and what it adds to the answer:
  * { body, problems, noOffer }. Throws an HttpError for the behaviours that
@@ -65,27 +77,21 @@ const ignoredProblem = (member) => ({
 function applyRequestOptions(body, trips, provider) {
   const options = provider.requestOptions;
   if (!options || !trips.some((t) => t.origin?.stopPlaceRef === options.from)) return { body, problems: [], noOffer: false };
+  const asked = Object.entries(options.members).filter(([member]) => presentIn(body, member));
+  for (const [member, behaviour] of asked) {
+    const refusal = refusalOf(member, behaviour, body, options);
+    if (refusal) throw refusal;
+  }
   let read = body;
   const problems = [];
-  let noOffer = false;
-  for (const [member, behaviour] of Object.entries(options.members)) {
-    if (!presentIn(body, member)) continue;
-    if (behaviour === 'not-implemented') throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', `This provider does not implement '${member}' in an offer request.`);
-    if (behaviour === 'error') throw new HttpError(500, 'INTERNAL_ERROR', 'Internal error', 'The offer request could not be handled.');
-    if (behaviour === 'refuse-unknown') {
-      const unknown = (body.promotionCodes || []).map((c) => c?.code).find((c) => !options.promotionCodes.includes(c));
-      if (unknown !== undefined) throw new HttpError(400, 'PROMOTION_CODE_UNKNOWN', 'Promotion code unknown', `The promotion code "${unknown}" is not known.`);
-      continue;
-    }
-    if (behaviour === 'ignore-silent' || behaviour === 'ignore-said') read = without(read, member);
+  for (const [member, behaviour] of asked) {
+    if (IGNORED.has(behaviour)) read = without(read, member);
     if (behaviour === 'ignore-said') problems.push(ignoredProblem(member));
     if (behaviour === 'no-offer-said') {
-      noOffer = true;
       problems.push({ code: 'NO_OFFER_FOUND', title: 'No offer found', detail: `No offer is sold for the '${member}' asked; asked without it, offers are available.` });
     }
-    if (behaviour === 'no-offer-silent') noOffer = true;
   }
-  return { body: read, problems, noOffer };
+  return { body: read, problems, noOffer: asked.some(([, behaviour]) => NO_OFFER.has(behaviour)) };
 }
 
 module.exports = { applyRequestOptions };

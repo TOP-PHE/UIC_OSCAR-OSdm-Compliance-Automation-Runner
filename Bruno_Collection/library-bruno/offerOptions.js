@@ -46,7 +46,11 @@ const MIN_REQUESTS = 3;
 const MAX_REQUESTS = 200;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const copy = (v) => JSON.parse(JSON.stringify(v));
+// Bruno's sandbox has no structuredClone: a copy goes through JSON.
+const copy = (v) => {
+  const text = JSON.stringify(v);
+  return JSON.parse(text);
+};
 
 // ── Seeded random (mulberry32, as #780's combinations) ───────────────────────
 
@@ -146,7 +150,7 @@ function mandatoryRequest(request) {
 // on a copy of the mandatory request.
 const IN = {
   criteria: (member) => ({ schema: 'OfferSearchCriteria', member,
-    set: (req, v) => { req.offerSearchCriteria = { ...(req.offerSearchCriteria || {}), [member]: v }; } }),
+    set: (req, v) => { req.offerSearchCriteria = { ...req.offerSearchCriteria, [member]: v }; } }),
   passenger: (member, { dropBirth = false } = {}) => ({ schema: 'AnonymousPassengerSpecification', member,
     set: (req, v) => req.anonymousPassengerSpecifications.forEach((p, i) => {
       if (dropBirth) delete p.dateOfBirth;
@@ -159,7 +163,7 @@ const IN = {
 };
 
 // A value the scenario or its declarations give, else OSCAR's generic one.
-const given = (ctx, key) => (ctx.values && ctx.values[key] !== undefined && ctx.values[key] !== null ? ctx.values[key] : undefined);
+const given = (ctx, key) => ctx.values?.[key] ?? undefined;
 
 const perPassenger = (list) => Object.assign(list, { perPassenger: true });
 
@@ -366,7 +370,8 @@ const pointersOf = (p) => (Array.isArray(p.pointers) ? p.pointers : [])
 /** A problem as one line: code, title, detail and the request members it points at. */
 const problemText = (p) => {
   const at = pointersOf(p);
-  return `${[p.code, p.title, p.detail].filter(Boolean).join(': ').slice(0, 200)}${at.length > 0 ? ` (at ${at.join(', ')})` : ''}`;
+  const where = at.length > 0 ? ` (at ${at.join(', ')})` : '';
+  return [p.code, p.title, p.detail].filter(Boolean).join(': ').slice(0, 200) + where;
 };
 
 /** Level 1: the status alone. */
@@ -397,7 +402,8 @@ function contentClass(request, body, picks, ignoredNames = []) {
   }
   const ignored = picks.filter(({ option }) => ignoredNames.includes(option.where.member.toLowerCase()));
   if (ignored.length > 0) {
-    return { result: 'ignored-said', message: `said ignored: ${ignored.map(({ option }) => option.key).join(', ')}${said ? ` (${said})` : ''}` };
+    const why = said ? ` (${said})` : '';
+    return { result: 'ignored-said', message: `said ignored: ${ignored.map(({ option }) => option.key).join(', ')}${why}` };
   }
   if (picks.some((p) => p.source === 'invalid')) {
     return problems.length > 0
@@ -405,13 +411,13 @@ function contentClass(request, body, picks, ignoredNames = []) {
       : { result: 'invalid-silent', message: 'a value OSCAR made up (unknown code) was taken without a word' };
   }
   const results = picks.map(({ option }) => (option.check ? option.check(request, body) : null));
-  if (results.some((r) => r === 'not-kept')) {
+  if (results.includes('not-kept')) {
     const off = picks.filter((_, i) => results[i] === 'not-kept').map(({ option }) => option.key);
     return problems.length > 0
       ? { result: 'ignored-said', message: `not kept: ${off.join(', ')} (${said})` }
       : { result: 'ignored-silent', message: `the offers do not keep to ${off.join(', ')}, and nothing says so` };
   }
-  if (results.some((r) => r === 'honoured')) return { result: 'honoured', message: `${offers.length} offer(s) keep to it` };
+  if (results.includes('honoured')) return { result: 'honoured', message: `${offers.length} offer(s) keep to it` };
   return { result: 'accepted', message: `${offers.length} offer(s); the answer cannot show the option was used` };
 }
 
@@ -466,28 +472,35 @@ function plan(budget, optionCount) {
  * `count` random combinations of the supported rows, 2 to 4 options each,
  * never two options of one `conflicts` group, each combination once.
  */
+// One draw: `size` rows taken at random, skipping a second of a conflict group.
+function drawOne(rows, rand) {
+  const size = 2 + Math.floor(rand() * (Math.min(MAX_COMBINATION_SIZE, rows.length) - 1));
+  const pool = [...rows];
+  const picked = [];
+  const groups = new Set();
+  while (picked.length < size && pool.length > 0) {
+    const [row] = pool.splice(Math.floor(rand() * pool.length), 1);
+    const g = row.option.conflicts;
+    if (!g || !groups.has(g)) {
+      if (g) groups.add(g);
+      picked.push(row);
+    }
+  }
+  return picked;
+}
+
 function drawCombinations(rows, count, seed) {
   const rand = mulberry32(seed ^ 0x5EED);
   const out = [];
   const seen = new Set();
   if (rows.length < 2) return out;
   for (let attempt = 0; out.length < count && attempt < count * 20; attempt++) {
-    const size = 2 + Math.floor(rand() * (Math.min(MAX_COMBINATION_SIZE, rows.length) - 1));
-    const pool = [...rows];
-    const picked = [];
-    const groups = new Set();
-    while (picked.length < size && pool.length > 0) {
-      const [row] = pool.splice(Math.floor(rand() * pool.length), 1);
-      const g = row.option.conflicts;
-      if (g && groups.has(g)) continue;
-      if (g) groups.add(g);
-      picked.push(row);
+    const picked = drawOne(rows, rand);
+    const key = picked.map((r) => r.option.key).sort((a, b) => a.localeCompare(b)).join('+');
+    if (picked.length >= 2 && !seen.has(key)) {
+      seen.add(key);
+      out.push(picked);
     }
-    if (picked.length < 2) continue;
-    const key = picked.map((r) => r.option.key).sort().join('+');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(picked);
   }
   return out;
 }
@@ -514,32 +527,49 @@ const short = (v) => {
 const SUMMARY_ORDER = ['honoured', 'accepted', 'ignored-said', 'ignored-silent', 'no-offer-said', 'no-offer-silent',
   'invalid-said', 'invalid-silent', 'refused', 'not-implemented', 'error', 'not-tested', 'not-reached'];
 
+const tail = (message) => (message ? ` — ${message}` : '');
+
+function optionLine(row) {
+  const value = row.value === undefined ? '' : ` = ${short(row.value)} (${row.source})`;
+  const status = row.status ? ` HTTP ${row.status},` : '';
+  return `[INFO] 🧭   ${row.option}${value}:${status} ${row.result}${tail(row.message)}`;
+}
+
+function phase4Line(all) {
+  if (!all) return '[INFO] 🧭 Phase 4 not run: no option was found supported.';
+  return `[INFO] 🧭 Phase 4, every supported option (${all.options.length}): HTTP ${all.status}, ${all.result}${tail(all.message)}`;
+}
+
 /** The lines of the report, for the run log. */
 function reportLines(report) {
-  const lines = [];
-  lines.push(`[INFO] 🧭 Offer request options (#227) — OSDM ${report.version}, budget ${report.budget} request(s), ${report.used} used, seed ${report.seed}.`);
-  lines.push(`[INFO] 🧭 Phase 1, mandatory members only: ${report.mandatory.ok ? 'answered' : 'NOT answered'} — ${report.mandatory.message}`);
+  const answered = report.mandatory.ok ? 'answered' : 'NOT answered';
+  const lines = [
+    `[INFO] 🧭 Offer request options (#227) — OSDM ${report.version}, budget ${report.budget} request(s), ${report.used} used, seed ${report.seed}.`,
+    `[INFO] 🧭 Phase 1, mandatory members only: ${answered} — ${report.mandatory.message}`,
+  ];
   const counts = {};
   for (const row of report.options) counts[row.result] = (counts[row.result] || 0) + 1;
-  lines.push(`[INFO] 🧭 Phase 2, one option at a time: ${SUMMARY_ORDER.filter((k) => counts[k]).map((k) => `${counts[k]} ${k}`).join(', ')}.`);
-  for (const row of report.options) {
-    const value = row.value === undefined ? '' : ` = ${short(row.value)} (${row.source})`;
-    const status = row.status ? ` HTTP ${row.status},` : '';
-    lines.push(`[INFO] 🧭   ${row.option}${value}:${status} ${row.result}${row.message ? ` — ${row.message}` : ''}`);
-  }
+  const summary = SUMMARY_ORDER.filter((k) => counts[k]).map((k) => `${counts[k]} ${k}`).join(', ');
+  lines.push(`[INFO] 🧭 Phase 2, one option at a time: ${summary}.`, ...report.options.map(optionLine));
   for (const c of report.combinations) {
-    lines.push(`[INFO] 🧭 Phase 3, ${c.options.join(' + ')}: HTTP ${c.status}, ${c.result}${c.message ? ` — ${c.message}` : ''}`);
+    lines.push(`[INFO] 🧭 Phase 3, ${c.options.join(' + ')}: HTTP ${c.status}, ${c.result}${tail(c.message)}`);
   }
-  if (report.all) {
-    lines.push(`[INFO] 🧭 Phase 4, every supported option (${report.all.options.length}): HTTP ${report.all.status}, ${report.all.result}${report.all.message ? ` — ${report.all.message}` : ''}`);
-  } else {
-    lines.push('[INFO] 🧭 Phase 4 not run: no option was found supported.');
-  }
+  lines.push(phase4Line(report.all));
   const silent = report.options.filter((r) => ['ignored-silent', 'no-offer-silent', 'invalid-silent'].includes(r.result));
   if (silent.length > 0) {
     lines.push(`[WARNING] 🧭 Offer request options taken without a word: ${silent.map((r) => r.option).join(', ')} — a distributor cannot tell what the offers answer.`);
   }
   return lines;
+}
+
+/**
+ * `fn` over `items` one after the other (each request waits for the one
+ * before: the provider is asked one thing at a time).
+ */
+async function inSequence(items, fn, i = 0, out = []) {
+  if (i >= items.length) return out;
+  out.push(await fn(items[i], i));
+  return inSequence(items, fn, i + 1, out);
 }
 
 /**
@@ -558,25 +588,21 @@ async function discover({ request, version, values, invalidValues, seed, travelD
     report.used += 1;
     return classify(answer.status, answer.body, body, picks, ignoredOf(answer.body));
   };
-  const tried = [];
-  for (const [i, r] of testable.entries()) {
-    if (i >= share.phase2) {
-      report.options.push({ option: r.option.key, group: r.option.group, value: r.value, source: r.source, result: 'not-reached', message: 'the request budget ran out' });
-      continue;
-    }
-    const outcome = await ask([r]);
-    const entry = { option: r.option.key, group: r.option.group, value: r.value, source: r.source, ...outcome };
+  const sent = testable.slice(0, share.phase2);
+  const tried = await inSequence(sent, async (r) => {
+    const entry = { option: r.option.key, group: r.option.group, value: r.value, source: r.source, ...(await ask([r])) };
     report.options.push(entry);
-    tried.push({ ...r, result: entry.result });
+    return { ...r, result: entry.result };
+  });
+  for (const r of testable.slice(share.phase2)) {
+    report.options.push({ option: r.option.key, group: r.option.group, value: r.value, source: r.source, result: 'not-reached', message: 'the request budget ran out' });
   }
   for (const r of rows.filter((x) => x.skipped)) {
     report.options.push({ option: r.option.key, group: r.option.group, result: 'not-tested', message: r.skipped });
   }
   const supported = tried.filter(isSupported);
-  for (const combo of drawCombinations(supported, share.phase3, seed)) {
-    const outcome = await ask(combo);
-    report.combinations.push({ options: combo.map((r) => r.option.key), ...outcome });
-  }
+  report.combinations = await inSequence(drawCombinations(supported, share.phase3, seed),
+    async (combo) => ({ options: combo.map((r) => r.option.key), ...(await ask(combo)) }));
   if (supported.length >= 2) {
     const all = allSupported(supported);
     report.all = { options: all.map((r) => r.option.key), ...(await ask(all)) };
