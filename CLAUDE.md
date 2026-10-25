@@ -572,7 +572,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the collection is refreshed without a restart) and `scenario_hash`
     (`scenarioHash()`, sha256 of `canonical()`), written by
     `recordRunVersions()` after the runner's refusals, never throwing; "to
-    run again" is null for runs before it. PR 2 is the page.
+    run again" is null for runs before it.
+    **PR 2 (1.11.396): the page**, a card of the Report Builder not tied to
+    the run selected (`coverageHtml()`, members only: `isPlatformUser` hides
+    it), and its Markdown export (`coverageMarkdown()`; `mdCell()` escapes
+    `\`, `|` and `<` and joins lines, so a text never breaks a table or reads
+    as HTML). `ui-scripts.test.js` runs them on the server module's own answer:
+    a field renamed in `coverageOf()` fails there.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

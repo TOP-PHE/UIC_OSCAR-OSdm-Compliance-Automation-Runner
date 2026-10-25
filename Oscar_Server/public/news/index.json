@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-25-test-framework-coverage-page",
+    "date": "October 25, 2026",
+    "tag": "Added",
+    "title": "Test Framework coverage in the Report Builder",
+    "summary": "The Report Builder now shows how far what the Test Framework declares is tested, and exports it as Markdown.",
+    "content": "Open the Report Builder and choose Show coverage. For each function the Test Framework declares, you see whether it passed, failed, was never run or has no scenario, the scenarios that test it with their latest result, which results should be made again because the collection or the scenario changed, and the open findings. Scenarios testing something the framework does not declare are listed apart.\n\nExport Markdown saves the same report as a file you can share or paste into a document."
+  },
+  {
     "id": "2026-10-25-test-framework-coverage-api",
     "date": "October 25, 2026",
     "tag": "Added",

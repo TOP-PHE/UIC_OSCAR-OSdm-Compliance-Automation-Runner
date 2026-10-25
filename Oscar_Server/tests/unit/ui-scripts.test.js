@@ -1453,3 +1453,78 @@ describe('the Report Builder offer request options section', () => {
     expect(source).toContain("['--- OFFER REQUEST OPTIONS ---'],");
   });
 });
+
+// #956 part 2: the Report Builder's Test Framework coverage section.
+describe('the Report Builder coverage section', () => {
+  const page = 'report-builder.html';
+  const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.codePointAt(0)};`);
+  const COVERAGE_STATES = { passed: 'Passed', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario' };
+  const coverageStateLabel = loadFunction(page, 'coverageStateLabel', { COVERAGE_STATES });
+  const coverageRunAgainLabel = loadFunction(page, 'coverageRunAgainLabel');
+  const coverageSummaryText = loadFunction(page, 'coverageSummaryText');
+  const coverageScenarioText = loadFunction(page, 'coverageScenarioText', { coverageStateLabel, coverageRunAgainLabel });
+  const coverageFindingText = loadFunction(page, 'coverageFindingText');
+  const helpers = { escHtml, coverageStateLabel, coverageScenarioText, coverageFindingText, coverageSummaryText };
+  const coverageRowsHtml = loadFunction(page, 'coverageRowsHtml', helpers);
+  const coverageNotDeclaredHtml = loadFunction(page, 'coverageNotDeclaredHtml', helpers);
+  const coverageHtml = loadFunction(page, 'coverageHtml', { ...helpers, coverageRowsHtml, coverageNotDeclaredHtml });
+  const mdCell = loadFunction(page, 'mdCell');
+  const coverageMarkdown = loadFunction(page, 'coverageMarkdown', { ...helpers, mdCell });
+
+  const answer = {
+    days: 30, framework: true, datafile: true,
+    summary: { declared: 2, covered: 1, passed: 0, failed: 1, neverRun: 0, notCovered: 1, toRunAgain: 1, latestRunAt: '2026-10-24 10:05:00' },
+    functions: [
+      { id: 'salesFlow:SALE', group: 'Sales <flows>', label: 'Sale | <b>', state: 'failed', toRunAgain: true,
+        scenarios: [{ code: 'S_<i>', result: 'failed', toRunAgain: true, run: { passed: 7, failed: 3, at: '2026-10-24' } }],
+        findings: [{ title: 'Refused\nby <x>', category: 'provider_deviation', status: 'open', scenarioCode: 'S_<i>' }] },
+      { id: 'salesFlow:REFUND_FULL', group: 'Sales <flows>', label: 'Full refund', state: 'not-covered', toRunAgain: false, scenarios: [], findings: [] },
+    ],
+    notDeclared: [{ code: 'X<y>', warnings: ['currency:PLN'] }],
+  };
+
+  test('every text of the answer is escaped; a group heads its rows once', () => {
+    const out = coverageHtml(answer);
+    for (const tag of ['<b>', '<i>', '<x>', '<y>', '<flows>']) expect(out.includes(tag)).toBe(false);
+    expect(out.split('Sales &#60;flows&#62;').length).toBe(2);
+    expect(out).toContain('S_&#60;i&#62;: Failed (7 passed, 3 failed, 2026-10-24), to run again');
+    expect(out).toContain('cov-not-covered">No scenario');
+    expect(out).toContain('2 function(s) declared');
+    expect(out).toContain('runs of the last 30 day(s), latest run 2026-10-24 10:05:00.');
+    expect(coverageHtml({ ...answer, framework: false, datafile: false, functions: [], notDeclared: [] })).toContain('No data file is stored');
+  });
+
+  test('the Markdown keeps one row per function, whatever the texts hold', () => {
+    const md = coverageMarkdown(answer, 'Gamma | test');
+    expect(md.startsWith('# Test Framework coverage — Gamma \\| test\n')).toBe(true);
+    expect(md).toContain('| Sale \\| \\<b> | Failed, to run again | S_\\<i>: Failed (7 passed, 3 failed, 2026-10-24), to run again | Refused by \\<x> (provider_deviation, open, S_\\<i>) |');
+    expect(md).toContain('| Full refund | No scenario |  |  |');
+    expect(md).toContain('- X\\<y>: currency:PLN');
+    expect(md).not.toContain('\n\n\n');
+    expect(md.match(/^## Sales/gm)).toHaveLength(1);
+    expect(mdCell(null)).toBe('');
+    expect(mdCell('a\r\nb\rc')).toBe('a b c');
+    expect(mdCell('a\\|b')).toBe('a\\\\\\|b');
+  });
+
+  test('the server module\'s own answer draws: every state and every run', () => {
+    const C = require('../../src/utils/frameworkCoverage');
+    const coverage = C.coverageOf({
+      framework: { salesFlows: ['SALE', 'REFUND_FULL'] },
+      datafile: { scenarios: [{ code: 'A', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1 }],
+        tripRequirements: [{ id: 1, tripType: 'SEARCH', trip: {} }], passengersList: [{ id: 1, passengers: [{ type: 'PERSON' }] }] },
+      runs: { A: { id: 'r', status: 'COMPLETED', queued_at: '2026-10-24 10:00:00', completed_at: '2026-10-24 10:05:00', total: 4, failed: 0 } },
+    });
+    const out = coverageHtml({ days: 365, framework: true, datafile: true, ...coverage });
+    expect(out).toContain('A: Passed (4 passed, 0 failed, 2026-10-24 10:05:00)');
+    expect(out).toContain('No scenario');
+    expect(coverageMarkdown({ days: 365, ...coverage }, 'P')).toContain('## Sales flows');
+  });
+
+  test('the card is shown to members only, and asks the coverage route', () => {
+    const source = read(page);
+    expect(source).toContain("if (!isPlatformUser) {\n  document.getElementById('coverage-card').style.display = 'block';");
+    expect(source).toContain("fetch('/v1/company/coverage?days=' + encodeURIComponent(");
+    expect(source).toContain('body.innerHTML = coverageHtml(data);');
+  });
+});
