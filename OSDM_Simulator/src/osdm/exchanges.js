@@ -32,9 +32,9 @@ const { HttpError } = require('../http');
 const { buildOfferCollection } = require('./offers');
 const variants = require('./variants');
 const { currencyOf } = require('./bookings');
+const afterSales = require('./afterSales');
 
 const MAX_FULFILLMENT_IDS = 20;
-const SEMI_FLEXIBLE_FEE_SHARE = 0.25;
 
 const bad = (detail) => new HttpError(400, 'VALIDATION_ERROR', 'The exchange request is not valid', detail);
 const conflict = (detail) => new HttpError(409, 'CONFLICT', 'Conflict', detail);
@@ -80,7 +80,7 @@ function feeOf(parts, overruled) {
   if (overruled) return 0;
   return parts.reduce((total, part) => {
     if (part.exchangeable === 'NO') return total + part.price.amount;
-    if (part.exchangeable === 'WITH_CONDITION') return total + Math.round(part.price.amount * SEMI_FLEXIBLE_FEE_SHARE);
+    if (part.exchangeable === 'WITH_CONDITION') return total + afterSales.feeOf(part.price.amount);
     return total;
   }, 0);
 }

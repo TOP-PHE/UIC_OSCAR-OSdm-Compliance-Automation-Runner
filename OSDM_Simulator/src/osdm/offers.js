@@ -48,6 +48,7 @@ const ticketing = require('./ticketing');
 const { horizonProblem } = require('./salesHorizon');
 const ageTariffs = require('./ageTariffs');
 const { fareOffersOf } = require('./fares');
+const { withOfferConditions } = require('./afterSales');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -547,7 +548,7 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
   const product = productOf(flexibility, travelClass, provider);
   const { serviceClass } = product;
   const ctx = { passengers, tariff: flexibility, travelClass, singlePrice, provider };
-  const admissionOfferParts = directions.flatMap((t) => admissionsOfDirection(t, ctx).map((part) => ({
+  const admissionOfferParts = directions.flatMap((t) => admissionsOfDirection(t, ctx).map((part) => withOfferConditions({
     objectType: 'AdmissionOfferPart',
     id: `${provider.idPrefix}-ADM-${randomId()}`,
     summary: `${part.product.summary}, ${part.product.serviceClass.name} class`,

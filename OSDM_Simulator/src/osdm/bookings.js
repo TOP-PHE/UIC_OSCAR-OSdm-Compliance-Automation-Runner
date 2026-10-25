@@ -21,6 +21,7 @@ const { HttpError } = require('../http');
 const { cardsOf } = require('./reductionCards');
 const { reservationsToBook, reservationFrom, linkReservations, propertiesAsked, propertiesGiven, isFarePlace } = require('./reservations');
 const placeMap = require('./placeMap');
+const { withBookedConditions } = require('./afterSales');
 
 /**
  * How a reservation is booked from a request (#766): the place properties it
@@ -149,7 +150,7 @@ function bookableOffer(selection, findOffer, nowMs) {
 
 // The booked part made from one admission part of an offer.
 function admissionFrom(part, passengers, createdOn, confirmableUntil) {
-  return {
+  return withBookedConditions({
     objectType: 'Admission',
     id: part.id,
     summary: part.summary,
@@ -170,7 +171,7 @@ function admissionFrom(part, passengers, createdOn, confirmableUntil) {
     // #601: as the offer said (true when a reservation is mandatory).
     isReservationRequired: part.isReservationRequired === true,
     ...(part.appliedPassengerTypes ? { appliedPassengerTypes: part.appliedPassengerTypes } : {}),
-  };
+  });
 }
 
 /**

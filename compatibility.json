@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.425",
+  "current_release": "2026.426",
   "releases": [
+    {
+      "release": "2026.426",
+      "date": "2026-10-24",
+      "server": "1.11.391",
+      "collection": "OTST_V2.0.220",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#950: simulator 0.53.0 states the after-sales conditions of its semi-flexible parts (REFUND and EXCHANGE, a quarter of the price), and the collection holds an exchange fee to the schedule of the parts given up, not of the new offer. Catalogue check counts and the generated Checks by scenario page follow a new recording."
+      ]
+    },
     {
       "release": "2026.425",
       "date": "2026-10-24",

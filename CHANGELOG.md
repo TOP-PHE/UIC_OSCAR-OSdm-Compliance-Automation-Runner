@@ -93,6 +93,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.391] / [collection-OTST_V2.0.220] — 2026-10-24
+
+Issue #950, release 2026.426. Simulator 0.53.0.
+
+### Simulator 0.53.0
+- **A part sold WITH_CONDITION states its conditions.** The semi-flexible tariff is refunded and exchanged for a quarter of its price; its admission and reservation offer parts now say so in `afterSalesConditions`, and the booked parts in `afterSaleConditions` (OSDM's two spellings, in every version from 3.6 to 3.12): one REFUND and one EXCHANGE condition, the fee a quarter of the part's price (of what was charged, for a booked reservation with a named-place fee), with no window, since the fee holds at any time. A part refundable YES or NO says nothing more. `src/osdm/afterSales.js` holds the share and the conditions; the refund and the exchange take their fee from it, so what is stated is what is kept.
+- The collection's warning "declares refundable=WITH_CONDITION but carries no REFUND afterSalesConditions" is gone from the semi-flexible scenarios (the six overrule refunds among them), and those scenarios get the conditions' checks, all passed.
+
+### Fixed
+- **An exchange fee is held to the schedule of the parts given up** (`validateExchangeFeesConsistentWithAfterSalesConditions()`, `exchanges.js`). The check read the new exchange offer's EXCHANGE conditions, which are for exchanging the new parts later; OSDM gives the fee per booking part given up (`ExchangeBreakdownItem.bookingPartIds`). It now reads the selected offer's conditions, as the refund's schedule check does, and is skipped (INFO) when the exchange gives up only some of the booking's fulfillments. No answer showed the mistake before: the first simulator offers with conditions failed it on every exchange of a flexible sale.
+
+### Changed
+- Recorded again on the simulator's 172 scenarios of OSDM 3.8 (and the 3.6 / 3.7 ones the page names): the catalogue's `checks` of five entries (four moved with this change, `OTST_OFFER_OPTION_COMBINATIONS` had drifted by one), the same numbers in *OSCAR - What is tested*, and *OSCAR - Checks by scenario* regenerated (it dated from collection OTST_V2.0.184).
+
+### Tests
+- `OSDM_Simulator/tests/after-sales.test.js`: the conditions of each flag, and a semi-flexible sale whose refund keeps the fee its booked parts state.
+- `bruno-exchanges.test.js`: the fee is read from the parts sold, a flexible sale exchanged for a product sold under conditions owes nothing, a partial exchange and a missing offer are skipped.
+
+---
+
 ## [server-1.11.390] / [collection-OTST_V2.0.219] — 2026-10-24
 
 Issue #949, release 2026.425. Only the simulator references change in the collection.
