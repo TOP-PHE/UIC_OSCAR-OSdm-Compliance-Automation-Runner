@@ -621,6 +621,25 @@ async function refusedOsdmVersion(datafilePath, scenarioCode, companyId) {
   }
 }
 
+// #956: what this run is made with (server and collection versions, the
+// scenario's content hash), for the coverage report's "to run again". Never
+// throws: a run is not stopped for its bookkeeping.
+async function recordRunVersions(runId, datafilePath, scenarioCode) {
+  try {
+    const { currentCollectionVersion, serverVersion } = require('../utils/versionInfo');
+    let hash = null;
+    if (datafilePath && scenarioCode && await fsExists(datafilePath)) {
+      const datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+      const scenario = (Array.isArray(datafile?.scenarios) ? datafile.scenarios : []).find((s) => s && s.code === scenarioCode);
+      hash = require('../utils/frameworkCoverage').scenarioHash(scenario);
+    }
+    dbRun('UPDATE runs SET server_version = ?, collection_version = ?, scenario_hash = ? WHERE id = ?',
+      [serverVersion === 'unknown' ? null : serverVersion, currentCollectionVersion(), hash, runId]);
+  } catch (err) {
+    log.warn({ err, runId }, 'run versions not recorded');
+  }
+}
+
 // S5: a run sends every OSDM request to the company api_base. Refuse to start
 // one aimed at a non-public target (loopback, the private network, a Docker
 // service name) before a token is resolved — with DNS, so a name that resolves
@@ -798,6 +817,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'error', `[runner] ${refusal}`);
     return { exitCode: 1, error: refusal };
   }
+  await recordRunVersions(runId, companyRow.datafile_path, scenarioOverride);
 
   // 3. Resolve access token (per-tester credentials, per-tester token cache).
   //    The oauth2/bearer logic + token cache live in access-token.js so the
