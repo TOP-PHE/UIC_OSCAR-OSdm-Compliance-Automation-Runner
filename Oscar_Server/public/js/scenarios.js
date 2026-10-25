@@ -4120,6 +4120,9 @@ const FW_LISTS = {
   card: { key: 'reductionCards', fields: FW_CARD_FIELDS, noun: 'card' },
   product: { key: 'products', fields: FW_PRODUCT_FIELDS, noun: 'product' },
   group: { key: 'groupProducts', fields: FW_GROUP_FIELDS, noun: 'group product' },
+  // #227 part 2: codes only the provider can give, for the offer request options scenario.
+  corporate: { key: 'corporateCodes', fields: [['code', 'Code', 60, 140], ['issuer', 'Issuer', 200, 220]], noun: 'corporate code' },
+  promotion: { key: 'promotionCodes', fields: [['code', 'Code', 60, 140]], noun: 'promotion code' },
 };
 
 function fwListFieldHtml(list, item, i, [field, label, max, width]) {
@@ -4174,8 +4177,74 @@ function fwGroupProductsHtml(fw) {
 
 // The list an action names ("fw-card-add" → card), or null.
 function fwListOf(action, kind) {
-  const m = /^fw-(card|product|group)-(add|remove|field)$/.exec(action);
+  const m = /^fw-(card|product|group|corporate|promotion)-(add|remove|field)$/.exec(action);
   return m && m[2] === kind ? m[1] : null;
+}
+
+// #227 part 2: the offer request options scenario's settings and the provider's codes.
+function fwOfferOptionsHtml(fw) {
+  const settings = fw.offerOptionDiscovery || {};
+  const invalid = settings.invalidValues === 'skip' ? 'skip' : 'random';
+  const corporate = fwListHtml('corporate', fw, {
+    label: 'Corporate codes', hint: 'a code and its issuer (a URN), as the provider gives them to a corporate customer',
+    none: 'None declared.', add: '+ Add a corporate code',
+    help: 'The offer request options scenario sends the first one; without one it sends a code it makes up, which the provider should refuse.',
+  });
+  const promotion = fwListHtml('promotion', fw, {
+    label: 'Promotion codes', hint: 'a code the provider accepts in an offer request',
+    none: 'None declared.', add: '+ Add a promotion code',
+    help: 'As for the corporate codes. An empty list says the provider takes none: a provider that does is then named in the run log.',
+  });
+  return `<div class="fw-subsection">
+        <label class="fw-subsection-label" for="fw-option-max-requests" style="display:block;margin:0 0 8px">
+          Offer request options: most requests
+          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — what the scenario finding which optional members of the offer request the provider supports may send (3 to 200; empty = 30)</span>
+        </label>
+        <input type="number" id="fw-option-max-requests" min="3" max="200" value="${Number.isInteger(settings.maxRequests) ? settings.maxRequests : ''}" data-action="fw-option-max-requests" style="width:90px">
+        <label class="fw-subsection-label" for="fw-option-invalid-values" style="display:block;margin:12px 0 8px">Options only the provider can give a value for, when none is declared</label>
+        <select id="fw-option-invalid-values" data-action="fw-option-invalid-values">
+          <option value="random"${invalid === 'random' ? ' selected' : ''}>Send a made-up value (it should be refused or said)</option>
+          <option value="skip"${invalid === 'skip' ? ' selected' : ''}>Do not test them</option>
+        </select>
+        <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">The scenario also sends what this framework declares (cards, products, currencies, classes…), and a declared option the provider refuses or ignores fails, so it can become a finding.</div>
+      </div>
+      <div style="margin-top:14px">${corporate}</div>
+      <div style="margin-top:14px">${promotion}</div>`;
+}
+
+// The ceiling typed into `settings` (changed in place): a number from 3 to
+// 200 is kept, an empty field clears it. False when the text is refused,
+// and the field then shows the stored value again.
+function applyOfferOptionCeiling(settings, el) {
+  const raw = el.value.trim();
+  const n = Number(raw);
+  if (raw === '') {
+    delete settings.maxRequests;
+  } else if (Number.isInteger(n) && n >= 3 && n <= 200) {
+    settings.maxRequests = n;
+  } else {
+    el.value = Number.isInteger(settings.maxRequests) ? settings.maxRequests : '';
+    return false;
+  }
+  return true;
+}
+
+// The two settings of the offer request options scenario; true when handled.
+function changeOfferOptionDiscovery(action, el) {
+  if (action !== 'fw-option-max-requests' && action !== 'fw-option-invalid-values') return false;
+  const fw = wizData.framework;
+  const settings = { ...fw.offerOptionDiscovery };
+  if (action === 'fw-option-max-requests') {
+    if (!applyOfferOptionCeiling(settings, el)) return true;
+  } else if (el.value === 'skip') {
+    settings.invalidValues = 'skip';
+  } else {
+    delete settings.invalidValues;
+  }
+  if (Object.keys(settings).length > 0) fw.offerOptionDiscovery = settings;
+  else delete fw.offerOptionDiscovery;
+  saveFrameworkDebounced();
+  return true;
 }
 
 function clickFwList(action, el) {
@@ -4997,6 +5066,7 @@ ${distributionPanelHtml(fw)}
         <input type="number" id="fw-sales-horizon" min="1" max="1000" value="${Number.isInteger(fw.salesHorizonDays) ? fw.salesHorizonDays : ''}" data-action="fw-sales-horizon" style="width:90px">
         <div style="margin-top:14px">${fwProductsHtml(fw)}</div>
         <div style="margin-top:14px">${fwGroupProductsHtml(fw)}</div>
+        <div style="margin-top:14px">${fwOfferOptionsHtml(fw)}</div>
       </div>
     </div>
   </div>
@@ -8705,7 +8775,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
 
   switch (action) {
     case 'file-upload':

@@ -1123,7 +1123,7 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
     // Handled before the change switch (Sonar S1479 caps its cases).
-    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;");
+    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;");
     const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
     expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
     expect(fn).toContain("const value = paxAgeValue(field, el.value);");
@@ -1377,5 +1377,44 @@ describe('js/scenarios.js — the Fares panel (#937)', () => {
     expect(source).toContain('if (clickFarePanel(action, el)) return;');
     expect(source).toContain('changeFareAge(action, el) ||');
     expect(source).toContain('${faresPanelHtml(fw)}');
+  });
+});
+
+// #227 part 2: the offer request options settings in the Test Framework editor.
+describe('the offer request options settings', () => {
+  const run = (value, action, stored) => {
+    const wizData = { framework: stored === undefined ? {} : { offerOptionDiscovery: stored } };
+    let saved = 0;
+    const applyOfferOptionCeiling = loadFunction('js/scenarios.js', 'applyOfferOptionCeiling');
+    const change = loadFunction('js/scenarios.js', 'changeOfferOptionDiscovery', { wizData, applyOfferOptionCeiling, saveFrameworkDebounced: () => { saved += 1; } });
+    const el = { value };
+    const handled = change(action, el);
+    return { handled, fw: wizData.framework, saved, el };
+  };
+
+  test('the ceiling is kept from 3 to 200, an empty field removes it, anything else is put back', () => {
+    expect(run('40', 'fw-option-max-requests').fw).toEqual({ offerOptionDiscovery: { maxRequests: 40 } });
+    expect(run('', 'fw-option-max-requests', { maxRequests: 40 }).fw).toEqual({});
+    const wrong = run('2', 'fw-option-max-requests', { maxRequests: 40 });
+    expect(wrong).toMatchObject({ handled: true, saved: 0, fw: { offerOptionDiscovery: { maxRequests: 40 } } });
+    expect(wrong.el.value).toBe(40);
+    expect(run('7.5', 'fw-option-max-requests').fw).toEqual({});
+    expect(run('201', 'fw-option-max-requests').handled).toBe(true);
+  });
+
+  test('made-up values are the default; skip is stored', () => {
+    expect(run('skip', 'fw-option-invalid-values').fw).toEqual({ offerOptionDiscovery: { invalidValues: 'skip' } });
+    expect(run('random', 'fw-option-invalid-values', { invalidValues: 'skip', maxRequests: 9 }).fw).toEqual({ offerOptionDiscovery: { maxRequests: 9 } });
+    expect(run('x', 'fw-other').handled).toBe(false);
+  });
+
+  test('the section draws both settings and both code lists', () => {
+    const FW_LISTS = { corporate: { key: 'corporateCodes' }, promotion: { key: 'promotionCodes' } };
+    const fwListHtml = (list) => `<list ${FW_LISTS[list].key}>`;
+    const html = loadFunction('js/scenarios.js', 'fwOfferOptionsHtml', { fwListHtml })({ offerOptionDiscovery: { maxRequests: 12, invalidValues: 'skip' } });
+    expect(html).toContain('value="12"');
+    expect(html).toContain('<option value="skip" selected>');
+    expect(html).toContain('<list corporateCodes>');
+    expect(html).toContain('<list promotionCodes>');
   });
 });

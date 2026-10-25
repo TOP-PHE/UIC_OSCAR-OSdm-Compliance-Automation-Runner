@@ -93,6 +93,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.393] / [collection-OTST_V2.0.222] — 2026-10-25
+
+Issue #227 (part 2), release 2026.428.
+
+### Added
+- **The Test Framework's part of the offer request options scenario** (`utils/offerOptionDiscovery.js`). The framework holds `offerOptionDiscovery: { maxRequests, invalidValues }` (the ceiling, 3 to 200, and `random` or `skip` for codes only the provider can give) and the provider's `corporateCodes` [{ code, issuer }] and `promotionCodes` [{ code }]. The three framework writers (Test Framework save, checklist apply, configuration import) refuse a value that cannot be stored with a 400, and a code holding `{{`, which a run would read as a template.
+- **The run's copy fills the scenario from the framework.** Each discovery scenario gets the ceiling and the choice (its own settings win), the values the framework declares (the first card, product, currency, flexibility, product tag, travel or service class, corporate and promotion code), and which options the framework says the provider supports or not, from explicit declarations only.
+- **Declarations are held to the answers.** An option the framework declares but the provider refuses, ignores or gives no offer for fails one check, "🧭 Offer request option <key> — declared in the Test Framework, taken by the provider", so a batch's finding drafts (#735) pick it up. An option the provider takes while the framework declares it unsupported is named in one INFO line. The report marks each declared option.
+- **Test Framework editor**: under the tariff section, the ceiling, the choice for made-up values, and the corporate and promotion code lists.
+
+### Tests
+- `offer-option-discovery.test.js`: the writer's checks, the declarations, the run's copy, and the comparison in the collection with a run that fails a declared option refused.
+- `company-test-framework-routes.test.js`: the 400s and a good save. `ui-scripts.test.js`: the editor's two settings and the section.
+
+---
+
 ## [server-1.11.392] / [collection-OTST_V2.0.221] — 2026-10-25
 
 Issue #227 (part 1), release 2026.427. Simulator 0.54.0.
