@@ -25,7 +25,7 @@ const { HttpError } = require('../http');
 function presentIn(body, member) {
   const [head, tail] = member.split('.');
   if (!tail) return body?.[head] !== undefined;
-  if (head === 'passenger') return (body?.anonymousPassengerSpecifications || []).some((p) => p && p[tail] !== undefined);
+  if (head === 'passenger') return (body?.anonymousPassengerSpecifications || []).some((p) => p?.[tail] !== undefined);
   return typeof body?.[head] === 'object' && body[head]?.[tail] !== undefined;
 }
 
