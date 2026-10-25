@@ -105,19 +105,8 @@ const SEARCH_OPTIONS = [
   ['serviceClassTypes', 'offerSearchCriteria.serviceClassTypes', ['ANY_CLASS']],
 ];
 
-/**
- * What the framework declares for the discovery:
- * { values: { optionKey: value }, declared: { optionKey: true|false } }.
- */
-function declarationsOf(framework) {
-  const fw = frameworkOf(framework) || {};
-  const values = {};
-  const declared = {};
-  const offer = (key, value) => {
-    if (value === undefined) return;
-    values[key] = value;
-    declared[key] = true;
-  };
+// The provider's own values: first card, product, currency, flexibility.
+function declareProviderValues(fw, offer) {
   const cards = declaredCards(fw);
   if (cards.length > 0) {
     const [card] = cards;
@@ -129,23 +118,34 @@ function declarationsOf(framework) {
   if (sold.length > 0) offer('offerSearchCriteria.currency', def || sold[0]);
   const flexibility = firstOf(fw.offerCriteria?.flexibilities);
   if (flexibility) offer('offerSearchCriteria.flexibilities', [flexibility]);
+}
+
+// An explicit list: its first value is sent; an empty one declares the option unsupported.
+function declareList(list, key, value, offer, declared) {
+  if (!Array.isArray(list)) return;
+  if (value) offer(key, [value]);
+  else declared[key] = false;
+}
+
+/**
+ * What the framework declares for the discovery:
+ * { values: { optionKey: value }, declared: { optionKey: true|false } }.
+ */
+function declarationsOf(framework) {
+  const fw = frameworkOf(framework) || {};
+  const values = {};
+  const declared = {};
+  const offer = (key, value) => {
+    values[key] = value;
+    declared[key] = true;
+  };
+  declareProviderValues(fw, offer);
   for (const [member, key, skip] of SEARCH_OPTIONS) {
     const list = fw.offerSearchOptions?.[member];
-    if (!Array.isArray(list)) continue;
-    const value = firstOf(list, skip);
-    if (value) offer(key, [value]);
-    else declared[key] = false;
+    declareList(list, key, firstOf(list, skip), offer, declared);
   }
-  const corporate = codesOf(fw.corporateCodes, true);
-  if (Array.isArray(fw.corporateCodes)) {
-    if (corporate.length > 0) offer('corporateCodes', [corporate[0]]);
-    else declared.corporateCodes = false;
-  }
-  const promotion = codesOf(fw.promotionCodes, false);
-  if (Array.isArray(fw.promotionCodes)) {
-    if (promotion.length > 0) offer('promotionCodes', [promotion[0]]);
-    else declared.promotionCodes = false;
-  }
+  declareList(fw.corporateCodes, 'corporateCodes', codesOf(fw.corporateCodes, true)[0], offer, declared);
+  declareList(fw.promotionCodes, 'promotionCodes', codesOf(fw.promotionCodes, false)[0], offer, declared);
   if (Array.isArray(fw.tripSearchParameters)) {
     for (const [name, key] of TRIP_PARAMETER_OPTIONS) declared[key] = fw.tripSearchParameters.includes(name);
   }

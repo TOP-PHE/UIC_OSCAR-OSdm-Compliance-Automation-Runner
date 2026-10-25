@@ -1385,7 +1385,8 @@ describe('the offer request options settings', () => {
   const run = (value, action, stored) => {
     const wizData = { framework: stored === undefined ? {} : { offerOptionDiscovery: stored } };
     let saved = 0;
-    const change = loadFunction('js/scenarios.js', 'changeOfferOptionDiscovery', { wizData, saveFrameworkDebounced: () => { saved += 1; } });
+    const offerOptionCeilingOf = loadFunction('js/scenarios.js', 'offerOptionCeilingOf');
+    const change = loadFunction('js/scenarios.js', 'changeOfferOptionDiscovery', { wizData, offerOptionCeilingOf, saveFrameworkDebounced: () => { saved += 1; } });
     const el = { value };
     const handled = change(action, el);
     return { handled, fw: wizData.framework, saved, el };
@@ -1397,6 +1398,8 @@ describe('the offer request options settings', () => {
     const wrong = run('2', 'fw-option-max-requests', { maxRequests: 40 });
     expect(wrong).toMatchObject({ handled: true, saved: 0, fw: { offerOptionDiscovery: { maxRequests: 40 } } });
     expect(wrong.el.value).toBe(40);
+    expect(run('7.5', 'fw-option-max-requests').fw).toEqual({});
+    expect(run('201', 'fw-option-max-requests').handled).toBe(true);
   });
 
   test('made-up values are the default; skip is stored', () => {
