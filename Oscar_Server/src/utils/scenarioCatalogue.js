@@ -218,7 +218,10 @@ function offerRequestOf(scenario, datafile) {
   if (form !== 'SEARCH') return { form, convertible: false };
   const trip = arr(datafile.tripRequirements).find((t) => isObj(t) && t.id === scenario.tripRequirementId);
   const filtered = ARMED.has(trip?.trip?.searchCriteria?.trainFilter);
-  return { form, convertible: Boolean(trip) && !filtered && scenarioReturnModel(scenario) === null };
+  // #227: the offer request options are found on a search, whose trip
+  // search members the other forms do not have.
+  const discovery = ARMED.has(scenario.offerOptionDiscovery);
+  return { form, convertible: Boolean(trip) && !filtered && !discovery && scenarioReturnModel(scenario) === null };
 }
 
 /** The declarations a framework lacks for these requirements, as sentences. */

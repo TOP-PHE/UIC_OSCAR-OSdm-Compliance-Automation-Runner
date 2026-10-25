@@ -70,6 +70,9 @@ runtime:
         require(bru.getEnvVar("library_base") + "fares.js").prepareSectionCheck();
         // #703: negative probe, the offer request with no passenger.
         require(bru.getEnvVar("library_base") + "passengerLimit.js").prepareEmptyPassengers();
+        // #227: which optional members of the request the provider supports;
+        // this request is sent with the mandatory members only.
+        require(bru.getEnvVar("library_base") + "offerOptions.js").prepareOptionDiscovery();
     - type: after-response
       code: |-
         const { postOfferResponse } = require(bru.getEnvVar("library_base")+"offers.js");
@@ -92,6 +95,14 @@ runtime:
         if (require(bru.getEnvVar("library_base") + "offers.js").checkOfferRequestByTripIds(res.getStatus(), _tripIdsBody)) {
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
           loopbackOrStop("POST Get Offer (by trip id)");
+          return;
+        }
+
+        // #227: the offer request options, one at a time, in combinations and
+        // all at once, sent from here; the scenario ends after the report.
+        if (await require(bru.getEnvVar("library_base") + "offerOptions.js").runOptionDiscovery(res.getStatus(), _tripIdsBody)) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (offer request options)");
           return;
         }
 

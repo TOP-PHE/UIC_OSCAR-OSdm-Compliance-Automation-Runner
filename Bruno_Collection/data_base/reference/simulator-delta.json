@@ -1080,6 +1080,32 @@
     },
     {
       "id": 32,
+      "resource_type": "TRAIN",
+      "label": "Trip 34 0000078–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000078",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "",
+            "departureTime": "08:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 33,
       "resource_type": "JOURNEY",
       "label": "Trip 4: 0000001–0000002, 2 legs",
       "data": {
@@ -1096,7 +1122,7 @@
       }
     },
     {
-      "id": 33,
+      "id": 34,
       "resource_type": "JOURNEY",
       "label": "Trip 5: 0000001–0000002, 2 legs",
       "data": {
@@ -1113,7 +1139,7 @@
       }
     },
     {
-      "id": 34,
+      "id": 35,
       "resource_type": "JOURNEY",
       "label": "Trip 11: 0000095–0000002, 2 legs",
       "data": {
@@ -1130,7 +1156,7 @@
       }
     },
     {
-      "id": 35,
+      "id": 36,
       "resource_type": "JOURNEY",
       "label": "Trip 24: 0000001–0000002, 2 legs",
       "data": {
@@ -1270,6 +1296,7 @@
     "SIM_FARE_BICYCLE_ONLY_39",
     "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_39",
     "SIM_NHF_FARE_NO_SECTION_TRIPIDS_39",
-    "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_39"
+    "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_39",
+    "SIM_OFFER_OPTION_DISCOVERY_39"
   ]
 }

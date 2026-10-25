@@ -114,26 +114,8 @@ function readBody() {
 }
 
 async function post(path, body) {
-  const { requestorHeader } = require('./requestHeaders.js');
   try {
-    const res = await new Promise((resolve, reject) => {
-      bru.sendRequest({
-        url: `${bru.getEnvVar('api_base')}${path}`,
-        method: 'POST',
-        headers: {
-          'Content-Type': `application/json;version=${bru.getEnvVar('osdmVersion')}`,
-          Accept: 'application/json',
-          Authorization: `Bearer ${bru.getEnvVar('access_token')}`,
-          ...requestorHeader(bru.getEnvVar('requestor')),
-        },
-        data: JSON.stringify(body),
-      }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
-    });
-    let data = res?.data ?? res?.body ?? null;
-    if (typeof data === 'string') {
-      try { data = JSON.parse(data); } catch { /* not JSON: kept as text */ }
-    }
-    return { status: res?.status || res?.statusCode || 0, body: data };
+    return await require('./osdmPost.js').postOsdm(path, body);
   } catch (err) {
     log(`[ERROR] Refund offer request for one fulfillment could not be sent: ${err?.message || err}`);
     return { status: 0, body: null };
