@@ -93,6 +93,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.397] / [collection-OTST_V2.0.223] — 2026-10-25
+
+Issue #956 (part 3), release 2026.432.
+
+### Added
+- **Coverage by flow and element** (`utils/coverageMatrix.js`, pure). The coverage was read by declared function only, so a row such as "Sale" listed a hundred scenario codes without saying what each tests. Now `GET /v1/company/coverage` also answers `matrix`: one row per flow and element tested. The flow is the scenario's after-sale (its IROPS flow when it sends a reason code), else the sale. The elements are what the scenario exercises: passenger type, seat selection flow, currency, card, product, offer request form, trip search parameter, option, limit… Each row has the flow first, a "whole flow" row, and these fields:
+  - **result**: passed, failed, never run, or no scenario.
+  - **Not supported (not declared)**: OSCAR warns that a scenario tests the element without the framework declaring it (#218's warnings; a flow left out of the framework counts too). A probe of what is not declared, such as an unsold currency, gets no warning and keeps its run's result.
+  - **Not supported (declared)**: the framework says the provider does not do it (passenger update, purchaser after the booking, an offer request option left without value). These rows have no scenario.
+  - **Test Framework**: declared, not declared, or every value declared.
+  - The scenario counts, "to run again", the open findings, and the number of scenarios whose latest run holds a warning saying the provider does not support something (501, PARAMETER_NOT_SUPPORTED…). That number stays beside the result, never in it: such a warning is about one request of the scenario, often an optional read, not about every element the scenario tests.
+- `scenarios`: one row per scenario, with its description, flow, elements, result, latest run, warnings and the provider's "not supported" lines.
+- **The Report Builder shows it by default** ("View: By flow and element"); the view by declared function stays one choice away. The Markdown export carries both.
+- **Download Excel**: `GET /v1/company/coverage/download?days=` answers an .xlsx file with four sheets: Summary, By flow and element, By scenario, By function. Each sheet has a bold, frozen header row and filters. It is written by OSCAR itself (`utils/xlsxWorkbook.js` over `zip.js`), with no new dependency. Every text is an inline string, so a cell starting with "=" stays text. Characters XML does not allow are dropped.
+
+### Tests
+- `coverage-matrix.test.js`:
+  - rows, results, both kinds of "not supported", the provider count beside the result, and the warnings read;
+  - every simulator reference: no row of its run list reads "not declared";
+  - the workbook: escaping, no formula, frozen header, filter, sheet names, and the four coverage sheets.
+- `coverage-routes.test.js`: the matrix from a run's warning, and the download (type, name, content, refused to a certifier, a bad window).
+- `ui-scripts.test.js`:
+  - the page's result and declaration names equal the server's;
+  - the matrix view (flow once, every text escaped), the Markdown, and the wiring.
+- Four mutations made these tests fail:
+  - an escape removed from the page;
+  - the run warnings not passed;
+  - the #218 warnings not read;
+  - the XML `&` not escaped.
+- The workbook was opened with openpyxl and in Chromium through the page.
+
+---
+
 ## [server-1.11.396] / [collection-OTST_V2.0.223] — 2026-10-25
 
 Issue #956 (part 2), release 2026.431.

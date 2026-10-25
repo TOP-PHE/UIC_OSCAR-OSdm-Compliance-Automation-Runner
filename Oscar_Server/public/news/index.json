@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-25-coverage-by-flow-and-element",
+    "date": "October 25, 2026",
+    "tag": "Added",
+    "title": "Coverage by flow and element, and an Excel download",
+    "summary": "The Test Framework coverage now shows, for each flow, every element tested and its result, and downloads as an Excel workbook.",
+    "content": "In the Report Builder, the coverage opens on a table by flow and element. For each flow (sale, refund, exchange…), each row names what its scenarios test (a passenger type, a seat selection, a currency, a card, a product…) and its result: passed, failed, never run, or not supported. Not supported means either that the Test Framework does not declare the element, or that it declares that the provider does not do it. When the provider answered \"not supported\" during a run, the number of such scenarios is shown next to the result. The view by declared function is still there.\n\nDownload Excel saves the same report as a workbook with four sheets: a summary, by flow and element, by scenario (with its description and what it tests), and by declared function."
+  },
+  {
     "id": "2026-10-25-test-framework-coverage-page",
     "date": "October 25, 2026",
     "tag": "Added",

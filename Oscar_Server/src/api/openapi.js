@@ -537,8 +537,14 @@ module.exports = {
     '/v1/company/coverage': {
       get: { tags: ['Company'], summary: 'How far what the Test Framework declares is tested, from the latest run of each scenario (#956)', security: [{ bearerAuth: [] }],
         parameters: [{ name: 'days', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 3650, default: 365 }, description: 'Runs queued within this many days are read' }],
-        description: 'Answers { days, framework, datafile, collectionVersion, summary, functions, notDeclared }. Each function: { id, group, label, state (passed | failed | never-run | not-covered), toRunAgain, scenarios: [{ code, result, toRunAgain, run }], findings }. A tester reads the scenarios of their view; the runs and findings are the company\'s or provider\'s of the request.',
+        description: 'Answers { days, framework, datafile, collectionVersion, summary, functions, notDeclared, matrix, scenarios }. matrix (#956 part 3): one row per flow and element tested { flow, flowLabel, element, group, label, result (passed | failed | never-run | not-covered | not-declared | declared-not-supported), declaration (declared | not-declared | every-value | declared-not-supported), counts, providerNotSupported, toRunAgain, scenarios, findings }; scenarios: one row per scenario { code, description, flow, elements, result, run, toRunAgain, notDeclared, providerNotSupported }. Each function: { id, group, label, state (passed | failed | never-run | not-covered), toRunAgain, scenarios: [{ code, result, toRunAgain, run }], findings }. A tester reads the scenarios of their view; the runs and findings are the company\'s or provider\'s of the request.',
         responses: { 200: { description: 'The coverage' }, 400: { description: 'days is not a whole number from 1 to 3650' }, 403: { description: 'Administrators and certifiers have no access' }, 409: { description: 'The data file cannot be read' } } },
+    },
+    '/v1/company/coverage/download': {
+      get: { tags: ['Company'], summary: 'The Test Framework coverage as an Excel workbook (#956 part 3)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'days', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 3650, default: 365 }, description: 'Runs queued within this many days are read' }],
+        description: 'The same report as GET /v1/company/coverage, as an .xlsx file: sheets Summary, By flow and element, By scenario, By function. Every text is an inline string (never a formula).',
+        responses: { 200: { description: 'The workbook' }, 400: { description: 'days is not a whole number from 1 to 3650' }, 403: { description: 'Administrators and certifiers have no access' }, 409: { description: 'The data file cannot be read' } } },
     },
     '/v1/company/providers': {
       get: { tags: ['Company'], summary: 'List the providers of the caller\'s company (Test Manager: all; tester: those granted)', security: [{ bearerAuth: [] }],

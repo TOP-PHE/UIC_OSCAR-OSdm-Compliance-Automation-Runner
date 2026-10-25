@@ -304,4 +304,7 @@ function latestRunsOf(rows) {
   return out;
 }
 
-module.exports = { declaredFunctions, functionsOf, scenarioHash, coverageOf, latestRunsOf, resultOf, toRunAgain };
+module.exports = {
+  declaredFunctions, functionsOf, scenarioHash, coverageOf, latestRunsOf, resultOf, toRunAgain,
+  scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf, SALES_FLOW_TEXT, OPTION_TEXT,
+};

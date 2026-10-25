@@ -172,6 +172,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .cov-failed{background:#ffebee;color:#c62828}
 .cov-never-run{background:#fff3e0;color:#bf360c}
 .cov-not-covered{background:#eceff1;color:#546e7a}
+.cov-not-declared,.cov-declared-not-supported{background:#ede7f6;color:#4527a0}
+.cov-provider{color:#bf360c}
+.cov-group{color:#546e7a}
 .cap-table{width:100%;border-collapse:collapse;font-size:13px}
 .cap-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
 .cap-table td{padding:8px 12px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
@@ -400,7 +403,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
           <option value="365" selected>365 days</option><option value="3650">10 years</option>
         </select>
         <button class="btn btn-primary btn-sm" id="coverage-btn" type="button">Show coverage</button>
+        <label for="coverage-view" style="font-size:13px">View</label>
+        <select id="coverage-view">
+          <option value="matrix" selected>By flow and element</option><option value="functions">By function declared</option>
+        </select>
         <button class="btn btn-secondary btn-sm" id="coverage-md-btn" type="button" disabled>Export Markdown</button>
+        <button class="btn btn-secondary btn-sm" id="coverage-xlsx-btn" type="button">Download Excel</button>
+        <span id="coverage-xlsx-msg" style="font-size:12px;color:#546e7a"></span>
       </div>
       <div id="coverage-body" style="margin-top:12px"></div>
     </div>
@@ -1875,12 +1884,21 @@ document.getElementById('logs-content').addEventListener('click', function(e) {
  * certifiers, whom the route refuses.
  */
 const COVERAGE_STATES = {
-  passed: 'Passed', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario'
+  passed: 'Passed', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario',
+  'not-declared': 'Not supported (not declared)', 'declared-not-supported': 'Not supported (declared)'
+};
+const COVERAGE_DECLARATIONS = {
+  declared: 'Declared', 'not-declared': 'Not declared', 'every-value': 'Every value declared',
+  'declared-not-supported': 'Declared not supported'
 };
 let coverageData = null;
 
 function coverageStateLabel(state) {
   return Object.hasOwn(COVERAGE_STATES, state) ? COVERAGE_STATES[state] : String(state || '');
+}
+
+function coverageDeclarationLabel(declaration) {
+  return Object.hasOwn(COVERAGE_DECLARATIONS, declaration) ? COVERAGE_DECLARATIONS[declaration] : String(declaration || '');
 }
 
 function coverageRunAgainLabel(value) {
@@ -1937,14 +1955,50 @@ function coverageNotDeclaredHtml(list) {
     + '</ul></div>';
 }
 
-function coverageHtml(data) {
+function coverageCountsText(c) {
+  var n = c || {};
+  return (n.scenarios || 0) + ' scenario(s): ' + (n.passed || 0) + ' passed, ' + (n.failed || 0) + ' failed, ' + (n.neverRun || 0) + ' never run';
+}
+
+function coverageProviderText(n) {
+  return 'the provider says "not supported" in ' + n + ' scenario(s)';
+}
+
+function coverageMatrixRowHtml(r, flowCell) {
+  var codes = (r.scenarios || []).map(function(code) { return '<li>' + escHtml(code) + '</li>'; }).join('');
+  var findings = (r.findings || []).map(function(x) { return '<li>' + escHtml(coverageFindingText(x)) + '</li>'; }).join('');
+  return '<tr><td><strong>' + escHtml(flowCell) + '</strong></td>'
+    + '<td><small class="cov-group">' + escHtml(r.group) + '</small><br>' + escHtml(r.label) + '</td>'
+    + '<td><span class="cov-state cov-' + escHtml(r.result) + '">' + escHtml(coverageStateLabel(r.result)) + '</span>'
+    + (r.toRunAgain ? '<br><small>to run again</small>' : '')
+    + (r.providerNotSupported ? '<br><small class="cov-provider">' + escHtml(coverageProviderText(r.providerNotSupported)) + '</small>' : '') + '</td>'
+    + '<td>' + escHtml(coverageDeclarationLabel(r.declaration)) + '</td>'
+    + '<td>' + escHtml(coverageCountsText(r.counts))
+    + (codes ? '<details><summary>Scenarios</summary><ul class="cov-list">' + codes + '</ul></details>' : '') + '</td>'
+    + '<td>' + (findings ? '<ul class="cov-list">' + findings + '</ul>' : '-') + '</td></tr>';
+}
+
+function coverageMatrixHtml(rows) {
+  var flow = null;
+  return '<table class="cap-table"><thead><tr><th>Flow</th><th>Element tested</th><th>Result</th><th>Test Framework</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead><tbody>'
+    + (rows || []).map(function(r) {
+      var flowCell = r.flow === flow ? '' : r.flowLabel;
+      flow = r.flow;
+      return coverageMatrixRowHtml(r, flowCell);
+    }).join('')
+    + '</tbody></table>';
+}
+
+function coverageHtml(data, view) {
   var notes = [];
   if (!data.framework) notes.push('No Test Framework is stored: nothing is declared beyond product-based distribution.');
   if (!data.datafile) notes.push('No data file is stored: no scenario exercises anything.');
   return '<div class="cov-summary">' + escHtml(coverageSummaryText(data.summary, data.days)) + '</div>'
     + notes.map(function(n) { return '<div class="cov-note">' + escHtml(n) + '</div>'; }).join('')
-    + '<table class="cap-table"><thead><tr><th>Function declared</th><th>State</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead>'
-    + '<tbody>' + coverageRowsHtml(data.functions) + '</tbody></table>'
+    + (view === 'functions'
+      ? '<table class="cap-table"><thead><tr><th>Function declared</th><th>State</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead>'
+        + '<tbody>' + coverageRowsHtml(data.functions) + '</tbody></table>'
+      : coverageMatrixHtml(data.matrix))
     + coverageNotDeclaredHtml(data.notDeclared);
 }
 
@@ -1955,7 +2009,14 @@ function mdCell(value) {
 }
 
 function coverageMarkdown(data, title) {
-  var lines = ['# Test Framework coverage — ' + mdCell(title), '', mdCell(coverageSummaryText(data.summary, data.days))];
+  var lines = ['# Test Framework coverage — ' + mdCell(title), '', mdCell(coverageSummaryText(data.summary, data.days)),
+    '', '## By flow and element', '', '| Flow | Element tested | Result | Test Framework | Scenarios |', '|---|---|---|---|---|'];
+  for (const r of data.matrix || []) {
+    var result = coverageStateLabel(r.result) + (r.toRunAgain ? ', to run again' : '')
+      + (r.providerNotSupported ? ', ' + coverageProviderText(r.providerNotSupported) : '');
+    lines.push('| ' + [r.flowLabel, r.group + ': ' + r.label, result, coverageDeclarationLabel(r.declaration), coverageCountsText(r.counts)].map(mdCell).join(' | ') + ' |');
+  }
+  lines.push('', '# By function declared');
   var group = null;
   for (const f of data.functions || []) {
     if (f.group !== group) {
@@ -1992,10 +2053,33 @@ async function loadCoverage() {
       return;
     }
     coverageData = data;
-    body.innerHTML = coverageHtml(data);
+    body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);
     mdBtn.disabled = false;
   } catch (e) {
     body.textContent = 'The coverage could not be read: ' + e.message + '.';
+  }
+}
+
+async function exportCoverageExcel() {
+  var msg = document.getElementById('coverage-xlsx-msg');
+  msg.textContent = 'Preparing the workbook...';
+  try {
+    var res = await fetch('/v1/company/coverage/download?days=' + encodeURIComponent(document.getElementById('coverage-days').value), {});
+    if (!res.ok) {
+      var err = await res.json().catch(function() { return null; });
+      msg.textContent = 'The workbook could not be made: ' + ((err && err.detail) || ('HTTP ' + res.status)) + '.';
+      return;
+    }
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+    msg.textContent = '';
+  } catch (e) {
+    msg.textContent = 'The workbook could not be made: ' + e.message + '.';
   }
 }
 
@@ -2014,6 +2098,10 @@ if (!isPlatformUser) {
   document.getElementById('coverage-card').style.display = 'block';
   document.getElementById('coverage-btn').addEventListener('click', function() { loadCoverage().catch(function() {}); });
   document.getElementById('coverage-md-btn').addEventListener('click', exportCoverageMarkdown);
+  document.getElementById('coverage-xlsx-btn').addEventListener('click', function() { exportCoverageExcel().catch(function() {}); });
+  document.getElementById('coverage-view').addEventListener('change', function() {
+    if (coverageData) document.getElementById('coverage-body').innerHTML = coverageHtml(coverageData, this.value);
+  });
 }
 
 /* ── Init ──────────────────────────────────────────────────────────────────── */
