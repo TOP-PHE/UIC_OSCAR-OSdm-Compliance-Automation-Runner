@@ -140,7 +140,7 @@ function workbook(sheets) {
     + `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${ns}"><sheets>`
     + list.map((s, i) => `<sheet name="${xmlText(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')
     + '</sheets>'
-    + `<definedNames>${list.map(filterName).join('')}</definedNames>`
+    + `<definedNames>${list.map((s, i) => filterName(s, i)).join('')}</definedNames>`
     + '</workbook>';
   const bookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
