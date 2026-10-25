@@ -41,7 +41,10 @@ test('an altered token is refused: payload, signature, or both swapped', () => {
   const [payload, signature] = token.split('.');
   const forged = Buffer.from(JSON.stringify({ p: 'beta', c: 'client-1', e: 9999999999 })).toString('base64url');
   assert.equal(tokens.verify(`${forged}.${signature}`), null);
-  assert.equal(tokens.verify(`${payload}.${signature.slice(0, -2)}AA`), null);
+  // #953: change the first character, which always changes the first byte;
+  // the last one carries unused bits, so changing it may decode to the same.
+  const other = signature[0] === 'A' ? 'B' : 'A';
+  assert.equal(tokens.verify(`${payload}.${other}${signature.slice(1)}`), null);
   assert.equal(tokens.verify(`${payload}.`), null);
   assert.equal(tokens.verify(payload), null);
   assert.equal(tokens.verify(`${payload}.${signature}.${signature}`), null);
