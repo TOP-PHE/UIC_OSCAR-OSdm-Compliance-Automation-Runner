@@ -129,27 +129,29 @@ const PHASE_1 = 'Phase 1, mandatory members only: ';
 const SILENT = 'Offer request options taken without a word: ';
 const withMessage = (message) => (message ? { message } : {});
 
-// The lines after the report's first one: [prefix, how it goes into the report].
+// The lines after the report's first one: { prefix, read: how it goes into the report }.
+const PHASE_3 = 'Phase 3, ';
+const PHASE_4 = 'Phase 4, every supported option';
 const LINE_READERS = [
-  [PHASE_1, (text, report) => {
+  { prefix: PHASE_1, read: (text, report) => {
     const [answer, message] = splitMessage(text.slice(PHASE_1.length));
     report.mandatory = { ok: answer === 'answered', message };
-  }],
-  ['Phase 3, ', (text, report) => {
-    const combo = phaseRequestOf(text.slice('Phase 3, '.length));
+  } },
+  { prefix: PHASE_3, read: (text, report) => {
+    const combo = phaseRequestOf(text.slice(PHASE_3.length));
     if (combo) report.combinations.push({ options: combo.label.split(' + '), status: combo.status, result: combo.result, ...withMessage(combo.message) });
-  }],
-  ['Phase 4, every supported option', (text, report) => {
+  } },
+  { prefix: PHASE_4, read: (text, report) => {
     const all = phaseRequestOf(text.slice('Phase 4, '.length));
     if (all) report.all = { count: Number.parseInt(all.label.slice(all.label.indexOf('(') + 1), 10) || null, status: all.status, result: all.result, ...withMessage(all.message) };
-  }],
-  [SILENT, (text, report) => { report.silent = splitMessage(text.slice(SILENT.length))[0].split(', '); }],
-  ['Phase ', () => {}],
-  ['Taken by ', () => {}],
-  ['', (text, report) => {
+  } },
+  { prefix: SILENT, read: (text, report) => { report.silent = splitMessage(text.slice(SILENT.length))[0].split(', '); } },
+  { prefix: 'Phase ', read: () => {} },
+  { prefix: 'Taken by ', read: () => {} },
+  { prefix: '', read: (text, report) => {
     const row = optionOf(text);
     if (row) report.options.push(row);
-  }],
+  } },
 ];
 
 const newReport = (text) => {
@@ -169,7 +171,7 @@ function reportOf(lines) {
     const text = afterMark(line);
     if (text === null) continue;
     if (text.startsWith('Offer request options (#227) — OSDM')) report = newReport(text);
-    else if (report && report.options.length < MAX_LINES) LINE_READERS.find(([prefix]) => text.startsWith(prefix))[1](text, report);
+    else if (report && report.options.length < MAX_LINES) LINE_READERS.find((reader) => text.startsWith(reader.prefix)).read(text, report);
   }
   return report;
 }
