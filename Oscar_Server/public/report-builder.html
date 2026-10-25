@@ -164,6 +164,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-json-body.expanded{display:block}
 
 /* Vendor capability matrix */
+.cov-summary{font-size:13px;color:#37474f;line-height:1.6;margin-bottom:10px}
+.cov-note{font-size:12px;color:#546e7a;margin:8px 0}
+.cov-list{margin:0;padding-left:16px;font-size:12px}
+.cov-state{display:inline-block;white-space:nowrap;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase}
+.cov-passed{background:#e8f5e9;color:#2e7d32}
+.cov-failed{background:#ffebee;color:#c62828}
+.cov-never-run{background:#fff3e0;color:#e65100}
+.cov-not-covered{background:#eceff1;color:#546e7a}
 .cap-table{width:100%;border-collapse:collapse;font-size:13px}
 .cap-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
 .cap-table td{padding:8px 12px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
@@ -378,6 +386,23 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
         <button class="btn btn-sm btn-secondary" id="load-template-btn" data-action="load-template">Load</button>
         <button class="btn btn-sm btn-secondary" id="delete-template-btn" data-action="delete-template">Delete</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Test Framework coverage (#956): not tied to a run -->
+  <div class="card" id="coverage-card" style="display:none">
+    <div class="card-title">Test Framework Coverage</div>
+    <div class="card-body">
+      <div class="actions-row">
+        <label for="coverage-days" style="font-size:13px">Runs of the last</label>
+        <select id="coverage-days">
+          <option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option>
+          <option value="365" selected>365 days</option><option value="3650">10 years</option>
+        </select>
+        <button class="btn btn-primary btn-sm" id="coverage-btn" type="button">Show coverage</button>
+        <button class="btn btn-secondary btn-sm" id="coverage-md-btn" type="button" disabled>Export Markdown</button>
+      </div>
+      <div id="coverage-body" style="margin-top:12px"></div>
     </div>
   </div>
 
@@ -1842,6 +1867,154 @@ document.getElementById('logs-content').addEventListener('click', function(e) {
   var expanded = body.classList.toggle('expanded');
   btn.classList.toggle('expanded', expanded);
 });
+
+/* ── Test Framework coverage (#956) ─────────────────────────────────────────
+ * GET /v1/company/coverage: how far what the Test Framework declares is
+ * tested, for the company or provider selected. Not tied to a run. The
+ * company's members only: the card is not drawn for administrators and
+ * certifiers, whom the route refuses.
+ */
+const COVERAGE_STATES = {
+  passed: 'Passed', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario'
+};
+let coverageData = null;
+
+function coverageStateLabel(state) {
+  return Object.hasOwn(COVERAGE_STATES, state) ? COVERAGE_STATES[state] : String(state || '');
+}
+
+function coverageRunAgainLabel(value) {
+  if (value === true) return 'to run again';
+  if (value === false) return 'up to date';
+  return '';
+}
+
+function coverageSummaryText(summary, days) {
+  var s = summary || {};
+  var parts = [
+    s.declared + ' function(s) declared', s.covered + ' with a scenario', s.passed + ' passed',
+    s.failed + ' failed', s.neverRun + ' never run', s.notCovered + ' without a scenario',
+    s.toRunAgain + ' to run again'
+  ];
+  var latest = s.latestRunAt ? 'latest run ' + s.latestRunAt : 'no run';
+  return parts.join(' · ') + ' — runs of the last ' + days + ' day(s), ' + latest + '.';
+}
+
+function coverageScenarioText(s) {
+  var text = s.code + ': ' + coverageStateLabel(s.result);
+  if (s.run) text += ' (' + s.run.passed + ' passed, ' + s.run.failed + ' failed, ' + (s.run.at || '?') + ')';
+  var again = coverageRunAgainLabel(s.toRunAgain);
+  if (again) text += ', ' + again;
+  return text;
+}
+
+function coverageFindingText(f) {
+  return f.title + ' (' + f.category + ', ' + f.status + (f.scenarioCode ? ', ' + f.scenarioCode : '') + ')';
+}
+
+function coverageRowsHtml(functions) {
+  var group = null;
+  return (functions || []).map(function(f) {
+    var head = '';
+    if (f.group !== group) {
+      group = f.group;
+      head = '<tr><th colspan="4">' + escHtml(group) + '</th></tr>';
+    }
+    var scenarios = (f.scenarios || []).map(function(s) { return '<li>' + escHtml(coverageScenarioText(s)) + '</li>'; }).join('');
+    var findings = (f.findings || []).map(function(x) { return '<li>' + escHtml(coverageFindingText(x)) + '</li>'; }).join('');
+    return head + '<tr><td>' + escHtml(f.label) + '</td>'
+      + '<td><span class="cov-state cov-' + escHtml(f.state) + '">' + escHtml(coverageStateLabel(f.state)) + '</span>'
+      + (f.toRunAgain ? '<br><small>to run again</small>' : '') + '</td>'
+      + '<td>' + (scenarios ? '<ul class="cov-list">' + scenarios + '</ul>' : '-') + '</td>'
+      + '<td>' + (findings ? '<ul class="cov-list">' + findings + '</ul>' : '-') + '</td></tr>';
+  }).join('');
+}
+
+function coverageNotDeclaredHtml(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<div class="cov-note"><strong>Scenarios testing what the Test Framework does not declare</strong><ul class="cov-list">'
+    + list.map(function(n) { return '<li>' + escHtml(n.code) + ': ' + escHtml((n.warnings || []).join(', ')) + '</li>'; }).join('')
+    + '</ul></div>';
+}
+
+function coverageHtml(data) {
+  var notes = [];
+  if (!data.framework) notes.push('No Test Framework is stored: nothing is declared beyond product-based distribution.');
+  if (!data.datafile) notes.push('No data file is stored: no scenario exercises anything.');
+  return '<div class="cov-summary">' + escHtml(coverageSummaryText(data.summary, data.days)) + '</div>'
+    + notes.map(function(n) { return '<div class="cov-note">' + escHtml(n) + '</div>'; }).join('')
+    + '<table class="cap-table"><thead><tr><th>Function declared</th><th>State</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead>'
+    + '<tbody>' + coverageRowsHtml(data.functions) + '</tbody></table>'
+    + coverageNotDeclaredHtml(data.notDeclared);
+}
+
+// One Markdown text: one line, no "|" breaking a table, no "<" read as HTML.
+function mdCell(value) {
+  return String(value ?? '').replaceAll('\r\n', ' ').replaceAll('\n', ' ').replaceAll('\r', ' ')
+    .replaceAll('\\', '\\\\').replaceAll('|', '\\|').replaceAll('<', '\\<');
+}
+
+function coverageMarkdown(data, title) {
+  var lines = ['# Test Framework coverage — ' + mdCell(title), '', mdCell(coverageSummaryText(data.summary, data.days))];
+  var group = null;
+  for (const f of data.functions || []) {
+    if (f.group !== group) {
+      group = f.group;
+      lines.push('', '## ' + mdCell(group), '', '| Function | State | Scenarios | Open findings |', '|---|---|---|---|');
+    }
+    var state = coverageStateLabel(f.state) + (f.toRunAgain ? ', to run again' : '');
+    lines.push('| ' + [f.label, state, (f.scenarios || []).map(coverageScenarioText).join('; '),
+      (f.findings || []).map(coverageFindingText).join('; ')].map(mdCell).join(' | ') + ' |');
+  }
+  if (Array.isArray(data.notDeclared) && data.notDeclared.length) {
+    lines.push('', '## Scenarios testing what the Test Framework does not declare', '');
+    for (const n of data.notDeclared) lines.push('- ' + mdCell(n.code) + ': ' + mdCell((n.warnings || []).join(', ')));
+  }
+  return lines.join('\n') + '\n';
+}
+
+function coverageTitle() {
+  var provider = typeof window.oscarSelectedProvider === 'function' ? window.oscarSelectedProvider() : null;
+  return (provider && provider.name) || company.name || 'company';
+}
+
+async function loadCoverage() {
+  var body = document.getElementById('coverage-body');
+  var mdBtn = document.getElementById('coverage-md-btn');
+  coverageData = null;
+  mdBtn.disabled = true;
+  body.textContent = 'Loading coverage...';
+  try {
+    var res = await fetch('/v1/company/coverage?days=' + encodeURIComponent(document.getElementById('coverage-days').value), {});
+    var data = await res.json().catch(function() { return null; });
+    if (!res.ok || !data) {
+      body.textContent = 'The coverage could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+      return;
+    }
+    coverageData = data;
+    body.innerHTML = coverageHtml(data);
+    mdBtn.disabled = false;
+  } catch (e) {
+    body.textContent = 'The coverage could not be read: ' + e.message + '.';
+  }
+}
+
+function exportCoverageMarkdown() {
+  if (!coverageData) return;
+  var blob = new Blob([coverageMarkdown(coverageData, coverageTitle())], { type: 'text/markdown' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.md';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+}
+
+if (!isPlatformUser) {
+  document.getElementById('coverage-card').style.display = 'block';
+  document.getElementById('coverage-btn').addEventListener('click', function() { loadCoverage().catch(function() {}); });
+  document.getElementById('coverage-md-btn').addEventListener('click', exportCoverageMarkdown);
+}
 
 /* ── Init ──────────────────────────────────────────────────────────────────── */
 loadRuns();

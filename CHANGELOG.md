@@ -93,6 +93,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.396] / [collection-OTST_V2.0.223] — 2026-10-25
+
+Issue #956 (part 2), release 2026.431.
+
+### Added
+- **Test Framework Coverage in the Report Builder.** A card of its own, not tied to the run selected, for testers and Test Managers (not drawn for administrators and certifiers, whom the route refuses). It reads `GET /v1/company/coverage` for the company or provider chosen in "Working on", over 7, 30, 90 or 365 days or 10 years of runs. One line sums it up; then one row per declared function, grouped as the Test Framework is (distribution, sales flows, currencies…): its state (passed, failed, never run, no scenario), "to run again", each scenario exercising it with its latest finished run (passed and failed checks, date, to run again or up to date), and the open findings of those scenarios. The scenarios testing what the framework does not declare are listed below. Every text from the answer is escaped.
+- **Export Markdown** writes the same report as `oscar-coverage-<date>.md`, one table per group. A text holding `|`, `<`, `\` or a line break stays in its cell and is never read as HTML.
+
+### Tests
+- `ui-scripts.test.js`: the page's own functions run on an answer holding markup and pipes (escaped, one heading per group, one Markdown row per function), on the server module's own answer, and the card's member-only wiring; two mutations (an escape removed, the pipe escape removed) make them fail.
+
+---
+
 ## [server-1.11.395] / [collection-OTST_V2.0.223] — 2026-10-25
 
 Issue #956 (part 1), release 2026.430.
