@@ -42,7 +42,10 @@ const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const ARMED = new Set(['on', 'true', 'yes', '1', true, 1]);
 const armed = (v) => ARMED.has(typeof v === 'string' ? v.toLowerCase() : v);
 const strings = (list) => [...new Set(arr(list).filter((v) => typeof v === 'string' && v.trim() !== '').map((v) => v.trim()))];
-const frameworkOf = (fw) => (isObj(fw?.config) ? fw.config : (isObj(fw) ? fw : {}));
+function frameworkOf(fw) {
+  if (isObj(fw?.config)) return fw.config;
+  return isObj(fw) ? fw : {};
+}
 
 const SALES_FLOW_TEXT = {
   SALE: 'Sale', REFUND_FULL: 'Full refund', REFUND_PARTIAL: 'Partial refund', REFUND_IROPS: 'Refund for irregular operations (IROPS)',
@@ -262,7 +265,7 @@ function coverageOf({ framework, datafile, runs = {}, findings = [], collectionV
     };
   });
   const count = (state) => functions.filter((f) => f.state === state).length;
-  const dates = [...entries.values()].map((e) => e.run?.at).filter(Boolean).sort();
+  const dates = [...entries.values()].map((e) => e.run?.at).filter(Boolean).sort((a, b) => a.localeCompare(b));
   return {
     summary: {
       declared: functions.length, covered: functions.length - count('not-covered'),
