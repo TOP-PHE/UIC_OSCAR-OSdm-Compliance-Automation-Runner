@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.426",
+  "current_release": "2026.427",
   "releases": [
+    {
+      "release": "2026.427",
+      "date": "2026-10-25",
+      "server": "1.11.392",
+      "collection": "OTST_V2.0.221",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#227 PR 1: a scenario finds which optional members of the offer request a provider supports. The request with the mandatory members only must be answered with offers; then each option alone, random combinations of those found supported and all of them, within 30 requests, each answer classified and reported. Simulator 0.54.0 shows every class from station 0000078. Reference scenario OTST_OFFER_OPTION_DISCOVERY."
+      ]
+    },
     {
       "release": "2026.426",
       "date": "2026-10-24",

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-25-offer-request-options",
+    "date": "October 25, 2026",
+    "tag": "Added",
+    "title": "Which offer request options a provider supports",
+    "summary": "A new reference scenario sends the offer request with the mandatory members only, then each optional member, combinations of them and all of them, and reports what the provider did with each.",
+    "content": "A provider must answer an offer request that holds only the passengers and the trip: this is the one check of the scenario. It then asks again with each optional member of the request alone (date of birth or age, cards, PRM needs, classes, flexibilities, currency, corporate and promotion codes, and the others of the provider's OSDM version), with random combinations of those it supports, and with all of them, within 30 requests.\n\nEach answer is classified: supported, refused, not implemented or error, then honoured, ignored (said or not), or no offer (with or without a reason). A code only the provider can give, such as a card or a promotion code, is made up when none is given: it should be refused or said, and a provider taking it silently is reported. The report is in the run log."
+  },
+  {
     "id": "2026-10-24-exchange-fee-schedule",
     "date": "October 24, 2026",
     "tag": "Fixed",

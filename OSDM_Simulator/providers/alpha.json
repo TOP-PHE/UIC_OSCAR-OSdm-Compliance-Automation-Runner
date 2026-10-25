@@ -29,6 +29,19 @@
     "perPassengerFrom": "urn:uic:stn:0000096",
     "perLegFrom": "urn:uic:stn:0000095"
   },
+  "requestOptions": {
+    "from": "urn:uic:stn:0000078",
+    "members": {
+      "offerSearchCriteria.flexibilities": "ignore-silent",
+      "passenger.residency": "ignore-said",
+      "passenger.prmNeeds": "not-implemented",
+      "embed": "error",
+      "passenger.transportable": "no-offer-said",
+      "tripResponseParameters": "no-offer-silent",
+      "promotionCodes": "refuse-unknown"
+    },
+    "promotionCodes": ["SIM-PROMO-10"]
+  },
   "ageTariffs": {
     "from": "urn:uic:stn:0000093",
     "bands": [

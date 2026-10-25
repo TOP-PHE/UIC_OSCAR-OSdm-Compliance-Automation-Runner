@@ -40,6 +40,7 @@
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
+const { applyRequestOptions } = require('./requestOptions');
 const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType } = require('./reductionCards');
 const { reservationsOfDirection, reservationProductOf } = require('./reservations');
 const { selectProducts } = require('./productSelection');
@@ -754,8 +755,11 @@ function applyStopPlaceVariants(trips, provider, offers, remembered) {
   }
 }
 
-function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
-  const trips = tripsOf(body, providerAsIs, known);
+function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
+  const trips = tripsOf(asked, providerAsIs, known);
+  // #227: optional members this provider ignores, refuses or answers without offers.
+  const options = applyRequestOptions(asked, trips, providerAsIs);
+  const { body } = options;
   // #780: the variant stop place answers as if no criteria were sent.
   const ignoresOptions = trips.some((t) => t.origin?.stopPlaceRef === providerAsIs.variants?.ignoresOfferOptionsFrom);
   const criteria = ignoresOptions ? undefined : body.offerSearchCriteria;
@@ -786,11 +790,11 @@ function buildOfferCollection(body, providerAsIs, nowMs, known = {}) {
   const fareOffers = beyondHorizon ? [] : fareOffersOf({
     body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS, fulfillmentOptions,
   });
-  const offers = [...productOffers, ...fareOffers];
+  const offers = options.noOffer ? [] : [...productOffers, ...fareOffers];
   // #906: a fare offer is booked like any other, so it is remembered too.
   for (const offer of fareOffers) remembered.push({ offer, trips, passengers, oneFulfillment: true, shortLivedMs });
   const allTrips = [...outboundTrips, ...trips];
-  const problems = [...problemsOf(passengers, built.offers, collective, refusals), ...productProblems];
+  const problems = [...problemsOf(passengers, built.offers, collective, refusals), ...productProblems, ...options.problems];
   const partsIgnored = fareOffers.length > 0 ? null : offerPartsIgnored(criteria);
   if (partsIgnored) problems.push(partsIgnored);
   if (beyondHorizon) problems.push(beyondHorizon);

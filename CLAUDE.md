@@ -240,6 +240,32 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`checkUndeclaredOption()`, `library-bruno/optionNotDeclared.js`) as the
     currency probe: refusal / none / ignored pass, kept FAIL, silent WARNING.
     An armed scenario gets no `offerOption:` warning. #780 is done.
+    **Offer request options (#227, PR 1 = 1.11.392 / OTST_V2.0.221,
+    simulator 0.54.0):** `offerOptionDiscovery` on a scenario makes step 01
+    a discovery (`library-bruno/offerOptions.js`). 01's before-request keeps
+    the whole request in `__offerOptionFull` and sends the mandatory members
+    only (`mandatoryRequest()`: passengers' externalRef + type, the trip):
+    the one check, which fails on a refusal or no offer. The after-response
+    (`runOptionDiscovery()`, before the other probes) sends from the script
+    (`osdmPost.js`, shared with the per-fulfillment refund) each option
+    alone, `drawCombinations()` of those found supported (mulberry32, seed
+    `offerOptionSeed` else `seedOf(code)`) and all at once, within
+    `offerOptionMaxRequests` (`budgetOf()`, 30, 3–200; `plan()` keeps 3 for
+    combinations), logs `reportLines()`, keeps `__offerOptionReport` and
+    ends the scenario. Options are `OPTIONS`, kept only when their member is
+    in the version's generated request schema (`memberIn()`); trip-search
+    ones only for a SEARCH trip; `conflicts` keeps age / date of birth and
+    travel / service class apart. Values: `offerOptionValues` (by option
+    key), else the scenario's, else an OSDM default, else for provider codes
+    (cards, corporate / promotion codes, products) a made-up one (`invalid`,
+    `offerOptionInvalidValues: skip` = not tested). `classify()`: status,
+    then honoured / accepted (no check possible) / ignored said or silent /
+    no offer said or silent / invalid said or silent; a single top-level
+    Problem counts as the answer's problem. Simulator: from `0000078`
+    (`requestOptions` in every profile, `src/osdm/requestOptions.js`) each
+    class is shown; elsewhere those members change nothing. PR 2: the
+    framework's declared values and ceiling, the checklist, finding drafts,
+    the Report Builder section.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`
@@ -2879,19 +2905,16 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
     - (**#306**, the OAuth token in plaintext in the ephemeral Bruno env-yml,
       was listed here as unfixed. It was fixed the next day by PR #468 and
       closed on 2026-07-03; checked 2026-10-06.)
-    - **#239**, **#222**, **#211** — scenario-authoring gaps
-      (`optionalReservationSelections`, collective booking, night-train
-      sales/refund).
-    - **#198/#199/#200** — SNCF-specific scenarios (PRM/IRT, claims,
-      exchange).
+    - **#198/#199** — SNCF-specific scenarios (PRM/IRT, claims). #239,
+      #222, #211 and #200 were closed in October 2026, each with what is
+      built and an issue of its own for what is left.
     - **The fare programme (#242)** is built: offers #903–#905, booking and
       fulfilment #906, refund #907, fare reservations #255. Open with OTST:
       D5 (#244 case 2), D6 (the refund fee request form, provisional in
       #907), D7 (a real provider with fare mode). The old OTST issues
       #205–#207 and #243–#248 are closed on the maintainer's word only (D8).
   - **Explicitly reserved for the user's own review — do NOT close these:**
-    **#226** (exchange → new offer request), **#227** (optional offer-request
-    parameters, e.g. age vs. birth date / gender for night trains), **#221**
+    **#226** (exchange → new offer request), **#221**
     (post-refactor code/comment review before merging to master). The user
     is handling these personally; leave them alone unless asked.
 - **Flagged, not built:** extend gating (or a parallel mechanism) so the

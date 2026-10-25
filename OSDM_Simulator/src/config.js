@@ -94,6 +94,7 @@ function checkProvider(key, raw) {
     ...checkTicketing(raw.ticketing, bad),
     ...checkSalesHorizon(raw.salesHorizon, bad),
     ...checkAgeTariffs(raw.ageTariffs, bad),
+    ...checkRequestOptions(raw.requestOptions, bad),
     ...checkPlacePreferences(raw.placePreferences, bad),
     ...checkPlaceMap(raw.placeMap, bad),
     ...checkOtherCurrencies(raw.otherCurrencies, raw.currency, bad),
@@ -278,6 +279,26 @@ function checkAgeTariffs(value, bad) {
     return { type: b.type, maxAge: b.maxAge, percent: b.percent };
   });
   return { ageTariffs: { from: value.from, bands } };
+}
+
+// #227: what the provider does with optional members of the offer request,
+// for trips from one stop place (`from`): `members` maps a member (as the
+// collection names it) to a behaviour of REQUEST_OPTION_BEHAVIOURS;
+// `promotionCodes` lists the codes it knows. Absent: no such behaviour.
+const REQUEST_OPTION_BEHAVIOURS = new Set(['ignore-silent', 'ignore-said', 'not-implemented', 'error', 'no-offer-said', 'no-offer-silent', 'refuse-unknown']);
+const REQUEST_OPTION_MEMBER = /^[a-zA-Z]+(\.[a-zA-Z]+)?$/;
+function checkRequestOptions(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || !isText(value.from, 1, 120)) throw bad('requestOptions');
+  const { members, promotionCodes = [] } = value;
+  if (!members || typeof members !== 'object' || Array.isArray(members)) throw bad('requestOptions');
+  const entries = Object.entries(members);
+  if (entries.length === 0 || entries.length > 30) throw bad('requestOptions');
+  for (const [member, behaviour] of entries) {
+    if (!REQUEST_OPTION_MEMBER.test(member) || !REQUEST_OPTION_BEHAVIOURS.has(behaviour)) throw bad('requestOptions');
+  }
+  if (!Array.isArray(promotionCodes) || promotionCodes.length > 20 || !promotionCodes.every((c) => isText(c, 1, 60))) throw bad('requestOptions');
+  return { requestOptions: { from: value.from, members: { ...members }, promotionCodes: [...promotionCodes] } };
 }
 
 // #704: how many days ahead the provider sells, for trips from one stop

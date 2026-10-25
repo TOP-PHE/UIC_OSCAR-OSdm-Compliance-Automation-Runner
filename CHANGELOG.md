@@ -93,6 +93,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.392] / [collection-OTST_V2.0.221] — 2026-10-25
+
+Issue #227 (part 1), release 2026.427. Simulator 0.54.0.
+
+### Added
+- **Offer request options** (`offerOptionDiscovery`, `library-bruno/offerOptions.js`). Step 01 of such a scenario finds which optional members of the offer request the provider supports, in four phases:
+  1. the request with the mandatory members only (each passenger's `externalRef` and `type`, and the trip). This is the scenario's one check: a refusal, or no offer, fails it, since OSDM requires nothing more;
+  2. each optional member alone;
+  3. random combinations of the members found supported (seeded: `offerOptionSeed`, else drawn from the scenario code, so a run can be repeated);
+  4. every supported member at once.
+  Phases 2 to 4 are sent from the step's script, within `offerOptionMaxRequests` (30 by default, 3 to 200; three are kept for combinations). The members are those of the scenario's OSDM version, read from the generated request schema: passenger (date of birth or age, gender, cards, PRM needs, residency, transportable), offer search criteria (offer parts, product tags and selections, flexibilities, travel or service class, offer mode, currency, inbound date), trip search (arrival time, vias, not-vias, parameters, return search, for a search trip only) and the others (requested sections, fulfillment options, corporate and promotion codes, trip response parameters, embed).
+- **Each answer is classified twice.** By its status: supported (2xx), refused (4xx, with the Problem's code and pointer), not implemented (501), error. Then, for a 2xx: honoured (the offers keep to it), accepted (the answer cannot show it), ignored and said (`PARAMETER_NOT_SUPPORTED`), ignored silently, no offer with a reason, or no offer with no word. The run log shows one row per member, then the combinations and the full request; a member taken without a word is a WARNING.
+- **Values.** A member takes `offerOptionValues`, else the scenario's own value, else a value OSDM defines for any provider. A code only the provider can give (a card, a corporate or promotion code, a product) is made up when none is given, and must be refused or said: taken silently, it is reported. `offerOptionInvalidValues: skip` leaves such members "not tested".
+- Reference scenario `OTST_OFFER_OPTION_DISCOVERY` (70 checks on the simulator), from `SIM_OFFER_OPTION_DISCOVERY_38` and its five version copies (trip 34).
+
+### Simulator 0.54.0
+- **Optional members of the offer request, from station 0000078** (`requestOptions` in every profile, `src/osdm/requestOptions.js`), so the discovery meets every class of answer: `flexibilities` ignored silently, `residency` ignored and said, 501 to `prmNeeds`, 500 to `embed`, no offer to a `transportable` (said) and to `tripResponseParameters` (not said), an unknown promotion code refused (400 `PROMOTION_CODE_UNKNOWN`). Elsewhere these members change nothing; no earlier scenario sends them.
+
+### Changed
+- A request sent from a script (the per-fulfillment refund offers, #883, and the discovery) goes through one helper, `library-bruno/osdmPost.js`, which also carries the scenario's simulator faults.
+
+### Tests
+- `bruno-offer-options.test.js`: the mandatory request, each option alone and all at once valid in every OSDM version from 3.4 to 3.12, the values, both levels of classification, the plan and the combinations, the report, the Bruno glue.
+- `OSDM_Simulator/tests/request-options.test.js`: each behaviour, nothing changed elsewhere, the profile check.
+
+---
+
 ## [server-1.11.391] / [collection-OTST_V2.0.220] — 2026-10-24
 
 Issue #950, release 2026.426. Simulator 0.53.0.
