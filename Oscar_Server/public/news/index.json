@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-25-test-framework-coverage-api",
+    "date": "October 25, 2026",
+    "tag": "Added",
+    "title": "How far the Test Framework is tested",
+    "summary": "OSCAR can now say, for a company or provider, which declared functions are tested, passed, failed, never run or not covered, from the latest run of each scenario.",
+    "content": "For each function the Test Framework declares (a sales flow, a return model, a currency, a reduction card, a product…), OSCAR lists the scenarios that exercise it, the latest result of each and the open findings, and says when a result should be made again because the collection or the scenario changed since. Scenarios that test something the framework does not declare are listed apart.\n\nThis release adds the report to OSCAR's API; the page that shows it follows."
+  },
+  {
     "id": "2026-10-25-offer-request-options-report",
     "date": "October 25, 2026",
     "tag": "Added",

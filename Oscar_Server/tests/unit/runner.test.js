@@ -1439,3 +1439,35 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
     });
   });
 });
+
+// #956: what a run is made with, for the coverage report's "to run again".
+describe('executeRun — records its versions and the scenario it ran (#956)', () => {
+  test('the server version, the collection version read now and the scenario hash', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-versions');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const runPromise = executeRun({ runId, companyId, userId, scenarioOverride: 'SEED_SCENARIO' });
+    await waitForSpawnCalls(1);
+    fakeProc.emit('close', 0);
+    await runPromise;
+    const row = getRunRow(runId);
+    expect(row.server_version).toBe(require('../../package.json').version);
+    expect(row.scenario_hash).toBe(require('../../src/utils/frameworkCoverage').scenarioHash({ code: 'SEED_SCENARIO' }));
+    expect(row.collection_version).toBe(require('../../src/utils/versionInfo').currentCollectionVersion());
+  });
+
+  test('a scenario the data file does not hold leaves the hash empty and the run going', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-versions-2');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const runPromise = executeRun({ runId, companyId, userId, scenarioOverride: 'NOT_THERE' });
+    await waitForSpawnCalls(1);
+    fakeProc.emit('close', 0);
+    expect((await runPromise).exitCode).toBe(0);
+    expect(getRunRow(runId).scenario_hash).toBeNull();
+  });
+});

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.429",
+  "current_release": "2026.430",
   "releases": [
+    {
+      "release": "2026.430",
+      "date": "2026-10-25",
+      "server": "1.11.395",
+      "collection": "OTST_V2.0.223",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#956 PR 1: GET /v1/company/coverage says, for the company or provider of the request, which functions the Test Framework declares, which scenarios exercise each, their latest run (passed, failed, never run, to run again) and the open findings, with the scenarios testing what is not declared. Runs now record the server and collection versions and a hash of their scenario (migration 42)."
+      ]
+    },
     {
       "release": "2026.429",
       "date": "2026-10-25",

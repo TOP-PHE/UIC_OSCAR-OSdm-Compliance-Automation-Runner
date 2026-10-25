@@ -592,6 +592,7 @@ app.use('/v1/company',         require('./api/routes/company-places'));
 app.use('/v1/company',         require('./api/routes/company-finding-suggestions'));
 app.use('/v1/company',         require('./api/routes/company-findings'));
 app.use('/v1/company',         require('./api/routes/company-scenario-copy'));
+app.use('/v1/company',         require('./api/routes/company-coverage'));
 app.use('/v1/company',         require('./api/routes/company-ai-analysis'));
 app.use('/v1/company',         require('./api/routes/company-ai-analysis-results'));
 app.use('/v1/company',         require('./api/routes/company-ai-checklist'));

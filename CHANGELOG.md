@@ -93,6 +93,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.395] / [collection-OTST_V2.0.223] — 2026-10-25
+
+Issue #956 (part 1), release 2026.430.
+
+### Added
+- **What the Test Framework declares, and how far it is tested** (`utils/frameworkCoverage.js`, pure). `declaredFunctions()` lists one row per explicit declaration: distribution mode (product-based when none is declared), sales flow, partial refund scope, return model, offer request form, trip search parameter, passenger type, seat selection flow, currency, offer search option value, offer request options, reduction card, product, group product, IROPS code, fare cluster, and the passenger, sales-horizon and age limits. A list left out means "every value" elsewhere and gives no row. `functionsOf()` names what one scenario exercises, from the rules the gating and the catalogue already use. A passenger of type PERSON counts as an adult unless it names the type it expects. A refund or exchange with an IROPS code counts as the IROPS flow and that code. A scenario asking no currency counts for the default one.
+- **`GET /v1/company/coverage?days=`** (testers and Test Managers of the company or provider of the request; administrators and certifiers 403). For each function, the scenarios that exercise it, each with its latest finished run within the window (365 days by default, 1 to 3650) and the run's passed and failed checks; the function's state (passed, failed, never run, not covered); "to run again" when that run used another collection version or the scenario has changed since; and the open findings of those scenarios. A summary counts them, and the scenarios testing something the framework does not declare are listed apart (the #218 warnings, computed on a copy). A tester reads the scenarios of their own view.
+- **A run records what it is made with** (migration 42): `runs.server_version`, `collection_version` (the collection's `VERSION` read at run time, as the collection is refreshed without a restart) and `scenario_hash` (sha256 of the scenario's canonical text). Older runs leave them empty, and their "to run again" is unknown.
+
+### Tests
+- `framework-coverage.test.js`: the rows a framework declares, what a scenario exercises, states, findings, summary, "to run again", the not-declared list, and every simulator reference (each scenario of its run list exercises something it declares, none is "not declared").
+- `coverage-routes.test.js`: the company's own latest finished runs only, a tester's view, an empty provider, the 403s, the window.
+- `runner.test.js`: the versions and the hash a run records (mutation-checked).
+
+---
+
 ## [server-1.11.394] / [collection-OTST_V2.0.223] — 2026-10-25
 
 Issue #227 (part 3), release 2026.429.

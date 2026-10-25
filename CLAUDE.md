@@ -551,6 +551,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     is a loop. Fences are longer than any backtick run of the body. Body
     20 KB, file 4 MB. The page puts only a UUID (`analysisIdOf()`) in the
     button and the address.
+  - **Coverage of what the framework declares** (#956, PR 1 = 1.11.395).
+    `utils/frameworkCoverage.js` (pure): `declaredFunctions()` makes one row
+    per *explicit* declaration (`id` like `salesFlow:SALE`,
+    `offerOption:travelClasses:FIRST`, `card:<code>`, `limit:maxPassengers`;
+    an absent list is "every value" and gives no row; distribution defaults
+    to PRODUCT), `functionsOf(scenario, datafile)` the ids one scenario
+    exercises, from the gating and catalogue helpers (`salesFlowsOf`,
+    `offerRequestFormOf`, `placeSelectionFlowOf`…): **a new declaration
+    adds its row in both**. A PERSON passenger is an ADULT unless it names
+    `expectedPassengerType`; a refund or exchange with an overrule code is
+    `salesFlow:<TYPE>_IROPS` + `overrule:<code>`; no currency asked = the
+    default currency. `coverageOf()` joins the latest *finished* run per code
+    (`latestRunsOf()`, COMPLETED or FAILED; checks from `run_assertions`),
+    open findings by `scenario_code`, and lists `notDeclared` (the #218
+    warnings, on a copy). Route `GET /v1/company/coverage?days=`
+    (`company-coverage.js`; members only like the findings, a tester on
+    `viewForTester`; `req.companyId`). Migration 42: `runs.server_version`,
+    `collection_version` (`currentCollectionVersion()`, read at each run:
+    the collection is refreshed without a restart) and `scenario_hash`
+    (`scenarioHash()`, sha256 of `canonical()`), written by
+    `recordRunVersions()` after the runner's refusals, never throwing; "to
+    run again" is null for runs before it. PR 2 is the page.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

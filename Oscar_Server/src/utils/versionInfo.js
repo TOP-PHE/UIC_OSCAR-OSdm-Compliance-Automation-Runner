@@ -131,4 +131,14 @@ function getVersionInfo() {
   };
 }
 
-module.exports = { getVersionInfo };
+/**
+ * #956: the collection version the next run uses. The collection is
+ * refreshed on the host without a restart, so the file is read again; the
+ * version read at start is the fallback.
+ */
+function currentCollectionVersion() {
+  if (!COLLECTION_PATH) return collectionVersion === 'unknown' ? null : collectionVersion;
+  return readTrimmedSafe(path.join(COLLECTION_PATH, 'VERSION')) || (collectionVersion === 'unknown' ? null : collectionVersion);
+}
+
+module.exports = { getVersionInfo, currentCollectionVersion, serverVersion };

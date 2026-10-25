@@ -534,6 +534,12 @@ module.exports = {
         description: 'Each entry: { code, kind, area, purpose, checks, requirements, missing }. missing lists what the company\'s Test Framework does not declare; such an entry cannot be copied. Copy with source_id "catalogue".',
         responses: { 200: { description: 'Catalogue entries' }, 403: { description: 'Administrators and certifiers have no access' }, 503: { description: 'The catalogue cannot be read' } } },
     },
+    '/v1/company/coverage': {
+      get: { tags: ['Company'], summary: 'How far what the Test Framework declares is tested, from the latest run of each scenario (#956)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'days', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 3650, default: 365 }, description: 'Runs queued within this many days are read' }],
+        description: 'Answers { days, framework, datafile, collectionVersion, summary, functions, notDeclared }. Each function: { id, group, label, state (passed | failed | never-run | not-covered), toRunAgain, scenarios: [{ code, result, toRunAgain, run }], findings }. A tester reads the scenarios of their view; the runs and findings are the company\'s or provider\'s of the request.',
+        responses: { 200: { description: 'The coverage' }, 400: { description: 'days is not a whole number from 1 to 3650' }, 403: { description: 'Administrators and certifiers have no access' }, 409: { description: 'The data file cannot be read' } } },
+    },
     '/v1/company/providers': {
       get: { tags: ['Company'], summary: 'List the providers of the caller\'s company (Test Manager: all; tester: those granted)', security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Providers' } } },

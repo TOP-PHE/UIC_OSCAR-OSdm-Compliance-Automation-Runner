@@ -913,6 +913,16 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_run_share_company ON run_share(company_id, shared_at)');
   }},
+  { version: 42, name: 'run-versions', up: () => {
+      // #956 - what a run was made with, so that a coverage report can say
+      // which results to make again: the server and collection versions, and
+      // a hash of the scenario's content. Older runs leave them null.
+      _safeAlter('ALTER TABLE runs ADD COLUMN server_version TEXT');
+      _safeAlter('ALTER TABLE runs ADD COLUMN collection_version TEXT');
+      _safeAlter('ALTER TABLE runs ADD COLUMN scenario_hash TEXT');
+      _safeAlter('ALTER TABLE runs ADD COLUMN scenario_code TEXT');   // migration 1's, for the index
+      db.exec('CREATE INDEX IF NOT EXISTS idx_runs_company_scenario ON runs(company_id, scenario_code, queued_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
