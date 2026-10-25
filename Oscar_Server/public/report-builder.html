@@ -170,7 +170,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .cov-state{display:inline-block;white-space:nowrap;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase}
 .cov-passed{background:#e8f5e9;color:#2e7d32}
 .cov-failed{background:#ffebee;color:#c62828}
-.cov-never-run{background:#fff3e0;color:#e65100}
+.cov-never-run{background:#fff3e0;color:#bf360c}
 .cov-not-covered{background:#eceff1;color:#546e7a}
 .cap-table{width:100%;border-collapse:collapse;font-size:13px}
 .cap-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
@@ -1951,7 +1951,7 @@ function coverageHtml(data) {
 // One Markdown text: one line, no "|" breaking a table, no "<" read as HTML.
 function mdCell(value) {
   return String(value ?? '').replaceAll('\r\n', ' ').replaceAll('\n', ' ').replaceAll('\r', ' ')
-    .replaceAll('\\', '\\\\').replaceAll('|', '\\|').replaceAll('<', '\\<');
+    .replaceAll('\\', String.raw`\\`).replaceAll('|', String.raw`\|`).replaceAll('<', String.raw`\<`);
 }
 
 function coverageMarkdown(data, title) {
