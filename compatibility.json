@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.431",
+  "current_release": "2026.432",
   "releases": [
+    {
+      "release": "2026.432",
+      "date": "2026-10-25",
+      "server": "1.11.397",
+      "collection": "OTST_V2.0.223",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#956 PR 3: the Test Framework coverage by flow and element tested (flow, element, result, what the framework declares, the scenarios and their runs), \"not supported\" when the framework leaves the element out or says the provider does not do it, the provider's \"not supported\" answers counted beside the result, and an Excel download (summary, by flow and element, by scenario, by function)."
+      ]
+    },
     {
       "release": "2026.431",
       "date": "2026-10-25",

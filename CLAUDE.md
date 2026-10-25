@@ -579,6 +579,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `\`, `|` and `<` and joins lines, so a text never breaks a table or reads
     as HTML). `ui-scripts.test.js` runs them on the server module's own answer:
     a field renamed in `coverageOf()` fails there.
+    **PR 3 (1.11.397): by flow and element, and Excel.** `utils/coverageMatrix.js`
+    (pure) `coverageMatrixOf()`: one row per (flow, element), the flow being
+    `mainFlowOf()` (the after-sale, IROPS with a code, else SALE), the
+    elements every `functionsOf()` id but the flows, listed whether declared
+    or not. "Not supported (not declared)" only where #218 warns
+    (`warnedElements()` maps the warning names to ids; a flow the framework
+    leaves out counts too), so a probe of what is not declared keeps its run's
+    result; "Not supported (declared)" rows come from `passengerUpdate` /
+    `purchaserAfterBooking` false and `declarationsOf()` false. **The
+    provider's "not supported" warnings (`providerRefusalsOf()`, read from
+    `run_events` level `warn`) are a count beside the result, never the
+    result**: they are about one request (often an optional read), and
+    putting them in the result marked every element of the scenario. The page
+    pins its `COVERAGE_STATES` / `COVERAGE_DECLARATIONS` to `RESULT_TEXT` /
+    `DECLARATION_TEXT`. `GET /coverage/download` answers an .xlsx made by
+    `utils/xlsxWorkbook.js` (hand-written OOXML over `zip.js`, inline strings
+    only, so no cell is a formula; checked with openpyxl).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

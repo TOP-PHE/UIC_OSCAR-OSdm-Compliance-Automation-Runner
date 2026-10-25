@@ -13,8 +13,11 @@
  *
  *   GET /v1/company/coverage?days=   the functions declared, the scenarios
  *                                    exercising each with their latest run,
- *                                    the open findings, the summary, and the
- *                                    scenarios testing what is not declared.
+ *                                    the open findings, the summary, the
+ *                                    scenarios testing what is not declared,
+ *                                    and (part 3) the same by flow and element
+ *                                    tested (`matrix`) and by scenario.
+ *   GET /v1/company/coverage/download?days=   the same as an .xlsx workbook.
  *
  * Read only. Like the data file and the findings it reads, the company's
  * members only: a tester sees the scenarios of their view (viewForTester) and
@@ -23,7 +26,7 @@
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { all } = require('../../db/db');
+const { all, get, colDecrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
@@ -33,6 +36,8 @@ const { viewForTester } = require('../../utils/datafileOwnership');
 const { getRunSelection } = require('../../utils/runSelections');
 const { currentCollectionVersion } = require('../../utils/versionInfo');
 const { coverageOf, latestRunsOf } = require('../../utils/frameworkCoverage');
+const { coverageMatrixOf } = require('../../utils/coverageMatrix');
+const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const log = require('../../utils/logger').child({ module: 'company-coverage' });
 
 const router = express.Router();
@@ -46,6 +51,7 @@ const coverageLimiter = rateLimit({
 const DEFAULT_DAYS = 365;
 const MAX_DAYS = 3650;
 const MAX_RUNS = 20000;
+const MAX_WARNING_EVENTS = 20000;
 
 // The window of runs read, in days: a whole number from 1 to 3650.
 function daysOf(raw) {
@@ -85,31 +91,87 @@ function latestRuns(companyId, days) {
   return latest;
 }
 
-router.get('/coverage', coverageLimiter, async (req, res) => {
+// The warning lines of each run, by scenario code: { code: [line] }. Only
+// those holding a "not supported" mark are kept by coverageMatrixOf().
+function warningLinesOf(latest) {
+  const codeOf = new Map(Object.values(latest).map((r) => [r.id, r.scenario_code]));
+  const ids = [...codeOf.keys()];
+  const out = {};
+  let read = 0;
+  for (let i = 0; i < ids.length && read < MAX_WARNING_EVENTS; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const rows = all(`SELECT run_id, message FROM run_events WHERE level = 'warn' AND run_id IN (${chunk.map(() => '?').join(',')}) ORDER BY id ASC LIMIT ?`,
+      [...chunk, MAX_WARNING_EVENTS - read]);
+    read += rows.length;
+    for (const row of rows) {
+      let text = '';
+      try { text = colDecrypt(row.message) || ''; } catch { text = ''; }
+      const code = codeOf.get(row.run_id);
+      (out[code] ||= []).push(...String(text).split('\n').filter((l) => l.includes('[WARNING]')));
+    }
+  }
+  return out;
+}
+
+// Refuses (res answered, null returned) or builds the report of the request.
+async function reportOf(req, res) {
   if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
-    return res.status(403).json({ status: 403, title: 'Forbidden',
+    res.status(403).json({ status: 403, title: 'Forbidden',
       detail: 'Administrators and certifiers do not have access to a vendor\'s test coverage.' });
+    return null;
   }
   const companyId = resolveCompanyScope(req, res);
-  if (companyId === null) return undefined;
+  if (companyId === null) return null;
   const days = daysOf(req.query.days);
-  if (days === null) return res.status(400).json({ status: 400, title: 'Bad Request', detail: `days must be a whole number from 1 to ${MAX_DAYS}.` });
+  if (days === null) {
+    res.status(400).json({ status: 400, title: 'Bad Request', detail: `days must be a whole number from 1 to ${MAX_DAYS}.` });
+    return null;
+  }
+  let datafile = await readDatafile(companyId);
+  if (datafile && req.user.role !== 'test_manager') {
+    datafile = viewForTester(datafile, req.user.email, getRunSelection(companyId, req.user.id));
+  }
+  const framework = frameworkConfigOf(companyId);
+  const findings = all("SELECT id, title, category, status, scenario_code FROM finding WHERE company_id = ? AND status != 'resolved'", [companyId]);
+  const runs = latestRuns(companyId, days);
+  const input = {
+    framework: framework || {}, datafile: datafile || { scenarios: [] }, runs, findings, collectionVersion: currentCollectionVersion(),
+  };
+  const coverage = coverageOf(input);
+  const { matrix, scenarios } = coverageMatrixOf({ ...input, refusals: warningLinesOf(runs) });
+  return {
+    companyId,
+    report: { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios },
+  };
+}
+
+function failed(res, err, companyId) {
+  if (err instanceof Refusal) return res.status(err.status).json({ status: err.status, title: 'Conflict', detail: err.message });
+  log.error({ err, companyId }, 'coverage report failed');
+  return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The coverage report could not be built.' });
+}
+
+router.get('/coverage', coverageLimiter, async (req, res) => {
   try {
-    let datafile = await readDatafile(companyId);
-    if (datafile && req.user.role !== 'test_manager') {
-      datafile = viewForTester(datafile, req.user.email, getRunSelection(companyId, req.user.id));
-    }
-    const framework = frameworkConfigOf(companyId);
-    const findings = all("SELECT id, title, category, status, scenario_code FROM finding WHERE company_id = ? AND status != 'resolved'", [companyId]);
-    const coverage = coverageOf({
-      framework: framework || {}, datafile: datafile || { scenarios: [] },
-      runs: latestRuns(companyId, days), findings, collectionVersion: currentCollectionVersion(),
-    });
-    return res.json({ days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: currentCollectionVersion(), ...coverage });
+    const built = await reportOf(req, res);
+    return built ? res.json(built.report) : undefined;
   } catch (err) {
-    if (err instanceof Refusal) return res.status(err.status).json({ status: err.status, title: 'Conflict', detail: err.message });
-    log.error({ err, companyId }, 'coverage report failed');
-    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The coverage report could not be built.' });
+    return failed(res, err, req.companyId);
+  }
+});
+
+router.get('/coverage/download', coverageLimiter, async (req, res) => {
+  try {
+    const built = await reportOf(req, res);
+    if (!built) return undefined;
+    const company = get('SELECT name FROM companies WHERE id = ?', [built.companyId]);
+    const now = new Date().toISOString();
+    const file = coverageWorkbook(built.report, { title: company?.name || '', generatedAt: now.replace('T', ' ').slice(0, 19) + ' UTC' });
+    res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.set('Content-Disposition', `attachment; filename="oscar-coverage-${now.slice(0, 10)}.xlsx"`);
+    return res.send(file);
+  } catch (err) {
+    return failed(res, err, req.companyId);
   }
 });
 

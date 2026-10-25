@@ -1454,20 +1454,33 @@ describe('the Report Builder offer request options section', () => {
   });
 });
 
-// #956 part 2: the Report Builder's Test Framework coverage section.
+// #956 parts 2 and 3: the Report Builder's Test Framework coverage section.
 describe('the Report Builder coverage section', () => {
   const page = 'report-builder.html';
   const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.codePointAt(0)};`);
-  const COVERAGE_STATES = { passed: 'Passed', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario' };
+  // A top-level `const NAME = { … };` of the page, evaluated.
+  const loadConst = (name) => {
+    const lines = read(page).split('\n');
+    const start = lines.findIndex((l) => l.startsWith(`const ${name} = {`));
+    const end = lines.findIndex((l, i) => i > start && l === '};');
+    return vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n').replace(`const ${name} = `, '').replace(/;$/, '')})`);
+  };
+  const COVERAGE_STATES = loadConst('COVERAGE_STATES');
+  const COVERAGE_DECLARATIONS = loadConst('COVERAGE_DECLARATIONS');
   const coverageStateLabel = loadFunction(page, 'coverageStateLabel', { COVERAGE_STATES });
+  const coverageDeclarationLabel = loadFunction(page, 'coverageDeclarationLabel', { COVERAGE_DECLARATIONS });
   const coverageRunAgainLabel = loadFunction(page, 'coverageRunAgainLabel');
   const coverageSummaryText = loadFunction(page, 'coverageSummaryText');
   const coverageScenarioText = loadFunction(page, 'coverageScenarioText', { coverageStateLabel, coverageRunAgainLabel });
   const coverageFindingText = loadFunction(page, 'coverageFindingText');
-  const helpers = { escHtml, coverageStateLabel, coverageScenarioText, coverageFindingText, coverageSummaryText };
+  const coverageCountsText = loadFunction(page, 'coverageCountsText');
+  const coverageProviderText = loadFunction(page, 'coverageProviderText');
+  const helpers = { escHtml, coverageStateLabel, coverageDeclarationLabel, coverageScenarioText, coverageFindingText, coverageSummaryText, coverageCountsText, coverageProviderText };
   const coverageRowsHtml = loadFunction(page, 'coverageRowsHtml', helpers);
   const coverageNotDeclaredHtml = loadFunction(page, 'coverageNotDeclaredHtml', helpers);
-  const coverageHtml = loadFunction(page, 'coverageHtml', { ...helpers, coverageRowsHtml, coverageNotDeclaredHtml });
+  const coverageMatrixRowHtml = loadFunction(page, 'coverageMatrixRowHtml', helpers);
+  const coverageMatrixHtml = loadFunction(page, 'coverageMatrixHtml', { ...helpers, coverageMatrixRowHtml });
+  const coverageHtml = loadFunction(page, 'coverageHtml', { ...helpers, coverageRowsHtml, coverageNotDeclaredHtml, coverageMatrixHtml });
   const mdCell = loadFunction(page, 'mdCell');
   const coverageMarkdown = loadFunction(page, 'coverageMarkdown', { ...helpers, mdCell });
 
@@ -1480,23 +1493,50 @@ describe('the Report Builder coverage section', () => {
         findings: [{ title: 'Refused\nby <x>', category: 'provider_deviation', status: 'open', scenarioCode: 'S_<i>' }] },
       { id: 'salesFlow:REFUND_FULL', group: 'Sales <flows>', label: 'Full refund', state: 'not-covered', toRunAgain: false, scenarios: [], findings: [] },
     ],
+    matrix: [
+      { flow: 'SALE', flowLabel: 'Sale <s>', group: 'Whole flow', label: 'Sale (every scenario)', result: 'failed', declaration: 'declared', toRunAgain: true,
+        counts: { scenarios: 2, passed: 1, failed: 1, neverRun: 0 }, scenarios: ['S_<i>', 'T'], findings: [{ title: 'F <z>', category: 'open', status: 'open' }] },
+      { flow: 'SALE', flowLabel: 'Sale <s>', group: 'Currencies', label: 'PLN <c>', result: 'not-declared', declaration: 'not-declared', toRunAgain: false,
+        counts: { scenarios: 1, passed: 1, failed: 0, neverRun: 0 }, scenarios: ['T'], findings: [] },
+      { flow: 'REFUND_FULL', flowLabel: 'Full refund', group: 'Whole flow', label: 'Full refund (every scenario)', result: 'passed', providerNotSupported: 1, declaration: 'every-value',
+        counts: { scenarios: 1, passed: 1, failed: 0, neverRun: 0 }, scenarios: ['R'], findings: [] },
+    ],
     notDeclared: [{ code: 'X<y>', warnings: ['currency:PLN'] }],
   };
 
-  test('every text of the answer is escaped; a group heads its rows once', () => {
-    const out = coverageHtml(answer);
+  test('the results are the server\'s, named alike', () => {
+    const { RESULT_TEXT } = require('../../src/utils/coverageMatrix');
+    const { DECLARATION_TEXT } = require('../../src/utils/coverageWorkbook');
+    expect({ ...COVERAGE_STATES }).toEqual({ ...RESULT_TEXT });
+    expect({ ...COVERAGE_DECLARATIONS }).toEqual({ ...DECLARATION_TEXT });
+  });
+
+  test('by flow and element: the flow in the first column once, every text escaped', () => {
+    const out = coverageHtml(answer, 'matrix');
+    for (const tag of ['<b>', '<i>', '<s>', '<c>', '<z>', '<y>']) expect(out.includes(tag)).toBe(false);
+    expect(out.split('Sale &#60;s&#62;').length).toBe(2);
+    expect(out).toContain('<th>Flow</th><th>Element tested</th><th>Result</th><th>Test Framework</th>');
+    expect(out).toContain('cov-not-declared">Not supported (not declared)');
+    expect(out).toContain('cov-passed">Passed</span><br><small class="cov-provider">the provider says &#34;not supported&#34; in 1 scenario(s)</small>');
+    expect(out).toContain('<td>Every value declared</td>');
+    expect(out).toContain('2 scenario(s): 1 passed, 1 failed, 0 never run<details><summary>Scenarios</summary><ul class="cov-list"><li>S_&#60;i&#62;</li><li>T</li>');
+  });
+
+  test('by function: every text escaped; a group heads its rows once', () => {
+    const out = coverageHtml(answer, 'functions');
     for (const tag of ['<b>', '<i>', '<x>', '<y>', '<flows>']) expect(out.includes(tag)).toBe(false);
     expect(out.split('Sales &#60;flows&#62;').length).toBe(2);
     expect(out).toContain('S_&#60;i&#62;: Failed (7 passed, 3 failed, 2026-10-24), to run again');
     expect(out).toContain('cov-not-covered">No scenario');
     expect(out).toContain('2 function(s) declared');
     expect(out).toContain('runs of the last 30 day(s), latest run 2026-10-24 10:05:00.');
-    expect(coverageHtml({ ...answer, framework: false, datafile: false, functions: [], notDeclared: [] })).toContain('No data file is stored');
+    expect(coverageHtml({ ...answer, framework: false, datafile: false, functions: [], matrix: [], notDeclared: [] }, 'functions')).toContain('No data file is stored');
   });
 
-  test('the Markdown keeps one row per function, whatever the texts hold', () => {
+  test('the Markdown keeps one row per element and per function, whatever the texts hold', () => {
     const md = coverageMarkdown(answer, 'Gamma | test');
     expect(md.startsWith('# Test Framework coverage — Gamma \\| test\n')).toBe(true);
+    expect(md).toContain('| Sale \\<s> | Currencies: PLN \\<c> | Not supported (not declared) | Not declared | 1 scenario(s): 1 passed, 0 failed, 0 never run |');
     expect(md).toContain('| Sale \\| \\<b> | Failed, to run again | S_\\<i>: Failed (7 passed, 3 failed, 2026-10-24), to run again | Refused by \\<x> (provider_deviation, open, S_\\<i>) |');
     expect(md).toContain('| Full refund | No scenario |  |  |');
     expect(md).toContain('- X\\<y>: currency:PLN');
@@ -1507,24 +1547,31 @@ describe('the Report Builder coverage section', () => {
     expect(mdCell('a\\|b')).toBe('a\\\\\\|b');
   });
 
-  test('the server module\'s own answer draws: every state and every run', () => {
+  test('the server modules\' own answer draws: every state and every run', () => {
     const C = require('../../src/utils/frameworkCoverage');
-    const coverage = C.coverageOf({
+    const M = require('../../src/utils/coverageMatrix');
+    const input = {
       framework: { salesFlows: ['SALE', 'REFUND_FULL'] },
       datafile: { scenarios: [{ code: 'A', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1 }],
         tripRequirements: [{ id: 1, tripType: 'SEARCH', trip: {} }], passengersList: [{ id: 1, passengers: [{ type: 'PERSON' }] }] },
       runs: { A: { id: 'r', status: 'COMPLETED', queued_at: '2026-10-24 10:00:00', completed_at: '2026-10-24 10:05:00', total: 4, failed: 0 } },
-    });
-    const out = coverageHtml({ days: 365, framework: true, datafile: true, ...coverage });
-    expect(out).toContain('A: Passed (4 passed, 0 failed, 2026-10-24 10:05:00)');
-    expect(out).toContain('No scenario');
-    expect(coverageMarkdown({ days: 365, ...coverage }, 'P')).toContain('## Sales flows');
+    };
+    const report = { days: 365, framework: true, datafile: true, ...C.coverageOf(input), ...M.coverageMatrixOf(input) };
+    const byFunction = coverageHtml(report, 'functions');
+    expect(byFunction).toContain('A: Passed (4 passed, 0 failed, 2026-10-24 10:05:00)');
+    expect(byFunction).toContain('No scenario');
+    const byElement = coverageHtml(report, 'matrix');
+    expect(byElement).toContain('<td><strong>Sale</strong></td><td><small class="cov-group">Whole flow</small><br>Sale (every scenario)</td><td><span class="cov-state cov-passed">Passed</span>');
+    expect(byElement).toContain('Passenger types</small><br>Adult');
+    expect(coverageMarkdown(report, 'P')).toContain('## Sales flows');
   });
 
-  test('the card is shown to members only, and asks the coverage route', () => {
+  test('the card is shown to members only, asks the coverage routes, and draws the view chosen', () => {
     const source = read(page);
     expect(source).toContain("if (!isPlatformUser) {\n  document.getElementById('coverage-card').style.display = 'block';");
     expect(source).toContain("fetch('/v1/company/coverage?days=' + encodeURIComponent(");
-    expect(source).toContain('body.innerHTML = coverageHtml(data);');
+    expect(source).toContain("fetch('/v1/company/coverage/download?days=' + encodeURIComponent(");
+    expect(source).toContain("body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);");
+    expect(source).toContain('<option value="matrix" selected>By flow and element</option>');
   });
 });

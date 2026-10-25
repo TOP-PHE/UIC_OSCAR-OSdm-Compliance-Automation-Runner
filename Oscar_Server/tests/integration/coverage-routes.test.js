@@ -81,6 +81,9 @@ beforeAll(async () => {
     [uuidv4(), ids.D, colEncrypt(JSON.stringify({ salesFlows: ['SALE', 'REFUND_FULL', 'EXCHANGE_FULL'] }))]);
   addRun(ids.D, 'SHARED_SALE', 'FAILED', 2, { at: '2026-10-20 09:00:00' });
   addRun(ids.D, 'SHARED_SALE', 'COMPLETED', 0, { collection: 'OLD', hash: scenarioHash(SCENARIOS[0]) });
+  const refund = addRun(ids.D, 'TM_REFUND', 'FAILED', 0, { at: '2026-10-19 09:00:00' });
+  run('INSERT INTO run_events (run_id, level, message) VALUES (?, ?, ?)',
+    [refund, 'warn', colEncrypt('[INFO] step\n🧪 [WARNING] the provider answers 501 (Not Implemented), so the probe could not be run.')]);
   addRun(ids.D, 'TM_REFUND', 'RUNNING', 0);
   addRun(ids.O, 'TM_REFUND', 'COMPLETED', 0);
   run(`INSERT INTO finding (id, company_id, title, scenario_code, category, status) VALUES (?, ?, 'Refund refused', 'TM_REFUND', 'provider_deviation', 'open')`, [uuidv4(), ids.D]);
@@ -102,10 +105,31 @@ describe('GET /v1/company/coverage', () => {
     expect(row('salesFlow:SALE')).toMatchObject({ state: 'passed' });
     const sale = row('salesFlow:SALE').scenarios.find((s) => s.code === 'SHARED_SALE');
     expect(sale).toMatchObject({ result: 'passed', run: { passed: 4, failed: 0, collectionVersion: 'OLD' } });
-    // The refund's only run of this company is still running; company O's run is not read.
-    expect(row('salesFlow:REFUND_FULL')).toMatchObject({ state: 'never-run', findings: [{ title: 'Refund refused', category: 'provider_deviation' }] });
+    // The refund's latest finished run is the company's own (company O's is not read).
+    expect(row('salesFlow:REFUND_FULL')).toMatchObject({ state: 'passed', findings: [{ title: 'Refund refused', category: 'provider_deviation' }] });
     expect(row('salesFlow:EXCHANGE_FULL').state).toBe('not-covered');
     expect(res.body.summary).toMatchObject({ declared: 4, notCovered: 1 });
+  });
+
+  test('by flow and element: the refund counts its run\'s "not supported" warning', async () => {
+    const res = await request(app).get('/v1/company/coverage').set(as('TM'));
+    const cell = (flow, label) => res.body.matrix.find((r) => r.flow === flow && r.label === label);
+    expect(cell('REFUND_FULL', 'Full refund (every scenario)')).toMatchObject({ result: 'passed', providerNotSupported: 1, scenarios: ['TM_REFUND'] });
+    expect(cell('SALE', 'Sale (every scenario)')).toMatchObject({ result: 'passed', counts: { scenarios: 1, passed: 1 } });
+    expect(res.body.scenarios.find((x) => x.code === 'TM_REFUND').providerNotSupported)
+      .toEqual(['the provider answers 501 (Not Implemented), so the probe could not be run.']);
+  });
+
+  test('the workbook is the same report, for members only', async () => {
+    const res = await request(app).get('/v1/company/coverage/download?days=30').set(as('TM'))
+      .buffer(true).parse((r, done) => { const parts = []; r.on('data', (c) => parts.push(c)); r.on('end', () => done(null, Buffer.concat(parts))); });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('spreadsheetml.sheet');
+    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="oscar-coverage-\d{4}-\d{2}-\d{2}\.xlsx"$/);
+    const { readZipEntry } = require('../../src/utils/zip');
+    expect(readZipEntry(res.body, 'xl/worksheets/sheet3.xml').toString()).toContain('TM_REFUND');
+    expect((await request(app).get('/v1/company/coverage/download').set(as('CERT'))).status).toBe(403);
+    expect((await request(app).get('/v1/company/coverage/download?days=x').set(as('TM'))).status).toBe(400);
   });
 
   test('a tester sees the scenarios of their view only', async () => {
