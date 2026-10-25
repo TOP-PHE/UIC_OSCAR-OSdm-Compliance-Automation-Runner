@@ -120,4 +120,5 @@ function groupProductsFromChecklist(answers) {
 
 module.exports = {
   FLEXIBILITIES, flexibilityOf, sizeOf, declaredProducts, productsFromChecklist, declaredGroupProducts, groupProductsFromChecklist,
+  rowsFromChecklist,
 };

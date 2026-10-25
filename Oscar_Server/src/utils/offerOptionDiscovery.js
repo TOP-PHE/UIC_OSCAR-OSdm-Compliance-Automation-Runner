@@ -175,6 +175,36 @@ function withOfferOptionDeclarations(datafile, framework) {
   return armed.length;
 }
 
+// A code the framework's writers take (see codeProblem).
+const storable = (c) => c.code.length <= 60 && (c.issuer || '').length <= 200 && !`${c.code}${c.issuer || ''}`.includes('{{');
+
+/**
+ * #227 part 3: the checklist's answers for the discovery, over `framework`
+ * (changed in place). A2.5 `fw.offerOptionDiscovery.maxRequests` and P1.21
+ * `fw.offerOptionDiscovery.invalidValues` are placed by
+ * `frameworkFromChecklist()`; a ceiling outside 3 to 200, or a choice it does
+ * not know, is dropped here, so an import never stores what the framework's
+ * writers refuse. P1.19 / P1.20 are tables (`data.corporateCode.<n>.code|issuer`,
+ * `data.promotionCode.<n>.code`): NO is an empty list, unanswered changes
+ * nothing.
+ */
+function withOfferOptionChecklist(framework, answers) {
+  const settings = framework.offerOptionDiscovery;
+  if (isObj(settings)) {
+    const n = settings.maxRequests;
+    if (n !== undefined && !(Number.isInteger(n) && n >= MIN_REQUESTS && n <= MAX_REQUESTS)) delete settings.maxRequests;
+    if (settings.invalidValues !== undefined && !INVALID_VALUES.includes(settings.invalidValues)) delete settings.invalidValues;
+    if (Object.keys(settings).length === 0) delete framework.offerOptionDiscovery;
+  }
+  const { rowsFromChecklist } = require('./namedProducts');
+  const corporate = rowsFromChecklist(answers, 'corporateCodes', 'corporateCode', ['code', 'issuer']);
+  if (corporate) framework.corporateCodes = codesOf(corporate, true).filter(storable);
+  const promotion = rowsFromChecklist(answers, 'promotionCodes', 'promotionCode', ['code']);
+  if (promotion) framework.promotionCodes = codesOf(promotion, false).filter(storable);
+  return framework;
+}
+
 module.exports = {
   MIN_REQUESTS, MAX_REQUESTS, INVALID_VALUES, codesOf, offerOptionDiscoveryProblem, declarationsOf, withOfferOptionDeclarations,
+  withOfferOptionChecklist,
 };

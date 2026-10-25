@@ -95,8 +95,8 @@ const LIST_PATHS = new Set([
   // #938: chapter F.
   'fares.clusters', 'fares.combinationModels', 'fares.reservations', 'fares.salesFlows',
 ]);
-const ONE_PATHS = new Set(['osdmVersion', 'mandatoryReservationForm']);
-const NUMBER_PATHS = new Set(['concurrentSessionLimit', 'maxPassengers', 'salesHorizonDays', 'fares.freeUnderAge']);
+const ONE_PATHS = new Set(['osdmVersion', 'mandatoryReservationForm', 'offerOptionDiscovery.invalidValues']);
+const NUMBER_PATHS = new Set(['concurrentSessionLimit', 'maxPassengers', 'salesHorizonDays', 'fares.freeUnderAge', 'offerOptionDiscovery.maxRequests']);
 // #938: a question of one tick YES / NO that the framework keeps as true / false.
 const YES_NO_PATHS = new Set(['fares.statedRefundFee']);
 const AGE_RANGE = /^passengerAgeRanges\.([A-Z_]+)\.(min|max)$/;
@@ -197,6 +197,8 @@ function frameworkFromChecklist(answers, { base = null, unplaced = null } = {}) 
   // PR 3: P1.18 (A4.19 before V01.06), the group products.
   const groups = require('./namedProducts').groupProductsFromChecklist(answers);
   if (groups) framework.groupProducts = groups;
+  // #227 part 3: A2.5, P1.19–P1.21, the offer request options scenario.
+  require('./offerOptionDiscovery').withOfferOptionChecklist(framework, answers);
   return framework;
 }
 

@@ -249,6 +249,12 @@
         "maxPassengers": 5
       }
     ],
+    "corporateCodes": [],
+    "promotionCodes": [
+      {
+        "code": "SIM-PROMO-10"
+      }
+    ],
     "fares": {
       "clusters": [
         "FULL_FLEX",

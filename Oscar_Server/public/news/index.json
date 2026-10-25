@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-25-offer-request-options-report",
+    "date": "October 25, 2026",
+    "tag": "Added",
+    "title": "Offer request options in the checklist and the Report Builder",
+    "summary": "The set-up checklist asks the provider's corporate and promotion codes and the scenario's request ceiling, and the Report Builder shows what a provider did with each offer request option.",
+    "content": "Checklist template V01.07 asks how many offer requests one scenario may send in a row, the provider's corporate and promotion codes, and whether to try a made-up value for an option no value is declared for. A filled checklist puts them in the Test Framework on import.\n\nThe Report Builder has an Offer Request Options section: for each run of the scenario, one row per option with the value sent, the HTTP status, what the provider did with it and what the Test Framework declares, then the combinations. The CSV export has the same rows."
+  },
+  {
     "id": "2026-10-25-offer-request-options-framework",
     "date": "October 25, 2026",
     "tag": "Added",

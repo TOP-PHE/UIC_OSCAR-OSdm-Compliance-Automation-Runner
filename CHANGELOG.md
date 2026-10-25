@@ -93,6 +93,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.394] / [collection-OTST_V2.0.223] — 2026-10-25
+
+Issue #227 (part 3), release 2026.429.
+
+### Added
+- **Checklist template V01.07.** A2.5: how many offer requests one scenario may send in a row (`fw.offerOptionDiscovery.maxRequests`). P1.19 / P1.20: the provider's corporate codes (code, issuer) and promotion codes, as tables. P1.21: an option only the provider can give a value for and not listed, made-up value or not tested (`fw.offerOptionDiscovery.invalidValues`). The Annex says where each goes. An import reads them into the Test Framework (`withOfferOptionChecklist()`), leaving out what the framework's writers would refuse: a ceiling outside 3 to 200, a code over 60 characters or holding `{{`. The template folder keeps V01.07, V01.06 and V01.05; the six simulator copies are rebuilt.
+- **The Report Builder shows the offer request options report.** The scenario sends its requests from step 01's script, so they are not in Bruno's results: the runner files the report's log lines (a tagged line holding 🧭) under the log category `offer_options`, and `utils/offerOptionReport.js` reads them back. `POST /v1/reports/configured` answers `offer_options` (run, scenario, counts per result, report); the page draws an *Offer Request Options* card (one table per run: option, value sent and its source, HTTP status, result, Test Framework declaration, detail; then the combinations and every supported option at once), and the CSV export has its section. Runs from before this release have no such lines and show none.
+- **The simulator references** (`data_base/reference/simulator-*.json`) declare promotion code `SIM-PROMO-10` and no corporate code, from their checklists.
+
+### Tests
+- `offer-option-report.test.js`: the collection's own `reportLines()` over 300 drawn reports read back row by row, a value or message naming a result, and the runner's category. `reports-routes.test.js`: the report in `/configured`. `offer-option-discovery.test.js`: the checklist's answers. `ui-scripts.test.js`: the page's section is escaped and exported. The checklist answer counts follow the regenerated simulator checklist (325 answers, `cut` 0).
+
+---
+
 ## [server-1.11.393] / [collection-OTST_V2.0.222] — 2026-10-25
 
 Issue #227 (part 2), release 2026.428.

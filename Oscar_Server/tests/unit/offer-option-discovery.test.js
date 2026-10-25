@@ -169,3 +169,40 @@ describe('the collection holds the answers to the declarations', () => {
     expect(logs.some((l) => /declared as not supported in the Test Framework: passenger\.gender\b/.test(l))).toBe(true);
   });
 });
+
+// #227 part 3: the checklist's questions A2.5, P1.19–P1.21.
+describe('the discovery settings read from a checklist', () => {
+  const { frameworkFromChecklist } = require('../../src/utils/referenceConfiguration');
+
+  test('the ceiling, the choice and both code tables', () => {
+    const fw = frameworkFromChecklist({
+      'fw.offerOptionDiscovery.maxRequests': '40',
+      'fw.offerOptionDiscovery.invalidValues=skip': true,
+      'data.corporateCodes=YES': true,
+      'data.corporateCode.1.code': 'CORP-1', 'data.corporateCode.1.issuer': 'urn:issuer',
+      'data.corporateCode.2.code': '{{access_token}}',
+      'data.corporateCode.3.code': 'x'.repeat(61),
+      'data.promotionCodes=YES': true,
+      'data.promotionCode.1.code': 'PROMO', 'data.promotionCode.2.code': 'PROMO',
+    });
+    expect(fw.offerOptionDiscovery).toEqual({ maxRequests: 40, invalidValues: 'skip' });
+    expect(fw.corporateCodes).toEqual([{ code: 'CORP-1', issuer: 'urn:issuer' }]);
+    expect(fw.promotionCodes).toEqual([{ code: 'PROMO' }]);
+    expect(d.offerOptionDiscoveryProblem(fw)).toBeNull();
+  });
+
+  test('a ceiling outside 3 to 200 is dropped; NO is an empty list; nothing answered changes nothing', () => {
+    for (const n of ['2', '201', '7.5']) {
+      const fw = frameworkFromChecklist({ 'fw.offerOptionDiscovery.maxRequests': n });
+      expect(fw.offerOptionDiscovery).toBeUndefined();
+      expect(d.offerOptionDiscoveryProblem(fw)).toBeNull();
+    }
+    const no = frameworkFromChecklist({ 'data.corporateCodes=NO': true, 'data.promotionCodes=NO': true });
+    expect(no).toMatchObject({ corporateCodes: [], promotionCodes: [] });
+    const none = frameworkFromChecklist({});
+    expect(none.corporateCodes).toBeUndefined();
+    expect(none.promotionCodes).toBeUndefined();
+    const base = { offerOptionDiscovery: { maxRequests: 12 }, promotionCodes: [{ code: 'KEPT' }] };
+    expect(frameworkFromChecklist({}, { base })).toMatchObject(base);
+  });
+});
