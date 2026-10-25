@@ -125,6 +125,39 @@ function phaseRequestOf(text) {
   return { label: text.slice(0, colon), ...statusAndResult(answer), ...(message ? { message } : {}) };
 }
 
+const PHASE_1 = 'Phase 1, mandatory members only: ';
+const SILENT = 'Offer request options taken without a word: ';
+const withMessage = (message) => (message ? { message } : {});
+
+// The lines after the report's first one: [prefix, how it goes into the report].
+const LINE_READERS = [
+  [PHASE_1, (text, report) => {
+    const [answer, message] = splitMessage(text.slice(PHASE_1.length));
+    report.mandatory = { ok: answer === 'answered', message };
+  }],
+  ['Phase 3, ', (text, report) => {
+    const combo = phaseRequestOf(text.slice('Phase 3, '.length));
+    if (combo) report.combinations.push({ options: combo.label.split(' + '), status: combo.status, result: combo.result, ...withMessage(combo.message) });
+  }],
+  ['Phase 4, every supported option', (text, report) => {
+    const all = phaseRequestOf(text.slice('Phase 4, '.length));
+    if (all) report.all = { count: Number.parseInt(all.label.slice(all.label.indexOf('(') + 1), 10) || null, status: all.status, result: all.result, ...withMessage(all.message) };
+  }],
+  [SILENT, (text, report) => { report.silent = splitMessage(text.slice(SILENT.length))[0].split(', '); }],
+  ['Phase ', () => {}],
+  ['Taken by ', () => {}],
+  ['', (text, report) => {
+    const row = optionOf(text);
+    if (row) report.options.push(row);
+  }],
+];
+
+const newReport = (text) => {
+  const report = { version: null, budget: null, used: null, seed: null, mandatory: null, options: [], combinations: [], all: null, silent: [] };
+  headerOf(text, report);
+  return report;
+};
+
 /**
  * The report a run's log holds, or null when it holds none. `lines` are the
  * log lines in order (text). Only the last report of the log is kept: a run
@@ -135,27 +168,8 @@ function reportOf(lines) {
   for (const line of (Array.isArray(lines) ? lines : []).slice(-MAX_LINES * 10)) {
     const text = afterMark(line);
     if (text === null) continue;
-    if (text.startsWith('Offer request options (#227) — OSDM')) {
-      report = { version: null, budget: null, used: null, seed: null, mandatory: null, options: [], combinations: [], all: null, silent: [] };
-      headerOf(text, report);
-    } else if (!report || report.options.length >= MAX_LINES) {
-      continue;
-    } else if (text.startsWith('Phase 1, mandatory members only: ')) {
-      const [answer, message] = splitMessage(text.slice('Phase 1, mandatory members only: '.length));
-      report.mandatory = { ok: answer === 'answered', message };
-    } else if (text.startsWith('Phase 3, ')) {
-      const combo = phaseRequestOf(text.slice('Phase 3, '.length));
-      if (combo) report.combinations.push({ options: combo.label.split(' + '), status: combo.status, result: combo.result, ...(combo.message ? { message: combo.message } : {}) });
-    } else if (text.startsWith('Phase 4, every supported option')) {
-      const all = phaseRequestOf(text.slice('Phase 4, '.length));
-      if (all) report.all = { count: Number.parseInt(all.label.slice(all.label.indexOf('(') + 1), 10) || null, status: all.status, result: all.result, ...(all.message ? { message: all.message } : {}) };
-    } else if (text.startsWith('Offer request options taken without a word: ')) {
-      const [names] = splitMessage(text.slice('Offer request options taken without a word: '.length));
-      report.silent = names.split(', ');
-    } else if (!text.startsWith('Phase ') && !text.startsWith('Taken by ')) {
-      const row = optionOf(text);
-      if (row) report.options.push(row);
-    }
+    if (text.startsWith('Offer request options (#227) — OSDM')) report = newReport(text);
+    else if (report && report.options.length < MAX_LINES) LINE_READERS.find(([prefix]) => text.startsWith(prefix))[1](text, report);
   }
   return report;
 }

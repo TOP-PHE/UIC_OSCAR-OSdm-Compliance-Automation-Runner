@@ -1068,7 +1068,8 @@ function offerOptionRunHtml(entry) {
     if (r.mandatory.message) mandatory += ' — ' + r.mandatory.message;
   }
   var rows = (r.options || []).map(function(o) {
-    var value = o.value != null ? o.value + (o.source ? ' (' + o.source + ')' : '') : '';
+    var value = o.value != null ? String(o.value) : '';
+    if (value && o.source) value += ' (' + o.source + ')';
     return '<tr><td>' + escHtml(o.option) + '</td><td>' + escHtml(value) + '</td>'
       + '<td>' + (o.status != null ? escHtml(o.status) : '-') + '</td>'
       + '<td>' + escHtml(offerOptionResultLabel(o.result)) + '</td>'

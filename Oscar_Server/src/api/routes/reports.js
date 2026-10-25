@@ -193,6 +193,32 @@ router.get('/comparisons/:id', (req, res) => {
   });
 });
 
+// #227 part 3: the offer request options report of each run that ran the
+// discovery, read back from its log (the runner files those lines under
+// category 'offer_options').
+function offerOptionReportsOf(runIds) {
+  const placeholders = runIds.map(() => '?').join(',');
+  const optionRows = all(
+    `SELECT run_id, message FROM run_events
+     WHERE run_id IN (${placeholders}) AND category = 'offer_options'
+     ORDER BY id ASC LIMIT 5000`,
+    [...runIds]
+  );
+  const linesByRun = new Map();
+  for (const row of optionRows) {
+    if (!linesByRun.has(row.run_id)) linesByRun.set(row.run_id, []);
+    linesByRun.get(row.run_id).push(colDecrypt(row.message));
+  }
+  if (linesByRun.size === 0) return [];
+  const scenarioOf = new Map(all(`SELECT id, scenario_code FROM runs WHERE id IN (${placeholders})`, [...runIds]).map(r => [r.id, r.scenario_code]));
+  const reports = [];
+  for (const [runId, lines] of linesByRun) {
+    const report = reportOf(lines);
+    if (report) reports.push({ run_id: runId, scenario_code: scenarioOf.get(runId) || null, counts: countsOf(report), report });
+  }
+  return reports;
+}
+
 // ── POST /v1/reports/configured ───────────────────────────────────────────────
 // Generates a filtered assertion report for selected runs.
 // Available to all authenticated users; certifiers use it for formal reports.
@@ -428,26 +454,7 @@ router.post('/configured', (req, res) => {
   });
   const capability_matrix = Object.values(capMatrix);
 
-  // #227 part 3: the offer request options report of each run that ran the
-  // discovery, read back from its log (the runner files those lines under
-  // category 'offer_options').
-  const optionRows = all(
-    `SELECT run_id, message FROM run_events
-     WHERE run_id IN (${placeholders}) AND category = 'offer_options'
-     ORDER BY id ASC LIMIT 5000`,
-    [...run_ids]
-  );
-  const linesByRun = new Map();
-  for (const row of optionRows) {
-    if (!linesByRun.has(row.run_id)) linesByRun.set(row.run_id, []);
-    linesByRun.get(row.run_id).push(colDecrypt(row.message));
-  }
-  const scenarioOf = new Map(all(`SELECT id, scenario_code FROM runs WHERE id IN (${placeholders})`, [...run_ids]).map(r => [r.id, r.scenario_code]));
-  const offer_options = [];
-  for (const [runId, lines] of linesByRun) {
-    const report = reportOf(lines);
-    if (report) offer_options.push({ run_id: runId, scenario_code: scenarioOf.get(runId) || null, counts: countsOf(report), report });
-  }
+  const offer_options = offerOptionReportsOf(run_ids);
 
   return res.json({
     title: title || 'OSDM Conformance Report',
