@@ -529,10 +529,13 @@ const SUMMARY_ORDER = ['honoured', 'accepted', 'ignored-said', 'ignored-silent',
 
 const tail = (message) => (message ? ` — ${message}` : '');
 
+const DECLARED_MARK = { true: ' [declared]', false: ' [declared not supported]' };
+
 function optionLine(row) {
   const value = row.value === undefined ? '' : ` = ${short(row.value)} (${row.source})`;
   const status = row.status ? ` HTTP ${row.status},` : '';
-  return `[INFO] 🧭   ${row.option}${value}:${status} ${row.result}${tail(row.message)}`;
+  const mark = DECLARED_MARK[row.declared] || '';
+  return `[INFO] 🧭   ${row.option}${mark}${value}:${status} ${row.result}${tail(row.message)}`;
 }
 
 function phase4Line(all) {
@@ -562,6 +565,28 @@ function reportLines(report) {
   return lines;
 }
 
+// ── The Test Framework's declarations (#227 part 2) ─────────────────────────
+
+// `{ declared: true|false }` when the framework says, else nothing.
+const declaredOf = (declared, key) => (typeof declared?.[key] === 'boolean' ? { declared: declared[key] } : {});
+
+// What a declared option must not get: the provider refuses it, ignores it or
+// gives no offer for it.
+const NOT_TAKEN = new Set(['refused', 'not-implemented', 'error', 'ignored-said', 'ignored-silent', 'no-offer-said', 'no-offer-silent']);
+
+/**
+ * The rows the framework contradicts: `declared` options the provider does not
+ * take (a FAIL each, so a finding draft, #735), and options it takes that the
+ * framework says it does not (a suggestion to declare them).
+ */
+function compareWithDeclarations(report) {
+  const rows = Array.isArray(report?.options) ? report.options : [];
+  return {
+    contradicted: rows.filter((r) => r.declared === true && NOT_TAKEN.has(r.result)),
+    undeclared: rows.filter((r) => r.declared === false && isSupported(r)),
+  };
+}
+
 /**
  * `fn` over `items` one after the other (each request waits for the one
  * before: the provider is asked one thing at a time).
@@ -576,7 +601,7 @@ async function inSequence(items, fn, i = 0, out = []) {
  * Every phase, given a `send(body)` that answers { status, body }. Returns the
  * report (see reportLines). Pure but for `send`.
  */
-async function discover({ request, version, values, invalidValues, seed, travelDay, budget, mandatory, send, ignoredOf }) {
+async function discover({ request, version, values, invalidValues, seed, travelDay, budget, mandatory, send, ignoredOf, declared = {} }) {
   const rows = optionsFor({ request, version, values, invalidValues, seed, travelDay });
   const testable = rows.filter((r) => !r.skipped);
   const share = plan(budget, testable.length);
@@ -590,15 +615,15 @@ async function discover({ request, version, values, invalidValues, seed, travelD
   };
   const sent = testable.slice(0, share.phase2);
   const tried = await inSequence(sent, async (r) => {
-    const entry = { option: r.option.key, group: r.option.group, value: r.value, source: r.source, ...(await ask([r])) };
+    const entry = { option: r.option.key, group: r.option.group, value: r.value, source: r.source, ...(await ask([r])), ...declaredOf(declared, r.option.key) };
     report.options.push(entry);
     return { ...r, result: entry.result };
   });
   for (const r of testable.slice(share.phase2)) {
-    report.options.push({ option: r.option.key, group: r.option.group, value: r.value, source: r.source, result: 'not-reached', message: 'the request budget ran out' });
+    report.options.push({ option: r.option.key, group: r.option.group, value: r.value, source: r.source, result: 'not-reached', message: 'the request budget ran out', ...declaredOf(declared, r.option.key) });
   }
   for (const r of rows.filter((x) => x.skipped)) {
-    report.options.push({ option: r.option.key, group: r.option.group, result: 'not-tested', message: r.skipped });
+    report.options.push({ option: r.option.key, group: r.option.group, result: 'not-tested', message: r.skipped, ...declaredOf(declared, r.option.key) });
   }
   const supported = tried.filter(isSupported);
   report.combinations = await inSequence(drawCombinations(supported, share.phase3, seed),
@@ -665,8 +690,21 @@ async function runOptionDiscovery(status, body) {
     mandatory,
     send: sendOffers,
     ignoredOf: (b) => ignoredParameters(b),
+    declared: envJson('offerOptionDeclared', {}) || {},
   });
   for (const line of reportLines(report)) validationLogger(line);
+  // #227 part 2: what the Test Framework declares, held to the answers.
+  const { contradicted, undeclared } = compareWithDeclarations(report);
+  for (const row of contradicted) {
+    const at = row.status ? ` (HTTP ${row.status})` : '';
+    const detail = row.message || 'no detail';
+    test(`🧭 Offer request option ${row.option} — declared in the Test Framework, taken by the provider`, () => {
+      throw new Error(`${row.result}${at}: ${detail}. Either the provider does not take it, and the Test Framework should not declare it, or the provider should.`);
+    });
+  }
+  if (undeclared.length > 0) {
+    validationLogger(`[INFO] 🧭 Taken by the provider but declared as not supported in the Test Framework: ${undeclared.map((r) => r.option).join(', ')}. The Test Framework could declare them.`);
+  }
   bru.setEnvVar('__offerOptionReport', JSON.stringify(report));
   return true;
 }
@@ -674,6 +712,7 @@ async function runOptionDiscovery(status, body) {
 module.exports = {
   DEFAULT_MAX_REQUESTS,
   discover,
+  compareWithDeclarations,
   prepareOptionDiscovery,
   runOptionDiscovery,
   OPTIONS,

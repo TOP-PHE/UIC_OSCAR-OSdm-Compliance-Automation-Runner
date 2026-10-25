@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-25-offer-request-options-framework",
+    "date": "October 25, 2026",
+    "tag": "Added",
+    "title": "Offer request options follow the Test Framework",
+    "summary": "The scenario that finds which offer request options a provider supports now sends what the Test Framework declares, and fails an option the framework declares but the provider refuses or ignores.",
+    "content": "The Test Framework editor has a place for the scenario's settings (how many requests it may send, and whether to try made-up values for codes only the provider can give) and for the provider's corporate and promotion codes.\n\nA run then sends the values the framework declares: the first reduction card, product, currency, flexibility, product tag and class, and the codes. An option the framework declares but the provider refuses, ignores or gives no offer for is a failed check, which the batch's finding drafts pick up. An option the provider takes while the framework says it does not is named in the run log, as a suggestion to declare it."
+  },
+  {
     "id": "2026-10-25-offer-request-options",
     "date": "October 25, 2026",
     "tag": "Added",

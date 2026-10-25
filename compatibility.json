@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.427",
+  "current_release": "2026.428",
   "releases": [
+    {
+      "release": "2026.428",
+      "date": "2026-10-25",
+      "server": "1.11.393",
+      "collection": "OTST_V2.0.222",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#227 PR 2: the Test Framework tells the offer request options scenario its ceiling, what to do with codes only the provider can give, the provider's corporate and promotion codes, and what it declares (cards, products, currencies, classes, flexibilities); an option the framework declares but the provider refuses or ignores fails, so it can become a finding."
+      ]
+    },
     {
       "release": "2026.427",
       "date": "2026-10-25",

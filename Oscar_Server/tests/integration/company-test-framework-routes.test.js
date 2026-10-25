@@ -164,6 +164,17 @@ describe('test-framework — PUT create/update + GET', () => {
     expect((await put({ clusters: ['NON_FLEX'], salesFlows: ['SALE', 'REFUND_FULL'], statedRefundFee: true, reservations: ['BICYCLE'], freeUnderAge: 6 })).status).toBe(200);
   });
 
+  // #227 part 2: the offer request options settings and the provider's codes.
+  test('400 for offer request options settings or codes that cannot be stored; good ones pass', async () => {
+    const put = (extra) => request(app).put('/v1/company/test-framework')
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ config: { profile: 'OTST', salesFlows: ['sale'], _salesFlowsMigratedAt: '2026-01-01T00:00:00.000Z', ...extra } });
+    expect((await put({ offerOptionDiscovery: { maxRequests: 2 } })).body.detail).toContain('from 3 to 200');
+    expect((await put({ offerOptionDiscovery: { budget: 30 } })).body.detail).toContain('"budget", which it does not know');
+    expect((await put({ promotionCodes: [{ code: '{{access_token}}' }] })).body.detail).toContain('template');
+    expect((await put({ offerOptionDiscovery: { maxRequests: 40, invalidValues: 'skip' }, corporateCodes: [{ code: 'ACME', issuer: 'urn:x:acme' }], promotionCodes: [] })).status).toBe(200);
+  });
+
   test('200 GET returns the decrypted config for a tester', async () => {
     const res = await request(app).get('/v1/company/test-framework')
       .set('Authorization', `Bearer ${makeToken('company_user', testerId)}`);

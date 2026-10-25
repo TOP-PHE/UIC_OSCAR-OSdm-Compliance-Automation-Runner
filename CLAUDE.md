@@ -263,9 +263,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     no offer said or silent / invalid said or silent; a single top-level
     Problem counts as the answer's problem. Simulator: from `0000078`
     (`requestOptions` in every profile, `src/osdm/requestOptions.js`) each
-    class is shown; elsewhere those members change nothing. PR 2: the
-    framework's declared values and ceiling, the checklist, finding drafts,
-    the Report Builder section.
+    class is shown; elsewhere those members change nothing.
+    **PR 2 (1.11.393 / OTST_V2.0.222): the Test Framework's part.**
+    `utils/offerOptionDiscovery.js` (pure): framework
+    `offerOptionDiscovery: { maxRequests, invalidValues }` and the provider's
+    `corporateCodes` [{ code, issuer }] / `promotionCodes` [{ code }]
+    (`offerOptionDiscoveryProblem()`, a 400 at the three writers after the
+    fare check; a code holding `{{` is refused: the run's copy carries it).
+    `withOfferOptionDeclarations()` (last of `withFrameworkWarnings()`'s
+    chain) gives each discovery scenario the ceiling and choice (its own
+    win), `offerOptionValues` from `declarationsOf()` (first declared card,
+    product, currency, flexibility, tag, class, codes) and
+    `__offerOptionDeclared` { key: true|false }, explicit declarations only
+    (an absent list is "every value" and names nothing). The parser's
+    `offerOptionDeclared`; `compareWithDeclarations()` (`offerOptions.js`):
+    a declared option refused, ignored or without offer is a failed check
+    `🧭 Offer request option <key> — declared…` (so a #735 draft), a
+    supported one declared unsupported an INFO line. Editor: under the
+    tariff section (`fwOfferOptionsHtml()`, `changeOfferOptionDiscovery()`
+    before the change switch; the code lists are `FW_LISTS` `corporate` /
+    `promotion`). Left for PR 3: the checklist question, the Report
+    Builder section.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`
