@@ -1467,24 +1467,19 @@ describe('the Report Builder coverage section', () => {
   };
   const COVERAGE_STATES = loadConst('COVERAGE_STATES');
   const COVERAGE_DECLARATIONS = loadConst('COVERAGE_DECLARATIONS');
-  const coverageStateLabel = loadFunction(page, 'coverageStateLabel', { COVERAGE_STATES });
-  const coverageDeclarationLabel = loadFunction(page, 'coverageDeclarationLabel', { COVERAGE_DECLARATIONS });
-  const coverageRunAgainLabel = loadFunction(page, 'coverageRunAgainLabel');
-  const coverageSummaryText = loadFunction(page, 'coverageSummaryText');
-  const coverageScenarioText = loadFunction(page, 'coverageScenarioText', { coverageStateLabel, coverageRunAgainLabel });
-  const coverageFindingText = loadFunction(page, 'coverageFindingText');
-  const coverageCountsText = loadFunction(page, 'coverageCountsText');
-  const coverageProviderText = loadFunction(page, 'coverageProviderText');
-  const coverageRunIdOf = loadFunction(page, 'coverageRunIdOf');
-  const coverageFailedHtml = loadFunction(page, 'coverageFailedHtml', { escHtml, coverageRunIdOf, coverageStateLabel, encodeURIComponent });
-  const helpers = { escHtml, coverageStateLabel, coverageDeclarationLabel, coverageScenarioText, coverageFindingText, coverageSummaryText, coverageCountsText, coverageProviderText, coverageFailedHtml };
-  const coverageRowsHtml = loadFunction(page, 'coverageRowsHtml', helpers);
-  const coverageNotDeclaredHtml = loadFunction(page, 'coverageNotDeclaredHtml', helpers);
-  const coverageMatrixRowHtml = loadFunction(page, 'coverageMatrixRowHtml', helpers);
-  const coverageMatrixHtml = loadFunction(page, 'coverageMatrixHtml', { ...helpers, coverageMatrixRowHtml });
-  const coverageHtml = loadFunction(page, 'coverageHtml', { ...helpers, coverageRowsHtml, coverageNotDeclaredHtml, coverageMatrixHtml });
-  const mdCell = loadFunction(page, 'mdCell');
-  const coverageMarkdown = loadFunction(page, 'coverageMarkdown', { ...helpers, mdCell });
+  const CAPABILITY_RESULTS = loadConst('CAPABILITY_RESULTS');
+  const POINT_KINDS = loadConst('POINT_KINDS');
+  // Every function of the section (up to coverageTitle(), which reads the
+  // page), lifted into one context so that each finds the others.
+  const sectionNames = (() => {
+    const src = read(page);
+    const from = src.indexOf('/* ── Test Framework coverage (#956)');
+    const to = src.indexOf('\nfunction coverageTitle(');
+    return [...src.slice(from, to).matchAll(/^function (\w+)\(/gm)].map((m) => m[1]);
+  })();
+  const ctx = { escHtml, encodeURIComponent, COVERAGE_STATES, COVERAGE_DECLARATIONS, CAPABILITY_RESULTS, POINT_KINDS };
+  for (const name of sectionNames) ctx[name] = loadFunction(page, name, ctx);
+  const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1550,7 +1545,7 @@ describe('the Report Builder coverage section', () => {
     expect(md).toContain('| Full refund | No scenario |  |  |');
     expect(md).toContain('- X\\<y>: currency:PLN');
     expect(md).not.toContain('\n\n\n');
-    expect(md.match(/^## Sales/gm)).toHaveLength(1);
+    expect(md.match(/^### Sales/gm)).toHaveLength(1);
     expect(mdCell(null)).toBe('');
     expect(mdCell('a\r\nb\rc')).toBe('a b c');
     expect(mdCell('a\\|b')).toBe('a\\\\\\|b');
@@ -1572,7 +1567,7 @@ describe('the Report Builder coverage section', () => {
     const byElement = coverageHtml(report, 'matrix');
     expect(byElement).toContain('<td><strong>Sale</strong></td><td><small class="cov-group">Whole flow</small><br>Sale (every scenario)</td><td><span class="cov-state cov-passed">Passed</span>');
     expect(byElement).toContain('Passenger types</small><br>Adult');
-    expect(coverageMarkdown(report, 'P')).toContain('## Sales flows');
+    expect(coverageMarkdown(report, 'P')).toContain('### Sales flows');
   });
 
   test('the card is shown to members only, asks the coverage routes, and draws the view chosen', () => {
@@ -1581,7 +1576,115 @@ describe('the Report Builder coverage section', () => {
     expect(source).toContain("fetch('/v1/company/coverage?days=' + encodeURIComponent(");
     expect(source).toContain("fetch('/v1/company/coverage/download?days=' + encodeURIComponent(");
     expect(source).toContain("body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);");
-    expect(source).toContain('<option value="matrix" selected>By flow and element</option>');
+    expect(source).toContain('<option value="capabilities" selected>By capability</option><option value="matrix">By flow and element</option>');
+  });
+
+  // #972 part 3: the coverage by capability.
+  const UUID = '0f0e8a2c-1b3d-4e5f-8a9b-0c1d2e3f4a5b';
+  const byCapability = {
+    summary: { tested: 2, passed: 0, deviation: 1, points: 1, blocked: 0, notSupported: 0, notTested: 1, outOfScope: 0,
+      expectedRefusals: { total: 1, refused: 0, deviation: 0, notRefused: 1, notRun: 0 },
+      pointsToLookAt: { total: 2, provider: 1, accepted: 0, questions: 0, oscar: 1, truncated: false }, declaredWithoutScenario: 1, apart: 1 },
+    capabilities: [
+      { id: 'sale', group: 'Sale <g>', label: 'Sale <l>', optional: false, result: 'points', declaration: 'declared',
+        tests: [{ key: 'K', entry: 'OTST_<e>', purpose: 'P <p>', result: 'points', forms: [
+          { code: 'C_<1>', form: 'SEARCH', result: 'points', runId: UUID, step: '02. <s>', check: 'X <c>', toRunAgain: true },
+          { code: 'C2', form: 'TRIP_IDS', result: 'not-run', toRunAgain: null }] }],
+        provenBy: { count: 3, codes: ['A'] }, sideProblems: [{ code: 'Z<z>', result: 'points' }], points: [1, 'x', 2.5] },
+      { id: 'fulfilment.documents', group: 'Sale <g>', label: 'Documents', optional: true, result: 'deviation', declaration: null,
+        tests: [], provenBy: { count: 1, codes: ['A'] }, sideProblems: [], points: [] },
+    ],
+    expectedRefusals: [{ key: 'NHF_<r>', entry: null, purpose: 'Must <refuse>', capability: 'refund.full', capabilityLabel: 'Full <refund>',
+      result: 'not-refused', forms: [{ code: 'NHF_<r>', result: 'not-refused', runId: 'bad"><x>' }], points: [2] }],
+    points: [
+      { number: 1, kind: 'provider', source: 'check', capability: 'sale', capabilityLabel: 'Sale <l>', step: '02. <s>', steps: ['02. <s>', '05. <t>'],
+        check: 'X <c>', status: 500, problemCode: 'P<q>', blocking: true, occurrences: 2, tests: [{ key: 'K', entry: 'OTST_<e>', codes: ['C_<1>'] }],
+        runs: [{ runId: UUID, code: 'C_<1>' }, { runId: 'nope', code: 'C2' }], firstSeen: '2026-10-20', lastSeen: '2026-10-26',
+        finding: { id: 'f', title: 'T <f>', category: 'provider_deviation', status: 'open' }, possibleFinding: null, expectedRefusal: false },
+      { number: 2, kind: 'oscar', source: 'check', capability: 'refund.full', capabilityLabel: 'Full <refund>', step: '14. <u>', steps: ['14. <u>'],
+        check: '[OSCAR request] <o>', status: 200, problemCode: null, blocking: false, occurrences: 1, tests: [{ key: 'NHF_<r>', entry: null, codes: ['NHF_<r>'] }],
+        runs: [], firstSeen: '2026-10-21', lastSeen: '2026-10-21', finding: null,
+        possibleFinding: { id: 'g', title: 'Maybe <m>', category: 'open', status: 'open' }, expectedRefusal: true },
+    ],
+    apart: [{ code: 'A_2', entry: 'A' }], notTested: [{ id: 'x', group: 'Cards', label: 'Card <k>', state: 'not-covered' }],
+  };
+  const TAGS = ['<g>', '<l>', '<e>', '<p>', '<1>', '<s>', '<c>', '<z>', '<r>', '<refuse>', '<refund>', '<x>', '<t>', '<q>', '<f>', '<m>', '<k>', '<u>', '<o>'];
+
+  test('the results and kinds are the server\'s, named alike', () => {
+    const { RESULT_TEXT } = require('../../src/utils/capabilityCoverage');
+    const { KIND_ORDER } = require('../../src/utils/coveragePoints');
+    expect({ ...CAPABILITY_RESULTS }).toEqual({ ...RESULT_TEXT });
+    expect(Object.keys(POINT_KINDS)).toEqual([...KIND_ORDER]);
+  });
+
+  test('by capability: the rows, the refusals and the numbered points, every text escaped', () => {
+    const out = coverageHtml({ ...answer, byCapability }, 'capabilities');
+    for (const tag of TAGS) expect(out.includes(tag)).toBe(false);
+    expect(out).toContain('2 capability(ies) tested: 0 passed, 1 passed with deviation, 1 passed with points, 0 blocked, 0 not supported by the provider');
+    expect(out).toContain('2 point(s) to look at: 1 for the provider, 0 accepted deviation(s), 0 question(s), 1 of OSCAR');
+    expect(out.split('<tr><th colspan="4">Sale &#60;g&#62;</th></tr>').length).toBe(2);
+    expect(out).toContain('<td>Sale &#60;l&#62; — Declared</td><td>1 test(s), 1 form(s) run · proven on the way by 3 run(s)<details><summary>Tests</summary>');
+    expect(out).toContain('<a href="/run-detail.html?id=' + UUID + '">C_&#60;1&#62;</a> (SEARCH): Passed with points at 02. &#60;s&#62; — X &#60;c&#62;, to run again');
+    expect(out).toContain('<details><summary>Problems on the way</summary><ul class="cov-list"><li>Z&#60;z&#62;: Passed with points</li>');
+    expect(out).toContain('cov-points">Passed with points</span></td><td><a href="#cov-point-1">#1</a></td>');
+    expect(out).toContain('<td>Documents (optional)</td>');
+    expect(out).toContain('cov-deviation">Passed with deviation');
+    expect(out).toContain('<td><strong>NHF_&#60;r&#62;</strong><br><small>Must &#60;refuse&#62;</small></td><td>Full &#60;refund&#62;</td>');
+    expect(out).not.toContain('bad"');
+    expect(out).toContain('<li id="cov-point-1"><strong>#1</strong> Sale &#60;l&#62; <span class="cov-state cov-blocked">Blocking</span><br>02. &#60;s&#62;, 05. &#60;t&#62;: X &#60;c&#62; (HTTP 500, P&#60;q&#62;)');
+    expect(out).toContain('Seen in OTST_&#60;e&#62; (C_&#60;1&#62;), from 2026-10-20 to 2026-10-26, 2 times');
+    expect(out).toContain('Finding: T &#60;f&#62; (provider_deviation, open)');
+    expect(out).toContain('Runs: <a href="/run-detail.html?id=' + UUID + '">C_&#60;1&#62;</a>, C2');
+    expect(out).toContain('<h4 class="cov-heading">Points to look at (2)</h4><h5 class="cov-subheading">For the provider (1)</h5>');
+    expect(out).toContain('<h5 class="cov-subheading">OSCAR&#39;s own points (not counted against the provider) (1)</h5>');
+    expect(out).toContain('(expected refusal)');
+    expect(out).toContain('Possibly finding: Maybe &#60;m&#62; (open, open)');
+    expect(out).toContain('Declared functions without a scenario run (1)');
+    expect(out).toContain('<li>A_2 (A)</li>');
+    expect(capabilityPointLinks([1, 'x', 2.5, -1])).toBe('<a href="#cov-point-1">#1</a>');
+    expect(capabilityHtml({ points: [] })).toContain('<div class="cov-note">None.</div>');
+  });
+
+  test('the Markdown starts with the capabilities, then the two views as detail (G4)', () => {
+    const md = coverageMarkdown({ ...answer, byCapability }, 'G');
+    expect(md.match(/^# /gm)).toHaveLength(1);
+    expect(md.match(/^## [A-Z].*$/gm)).toEqual(['## By capability', '## Expected refusals', '## Points to look at',
+      '## Declared functions without a scenario run', '## Scenarios set apart (neither in the run list nor run)',
+      '## By flow and element', '## By function declared', '## Scenarios testing what the Test Framework does not declare']);
+    expect(md).toContain('| Sale \\<l> — Declared | 1 test(s), 1 form(s) run · proven on the way by 3 run(s) | Passed with points | #1 |');
+    expect(md).toContain('| NHF_\\<r> | Full \\<refund> | Not refused | NHF_\\<r>: Not refused | #2 |');
+    expect(md).toContain('- #1 Sale \\<l>, blocking — 02. \\<s>, 05. \\<t>: X \\<c> (HTTP 500, P\\<q>). Seen in OTST_\\<e> (C_\\<1>), from 2026-10-20 to 2026-10-26, 2 times. Finding: T \\<f> (provider_deviation, open).');
+    expect(md).toContain('## Points to look at\n\n### For the provider\n');
+    expect(md).toContain('### OSCAR\'s own points (not counted against the provider)');
+    expect(md).toContain('### Sales \\<flows>');
+    expect(md).not.toContain('\n\n\n');
+  });
+
+  test('by function: a function\'s scenarios are folded, those not passed shown (G3)', () => {
+    const many = Array.from({ length: 13 }, (_, i) => ({ code: 'S' + i, result: i < 12 ? 'failed' : 'passed', run: { passed: 1, failed: 1, at: 'd' } }));
+    const out = coverageHtml({ ...answer, functions: [{ ...answer.functions[0], scenarios: many }] }, 'functions');
+    expect(out).toContain('1 of 13 scenario(s) passed (0 with defects, 12 failed, 0 never run)<ul class="cov-list cov-failed-list">');
+    expect(out).toContain('<li>… and 2 more</li></ul><details><summary>Scenarios</summary>');
+    expect(out.match(/<li>S\d+: /g)).toHaveLength(10 + 13);
+  });
+
+  test('the server\'s own coverage by capability draws', () => {
+    const { capabilityCoverageOf } = require('../../src/utils/capabilityCoverage');
+    const report = capabilityCoverageOf({
+      framework: { salesFlows: ['SALE'] },
+      datafile: { scenarios: [{ code: 'A', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1 }],
+        tripRequirements: [{ id: 1, tripType: 'SEARCH', trip: {} }], passengersList: [{ id: 1, passengers: [{ type: 'PERSON' }] }] },
+      runs: { A: { id: UUID, status: 'FAILED', completed_at: '2026-10-24 10:05:00',
+        steps: ['01. POST Get Offer', '02. POST Create Booking', '06. POST Obtaining Fulfillments from Booking'].map((n) => ({ request_name: n, http_status: 200 })),
+        checks: [{ request_name: '02. POST Create Booking', assertion_name: 'Booking price is 12.50', category: 'business_logic', severity: 'major', http_status: 200 }] } },
+    });
+    const out = capabilityHtml(report);
+    expect(out).toContain('<td>Sale: pre-booking and confirmation — Declared</td>');
+    expect(out).toContain('cov-points">Passed with points</span></td><td><a href="#cov-point-1">#1</a></td>');
+    // A 2xx status is not printed: the answer was a success.
+    expect(out).toContain('<li id="cov-point-1"><strong>#1</strong> Sale: pre-booking and confirmation<br>02. POST Create Booking: Booking price is N<br><small>');
+    // A test outside the catalogue is named by its code, once.
+    expect(out).toContain('Seen in A, on 2026-10-24 10:05:00');
   });
 });
 

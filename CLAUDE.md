@@ -639,7 +639,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     linked to a finding by `matchFinding()`'s sure match only. Kinds, in
     numbering order: provider, accepted, question (`spec_question`), oscar
     (`oscar_issue`, a #735 draft marked OSCAR's, an `[OSCAR request]` check;
-    listed apart, still counted). **Accepted = a `provider_deviation` finding
+    listed apart, not counted since PR 3). **Accepted = a `provider_deviation` finding
     that is resolved** (maintainer, 2026-10-26), or a known deviation the run
     applied, read from the collection's "[WARNING] Known deviation
     (documented): <step> returned HTTP <status>" line (`knownDeviationOf()`,
@@ -651,6 +651,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`sideResult()`; on the simulator a card scenario's accepted 01c failure
     first marked the offers by search). The route reads every finding for this (resolved included); a
     point shows only id, title, category, status.
+    **PR 3 (1.11.406): the page and the exports**, and three choices of the
+    maintainer (2026-10-26). (1) **OSCAR's points do not count against the
+    provider**: their checks go to `step.oscar`. (2) **One problem = one
+    point whatever the step** (`placeOf()`: capability, refusal, check text,
+    problem code; a generic status check, `STATUS_CHECK` of
+    `findingSuggestions.js`, keeps its step). A point lists `steps` and its
+    #735 `keys` (for part 4), takes the first finding any key links to, and
+    is OSCAR's when any key is. `pointsOf()` hands back the check objects of
+    accepted and OSCAR's points (`accepted`, `oscar`), and `stepsOf()` sorts
+    by object, not by key: the points are made from steps read once without
+    them, then the results. (3) First and last seen stay on the latest runs.
+    Page: view **By capability** first and by default (`capabilityHtml()`
+    and its helpers, `CAPABILITY_RESULTS` / `POINT_KINDS` pinned to
+    `RESULT_TEXT` / `KIND_ORDER`); a point number is linked only when whole,
+    a run only for a UUID, a 2xx status is not printed. `ui-scripts.test.js`
+    lifts every function of the section into one context (the names between
+    the section's comment and `coverageTitle()`): a new helper needs no
+    wiring. Markdown and the workbook (seven sheets: Summary, Capabilities,
+    Expected refusals, Points to look at, then the detail) in the same order.
+    G3: the function view folds its scenarios; G4: "By function declared" is
+    level 2. The coverage lists wrap long codes (`overflow-wrap:anywhere`).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

@@ -389,8 +389,9 @@ describe('points to look at, each once (R6)', () => {
     ]);
     expect(r.points[1].finding).toEqual({ id: 'q1', title: 'One fulfilment per passenger?', category: 'spec_question', status: 'discussing' });
     expect(r.points[3]).toMatchObject({ capability: 'fulfilment.documents', step: '06b. GET Fulfillment' });
-    // OSCAR's points are listed apart; they still count where they failed.
+    // OSCAR's points are listed apart and do not count against the provider (maintainer, 2026-10-26).
     expect(row(r, 'sale')).toMatchObject({ result: 'points', points: [1, 2, 3] });
+    expect(row(r, 'fulfilment.documents')).toMatchObject({ result: 'passed', points: [4] });
     expect(r.summary.pointsToLookAt).toEqual({ total: 4, provider: 1, accepted: 0, questions: 1, oscar: 2, truncated: false });
   });
 
@@ -403,6 +404,20 @@ describe('points to look at, each once (R6)', () => {
     expect(r.points).toEqual([expect.objectContaining({ number: 1, capability: 'refund.full', expectedRefusal: true })]);
     expect(r.expectedRefusals[0].points).toEqual([1]);
     expect(row(r, 'refund.full').points).toEqual([]);
+  });
+});
+
+describe('OSCAR\'s own points do not count against the provider (maintainer, 2026-10-26)', () => {
+  test('a capability whose only point is OSCAR\'s reads passed; a run it stopped is still blocked', () => {
+    const oscarCheck = '[OSCAR request] The body sent conforms to OSDM';
+    const runs = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { '02. POST Create Booking': fail(oscarCheck) } }) };
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], runs);
+    expect(row(r, 'sale')).toMatchObject({ result: 'passed', points: [1], tests: [{ forms: [{ result: 'passed' }] }] });
+    expect(r.points).toEqual([expect.objectContaining({ kind: 'oscar', check: oscarCheck })]);
+    expect(r.summary).toMatchObject({ points: 0, pointsToLookAt: { oscar: 1 } });
+    // A run OSCAR's defect stopped is still blocked: nothing past it was tested.
+    const stopped = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { stopAt: '01. POST Get Offer', failures: { '01. POST Get Offer': fail(oscarCheck) } }) };
+    expect(row(report([oneWay('OTST_SALE_ONE_WAY_1ADT')], stopped), 'sale').result).toBe('blocked');
   });
 });
 
@@ -517,8 +532,10 @@ describe('an accepted deviation reads "Passed with deviation" (decision 3)', () 
 
   test('a step\'s accepted failures are kept apart from its failures', () => {
     const check = { request_name: at07, assertion_name: 'Booking summary names the product', http_status: 200 };
-    const steps = stepsOf({ steps: [{ request_name: at07, http_status: 200 }], checks: [check] }, { accepted: new Set([P.keyOfCheck(check)]) });
+    const steps = stepsOf({ steps: [{ request_name: at07, http_status: 200 }], checks: [check] }, { accepted: new Set([check]) });
     expect(steps[0]).toMatchObject({ state: 'passed', deviation: true, failures: [], accepted: [check] });
+    const oscar = stepsOf({ steps: [{ request_name: at07, http_status: 200 }], checks: [check] }, { oscar: new Set([check]) });
+    expect(oscar[0]).toMatchObject({ state: 'passed', deviation: false, failures: [], oscar: [check] });
     expect(stepsOf({ steps: [{ request_name: at07, http_status: 200 }], checks: [check] })[0]).toMatchObject({ state: 'failed', deviation: false });
   });
 });

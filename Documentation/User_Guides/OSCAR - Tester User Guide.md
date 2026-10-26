@@ -22,6 +22,7 @@
 4. [Authoring a scenario](#4-authoring-a-scenario)
 5. [Running tests](#5-running-tests)
 6. [Reading the report](#6-reading-the-report)
+   - Assertions · HTTP Traffic · Test Framework coverage (by capability, points to look at, exports)
 7. [Reference tables](#7-reference-tables)
 8. [Troubleshooting](#8-troubleshooting)
 9. [Testing OSCAR with the OSDM simulator](#9-testing-oscar-with-the-osdm-simulator)
@@ -1404,6 +1405,82 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 
 **HTTP status vs. assertion failures are different things.** A request can be
 `200` (HTTP OK) and still have failed assertions (spec deviations), and vice‑versa.
+
+### Test Framework coverage (Report Builder)
+
+The **Test Framework Coverage** card of the Report Builder is not tied to one
+run. It reads the latest finished run of each scenario of the company or
+provider selected, over the period chosen (365 days by default). Choose
+**Show coverage**. It opens **By capability**, the way an assessment is
+written.
+
+**By capability.** One row per capability: an offer search, a sale, a full
+refund, a seat near a given place… Each row shows:
+
+- what the Test Framework says of it;
+- its tests and their forms (search, specification, trip id);
+- the number of other runs that went through it on the way;
+- its result;
+- the numbers of its points to look at.
+
+A failed check counts only against the capability its scenario is for. A
+failure at an optional operation (a reference data read, the fulfilment read,
+a withdrawal, the refund receipt) counts only against that operation. The
+results:
+
+| Result | Meaning |
+|---|---|
+| Passed | Every run that reached it passed. |
+| Passed with deviation | It passed, except for deviations that are accepted (see below). |
+| Passed with points | It went through, with checks to look at. |
+| Blocked | No run got as far as this capability. |
+| Not supported by the provider | The provider answered 501, or "not implemented" on an optional read. |
+| Not tested | Declared in the Test Framework, but no run reached it. |
+| Out of scope | Not declared, or declared as not supported. |
+
+**Expected refusals** (the `NHF_` scenarios and the refusal probes) are listed
+apart: refused as expected, not refused, or not run. They never change the
+result of the capability they probe.
+
+**Points to look at.** Each distinct problem appears once, with a number,
+however many forms, runs and steps showed it. The same check failing at
+several steps of a test is one point that lists those steps. Each point
+shows:
+
+- the capability it counts against;
+- the step(s), the check and, for an error answer, the HTTP status and problem
+  code;
+- the tests and scenario codes that showed it, and the first and last day
+  seen;
+- whether it blocked the run;
+- the finding it is recorded as, and links to its runs.
+
+The points come in four lists:
+
+- **For the provider**: the provider's points.
+- **Accepted deviations**: the finding is classified *provider deviation* and
+  resolved, or the run met a status baselined as a known deviation. The
+  capability then reads *Passed with deviation*.
+- **Questions on the specification**: the finding is a *spec question*.
+- **OSCAR's own points**: the finding is an *OSCAR issue*, the suggested
+  finding was marked as OSCAR's, or the check is OSCAR's own request check.
+  These do not count against the provider.
+
+Below the points, two folded lists:
+
+- the declared functions no scenario run tests;
+- the scenarios set apart: neither in the run list nor run, such as copies
+  made twice.
+
+**The other two views.** *By flow and element* and *By function declared* are
+the detail behind it: one row per element a flow tests, and one per function
+the Test Framework declares, with their scenarios (folded).
+
+**Exports.** *Export Markdown* and *Download Excel* save the same report in
+the same order: the capabilities, the expected refusals and the points to look
+at first, then the two detailed views. The workbook has seven sheets: Summary,
+Capabilities, Expected refusals, Points to look at, By flow and element, By
+scenario, By function.
 
 ---
 

@@ -189,8 +189,8 @@ describe('GET /v1/company/coverage', () => {
       const res = await request(app).get('/v1/company/coverage').set(as('TM'));
       const r = res.body.byCapability;
       const cap = (c) => r.capabilities.find((x) => x.id === c);
-      // OSCAR's point still counts where it failed (part 2 lists it apart only).
-      expect(cap('sale')).toMatchObject({ result: 'points' });
+      // OSCAR's point is listed apart and does not count: the accepted deviation is all that is left.
+      expect(cap('sale')).toMatchObject({ result: 'deviation' });
       expect(cap('fulfilment.documents')).toMatchObject({ result: 'points' });
       const pointAt = (step) => r.points.find((p) => p.step === step);
       expect(pointAt('06b. GET Fulfillment')).toMatchObject({ kind: 'provider', status: 422, problemCode: 'FULFILLMENT_NOT_READY', capability: 'fulfilment.documents' });
@@ -221,7 +221,9 @@ describe('GET /v1/company/coverage', () => {
     expect(res.headers['content-type']).toContain('spreadsheetml.sheet');
     expect(res.headers['content-disposition']).toMatch(/^attachment; filename="oscar-coverage-\d{4}-\d{2}-\d{2}\.xlsx"$/);
     const { readZipEntry } = require('../../src/utils/zip');
-    expect(readZipEntry(res.body, 'xl/worksheets/sheet3.xml').toString()).toContain('TM_REFUND');
+    // Summary, then the coverage by capability, then the detail (#972): By scenario is the sixth sheet.
+    expect(readZipEntry(res.body, 'xl/worksheets/sheet6.xml').toString()).toContain('TM_REFUND');
+    expect(readZipEntry(res.body, 'xl/worksheets/sheet2.xml').toString()).toContain('Sale: pre-booking and confirmation');
     expect((await request(app).get('/v1/company/coverage/download').set(as('CERT'))).status).toBe(403);
     expect((await request(app).get('/v1/company/coverage/download?days=x').set(as('TM'))).status).toBe(400);
   });

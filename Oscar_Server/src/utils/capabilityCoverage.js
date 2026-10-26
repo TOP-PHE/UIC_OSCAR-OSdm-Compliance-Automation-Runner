@@ -30,7 +30,8 @@
  *       run), out-of-scope (not declared, or declared not supported).
  *   R6  The points to look at, each once (coveragePoints.js). A failed check
  *       of an accepted deviation is not a point of its capability: it reads
- *       "Passed with deviation".
+ *       "Passed with deviation". One of OSCAR's points does not count against
+ *       the provider at all (maintainer, 2026-10-26).
  *   R7  An optional operation is its own row: masterData, the seat map, the
  *       fulfilment read, the refund receipt, a withdrawal, Idempotency-Key.
  */
@@ -85,21 +86,23 @@ function stepNotSupported(name, statuses) {
 /**
  * The steps of a run, in order, each once: { name, state (passed / failed /
  * not-supported), failures (its failed checks, probes apart), accepted (those
- * of an accepted deviation: `accepted` holds their keys), deviation (an
+ * of an accepted deviation), oscar (those of OSCAR's points), deviation (an
  * accepted deviation or a known deviation was met there), blocking }.
+ * `accepted` and `oscar` are sets of the run's check objects.
  */
-function stepsOf(run, { accepted, deviations } = {}) {
+function stepsOf(run, { accepted, oscar, deviations } = {}) {
   const steps = stepsByName(run?.steps);
   for (const check of arr(run?.checks)) {
     const step = isObj(check) ? steps.get(check.request_name) : undefined;
-    if (step) bucketOf(step, check, accepted).push(check);
+    if (step) bucketOf(step, check, { accepted, oscar }).push(check);
   }
   const deviated = new Set(arr(deviations).map((d) => stepKey(d.step)));
   return [...steps.values()].map((s) => withState(s, deviated));
 }
 
-function bucketOf(step, check, accepted) {
-  if (accepted?.size > 0 && accepted.has(P.keyOfCheck(check))) return step.accepted;
+function bucketOf(step, check, { accepted, oscar }) {
+  if (accepted?.has(check)) return step.accepted;
+  if (oscar?.has(check)) return step.oscar;
   return isProbe(check) ? step.probes : step.failures;
 }
 
@@ -108,7 +111,7 @@ function stepsByName(rows) {
   const steps = new Map();
   for (const row of arr(rows)) {
     if (!isObj(row) || typeof row.request_name !== 'string') continue;
-    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [], accepted: [] });
+    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [], accepted: [], oscar: [] });
     const status = Number(row.http_status);
     if (Number.isInteger(status) && status > 0) steps.get(row.request_name).statuses.push(status);
   }
@@ -207,11 +210,12 @@ function sideResult(capability, steps, traits) {
 /**
  * Everything one run says: its main result, what it proves of the other
  * capabilities ({ capability: passed | deviation | not-supported | points }),
- * and its steps. `accepted` holds the keys of the failures that are accepted
- * deviations, `deviations` the known deviations the run applied.
+ * and its steps. `accepted` and `oscar` hold the failed checks of accepted
+ * deviations and of OSCAR's points, `deviations` the known deviations the run
+ * applied.
  */
-function runEvidence(run, { main, traits, refusal, accepted, deviations }) {
-  const steps = stepsOf(run, { accepted, deviations });
+function runEvidence(run, { main, traits, refusal, accepted, oscar, deviations }) {
+  const steps = stepsOf(run, { accepted, oscar, deviations });
   const side = new Set(steps.flatMap((s) => capabilitiesOfStep(s, traits)));
   for (const f of arr(traits?.features)) side.add(f);
   // A refusal's result is a row of its own (R4): the capability it probes
@@ -306,12 +310,12 @@ function failuresOf(items) {
     .map((check) => ({ check, run: item.run, code: item.scenario.code })));
 }
 
-// Each item's evidence and form, once the accepted deviations are known.
-function withEvidence(items, { accepted, warnings, collectionVersion }) {
+// Each item's evidence and form, once the accepted deviations and OSCAR's
+// points are known.
+function withEvidence(items, { accepted, oscar, collectionVersion }) {
   for (const item of items) {
-    item.deviations = item.run ? P.knownDeviationsOf(warnings[item.scenario.code]) : [];
     item.evidence = item.run
-      ? runEvidence(item.run, { main: item.main, traits: item.traits, refusal: item.refusal, accepted, deviations: item.deviations })
+      ? runEvidence(item.run, { main: item.main, traits: item.traits, refusal: item.refusal, accepted, oscar, deviations: item.deviations })
       : null;
     item.form = formOf(item, collectionVersion);
   }
@@ -338,10 +342,10 @@ function seenAt(item, step, extra) {
 function seenOf(items) {
   const seen = [];
   for (const item of items) {
-    const steps = arr(item.evidence?.steps);
+    const steps = item.run ? stepsOf(item.run) : [];
     for (const step of steps) {
       const severe = step.statuses.some((s) => s >= 500);
-      for (const check of [...step.failures, ...step.probes, ...step.accepted]) {
+      for (const check of [...step.failures, ...step.probes]) {
         seen.push(seenAt(item, step, { check, blocking: severe || isBlocking(check) }));
       }
     }
@@ -443,11 +447,12 @@ function capabilityCoverageOf({
   const fw = frameworkOf(framework);
   const declaredIds = new Set(declaredFunctions(fw).map((f) => f.id));
   const { items, apart } = scenarioItems({ datafile, catalogue: arr(catalogue), runs: runs || {}, runList: runListOf(datafile) });
+  for (const item of items) item.deviations = item.run ? P.knownDeviationsOf((warnings || {})[item.scenario.code]) : [];
   const links = P.linkFailures(failuresOf(items), { findings, suggestions });
-  withEvidence(items, { accepted: P.acceptedKeysOf(links), warnings: warnings || {}, collectionVersion });
-  const { points, truncated } = P.pointsOf(seenOf(items), {
+  const { points, truncated, accepted, oscar } = P.pointsOf(seenOf(items), {
     links, findings, capabilities: K.CAPABILITIES.map((c) => c.id), label: (id) => K.CAPABILITY.get(id)?.label || id,
   });
+  withEvidence(items, { accepted, oscar, collectionVersion });
   const tests = testsOf(items);
   const side = sideEvidenceOf(items);
   const capabilities = [];
