@@ -698,7 +698,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`publishedListHtml()`, `comparisonHtml()`, `publishedHtml()`; a report id
     reaches an address only through `coverageRunIdOf()`); a report shown
     clears the live coverage, so one set of point anchors is on the page.
-    **A point number opens its point under the row** (#984, 1.11.409):
+    **A point number opens its point under the row** (#984, 1.11.410):
     hidden rows drawn with the table (`capabilityPointRows()`, no anchor id,
     so ids stay unique), `toggleCoveragePoint()` on `coverage-body` and
     `published-body`; the number keeps its link to the list at the end.
@@ -862,6 +862,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `src/protocol.js` (initialize, ping, tools/list, tools/call), no SDK.
   **A new `/v1/api` GET needs its tool**: `mcp-end-to-end.test.js` pins the
   tools to the OpenAPI paths and runs the server against the real router.
+- **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
+  The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
+  read "100 scenarios". `whole_batches=1` adds the rest of each batch on the
+  page with the page's own query (`listed.sql` + `listed.params`, so scope
+  and hidden statuses cannot drift); rows may exceed `limit`. Any page that
+  groups runs by batch asks for it.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

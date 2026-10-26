@@ -663,7 +663,7 @@ async function confirmDelete() {
 
 // ── Load runs ─────────────────────────────────────────────────────────────────
 async function loadRuns() {
-  const res = await fetch('/v1/runs?limit=100', {});
+  const res = await fetch('/v1/runs?limit=100&whole_batches=1', {});
   if (res.status === 401) { logout(); return; }
   const data = await res.json();
   allRuns = data.runs || [];

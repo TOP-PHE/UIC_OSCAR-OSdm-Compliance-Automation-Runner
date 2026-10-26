@@ -1,11 +1,19 @@
 [
   {
-    "id": "2026-10-26-point-under-row",
-    "date": "October 26, 2026",
+    "id": "2026-10-27-point-under-row",
+    "date": "October 27, 2026",
     "tag": "Improvement",
     "title": "A point to look at opens under its capability",
     "summary": "In the coverage by capability, clicking a point number shows that point right under the row, instead of jumping to the list at the end.",
     "content": "In the Report Builder's coverage by capability, the Points column numbers the points to look at. Clicking a number now opens that point in a row right under the capability (or expected refusal) you clicked, and clicking it again closes it. Before, it jumped to the list of every point at the end of the report, where nothing marked the one you asked for.\n\nThe full list is still at the end of the report, for reading every point. It works the same in a published coverage report."
+  },
+  {
+    "id": "2026-10-27-whole-batches",
+    "date": "October 27, 2026",
+    "tag": "Fixed",
+    "title": "Large batches shown in full",
+    "summary": "Test Runs now counts every scenario of a large batch.",
+    "content": "A batch of more than 100 scenarios was shown with only 100 of them on Test Runs, though all had run. The batch line now counts and lists every scenario of the batch."
   },
   {
     "id": "2026-10-26-status-check-blocks",

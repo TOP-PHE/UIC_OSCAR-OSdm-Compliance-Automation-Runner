@@ -93,9 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.409] / [collection-OTST_V2.0.226] — 2026-10-26
+## [server-1.11.410] / [collection-OTST_V2.0.226] — 2026-10-27
 
-Issue #984, release 2026.444. In the coverage by capability, a point number opens that point under its row instead of jumping to the long list at the end.
+Issue #984, release 2026.445. In the coverage by capability, a point number opens that point under its row instead of jumping to the long list at the end.
 
 ### Changed
 - **Report Builder, coverage by capability.** A point number (`#1`, `#2`…) in the capability table or the expected refusals table opens that point in a row right under the row clicked. A second click closes it. This works for the live coverage and for a published report.
@@ -117,6 +117,16 @@ Issue #984, release 2026.444. In the coverage by capability, a point number open
   - a second click closes it;
   - `#10` opens the right one of the sale row's 17;
   - a published report's expected refusal opens the same way.
+
+---
+
+## [server-1.11.409] / [collection-OTST_V2.0.226] — 2026-10-27
+
+Test Runs shows whole batches, release 2026.444 (#986).
+
+### Fixed
+- **A batch larger than the page showed part of its runs.** The dashboard reads the last 100 runs (`GET /v1/runs?limit=100`) and groups them by batch, so a batch of 301 scenarios read "100 scenarios" with the counts, duration, rows and "select all in this batch" of those 100 only. All 301 had run.
+- **`GET /v1/runs?whole_batches=1`** adds the other runs of every batch on the page (`withWholeBatches()` in `runs.js`), read with the page's own query: same company, a tester's own runs only, the same statuses hidden, a certifier's shared runs only. `total`, `limit` and `offset` keep their meaning; the answer may hold more rows than `limit` (at most 5,000 added). The dashboard asks for it; the Report Builder and the administrator's list do not group by batch and are unchanged.
 
 ---
 
