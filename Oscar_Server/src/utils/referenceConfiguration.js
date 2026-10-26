@@ -39,6 +39,7 @@
 
 const crypto = require('node:crypto');
 const { CONFIGURATION_KEY, CONFIGURATION_FORMAT } = require('./configurationBundle');
+const { refSlots, refsIn } = require('./datafileOwnership');
 
 const REFERENCE_KEY = '__oscarReference';
 const REFERENCE_FORMAT = 1;
@@ -318,7 +319,9 @@ function providerPartOf(datafile, osdmVersion) {
   part.scenarios = scenarios;
   for (const [list, field] of RESOURCE_LISTS) {
     if (!Array.isArray(datafile?.[list])) continue;
-    const named = new Set(scenarios.map(s => s[field]));
+    // #959: an exchange's own trip is named too (datafileOwnership.refSlots).
+    const slots = refSlots(list, field);
+    const named = new Set(scenarios.flatMap(s => refsIn(s, slots)));
     part[list] = datafile[list].filter((entry, i) => named.has(entry?.id) || (list === 'purchaserList' && i === 0));
   }
   return part;

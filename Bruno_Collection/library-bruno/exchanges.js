@@ -15,7 +15,8 @@ module.exports = {
   validateExchangeOfferResponse,
   validateExchangeFeesConsistentWithAfterSalesConditions,
   validateExchangeAppliedOverruleCode,
-  checkBookingAroundExchange
+  checkBookingAroundExchange,
+  checkExchangeTripOffers
 };
 
 // Function to validate exchange offers response
@@ -362,6 +363,39 @@ function rememberAddedParts(added) {
   bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", [...new Set([...ids, ...added.map(({ part }) => part.id).filter(Boolean)])]);
 }
 
+// #959: the trip the scenario's exchange block asks for, kept by the parser;
+// null when the scenario has none (the exchange asks for the sale's trip, and
+// nothing more is checked).
+function exchangeTripAsked() {
+  let asked = bru.getEnvVar("__exchangeTripAsked");
+  if (typeof asked === 'string') {
+    try { asked = asked ? JSON.parse(asked) : null; } catch { asked = null; }
+  }
+  return asked && typeof asked === 'object' && Array.isArray(asked.trains) ? asked : null;
+}
+
+function recordTripChecks(checks) {
+  checks.forEach((c) => {
+    if (c.level === 'warn') {
+      if (!c.ok) validationLogger(`[WARNING] ${c.name}: ${c.message}`);
+      return;
+    }
+    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+  });
+}
+
+// Step 10: the exchange offers cover the trip asked; the one that does is
+// taken when the first does not.
+function checkExchangeTripOffers(jsonData) {
+  const asked = exchangeTripAsked();
+  if (!asked) return;
+  const { checkExchangeOffers } = require('./exchangeTrip.js');
+  const out = checkExchangeOffers(jsonData, asked);
+  out.lines.forEach((line) => validationLogger(line));
+  if (out.offerId) bru.setEnvVar("exchangeOffersOfferId", out.offerId);
+  recordTripChecks(out.checks);
+}
+
 function checkBookingAroundExchange(jsonData, stage) {
   const { postCreateBookingResponse } = require('./bookings.js');
   const { splitExchangeBooking, checkAddedParts } = require('./exchangeParts.js');
@@ -390,6 +424,12 @@ function checkBookingAroundExchange(jsonData, stage) {
     if (c.level === 'info') { validationLogger(`[INFO] ${c.name}: ${c.message}`); return; }
     test(c.name, () => { if (!c.ok) throw new Error(c.message); });
   });
+  // #959: once confirmed, the new booked offer is for the trip asked.
+  const asked = rule.confirmed ? exchangeTripAsked() : null;
+  if (asked) {
+    const { checkExchangedBooking } = require('./exchangeTrip.js');
+    recordTripChecks(checkExchangedBooking(jsonData, added.map(({ part }) => part.id), asked));
+  }
 }
 
 // Expose to global for convenience in eval/require loader flows

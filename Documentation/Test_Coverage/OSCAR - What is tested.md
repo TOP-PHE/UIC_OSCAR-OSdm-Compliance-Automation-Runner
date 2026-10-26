@@ -156,7 +156,7 @@ WARNING.
 
 | Step | Request | What is checked |
 |---|---|---|
-| 10. POST Exchange Offers | `POST /bookings/{id}/exchange-offers` | exchange offers with an id, a pre-booking deadline in the future, admissions, price, fee, and `amountToBePaid = exchangePrice + exchangeFee − confirmedPrice` |
+| 10. POST Exchange Offers | `POST /bookings/{id}/exchange-offers` | exchange offers with an id, a pre-booking deadline in the future, admissions, price, fee, and `amountToBePaid = exchangePrice + exchangeFee − confirmedPrice`; when the scenario's `exchange` block names another trip, day or time (#959), the offers cover that trip, and once confirmed (15) the booked offer of the exchange does too |
 | 11. POST Exchange Operations | `POST …/exchange-operations` | the operation is created `PREBOOKED` with the offer taken |
 | 12. GET Exchange Offer, 13. GET Booking | reads | the parts sold first are `EXCHANGE_ONGOING`, checked against the original offer; the exchange's new parts, when the provider already shows them, are `PREBOOKED` (OSDM does not say whether they show before the confirmation) |
 | 14. POST Obtaining Fulfillments, 15. / 17. GET Booking | confirmation and reads | the old parts are `EXCHANGED`, checked against the original offer; the new admissions are in the booking, fulfilled; the confirmed price updated. After a withdrawn exchange (17), the old parts are back |

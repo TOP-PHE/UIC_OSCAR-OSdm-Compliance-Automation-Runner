@@ -255,5 +255,5 @@ function describeRawAnswer(text, contentType) {
 
 module.exports = {
   UNKNOWN_TRIP_ID, tripsCollectionRequest, tripsCollectionPath, vehicleNumbersOf, chooseTrip, checkTripsCollection, offerRequestByTripIds, checkOffersForTrip,
-  coveredTripsOf, describeTripsAnswer, describeRawAnswer,
+  coveredTripsOf, describeTripsAnswer, describeRawAnswer, endsOf, startOf,
 };

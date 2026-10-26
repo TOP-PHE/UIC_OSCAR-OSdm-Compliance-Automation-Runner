@@ -250,6 +250,10 @@
             "description": "The product (tariff) the scenario expects (#598): a product code, matched exactly, or else words of the product's name (summary, then description), without case. The offer step keeps the offers that hold it and stops the scenario when none does; the fulfilled booking must hold it. Empty or null: the offer is chosen as before.",
             "type": ["string", "null"]
           },
+          "exchange": {
+            "description": "Exchange (#959): what the booking is exchanged for. tripRequirementId names another trip of the data file (another route); dateOffsetDays moves the day from the sale's (-60 to 60); time (\"HH:MM\") is the departure asked, for a SEARCH trip; offerSearchCriteria holds travelClasses, serviceClassTypes and flexibilities sent over the sale's criteria. Absent or null: the exchange asks for the sale's trip with the sale's criteria.",
+            "type": ["object", "null"]
+          },
           "requestedSections": {
             "description": "Fares (#903): the sections of the trip the provider prices, sent as OfferCollectionRequest.requestedSections. Each names a start and an end station, a UIC URN (urn:uic:stn:8500010) or a bare UIC code; the start is usually a border station. OSDM asks for a section whenever fares are asked for given trips. Empty or null: none is sent.",
             "type": ["array", "null"],

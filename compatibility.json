@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.433",
+  "current_release": "2026.434",
   "releases": [
+    {
+      "release": "2026.434",
+      "date": "2026-10-26",
+      "server": "1.11.399",
+      "collection": "OTST_V2.0.224",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Issue #959 (part 1): an EXCHANGE scenario can say what the booking is exchanged for (exchange: another trip of the data file, another day, a departure time, travel class, service class or flexibility). The exchange offers and, once confirmed, the booked offer of the exchange are checked against the trip asked. Simulator 0.55.0: the exchange answer names its trips, and a deliberately wrong variant keeps the booking's own trip."
+      ]
+    },
     {
       "release": "2026.433",
       "date": "2026-10-25",

@@ -36,6 +36,8 @@
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
  *   wrong-exchange-amount   amountToBePaid one cent off its identity
+ *   wrong-exchange-keeps-trip the exchange offers are for the booking's own
+ *                           trip, whatever trip the request asks for (#959)
  *   fare-not-in-fulfillment the fare fulfilment leaves the last fare out of
  *                           its bookingParts (#906)
  *   fare-fulfillment-document the fare fulfilment carries a PDF ticket, which
@@ -49,7 +51,7 @@
  *                           booked without distributionMode, so in product
  *                           mode (#255)
  *
- * The four "wrong-" variants and the five "fare-" ones are deliberately wrong: each must make a check of
+ * The five "wrong-" variants and the five "fare-" ones are deliberately wrong: each must make a check of
  * the collection fail. The offers of a trip from `variants.wrongOffersFrom`
  * are wrong too (minimalPrice one cent off), for the offer validators.
  */
@@ -57,7 +59,7 @@
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
   'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request',
-  'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount',
+  'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount', 'wrong-exchange-keeps-trip',
   'fare-not-in-fulfillment', 'fare-fulfillment-document', 'fare-wrong-combining-fee', 'fare-ignores-refund-fee', 'fare-reservation-product-mode',
 ]);
 

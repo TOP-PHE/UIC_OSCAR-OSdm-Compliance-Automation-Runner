@@ -355,7 +355,8 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
       if (operationId !== undefined) throw notFound();
       requireMethod(req, 'POST');
       const known = { trip: (id) => store.get('trip', scope, id) };
-      return { exchangeOffers: exchanges.createExchangeOffers(booking, await bodyOf(req), provider, now(), known) };
+      const exchangeOffers = exchanges.createExchangeOffers(booking, await bodyOf(req), provider, now(), known);
+      return { exchangeOffers, trips: exchanges.tripsOfExchangeOffers(booking, exchangeOffers) };
     }
     if (operationId === undefined) {
       requireMethod(req, 'POST');
