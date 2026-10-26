@@ -1123,7 +1123,7 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
     // Handled before the change switch (Sonar S1479 caps its cases).
-    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;");
+    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el)) return;");
     const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
     expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
     expect(fn).toContain("const value = paxAgeValue(field, el.value);");
@@ -1582,5 +1582,133 @@ describe('the Report Builder coverage section', () => {
     expect(source).toContain("fetch('/v1/company/coverage/download?days=' + encodeURIComponent(");
     expect(source).toContain("body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);");
     expect(source).toContain('<option value="matrix" selected>By flow and element</option>');
+  });
+});
+
+// #959: the "Exchange to" section of an EXCHANGE scenario.
+describe('scenarios.js — what an exchange is for (#959)', () => {
+  const S = 'js/scenarios.js';
+  const exchangeBlockOf = loadFunction(S, 'exchangeBlockOf');
+  const withExchangeValue = loadFunction(S, 'withExchangeValue', { exchangeBlockOf });
+  const withExchangeCriterion = loadFunction(S, 'withExchangeCriterion', { exchangeBlockOf, withExchangeValue });
+  const lines = read(S).split('\n');
+  const constOf = (name) => vm.runInNewContext(lines.find(l => l.startsWith(`const ${name} = `)).replace(/^const \w+ = /, '').replace(/;$/, ''));
+  const EXCHANGE_TIME = constOf('EXCHANGE_TIME');
+  const exchangeInputValue = loadFunction(S, 'exchangeInputValue', { EXCHANGE_TIME });
+  const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  test('the criteria are those the collection takes', () => {
+    const { CRITERIA_KEYS } = require('../../../Bruno_Collection/library-bruno/exchangeTrip.js');
+    expect(constOf('EXCHANGE_CRITERIA_KEYS')).toEqual(CRITERIA_KEYS);
+  });
+
+  test('a value set or removed; nothing left = no block', () => {
+    expect(withExchangeValue({}, 'dateOffsetDays', 1)).toEqual({ dateOffsetDays: 1 });
+    expect(withExchangeValue({ exchange: { dateOffsetDays: 1, time: '12:00' } }, 'time', null)).toEqual({ dateOffsetDays: 1 });
+    expect(withExchangeValue({ exchange: { time: '12:00' } }, 'time', '')).toBeNull();
+    expect(withExchangeValue({ exchange: 'odd' }, 'time', '12:00')).toEqual({ time: '12:00' });
+  });
+
+  test('a criterion ticked and unticked; empty lists and criteria go', () => {
+    const one = withExchangeCriterion({}, 'travelClasses', 'FIRST', true);
+    expect(one).toEqual({ offerSearchCriteria: { travelClasses: ['FIRST'] } });
+    const two = withExchangeCriterion({ exchange: one }, 'flexibilities', 'NON_FLEXIBLE', true);
+    expect(two.offerSearchCriteria).toEqual({ travelClasses: ['FIRST'], flexibilities: ['NON_FLEXIBLE'] });
+    expect(withExchangeCriterion({ exchange: one }, 'travelClasses', 'FIRST', true)).toEqual(one);   // never twice
+    expect(withExchangeCriterion({ exchange: one }, 'travelClasses', 'FIRST', false)).toBeNull();
+    expect(withExchangeCriterion({ exchange: { ...one, dateOffsetDays: 2 } }, 'travelClasses', 'FIRST', false)).toEqual({ dateOffsetDays: 2 });
+  });
+
+  test('typed values: what the collection takes, else ignored mid-edit', () => {
+    expect(exchangeInputValue('dateOffsetDays', ' 3 ')).toBe(3);
+    expect(exchangeInputValue('dateOffsetDays', '-60')).toBe(-60);
+    expect(exchangeInputValue('dateOffsetDays', '61')).toBeUndefined();
+    expect(exchangeInputValue('dateOffsetDays', '1.5')).toBeUndefined();
+    expect(exchangeInputValue('time', '12:05')).toBe('12:05');
+    expect(exchangeInputValue('time', '12:0')).toBeUndefined();
+    expect(exchangeInputValue('time', '24:00')).toBeUndefined();
+    expect(exchangeInputValue('tripRequirementId', '7')).toBe(7);
+    expect(exchangeInputValue('tripRequirementId', '')).toBeNull();
+    expect(exchangeInputValue('other', '1')).toBeUndefined();
+  });
+
+  test('the trips a scenario names include its exchange\'s', () => {
+    const scenarioTripIds = loadFunction(S, 'scenarioTripIds', { exchangeBlockOf });
+    expect(scenarioTripIds({ tripRequirementId: 1 })).toEqual([1]);
+    expect(scenarioTripIds({ tripRequirementId: 1, exchange: { tripRequirementId: 2 } })).toEqual([1, 2]);
+    expect(scenarioTripIds(undefined)).toEqual([undefined]);
+  });
+
+  function section(sc, trips) {
+    const exchangeTripLabel = loadFunction(S, 'exchangeTripLabel');
+    const ctx = { esc: escHtml, lbl: (v) => v, ENUMS: { travelClass: ['FIRST', 'SECOND'], serviceClass: ['STANDARD'], flexibilities: ['FULL_FLEXIBLE'] } };
+    ctx.exchangeCriterionHtml = loadFunction(S, 'exchangeCriterionHtml', ctx);
+    return loadFunction(S, 'buildExchangeSection', {
+      ...ctx, exchangeBlockOf, exchangeTripLabel,
+      state: { tripRequirements: trips },
+      getTrip: (id) => trips.find(t => t.id === id),
+    })(0, sc);
+  }
+  const TRIPS = [
+    { id: 1, tripType: 'SEARCH', trip: { origin: 'urn:uic:stn:0000001', destination: 'urn:uic:stn:0000002' } },
+    { id: 2, tripType: 'SPECIFICATION', legs: [{ origin: 'urn:uic:stn:0000003', destination: 'urn:uic:stn:4' }, { origin: 'x', destination: 'urn:uic:stn:0000001' }] },
+  ];
+
+  test('drawn for an exchange only, with every trip, the choice and the ticks', () => {
+    expect(section({ scenarioType: 'REFUND', tripRequirementId: 1 }, TRIPS)).toBe('');
+    const html = section({ scenarioType: 'EXCHANGE', tripRequirementId: 1,
+      exchange: { tripRequirementId: 2, dateOffsetDays: 1, offerSearchCriteria: { travelClasses: ['FIRST'] } } }, TRIPS);
+    expect(html).toContain('<option value="2" selected>#2 0000003 → 0000001 (SPECIFICATION)</option>');
+    expect(html).toContain('<option value="1" >#1 0000001 → 0000002 (SEARCH)</option>');
+    expect(html).toContain('value="1"\n          placeholder="leave empty = the sale\'s day"');
+    expect(html).toMatch(/checked data-action="toggle-exchange-criterion" data-idx="0" data-field="travelClasses" data-val="FIRST"/);
+    expect(html).toContain('A trip specification takes the times of its legs');
+    expect(section({ scenarioType: 'EXCHANGE', tripRequirementId: 1 }, TRIPS)).toContain("(the sale's trip)");
+  });
+
+  test('a trip id the data file does not hold is shown, not dropped', () => {
+    const html = section({ scenarioType: 'EXCHANGE', tripRequirementId: 1, exchange: { tripRequirementId: 9 } }, TRIPS);
+    expect(html).toContain('<option value="9" selected>#9 (not in the data file)</option>');
+  });
+
+  test('a trip label is text: a stop place holding markup is escaped when drawn', () => {
+    const html = section({ scenarioType: 'EXCHANGE', tripRequirementId: 1 },
+      [{ id: 3, tripType: 'SEARCH', trip: { origin: '<b>x', destination: 'y' } }]);
+    expect(html).toContain('#3 &lt;b&gt;x → y (SEARCH)');
+    expect(html).not.toContain('<b>x');
+  });
+
+  test('the handler stores the block, removes it when empty, and ignores a value mid-edit', () => {
+    const scenarios = [{ code: 'X', scenarioType: 'EXCHANGE', tripRequirementId: 1 }];
+    let dirty = 0;
+    let redrawn = 0;
+    const change = loadFunction(S, 'changeExchange', {
+      state: { scenarios }, markDirty: () => { dirty++; }, reRenderScenarioDetail: () => { redrawn++; },
+      withExchangeValue, withExchangeCriterion, exchangeInputValue,
+    });
+    const el = (action, field, value, extra = {}) => ({ dataset: { idx: '0', field, ...extra }, value, ...(action === 'toggle-exchange-criterion' ? { checked: value } : {}) });
+    expect(change('set-scenario-text', el('x', 'y', 'z'))).toBe(false);
+    expect(change('set-exchange-field', el('set-exchange-field', 'time', '12:'))).toBe(true);
+    expect(scenarios[0].exchange).toBeUndefined();
+    expect(dirty).toBe(0);
+    change('set-exchange-field', el('set-exchange-field', 'time', '12:30'));
+    change('set-exchange-field', el('set-exchange-field', 'tripRequirementId', '2'));
+    change('toggle-exchange-criterion', el('toggle-exchange-criterion', 'travelClasses', true, { val: 'FIRST' }));
+    expect(scenarios[0].exchange).toEqual({ time: '12:30', tripRequirementId: 2, offerSearchCriteria: { travelClasses: ['FIRST'] } });
+    expect(redrawn).toBe(2);
+    change('set-exchange-field', el('set-exchange-field', 'time', ''));
+    change('set-exchange-field', el('set-exchange-field', 'tripRequirementId', ''));
+    change('toggle-exchange-criterion', el('toggle-exchange-criterion', 'travelClasses', false, { val: 'FIRST' }));
+    expect('exchange' in scenarios[0]).toBe(false);
+    expect(dirty).toBe(6);
+  });
+
+  test('the wiring: drawn after the trip, handled by the change and input listeners, trips in use follow it', () => {
+    const source = read(S);
+    expect(source).toContain('${buildTripSection(idx, sc, trip)}\n\n  <!-- #959: what an exchange is for -->\n  ${buildExchangeSection(idx, sc)}');
+    expect(source).toContain('  if (changeExchange(action, el)) return;\n');
+    expect(source).toContain('|| changeExchange(action, el)) return;');
+    expect(source).toContain('scenarioTripIds(sc).includes(trip.id) && isReadOnlyForMe(sc)');
+    expect(source).toContain('...scenarioTripIds(s), s.passengersListId');
   });
 });

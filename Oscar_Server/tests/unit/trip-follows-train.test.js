@@ -100,6 +100,8 @@ describe('#787 the Test Config page', () => {
       document: { querySelectorAll: () => [] },
       Number,
     };
+    ctx.exchangeBlockOf = lift('exchangeBlockOf', ctx);
+    ctx.scenarioTripIds = lift('scenarioTripIds', ctx);
     ctx.tripEditableByMe = lift('tripEditableByMe', ctx);
     const offer = lift('offerTripUpdateFromTrain', ctx);
     return { state, toasts, offer, dirty: () => dirty };

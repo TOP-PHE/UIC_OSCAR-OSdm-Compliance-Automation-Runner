@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-exchange-to-in-test-config",
+    "date": "October 26, 2026",
+    "tag": "Added",
+    "title": "Set what an exchange is for in Test Config",
+    "summary": "Exchange scenarios have a new \"Exchange to\" section in Test Config.",
+    "content": "Under the trip of an exchange scenario, the \"Exchange to\" section sets what the booking is exchanged for: another trip of the data file, a number of days after the sale, a departure time, and the travel class, service class or flexibility asked. Leave a field empty to keep the sale's value. Scenarios without these settings run as before."
+  },
+  {
     "id": "2026-10-26-exchange-to-another-trip",
     "date": "October 26, 2026",
     "tag": "Added",

@@ -1378,7 +1378,7 @@ async function deleteTrainResource(resourceId) {
       .map(tr => tr.id));
 
     impacted = (state.scenarios || []).filter(sc =>
-      matchingTripIds.has(sc.tripRequirementId)
+      scenarioTripIds(sc).some(id => matchingTripIds.has(id))
     );
   }
 
@@ -2291,6 +2291,9 @@ function buildDetailHTML(idx) {
 
   <!-- Trip requirement -->
   ${buildTripSection(idx, sc, trip)}
+
+  <!-- #959: what an exchange is for -->
+  ${buildExchangeSection(idx, sc)}
 
   <!-- Offer search criteria -->
   ${buildOfferSection(idx, sc)}
@@ -3757,6 +3760,157 @@ function syncPurchaserFromPassenger(paxList, pax) {
     p0.purchaserEmail        = pax.email        || '';
     p0.purchaserPhoneNumber  = pax.phoneNumber  || '';
   });
+}
+
+// ── #959: what an exchange is for ────────────────────────────────────────────
+// An EXCHANGE scenario's `exchange` block: another trip of the data file, a
+// day offset from the sale's day, a departure time (SEARCH trip), and offer
+// criteria sent over the sale's. Read by the collection's exchangeTrip.js;
+// EXCHANGE_CRITERIA_KEYS is pinned to its CRITERIA_KEYS by a test.
+const EXCHANGE_CRITERIA_KEYS = ['travelClasses', 'serviceClassTypes', 'flexibilities'];
+const EXCHANGE_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// The trips a scenario names: its own, and its exchange's (#959).
+function scenarioTripIds(sc) {
+  const own = sc?.tripRequirementId;
+  const exchange = exchangeBlockOf(sc).tripRequirementId;
+  return exchange == null ? [own] : [own, exchange];
+}
+
+// The block of a scenario, or {} when it has none.
+function exchangeBlockOf(sc) {
+  const ex = sc?.exchange;
+  return ex && typeof ex === 'object' && !Array.isArray(ex) ? ex : {};
+}
+
+// The block with `key` set to `value` (null or '' removes it); null when
+// nothing is left, so a scenario without one stores no key at all.
+function withExchangeValue(sc, key, value) {
+  const ex = { ...exchangeBlockOf(sc) };
+  if (value === null || value === undefined || value === '') delete ex[key];
+  else ex[key] = value;
+  return Object.keys(ex).length > 0 ? ex : null;
+}
+
+// The block with `value` ticked or unticked in criterion `key`; an empty
+// list, then an empty criteria object, is removed.
+function withExchangeCriterion(sc, key, value, on) {
+  const criteria = { ...(exchangeBlockOf(sc).offerSearchCriteria || {}) };
+  const list = (Array.isArray(criteria[key]) ? criteria[key] : []).filter(v => v !== value);
+  if (on) list.push(value);
+  if (list.length > 0) criteria[key] = list;
+  else delete criteria[key];
+  return withExchangeValue(sc, 'offerSearchCriteria', Object.keys(criteria).length > 0 ? criteria : null);
+}
+
+// A trip of the data file in words: "#2 0000003 → 0000001 (SEARCH)".
+function exchangeTripLabel(t) {
+  const legs = Array.isArray(t?.legs) ? t.legs : [];
+  const from = t?.tripType === 'SPECIFICATION' ? legs[0]?.origin : t?.trip?.origin;
+  const to = t?.tripType === 'SPECIFICATION' ? legs.at(-1)?.destination : t?.trip?.destination;
+  const stop = (ref) => String(ref || '?').replace(/^urn:uic:stn:/, '');
+  return `#${t?.id} ${stop(from)} → ${stop(to)} (${t?.tripType || '?'})`;
+}
+
+// The value typed in a field of the section, or undefined while it is not
+// one the collection takes (ignored mid-edit, as the other number fields).
+function exchangeInputValue(field, raw) {
+  const v = String(raw ?? '').trim();
+  if (v === '') return null;
+  if (field === 'dateOffsetDays') {
+    const n = Number(v);
+    return Number.isInteger(n) && Math.abs(n) <= 60 ? n : undefined;
+  }
+  if (field === 'time') return EXCHANGE_TIME.test(v) ? v : undefined;
+  if (field === 'tripRequirementId') {
+    const n = Number(v);
+    return Number.isSafeInteger(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+function exchangeCriterionHtml(idx, key, label, values, ex) {
+  const chosen = Array.isArray(ex.offerSearchCriteria?.[key]) ? ex.offerSearchCriteria[key] : [];
+  const list = [...new Set([...values, ...chosen])];
+  return `
+    <div style="padding:4px 14px 2px;font-size:10px;font-weight:800;color:#90a4ae;text-transform:uppercase;letter-spacing:.4px">
+      ${esc(label)} <span style="font-weight:400;text-transform:none">(optional) — over the sale's</span>
+    </div>
+    <div class="multi-check">
+      ${list.map(v => {
+        const checked = chosen.includes(v);
+        return `<label class="${checked ? 'checked' : ''}">
+          <input type="checkbox" ${checked ? 'checked' : ''} data-action="toggle-exchange-criterion" data-idx="${esc(idx)}" data-field="${esc(key)}" data-val="${esc(v)}">
+          ${esc(lbl(v))}
+        </label>`;
+      }).join('')}
+    </div>`;
+}
+
+function buildExchangeSection(idx, sc) {
+  if (sc?.scenarioType !== 'EXCHANGE') return '';
+  const ex = exchangeBlockOf(sc);
+  const trips = (state.tripRequirements || []).filter(t => t && t.id != null);
+  const chosen = ex.tripRequirementId;
+  const known = chosen == null || trips.some(t => t.id === chosen);
+  const options = [
+    `<option value="" ${chosen == null ? 'selected' : ''}>The sale's trip</option>`,
+    ...trips.map(t => `<option value="${esc(t.id)}" ${t.id === chosen ? 'selected' : ''}>${esc(exchangeTripLabel(t))}</option>`),
+    ...(known ? [] : [`<option value="${esc(chosen)}" selected>#${esc(chosen)} (not in the data file)</option>`]),
+  ].join('');
+  const chosenTrip = trips.find(t => t.id === chosen);
+  const search = (chosenTrip || getTrip(sc.tripRequirementId))?.tripType !== 'SPECIFICATION';
+  const set = Object.keys(ex).length > 0;
+  return `
+  <div class="param-section">
+    <div class="param-section-head" data-action="toggle-param-section">🔁 Exchange to${set ? '' : ' <span style="font-weight:400;color:#90a4ae">(the sale\'s trip)</span>'}<span class="ps-arrow">▶</span></div>
+    <div class="param-section-body">
+    <div class="param-grid" style="padding:12px 14px 4px">
+      <div class="param-field">
+        <span class="param-label">Trip <span class="param-hint">${esc('What the booking is exchanged for (#959): another trip of the data file (another route), or the sale\'s own. It goes on the sale\'s day, moved to the first day its Test Data trains run. The exchange offers and, once confirmed, the booked offer of the exchange must cover it.')}</span></span>
+        <select class="param-input param-select" data-action="set-exchange-field" data-idx="${esc(idx)}" data-field="tripRequirementId">
+          ${options}
+        </select>
+      </div>
+      <div class="param-field">
+        <span class="param-label">Days after the sale's day <span class="param-hint">${esc('The day of the exchange trip, counted from the sale\'s (-60 to 60): 1 the next day. A day with no train of the trip running is kept, and warned about in the run. Empty: the sale\'s day.')}</span></span>
+        <input class="param-input" type="number" min="-60" max="60" value="${esc(ex.dateOffsetDays ?? '')}"
+          placeholder="leave empty = the sale's day"
+          data-action="set-exchange-field" data-idx="${esc(idx)}" data-field="dateOffsetDays">
+      </div>
+      <div class="param-field">
+        <span class="param-label">Departure time <span class="param-hint">${esc(search ? 'The departure asked, HH:MM, instead of the trip\'s own. Empty: the trip\'s time.' : 'A trip specification takes the times of its legs: a time is not used.')}</span></span>
+        <input class="param-input" type="text" maxlength="5" value="${esc(ex.time ?? '')}" placeholder="e.g. 12:00"
+          data-action="set-exchange-field" data-idx="${esc(idx)}" data-field="time">
+      </div>
+    </div>
+    ${exchangeCriterionHtml(idx, 'travelClasses', 'Travel class', ENUMS.travelClass, ex)}
+    ${exchangeCriterionHtml(idx, 'serviceClassTypes', 'Service class', ENUMS.serviceClass, ex)}
+    ${exchangeCriterionHtml(idx, 'flexibilities', 'Flexibility', ENUMS.flexibilities, ex)}
+    </div>
+  </div>`;
+}
+
+// A field or tick of the "Exchange to" section. Outside the switches, which
+// are long enough (S1479).
+function changeExchange(action, el) {
+  if (action !== 'set-exchange-field' && action !== 'toggle-exchange-criterion') return false;
+  const idx = Number.parseInt(el.dataset.idx);
+  const sc = state.scenarios[idx];
+  if (!sc) return true;
+  let next;
+  if (action === 'toggle-exchange-criterion') {
+    next = withExchangeCriterion(sc, el.dataset.field, el.dataset.val, el.checked);
+  } else {
+    const value = exchangeInputValue(el.dataset.field, el.value);
+    if (value === undefined) return true;
+    next = withExchangeValue(sc, el.dataset.field, value);
+  }
+  if (next) sc.exchange = next;
+  else delete sc.exchange;
+  markDirty();
+  if (action === 'toggle-exchange-criterion' || el.dataset.field === 'tripRequirementId') reRenderScenarioDetail(idx);
+  return true;
 }
 
 // ── Offer search criteria section (inline on scenario) ───────────────────────
@@ -5912,7 +6066,7 @@ async function wizSaveTrain(tidx, opts = {}) {
 
 // #787: a trip this person may change: no scenario using it is read-only for them.
 function tripEditableByMe(trip) {
-  return !(state?.scenarios || []).some(sc => sc && trip && sc.tripRequirementId === trip.id && isReadOnlyForMe(sc));
+  return !(state?.scenarios || []).some(sc => sc && trip && scenarioTripIds(sc).includes(trip.id) && isReadOnlyForMe(sc));
 }
 
 // #787: a trip copies its train set's values ("Apply test data"), so an edited
@@ -5933,7 +6087,7 @@ function offerTripUpdateFromTrain(before, saved) {
   document.querySelectorAll('.scenario-detail').forEach(det => {
     if (!det.dataset.rendered) return;
     const scIdx = Number.parseInt(det.id.replace('detail-', ''), 10);
-    if (tripIds.has(state.scenarios[scIdx]?.tripRequirementId)) reRenderScenarioDetail(scIdx);
+    if (scenarioTripIds(state.scenarios[scIdx]).some(id => tripIds.has(id))) reRenderScenarioDetail(scIdx);
   });
   oscarToast(`${tripIdxs.length} trip(s) updated from "${saved.label}": Save & Apply to keep it.`, 'info');
 }
@@ -7902,7 +8056,7 @@ async function wizGenerateScenario() {
     let nextId = (() => {
       const ids = [
         ...(dataFile.scenarios||[]).flatMap(s => [
-          s.tripRequirementId, s.passengersListId, s.purchaserListId,
+          ...scenarioTripIds(s), s.passengersListId, s.purchaserListId,
           s.requestedFulfillmentOptionsListId]),
         ...(dataFile.tripRequirements||[]).map(t => t.id),
         ...(dataFile.passengersList||[]).map(p => p.id),
@@ -8775,7 +8929,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el)) return;
 
   switch (action) {
     case 'file-upload':
@@ -8928,7 +9082,7 @@ document.body.addEventListener('change', function(e) {
           if (!det.dataset.rendered) return;
           const sIdx = Number.parseInt(det.id.replace('detail-', ''));
           const sc = state.scenarios[sIdx];
-          if (!sc || sc.tripRequirementId !== trip.id) return;
+          if (!sc || !scenarioTripIds(sc).includes(trip.id)) return;
           // Preserve which param sections were open
           const openSections = new Set();
           det.querySelectorAll('.param-section-head').forEach(h => {
@@ -9247,6 +9401,7 @@ document.body.addEventListener('input', function(e) {
   if (!el) return;
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }   // #515, as above
   const action = el.dataset.action;
+  if (changeExchange(action, el)) return;
   if (inputRequestedSection(action, el)) return;
   if (inputFareRefundFee(action, el)) return;
 

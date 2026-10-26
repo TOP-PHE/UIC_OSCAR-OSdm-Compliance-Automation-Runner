@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.434",
+  "current_release": "2026.435",
   "releases": [
+    {
+      "release": "2026.435",
+      "date": "2026-10-26",
+      "server": "1.11.400",
+      "collection": "OTST_V2.0.224",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Issue #959 (part 2): Test Config shows an \"Exchange to\" section on every EXCHANGE scenario, to set the trip, day, departure time, travel class, service class and flexibility the booking is exchanged for, without editing the data file. A trip used only as an exchange's trip now counts as used by its scenario."
+      ]
+    },
     {
       "release": "2026.434",
       "date": "2026-10-26",

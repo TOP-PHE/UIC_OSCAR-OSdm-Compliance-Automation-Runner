@@ -120,7 +120,7 @@ describe('#785 the Test Config page', () => {
   });
 
   test('the page wires it: typing stores a version only, leaving checks it, the value is escaped', () => {
-    expect(source).toContain('|| changeOsdmVersion(action, el)) return;');
+    expect(source).toContain('|| changeOsdmVersion(action, el) || changeExchange(action, el)) return;');
     expect(source).toContain("if (!v || !isOsdmVersionText(v)) break;");
     expect(source).toContain("if (el.dataset.field === 'osdmVersion' && el.value.trim() && !isOsdmVersionText(el.value)) break;");
     expect(source).toContain('value="${esc(fw.osdmVersion||\'3.4\')}"');
