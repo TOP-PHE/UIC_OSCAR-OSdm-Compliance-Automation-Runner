@@ -93,6 +93,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.409] / [collection-OTST_V2.0.226] — 2026-10-27
+
+Test Runs shows whole batches, release 2026.444 (#986).
+
+### Fixed
+- **A batch larger than the page showed part of its runs.** The dashboard reads the last 100 runs (`GET /v1/runs?limit=100`) and groups them by batch, so a batch of 301 scenarios read "100 scenarios" with the counts, duration, rows and "select all in this batch" of those 100 only. All 301 had run.
+- **`GET /v1/runs?whole_batches=1`** adds the other runs of every batch on the page (`withWholeBatches()` in `runs.js`), read with the page's own query: same company, a tester's own runs only, the same statuses hidden, a certifier's shared runs only. `total`, `limit` and `offset` keep their meaning; the answer may hold more rows than `limit` (at most 5,000 added). The dashboard asks for it; the Report Builder and the administrator's list do not group by batch and are unchanged.
+
+---
+
 ## [server-1.11.408] / [collection-OTST_V2.0.226] — 2026-10-26
 
 Issue #982, release 2026.443. The collection's own status check is read as a status check, so a wrong status blocks the run in the coverage reports, for new runs and for runs already stored.

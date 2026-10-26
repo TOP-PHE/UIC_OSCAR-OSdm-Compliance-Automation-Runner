@@ -336,7 +336,7 @@ router.get('/', (req, res) => {
   }
 
   const isPlatform = isPlatformRole(req.user.role);
-  let rows, total;
+  let rows, total, listed;
 
   // Aggregate subquery fragments reused by both branches below.
   // LEFT JOINs avoid N+1 correlated subqueries (one scan per run row).
@@ -364,8 +364,8 @@ router.get('/', (req, res) => {
     const certifierFilter = req.user.role === 'certification_user'
       ? 'AND r.shared_with_certifier_at IS NOT NULL'
       : '';
-    rows = all(
-      `SELECT r.id, r.company_id, c.name AS company_name, r.status,
+    listed = {
+      sql: `SELECT r.id, r.company_id, c.name AS company_name, r.status,
               r.auth_mode_used, r.api_base_used, r.env_name_used,
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.deleted_by, r.previous_status, r.batch_id, r.scenario_code,
@@ -376,11 +376,12 @@ router.get('/', (req, res) => {
        FROM runs r
        JOIN users u ON u.id = r.user_id
        JOIN companies c ON c.id = r.company_id${agg}
-       WHERE r.status != 'DELETED' ${certifierFilter}
+       WHERE r.status != 'DELETED' ${certifierFilter}`,
+      params: []
+    };
+    rows = all(`${listed.sql}
        ORDER BY r.queued_at DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
+       LIMIT ? OFFSET ?`, [...listed.params, limit, offset]);
     total = get(
       `SELECT COUNT(*) AS n FROM runs r JOIN companies c ON c.id = r.company_id
        WHERE r.status != 'DELETED' ${certifierFilter}`
@@ -401,8 +402,8 @@ router.get('/', (req, res) => {
     const ownScopeCount = isElevatedViewer ? '' : ' AND user_id = ?';
     // Tester: hide DELETION_REQUESTED (they already "deleted" it) and permanently DELETED,
     // but show DELETED_BY_ADMIN (flagged) so they know admin has marked it
-    rows = all(
-      `SELECT r.id, r.company_id, c.name AS company_name, r.status,
+    listed = {
+      sql: `SELECT r.id, r.company_id, c.name AS company_name, r.status,
               r.auth_mode_used, r.api_base_used, r.env_name_used,
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.user_id, r.deleted_by, r.batch_id, r.scenario_code,
@@ -415,19 +416,43 @@ router.get('/', (req, res) => {
        FROM runs r
        JOIN users u ON u.id = r.user_id
        JOIN companies c ON c.id = r.company_id${agg}
-       WHERE r.company_id = ?${ownScope} AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')
+       WHERE r.company_id = ?${ownScope} AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
+      params: isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
+    };
+    rows = all(`${listed.sql}
        ORDER BY r.queued_at DESC
-       LIMIT ? OFFSET ?`,
-      isElevatedViewer ? [req.companyId, limit, offset] : [req.companyId, req.user.id, limit, offset]
-    );
+       LIMIT ? OFFSET ?`, [...listed.params, limit, offset]);
     total = get(
       `SELECT COUNT(*) AS n FROM runs WHERE company_id = ?${ownScopeCount} AND status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
       isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
     );
   }
 
+  // #986: the dashboard groups the page by batch, so a batch the page cuts
+  // was counted, listed and selected from part of its runs. With
+  // whole_batches=1 the other runs of each batch on the page are added, read
+  // under the same rule as the page.
+  if (req.query.whole_batches === '1') rows = withWholeBatches(rows, listed);
+
   return res.json({ total: total.n, limit, offset, runs: rows });
 });
+
+// Every batch is at most one run per scenario of a data file; this bounds
+// what one answer can add if that ever stops being true.
+const WHOLE_BATCH_ROWS = 5000;
+
+function withWholeBatches(rows, listed) {
+  const batchIds = [...new Set(rows.map(r => r.batch_id).filter(Boolean))];
+  if (batchIds.length === 0) return rows;
+  const marks = batchIds.map(() => '?').join(', ');
+  const others = all(`${listed.sql} AND r.batch_id IN (${marks})
+       ORDER BY r.queued_at DESC
+       LIMIT ?`, [...listed.params, ...batchIds, WHOLE_BATCH_ROWS]);
+  const seen = new Set(rows.map(r => r.id));
+  const added = others.filter(r => !seen.has(r.id));
+  if (added.length === 0) return rows;
+  return [...rows, ...added].sort((a, b) => String(b.queued_at).localeCompare(String(a.queued_at)));
+}
 
 // ── POST /v1/runs/bulk-delete — tester soft-delete (→ DELETION_REQUESTED) ────
 // NOTE: must be defined BEFORE /:id routes to avoid Express swallowing it
