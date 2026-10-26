@@ -220,6 +220,16 @@ describe('the steps a run went through are evidence (R2), an optional operation 
     expect(row(r, 'fulfilment.documents')).toMatchObject({ result: 'points', sideProblems: [{ code: 'OTST_SALE_ONE_WAY_1ADT', result: 'points' }] });
   });
 
+  test('a capability\'s own step answering 500 blocks it; a check failing there leaves points', () => {
+    const later = [{ code: 'L', scenarioType: 'SALE', reservationBookingForm: 'ADD_LATER', tripRequirementId: 2, passengersListId: 2 }];
+    const at09 = '09. POST Add Reservation to Booking';
+    const blocked = report(later, { L: run([...SALE, at09], { statuses: { [at09]: 500 }, failures: { [at09]: fail('POST …/offer-parts → 500 (FAIL)') } }) });
+    expect(row(blocked, 'reservation.addLater')).toMatchObject({ result: 'blocked', tests: [{ forms: [{ step: at09 }] }] });
+    const points = report(later, { L: run([...SALE, at09], { failures: { [at09]: fail('The reservation names the leg asked') } }) });
+    expect(row(points, 'reservation.addLater').result).toBe('points');
+    expect(row(points, 'sale').result).toBe('passed');
+  });
+
   test('a scenario that stops before its capability leaves it blocked, with the step it stopped at', () => {
     const refund = [{ code: 'R', scenarioType: 'REFUND', scenarioAction: 'PATCH', tripRequirementId: 1, passengersListId: 1 }];
     const r = report(refund, { R: run([...SALE, ...REFUND], { stopAt: '01. POST Get Offer', failures: { '01. POST Get Offer': fail('Offers exist', 'business_logic') } }) });

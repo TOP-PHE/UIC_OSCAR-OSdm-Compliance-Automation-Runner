@@ -89,17 +89,19 @@ function stepsOf(run) {
     if (Number.isInteger(status) && status > 0) steps.get(row.request_name).statuses.push(status);
   }
   for (const check of arr(run?.checks)) {
-    if (!isObj(check) || !steps.has(check.request_name)) continue;
-    const step = steps.get(check.request_name);
-    (isProbe(check) ? step.probes : step.failures).push(check);
+    const step = isObj(check) ? steps.get(check.request_name) : undefined;
+    if (step) (isProbe(check) ? step.probes : step.failures).push(check);
   }
-  for (const step of steps.values()) {
-    step.notSupported = stepNotSupported(step.name, step.statuses);
-    step.blocking = step.failures.some(isBlocking) || (step.failures.length > 0 && step.statuses.some((s) => s >= 500));
-    if (step.notSupported) step.state = 'not-supported';
-    else step.state = step.failures.length > 0 ? 'failed' : 'passed';
-  }
-  return [...steps.values()];
+  return [...steps.values()].map(withState);
+}
+
+// A step's state, once its statuses and failed checks are known.
+function withState(step) {
+  const failed = step.failures.length > 0;
+  const notSupported = stepNotSupported(step.name, step.statuses);
+  let state = failed ? 'failed' : 'passed';
+  if (notSupported) state = 'not-supported';
+  return { ...step, notSupported, state, blocking: step.failures.some(isBlocking) || (failed && step.statuses.some((s) => s >= 500)) };
 }
 
 const capabilitiesOfStep = (step, traits) => K.stepCapabilities(step.name, traits);
@@ -210,16 +212,17 @@ function capabilityDeclaration(capability, fw, declaredIds) {
   return answers.every((a) => a === 'not-declared') ? 'not-declared' : 'every-value';
 }
 
-// The scenarios that count (R3): in the run list, or run in the window.
+// The scenarios that count (R3): in the run list, or run in the window. A
+// run list of null is "ALL", as POST /v1/runs reads it.
 function inScope(code, runList, runs) {
-  return runList === 'ALL' || runList.has(code) || Boolean(runs[code]);
+  return runList === null || runList.has(code) || Boolean(runs[code]);
 }
 
-const runListOf = (datafile) => {
+// The data file's run list as a set of codes, or null for every scenario.
+function runListOf(datafile) {
   const list = datafile?.scenariosToRun;
-  if (list == null || list === 'ALL') return 'ALL';
-  return new Set(arr(list).filter((c) => typeof c === 'string'));
-};
+  return list == null || list === 'ALL' ? null : new Set(arr(list).filter((c) => typeof c === 'string'));
+}
 
 // One form of a test: a scenario, its run and its result.
 function formOf(scenario, run, evidence, context) {
@@ -296,7 +299,7 @@ function capabilityRow(def, tests, side, declaration) {
   };
 }
 
-const COUNTED = ['passed', 'points', 'blocked', 'not-supported'];
+const COUNTED = new Set(['passed', 'points', 'blocked', 'not-supported']);
 
 /**
  * The coverage by capability.
@@ -333,7 +336,7 @@ function capabilityCoverageOf({ framework, datafile, catalogue = [], runs = {}, 
   return {
     capabilities, expectedRefusals, apart, notTested,
     summary: {
-      tested: capabilities.filter((c) => COUNTED.includes(c.result)).length,
+      tested: capabilities.filter((c) => COUNTED.has(c.result)).length,
       passed: count('passed'), points: count('points'), blocked: count('blocked'), notSupported: count('not-supported'),
       notTested: count('not-tested'), outOfScope: count('out-of-scope'),
       expectedRefusals: {

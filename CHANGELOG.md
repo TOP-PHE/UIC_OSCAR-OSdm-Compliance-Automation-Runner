@@ -135,7 +135,7 @@ Issue #972 (part 1 of 4), release 2026.434. The #956 report read as if nothing w
   - one fixture per mechanism, each showing the result #956 gave and the one given now: a failure spreading, a late failure at an optional operation, a probe, a failed fulfilment read, forms and copies.
 - `framework-coverage.test.js`: G1 and G2.
 - `coverage-routes.test.js`: `byCapability` built from steps stored in the database.
-- Fifteen deliberate breaks each make a test fail: each rule, the step table, the catalogue, G1, G2, and the route reading the steps.
+- Seventeen deliberate breaks each make a test fail: each rule, a step's blocking answer, the step table, the catalogue, G1, G2, and the route reading the steps.
 - Checked on the simulator: gamma's reference, 135 runs through a throwaway OSCAR. Every deliberately wrong scenario counts only against its own capability, and the shared rows (offers by search, reference data, passenger update) stay passed.
 
 ---
