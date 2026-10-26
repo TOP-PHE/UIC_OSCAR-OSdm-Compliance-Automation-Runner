@@ -1601,6 +1601,117 @@ function searchTrip(tripRequirement, tripDate, scenario, env) {
     tripRequirement.trip.searchCriteria || null, env);
 }
 
+// #722: the train and operator filters (`parameters.dataFilter`), sent only
+// when the trip's Trip Search Criteria turn "Train filter" on (the filter's
+// own test); otherwise the train is chosen in the answer (searchTrain.js).
+function searchTrainParameters(legDef, searchCriteria, env) {
+  const { trainFilterOn } = require('./searchTrain.js');
+  const _withFilter = trainFilterOn(searchCriteria);
+  env.set("__searchTrainFilter", _withFilter ? "true" : "");
+  const carrierFilter = _withFilter && legDef.carrier ? new CarrierFilter([legDef.carrier], false) : null;
+  const vehicleFilter = _withFilter && legDef.vehicleNumber ? new VehicleFilter([legDef.vehicleNumber], null, false) : null;
+  if (!_withFilter && (legDef.carrier || legDef.vehicleNumber)) {
+    const _train = legDef.vehicleNumber ? ' ' + legDef.vehicleNumber : '';
+    const _operator = legDef.carrier ? ' (operator ' + legDef.carrier + ')' : '';
+    validationLogger(`[INFO] 🔎 Search by place and time only: the train${_train}${_operator} is chosen in the answer, not sent as a filter. Trip Search Criteria → Train filter sends it.`);
+  }
+  const tripDataFilter = (carrierFilter || vehicleFilter) ? new TripDataFilter(carrierFilter, vehicleFilter) : null;
+  return tripDataFilter ? new TripParameters(tripDataFilter) : null;
+}
+
+// The departure of a search: LocalDateTime (no offset, no trailing Z) for
+// every provider but Bileto, which keeps the OffsetDateTime.
+function searchDepartureTime(legDef, env, apiBase) {
+  const _osdmVersionRaw = env.get("osdmVersion");
+  const _parsedVersion = require("./osdmVersion.js").parseVersion(_osdmVersionRaw);
+  const _osdmVersionForDatetime = _parsedVersion ? `${_parsedVersion.major}.${_parsedVersion.minor}` : 0;
+  const bileto = apiBase.includes("bileto");
+  const _startDateTime = bileto ? toOffsetDateTime(legDef.startDateTime) : toLocalDateTime(legDef.startDateTime);
+  if (bileto) validationLogger(`[INFO] Bileto exception — TripSearchCriteria uses OffsetDateTime: "${_startDateTime}"`);
+  validationLogger(
+    `[INFO] 📅 TripSearchCriteria datetime — osdmVersion: "${_osdmVersionRaw}" (parsed: ${_osdmVersionForDatetime}) → ` +
+    (bileto
+      ? `OffsetDateTime format (Bileto exception) → "${_startDateTime}"`
+      : `LocalDateTime format (offset/Z stripped) → "${_startDateTime}" (raw: "${legDef.startDateTime}")`)
+  );
+  return _startDateTime;
+}
+
+const isFilled = v => v != null && String(v).trim() !== '';
+
+// Arrival-time basis (OSDM: exactly one of departureTime/arrivalTime), from
+// the trip's Arrival field, in the departure's convention.
+function applyArrivalBasis(tripSearchCriteria, legDef, searchCriteria, apiBase, applied) {
+  if (searchCriteria.timeBasis !== 'ARRIVAL') return;
+  if (!legDef.endDateTime) {
+    validationLogger('[WARNING] Trip Search Criteria asks for ARRIVAL-time search but the trip has no Arrival time — falling back to departure-time search. Fill the Arrival field in the Trip requirement.');
+    return;
+  }
+  tripSearchCriteria.arrivalTime = apiBase.includes("bileto")
+    ? toOffsetDateTime(legDef.endDateTime)
+    : toLocalDateTime(legDef.endDateTime);
+  delete tripSearchCriteria.departureTime;
+  applied.push(`arrival-time basis (${tripSearchCriteria.arrivalTime})`);
+}
+
+// Vias (ordered; optional dwellTime per via) and not-vias (comma-separated
+// refs, one NotVia entry with the list).
+function applyVias(tripSearchCriteria, searchCriteria, applied) {
+  const _vias = [];
+  [['via1Place', 'via1Dwell'], ['via2Place', 'via2Dwell']].forEach(([pf, df]) => {
+    if (!isFilled(searchCriteria[pf])) return;
+    const v = { viaPlace: new StopPlaceRef(String(searchCriteria[pf]).trim()) };
+    if (isFilled(searchCriteria[df])) v.dwellTime = String(searchCriteria[df]).trim();
+    _vias.push(v);
+  });
+  if (_vias.length) {
+    tripSearchCriteria.vias = _vias;
+    applied.push(`${_vias.length} via(s): ${_vias.map(v => v.viaPlace.stopPlaceRef).join(', ')}`);
+  }
+  if (!isFilled(searchCriteria.notVias)) return;
+  const _places = String(searchCriteria.notVias).split(',').map(s => s.trim()).filter(Boolean);
+  if (_places.length) {
+    tripSearchCriteria.notVias = [{ notViaPlace: _places.map(pl => new StopPlaceRef(pl)) }];
+    applied.push(`notVia: ${_places.join(', ')}`);
+  }
+}
+
+// Simple TripParameters, merged with the train-binding dataFilter; the
+// paxone exception (no parameters member at all) is preserved.
+function applyTripParameters(tripSearchCriteria, searchCriteria, apiBase, applied) {
+  const _params = {};
+  ['transferLimit', 'numberOfResults', 'numberOfResultsBefore', 'numberOfResultsAfter'].forEach(k => {
+    if (!isFilled(searchCriteria[k])) return;
+    const n = Number.parseInt(searchCriteria[k], 10);
+    if (Number.isInteger(n) && n >= 0) { _params[k] = n; applied.push(`${k} ${n}`); }
+    else validationLogger(`[WARNING] Trip Search Criteria ${k}="${searchCriteria[k]}" is not a non-negative integer — ignored.`);
+  });
+  if (isFilled(searchCriteria.ignoreRealtimeData)) {
+    _params.ignoreRealtimeData = String(searchCriteria.ignoreRealtimeData) === 'true';
+    applied.push(`ignoreRealtimeData ${_params.ignoreRealtimeData}`);
+  }
+  if (Object.keys(_params).length === 0) return;
+  if (apiBase.includes("paxone")) {
+    validationLogger('[INFO] paxone exception — TripParameters omitted from the request; the configured transfer/result/realtime options are not sent (vias/notVias/arrival basis still apply).');
+    return;
+  }
+  tripSearchCriteria.parameters = Object.assign(tripSearchCriteria.parameters || {}, _params);
+}
+
+// #359: optional OSDM TripSearchCriteria members from the wizard's Trip
+// Search Criteria sub-panel. Only filled fields are sent; the wire shape is
+// unchanged when nothing is configured.
+function applySearchOptions(tripSearchCriteria, legDef, searchCriteria, apiBase) {
+  if (!searchCriteria || typeof searchCriteria !== 'object') return;
+  const applied = [];
+  applyArrivalBasis(tripSearchCriteria, legDef, searchCriteria, apiBase, applied);
+  applyVias(tripSearchCriteria, searchCriteria, applied);
+  applyTripParameters(tripSearchCriteria, searchCriteria, apiBase, applied);
+  if (applied.length) {
+    validationLogger(`[INFO] 🔎 Trip search criteria applied — ${applied.join('; ')}`);
+  }
+}
+
 // Function to set trip search criteria
 function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria, env = saleEnv) {
   test('Trip Search Criteria has at least one leg', function () {
@@ -1614,140 +1725,20 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria, env 
   }
 
   const legDef = legDefinitions[0];
-
-  // #722: the train and operator filters are optional in OSDM, and a provider
-  // that does not take them refuses the whole search. They are sent only when
-  // the trip's Trip Search Criteria turn "Train filter" on (the filter's own
-  // test); otherwise the train is chosen in the answer (searchTrain.js).
-  const { trainFilterOn } = require('./searchTrain.js');
-  const _withFilter = trainFilterOn(searchCriteria);
-  env.set("__searchTrainFilter", _withFilter ? "true" : "");
-  const carrierFilter = _withFilter && legDef.carrier ? new CarrierFilter([legDef.carrier], false) : null;
-  const vehicleFilter = _withFilter && legDef.vehicleNumber ? new VehicleFilter([legDef.vehicleNumber], null, false) : null;
-  if (!_withFilter && (legDef.carrier || legDef.vehicleNumber)) {
-    const _train = legDef.vehicleNumber ? ' ' + legDef.vehicleNumber : '';
-    const _operator = legDef.carrier ? ' (operator ' + legDef.carrier + ')' : '';
-    validationLogger(`[INFO] 🔎 Search by place and time only: the train${_train}${_operator} is chosen in the answer, not sent as a filter. Trip Search Criteria → Train filter sends it.`);
-  }
-
-  const tripDataFilter = (carrierFilter || vehicleFilter) ? new TripDataFilter(carrierFilter, vehicleFilter) : null;
-  const tripParameters = tripDataFilter ? new TripParameters(tripDataFilter) : null;
-
-  // TripSearchCriteria must use LocalDateTime (no offset, no trailing Z)
-  // for all providers except Bileto.
-  const _osdmVersionRaw = env.get("osdmVersion");
-  const _parsedVersion = require("./osdmVersion.js").parseVersion(_osdmVersionRaw);
-  const _osdmVersionForDatetime = _parsedVersion ? `${_parsedVersion.major}.${_parsedVersion.minor}` : 0;
-  let _startDateTime = toLocalDateTime(legDef.startDateTime);
-
-  // Bileto exception: keep OffsetDateTime in TripSearchCriteria.
+  const tripParameters = searchTrainParameters(legDef, searchCriteria, env);
   const _apiBase = env.get("api_base") || "";
-  if (_apiBase.includes("bileto")) {
-    _startDateTime = toOffsetDateTime(legDef.startDateTime);
-    validationLogger(`[INFO] Bileto exception — TripSearchCriteria uses OffsetDateTime: "${_startDateTime}"`);
-  }
+  const _startDateTime = searchDepartureTime(legDef, env, _apiBase);
 
-  validationLogger(
-    `[INFO] 📅 TripSearchCriteria datetime — osdmVersion: "${_osdmVersionRaw}" (parsed: ${_osdmVersionForDatetime}) → ` +
-    (_apiBase.includes("bileto")
-      ? `OffsetDateTime format (Bileto exception) → "${_startDateTime}"`
-      : `LocalDateTime format (offset/Z stripped) → "${_startDateTime}" (raw: "${legDef.startDateTime}")`)
+  const tripSearchCriteria = new TripSearchCriteria(
+    _startDateTime,
+    new StopPlaceRef(legDef.startStopPlaceRef),
+    new StopPlaceRef(legDef.endStopPlaceRef),
+    _apiBase.includes("paxone") ? null : tripParameters
   );
-
-  const sandbox = env.get("api_base") || "";
-  let tripSearchCriteria;
-  if (sandbox.includes("paxone")) {
-    tripSearchCriteria = new TripSearchCriteria(
-      _startDateTime,
-      new StopPlaceRef(legDef.startStopPlaceRef),
-      new StopPlaceRef(legDef.endStopPlaceRef),
-      null
-    );
-  } else {
-    tripSearchCriteria = new TripSearchCriteria(
-      _startDateTime,
-      new StopPlaceRef(legDef.startStopPlaceRef),
-      new StopPlaceRef(legDef.endStopPlaceRef),
-      tripParameters
-    );
-  }
 
   // Return trip (#176, #594): the inbound date, from the outbound departure.
   applyReturnOpts(tripSearchCriteria, returnOpts, _startDateTime);
-
-  // ── #359: optional OSDM TripSearchCriteria members from the wizard's
-  // Trip Search Criteria sub-panel. Only filled fields are sent; the wire
-  // shape is unchanged when nothing is configured.
-  if (searchCriteria && typeof searchCriteria === 'object') {
-    const _set = v => v != null && String(v).trim() !== '';
-    const _applied = [];
-
-    // Arrival-time basis (OSDM: exactly one of departureTime/arrivalTime).
-    // Uses the trip's Arrival field, same datetime convention as departure
-    // (LocalDateTime; OffsetDateTime for the Bileto exception).
-    if (searchCriteria.timeBasis === 'ARRIVAL') {
-      if (legDef.endDateTime) {
-        tripSearchCriteria.arrivalTime = _apiBase.includes("bileto")
-          ? toOffsetDateTime(legDef.endDateTime)
-          : toLocalDateTime(legDef.endDateTime);
-        delete tripSearchCriteria.departureTime;
-        _applied.push(`arrival-time basis (${tripSearchCriteria.arrivalTime})`);
-      } else {
-        validationLogger('[WARNING] Trip Search Criteria asks for ARRIVAL-time search but the trip has no Arrival time — falling back to departure-time search. Fill the Arrival field in the Trip requirement.');
-      }
-    }
-
-    // Vias (ordered; optional dwellTime per via).
-    const _vias = [];
-    [['via1Place', 'via1Dwell'], ['via2Place', 'via2Dwell']].forEach(([pf, df]) => {
-      if (_set(searchCriteria[pf])) {
-        const v = { viaPlace: new StopPlaceRef(String(searchCriteria[pf]).trim()) };
-        if (_set(searchCriteria[df])) v.dwellTime = String(searchCriteria[df]).trim();
-        _vias.push(v);
-      }
-    });
-    if (_vias.length) {
-      tripSearchCriteria.vias = _vias;
-      _applied.push(`${_vias.length} via(s): ${_vias.map(v => v.viaPlace.stopPlaceRef).join(', ')}`);
-    }
-
-    // Not-vias (comma-separated refs → one NotVia entry with the list).
-    if (_set(searchCriteria.notVias)) {
-      const _places = String(searchCriteria.notVias).split(',').map(s => s.trim()).filter(Boolean);
-      if (_places.length) {
-        tripSearchCriteria.notVias = [{ notViaPlace: _places.map(pl => new StopPlaceRef(pl)) }];
-        _applied.push(`notVia: ${_places.join(', ')}`);
-      }
-    }
-
-    // Simple TripParameters. Merged with the train-binding dataFilter; the
-    // paxone exception (no parameters member at all) is preserved.
-    const _params = {};
-    ['transferLimit', 'numberOfResults', 'numberOfResultsBefore', 'numberOfResultsAfter'].forEach(k => {
-      if (_set(searchCriteria[k])) {
-        const n = Number.parseInt(searchCriteria[k], 10);
-        if (Number.isInteger(n) && n >= 0) { _params[k] = n; _applied.push(`${k} ${n}`); }
-        else validationLogger(`[WARNING] Trip Search Criteria ${k}="${searchCriteria[k]}" is not a non-negative integer — ignored.`);
-      }
-    });
-    if (_set(searchCriteria.ignoreRealtimeData)) {
-      _params.ignoreRealtimeData = String(searchCriteria.ignoreRealtimeData) === 'true';
-      _applied.push(`ignoreRealtimeData ${_params.ignoreRealtimeData}`);
-    }
-    if (Object.keys(_params).length > 0) {
-      if (sandbox.includes("paxone")) {
-        validationLogger('[INFO] paxone exception — TripParameters omitted from the request; the configured transfer/result/realtime options are not sent (vias/notVias/arrival basis still apply).');
-      } else {
-        const _merged = tripSearchCriteria.parameters || {};
-        Object.assign(_merged, _params);
-        tripSearchCriteria.parameters = _merged;
-      }
-    }
-
-    if (_applied.length) {
-      validationLogger(`[INFO] 🔎 Trip search criteria applied — ${_applied.join('; ')}`);
-    }
-  }
+  applySearchOptions(tripSearchCriteria, legDef, searchCriteria, _apiBase);
 
   env.set("offerTripSearchCriteria", JSON.stringify(tripSearchCriteria));
 }

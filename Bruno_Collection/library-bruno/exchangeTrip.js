@@ -252,7 +252,7 @@ function checkExchangeOffers(body, asked) {
     };
   }
   const judged = offers.map((offer) => ({ offer, best: bestTrip(coveredIds(offer, ['admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts']), trips, asked) }));
-  const fit = judged.find((j) => j.best && j.best.problems.length === 0);
+  const fit = judged.find((j) => j.best?.problems.length === 0);
   const lines = [];
   let offerId = null;
   if (fit && fit.offer !== offers[0]) {

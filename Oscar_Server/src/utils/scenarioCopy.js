@@ -253,6 +253,17 @@ function moveExchangeTrip(ctx, sc, copy) {
   return true;
 }
 
+// The copy pointed at copies of the entries of COPIED_LISTS it names; a
+// dangling optional reference is not carried over.
+function copyListEntries(ctx, sc, copy) {
+  for (const [field, list] of COPIED_LISTS) {
+    if (copy[field] == null) continue;
+    const entry = findById(ctx.source[list], sc[field]);
+    if (entry) copy[field] = copiedEntry(ctx, list, entry, e => e);
+    else delete copy[field];
+  }
+}
+
 // `sc` re-pointed at copies of its entries in the target, or null (errors recorded).
 function copiedScenario(ctx, sc) {
   const { source, errors } = ctx;
@@ -267,12 +278,7 @@ function copiedScenario(ctx, sc) {
   moveSections(copy, tripEntry, findById(ctx.out.tripRequirements, tripId));
   if (!moveExchangeTrip(ctx, sc, copy)) return null;
 
-  for (const [field, list] of COPIED_LISTS) {
-    if (copy[field] == null) continue;
-    const entry = findById(source[list], sc[field]);
-    if (entry) copy[field] = copiedEntry(ctx, list, entry, e => e);
-    else delete copy[field];   // a dangling optional reference is not carried over
-  }
+  copyListEntries(ctx, sc, copy);
   let broken = false;
   const fulfillment = findById(source.requestedFulfillmentOptionsList, sc.requestedFulfillmentOptionsListId);
   if (fulfillment) {
