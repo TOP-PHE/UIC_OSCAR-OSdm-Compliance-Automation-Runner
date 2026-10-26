@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-published-coverage-reports",
+    "date": "October 26, 2026",
+    "tag": "Added",
+    "title": "Published coverage reports, shared with the certifier",
+    "summary": "A Test Manager can publish the coverage as a numbered, frozen report, share it with the certifier, and see what changed since the last one shared.",
+    "content": "In the Report Builder, after Show coverage, a Test Manager can choose Publish this report. The report is numbered and frozen: later runs do not change it, and correcting it means publishing a new one. In Published Coverage Reports, Share with the certifier gives the certifier the report and its runs; a shared report can be withdrawn, which is recorded in the audit log.\n\nEach report says what changed since the last report shared with the certifier: points fixed, still open, new, or not run again, and the capabilities whose result changed. The Excel download has this as its second sheet.\n\nCertifiers find the reports shared with them in the same card of the Report Builder. Testers do not see published reports: a report holds every scenario of the company."
+  },
+  {
     "id": "2026-10-26-coverage-by-capability",
     "date": "October 26, 2026",
     "tag": "Added",

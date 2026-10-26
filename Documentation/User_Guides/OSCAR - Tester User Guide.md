@@ -22,7 +22,7 @@
 4. [Authoring a scenario](#4-authoring-a-scenario)
 5. [Running tests](#5-running-tests)
 6. [Reading the report](#6-reading-the-report)
-   - Assertions · HTTP Traffic · Test Framework coverage (by capability, points to look at, exports)
+   - Assertions · HTTP Traffic · Test Framework coverage (by capability, points to look at, exports) · Published coverage reports (Test Managers and certifiers)
 7. [Reference tables](#7-reference-tables)
 8. [Troubleshooting](#8-troubleshooting)
 9. [Testing OSCAR with the OSDM simulator](#9-testing-oscar-with-the-osdm-simulator)
@@ -1481,6 +1481,44 @@ the same order: the capabilities, the expected refusals and the points to look
 at first, then the two detailed views. The workbook has seven sheets: Summary,
 Capabilities, Expected refusals, Points to look at, By flow and element, By
 scenario, By function.
+
+### Published coverage reports (Test Managers and certifiers)
+
+A Test Manager can **publish** the coverage shown, with *Publish this
+report*. A published report is numbered (1, 2, 3… for each company or
+provider) and frozen: later runs do not change it. To correct one, publish
+a new one.
+
+In the **Published Coverage Reports** card:
+
+- **Share with the certifier** gives the certifier the report and every run
+  it reads. A report is shared once.
+- **Withdraw** takes a shared report away from the certifier. The report
+  stays in the list, marked withdrawn, and its runs stay shared; unshare a
+  run on its own page if needed. Sharing and withdrawing are recorded in the
+  audit log.
+- **View** shows the report as it was published. **Excel** downloads it.
+
+**What changed.** Each report is compared with the last report shared with
+the certifier and not withdrawn, at the moment it is published:
+
+| Change | Meaning |
+|---|---|
+| Fixed | A point of the previous report is gone, and its tests were run again. |
+| Still open | A point of the previous report is seen again. |
+| New | A point the previous report did not have. |
+| Not run again | A point of the previous report is gone, but its tests were not run again: nothing can be said of it. |
+
+The capabilities whose result changed are listed too. In the workbook, this
+comparison is the second sheet, *Since report N*.
+
+Only Test Managers publish and read the published reports: a report holds
+every scenario, testers' private ones included.
+
+**Certifiers** see, in the same card, the reports companies have shared with
+them: whose they are, when they were published and shared, the report, what
+changed, and the workbook. They also read the runs of a shared report. They
+see no e-mail address of the company's users.
 
 ---
 

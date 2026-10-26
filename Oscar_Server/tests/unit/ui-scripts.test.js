@@ -1469,6 +1469,7 @@ describe('the Report Builder coverage section', () => {
   const COVERAGE_DECLARATIONS = loadConst('COVERAGE_DECLARATIONS');
   const CAPABILITY_RESULTS = loadConst('CAPABILITY_RESULTS');
   const POINT_KINDS = loadConst('POINT_KINDS');
+  const CHANGE_LABELS = loadConst('CHANGE_LABELS');
   // Every function of the section (up to coverageTitle(), which reads the
   // page), lifted into one context so that each finds the others.
   const sectionNames = (() => {
@@ -1477,9 +1478,10 @@ describe('the Report Builder coverage section', () => {
     const to = src.indexOf('\nfunction coverageTitle(');
     return [...src.slice(from, to).matchAll(/^function (\w+)\(/gm)].map((m) => m[1]);
   })();
-  const ctx = { escHtml, encodeURIComponent, COVERAGE_STATES, COVERAGE_DECLARATIONS, CAPABILITY_RESULTS, POINT_KINDS };
+  const ctx = { escHtml, encodeURIComponent, COVERAGE_STATES, COVERAGE_DECLARATIONS, CAPABILITY_RESULTS, POINT_KINDS, CHANGE_LABELS };
   for (const name of sectionNames) ctx[name] = loadFunction(page, name, ctx);
-  const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks } = ctx;
+  const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks,
+    publishedListHtml, comparisonHtml, publishedHtml } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1666,6 +1668,71 @@ describe('the Report Builder coverage section', () => {
     expect(out).toContain('1 of 13 scenario(s) passed (0 with defects, 12 failed, 0 never run)<ul class="cov-list cov-failed-list">');
     expect(out).toContain('<li>… and 2 more</li></ul><details><summary>Scenarios</summary>');
     expect(out.match(/<li>S\d+: /g)).toHaveLength(10 + 13);
+  });
+
+  // #972 part 4: the published reports.
+  const ID = '0f0e8a2c-1b3d-4e5f-8a9b-0c1d2e3f4a5b';
+  const listed = (extra) => ({ id: ID, number: 3, days: 30, createdAt: '2026-10-26 10:00:00', createdBy: 'tm@x', summary: { tested: 4, passed: 2, pointsToLookAt: { total: 5 } }, ...extra });
+
+  test('published reports: the change names are the workbook\'s', () => {
+    const { CHANGE_TEXT } = require('../../src/utils/coverageWorkbook');
+    expect({ ...CHANGE_LABELS }).toEqual({ ...CHANGE_TEXT });
+  });
+
+  test('published reports: each state offers its own actions, every text escaped', () => {
+    const buttons = (html) => [...html.matchAll(/data-report-action="(\w+)"/g)].map((m) => m[1]);
+    expect(buttons(publishedListHtml([listed()], true))).toEqual(['view', 'excel', 'share']);
+    expect(buttons(publishedListHtml([listed({ sharedAt: 'd', sharedBy: 's' })], true))).toEqual(['view', 'excel', 'withdraw']);
+    expect(buttons(publishedListHtml([listed({ sharedAt: 'd', withdrawnAt: 'w' })], true))).toEqual(['view', 'excel']);
+    // The certifier only reads.
+    expect(buttons(publishedListHtml([listed({ sharedAt: 'd', company: 'P <p>', distributor: 'D <d>' })], false))).toEqual(['view', 'excel']);
+    const out = publishedListHtml([listed({ sharedAt: 'd', company: 'P <p>', distributor: 'D <d>', createdBy: 'a<b>' }), listed({ id: 'x"><y>' })], false);
+    for (const tag of ['<p>', '<d>', '<b>', '<y>']) expect(out.includes(tag)).toBe(false);
+    expect(out).toContain('<td><strong>#3</strong><br><small>D &#60;d&#62; — P &#60;p&#62;</small></td>');
+    expect(out).toContain('4 capability(ies) tested: 2 passed, 0 with deviation, 0 with points, 0 blocked · 5 point(s) to look at');
+    expect(out.match(/<tr><td>/g)).toHaveLength(1);
+    expect(publishedListHtml([listed({ number: '3"><z>' })], true)).toContain('data-report-number="0"');
+    expect(publishedListHtml([], true)).toContain('No report published yet');
+    expect(publishedListHtml(null, false)).toContain('No report has been shared with you yet.');
+  });
+
+  test('published reports: the comparison, and the report under it', () => {
+    expect(comparisonHtml(null)).toContain('nothing to compare with');
+    const c = {
+      previous: { id: 'p', number: 2, sharedAt: '2026-10-20' }, counts: { fixed: 1, still: 1, new: 0, notRetested: 0 },
+      points: { fixed: [{ previousNumber: 4, capabilityLabel: 'Sale <s>', steps: ['07. <x>'], check: 'C <c>' }],
+        still: [{ number: 1, previousNumber: 2, capabilityLabel: 'Sale', steps: ['02.'], check: 'D' }], new: [], notRetested: [] },
+      capabilities: [{ id: 'sale', label: 'Sale <s>', before: 'points', now: 'passed' }, { id: 'x', label: 'X', before: null, now: 'blocked' }],
+    };
+    const out = comparisonHtml(c);
+    for (const tag of ['<s>', '<x>', '<c>']) expect(out.includes(tag)).toBe(false);
+    expect(out).toContain('Since published report #2 (shared 2026-10-20): 1 fixed, 1 still open, 0 new, 0 not run again.');
+    expect(out).toContain('<li>Sale &#60;s&#62;: Passed with points → Passed</li><li>X: not in the report → Blocked</li>');
+    expect(out).toContain('<summary>Fixed (1)</summary><ul class="cov-list"><li>#4 of the previous report Sale &#60;s&#62; — 07. &#60;x&#62;: C &#60;c&#62;</li>');
+    expect(out).toContain('<li>#1 (was #2) Sale — 02.: D</li>');
+    expect(out).not.toContain('New (0)');
+    const page = publishedHtml({ ...listed({ sharedAt: 'd', company: 'P' }), comparison: c, report: { ...answer, byCapability } }, 'capabilities');
+    expect(page).toContain('Published report #3 of P, frozen on 2026-10-26 10:00:00 (runs of the last 30 day(s)). Shared with the certifier d.');
+    expect(page).toContain('2 capability(ies) tested');
+  });
+
+  test('published reports: the server\'s own comparison draws', () => {
+    const { comparisonOf } = require('../../src/utils/coverageReports');
+    const point = (number, key, check) => ({ number, keys: [key], kind: 'provider', capability: 'sale', capabilityLabel: 'Sale', steps: ['07.'], check, tests: [{ key: 'T', codes: ['A'] }] });
+    const r = (points) => ({ byCapability: { capabilities: [{ id: 'sale', label: 'Sale', result: 'points', tests: [{ forms: [{ code: 'A', runId: ID }] }] }], expectedRefusals: [], points } });
+    const out = comparisonHtml(comparisonOf(r([point(1, 'b', 'New one')]), { id: 'p', number: 1, sharedAt: 's', report: r([point(1, 'a', 'Old one')]) }));
+    expect(out).toContain('1 fixed, 0 still open, 1 new, 0 not run again.');
+    expect(out).toContain('#1 of the previous report Sale — 07.: Old one');
+  });
+
+  test('published reports: the card is for Test Managers and certifiers; only an id that is a UUID reaches an address', () => {
+    const source = read(page);
+    expect(source).toContain("if (canPublish || isCertifier) {\n  document.getElementById('published-card').style.display = 'block';");
+    expect(source).toContain("const canPublish = userRole === 'test_manager';");
+    expect(source).toContain("return isCertifier ? '/v1/certifier/coverage-reports' : '/v1/company/coverage/reports';");
+    expect(source).toContain("var id = coverageRunIdOf(button.dataset.reportId);");
+    expect(source).toContain("fetch(publishedBase() + '/' + encodeURIComponent(id) + '/' + action, { method: 'POST' })");
+    expect(source).toContain("document.getElementById('coverage-publish-btn').disabled = false;");
   });
 
   test('the server\'s own coverage by capability draws', () => {

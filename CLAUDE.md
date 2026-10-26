@@ -672,6 +672,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Expected refusals, Points to look at, then the detail) in the same order.
     G3: the function view folds its scenarios; G4: "By function declared" is
     level 2. The coverage lists wrap long codes (`overflow-wrap:anywhere`).
+    **PR 4 (1.11.407): published reports for the certifier** (decision 4).
+    `coverage_report` (migration 43): numbered per company or provider,
+    `content` and `comparison` encrypted, `run_ids` and `summary` (counts)
+    plain. `company-coverage-reports.js` (Test Managers only, testers never:
+    a report holds testers' private scenarios): publish builds
+    `buildCoverage()` (exported by `company-coverage.js`, the same report as
+    the route) and stores it with `comparisonOf()` (`utils/coverageReports.js`,
+    pure) against the last report **shared and not withdrawn**: points
+    still / new / fixed (their tests ran again) / not run again, matched by
+    any shared #735 key, and the capabilities whose result moved. Share sets
+    `shared_at` and `runs.shared_with_certifier_at` of the report's runs, of
+    that company, finished, not shared yet (whatever `run_ids` holds).
+    **Withdraw** (maintainer, 2026-10-26) hides it from the certifier, keeps
+    it listed and its runs shared; a withdrawn report is not shared again.
+    `certifier-coverage-reports.js` (`/v1/certifier`, certifiers only):
+    shared and not withdrawn, every company, names and dates, never an
+    e-mail; 404 otherwise. The workbook takes the comparison as its second
+    sheet, *Since report N*. Page: *Publish this report* after Show coverage,
+    the *Published Coverage Reports* card for Test Managers and certifiers
+    (`publishedListHtml()`, `comparisonHtml()`, `publishedHtml()`; a report id
+    reaches an address only through `coverageRunIdOf()`); a report shown
+    clears the live coverage, so one set of point anchors is on the page.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
