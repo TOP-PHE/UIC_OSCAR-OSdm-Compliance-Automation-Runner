@@ -93,6 +93,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.401] / [collection-OTST_V2.0.225] — 2026-10-26
+
+Issue #959 (part 3), release 2026.436.
+
+### Added
+- **Reference scenario `OTST_EXCHANGE_OTHER_ROUTE_1ADT`** (source `SIM_EXCHANGE_OTHER_ROUTE_1ADT_38`, 392 checks): the exchange of a one-way ticket for a trip on another route. Like every exchange entry, it needs EXCHANGE_FULL declared.
+- **A need of its own, `exchangeRoute`**: "a second train, on another route, to exchange to". `dataNeedsOf()` gives it to a scenario whose `exchange.tripRequirementId` names a trip other than its own.
+
+### Changed
+- **The catalogue's data file holds the trip an exchange is for** (`catalogueDatafile()`); before, only the scenario's own trip came with it.
+- **Copy scenarios and the checklist's apply propose another route for the exchange** (`suggestTrips()` in `catalogueMatch.js`, used instead of `suggestTrip()` trip by trip). A trip an exchange names goes on a train (or a journey of as many legs) whose route differs from the sale trip's: another train of the same route does not count. When the Test Data has no other route, a trip only exchanges use gets no proposal (in the checklist's apply, the scenario is then not copied, as with no train at all), and a trip that is also another scenario's sale trip keeps the first train.
+
+### Tests
+- `catalogue-match.test.js`: `suggestTrips()` (sales only, another route, a shared trip, no other route, journeys, the catalogue's entry); `scenario-catalogue.test.js`: the need and the exchange's trip in the catalogue's data file (built from that entry alone, so the test fails without the change); `checklist-scenarios.test.js`: two routes, two mappings; `scenario-catalogue-routes.test.js`: the entry refused without EXCHANGE_FULL, then copied with a trip of its own for the exchange.
+
+---
+
 ## [server-1.11.400] / [collection-OTST_V2.0.224] — 2026-10-26
 
 Issue #959 (part 2), release 2026.435.

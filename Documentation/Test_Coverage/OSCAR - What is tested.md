@@ -295,6 +295,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
 | `OTST_EXCHANGE_1ADT` | Exchange of a one-way ticket: exchange offers, one taken, confirmed. | EXCHANGE_FULL | 389 | `SIM_EXCHANGE_1ADT_38` |
+| `OTST_EXCHANGE_OTHER_ROUTE_1ADT` | Exchange of a one-way ticket for a trip on another route: the exchange offers and, once confirmed, the booking cover the new trip. | EXCHANGE_FULL | 392 | `SIM_EXCHANGE_OTHER_ROUTE_1ADT_38` |
 | `OTST_EXCHANGE_WITHDRAWN_1ADT` | Exchange pre-booked, then withdrawn before its confirmation: the ticket stays. | EXCHANGE_FULL | 361 | `SIM_EXCHANGE_DELETE_1ADT_38` |
 
 #### Negative tests (NHF: the provider must refuse)

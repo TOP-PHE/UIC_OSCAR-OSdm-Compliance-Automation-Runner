@@ -39,7 +39,7 @@ const { withDatafileLock } = require('../../utils/datafileLock');
 const { writeDatafile } = require('../../utils/datafileWrite');
 const { planCopy, applyCopy } = require('../../utils/scenarioCopy');
 const { catalogueDatafile, catalogueFor } = require('../../utils/scenarioCatalogue');
-const { adaptCatalogueDatafile, suggestTrip, journeysMissing } = require('../../utils/catalogueMatch');
+const { adaptCatalogueDatafile, suggestTrips, journeysMissing } = require('../../utils/catalogueMatch');
 const { Refusal, readDatafile, readCatalogue, testDataChoices } = require('../helpers/catalogueSource');
 const { copyReport } = require('../../../public/js/copy-report');
 const { getRunSelection } = require('../../utils/runSelections');
@@ -163,7 +163,9 @@ router.post('/scenario-copy/preview', previewLimiter, async (req, res) => {
   const testData = testDataChoices(ctx.resources);
   // #681: a proposed train or journey for each trip of a reference scenario.
   if (ctx.entries) {
-    plan.trips = plan.trips.map(t => ({ ...t, suggested: suggestTrip(t, testData) }));
+    // #959: an exchange's own trip goes on another route than its sale's.
+    const suggested = suggestTrips(plan.trips, testData);
+    plan.trips = plan.trips.map(t => ({ ...t, suggested: suggested[t.id] }));
     // #799: a trip of several legs needs a journey of as many in the Test Data.
     const noJourney = journeysMissing(plan.trips, testData);
     plan.scenarios = plan.scenarios.map(s => ({ ...s, journeyLegsMissing: noJourney[s.code] || [] }));

@@ -344,6 +344,18 @@
       }
     },
     {
+      "code": "OTST_EXCHANGE_OTHER_ROUTE_1ADT",
+      "source": "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38",
+      "purpose": "Exchange of a one-way ticket for a trip on another route: the exchange offers and, once confirmed, the booking cover the new trip.",
+      "checks": 392,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "EXCHANGEABLE",
+        "passengers": 1,
+        "exchangeRoute": true
+      }
+    },
+    {
       "code": "OTST_EXCHANGE_WITHDRAWN_1ADT",
       "source": "SIM_EXCHANGE_DELETE_1ADT_38",
       "purpose": "Exchange pre-booked, then withdrawn before its confirmation: the ticket stays.",

@@ -105,7 +105,13 @@ const OFFER_OPTION_PROBES = [
 ];
 // The keys of `needs` (#681), in the order dataNeedsOf() writes them.
 const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
-  'reductionCards', 'providerValues', 'requestedInformation', 'expiry'];
+  'reductionCards', 'providerValues', 'requestedInformation', 'expiry', 'exchangeRoute'];
+
+// #959: the trip an exchange is for, when it names one of its own.
+function exchangeTripOf(scenario) {
+  const id = isObj(scenario?.exchange) ? scenario.exchange.tripRequirementId : null;
+  return id == null || id === scenario.tripRequirementId ? null : id;
+}
 
 // The problems of one entry of the catalogue.
 function entryProblems(e, at, scenarios, codes) {
@@ -374,6 +380,8 @@ function dataNeedsOf(scenario, datafile, facts) {
     requestedInformation: Boolean(scenario.requestedInformationProbe)
       || (facts.requestedInformationFrom !== null && stops.includes(facts.requestedInformationFrom)),
     expiry: EXPIRY_TESTS.filter(([flag]) => ARMED.has(scenario[flag])).map(([, name]) => name),
+    // #959: an exchange to another route needs a second train.
+    exchangeRoute: exchangeTripOf(scenario) !== null,
   };
   const out = {};
   for (const key of NEEDS_KEYS) {
@@ -399,6 +407,7 @@ const NEED_PHRASES = {
   providerValues: (v) => v.map((field) => `the provider's own ${field}`),
   requestedInformation: () => 'a trip where the provider asks for passenger details',
   expiry: (v) => (v.length ? `waits for the provider's deadline: ${v.join(', ').toLowerCase().replaceAll('_', ' ')}` : null),
+  exchangeRoute: () => 'a second train, on another route, to exchange to',
 };
 
 /** The needs of an entry, as short phrases for the person copying it. */
@@ -422,8 +431,12 @@ function catalogueDatafile(catalogue, simulator) {
     const scenario = { ...clone(source), ...clone(entry.set || {}), code: entry.code, description: entry.purpose, shared: true };
     delete scenario.created_by;
     out.scenarios.push(scenario);
-    for (const [field, list] of LISTS) {
-      const item = arr(simulator[list]).find((e) => isObj(e) && e.id === scenario[field]);
+    const refs = LISTS.map(([field, list]) => [list, scenario[field]]);
+    // #959: the trip an exchange is for comes with its scenario.
+    const exchangeTrip = exchangeTripOf(scenario);
+    if (exchangeTrip !== null) refs.push(['tripRequirements', exchangeTrip]);
+    for (const [list, id] of refs) {
+      const item = arr(simulator[list]).find((e) => isObj(e) && e.id === id);
       if (item && !out[list].some((e) => e.id === item.id)) out[list].push(clone(item));
     }
   }

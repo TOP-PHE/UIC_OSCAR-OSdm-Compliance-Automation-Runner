@@ -21,7 +21,7 @@
  */
 
 const { catalogueDatafile, catalogueFor } = require('./scenarioCatalogue');
-const { adaptCatalogueDatafile, suggestTrip, journeysMissing } = require('./catalogueMatch');
+const { adaptCatalogueDatafile, suggestTrips, journeysMissing } = require('./catalogueMatch');
 const { planCopy } = require('./scenarioCopy');
 
 const CHOICES = Object.freeze(['copy', 'none']);
@@ -58,8 +58,9 @@ function scenarioPlan({ catalogue, simulator, framework, testData, existingCodes
   const legsMissing = journeysMissing(plan.trips, testData);
   const tripMap = {};
   const noTestData = new Set();
+  const suggestions = suggestTrips(plan.trips, testData);
   for (const trip of plan.trips) {
-    const suggested = suggestTrip(trip, testData);
+    const suggested = suggestions[trip.id];
     if (suggested) tripMap[String(trip.id)] = mappingOf(suggested);
     else if (!trip.needsJourney && (Number(trip.legs) || 1) === 1) trip.usedBy.forEach(code => noTestData.add(code));
   }

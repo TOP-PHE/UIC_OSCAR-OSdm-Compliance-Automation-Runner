@@ -72,3 +72,13 @@ test('helpers', () => {
   expect(CS.codesOf({ scenarios: [{ code: 'A' }, null, { code: '' }, { code: 7 }, { code: 'B' }] })).toEqual(['A', 'B']);
   expect(CS.codesOf(null)).toEqual([]);
 });
+
+// #959: the exchange to another route goes on another train than its sale.
+test('two routes in the Test Data: the exchange to another route is copied onto both', () => {
+  const back = { ...train, id: 't2', origin: 'B', destination: 'C', services: [{ index: 3, vehicleNumber: '2', departureTime: '10:00', arrivalTime: '11:00' }] };
+  const p = plan({ trains: [train, back], journeys: [journey2] });
+  expect(p.copy.map(c => c.code)).toContain('OTST_EXCHANGE_OTHER_ROUTE_1ADT');
+  const source = p.source.scenarios.find(s => s.code === 'OTST_EXCHANGE_OTHER_ROUTE_1ADT');
+  expect(p.tripMap[String(source.tripRequirementId)]).toEqual({ type: 'train', train_id: 't1', service_index: 0 });
+  expect(p.tripMap[String(source.exchange.tripRequirementId)]).toEqual({ type: 'train', train_id: 't2', service_index: 3 });
+});

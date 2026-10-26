@@ -153,6 +153,33 @@ describe('copy from the catalogue', () => {
     expect(file.systemInfoParameters).toBeUndefined();
   });
 
+  // #959: the trip an exchange is for is mapped and copied like the sale's.
+  test('the exchange to another route is copied with a trip of its own for the exchange', async () => {
+    const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
+    const code = 'OTST_EXCHANGE_OTHER_ROUTE_1ADT';
+    expect(preview.scenarios.find(s => s.code === code).dataNeeds).toContain('a second train, on another route, to exchange to');
+    const used = preview.trips.filter(t => t.usedBy.includes(code) || t.usedBy.includes(`${code} (exchange)`));
+    expect(used.map(t => t.usedBy.some(u => u === `${code} (exchange)`))).toEqual([false, true]);
+    const tripMap = Object.fromEntries(used.map(t => [t.id, { type: 'train', train_id: train(ids.P)[0], service_index: 0 }]));
+    const copy = () => request(app).post('/v1/company/scenario-copy').set(as('TM', 'P')).send({ source_id: 'catalogue', codes: [code], trip_map: tripMap });
+    // The golden rule: P's Test Framework does not declare the exchange.
+    const refused = await copy();
+    expect([refused.status, refused.body.detail]).toEqual([400, `${code} needs sales flow EXCHANGE_FULL in the Test Framework.`]);
+    const stored = get('SELECT config FROM test_frameworks WHERE company_id = ?', [ids.P]).config;
+    run('UPDATE test_frameworks SET config = ? WHERE company_id = ?',
+      [framework({ osdmVersion: '3.8.0', salesFlows: ['SALE', 'REFUND_FULL', 'EXCHANGE_FULL'], returnModels: ['SEPARATE', 'COMBINED'] }), ids.P]);
+    try {
+      const res = await copy();
+      expect([res.status, res.body.detail]).toEqual([200, undefined]);
+      const file = await readFile(ids.P);
+      const copied = file.scenarios.find(s => s.code === res.body.copied[0].to);
+      expect(copied.exchange.tripRequirementId).not.toBe(copied.tripRequirementId);
+      expect(file.tripRequirements.map(t => t.id)).toEqual(expect.arrayContaining([copied.tripRequirementId, copied.exchange.tripRequirementId]));
+    } finally {
+      run('UPDATE test_frameworks SET config = ? WHERE company_id = ?', [stored, ids.P]);
+    }
+  });
+
   // #681: the company's values replace the simulator's, and the page is told what is left.
   test('the preview proposes the company\'s train and says what is left to complete or check', async () => {
     const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
