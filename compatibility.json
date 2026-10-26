@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.444",
+  "current_release": "2026.445",
   "releases": [
+    {
+      "release": "2026.445",
+      "date": "2026-10-27",
+      "server": "1.11.410",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Coverage reads a run's blocking failure right in two more cases (#988): an id holding \"500\" or \"401\" no longer makes a check a server or authorisation error, and no offer or no trip to ask offers for (and no exchange offer) blocks the run. Runs already stored are read again."
+      ]
+    },
     {
       "release": "2026.444",
       "date": "2026-10-27",

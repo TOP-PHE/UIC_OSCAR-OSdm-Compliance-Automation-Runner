@@ -99,6 +99,13 @@ describe('classifyCategory', () => {
     test('"prerequisite: offerId must be set" → prerequisite', () => {
       expect(classifyCategory('prerequisite: offerId must be set')).toBe('prerequisite');
     });
+    test('no offer, or no trip to ask offers for, stops the scenario (#988)', () => {
+      expect(classifyCategory('Offers found in response')).toBe('prerequisite');
+      expect(classifyCategory('Exchange offers found in response')).toBe('prerequisite');
+      expect(classifyCategory('Trips collection: a trip to ask offers for — none')).toBe('prerequisite');
+      expect(classifyCategory("Trips collection: the scenario's SEARCH trip gives an origin and a destination")).toBe('prerequisite');
+      expect(classifyCategory('Trips collection: a trip to ask offers for — the train asked, T1')).not.toBe('prerequisite');
+    });
   });
 
   describe('data_consistency', () => {
@@ -324,6 +331,13 @@ describe('classifySeverity', () => {
   });
   test('500 in name failed → critical', () => {
     expect(classifySeverity('→ 500 server error', 'http_status', false)).toBe('critical');
+  });
+  test('a number inside an id is not a status (#988)', () => {
+    const name = 'admission[8] has a counterpart in the booking (offer part id=7193ec2c-36a1-4eaa-ae58-15000c27799f, passenger types ADULT)';
+    expect(classifySeverity(name, 'business_logic', false)).toBe('major');
+    expect(classifySeverity('booking a1401b2c-0000-4000-8000-000000000401 read', 'business_logic', false)).toBe('major');
+    expect(classifySeverity('HTTP response status — expected 200, actual: 500', 'http_status', false)).toBe('critical');
+    expect(classifySeverity('POST /bookings → 401', 'http_status', false)).toBe('critical');
   });
   test('"token.*error" pattern → critical', () => {
     expect(classifySeverity('token fetch error', 'business_logic', false)).toBe('critical');
