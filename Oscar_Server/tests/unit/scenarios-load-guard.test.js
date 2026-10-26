@@ -231,7 +231,7 @@ describe('wizGenerateScenario (the path that wrote over the stored datafile)', (
     const { fetch, calls } = fakeFetch({ [`GET ${DATAFILE}`]: datafileAnswer });
     const btn = { disabled: false, textContent: '' };
     const status = { innerHTML: '' };
-    const ctx = page(['loadForEdit', 'wizGenerateScenario'], {
+    const ctx = page(['loadForEdit', 'wizGenerateScenario', 'scenarioTripIds', 'exchangeBlockOf'], {
       fetch,
       loggedOut: 0,
       logout() { ctx.loggedOut++; },
