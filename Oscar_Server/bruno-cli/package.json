@@ -4,7 +4,7 @@
   "description": "The Bruno CLI that runs OSCAR's collection: the Docker image and CI install it from this lockfile with npm ci",
   "license": "Apache-2.0",
   "dependencies": {
-    "@usebruno/cli": "4.2.1"
+    "@usebruno/cli": "4.3.0"
   },
   "overrides": {
     "axios": "^1.20.0",
