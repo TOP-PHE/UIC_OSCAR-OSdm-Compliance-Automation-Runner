@@ -29,12 +29,13 @@ const { isRunId } = require('../../utils/coverageReports');
 const { sendWorkbook, parseStored } = require('./company-coverage-reports');
 
 const router = express.Router();
-router.use(requireAuth);
 
+// Before the sign-in check: the router has /v1/certifier to itself.
 const readLimiter = rateLimit({
   windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false,
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests for published reports. Wait a minute.' },
 });
+router.use(readLimiter, requireAuth);
 
 const NOT_FOUND = { status: 404, title: 'Not Found', detail: 'Published report not found.' };
 const SHARED = 'r.shared_at IS NOT NULL AND r.withdrawn_at IS NULL';
@@ -62,7 +63,7 @@ function listItem(row) {
   };
 }
 
-router.get('/coverage-reports', readLimiter, (req, res) => {
+router.get('/coverage-reports', (req, res) => {
   if (!certifierOnly(req, res)) return undefined;
   const rows = all(`SELECT r.id, r.number, r.days, r.created_at, r.shared_at, r.summary, c.name AS company_name, p.name AS distributor_name
                       FROM coverage_report r JOIN companies c ON c.id = r.company_id LEFT JOIN companies p ON p.id = c.parent_id
@@ -70,14 +71,14 @@ router.get('/coverage-reports', readLimiter, (req, res) => {
   return res.json({ reports: rows.map(listItem) });
 });
 
-router.get('/coverage-reports/:id', readLimiter, (req, res) => {
+router.get('/coverage-reports/:id', (req, res) => {
   if (!certifierOnly(req, res)) return undefined;
   const row = sharedRow(req.params.id);
   if (!row) return res.status(404).json(NOT_FOUND);
   return res.json({ ...listItem(row), report: parseStored(row.content), comparison: parseStored(row.comparison) });
 });
 
-router.get('/coverage-reports/:id/download', readLimiter, (req, res) => {
+router.get('/coverage-reports/:id/download', (req, res) => {
   if (!certifierOnly(req, res)) return undefined;
   const row = sharedRow(req.params.id);
   if (!row) return res.status(404).json(NOT_FOUND);
