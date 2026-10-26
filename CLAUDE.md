@@ -629,9 +629,25 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     equal `derivedCapability()` of its source. G1: an `expectedProduct` named
     by words is the declared product (`productIdsOf()`). G2: #937's fare
     declarations have rows once FARE is declared (`fareRows()`), and a
-    bicycle under a fare reservation is that reservation. Parts 2–4: the
-    points to look at with "Passed with deviation", the page and exports, and
-    published reports for the certifier (#972's two decision comments).
+    bicycle under a fare reservation is that reservation. Parts 3–4: the
+    page and exports, and published reports for the certifier (#972's two
+    decision comments).
+    **PR 2 (SERVER_VERSION): points to look at and "Passed with deviation".**
+    `byCapability.points` (`utils/coveragePoints.js`, pure): the latest runs'
+    failed checks grouped with the #735 key (`groupKeyOf()`, so the route now
+    reads each failed check's HTTP status and an error answer's problem code),
+    linked to a finding by `matchFinding()`'s sure match only. Kinds, in
+    numbering order: provider, accepted, question (`spec_question`), oscar
+    (`oscar_issue`, a #735 draft marked OSCAR's, an `[OSCAR request]` check;
+    listed apart, still counted). **Accepted = a `provider_deviation` finding
+    that is resolved** (maintainer, 2026-10-26), or a known deviation the run
+    applied, read from the collection's "[WARNING] Known deviation
+    (documented): <step> returned HTTP <status>" line (`knownDeviationOf()`,
+    pinned to `noteKnownDeviation()` by `coverage-points.test.js`: change
+    both or neither). Its failures move to `step.accepted`; a run that went
+    through reads `deviation` ("Passed with deviation"), a blocked one stays
+    blocked. The route reads every finding for this (resolved included); a
+    point shows only id, title, category, status.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

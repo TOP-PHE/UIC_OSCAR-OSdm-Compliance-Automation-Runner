@@ -40,6 +40,8 @@ const { coverageOf, latestRunsOf, failureOf } = require('../../utils/frameworkCo
 const { coverageMatrixOf } = require('../../utils/coverageMatrix');
 const { capabilityCoverageOf } = require('../../utils/capabilityCoverage');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
+const { problemOf } = require('../../utils/findingSuggestions');
+const { toApiFinding } = require('../helpers/findings');
 const log = require('../../utils/logger').child({ module: 'company-coverage' });
 
 const router = express.Router();
@@ -56,6 +58,7 @@ const MAX_RUNS = 20000;
 const MAX_WARNING_EVENTS = 20000;
 const MAX_FAILED_CHECKS = 50000;
 const MAX_STEPS = 200000;
+const MAX_PROBLEM_BODIES = 5000;
 
 // The window of runs read, in days: a whole number from 1 to 3650.
 function daysOf(raw) {
@@ -64,21 +67,42 @@ function daysOf(raw) {
   return Number.isInteger(n) && n >= 1 && n <= MAX_DAYS ? n : null;
 }
 
-// The failed checks of the runs, by run, in order, with their step.
+// The failed checks of the runs, by run, in order, with their step, its HTTP
+// status and, for an error answer, its problem code (#972 R6: the #735 key).
 function failedChecksOf(ids) {
   const byRun = new Map();
+  const rows = [];
   for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);
-    const rows = all(`SELECT a.run_id, a.assertion_name, a.category, a.severity, q.request_name
+    rows.push(...all(`SELECT a.run_id, a.assertion_name, a.category, a.severity, q.request_name, q.http_status, q.id AS request_id
                         FROM run_assertions a JOIN run_requests q ON q.id = a.request_id
                        WHERE a.passed = 0 AND a.run_id IN (${chunk.map(() => '?').join(',')})
-                       ORDER BY a.id ASC LIMIT ${MAX_FAILED_CHECKS}`, chunk);
-    for (const row of rows) {
-      if (!byRun.has(row.run_id)) byRun.set(row.run_id, []);
-      byRun.get(row.run_id).push(row);
-    }
+                       ORDER BY a.id ASC LIMIT ${MAX_FAILED_CHECKS}`, chunk));
+  }
+  const problems = problemCodesOf([...new Set(rows.filter((r) => Number(r.http_status) >= 400).map((r) => r.request_id))]);
+  for (const { request_id: requestId, ...row } of rows) {
+    row.problem_code = problems.get(requestId) || null;
+    if (!byRun.has(row.run_id)) byRun.set(row.run_id, []);
+    byRun.get(row.run_id).push(row);
   }
   return byRun;
+}
+
+// The problem code of each error answer, by request id: one decryption per
+// request, at most MAX_PROBLEM_BODIES (the others group without a code).
+function problemCodesOf(requestIds) {
+  const codes = new Map();
+  const ids = requestIds.slice(0, MAX_PROBLEM_BODIES);
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    for (const row of all(`SELECT id, response_body FROM run_requests WHERE id IN (${chunk.map(() => '?').join(',')})`, chunk)) {
+      let body = null;
+      try { body = row.response_body ? colDecrypt(row.response_body) : null; } catch { body = null; }
+      const code = problemOf(body)?.code;
+      if (code) codes.set(row.id, code);
+    }
+  }
+  return codes;
 }
 
 // The steps of the runs (#972), by run, in order: { request_name, http_status }.
@@ -159,6 +183,18 @@ function warningLinesOf(latest) {
   return out;
 }
 
+// What the Test Manager decided of the #735 drafts: the finding each accepted
+// draft became, by group key, and the keys marked as OSCAR's issue.
+function suggestionsOf(companyId) {
+  const accepted = Object.create(null);
+  const oscarIssues = [];
+  for (const r of all("SELECT group_key, finding_id, state FROM finding_suggestion WHERE company_id = ? AND state IN ('accepted', 'oscar_issue')", [companyId])) {
+    if (r.state === 'oscar_issue') oscarIssues.push(r.group_key);
+    else if (r.finding_id) accepted[r.group_key] = r.finding_id;
+  }
+  return { accepted, oscarIssues };
+}
+
 // The catalogue's entries (#972: each names its capability). A catalogue that
 // cannot be read leaves every scenario to derivedCapability().
 function catalogueEntries() {
@@ -190,15 +226,21 @@ async function reportOf(req, res) {
     datafile = viewForTester(datafile, req.user.email, getRunSelection(companyId, req.user.id));
   }
   const framework = frameworkConfigOf(companyId);
-  const findings = all("SELECT id, title, category, status, scenario_code FROM finding WHERE company_id = ? AND status != 'resolved'", [companyId]);
+  const allFindings = all('SELECT * FROM finding WHERE company_id = ?', [companyId]);
+  // The function and matrix views list open findings by these fields only.
+  const findings = allFindings.filter((f) => f.status !== 'resolved')
+    .map(({ id, title, category, status, scenario_code: code }) => ({ id, title, category, status, scenario_code: code }));
   const runs = latestRuns(companyId, days);
+  const warnings = warningLinesOf(runs);
   const input = {
     framework: framework || {}, datafile: datafile || { scenarios: [] }, runs, findings, collectionVersion: currentCollectionVersion(),
     catalogue: catalogueEntries(),
   };
   const coverage = coverageOf(input);
-  const { matrix, scenarios } = coverageMatrixOf({ ...input, refusals: warningLinesOf(runs) });
-  const byCapability = capabilityCoverageOf({ ...input, functions: coverage.functions });
+  const { matrix, scenarios } = coverageMatrixOf({ ...input, refusals: warnings });
+  const byCapability = capabilityCoverageOf({
+    ...input, functions: coverage.functions, warnings, findings: allFindings.map(toApiFinding), suggestions: suggestionsOf(companyId),
+  });
   return {
     companyId,
     report: { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios, byCapability },

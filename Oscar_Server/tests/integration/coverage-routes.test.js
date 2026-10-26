@@ -21,6 +21,7 @@ const request = require('supertest');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { run, get, colEncrypt } = require('../../src/db/db');
 const { writeDatafile } = require('../../src/utils/datafileWrite');
+const { groupKeyOf } = require('../../src/utils/findingSuggestions');
 const { scenarioHash, daysOf } = (() => ({
   ...require('../../src/utils/frameworkCoverage'), daysOf: require('../../src/api/routes/company-coverage').daysOf,
 }))();
@@ -155,6 +156,61 @@ describe('GET /v1/company/coverage', () => {
       expect(ana.body.byCapability.capabilities.some((x) => x.tests.some((t) => t.key === 'TM_REFUND'))).toBe(false);
     } finally {
       run('DELETE FROM runs WHERE id = ?', [id]);
+    }
+  });
+
+  test('by capability (#972 part 2): the points to look at, an accepted deviation and a known deviation', async () => {
+    const id = addRun(ids.D, 'SHARED_SALE', 'FAILED', 0, { at: '2026-10-25 11:00:00' });
+    const suite = get('SELECT id FROM run_suites WHERE run_id = ?', [id]).id;
+    const problem = colEncrypt(JSON.stringify({ code: 'urn:osdm:problem:FULFILLMENT_NOT_READY', title: 'Not ready', status: 422 }));
+    const requests = {};
+    for (const [name, status, body] of [['01. POST Get Offer', 200], ['02. POST Create Booking', 202], ['06. POST Obtaining Fulfillments from Booking', 200],
+      ['06b. GET Fulfillment', 422, problem], ['07. GET Booking after Fulfillments', 200]]) {
+      requests[name] = run('INSERT INTO run_requests (suite_id, run_id, company_id, request_name, http_status, response_body) VALUES (?, ?, ?, ?, ?, ?)',
+        [suite, id, ids.D, name, status, body || null]).lastInsertRowid;
+    }
+    const failCheck = (name, text) => run(`INSERT INTO run_assertions (request_id, suite_id, run_id, company_id, assertion_key, assertion_name, type, category, passed)
+         VALUES (?, ?, ?, ?, ?, ?, 'test', 'business_logic', 0)`, [requests[name], suite, id, ids.D, `k-${text}`, text]);
+    failCheck('07. GET Booking after Fulfillments', 'Booking summary names the product');
+    failCheck('06b. GET Fulfillment', 'Fulfillment status is FULFILLED');
+    failCheck('07. GET Booking after Fulfillments', 'Booking holds the ticket');
+    // A #735 draft of that failure the Test Manager marked as OSCAR's issue.
+    const oscarKey = groupKeyOf({ step: '07. GET Booking after Fulfillments', check: 'Booking holds the ticket', status: 200, problemCode: null });
+    run("INSERT INTO finding_suggestion (id, company_id, group_key, state, draft) VALUES (?, ?, ?, 'oscar_issue', ?)", [uuidv4(), ids.D, oscarKey, colEncrypt('{}')]);
+    run('INSERT INTO run_events (run_id, level, message) VALUES (?, ?, ?)', [id, 'warn',
+      colEncrypt('[WARNING] Known deviation (documented): 02. POST Create Booking returned HTTP 202 — Booking confirmed later. Not counted as a failure; surfaced for visibility.')]);
+    const accepted = uuidv4();
+    const baseline = uuidv4();
+    run(`INSERT INTO finding (id, company_id, title, step, observed, category, status, created_by) VALUES (?, ?, 'No product in the summary', '07. GET Booking after Fulfillments',
+         'Booking summary names the product', 'provider_deviation', 'resolved', ?)`, [accepted, ids.D, users.TM.email]);
+    run(`INSERT INTO finding (id, company_id, title, step, expected_status, baseline_in_run, category, status) VALUES (?, ?, 'Booking confirmed later', 'POST Create Booking',
+         202, 1, 'provider_deviation', 'open')`, [baseline, ids.D]);
+    try {
+      const res = await request(app).get('/v1/company/coverage').set(as('TM'));
+      const r = res.body.byCapability;
+      const cap = (c) => r.capabilities.find((x) => x.id === c);
+      // OSCAR's point still counts where it failed (part 2 lists it apart only).
+      expect(cap('sale')).toMatchObject({ result: 'points' });
+      expect(cap('fulfilment.documents')).toMatchObject({ result: 'points' });
+      const pointAt = (step) => r.points.find((p) => p.step === step);
+      expect(pointAt('06b. GET Fulfillment')).toMatchObject({ kind: 'provider', status: 422, problemCode: 'FULFILLMENT_NOT_READY', capability: 'fulfilment.documents' });
+      expect(pointAt('07. GET Booking after Fulfillments')).toMatchObject({
+        kind: 'accepted', source: 'check', capability: 'sale', finding: { id: accepted, title: 'No product in the summary', category: 'provider_deviation', status: 'resolved' },
+      });
+      expect(pointAt('02. POST Create Booking')).toMatchObject({ kind: 'accepted', source: 'known-deviation', status: 202, note: 'Booking confirmed later', finding: { id: baseline } });
+      // A point names its finding by id, title, category and status only.
+      expect(Object.keys(pointAt('07. GET Booking after Fulfillments').finding).sort()).toEqual(['category', 'id', 'status', 'title']);
+      expect(r.points.find((p) => p.check === 'Booking holds the ticket')).toMatchObject({ kind: 'oscar', capability: 'sale' });
+      expect(r.summary).toMatchObject({ pointsToLookAt: { total: 4, provider: 1, accepted: 2, oscar: 1 } });
+      // The function view still lists open findings only, by these fields.
+      expect(res.body.functions.some((f) => f.findings.some((x) => x.id === accepted))).toBe(false);
+      const listed = res.body.functions.flatMap((f) => f.findings);
+      expect(listed.length).toBeGreaterThan(0);
+      for (const f of listed) expect(Object.keys(f).sort()).toEqual(['category', 'id', 'scenarioCode', 'status', 'title']);
+    } finally {
+      run('DELETE FROM runs WHERE id = ?', [id]);
+      run('DELETE FROM finding WHERE id IN (?, ?)', [accepted, baseline]);
+      run('DELETE FROM finding_suggestion WHERE company_id = ?', [ids.D]);
     }
   });
 
