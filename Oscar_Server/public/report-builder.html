@@ -435,7 +435,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
     <div class="card-body">
       <div class="cov-note" id="published-intro"></div>
       <div id="published-list"></div>
-      <div id="published-msg" class="cov-note" role="status"></div>
+      <output id="published-msg" class="cov-note" style="display:block"></output>
       <div class="actions-row" id="published-actions" hidden>
         <label for="published-view" style="font-size:13px">View</label>
         <select id="published-view">
@@ -2443,7 +2443,8 @@ function comparisonResultText(result) {
 }
 
 function comparisonPointText(p) {
-  var which = p.number ? '#' + p.number + (p.previousNumber ? ' (was #' + p.previousNumber + ')' : '') : '#' + p.previousNumber + ' of the previous report';
+  var which = '#' + p.previousNumber + ' of the previous report';
+  if (p.number) which = '#' + p.number + (p.previousNumber ? ' (was #' + p.previousNumber + ')' : '');
   return which + ' ' + (p.capabilityLabel || p.capability || '') + ' — ' + (p.steps || []).join(', ') + ': ' + (p.check || '');
 }
 
