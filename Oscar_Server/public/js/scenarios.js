@@ -3817,23 +3817,12 @@ function exchangeTripLabel(t) {
 // (ignored mid-edit, as the other number fields).
 function exchangeInputValue(field, raw) {
   const v = String(raw ?? '').trim();
-  let value = v;
-  let valid;
-  if (v === '') {
-    value = null;
-    valid = true;
-  } else if (field === 'dateOffsetDays') {
-    value = Number(v);
-    valid = Number.isInteger(value) && Math.abs(value) <= 60;
-  } else if (field === 'time') {
-    valid = EXCHANGE_TIME.test(v);
-  } else if (field === 'tripRequirementId') {
-    value = Number(v);
-    valid = Number.isSafeInteger(value);
-  } else {
-    valid = false;
-  }
-  return { valid, value };
+  if (v === '') return { valid: true, value: null };
+  if (field === 'time') return { valid: EXCHANGE_TIME.test(v), value: v };
+  const n = Number(v);
+  if (field === 'dateOffsetDays') return { valid: Number.isInteger(n) && Math.abs(n) <= 60, value: n };
+  if (field === 'tripRequirementId') return { valid: Number.isSafeInteger(n), value: n };
+  return { valid: false, value: v };
 }
 
 function exchangeCriterionHtml(idx, key, label, values, ex) {
