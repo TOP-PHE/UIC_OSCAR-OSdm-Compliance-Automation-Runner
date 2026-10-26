@@ -750,6 +750,25 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
   bru.setEnvVar("requestRefundOffersBodyData", JSON.stringify(body));
 }
 
+// #959: the trip and criteria of the exchange offer request: the scenario's
+// exchange trip when the parser built one (exchangeTripType), else the sale's;
+// the exchange's criteria over the sale's.
+function exchangeTripAndCriteria() {
+  const own = bru.getEnvVar("exchangeTripType");
+  let trip;
+  if (own === "SPECIFICATION") trip = { tripSpecifications: parseEnvJson('exchangeTripSpecifications') };
+  else if (own === "SEARCH") trip = { tripSearchCriteria: parseEnvJson('exchangeTripSearchCriteria') };
+  else if (bru.getEnvVar("TripType") === "SPECIFICATION") trip = { tripSpecifications: parseEnvJson('offerTripSpecifications') };
+  else trip = { tripSearchCriteria: parseEnvJson('offerTripSearchCriteria') };
+  let criteria = parseEnvJson('offerSearchCriteria');
+  const asked = parseEnvJson('exchangeOfferSearchCriteria', null);
+  if (asked && typeof asked === 'object') {
+    criteria = { ...(criteria && typeof criteria === 'object' ? criteria : {}), ...asked };
+    validationLogger("[INFO] 🔁 Exchange offer criteria: " + JSON.stringify(asked) + " over the sale's.");
+  }
+  return { trip, criteria };
+}
+
 // Function to create request body for exchange offers
 function requestExchangeOffersBody(overruleCode) {
   validationLogger("[DEBUG] ➤ requestExchangeOffersBody");
@@ -792,13 +811,12 @@ function requestExchangeOffersBody(overruleCode) {
 
   // #748: the trip goes as the sale asked it. A trip specification used to go
   // as a null tripSearchCriteria, which a provider can only refuse.
-  const trip = bru.getEnvVar("TripType") === "SPECIFICATION"
-    ? { tripSpecifications: parseEnvJson('offerTripSpecifications') }
-    : { tripSearchCriteria: parseEnvJson('offerTripSearchCriteria') };
+  // #959: a scenario's exchange block names another trip, day or criteria.
+  const { trip, criteria } = exchangeTripAndCriteria();
   const body = {
     fulfillmentIds: parseFulfillmentIds(),
     ...trip,
-    offerSearchCriteria: parseEnvJson('offerSearchCriteria'),
+    offerSearchCriteria: criteria,
     anonymousPassengerSpecifications,
     ...(overruleCode != null && { overruleCode })
   };

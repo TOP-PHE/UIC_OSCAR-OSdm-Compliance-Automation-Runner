@@ -118,7 +118,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "offerOptionDiscovery", "offerOptionMaxRequests", "offerOptionValues", "offerOptionInvalidValues", "offerOptionSeed", "offerOptionDeclared", "__offerOptionFull", "__offerOptionReport", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults", "requestedSections", "isPartOfInternationalTrip", "desiredFareCluster", "bookMode", "expectFares", "fareOfferId", "__fareSale", "__fareIds", "__fareProductIds", "fareRefundFee", "__fareRefundFulfillments", "__fareRefundFeesSent", "__fareReservationIds", "__fareSectionsOutside", "__chosenTripLegs",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "offerOptionDiscovery", "offerOptionMaxRequests", "offerOptionValues", "offerOptionInvalidValues", "offerOptionSeed", "offerOptionDeclared", "__offerOptionFull", "__offerOptionReport", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults", "requestedSections", "isPartOfInternationalTrip", "desiredFareCluster", "bookMode", "expectFares", "fareOfferId", "__fareSale", "__fareIds", "__fareProductIds", "fareRefundFee", "__fareRefundFulfillments", "__fareRefundFeesSent", "__fareReservationIds", "__fareSectionsOutside", "__chosenTripLegs", "exchangeTripType", "exchangeTripSpecifications", "exchangeTripSearchCriteria", "exchangeOfferSearchCriteria", "__exchangeTripAsked",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -1114,55 +1114,11 @@ function parseScenarioData(jsonData) {
           switch (tripRequirement.tripType) {
             case "SPECIFICATION": {
               validationLogger('[INFO] ⏳ processing a specification');
-              const legDefinitions = [];
               // #363: per-trip departure day (Auto when unset).
               const _specTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
               // #705: the day ages are counted on.
               bru.setEnvVar("__travelDay", _specTripDate);
-
-              tripRequirement.legs.forEach(function (leg, legIndex) {
-                const legPrefix = `leg${legIndex + 1}`;
-                const _legCtx = `tripRequirement (SPECIFICATION) leg ${legIndex + 1}`;
-                const _storedStart = subTripDate(leg.startDatetime, _specTripDate, 'startDatetime', _legCtx);
-                const _sameDayEnd = subTripDate(leg.endDatetime, _specTripDate, 'endDatetime', _legCtx);
-                const _storedEnd = arrivalAfterDeparture(_storedStart, _sameDayEnd);
-                if (_storedEnd !== _sameDayEnd) {
-                  validationLogger(`[INFO] ${_legCtx}: arrival ${_sameDayEnd} is not after the departure ${_storedStart} — taken as the next day, ${_storedEnd}.`);
-                }
-                // #772: the stored offset is that of the day the service was
-                // seen; the trip date may be on the other side of a clock change.
-                const { onTheDay } = require('./stationTimeZones.js');
-                const startDatetime = onTheDay(_storedStart, leg.origin);
-                const endDatetime = onTheDay(_storedEnd, leg.destination);
-                if (startDatetime !== _storedStart || endDatetime !== _storedEnd) {
-                  validationLogger(`[INFO] ${_legCtx}: times given the offset of the trip date in the stop places' time zone — ${startDatetime} to ${endDatetime} (stored ${_storedStart} to ${_storedEnd}).`);
-                }
-
-                bru.setEnvVar(`${legPrefix}StartStopPlaceRef`, leg.origin);
-                bru.setEnvVar(`${legPrefix}EndStopPlaceRef`, leg.destination);
-                bru.setEnvVar(`${legPrefix}StartDatetime`, startDatetime);
-                bru.setEnvVar(`${legPrefix}EndDatetime`, endDatetime);
-                bru.setEnvVar(`${legPrefix}VehicleNumber`, leg.vehicleNumber);
-                bru.setEnvVar(`${legPrefix}OperatorCode`, leg.operatorCode);
-                bru.setEnvVar(`${legPrefix}ProductCategoryRef`, leg.productCategoryRef || null);
-                bru.setEnvVar(`${legPrefix}ProductCategoryName`, leg.productCategoryName || null);
-                bru.setEnvVar(`${legPrefix}ProductCategoryShortName`, leg.productCategoryShortName || null);
-                validationLogger("[DEBUG] 🪲 parseScenarioData1");
-
-                legDefinitions.push(new TripLegDefinition(
-                  leg.origin,
-                  startDatetime,
-                  leg.destination,
-                  endDatetime,
-                  leg.productCategoryRef,
-                  leg.productCategoryName,
-                  leg.productCategoryShortName,
-                  leg.vehicleNumber,
-                  leg.operatorCode
-                ));
-              });
-
-              osdmTripSpecification(legDefinitions, returnOptsFromScenario(scenario));
+              specificationTrip(tripRequirement, _specTripDate, scenario, saleEnv);
               break;
             }
 
@@ -1172,45 +1128,7 @@ function parseScenarioData(jsonData) {
               const _searchTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
               // #705: the day ages are counted on.
               bru.setEnvVar("__travelDay", _searchTripDate);
-              const _searchStart = subTripDate(tripRequirement.trip.startDatetime, _searchTripDate, 'startDatetime', 'tripRequirement (SEARCH)');
-              // #333 (v1.11.112): endDatetime is OPTIONAL on a TripSearchCriteria
-              // per OSDM spec — you specify a departure time, not a window. And
-              // osdmTripSearchCriteria() below doesn't use the endDateTime
-              // anyway (only `startDateTime` is passed to TripSearchCriteria —
-              // see line 1171 below). Requiring it via subTripDate() was
-              // rejecting valid OSDM data (e.g. the OBB Nightjet datafile).
-              // Pass null when absent; SPECIFICATION branch keeps its strict
-              // both-required check (legs[*].endDatetime IS required when
-              // you're specifying exact trips).
-              const _searchEnd = tripRequirement.trip.endDatetime
-                ? subTripDate(tripRequirement.trip.endDatetime, _searchTripDate, 'endDatetime', 'tripRequirement (SEARCH)')
-                : null;
-              bru.setEnvVar("tripStartStopPlaceRef", tripRequirement.trip.origin);
-              bru.setEnvVar("tripEndStopPlaceRef", tripRequirement.trip.destination);
-              bru.setEnvVar("tripStartDatetime", _searchStart);
-              bru.setEnvVar("tripEndDatetime", _searchEnd);
-              bru.setEnvVar("tripVehicleNumber", tripRequirement.trip.vehicleNumber);
-              bru.setEnvVar("tripOperatorCode", tripRequirement.trip.operatorCode);
-              bru.setEnvVar("tripProductCategoryRef", tripRequirement.trip.productCategoryRef || null);
-              bru.setEnvVar("tripProductCategoryName", tripRequirement.trip.productCategoryName || null);
-              bru.setEnvVar("tripProductCategoryShortName", tripRequirement.trip.productCategoryShortName || null);
-
-              osdmTripSearchCriteria([
-                new TripLegDefinition(
-                  tripRequirement.trip.origin,
-                  _searchStart,
-                  tripRequirement.trip.destination,
-                  _searchEnd,
-                  tripRequirement.trip.productCategoryRef,
-                  tripRequirement.trip.productCategoryName,
-                  tripRequirement.trip.productCategoryShortName,
-                  tripRequirement.trip.vehicleNumber,
-                  tripRequirement.trip.operatorCode
-                )
-              ], returnOptsFromScenario(scenario),
-                // #359: optional OSDM search options from the wizard's
-                // Trip Search Criteria sub-panel (flat fields).
-                tripRequirement.trip.searchCriteria || null);
+              searchTrip(tripRequirement, _searchTripDate, scenario, saleEnv);
               break;
             }
           }
@@ -1234,6 +1152,9 @@ function parseScenarioData(jsonData) {
           return true;
         }
       });
+
+      // #959: the trip and criteria an exchange asks for.
+      prepareExchangeTrip(scenario, jsonData);
 
       // Purchaser details
       jsonData.purchaserList?.some(function (purchaserList) {
@@ -1524,8 +1445,164 @@ function parseScenarioData(jsonData) {
   }
 }
 
+// #959: an EXCHANGE scenario's `exchange` block: the trip it is exchanged
+// for, built by the sale's own builders into a store of its own, and dated
+// from the sale's day. Sets exchangeTripType, exchangeTripSpecifications or
+// exchangeTripSearchCriteria, exchangeOfferSearchCriteria and
+// __exchangeTripAsked; without a block, none of them (the exchange asks for
+// the sale's trip, as before).
+function prepareExchangeTrip(scenario, jsonData) {
+  if (scenario?.exchange == null) return;
+  const X = require('./exchangeTrip.js');
+  const trips = Array.isArray(jsonData.tripRequirements) ? jsonData.tripRequirements : [];
+  const saleTrip = trips.find((t) => t && t.id === scenario.tripRequirementId) || null;
+  const { plan, lines, problem } = X.exchangePlan(scenario, trips, saleTrip);
+  lines.forEach((line) => validationLogger(line));
+  if (problem) {
+    validationLogger(`[ERROR] 🔁 ${problem}: the exchange would ask for the sale's trip.`);
+    test('🔁 The exchange trip of the scenario is in the data file', function () {
+      throw new Error(problem);
+    });
+    return;
+  }
+  if (!plan || !plan.trip) return;
+  if (scenario.scenarioType !== 'EXCHANGE') {
+    validationLogger(`[WARNING] 🔁 The scenario has an exchange block but its type is ${scenario.scenarioType}: it is not used.`);
+    return;
+  }
+  const saleDay = bru.getEnvVar("__travelDay");
+  if (!saleDay) {
+    validationLogger("[WARNING] 🔁 The sale's trip has no date: the exchange asks for the sale's trip.");
+    return;
+  }
+  const { dateForTrip } = require('./tripCalendar.js');
+  const base = X.addDays(saleDay, plan.offsetDays);
+  // A day the scenario moves to is kept (warned when no train runs then);
+  // another trip on the sale's day goes to the first day its trains run.
+  const dated = dateForTrip(base, plan.offsetDays !== 0, plan.trip);
+  dated.lines.forEach((line) => validationLogger(line));
+  const trip = X.withTime(plan.trip, plan.time);
+  const store = {};
+  const env = envOf(store);
+  validationLogger(`[INFO] 🔁 Exchange trip: ${plan.otherTrip ? 'trip ' + plan.trip.id : "the sale's trip"} on ${dated.date}${plan.time ? ' from ' + plan.time : ''}${plan.criteria ? ', criteria ' + JSON.stringify(plan.criteria) : ''}.`);
+  if (trip.tripType === 'SPECIFICATION') {
+    specificationTrip(trip, dated.date, scenario, env);
+    bru.setEnvVar("exchangeTripSpecifications", store.offerTripSpecifications);
+  } else {
+    searchTrip(trip, dated.date, scenario, env);
+    bru.setEnvVar("exchangeTripSearchCriteria", store.offerTripSearchCriteria);
+  }
+  bru.setEnvVar("exchangeTripType", trip.tripType);
+  bru.setEnvVar("exchangeOfferSearchCriteria", plan.criteria ? JSON.stringify(plan.criteria) : "");
+  bru.setEnvVar("__exchangeTripAsked", JSON.stringify(X.askedTrip(trip, dated.date)));
+}
+
+// #959: where a trip builder writes its variables. The sale writes the run's
+// environment; the exchange trip is built by the same code into a store of its
+// own, so that the sale's variables (leg*, trip*, offerTrip*) stay as they are.
+function envOf(store) {
+  if (!store) return { set: (k, v) => bru.setEnvVar(k, v), get: (k) => bru.getEnvVar(k) };
+  return {
+    set: (k, v) => { store[k] = v; },
+    get: (k) => (Object.hasOwn(store, k) ? store[k] : bru.getEnvVar(k)),
+  };
+}
+const saleEnv = envOf(null);
+
+// A SPECIFICATION trip requirement on the day given: its legs' variables and
+// offerTripSpecifications.
+function specificationTrip(tripRequirement, tripDate, scenario, env) {
+  const legDefinitions = [];
+  tripRequirement.legs.forEach(function (leg, legIndex) {
+    const legPrefix = `leg${legIndex + 1}`;
+    const _legCtx = `tripRequirement (SPECIFICATION) leg ${legIndex + 1}`;
+    const _storedStart = subTripDate(leg.startDatetime, tripDate, 'startDatetime', _legCtx);
+    const _sameDayEnd = subTripDate(leg.endDatetime, tripDate, 'endDatetime', _legCtx);
+    const _storedEnd = arrivalAfterDeparture(_storedStart, _sameDayEnd);
+    if (_storedEnd !== _sameDayEnd) {
+      validationLogger(`[INFO] ${_legCtx}: arrival ${_sameDayEnd} is not after the departure ${_storedStart} — taken as the next day, ${_storedEnd}.`);
+    }
+    // #772: the stored offset is that of the day the service was
+    // seen; the trip date may be on the other side of a clock change.
+    const { onTheDay } = require('./stationTimeZones.js');
+    const startDatetime = onTheDay(_storedStart, leg.origin);
+    const endDatetime = onTheDay(_storedEnd, leg.destination);
+    if (startDatetime !== _storedStart || endDatetime !== _storedEnd) {
+      validationLogger(`[INFO] ${_legCtx}: times given the offset of the trip date in the stop places' time zone — ${startDatetime} to ${endDatetime} (stored ${_storedStart} to ${_storedEnd}).`);
+    }
+
+    env.set(`${legPrefix}StartStopPlaceRef`, leg.origin);
+    env.set(`${legPrefix}EndStopPlaceRef`, leg.destination);
+    env.set(`${legPrefix}StartDatetime`, startDatetime);
+    env.set(`${legPrefix}EndDatetime`, endDatetime);
+    env.set(`${legPrefix}VehicleNumber`, leg.vehicleNumber);
+    env.set(`${legPrefix}OperatorCode`, leg.operatorCode);
+    env.set(`${legPrefix}ProductCategoryRef`, leg.productCategoryRef || null);
+    env.set(`${legPrefix}ProductCategoryName`, leg.productCategoryName || null);
+    env.set(`${legPrefix}ProductCategoryShortName`, leg.productCategoryShortName || null);
+    validationLogger("[DEBUG] 🪲 parseScenarioData1");
+
+    legDefinitions.push(new TripLegDefinition(
+      leg.origin,
+      startDatetime,
+      leg.destination,
+      endDatetime,
+      leg.productCategoryRef,
+      leg.productCategoryName,
+      leg.productCategoryShortName,
+      leg.vehicleNumber,
+      leg.operatorCode
+    ));
+  });
+
+  osdmTripSpecification(legDefinitions, returnOptsFromScenario(scenario), env);
+}
+
+// A SEARCH trip requirement on the day given: the trip* variables and
+// offerTripSearchCriteria.
+function searchTrip(tripRequirement, tripDate, scenario, env) {
+  const _searchStart = subTripDate(tripRequirement.trip.startDatetime, tripDate, 'startDatetime', 'tripRequirement (SEARCH)');
+  // #333 (v1.11.112): endDatetime is OPTIONAL on a TripSearchCriteria
+  // per OSDM spec — you specify a departure time, not a window. And
+  // osdmTripSearchCriteria() below doesn't use the endDateTime
+  // anyway (only `startDateTime` is passed to TripSearchCriteria).
+  // Requiring it via subTripDate() was rejecting valid OSDM data (e.g. the
+  // OBB Nightjet datafile). Pass null when absent; the SPECIFICATION branch
+  // keeps its strict both-required check (legs[*].endDatetime IS required
+  // when you're specifying exact trips).
+  const _searchEnd = tripRequirement.trip.endDatetime
+    ? subTripDate(tripRequirement.trip.endDatetime, tripDate, 'endDatetime', 'tripRequirement (SEARCH)')
+    : null;
+  env.set("tripStartStopPlaceRef", tripRequirement.trip.origin);
+  env.set("tripEndStopPlaceRef", tripRequirement.trip.destination);
+  env.set("tripStartDatetime", _searchStart);
+  env.set("tripEndDatetime", _searchEnd);
+  env.set("tripVehicleNumber", tripRequirement.trip.vehicleNumber);
+  env.set("tripOperatorCode", tripRequirement.trip.operatorCode);
+  env.set("tripProductCategoryRef", tripRequirement.trip.productCategoryRef || null);
+  env.set("tripProductCategoryName", tripRequirement.trip.productCategoryName || null);
+  env.set("tripProductCategoryShortName", tripRequirement.trip.productCategoryShortName || null);
+
+  osdmTripSearchCriteria([
+    new TripLegDefinition(
+      tripRequirement.trip.origin,
+      _searchStart,
+      tripRequirement.trip.destination,
+      _searchEnd,
+      tripRequirement.trip.productCategoryRef,
+      tripRequirement.trip.productCategoryName,
+      tripRequirement.trip.productCategoryShortName,
+      tripRequirement.trip.vehicleNumber,
+      tripRequirement.trip.operatorCode
+    )
+  ], returnOptsFromScenario(scenario),
+    // #359: optional OSDM search options from the wizard's
+    // Trip Search Criteria sub-panel (flat fields).
+    tripRequirement.trip.searchCriteria || null, env);
+}
+
 // Function to set trip search criteria
-function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
+function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria, env = saleEnv) {
   test('Trip Search Criteria has at least one leg', function () {
     expect(legDefinitions).to.be.an("array");
     expect(legDefinitions.length).to.be.above(0);
@@ -1544,7 +1621,7 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
   // test); otherwise the train is chosen in the answer (searchTrain.js).
   const { trainFilterOn } = require('./searchTrain.js');
   const _withFilter = trainFilterOn(searchCriteria);
-  bru.setEnvVar("__searchTrainFilter", _withFilter ? "true" : "");
+  env.set("__searchTrainFilter", _withFilter ? "true" : "");
   const carrierFilter = _withFilter && legDef.carrier ? new CarrierFilter([legDef.carrier], false) : null;
   const vehicleFilter = _withFilter && legDef.vehicleNumber ? new VehicleFilter([legDef.vehicleNumber], null, false) : null;
   if (!_withFilter && (legDef.carrier || legDef.vehicleNumber)) {
@@ -1558,13 +1635,13 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
 
   // TripSearchCriteria must use LocalDateTime (no offset, no trailing Z)
   // for all providers except Bileto.
-  const _osdmVersionRaw = bru.getEnvVar("osdmVersion");
+  const _osdmVersionRaw = env.get("osdmVersion");
   const _parsedVersion = require("./osdmVersion.js").parseVersion(_osdmVersionRaw);
   const _osdmVersionForDatetime = _parsedVersion ? `${_parsedVersion.major}.${_parsedVersion.minor}` : 0;
   let _startDateTime = toLocalDateTime(legDef.startDateTime);
 
   // Bileto exception: keep OffsetDateTime in TripSearchCriteria.
-  const _apiBase = bru.getEnvVar("api_base") || "";
+  const _apiBase = env.get("api_base") || "";
   if (_apiBase.includes("bileto")) {
     _startDateTime = toOffsetDateTime(legDef.startDateTime);
     validationLogger(`[INFO] Bileto exception — TripSearchCriteria uses OffsetDateTime: "${_startDateTime}"`);
@@ -1577,7 +1654,7 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
       : `LocalDateTime format (offset/Z stripped) → "${_startDateTime}" (raw: "${legDef.startDateTime}")`)
   );
 
-  const sandbox = bru.getEnvVar("api_base") || "";
+  const sandbox = env.get("api_base") || "";
   let tripSearchCriteria;
   if (sandbox.includes("paxone")) {
     tripSearchCriteria = new TripSearchCriteria(
@@ -1672,7 +1749,7 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
     }
   }
 
-  bru.setEnvVar("offerTripSearchCriteria", JSON.stringify(tripSearchCriteria));
+  env.set("offerTripSearchCriteria", JSON.stringify(tripSearchCriteria));
 }
 
 // #809: why a trip specification leg has no carrier, and what to do.
@@ -1684,14 +1761,14 @@ function carrierMissingText(n, legDef) {
 }
 
 // Function to set trip specifications
-function osdmTripSpecification(legDefinitions, returnOpts) {
+function osdmTripSpecification(legDefinitions, returnOpts, env = saleEnv) {
   test('Trip Specification has at least one leg', function () {
     expect(legDefinitions).to.be.an("array");
     expect(legDefinitions.length).to.be.above(0);
     if (legDefinitions.length === 0) return;
   });
 
-  bru.setEnvVar(TRIP.EXTERNAL_REF, randomUUID());
+  env.set(TRIP.EXTERNAL_REF, randomUUID());
 
   const legSpecs = [];
   let outboundStartDateTime = null;   // first leg's departure — basis for the return date
@@ -1742,16 +1819,16 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
       datedJourney
     );
 
-    bru.setEnvVar(legKey, randomUUID());
+    env.set(legKey, randomUUID());
 
     legSpecs.push(new TripLegSpecification(
-      bru.getEnvVar(legKey),
+      env.get(legKey),
       timedLegSpec
     ));
   }
 
   const tripSpecification = new TripSpecification(
-    bru.getEnvVar(TRIP.EXTERNAL_REF),
+    env.get(TRIP.EXTERNAL_REF),
     legSpecs
   );
 
@@ -1759,10 +1836,10 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
   applyReturnOpts(tripSpecification, returnOpts, outboundStartDateTime);
   // #903: the trip is part of an international trip (OSDM: for VAT). Sent
   // only when the scenario says so, either way.
-  const _international = bru.getEnvVar("isPartOfInternationalTrip");
+  const _international = env.get("isPartOfInternationalTrip");
   if (_international === "true" || _international === "false") tripSpecification.isPartOfInternationalTrip = _international === "true";
 
-  bru.setEnvVar("offerTripSpecifications", JSON.stringify([tripSpecification]));
+  env.set("offerTripSpecifications", JSON.stringify([tripSpecification]));
 }
 
 // Return trip (#176): OSDM expresses a return via TripSearchCriteria /

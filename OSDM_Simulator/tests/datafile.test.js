@@ -187,6 +187,9 @@ test('the refund offers not confirmed, and the exchanges: one-way, on gamma, the
   assert.deepEqual(ends, {
     SIM_EXCHANGE_1ADT_38: 'EXCHANGE null',
     SIM_EXCHANGE_DELETE_1ADT_38: 'EXCHANGE DELETE',
+    // #959: exchanged for another route, and for another day, time and class.
+    SIM_EXCHANGE_OTHER_ROUTE_1ADT_38: 'EXCHANGE null',
+    SIM_EXCHANGE_OTHER_DAY_1ADT_38: 'EXCHANGE null',
     SIM_REFUND_DELETE_1ADT_38: 'REFUND DELETE',
     SIM_REFUND_ONLY_OFFER_1ADT_38: 'REFUND null',
   });
@@ -247,6 +250,7 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_FULFILLMENT_STATUS_38: ['wrong-fulfillment-status'],
     SIM_WRONG_REFUND_AMOUNT_38: ['wrong-refund-amount'],
     SIM_WRONG_EXCHANGE_AMOUNT_38: ['wrong-exchange-amount'],
+    SIM_WRONG_EXCHANGE_KEEPS_TRIP_38: ['wrong-exchange-keeps-trip'],
     SIM_WRONG_NAMED_PLACE_38: ['gives-other-place'],
     SIM_WRONG_OFFER_PROBE_IGNORED_38: [],
     SIM_WRONG_OFFER_PROBE_RESERVATION_ONLY_38: [],

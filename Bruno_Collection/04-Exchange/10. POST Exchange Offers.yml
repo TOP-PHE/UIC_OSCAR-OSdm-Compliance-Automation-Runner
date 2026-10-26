@@ -32,7 +32,7 @@ runtime:
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
-        const { postPatchExchangeOffersResponse } = require(bru.getEnvVar("library_base")+"exchanges.js");
+        const { postPatchExchangeOffersResponse, checkExchangeTripOffers } = require(bru.getEnvVar("library_base")+"exchanges.js");
 
         // Validate HTTP response status
         test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
@@ -66,6 +66,8 @@ runtime:
         try {
           postPatchExchangeOffersResponse(jsonData, ["CONFIRMED", "FULFILLED"]);
           bru.setEnvVar('__exchangeOfferRetryCount', '0'); // reset on success
+          // #959: the exchange offers cover the trip the scenario asks for.
+          checkExchangeTripOffers(jsonData);
         } catch (noOffersErr) {
           test("Exchange offers found in response", () => { throw noOffersErr; });
           const _retryCount = parseInt(bru.getEnvVar('__exchangeOfferRetryCount') || '0', 10) + 1;

@@ -145,3 +145,68 @@ test('exchange: refused requests', async () => {
   assert.equal((await call(sim.base, token, 'GET', `${base}/exchange-offers`)).status, 405);
   assert.equal((await call(sim.base, token, 'POST', `${base}/exchange-offers/x`, {})).status, 404);
 });
+
+// #959: an exchange for another route, day or class.
+const otherTrip = (departureTime, from, to) => ({
+  tripSearchCriteria: {
+    departureTime,
+    origin: { objectType: 'StopPlaceRef', stopPlaceRef: from },
+    destination: { objectType: 'StopPlaceRef', stopPlaceRef: to },
+  },
+});
+const endsOfTrip = (trip) => ({
+  from: trip.legs[0].timedLeg.start.stopPlaceRef.stopPlaceRef,
+  to: trip.legs.at(-1).timedLeg.end.stopPlaceRef.stopPlaceRef,
+  day: trip.legs[0].timedLeg.start.serviceDeparture.timetabledTime.slice(0, 10),
+});
+
+test('exchange: offers for another route and day name its trips, and are priced from it (#959)', async () => {
+  const { token, base, fulfillments } = await booked('gamma');
+  const asked = otherTrip('2026-11-21T14:30:00', 'urn:uic:stn:0000003', 'urn:uic:stn:0000001');
+  const res = await call(sim.base, token, 'POST', `${base}/exchange-offers`, exchangeRequest([fulfillments[0].id], asked));
+  assert.equal(res.status, 200);
+  assert.ok(res.body.trips.length > 0, 'the answer names the trips of its offers');
+  for (const offer of res.body.exchangeOffers) {
+    const trip = res.body.trips.find((t) => t.id === offer.tripCoverage.coveredTripId);
+    assert.deepEqual(endsOfTrip(trip), { from: 'urn:uic:stn:0000003', to: 'urn:uic:stn:0000001', day: '2026-11-21' });
+  }
+});
+
+test('exchange: the class asked for the exchange is offered (#959)', async () => {
+  const { token, base, fulfillments } = await booked('gamma');
+  const res = await call(sim.base, token, 'POST', `${base}/exchange-offers`,
+    exchangeRequest([fulfillments[0].id], { offerSearchCriteria: { travelClasses: ['FIRST'] } }));
+  assert.equal(res.status, 200);
+  const classes = res.body.exchangeOffers.flatMap((o) => o.products.map((p) => p.travelClass)).filter(Boolean);
+  assert.ok(classes.length > 0 && classes.every((c) => c === 'FIRST'), JSON.stringify(classes));
+});
+
+test('exchange: the confirmed exchange books the new trip, and the booking holds it (#959)', async () => {
+  const { token, base, fulfillments } = await booked('gamma');
+  const asked = otherTrip('2026-11-21T14:30:00', 'urn:uic:stn:0000003', 'urn:uic:stn:0000001');
+  const [chosen] = (await call(sim.base, token, 'POST', `${base}/exchange-offers`, exchangeRequest([fulfillments[0].id], asked))).body.exchangeOffers;
+  await call(sim.base, token, 'POST', `${base}/exchange-operations`, { exchangeOffers: [{ offerId: chosen.offerId, passengerRefs: chosen.passengerRefs }] });
+  await call(sim.base, token, 'POST', `${base}/fulfillments`, {});
+  const booking = (await call(sim.base, token, 'GET', base)).body.booking;
+  const added = booking.bookedOffers.find((o) => o.offerId === chosen.offerId);
+  const trip = booking.trips.find((t) => t.id === added.tripCoverage.coveredTripId);
+  assert.deepEqual(endsOfTrip(trip), { from: 'urn:uic:stn:0000003', to: 'urn:uic:stn:0000001', day: '2026-11-21' });
+});
+
+test('exchange: variant wrong-exchange-keeps-trip offers the booking\'s own trip (#959)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', clientOf.gamma);
+  const offers = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body.offers;
+  const offer = offers.find((o) => o.offerSummary.overallFlexibility === 'FULL_FLEXIBLE');
+  const request = bookingRequest(offer);
+  request.passengerSpecifications[0].detail.lastName = 'Simvariant-wrong-exchange-keeps-trip';
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+  const base = `/gamma/bookings/${booking.id}`;
+  const fulfillments = (await call(sim.base, token, 'POST', `${base}/fulfillments`, {})).body.fulfillments;
+  const asked = otherTrip('2026-11-21T14:30:00', 'urn:uic:stn:0000003', 'urn:uic:stn:0000001');
+  const res = await call(sim.base, token, 'POST', `${base}/exchange-offers`, exchangeRequest([fulfillments[0].id], asked));
+  assert.equal(res.status, 200);
+  for (const offer2 of res.body.exchangeOffers) {
+    const trip = res.body.trips.find((t) => t.id === offer2.tripCoverage.coveredTripId);
+    assert.deepEqual(endsOfTrip(trip), { from: 'urn:uic:stn:0000001', to: 'urn:uic:stn:0000002', day: '2026-11-20' });
+  }
+});
