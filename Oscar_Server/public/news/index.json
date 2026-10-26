@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-coverage-blocking",
+    "date": "October 27, 2026",
+    "tag": "Fixed",
+    "title": "Coverage results read right",
+    "summary": "Two cases where a scenario's result in the coverage was wrong are fixed.",
+    "content": "A scenario could read \"Failed\" because an id in one of its checks held the number 500, and a sale that got no offer at all could read \"Passed with defects\". Both now read as they should, for runs already made too."
+  },
+  {
     "id": "2026-10-27-whole-batches",
     "date": "October 27, 2026",
     "tag": "Fixed",

@@ -93,6 +93,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.410] / [collection-OTST_V2.0.226] — 2026-10-27
+
+Coverage: a run's blocking failure read right, release 2026.445 (#988).
+
+### Fixed
+- **An id is not a status.** `classifySeverity()` (`reports/classifier.js`) read `500` and `401` anywhere in a check's text, so "admission[8] has a counterpart in the booking (offer part id=…-15000c27799f…)" was stored critical and the run read "Failed", while its twin with the same failures and other ids read "Passed with defects". UUIDs are now taken out of the text first, and the two numbers count as whole numbers only.
+- **No offer, or no trip to ask offers for, blocks.** "Offers found in response" (a sale with no offer after three tries; "Exchange offers found in response" alike), "Trips collection: a trip to ask offers for — none" and "Trips collection: the scenario's SEARCH trip gives an origin and a destination" stop the scenario: they are a `prerequisite` now, so the run is "Failed", not "Passed with defects".
+- **Stored runs are read again.** `isBlockingCheck()` (`frameworkCoverage.js`) takes the severity from the check's text, as #982 did for the category, so the coverage of runs made before this release changes without running them again.
+- Checked against a real provider's batch of 301 runs: exactly the three runs above change result, each the right way.
+
+---
+
 ## [server-1.11.409] / [collection-OTST_V2.0.226] — 2026-10-27
 
 Test Runs shows whole batches, release 2026.444 (#986).

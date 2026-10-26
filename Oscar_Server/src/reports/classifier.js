@@ -20,6 +20,12 @@
 
 // ── Category classification ──────────────────────────────────────────────────
 // Determines what KIND of check the assertion performs.
+const STOPPING_CHECKS = [
+  'offers found in response',
+  'trips collection: a trip to ask offers for — none',
+  "trips collection: the scenario's search trip gives",
+];
+
 function classifyCategory(name) {
   const n = name.toLowerCase();
 
@@ -35,6 +41,9 @@ function classifyCategory(name) {
   if (n.includes('content-type')) return 'content_type';
   if (['post-response script error', 'pre-request script error'].some(k => n.includes(k))) return 'script_error';
   if (n.includes('prerequisite')) return 'prerequisite';
+  // #988: no offer (sale or exchange, after three tries) or no trip to ask
+  // offers for: the scenario stops there, so nothing after it was tested.
+  if (STOPPING_CHECKS.some(k => n.includes(k))) return 'prerequisite';
   if (['matches between offer and booking', 'matches offer currency', 'member in common between',
        'in both offer and booking', 'matches confirmedprice', 'matches offersummary',
        'currency consistency'].some(k => n.includes(k))) {
@@ -108,17 +117,22 @@ function classifyOfferPart(name) {
 
 // ── Severity auto-detection ──────────────────────────────────────────────────
 // Determines assertion severity based on category and assertion context.
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+
 function classifySeverity(name, category, passed) {
   // Passed assertions are always 'info' severity
   if (passed) return 'info';
 
-  const n = name.toLowerCase();
+  // #988: an id is not a status. An offer part id holding "15000c" made a
+  // check about the booking's parts a server error, so the ids are taken out
+  // and 401 / 500 count only as whole numbers.
+  const n = name.toLowerCase().replace(UUID, '<id>');
 
   // Critical: auth failures, script errors, prerequisites
   if (category === 'script_error') return 'critical';
   if (category === 'prerequisite') return 'critical';
-  if (/401|unauthorized|forbidden|token.*error|auth.*failed/.test(n)) return 'critical';
-  if (/500|server error/.test(n)) return 'critical';
+  if (/\b401\b|unauthorized|forbidden|token.*error|auth.*failed/.test(n)) return 'critical';
+  if (/\b500\b|server error/.test(n)) return 'critical';
 
   // Major: HTTP status failures, business logic failures, data consistency
   if (category === 'http_status') return 'major';

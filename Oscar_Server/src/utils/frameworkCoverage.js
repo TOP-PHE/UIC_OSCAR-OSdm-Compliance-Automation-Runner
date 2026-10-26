@@ -31,7 +31,7 @@ const {
 } = require('./frameworkGating');
 const { salesFlowsOf, catalogueEntryForScenario } = require('./scenarioCatalogue');
 const { declaredCards } = require('./reductionCards');
-const { classifyCategory } = require('../reports/classifier');
+const { classifyCategory, classifySeverity } = require('../reports/classifier');
 const { declaredProducts, declaredGroupProducts } = require('./namedProducts');
 const { currenciesOf } = require('./currencies');
 const { distributionModesOf } = require('./distributionModes');
@@ -257,11 +257,17 @@ function scenarioHash(scenario) {
 // missing. Any other failed check (a field, a structure, a consistency) is a
 // defect of a flow that went through. The category is also read again from
 // the check's text (#982): until 1.11.408 the collection's "HTTP response
-// status — expected 200, actual: N" check was stored as business_logic.
+// status — expected 200, actual: N" check was stored as business_logic. So is
+// the severity (#988): until 1.11.410 an id holding "500" was stored critical,
+// and no offer or no trip at the first step was not a prerequisite.
 const BLOCKING_CATEGORIES = new Set(['http_status', 'script_error', 'prerequisite']);
-const isBlockingCheck = (check) => isObj(check) && (check.severity === 'critical'
-  || BLOCKING_CATEGORIES.has(check.category)
-  || BLOCKING_CATEGORIES.has(classifyCategory(String(check.assertion_name ?? ''))));
+const isBlockingCheck = (check) => {
+  if (!isObj(check)) return false;
+  const name = String(check.assertion_name ?? '');
+  const category = classifyCategory(name);
+  return BLOCKING_CATEGORIES.has(check.category) || BLOCKING_CATEGORIES.has(category)
+    || classifySeverity(name, category, false) === 'critical';
+};
 const MAX_CHECK_TEXT = 300;
 
 /**

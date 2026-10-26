@@ -600,6 +600,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     checks (`run_assertions` + step): blocking = category `http_status` /
     `script_error` / `prerequisite` or severity critical, else the run is
     `defects` ("Passed with defects"); unread failures count as failed.
+    **Blocking is read again from the check's text** (#982 category, #988
+    severity: a UUID holding "500" made a check critical; no offer / no trip
+    at 01 is a `prerequisite`), so a rule fix changes stored runs' coverage.
+    Checked against a real provider's 301 Bruno result files: test such a
+    change by replaying them through `failureOf()`.
     **The category is read again from the check's text** (`isBlockingCheck()`,
     #982, 1.11.408, shared with `byCapability`): the collection's main status
     check, "HTTP response status — expected 200, actual: N", was stored as

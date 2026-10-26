@@ -132,7 +132,17 @@ describe('the coverage', () => {
     expect(C.failureOf([check('field_validation'), { ...check('http_status'), request_name: '02. POST Booking' }]))
       .toEqual({ blocking: true, step: '02. POST Booking', check: 'x http_status' });
     for (const c of ['script_error', 'prerequisite']) expect(C.failureOf([check(c)]).blocking).toBe(true);
-    expect(C.failureOf([check('business_logic', { severity: 'critical' })]).blocking).toBe(true);
+    // #988: critical is read from the check's text, not from the stored
+    // severity: an id holding "500" was stored critical until 1.11.410.
+    expect(C.failureOf([check('business_logic', { assertion_name: '→ 500 server error' })]).blocking).toBe(true);
+    const partWithId = 'admission[8] has a counterpart in the booking (offer part id=7193ec2c-36a1-4eaa-ae58-15000c27799f, passenger types ADULT)';
+    expect(C.failureOf([check('business_logic', { assertion_name: partWithId, severity: 'critical' })]).blocking).toBe(false);
+    // #988: no offer, or no trip to ask offers for, stops the scenario at 01.
+    for (const name of ['Offers found in response', 'Exchange offers found in response',
+      'Trips collection: a trip to ask offers for — none',
+      "Trips collection: the scenario's SEARCH trip gives an origin and a destination"]) {
+      expect(C.failureOf([check('business_logic', { request_name: '01. POST Get Offer', assertion_name: name })]).blocking).toBe(true);
+    }
     expect(C.failureOf([check('business_logic', { assertion_name: 'y'.repeat(400) })]).check).toHaveLength(300);
     // #982: a run stored before 1.11.408 holds the collection's status check as business_logic.
     const status400 = check('business_logic', { request_name: '02. POST Create Booking', assertion_name: 'HTTP response status — expected 200, actual: 400' });
