@@ -422,9 +422,27 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
         </select>
         <button class="btn btn-secondary btn-sm" id="coverage-md-btn" type="button" disabled>Export Markdown</button>
         <button class="btn btn-secondary btn-sm" id="coverage-xlsx-btn" type="button">Download Excel</button>
+        <button class="btn btn-primary btn-sm" id="coverage-publish-btn" type="button" hidden disabled>Publish this report</button>
         <span id="coverage-xlsx-msg" style="font-size:12px;color:#546e7a"></span>
       </div>
       <div id="coverage-body" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- Published coverage reports (#972 part 4): Test Managers and certifiers -->
+  <div class="card" id="published-card" style="display:none">
+    <div class="card-title">Published Coverage Reports</div>
+    <div class="card-body">
+      <div class="cov-note" id="published-intro"></div>
+      <div id="published-list"></div>
+      <output id="published-msg" class="cov-note" style="display:block"></output>
+      <div class="actions-row" id="published-actions" hidden>
+        <label for="published-view" style="font-size:13px">View</label>
+        <select id="published-view">
+          <option value="capabilities" selected>By capability</option><option value="matrix">By flow and element</option><option value="functions">By function declared</option>
+        </select>
+      </div>
+      <div id="published-body" style="margin-top:12px"></div>
     </div>
   </div>
 
@@ -1910,6 +1928,10 @@ const CAPABILITY_RESULTS = {
   'not-supported': 'Not supported by the provider', 'not-tested': 'Not tested', 'out-of-scope': 'Out of scope',
   refused: 'Refused as expected', 'not-refused': 'Not refused', 'not-run': 'Not run'
 };
+// #972 part 4: what changed since the previous shared report, as the workbook names it.
+const CHANGE_LABELS = {
+  fixed: 'Fixed', still: 'Still open', new: 'New', notRetested: 'Not run again'
+};
 const POINT_KINDS = {
   provider: 'For the provider', accepted: 'Accepted deviations', question: 'Questions on the specification',
   oscar: 'OSCAR\'s own points (not counted against the provider)'
@@ -2362,6 +2384,99 @@ function coverageMarkdown(data, title) {
   return lines.join('\n') + '\n';
 }
 
+/* ── Published coverage reports (#972 part 4) ──────────────────────────────
+ * A Test Manager publishes the coverage of the day: numbered and frozen.
+ * Sharing it with the certifier shares its runs; a shared report can be
+ * withdrawn. Each report says what changed since the previous shared one.
+ * The certifier reads the reports shared with it. Ids reach a request
+ * address only as UUIDs (coverageRunIdOf()).
+ */
+function publishedStateText(r) {
+  if (r.withdrawnAt) return 'Withdrawn ' + r.withdrawnAt + (r.withdrawnBy ? ' by ' + r.withdrawnBy : '');
+  if (r.sharedAt) return 'Shared with the certifier ' + r.sharedAt + (r.sharedBy ? ' by ' + r.sharedBy : '');
+  return 'Not shared';
+}
+
+function publishedCountsText(s) {
+  var c = s || {};
+  var p = c.pointsToLookAt || {};
+  return (c.tested || 0) + ' capability(ies) tested: ' + (c.passed || 0) + ' passed, ' + (c.deviation || 0) + ' with deviation, '
+    + (c.points || 0) + ' with points, ' + (c.blocked || 0) + ' blocked · ' + (p.total || 0) + ' point(s) to look at';
+}
+
+function publishedOwnerText(r) {
+  if (!r.company) return '';
+  return r.distributor ? r.distributor + ' — ' + r.company : r.company;
+}
+
+function publishedButtonHtml(action, id, number, label) {
+  return '<button class="btn btn-secondary btn-sm" type="button" data-report-action="' + action + '" data-report-id="' + id
+    + '" data-report-number="' + number + '">' + escHtml(label) + '</button>';
+}
+
+function publishedRowHtml(r, canChange) {
+  var id = coverageRunIdOf(r.id);
+  var number = Number.isInteger(r.number) ? r.number : 0;
+  if (!id) return '';
+  var actions = [publishedButtonHtml('view', id, number, 'View'), publishedButtonHtml('excel', id, number, 'Excel')];
+  if (canChange && !r.sharedAt) actions.push(publishedButtonHtml('share', id, number, 'Share with the certifier'));
+  if (canChange && r.sharedAt && !r.withdrawnAt) actions.push(publishedButtonHtml('withdraw', id, number, 'Withdraw'));
+  var owner = publishedOwnerText(r);
+  return '<tr><td><strong>#' + number + '</strong>' + (owner ? '<br><small>' + escHtml(owner) + '</small>' : '') + '</td>'
+    + '<td>' + escHtml(r.createdAt || '') + (r.createdBy ? '<br><small>' + escHtml(r.createdBy) + '</small>' : '') + '</td>'
+    + '<td>' + escHtml(publishedStateText(r)) + '</td>'
+    + '<td>' + escHtml(publishedCountsText(r.summary)) + '</td>'
+    + '<td>' + actions.join(' ') + '</td></tr>';
+}
+
+function publishedListHtml(reports, canChange) {
+  var list = Array.isArray(reports) ? reports : [];
+  if (list.length === 0) {
+    return '<div class="cov-note">' + (canChange ? 'No report published yet: show the coverage, then publish it.' : 'No report has been shared with you yet.') + '</div>';
+  }
+  return '<table class="cap-table"><thead><tr><th>Report</th><th>Published</th><th>Certifier</th><th>Summary</th><th>Actions</th></tr></thead><tbody>'
+    + list.map(function(r) { return publishedRowHtml(r, canChange); }).join('') + '</tbody></table>';
+}
+
+function comparisonResultText(result) {
+  return result ? capabilityResultLabel(result) : 'not in the report';
+}
+
+function comparisonPointText(p) {
+  var which = '#' + p.previousNumber + ' of the previous report';
+  if (p.number) which = '#' + p.number + (p.previousNumber ? ' (was #' + p.previousNumber + ')' : '');
+  return which + ' ' + (p.capabilityLabel || p.capability || '') + ' — ' + (p.steps || []).join(', ') + ': ' + (p.check || '');
+}
+
+function comparisonHtml(c) {
+  if (!c) return '<div class="cov-note">No report had been shared with the certifier before this one: nothing to compare with.</div>';
+  var counts = c.counts || {};
+  var previous = c.previous || {};
+  var head = 'Since published report #' + (previous.number || '?') + ' (shared ' + (previous.sharedAt || '?') + '): ' + (counts.fixed || 0) + ' fixed, '
+    + (counts.still || 0) + ' still open, ' + (counts.new || 0) + ' new, ' + (counts.notRetested || 0) + ' not run again.';
+  var changed = (c.capabilities || []).map(function(x) {
+    return '<li>' + escHtml((x.label || x.id) + ': ' + comparisonResultText(x.before) + ' → ' + comparisonResultText(x.now)) + '</li>';
+  }).join('');
+  var lists = Object.keys(CHANGE_LABELS).map(function(k) {
+    var of = (c.points && c.points[k]) || [];
+    if (of.length === 0) return '';
+    return '<details><summary>' + escHtml(CHANGE_LABELS[k] + ' (' + of.length + ')') + '</summary><ul class="cov-list">'
+      + of.map(function(p) { return '<li>' + escHtml(comparisonPointText(p)) + '</li>'; }).join('') + '</ul></details>';
+  }).join('');
+  return '<div class="cov-summary">' + escHtml(head) + '</div>'
+    + (changed ? '<details><summary>' + escHtml('Capabilities whose result changed (' + c.capabilities.length + ')') + '</summary><ul class="cov-list">' + changed + '</ul></details>' : '')
+    + lists;
+}
+
+function publishedHtml(d, view) {
+  var owner = publishedOwnerText(d);
+  var head = 'Published report #' + d.number + (owner ? ' of ' + owner : '') + ', frozen on ' + d.createdAt
+    + ' (runs of the last ' + d.days + ' day(s)). ' + publishedStateText(d) + '.';
+  return '<h4 class="cov-heading">' + escHtml(head) + '</h4>'
+    + '<h5 class="cov-subheading">What changed</h5>' + comparisonHtml(d.comparison)
+    + '<h5 class="cov-subheading">The report</h5>' + coverageHtml(d.report || {}, view);
+}
+
 function coverageTitle() {
   var provider = typeof window.oscarSelectedProvider === 'function' ? window.oscarSelectedProvider() : null;
   return (provider && provider.name) || company.name || 'company';
@@ -2383,6 +2498,8 @@ async function loadCoverage() {
     coverageData = data;
     body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);
     mdBtn.disabled = false;
+    document.getElementById('coverage-publish-btn').disabled = false;
+    document.getElementById('published-body').textContent = '';
   } catch (e) {
     body.textContent = 'The coverage could not be read: ' + e.message + '.';
   }
@@ -2430,6 +2547,126 @@ if (!isPlatformUser) {
   document.getElementById('coverage-view').addEventListener('change', function() {
     if (coverageData) document.getElementById('coverage-body').innerHTML = coverageHtml(coverageData, this.value);
   });
+}
+
+const canPublish = userRole === 'test_manager';
+const isCertifier = userRole === 'certification_user';
+let publishedShown = null;
+
+function publishedBase() {
+  return isCertifier ? '/v1/certifier/coverage-reports' : '/v1/company/coverage/reports';
+}
+
+async function loadPublished() {
+  var listEl = document.getElementById('published-list');
+  try {
+    var res = await fetch(publishedBase(), {});
+    var data = await res.json().catch(function() { return null; });
+    if (!res.ok || !data) {
+      listEl.textContent = 'The published reports could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+      return;
+    }
+    listEl.innerHTML = publishedListHtml(data.reports, canPublish);
+  } catch (e) {
+    listEl.textContent = 'The published reports could not be read: ' + e.message + '.';
+  }
+}
+
+async function showPublished(id) {
+  var body = document.getElementById('published-body');
+  body.textContent = 'Loading the report...';
+  var res = await fetch(publishedBase() + '/' + encodeURIComponent(id), {});
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    body.textContent = 'The report could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  publishedShown = data;
+  // One set of point anchors at a time: the live coverage is cleared.
+  if (!isCertifier) document.getElementById('coverage-body').textContent = '';
+  document.getElementById('published-actions').hidden = false;
+  body.innerHTML = publishedHtml(data, document.getElementById('published-view').value);
+}
+
+async function changePublished(id, action) {
+  var question = action === 'share'
+    ? 'Share this report with the certifier? Its runs are shared with the certifier too.'
+    : 'Withdraw this report? The certifier will no longer see it. Its runs stay shared.';
+  if (!confirm(question)) return;
+  var msg = document.getElementById('published-msg');
+  var res = await fetch(publishedBase() + '/' + encodeURIComponent(id) + '/' + action, { method: 'POST' });
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    msg.textContent = 'Not done: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  msg.textContent = action === 'share' ? 'Report #' + data.number + ' is shared with the certifier, with ' + data.runsShared + ' run(s) not shared before.'
+    : 'Report #' + data.number + ' is withdrawn.';
+  await loadPublished();
+}
+
+async function downloadPublished(id, number) {
+  var msg = document.getElementById('published-msg');
+  var res = await fetch(publishedBase() + '/' + encodeURIComponent(id) + '/download', {});
+  if (!res.ok) {
+    var err = await res.json().catch(function() { return null; });
+    msg.textContent = 'The workbook could not be made: ' + ((err && err.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  var url = URL.createObjectURL(await res.blob());
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'oscar-coverage-report-' + number + '.xlsx';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+}
+
+async function publishCoverage() {
+  var msg = document.getElementById('coverage-xlsx-msg');
+  if (!confirm('Publish this coverage as a numbered report? It is frozen as it is now.')) return;
+  var res = await fetch('/v1/company/coverage/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days: Number(document.getElementById('coverage-days').value) })
+  });
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    msg.textContent = 'The report could not be published: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  msg.textContent = 'Published as report #' + data.number + '. Share it from Published Coverage Reports.';
+  await loadPublished();
+}
+
+function onPublishedClick(e) {
+  var button = e.target.closest('[data-report-action]');
+  if (!button) return;
+  var id = coverageRunIdOf(button.dataset.reportId);
+  var number = Number.parseInt(button.dataset.reportNumber, 10) || 0;
+  if (!id) return;
+  var action = button.dataset.reportAction;
+  var done;
+  if (action === 'view') done = showPublished(id);
+  else if (action === 'excel') done = downloadPublished(id, number);
+  else if (action === 'share' || action === 'withdraw') done = changePublished(id, action);
+  if (done) done.catch(function(err) { document.getElementById('published-msg').textContent = 'Not done: ' + err.message + '.'; });
+}
+
+if (canPublish || isCertifier) {
+  document.getElementById('published-card').style.display = 'block';
+  document.getElementById('published-intro').textContent = canPublish
+    ? 'A published report is frozen as it was. Sharing it with the certifier also shares its runs; a shared report can be withdrawn. Each report says what changed since the last report shared.'
+    : 'The coverage reports companies have shared with you, each frozen as it was published, with what changed since their previous shared report.';
+  document.getElementById('published-list').addEventListener('click', onPublishedClick);
+  document.getElementById('published-view').addEventListener('change', function() {
+    if (publishedShown) document.getElementById('published-body').innerHTML = publishedHtml(publishedShown, this.value);
+  });
+  loadPublished().catch(function() {});
+}
+if (canPublish) {
+  var publishBtn = document.getElementById('coverage-publish-btn');
+  publishBtn.hidden = false;
+  publishBtn.addEventListener('click', function() { publishCoverage().catch(function() {}); });
 }
 
 /* ── Init ──────────────────────────────────────────────────────────────────── */

@@ -185,12 +185,40 @@ function functionSheet(report) {
   };
 }
 
-/** The workbook of a coverage report, as a Buffer. */
-function coverageWorkbook(report, { title = '', generatedAt = '' } = {}) {
+const CHANGE_TEXT = Object.freeze({ still: 'Still open', new: 'New', fixed: 'Fixed', notRetested: 'Not run again' });
+
+// #972 part 4: what changed since the previous report shared with the certifier.
+function comparisonSheet(comparison) {
+  const points = comparison.points || {};
+  const pointRows = Object.keys(CHANGE_TEXT).flatMap((change) => arr(points[change]).map((p) => [
+    CHANGE_TEXT[change], p.number ?? null, p.previousNumber ?? null, p.capabilityLabel || p.capability || '',
+    arr(p.steps).join('\n'), p.check || '', '', '',
+  ]));
+  const capabilityRows = arr(comparison.capabilities).map((c) => [
+    'Capability result', null, null, c.label || c.id, '', '', capabilityText(c.before), capabilityText(c.now),
+  ]);
+  return {
+    name: `Since report ${comparison.previous?.number ?? ''}`.trim(),
+    columns: [
+      { title: 'What changed', width: 18 }, { title: 'Point now', width: 10 }, { title: 'Point before', width: 12 },
+      { title: 'Capability', width: 36 }, { title: 'Steps', width: 40 }, { title: 'Check', width: 70 },
+      { title: 'Result before', width: 24 }, { title: 'Result now', width: 24 },
+    ],
+    rows: [...pointRows, ...capabilityRows],
+  };
+}
+
+/**
+ * The workbook of a coverage report, as a Buffer. A published report (#972
+ * part 4) passes its comparison with the previous shared report, which comes
+ * second.
+ */
+function coverageWorkbook(report, { title = '', generatedAt = '', comparison = null } = {}) {
   return workbook([
-    summarySheet(report, { title, generatedAt }), capabilitiesSheet(report), refusalsSheet(report), pointsSheet(report),
+    summarySheet(report, { title, generatedAt }), ...(comparison ? [comparisonSheet(comparison)] : []),
+    capabilitiesSheet(report), refusalsSheet(report), pointsSheet(report),
     matrixSheet(report), scenarioSheet(report), functionSheet(report),
   ]);
 }
 
-module.exports = { coverageWorkbook, DECLARATION_TEXT, KIND_TEXT };
+module.exports = { coverageWorkbook, DECLARATION_TEXT, KIND_TEXT, CHANGE_TEXT };

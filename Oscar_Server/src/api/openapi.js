@@ -94,6 +94,7 @@ module.exports = {
     { name: 'Admin',   description: 'Administrator-only — users, companies, server config, activity' },
     { name: 'Health',  description: 'Liveness/readiness probes' },
     { name: 'API',     description: 'Read-only, by API key (#503)' },
+    { name: 'Certifier', description: 'What companies share with certifiers: published coverage reports (#972)' },
   ],
   paths: {
     '/health': {
@@ -543,8 +544,52 @@ module.exports = {
     '/v1/company/coverage/download': {
       get: { tags: ['Company'], summary: 'The Test Framework coverage as an Excel workbook (#956 part 3)', security: [{ bearerAuth: [] }],
         parameters: [{ name: 'days', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 3650, default: 365 }, description: 'Runs queued within this many days are read' }],
-        description: 'The same report as GET /v1/company/coverage, as an .xlsx file: sheets Summary, By flow and element, By scenario, By function. Every text is an inline string (never a formula).',
+        description: 'The same report as GET /v1/company/coverage, as an .xlsx file: sheets Summary, Capabilities, Expected refusals, Points to look at, By flow and element, By scenario, By function (#972). Every text is an inline string (never a formula).',
         responses: { 200: { description: 'The workbook' }, 400: { description: 'days is not a whole number from 1 to 3650' }, 403: { description: 'Administrators and certifiers have no access' }, 409: { description: 'The data file cannot be read' } } },
+    },
+    '/v1/company/coverage/reports': {
+      post: { tags: ['Company'], summary: 'Publish the coverage report of the day, numbered and frozen (#972 part 4; Test Manager only)', security: [{ bearerAuth: [] }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 3650, default: 365 } } } } } },
+        description: 'Builds the report of GET /v1/company/coverage for the company or provider of the request (X-Provider-Id) and stores it frozen (encrypted), with its comparison with the last report shared with the certifier and not withdrawn: points still open, new, fixed (their tests ran again) or not run again, matched by their #735 keys, and the capabilities whose result moved. Numbered per company or provider.',
+        responses: { 201: { description: '{ id, number, days, createdAt, createdBy, sharedAt, sharedBy, withdrawnAt, withdrawnBy, comparedWith, summary }' }, 400: { description: 'days is not a whole number from 1 to 3650' }, 403: { description: 'Not a Test Manager' }, 429: { description: 'Ten publications a minute at most' } } },
+      get: { tags: ['Company'], summary: 'The published coverage reports of the company or provider (Test Manager only)', security: [{ bearerAuth: [] }],
+        responses: { 200: { description: '{ reports: [{ id, number, days, createdAt, createdBy, sharedAt, sharedBy, withdrawnAt, withdrawnBy, comparedWith, summary }] }, newest first' }, 403: { description: 'Not a Test Manager' } } },
+    },
+    '/v1/company/coverage/reports/{id}': {
+      get: { tags: ['Company'], summary: 'One published report, as it was frozen, and its comparison (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'The list item, with report (the coverage report as published) and comparison (null for none)' }, 403: { description: 'Not a Test Manager' }, 404: { description: 'No such report of this company or provider' } } },
+    },
+    '/v1/company/coverage/reports/{id}/download': {
+      get: { tags: ['Company'], summary: 'One published report as an .xlsx workbook, its comparison second (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'The workbook' }, 403: { description: 'Not a Test Manager' }, 404: { description: 'No such report' } } },
+    },
+    '/v1/company/coverage/reports/{id}/share': {
+      post: { tags: ['Company'], summary: 'Share a published report with the certifier, and its runs (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        description: 'Marks the report shared and shares with the certifier every finished run of the company it reads that was not shared yet (runs.shared_with_certifier_at). Audited.',
+        responses: { 200: { description: 'The list item, with runsShared' }, 403: { description: 'Not a Test Manager' }, 404: { description: 'No such report' }, 409: { description: 'Already shared, or withdrawn' } } },
+    },
+    '/v1/company/coverage/reports/{id}/withdraw': {
+      post: { tags: ['Company'], summary: 'Withdraw a shared report: the certifier no longer sees it (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        description: 'The report stays listed for the company, marked withdrawn; its runs stay shared. Audited.',
+        responses: { 200: { description: 'The list item' }, 403: { description: 'Not a Test Manager' }, 404: { description: 'No such report' }, 409: { description: 'Not shared, or already withdrawn' } } },
+    },
+    '/v1/certifier/coverage-reports': {
+      get: { tags: ['Certifier'], summary: 'The coverage reports shared with certifiers and not withdrawn, every company (#972 part 4; certifiers only)', security: [{ bearerAuth: [] }],
+        responses: { 200: { description: '{ reports: [{ id, number, days, company, distributor, createdAt, sharedAt, summary }] }; no e-mail' }, 403: { description: 'Not a certifier' } } },
+    },
+    '/v1/certifier/coverage-reports/{id}': {
+      get: { tags: ['Certifier'], summary: 'One shared report, as it was frozen, and its comparison (certifiers only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'The list item, with report and comparison' }, 403: { description: 'Not a certifier' }, 404: { description: 'Not shared, withdrawn or unknown' } } },
+    },
+    '/v1/certifier/coverage-reports/{id}/download': {
+      get: { tags: ['Certifier'], summary: 'One shared report as an .xlsx workbook (certifiers only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'The workbook' }, 403: { description: 'Not a certifier' }, 404: { description: 'Not shared, withdrawn or unknown' } } },
     },
     '/v1/company/providers': {
       get: { tags: ['Company'], summary: 'List the providers of the caller\'s company (Test Manager: all; tester: those granted)', security: [{ bearerAuth: [] }],

@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.441",
+  "current_release": "2026.442",
   "releases": [
+    {
+      "release": "2026.442",
+      "date": "2026-10-26",
+      "server": "1.11.407",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#972 PR 4: a Test Manager publishes the coverage as a numbered, frozen report (migration 43), shares it with the certifier (which shares its runs) and can withdraw it; certifiers read the reports shared with them under /v1/certifier/coverage-reports.",
+        "Each report says what changed since the last report shared with the certifier: points fixed, still open, new or not run again, and the capabilities whose result moved. The Report Builder has a Published Coverage Reports card for Test Managers and certifiers."
+      ]
+    },
     {
       "release": "2026.441",
       "date": "2026-10-26",

@@ -593,6 +593,7 @@ app.use('/v1/company',         require('./api/routes/company-finding-suggestions
 app.use('/v1/company',         require('./api/routes/company-findings'));
 app.use('/v1/company',         require('./api/routes/company-scenario-copy'));
 app.use('/v1/company',         require('./api/routes/company-coverage'));
+app.use('/v1/company',         require('./api/routes/company-coverage-reports'));   // published reports (#972)
 app.use('/v1/company',         require('./api/routes/company-ai-analysis'));
 app.use('/v1/company',         require('./api/routes/company-ai-analysis-results'));
 app.use('/v1/company',         require('./api/routes/company-ai-checklist'));
@@ -601,6 +602,7 @@ app.use('/v1/company',         require('./api/routes/company-api-keys'));
 app.use('/v1/company',         require('./api/routes/company-run-shares'));
 app.use('/v1/runs',            require('./api/routes/runs'));
 app.use('/v1/reports',         require('./api/routes/reports'));
+app.use('/v1/certifier',       require('./api/routes/certifier-coverage-reports'));   // reports shared with certifiers (#972)
 app.use('/v1/admin/simulator', require('./api/routes/admin-simulator'));   // the OSDM simulator's accounts (#930)
 app.use('/v1/admin',           require('./api/routes/admin'));
 app.use('/v1/api',             require('./api/routes/api'));   // read-only, by API key (#503)

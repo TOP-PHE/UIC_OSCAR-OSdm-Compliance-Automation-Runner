@@ -93,6 +93,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.407] / [collection-OTST_V2.0.226] — 2026-10-26
+
+Issue #972 (part 4 of 4), release 2026.442. A Test Manager publishes the coverage as a numbered, frozen report and shares it with the certifier, who reads it; each report says what changed since the last one shared (decision 4).
+
+### Added
+- **Published coverage reports** (`company-coverage-reports.js`, table `coverage_report`, migration 43).
+  - **Publish:** `POST /v1/company/coverage/reports` stores the report of `GET /v1/company/coverage` frozen and encrypted. The report is numbered per company or provider, with its run ids and its counts.
+  - **Share:** `…/:id/share` gives the certifier the report and every run it reads (finished runs of that company not shared yet), once.
+  - **Withdraw:** `…/:id/withdraw` takes a shared report away from the certifier (maintainer's choice, 2026-10-26). The report stays listed, marked withdrawn, and its runs stay shared. Sharing and withdrawing are audited.
+  - **Read:** list, read and download (`.xlsx`) the reports.
+  - Test Managers only: a report holds every scenario, testers' private ones included.
+- **What changed since the last shared report** (`utils/coverageReports.js`, pure), computed when a report is published, against the last report shared and not withdrawn:
+  - points **still open**: a point is the same when any of its #735 keys meets one of the other's;
+  - points **new**;
+  - points **fixed**: gone, and their tests were run again;
+  - points **not run again**: gone, but their tests were not run again, so nothing can be said;
+  - the capabilities whose result moved.
+- **For the certifier:** `GET /v1/certifier/coverage-reports`, `…/:id` and `…/:id/download` (certifiers only) list and read the reports shared and not withdrawn, of every company. They give the company's and distributor's names and the dates, never an e-mail address. Anything else answers 404.
+- **The workbook** of a published report has the comparison as its second sheet, *Since report N*.
+- **Report Builder:**
+  - *Publish this report*, offered once the coverage is shown.
+  - The *Published Coverage Reports* card, for Test Managers and certifiers: the reports with their state and counts; *View*, *Excel*, *Share with the certifier* and *Withdraw* for the Test Manager; *View* and *Excel* for the certifier.
+  - A report shown gives its comparison, then the report in the three views.
+- News entry; Tester User Guide §6 (*Published coverage reports*). OpenAPI: the new routes, a *Certifier* tag, and the coverage download's seven sheets (left out of date in part 3).
+
+### Changed
+- `company-coverage.js` exports `buildCoverage()`, the report it answers, so a published report is the same report.
+
+### Tests
+- `coverage-reports-routes.test.js`:
+  - only a Test Manager publishes, and the report is stored encrypted;
+  - sharing shares the report's runs once: not another company's, not an unfinished one, whatever its stored list says;
+  - the certifier reads without e-mail addresses;
+  - the next report is compared with the last shared one, and the first stays as it was;
+  - the download's sheets;
+  - withdrawal: the certifier loses it, the runs stay shared, it is not shared again, and the next report is not compared with it;
+  - a provider's own numbering and names.
+- `coverage-reports.test.js`: still / new / fixed / not run again, a match on any key, the capability changes, the runs kept, and the summary.
+- `ui-scripts.test.js`:
+  - the actions each state offers;
+  - escaping;
+  - an id that is not a UUID dropped;
+  - the comparison drawn, from the server's own answer too;
+  - the card for Test Managers and certifiers only.
+- Twenty-two deliberate breaks each make a test fail. Two were missed at first: a withdrawn report shared again was refused for another reason, and the comparison test's key came first. The tests now check those.
+- **Checked in Chromium on the simulator's runs** (a throwaway OSCAR, gamma's reference).
+  - As Test Manager: report #1 published, then shared (135 runs shared); report #2 compared with it (14 points still open).
+  - As certifier: only #1 listed, view and Excel only, no e-mail, its runs readable.
+  - The workbook opens in Excel with *Since report 1* second.
+
+---
+
 ## [server-1.11.406] / [collection-OTST_V2.0.226] — 2026-10-26
 
 Issue #972 (part 3 of 4), release 2026.441. The Report Builder shows the coverage by capability, and the exports follow it. Three choices of the maintainer on 2026-10-26 change the points of part 2.

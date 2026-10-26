@@ -221,9 +221,18 @@ async function reportOf(req, res) {
     res.status(400).json({ status: 400, title: 'Bad Request', detail: `days must be a whole number from 1 to ${MAX_DAYS}.` });
     return null;
   }
+  return { companyId, report: await buildCoverage(companyId, days, req.user) };
+}
+
+/**
+ * The coverage report of a company or provider over the last `days` days, as
+ * `user` reads it: a tester sees the scenarios of their view only. Shared with
+ * the published reports (#972 part 4), which a Test Manager makes.
+ */
+async function buildCoverage(companyId, days, user) {
   let datafile = await readDatafile(companyId);
-  if (datafile && req.user.role !== 'test_manager') {
-    datafile = viewForTester(datafile, req.user.email, getRunSelection(companyId, req.user.id));
+  if (datafile && user.role !== 'test_manager') {
+    datafile = viewForTester(datafile, user.email, getRunSelection(companyId, user.id));
   }
   const framework = frameworkConfigOf(companyId);
   const allFindings = all('SELECT * FROM finding WHERE company_id = ?', [companyId]);
@@ -241,10 +250,7 @@ async function reportOf(req, res) {
   const byCapability = capabilityCoverageOf({
     ...input, functions: coverage.functions, warnings, findings: allFindings.map(toApiFinding), suggestions: suggestionsOf(companyId),
   });
-  return {
-    companyId,
-    report: { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios, byCapability },
-  };
+  return { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios, byCapability };
 }
 
 function failed(res, err, companyId) {
@@ -279,3 +285,5 @@ router.get('/coverage/download', coverageLimiter, async (req, res) => {
 
 module.exports = router;
 module.exports.daysOf = daysOf;
+module.exports.buildCoverage = buildCoverage;
+module.exports.MAX_DAYS = MAX_DAYS;

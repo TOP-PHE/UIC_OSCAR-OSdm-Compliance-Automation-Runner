@@ -923,6 +923,32 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE runs ADD COLUMN scenario_code TEXT');   // migration 1's, for the index
       db.exec('CREATE INDEX IF NOT EXISTS idx_runs_company_scenario ON runs(company_id, scenario_code, queued_at)');
   }},
+  { version: 43, name: 'coverage-reports', up: () => {
+      // #972 part 4 - a coverage report published by a Test Manager: numbered
+      // per company or provider, frozen (the report and its comparison with
+      // the previous shared report, encrypted), shared with the certifier
+      // (which shares its runs) and possibly withdrawn. run_ids and summary
+      // hold run UUIDs and counts only.
+      db.exec(`CREATE TABLE IF NOT EXISTS coverage_report (
+        id             TEXT PRIMARY KEY,
+        company_id     TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        number         INTEGER NOT NULL,
+        days           INTEGER NOT NULL,
+        content        TEXT NOT NULL,
+        comparison     TEXT,
+        compared_with  TEXT,
+        run_ids        TEXT NOT NULL,
+        summary        TEXT,
+        created_by     TEXT NOT NULL,
+        created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+        shared_at      TEXT,
+        shared_by      TEXT,
+        withdrawn_at   TEXT,
+        withdrawn_by   TEXT,
+        UNIQUE (company_id, number)
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_coverage_report_shared ON coverage_report(shared_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
