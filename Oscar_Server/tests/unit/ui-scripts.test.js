@@ -1481,7 +1481,7 @@ describe('the Report Builder coverage section', () => {
   const ctx = { escHtml, encodeURIComponent, COVERAGE_STATES, COVERAGE_DECLARATIONS, CAPABILITY_RESULTS, POINT_KINDS, CHANGE_LABELS };
   for (const name of sectionNames) ctx[name] = loadFunction(page, name, ctx);
   const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks,
-    publishedListHtml, comparisonHtml, publishedHtml } = ctx;
+    capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1628,7 +1628,7 @@ describe('the Report Builder coverage section', () => {
     expect(out).toContain('<td>Sale &#60;l&#62; — Declared</td><td>1 test(s), 1 form(s) run · proven on the way by 3 run(s)<details><summary>Tests</summary>');
     expect(out).toContain('<a href="/run-detail.html?id=' + UUID + '">C_&#60;1&#62;</a> (SEARCH): Passed with points at 02. &#60;s&#62; — X &#60;c&#62;, to run again');
     expect(out).toContain('<details><summary>Problems on the way</summary><ul class="cov-list"><li>Z&#60;z&#62;: Passed with points</li>');
-    expect(out).toContain('cov-points">Passed with points</span></td><td><a href="#cov-point-1">#1</a></td>');
+    expect(out).toContain('cov-points">Passed with points</span></td><td><a href="#cov-point-1" data-cov-point="1" aria-expanded="false">#1</a></td>');
     expect(out).toContain('<td>Documents (optional)</td>');
     expect(out).toContain('cov-deviation">Passed with deviation');
     expect(out).toContain('<td><strong>NHF_&#60;r&#62;</strong><br><small>Must &#60;refuse&#62;</small></td><td>Full &#60;refund&#62;</td>');
@@ -1643,8 +1643,45 @@ describe('the Report Builder coverage section', () => {
     expect(out).toContain('Possibly finding: Maybe &#60;m&#62; (open, open)');
     expect(out).toContain('Declared functions without a scenario run (1)');
     expect(out).toContain('<li>A_2 (A)</li>');
-    expect(capabilityPointLinks([1, 'x', 2.5, -1])).toBe('<a href="#cov-point-1">#1</a>');
+    expect(capabilityPointLinks([1, 'x', 2.5, -1])).toBe('<a href="#cov-point-1" data-cov-point="1" aria-expanded="false">#1</a>');
     expect(capabilityHtml({ points: [] })).toContain('<div class="cov-note">None.</div>');
+  });
+
+  test('a point number opens that point under its row, and closes it (#984)', () => {
+    const out = coverageHtml({ ...answer, byCapability }, 'capabilities');
+    // Under the row naming it, hidden, without the id the list at the end keeps.
+    expect(out).toContain('#1</a></td></tr><tr class="cov-point-detail" data-cov-detail="1" hidden><td colspan="4"><ul class="cov-points-list">'
+      + '<li><strong>#1</strong> Sale &#60;l&#62; <span class="cov-state cov-blocked">Blocking</span>');
+    expect(out).toContain('#2</a></td></tr><tr class="cov-point-detail" data-cov-detail="2" hidden><td colspan="5"><ul class="cov-points-list"><li><strong>#2</strong>');
+    expect(out.match(/id="cov-point-1"/g)).toHaveLength(1);
+    expect(out.match(/id="cov-point-2"/g)).toHaveLength(1);
+    expect(capabilityPointRows([1, 9, 'x'], byCapability.points, 4).match(/<tr /g)).toHaveLength(1);
+    expect(capabilityPointRows(null, null, 4)).toBe('');
+
+    const fakeRow = (cls, covDetail) => ({ classList: { contains: (c) => c === cls }, dataset: { covDetail }, hidden: true, nextElementSibling: null });
+    const first = fakeRow('cov-point-detail', '1');
+    const second = fakeRow('cov-point-detail', '2');
+    first.nextElementSibling = second;
+    second.nextElementSibling = fakeRow('group', undefined);
+    const tr = { nextElementSibling: first };
+    const attrs = {};
+    const link = { dataset: { covPoint: '2' }, closest: (s) => (s === 'tr' ? tr : null), setAttribute: (k, v) => { attrs[k] = v; } };
+    let prevented = 0;
+    const click = { target: { closest: (s) => (s === 'a[data-cov-point]' ? link : null) }, preventDefault: () => { prevented += 1; } };
+    toggleCoveragePoint(click);
+    expect([first.hidden, second.hidden, attrs['aria-expanded'], prevented]).toEqual([true, false, 'true', 1]);
+    toggleCoveragePoint(click);
+    expect([second.hidden, attrs['aria-expanded'], prevented]).toEqual([true, 'false', 2]);
+    // A number with no row under it is left to its link, to the list.
+    link.dataset.covPoint = '7';
+    toggleCoveragePoint(click);
+    expect([first.hidden, second.hidden, prevented]).toEqual([true, true, 2]);
+    expect(() => toggleCoveragePoint({ target: { closest: () => null } })).not.toThrow();
+    expect(() => toggleCoveragePoint({ target: {} })).not.toThrow();
+    // The live coverage and a published report both listen.
+    const source = read(page);
+    expect(source).toContain("document.getElementById('coverage-body').addEventListener('click', toggleCoveragePoint);");
+    expect(source).toContain("document.getElementById('published-body').addEventListener('click', toggleCoveragePoint);");
   });
 
   test('the Markdown starts with the capabilities, then the two views as detail (G4)', () => {
@@ -1747,7 +1784,7 @@ describe('the Report Builder coverage section', () => {
     });
     const out = capabilityHtml(report);
     expect(out).toContain('<td>Sale: pre-booking and confirmation — Declared</td>');
-    expect(out).toContain('cov-points">Passed with points</span></td><td><a href="#cov-point-1">#1</a></td>');
+    expect(out).toContain('cov-points">Passed with points</span></td><td><a href="#cov-point-1" data-cov-point="1" aria-expanded="false">#1</a></td>');
     // A 2xx status is not printed: the answer was a success.
     expect(out).toContain('<li id="cov-point-1"><strong>#1</strong> Sale: pre-booking and confirmation<br>02. POST Create Booking: Booking price is N<br><small>');
     // A test outside the catalogue is named by its code, once.

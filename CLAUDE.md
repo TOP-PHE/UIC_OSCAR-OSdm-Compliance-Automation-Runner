@@ -698,6 +698,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`publishedListHtml()`, `comparisonHtml()`, `publishedHtml()`; a report id
     reaches an address only through `coverageRunIdOf()`); a report shown
     clears the live coverage, so one set of point anchors is on the page.
+    **A point number opens its point under the row** (#984, 1.11.409):
+    hidden rows drawn with the table (`capabilityPointRows()`, no anchor id,
+    so ids stay unique), `toggleCoveragePoint()` on `coverage-body` and
+    `published-body`; the number keeps its link to the list at the end.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
