@@ -501,7 +501,8 @@ function suggestTrip(trip, testData) {
 }
 
 // #959: the label planCopy() gives a trip an exchange is for.
-const EXCHANGE_USE = / \(exchange\)$/;
+const EXCHANGE_USE = ' (exchange)';
+const isExchangeUse = (u) => String(u).endsWith(EXCHANGE_USE);
 const stopKey = (urn) => String(urn || '').replace(/^urn:uic:stn:/, '').replace(/^0+/, '');
 const routeOf = (train) => `${stopKey(train.origin)}>${stopKey(train.destination)}`;
 
@@ -534,7 +535,7 @@ function suggestTrips(trips, testData) {
   const list = arr(trips);
   const out = {};
   const saleOf = {};
-  const exchangeCodes = (trip) => arr(trip.usedBy).filter((u) => EXCHANGE_USE.test(u)).map((u) => u.replace(EXCHANGE_USE, ''));
+  const exchangeCodes = (trip) => arr(trip.usedBy).filter(isExchangeUse).map((u) => u.slice(0, -EXCHANGE_USE.length));
   for (const trip of list) {
     if (exchangeCodes(trip).length) continue;
     out[trip.id] = suggestTrip(trip, testData);
@@ -543,7 +544,7 @@ function suggestTrips(trips, testData) {
   for (const trip of list) {
     if (trip.id in out) continue;
     const avoid = exchangeCodes(trip).flatMap((code) => saleOf[code] || []).filter(Boolean);
-    const onlyExchanges = arr(trip.usedBy).every((u) => EXCHANGE_USE.test(u));
+    const onlyExchanges = arr(trip.usedBy).every(isExchangeUse);
     out[trip.id] = otherRouteFor(trip, testData, avoid) ?? (onlyExchanges ? null : suggestTrip(trip, testData));
   }
   return out;
