@@ -858,6 +858,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `src/protocol.js` (initialize, ping, tools/list, tools/call), no SDK.
   **A new `/v1/api` GET needs its tool**: `mcp-end-to-end.test.js` pins the
   tools to the OpenAPI paths and runs the server against the real router.
+- **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
+  The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
+  read "100 scenarios". `whole_batches=1` adds the rest of each batch on the
+  page with the page's own query (`listed.sql` + `listed.params`, so scope
+  and hidden statuses cannot drift); rows may exceed `limit`. Any page that
+  groups runs by batch asks for it.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

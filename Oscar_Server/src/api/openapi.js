@@ -185,6 +185,7 @@ module.exports = {
         parameters: [
           { name: 'limit',  in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
           { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'whole_batches', in: 'query', description: '1 adds the other runs of every batch on the page, so the answer may hold more rows than limit (#986).', schema: { type: 'string', enum: ['1'] } },
         ],
         responses: { 200: { description: 'List of runs', content: { 'application/json': { schema: {
           type: 'object',
