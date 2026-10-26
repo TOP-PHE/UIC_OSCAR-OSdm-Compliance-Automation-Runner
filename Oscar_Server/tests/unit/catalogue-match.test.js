@@ -16,7 +16,7 @@
 const path = require('node:path');
 
 process.env.COLLECTION_PATH = path.resolve(__dirname, '../../../Bruno_Collection');
-const { adaptReferenceScenario, adaptCatalogueDatafile, suggestTrip, journeysMissing, OVERRULE_CODES } = require('../../src/utils/catalogueMatch');
+const { adaptReferenceScenario, adaptCatalogueDatafile, suggestTrip, suggestTrips, journeysMissing, OVERRULE_CODES } = require('../../src/utils/catalogueMatch');
 const { catalogueDatafile, catalogueFor } = require('../../src/utils/scenarioCatalogue');
 
 const DATA = path.resolve(__dirname, '../../../Bruno_Collection/data_base');
@@ -156,6 +156,56 @@ describe('suggestTrip', () => {
     expect(suggestTrip({ legs: 1 }, { trains: [{ id: 'T2', services: [] }], journeys: [] })).toBe('train::T2::0');
     expect(suggestTrip({ legs: 1 }, { trains: [], journeys: [{ id: 'J9', legs: 1 }] })).toBe('journey::J9');
     expect(suggestTrip({ legs: 1 }, { trains: [], journeys: [] })).toBeNull();
+  });
+});
+
+// #959: the trip an exchange is for goes on another route than its sale's.
+describe('suggestTrips', () => {
+  const testData = {
+    trains: [
+      { id: 'A', origin: 'urn:uic:stn:0000001', destination: 'urn:uic:stn:0000002', services: [{ index: 0 }] },
+      { id: 'B', origin: '1', destination: '2', services: [{ index: 0 }] },
+      { id: 'C', origin: '0000003', destination: '0000001', services: [{ index: 4 }] },
+    ],
+    journeys: [{ id: 'J1', legs: 2 }, { id: 'J2', legs: 2 }],
+  };
+
+  test('a trip of sales only gets what suggestTrip() gives', () => {
+    const trips = [{ id: 1, legs: 1, usedBy: ['S'] }, { id: 2, legs: 2, needsJourney: true, usedBy: ['T'] }];
+    expect(suggestTrips(trips, testData)).toEqual({ 1: suggestTrip(trips[0], testData), 2: suggestTrip(trips[1], testData) });
+  });
+
+  test('an exchange\'s trip goes on another route than its sale trip; a train of the same route under another id does not count', () => {
+    const trips = [{ id: 1, legs: 1, usedBy: ['E'] }, { id: 2, legs: 1, usedBy: ['E (exchange)'] }];
+    expect(suggestTrips(trips, testData)).toEqual({ 1: 'train::A::0', 2: 'train::C::4' });
+  });
+
+  test('a trip that is a sale trip too still goes on another route than the exchanging scenario\'s sale', () => {
+    const trips = [{ id: 1, legs: 1, usedBy: ['E'] }, { id: 2, legs: 1, usedBy: ['S', 'E (exchange)'] }];
+    expect(suggestTrips(trips, testData)[2]).toBe('train::C::4');
+  });
+
+  test('no other route: none for a trip of exchanges only, suggestTrip()\'s for a shared one', () => {
+    const one = { trains: [testData.trains[0]], journeys: [] };
+    expect(suggestTrips([{ id: 1, legs: 1, usedBy: ['E'] }, { id: 2, legs: 1, usedBy: ['E (exchange)'] }], one))
+      .toEqual({ 1: 'train::A::0', 2: null });
+    expect(suggestTrips([{ id: 1, legs: 1, usedBy: ['E'] }, { id: 2, legs: 1, usedBy: ['S', 'E (exchange)'] }], one))
+      .toEqual({ 1: 'train::A::0', 2: 'train::A::0' });
+  });
+
+  test('an exchange\'s trip of several legs takes another journey of as many legs', () => {
+    const trips = [{ id: 1, legs: 2, needsJourney: true, usedBy: ['E'] }, { id: 2, legs: 2, needsJourney: true, usedBy: ['E (exchange)'] }];
+    expect(suggestTrips(trips, testData)).toEqual({ 1: 'journey::J1', 2: 'journey::J2' });
+    expect(suggestTrips(trips, { trains: [], journeys: [{ id: 'J1', legs: 2 }] })[2]).toBeNull();
+  });
+
+  test('the catalogue\'s exchange to another route: two trips, two routes', () => {
+    const { planCopy } = require('../../src/utils/scenarioCopy');
+    const plan = planCopy(catalogueDatafile(catalogue, simulator), ['OTST_EXCHANGE_OTHER_ROUTE_1ADT'], {});
+    expect(plan.trips.map(t => t.usedBy)).toEqual([['OTST_EXCHANGE_OTHER_ROUTE_1ADT'], ['OTST_EXCHANGE_OTHER_ROUTE_1ADT (exchange)']]);
+    const suggested = suggestTrips(plan.trips, testData);
+    expect(suggested[plan.trips[0].id]).toBe('train::A::0');
+    expect(suggested[plan.trips[1].id]).toBe('train::C::4');
   });
 });
 

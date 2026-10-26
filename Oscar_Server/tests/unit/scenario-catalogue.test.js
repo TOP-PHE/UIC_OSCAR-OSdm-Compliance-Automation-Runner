@@ -200,6 +200,24 @@ describe('#681 what a reference scenario needs from the provider\'s data', () =>
     expect(dataNeedsOf(sc({ requestedInformationProbe: 'omit' }), df, f).requestedInformation).toBe(true);
   });
 
+  test('#959: an exchange to another trip needs a second route; one to its own trip does not', () => {
+    expect(dataNeedsOf(sc({ scenarioType: 'EXCHANGE', exchange: { tripRequirementId: 3 } }), df, f).exchangeRoute).toBe(true);
+    expect(dataNeedsOf(sc({ scenarioType: 'EXCHANGE', exchange: { tripRequirementId: 1 } }), df, f).exchangeRoute).toBeUndefined();
+    expect(dataNeedsOf(sc({ scenarioType: 'EXCHANGE', exchange: { dateOffsetDays: 1 } }), df, f).exchangeRoute).toBeUndefined();
+    expect(needsText({ exchangeRoute: true })).toEqual(['a second train, on another route, to exchange to']);
+  });
+
+  test('#959: the catalogue\'s data file holds the trip an exchange is for, once', () => {
+    const only = { entries: catalogue.entries.filter(e => e.code === 'OTST_EXCHANGE_OTHER_ROUTE_1ADT') };
+    const made = catalogueDatafile(only, simulator);
+    const sc = made.scenarios[0];
+    expect(made.tripRequirements).toHaveLength(2);
+    expect(sc.exchange.tripRequirementId).not.toBe(sc.tripRequirementId);
+    const ids = made.tripRequirements.map(t => t.id);
+    expect(ids).toContain(sc.exchange.tripRequirementId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   test('said to the person copying, and given with each entry of the catalogue', () => {
     expect(needsText({ trip: 'SPECIFICATION', legs: 2, reservations: ['MANDATORY'], tariff: 'REFUNDABLE', passengers: 2, providerValues: ['overruleCode'], expiry: ['REFUND_OFFER'] }))
       .toEqual(['a journey of 2 legs', 'a train with a mandatory seat reservation', 'a refundable tariff', '2 passengers',

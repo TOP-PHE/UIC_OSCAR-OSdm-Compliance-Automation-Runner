@@ -1993,6 +1993,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   scenario uses" is `scenarioTripIds()`** (own + exchange): a new place that
   asks which scenarios use a trip goes through it. The criteria are pinned
   to the collection's `CRITERIA_KEYS` by `ui-scripts.test.js`.
+  **PR 3 (1.11.402 / OTST_V2.0.226): `OTST_EXCHANGE_OTHER_ROUTE_1ADT`.**
+  `catalogueDatafile()` brings the exchange's trip with its scenario, need
+  `exchangeRoute`. **Trips of a copy plan are proposed by `suggestTrips()`**
+  (`catalogueMatch.js`, both the copy route and the checklist's apply): a
+  trip an exchange names goes on another *route* than the exchanging
+  scenario's sale trip (another train id on the same route does not count);
+  none when the Test Data has no other route, unless the trip is also a
+  sale trip (then `suggestTrip()`'s). The catalogue's trip 2 is also
+  `OTST_SALE_ONE_WAY_2ADT_SAVER`'s sale trip: a test of the exchange's trip
+  must build the catalogue from that entry alone.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

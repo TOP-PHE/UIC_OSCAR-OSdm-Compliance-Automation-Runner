@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-exchange-to-another-route-reference",
+    "date": "October 26, 2026",
+    "tag": "Added",
+    "title": "Reference scenario: exchange for another route",
+    "summary": "Copy scenarios offers an exchange of a one-way ticket for a trip on another route.",
+    "content": "The new reference scenario OTST_EXCHANGE_OTHER_ROUTE_1ADT sells a one-way ticket, then exchanges it for a trip on another route, and checks that the exchange offers and the booking cover the new trip. When it is copied, OSCAR proposes for the exchange a train of your Test Data on another route than the sale's. Your Test Framework must declare the exchange (EXCHANGE_FULL), and your Test Data needs trains on two routes."
+  },
+  {
     "id": "2026-10-26-exchange-to-in-test-config",
     "date": "October 26, 2026",
     "tag": "Added",

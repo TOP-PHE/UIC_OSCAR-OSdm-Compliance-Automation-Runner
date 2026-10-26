@@ -500,6 +500,56 @@ function suggestTrip(trip, testData) {
   return `train::${train.id}::${service ? service.index : 0}`;
 }
 
+// #959: the label planCopy() gives a trip an exchange is for.
+const EXCHANGE_USE = ' (exchange)';
+const isExchangeUse = (u) => String(u).endsWith(EXCHANGE_USE);
+const stopKey = (urn) => String(urn || '').replace(/^urn:uic:stn:/, '').replace(/^0+/, '');
+const routeOf = (train) => `${stopKey(train.origin)}>${stopKey(train.destination)}`;
+
+// A train or journey of the Test Data on another route than any of `avoid`
+// (suggestions of the sale trips), or null when the Test Data has none.
+function otherRouteFor(trip, testData, avoid) {
+  const legs = Number(trip?.legs) || 1;
+  if (trip?.needsJourney || legs > 1) {
+    const taken = new Set(avoid.filter((s) => s.startsWith('journey::')).map((s) => s.split('::')[1]));
+    const other = arr(testData?.journeys).find((j) => j.legs === legs && !taken.has(String(j.id)));
+    return other ? `journey::${other.id}` : null;
+  }
+  const trains = arr(testData?.trains);
+  const takenIds = new Set(avoid.filter((s) => s.startsWith('train::')).map((s) => s.split('::')[1]));
+  const takenRoutes = new Set(trains.filter((t) => takenIds.has(String(t.id))).map(routeOf));
+  const other = trains.find((t) => !takenIds.has(String(t.id)) && !takenRoutes.has(routeOf(t)));
+  if (!other) return null;
+  const service = arr(other.services)[0];
+  return `train::${other.id}::${service ? service.index : 0}`;
+}
+
+/**
+ * #959: a proposed train or journey for each trip of a copy plan, by trip
+ * id: suggestTrip() for each, but a trip an exchange is for goes on another
+ * route than the sale trips of the scenarios exchanging to it. When the Test
+ * Data has no other route, a trip used by exchanges only gets none (null),
+ * one that is also a sale trip keeps suggestTrip()'s.
+ */
+function suggestTrips(trips, testData) {
+  const list = arr(trips);
+  const out = {};
+  const saleOf = {};
+  const exchangeCodes = (trip) => arr(trip.usedBy).filter(isExchangeUse).map((u) => u.slice(0, -EXCHANGE_USE.length));
+  for (const trip of list) {
+    if (exchangeCodes(trip).length) continue;
+    out[trip.id] = suggestTrip(trip, testData);
+    for (const code of arr(trip.usedBy)) (saleOf[code] || (saleOf[code] = [])).push(out[trip.id]);
+  }
+  for (const trip of list) {
+    if (trip.id in out) continue;
+    const avoid = exchangeCodes(trip).flatMap((code) => saleOf[code] || []).filter(Boolean);
+    const onlyExchanges = arr(trip.usedBy).every(isExchangeUse);
+    out[trip.id] = otherRouteFor(trip, testData, avoid) ?? (onlyExchanges ? null : suggestTrip(trip, testData));
+  }
+  return out;
+}
+
 /**
  * The scenarios that cannot be copied from the catalogue as the Test Data
  * stands: one of their trips has several legs, and no journey of the Test
@@ -522,5 +572,5 @@ function journeysMissing(trips, testData) {
 }
 
 module.exports = {
-  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, journeysMissing, withOfferRequestForms, withOfferOptions, withCurrencies, OVERRULE_CODES,
+  adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, suggestTrips, journeysMissing, withOfferRequestForms, withOfferOptions, withCurrencies, OVERRULE_CODES,
 };
