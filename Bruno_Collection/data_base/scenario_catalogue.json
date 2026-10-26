@@ -1,10 +1,11 @@
 {
-  "$comment": "Scenario catalogue (#612): reference scenarios a company can copy into its data file from Test Config. Each entry names the scenario of simulator_datafile.json that supplies its data (source), says what it tests (purpose), and gives the number of checks it produced on the OSDM simulator (checks, from node OSDM_Simulator/scripts/replay.js). set changes only the *MaxWaitMinutes waits, for a real provider. needs is what the scenario needs from the provider's data (#681), equal to dataNeedsOf() of its source: the trip, the reservation it exercises, the tariff, the passengers, the values only the provider gives. Kept sound by Oscar_Server/tests/unit/scenario-catalogue.test.js.",
+  "$comment": "Scenario catalogue (#612): reference scenarios a company can copy into its data file from Test Config. Each entry names the scenario of simulator_datafile.json that supplies its data (source), says what it tests (purpose) and under which capability of the coverage report it counts (capability, #972: an id of Oscar_Server/src/utils/capabilities.js), and gives the number of checks it produced on the OSDM simulator (checks, from node OSDM_Simulator/scripts/replay.js). set changes only the *MaxWaitMinutes waits, for a real provider. needs is what the scenario needs from the provider's data (#681), equal to dataNeedsOf() of its source: the trip, the reservation it exercises, the tariff, the passengers, the values only the provider gives. Kept sound by Oscar_Server/tests/unit/scenario-catalogue.test.js.",
   "entries": [
     {
       "code": "OTST_SALE_ONE_WAY_1ADT",
       "source": "SIM_SALE_SEARCH_1ADT_38",
       "purpose": "One-way sale for one adult: offers, booking, passenger update, confirmation, documents.",
+      "capability": "sale",
       "checks": 234,
       "needs": {
         "trip": "SEARCH",
@@ -15,6 +16,7 @@
       "code": "OTST_SALE_ONE_WAY_2ADT_SAVER",
       "source": "SIM_SALE_SEARCH_2ADT_SAVER_38",
       "purpose": "One-way sale for two adults, choosing the non-flexible (saver) offer.",
+      "capability": "sale",
       "checks": 294,
       "needs": {
         "trip": "SEARCH",
@@ -26,6 +28,7 @@
       "code": "OTST_SALE_MAX_PASSENGERS",
       "source": "SIM_SALE_MAX_PASSENGERS_38",
       "purpose": "Sale at the provider's maximum number of passengers per offer and booking, every passenger updated after booking.",
+      "capability": "sale.limits",
       "checks": 1314,
       "limit": "MAX_PASSENGERS",
       "needs": {
@@ -37,6 +40,7 @@
       "code": "OTST_SALE_ACCENTED_LONG_NAMES",
       "source": "SIM_SALE_ACCENTED_NAMES_38",
       "purpose": "Accented (Czech) and long names, updated after booking to other accented names: every read must give them back unchanged.",
+      "capability": "passengers.names",
       "checks": 294,
       "needs": {
         "trip": "SEARCH",
@@ -47,6 +51,7 @@
       "code": "OTST_SALE_AT_SALES_HORIZON",
       "source": "SIM_SALE_AT_SALES_HORIZON_38",
       "purpose": "Sale of a departure on the last day of the provider's sales horizon.",
+      "capability": "sale.limits",
       "checks": 234,
       "limit": "SALES_HORIZON",
       "needs": {
@@ -58,6 +63,7 @@
       "code": "OTST_SALE_AGE_LIMITS",
       "source": "SIM_SALE_AGE_LIMITS_38",
       "purpose": "Three passengers on the edges of the age ranges: a child on the last day of its range, a passenger the day it leaves it, an adult on the first day of the adult range; each priced as its type.",
+      "capability": "passengers.ages",
       "checks": 408,
       "limit": "AGE_RANGES",
       "needs": {
@@ -69,6 +75,7 @@
       "code": "OTST_SALE_RETURN_SEPARATE_1ADT",
       "source": "SIM_RETURN_SEPARATE_1ADT_38",
       "purpose": "Return sold as two offers, one per direction (returnSearchParameters.outwardOfferIds).",
+      "capability": "return.separate",
       "checks": 314,
       "needs": {
         "trip": "SEARCH",
@@ -80,6 +87,7 @@
       "code": "OTST_SALE_RETURN_COMBINED_1ADT",
       "source": "SIM_RETURN_COMBINED_1ADT_38",
       "purpose": "Return sold as one offer covering both directions (outboundTripIds, OSDM 3.7 and later).",
+      "capability": "return.combined",
       "checks": 356,
       "needs": {
         "trip": "SEARCH",
@@ -91,6 +99,7 @@
       "code": "OTST_REFUND_RETURN_FULL_1ADT",
       "source": "SIM_REFUND_RETURN_1ADT_38",
       "purpose": "Full refund of a return: every refund offer confirmed, every fulfillment refunded.",
+      "capability": "refund.full",
       "checks": 527,
       "needs": {
         "trip": "SEARCH",
@@ -103,6 +112,7 @@
       "code": "OTST_REFUND_RETURN_INBOUND_1ADT",
       "source": "SIM_REFUND_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return by fulfillment: the inbound ticket alone.",
+      "capability": "refund.partial.fulfillment",
       "checks": 455,
       "needs": {
         "trip": "SEARCH",
@@ -115,6 +125,7 @@
       "code": "OTST_REFUND_PARTIAL_PASSENGER_2ADT",
       "source": "SIM_REFUND_PAX_2ADT_38",
       "purpose": "Partial refund by passenger: two adults, the last one refunded alone; the other passenger's ticket stays.",
+      "capability": "refund.partial.passenger",
       "checks": 476,
       "needs": {
         "trip": "SEARCH",
@@ -126,6 +137,7 @@
       "code": "OTST_REFUND_PARTIAL_LEG_1ADT",
       "source": "SIM_REFUND_LEG_1ADT_38",
       "purpose": "Partial refund by leg: a two-leg journey, the last leg refunded alone; the first leg stays.",
+      "capability": "refund.partial.leg",
       "checks": 453,
       "needs": {
         "trip": "SPECIFICATION",
@@ -138,6 +150,7 @@
       "code": "OTST_REFUND_PARTIAL_PASSENGERS_THIRD",
       "source": "SIM_REFUND_PAX_THIRD_19PAX_38",
       "purpose": "Partial refund of a third of the passengers, at the provider's maximum number of passengers: only theirs are refunded, the others' tickets stay.",
+      "capability": "refund.partial.passenger",
       "checks": 5237,
       "limit": "MAX_PASSENGERS",
       "needs": {
@@ -150,6 +163,7 @@
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
       "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",
+      "capability": "refund.technical",
       "checks": 611,
       "needs": {
         "trip": "SEARCH",
@@ -164,6 +178,7 @@
       "code": "NHF_CONFIRM_TWICE",
       "source": "SIM_NHF_CONFIRM_AGAIN_38",
       "purpose": "A booking confirmed twice: the second confirmation must give the same tickets, or be refused; never new ones.",
+      "capability": "sale",
       "checks": 235,
       "needs": {
         "trip": "SEARCH",
@@ -174,6 +189,7 @@
       "code": "NHF_REFUND_TWICE",
       "source": "SIM_NHF_REFUND_AGAIN_38",
       "purpose": "A ticket refunded in full cannot be refunded again: the second refund offer request must be refused.",
+      "capability": "refund.full",
       "checks": 350,
       "needs": {
         "trip": "SEARCH",
@@ -185,6 +201,7 @@
       "code": "NHF_EXCHANGE_REFUNDED",
       "source": "SIM_NHF_EXCHANGE_REFUNDED_38",
       "purpose": "A ticket refunded in full cannot be exchanged: the exchange offer request must be refused.",
+      "capability": "exchange.full",
       "checks": 350,
       "needs": {
         "trip": "SEARCH",
@@ -196,6 +213,7 @@
       "code": "NHF_SALE_NO_PASSENGER",
       "source": "SIM_NHF_NO_PASSENGER_38",
       "purpose": "An offer request with no passenger at all must be refused.",
+      "capability": "sale",
       "checks": 71,
       "needs": {
         "trip": "SEARCH",
@@ -206,6 +224,7 @@
       "code": "NHF_SALE_TOO_MANY_PASSENGERS",
       "source": "SIM_NHF_TOO_MANY_PASSENGERS_38",
       "purpose": "One passenger more than the provider's maximum: the offer request, or else the booking, must be refused.",
+      "capability": "sale.limits",
       "checks": 71,
       "limit": "OVER_MAX_PASSENGERS",
       "needs": {
@@ -217,6 +236,7 @@
       "code": "NHF_SALE_BEYOND_SALES_HORIZON",
       "source": "SIM_NHF_BEYOND_SALES_HORIZON_38",
       "purpose": "A departure one day beyond the provider's sales horizon: the offer request must be refused, or give no offer.",
+      "capability": "sale.limits",
       "checks": 70,
       "limit": "OVER_SALES_HORIZON",
       "needs": {
@@ -228,6 +248,7 @@
       "code": "NHF_SALE_DEPARTURE_IN_PAST",
       "source": "SIM_NHF_DEPARTURE_IN_PAST_38",
       "purpose": "A departure yesterday: the offer request must be refused, or give no offer.",
+      "capability": "sale.limits",
       "checks": 72,
       "needs": {
         "trip": "SEARCH",
@@ -238,6 +259,7 @@
       "code": "NHF_REFUND_OVERRULE_CODE_REFUSED",
       "source": "SIM_REFUND_OVERRULE_REFUSED_38",
       "purpose": "A refund with an overrule code the provider does not accept must be refused.",
+      "capability": "refund.technical",
       "checks": 361,
       "needs": {
         "trip": "SEARCH",
@@ -252,6 +274,7 @@
       "code": "OTST_REFUND_WITHDRAWN_1ADT",
       "source": "SIM_REFUND_DELETE_1ADT_38",
       "purpose": "Refund offer asked for, then withdrawn instead of confirmed: the ticket stays.",
+      "capability": "refund.withdraw",
       "checks": 333,
       "needs": {
         "trip": "SEARCH",
@@ -263,6 +286,7 @@
       "code": "OTST_REFUND_OFFER_ONLY_1ADT",
       "source": "SIM_REFUND_ONLY_OFFER_1ADT_38",
       "purpose": "Refund offer asked for and read, neither confirmed nor withdrawn.",
+      "capability": "refund.offer",
       "checks": 300,
       "needs": {
         "trip": "SEARCH",
@@ -274,6 +298,7 @@
       "code": "OTST_REFUND_RECEIPT_RETURN_1ADT",
       "source": "SIM_REFUND_RECEIPT_RETURN_1ADT_38",
       "purpose": "Full refund of a return, then the refund receipt waited for in the booking.",
+      "capability": "refund.receipt",
       "checks": 530,
       "needs": {
         "trip": "SEARCH",
@@ -286,6 +311,7 @@
       "code": "OTST_REFUND_RETURN_COMBINED_FULL_1ADT",
       "source": "SIM_REFUND_COMBINED_RETURN_1ADT_38",
       "purpose": "Full refund of a return sold as one offer covering both directions: every refund offer confirmed, every fulfillment refunded.",
+      "capability": "refund.full",
       "checks": 595,
       "needs": {
         "trip": "SEARCH",
@@ -298,6 +324,7 @@
       "code": "OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT",
       "source": "SIM_REFUND_COMBINED_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return sold as one offer, by fulfillment: the inbound ticket alone.",
+      "capability": "refund.partial.fulfillment",
       "checks": 516,
       "needs": {
         "trip": "SEARCH",
@@ -310,6 +337,7 @@
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation of a return sold as one offer: refund with an overrule code, everything back and no fee.",
+      "capability": "refund.technical",
       "checks": 758,
       "needs": {
         "trip": "SEARCH",
@@ -324,6 +352,7 @@
       "code": "OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_RECEIPT_1ADT_38",
       "purpose": "Full refund of a return sold as one offer, then the refund receipt waited for in the booking.",
+      "capability": "refund.receipt",
       "checks": 598,
       "needs": {
         "trip": "SEARCH",
@@ -336,6 +365,7 @@
       "code": "OTST_EXCHANGE_1ADT",
       "source": "SIM_EXCHANGE_1ADT_38",
       "purpose": "Exchange of a one-way ticket: exchange offers, one taken, confirmed.",
+      "capability": "exchange.full",
       "checks": 389,
       "needs": {
         "trip": "SEARCH",
@@ -347,6 +377,7 @@
       "code": "OTST_EXCHANGE_WITHDRAWN_1ADT",
       "source": "SIM_EXCHANGE_DELETE_1ADT_38",
       "purpose": "Exchange pre-booked, then withdrawn before its confirmation: the ticket stays.",
+      "capability": "exchange.withdraw",
       "checks": 361,
       "needs": {
         "trip": "SEARCH",
@@ -358,6 +389,7 @@
       "code": "OTST_SALE_REDUCTION_CARD_1ADT",
       "source": "SIM_SALE_CARD_25_1ADT_38",
       "purpose": "Sale to an adult holding a reduction card, the first one the Test Framework declares: the offer names the card on the passenger and costs less than the same request without it.",
+      "capability": "sale.reductionCards",
       "checks": 261,
       "limit": "REDUCTION_CARDS",
       "needs": {
@@ -370,6 +402,7 @@
       "code": "OTST_SALE_REDUCTION_CARD_2ADT",
       "source": "SIM_SALE_CARD_50_2ADT_38",
       "purpose": "Sale to two adults, one holding the first reduction card the Test Framework declares: only that passenger pays less.",
+      "capability": "sale.reductionCards",
       "checks": 321,
       "limit": "REDUCTION_CARDS",
       "needs": {
@@ -382,6 +415,7 @@
       "code": "OTST_SALE_NAMED_PRODUCT_1ADT",
       "source": "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38",
       "purpose": "Sale to an adult of a named product, the first one the Test Framework declares, by its code and in its flexibility: the offer chosen holds that product, and the booking and its fulfilment name it.",
+      "capability": "sale.products",
       "checks": 237,
       "limit": "NAMED_PRODUCTS",
       "needs": {
@@ -397,6 +431,7 @@
       "code": "OTST_SALE_GROUP_TARIFF",
       "source": "SIM_GROUP_6ADT_38",
       "purpose": "Group sale in the COLLECTIVE mode with the first group product the Test Framework declares, by its code, for a group of its sizes: one collective admission for the whole group, every passenger in appliedPassengerTypes, and the group compared with the same passengers alone.",
+      "capability": "sale.groupTariff",
       "checks": 498,
       "limit": "GROUP_TARIFF",
       "needs": {
@@ -411,6 +446,7 @@
       "code": "NHF_SALE_GROUP_TOO_LARGE",
       "source": "SIM_GROUP_WEEKEND_6PAX_ABSENT_38",
       "purpose": "Group of one passenger more than the maximum of the first group product the Test Framework declares with one: the provider must refuse the request or offer it without that product.",
+      "capability": "sale.groupTariff",
       "checks": 172,
       "limit": "OVER_GROUP_SIZE",
       "needs": {
@@ -426,6 +462,7 @@
       "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
       "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
       "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",
+      "capability": "sale.classPerLeg",
       "checks": 289,
       "needs": {
         "trip": "SPECIFICATION",
@@ -441,6 +478,7 @@
       "code": "OTST_SALE_RESERVATION_MANDATORY_2ADT",
       "source": "SIM_SALE_RESERVATION_MANDATORY_2ADT_38",
       "purpose": "A mandatory seat reservation, detected from the admission and booked with it.",
+      "capability": "reservation.mandatory",
       "checks": 343,
       "needs": {
         "trip": "SPECIFICATION",
@@ -455,6 +493,7 @@
       "code": "OTST_SALE_RESERVATION_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with optionalReservationSelections.",
+      "capability": "reservation.optional",
       "checks": 369,
       "needs": {
         "trip": "SPECIFICATION",
@@ -469,6 +508,7 @@
       "code": "OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with placeSelections.",
+      "capability": "reservation.placeSelection",
       "checks": 369,
       "needs": {
         "trip": "SPECIFICATION",
@@ -483,6 +523,7 @@
       "code": "OTST_SALE_RESERVATION_ADD_LATER_2ADT",
       "source": "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38",
       "purpose": "An optional seat reservation added to the pre-booked booking afterwards.",
+      "capability": "reservation.addLater",
       "checks": 368,
       "needs": {
         "trip": "SPECIFICATION",
@@ -497,6 +538,7 @@
       "code": "OTST_SALE_SEAT_PREFERENCE_1ADT",
       "source": "SIM_SALE_SEAT_PREFERENCE_1ADT_38",
       "purpose": "A seat preference (window) asked in the booking with the reservation; the place booked must give it.",
+      "capability": "reservation.preferences",
       "checks": 271,
       "needs": {
         "trip": "SPECIFICATION",
@@ -513,6 +555,7 @@
       "code": "OTST_SALE_SEAT_PREFERENCES_FLOW_2ADT",
       "source": "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38",
       "purpose": "Seat preferences in the PREFERENCES flow: GET /availabilities/preferences before the booking; one not offered and one no longer available are warnings, the rest is asked and given.",
+      "capability": "reservation.preferences",
       "checks": 337,
       "needs": {
         "trip": "SPECIFICATION",
@@ -529,6 +572,7 @@
       "code": "OTST_SALE_NAMED_PLACE_2ADT",
       "source": "SIM_SALE_NAMED_PLACE_2ADT_38",
       "purpose": "Two named seats without a selection fee, chosen on the place map (POST /availabilities/vehicle-place-map); the booking gives them at the offer's price.",
+      "capability": "reservation.namedPlace",
       "checks": 336,
       "needs": {
         "trip": "SPECIFICATION",
@@ -542,6 +586,7 @@
       "code": "OTST_SALE_NAMED_PLACE_FEE_1ADT",
       "source": "SIM_SALE_NAMED_PLACE_FEE_1ADT_38",
       "purpose": "A named seat with a selection fee, chosen on the place map; the booking gives it at the offer's price plus the fee.",
+      "capability": "reservation.namedPlace",
       "checks": 273,
       "needs": {
         "trip": "SPECIFICATION",
@@ -555,6 +600,7 @@
       "code": "OTST_SALE_NAMED_COMPARTMENT_2ADT",
       "source": "SIM_SALE_NAMED_COMPARTMENT_2ADT_38",
       "purpose": "A compartment booked as a whole, chosen on the place map; the booking gives it.",
+      "capability": "reservation.namedPlace",
       "checks": 336,
       "needs": {
         "trip": "SPECIFICATION",
@@ -568,6 +614,7 @@
       "code": "OTST_SALE_NEARBY_PLACE_2ADT",
       "source": "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38",
       "purpose": "Two seats near the place of another passenger (AUTOMATIC_PLACE_SELECTION_NEARBY): the trip is booked first for the first passenger alone, the place given is the reference place; GET /availabilities/nearby, then the booking names it in placeSelections[].referencePlace and gives seats in its coach, never that place itself. The first booking is deleted.",
+      "capability": "reservation.nearby",
       "checks": 336,
       "needs": {
         "trip": "SPECIFICATION",
@@ -581,6 +628,7 @@
       "code": "OTST_SALE_NEARBY_PLACE_1ADT",
       "source": "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38",
       "purpose": "One seat near the place of a first booking (AUTOMATIC_PLACE_SELECTION_NEARBY), for one passenger: the same as OTST_SALE_NEARBY_PLACE_2ADT for a provider that books one passenger's reservation only.",
+      "capability": "reservation.nearby",
       "checks": 273,
       "needs": {
         "trip": "SPECIFICATION",
@@ -594,6 +642,7 @@
       "code": "OTST_SALE_NAMED_PLACE_ADD_LATER_2ADT",
       "source": "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38",
       "purpose": "An optional reservation added after the booking with two named seats: the place map asked for the booking (POST /availabilities/vehicle-place-map, BOOKING context), the seats named in the offer-parts request and given.",
+      "capability": "reservation.addLater",
       "checks": 335,
       "needs": {
         "trip": "SPECIFICATION",
@@ -607,6 +656,7 @@
       "code": "OTST_SALE_NEARBY_PLACE_ADD_LATER_2ADT",
       "source": "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38",
       "purpose": "An optional reservation added after the booking near the place of another passenger: a first booking for the first passenger alone gives the reference place; GET /availabilities/nearby for the booking, the reference place in the offer-parts request, seats given in its coach. The first booking is deleted.",
+      "capability": "reservation.addLater",
       "checks": 335,
       "needs": {
         "trip": "SPECIFICATION",
@@ -620,6 +670,7 @@
       "code": "OTST_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT",
       "source": "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38",
       "purpose": "An optional reservation added after the booking with a seat preference: GET /availabilities/preferences for the booking, the preference in the offer-parts request, and the place given names it.",
+      "capability": "reservation.addLater",
       "checks": 336,
       "needs": {
         "trip": "SPECIFICATION",
@@ -636,6 +687,7 @@
       "code": "OTST_SALE_BY_TRIP_ID_1ADT",
       "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
       "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",
+      "capability": "offers.tripIds",
       "checks": 241,
       "needs": {
         "trip": "SEARCH",
@@ -646,6 +698,7 @@
       "code": "NHF_SALE_BY_TRIP_ID_UNKNOWN",
       "source": "SIM_SALE_BY_TRIP_ID_UNKNOWN_38",
       "purpose": "Offers asked for a trip id the provider never gave must be refused.",
+      "capability": "offers.tripIds",
       "checks": 71,
       "needs": {
         "trip": "SEARCH",
@@ -656,6 +709,7 @@
       "code": "OTST_SALE_SEARCH_TRAIN_FILTER_1ADT",
       "source": "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38",
       "purpose": "An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only.",
+      "capability": "offers.tripParameters",
       "checks": 235,
       "needs": {
         "trip": "SEARCH",
@@ -666,6 +720,7 @@
       "code": "OTST_SALE_DOCUMENTS_RETURN_1ADT",
       "source": "SIM_SALE_DOCUMENTS_RETURN_1ADT_38",
       "purpose": "Fulfillment documents of a return, and each fulfillment read with GET /fulfillments/{id}.",
+      "capability": "fulfilment.documents",
       "checks": 356,
       "needs": {
         "trip": "SEARCH",
@@ -677,6 +732,7 @@
       "code": "OTST_SALE_IDEMPOTENCY_1ADT",
       "source": "SIM_SALE_IDEMPOTENCY_1ADT_38",
       "purpose": "Idempotency-Key on the booking and the confirmation: the same key gives the same answer.",
+      "capability": "sale.idempotency",
       "checks": 240,
       "needs": {
         "trip": "SEARCH",
@@ -687,6 +743,7 @@
       "code": "NHF_EXPIRED_OFFER",
       "source": "SIM_NHF_EXPIRED_OFFER_38",
       "purpose": "Booking an offer after its preBookableUntil must be refused.",
+      "capability": "expiry",
       "checks": 121,
       "set": {
         "expiredOfferMaxWaitMinutes": 40
@@ -703,6 +760,7 @@
       "code": "NHF_EXPIRED_BOOKING",
       "source": "SIM_NHF_EXPIRED_BOOKING_38",
       "purpose": "Confirming a booking after its confirmation time limit must be refused.",
+      "capability": "expiry",
       "checks": 191,
       "set": {
         "expiredBookingMaxWaitMinutes": 40
@@ -719,6 +777,7 @@
       "code": "NHF_EXPIRED_REFUND_OFFER",
       "source": "SIM_NHF_EXPIRED_REFUND_OFFER_38",
       "purpose": "Confirming a refund offer after its validUntil must be refused.",
+      "capability": "expiry",
       "checks": 304,
       "set": {
         "expiredRefundOfferMaxWaitMinutes": 40
@@ -736,6 +795,7 @@
       "code": "NHF_EXPIRED_EXCHANGE_OFFER",
       "source": "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38",
       "purpose": "Taking an exchange offer after its preBookableUntil must be refused.",
+      "capability": "expiry",
       "checks": 273,
       "set": {
         "expiredExchangeOfferMaxWaitMinutes": 40
@@ -753,6 +813,7 @@
       "code": "OTST_SALE_REQUESTED_INFORMATION_1ADT",
       "source": "SIM_RI_AUTOFEED_1ADT_38",
       "purpose": "Requested information: what the offers ask for is checked and supplied.",
+      "capability": "passengers.requestedInformation",
       "checks": 237,
       "needs": {
         "trip": "SEARCH",
@@ -764,6 +825,7 @@
       "code": "NHF_REQUESTED_INFORMATION_OMITTED",
       "source": "SIM_NHF_RI_OMIT_1ADT_38",
       "purpose": "A passenger update without a demanded field must be refused.",
+      "capability": "passengers.requestedInformation",
       "checks": 147,
       "needs": {
         "trip": "SEARCH",
@@ -775,6 +837,7 @@
       "code": "NHF_PASSENGER_DATA_INVALID",
       "source": "SIM_NHF_RI_INVALID_1ADT_38",
       "purpose": "A passenger update with an invalid field, one field per pass, must be refused.",
+      "capability": "passengers.update",
       "checks": 163,
       "needs": {
         "trip": "SEARCH",
@@ -786,6 +849,7 @@
       "code": "OTST_PURCHASER_DEFERRED_1ADT",
       "source": "SIM_PURCHASER_DEFERRED_1ADT_38",
       "purpose": "Booking made without its purchaser, which is written afterwards.",
+      "capability": "purchaser",
       "checks": 239,
       "needs": {
         "trip": "SEARCH",
@@ -796,6 +860,7 @@
       "code": "NHF_PURCHASER_INVALID",
       "source": "SIM_NHF_PURCHASER_INVALID_1ADT_38",
       "purpose": "A purchaser with a missing or invalid field, one per pass, must be refused.",
+      "capability": "purchaser",
       "checks": 250,
       "needs": {
         "trip": "SEARCH",
@@ -806,6 +871,7 @@
       "code": "OTST_OFFER_OPTION_PROBE",
       "source": "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38",
       "purpose": "Offer search probes: offers asked with one option of the offer search criteria alone, one probe per value the Test Framework declares; no offer keeping to it, or the provider ignoring it, fails.",
+      "capability": "offers.options",
       "checks": 118,
       "probe": "OFFER_OPTIONS",
       "needs": {
@@ -817,6 +883,7 @@
       "code": "OTST_OFFER_OPTION_COMBINATIONS",
       "source": "SIM_OFFER_PROBE_COMBINATION_38",
       "purpose": "Offer search combinations: offers asked with two or more declared option values together, drawn at random from the Test Framework's seed (the same seed, the same combinations); an option no offer keeps to, or that the provider ignores, fails.",
+      "capability": "offers.options",
       "checks": 121,
       "probe": "OFFER_COMBINATIONS",
       "needs": {
@@ -828,6 +895,7 @@
       "code": "OTST_TRIP_TRANSFER_LIMIT_0",
       "source": "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38",
       "purpose": "Trip search probe: direct trips only and one result asked (parameters.transferLimit 0, numberOfResults 1); a trip with a transfer, more trips than asked, or the provider ignoring either, fails. The scenario ends after the offer.",
+      "capability": "offers.tripParameters",
       "checks": 119,
       "needs": {
         "trip": "SEARCH",
@@ -838,6 +906,7 @@
       "code": "OTST_OFFER_OPTION_NOT_DECLARED",
       "source": "SIM_OFFER_PROBE_NOT_DECLARED_38",
       "purpose": "Undeclared option probe: offers asked with an offer search option value the Test Framework's lists leave out (the first of travel class, service class, offer part, flexibility, product tag); a refusal, no offer, or the provider saying it ignored it pass, offers keeping to the value fail (the framework should declare it). The scenario ends after the offer.",
+      "capability": "offers.options",
       "checks": 70,
       "probe": "OFFER_OPTION_NOT_DECLARED",
       "needs": {
@@ -849,6 +918,7 @@
       "code": "OTST_OFFER_OPTION_DISCOVERY",
       "source": "SIM_OFFER_OPTION_DISCOVERY_38",
       "purpose": "Offer request options: the offer request with the mandatory members only (the passengers' externalRef and type, and the trip) must be answered with offers; then each optional member of the version's OfferCollectionRequest alone, random combinations of those found supported, and all of them, each answer classified (supported, refused, not implemented, error; honoured, ignored said or silent, no offer said or silent, accepted). A code only the provider can give (card, corporate or promotion code, product) is made up when none is declared, and must be refused or said. Only the first request can fail; the rest is a report. The scenario ends after the offer.",
+      "capability": "offers.requestOptions",
       "checks": 70,
       "needs": {
         "trip": "SEARCH",
@@ -859,6 +929,7 @@
       "code": "OTST_SALE_CURRENCY",
       "source": "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38",
       "purpose": "Sale in each currency the Test Framework declares, then a full refund: offers, booking and refund offers all in the currency asked.",
+      "capability": "sale.currencies",
       "checks": 527,
       "probe": "CURRENCIES",
       "needs": {
@@ -872,6 +943,7 @@
       "code": "OTST_EXCHANGE_CURRENCY",
       "source": "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38",
       "purpose": "Exchange in each currency the Test Framework declares: the exchange request carries the sale’s currency, and the exchange offers are in it.",
+      "capability": "sale.currencies",
       "checks": 389,
       "probe": "CURRENCIES",
       "needs": {
@@ -884,6 +956,7 @@
       "code": "OTST_SALE_DEFAULT_CURRENCY",
       "source": "SIM_CURRENCY_DEFAULT_1ADT_38",
       "purpose": "Sale with no currency asked: the offers are in the default currency the Test Framework declares, and the booking keeps it.",
+      "capability": "sale.currencies",
       "checks": 234,
       "probe": "DEFAULT_CURRENCY",
       "needs": {
@@ -895,6 +968,7 @@
       "code": "NHF_CURRENCY_NOT_SOLD",
       "source": "SIM_NHF_CURRENCY_NOT_SOLD_38",
       "purpose": "Negative test: offers asked in a common currency the Test Framework does not declare; a refusal or no offer passes, offers in that currency fail. The scenario ends after the offer.",
+      "capability": "sale.currencies",
       "checks": 71,
       "probe": "CURRENCY_NOT_SOLD",
       "needs": {
@@ -907,6 +981,7 @@
       "source": "SIM_FARE_SPEC_1ADT_38",
       "checks": 117,
       "purpose": "Fare sale for one adult by trip specification: fares asked for the last leg's section, one fare offer per cluster checked (fares, passengers, section coverage, conditions), the fare offer of the chosen cluster booked and fulfilled as fares.",
+      "capability": "fares.sale",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -918,6 +993,7 @@
       "source": "SIM_FARE_SRCH_1ADT_38",
       "checks": 117,
       "purpose": "Fare sale for one adult by search criteria: fares asked for the whole trip, the fare offers checked, the fare offer of the chosen cluster booked and fulfilled as fares.",
+      "capability": "fares.sale",
       "needs": {
         "trip": "SEARCH",
         "passengers": 1
@@ -928,6 +1004,7 @@
       "source": "SIM_FARE_TRIPIDS_1ADT_38",
       "checks": 124,
       "purpose": "Fare sale for one adult by trip id: POST /trips-collection, then the fares of the trip chosen, by its id, for the whole trip; the fare offer of the chosen cluster booked and fulfilled as fares.",
+      "capability": "fares.sale",
       "needs": {
         "trip": "SEARCH",
         "passengers": 1
@@ -939,6 +1016,7 @@
       "checks": 116,
       "limit": "FREE_CHILD",
       "purpose": "Fare sale for an adult and a child one year under the age the Test Framework declares free: every passenger has a fare, the child's priced 0.",
+      "capability": "fares.sale",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -950,6 +1028,7 @@
       "source": "SIM_NHF_FARE_UNASKED_38",
       "checks": 71,
       "purpose": "Negative fare request: a section named but only ADMISSION asked; a fare in the answer fails (fares are given only when asked). The scenario ends after the offer.",
+      "capability": "fares.offers",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -961,6 +1040,7 @@
       "source": "SIM_NHF_FARE_NO_SECTION_SPEC_38",
       "checks": 71,
       "purpose": "Negative fare request: FARE_ADMISSION asked by trip specification without a section; a fare in the answer fails. The scenario ends after the offer.",
+      "capability": "fares.offers",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -972,6 +1052,7 @@
       "source": "SIM_NHF_FARE_EMPTY_SECTIONS_38",
       "checks": 71,
       "purpose": "Negative fare request: FARE_ADMISSION asked by trip specification with an empty list of sections; a fare in the answer fails. The scenario ends after the offer.",
+      "capability": "fares.offers",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -983,6 +1064,7 @@
       "source": "SIM_NHF_FARE_NO_SECTION_SRCH_38",
       "checks": 235,
       "purpose": "Negative fare request, then a product sale: a search asking ADMISSION and FARE_ADMISSION without a section; a fare in the answer fails, and the sale goes on with a product offer, booked and fulfilled.",
+      "capability": "fares.offers",
       "needs": {
         "trip": "SEARCH",
         "passengers": 1
@@ -993,6 +1075,7 @@
       "source": "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38",
       "checks": 71,
       "purpose": "Negative fare request: FARE_ADMISSION asked by search criteria with an empty list of sections; a fare in the answer fails. The scenario ends after the offer.",
+      "capability": "fares.offers",
       "needs": {
         "trip": "SEARCH",
         "passengers": 1
@@ -1003,6 +1086,7 @@
       "source": "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38",
       "checks": 78,
       "purpose": "Negative fare request: FARE_ADMISSION asked by trip id without a section; a fare in the answer fails. The scenario ends after the offer.",
+      "capability": "fares.offers",
       "needs": {
         "trip": "SEARCH",
         "passengers": 1
@@ -1013,6 +1097,7 @@
       "source": "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38",
       "checks": 78,
       "purpose": "Negative fare request: FARE_ADMISSION asked by trip id with an empty list of sections; a fare in the answer fails. The scenario ends after the offer.",
+      "capability": "fares.offers",
       "needs": {
         "trip": "SEARCH",
         "passengers": 1
@@ -1023,6 +1108,7 @@
       "source": "SIM_FARE_REFUND_1ADT_38",
       "checks": 180,
       "purpose": "Fare sale refunded in full, no fee stated: the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
+      "capability": "fares.refund",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -1035,6 +1121,7 @@
       "source": "SIM_FARE_REFUND_FEE_1ADT_38",
       "checks": 181,
       "purpose": "Fare sale refunded in full with a refund fee stated by OSCAR (RefundSpecification.refundFee, OSDM 3.8): the refund offer keeps the fee stated, CLUSTERING fares.",
+      "capability": "fares.refund",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -1048,6 +1135,7 @@
       "checks": 179,
       "combinationModel": "COMBINING",
       "purpose": "Fare sale of fares combined by COMBINING, refunded in full: the fee is the fare's own, from its refund conditions at the time of the refund offer.",
+      "capability": "fares.refund",
       "needs": {
         "trip": "SPECIFICATION",
         "tariff": "REFUNDABLE",
@@ -1059,6 +1147,7 @@
       "source": "SIM_FARE_BICYCLE_1ADT_38",
       "checks": 130,
       "purpose": "Fare sale for an adult and a bicycle (OSDM 3.8): the adult's fare and the bicycle's fare reservation in fare mode, selected, booked and fulfilled with the fare.",
+      "capability": "fares.reservation",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,
@@ -1070,6 +1159,7 @@
       "source": "SIM_FARE_BICYCLE_ONLY_38",
       "checks": 108,
       "purpose": "Fare reservation alone for a bicycle (OSDM 3.8): an offer holding the bicycle place in fare mode and no fare, booked and fulfilled as fares.",
+      "capability": "fares.reservation",
       "needs": {
         "trip": "SPECIFICATION",
         "legs": 2,

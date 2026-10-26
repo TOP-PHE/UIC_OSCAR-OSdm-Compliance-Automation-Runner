@@ -606,6 +606,32 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     UUID (`coverageRunIdOf()`). **Under an after-sale flow only
     `partialRefund:` and `overrule:` elements are rows** (`shownUnder()`): the
     trip, passengers and currency of a refund belong to the sale before it.
+    **#972 PR 1 (1.11.399 / OTST_V2.0.224): by capability.** On a real
+    provider the report above read "9 functions failed" for a campaign whose
+    tests mostly passed, so `byCapability` (`utils/capabilityCoverage.js`,
+    pure) reads it the way an assessment does. Each scenario has one main
+    capability (`utils/capabilities.js`, 48 of them): the catalogue entry's
+    `capability`, else `derivedCapability()`. A simulator scenario takes the
+    entry it is the source of, in any version (`catalogueEntryForScenario()`).
+    The rules (#972 R1–R7):
+    - a failed check counts only against the main capability, except at an
+      optional operation's step, which is that operation's own row;
+    - the steps a run went through prove theirs: `STEP_ROLES` names every
+      request of the collection, a test fails on a new one without a role;
+    - a stage that went through proves the scenario's traits (`traitsOf()`);
+    - a catalogue entry is one test whatever its forms and copies;
+    - expected refusals (`isRefusalTest()`) are rows of their own;
+    - a 501, or #488's "not implemented" on an optional read, is "not
+      supported by the provider".
+    The route now reads each latest run's steps (`run_requests`) too.
+    `DATA_DRIVEN` in `capability-coverage.test.js` lists the seven entries
+    whose capability their source's fields cannot tell; any other entry must
+    equal `derivedCapability()` of its source. G1: an `expectedProduct` named
+    by words is the declared product (`productIdsOf()`). G2: #937's fare
+    declarations have rows once FARE is declared (`fareRows()`), and a
+    bicycle under a fare reservation is that reservation. Parts 2–4: the
+    points to look at with "Passed with deviation", the page and exports, and
+    published reports for the certifier (#972's two decision comments).
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

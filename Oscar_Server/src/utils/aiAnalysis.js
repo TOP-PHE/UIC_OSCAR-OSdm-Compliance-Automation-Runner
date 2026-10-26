@@ -30,6 +30,11 @@
 const crypto = require('node:crypto');
 const S = require('./findingSuggestions');
 const OR = require('./osdmReferences');
+// The reference scenario a code was copied from (#827): the catalogue entry
+// of the same code, else the longest one it extends with "_…" (a copy per
+// request form or currency: OTST_SALE_ONE_WAY_1ADT_SPEC, …_CURRENCY_EUR).
+// One implementation, shared with the coverage report (#972).
+const { catalogueEntryOf } = require('./scenarioCatalogue');
 
 const LANGUAGES = Object.freeze(['English', 'French', 'German', 'Italian', 'Spanish', 'Dutch', 'Czech', 'Polish', 'Portuguese', 'Swedish']);
 const OWNERS = Object.freeze(['provider', 'oscar', 'configuration', 'unclear']);
@@ -193,20 +198,6 @@ function findingAsSent(f) {
     step: f.step || null, scenario: f.scenarioCode || null };
 }
 
-/**
- * The reference scenario a code was copied from (#827): the catalogue entry
- * of the same code, else the longest one it extends with "_…" (a copy per
- * request form or currency: OTST_SALE_ONE_WAY_1ADT_SPEC, …_CURRENCY_EUR).
- */
-function catalogueEntryOf(code, entries) {
-  let best = null;
-  for (const e of entries || []) {
-    if (typeof e?.code !== 'string') continue;
-    if (e.code === code) return e;
-    if (code.startsWith(e.code + '_') && (!best || e.code.length > best.code.length)) best = e;
-  }
-  return best;
-}
 
 /**
  * The scenarios the groups name, with the data file's description, the OSDM
