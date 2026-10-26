@@ -1287,7 +1287,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **Both `FROM` lines carry a digest.** Docker Hub rate-limits shared IPs
     (429); `mirror.gcr.io/v2/library/node/manifests/22-slim` and
     `public.ecr.aws` give the same index digest without an account. Read the
-    index digest, not one platform's.
+    index digest, not one platform's. **The simulator's
+    `deploy/docker-compose.yml` names the same digest** (pinned by
+    `OSDM_Simulator/tests/deploy.test.js`), and Dependabot's docker bump
+    changes the Dockerfile only: add the compose line in the same PR
+    (#969, 1.11.403).
   - A new Bruno version is a server release (bump + `compatibility.json`),
     even though no server code changes: it is the engine of every run.
 - **Several Dependabot npm PRs open at once: combine them** (2026-10-06, #547).

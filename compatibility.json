@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.437",
+  "current_release": "2026.438",
   "releases": [
+    {
+      "release": "2026.438",
+      "date": "2026-10-26",
+      "server": "1.11.403",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Dependency updates (Dependabot #969 and #970, combined): the server image and the simulator's container start from node:22-slim at Node 22.23.4 (sha256:de170b39…122f38d, published 2026-10-21), and nodemailer moves from 10.1.7 to 10.2.1. No code changed."
+      ]
+    },
     {
       "release": "2026.437",
       "date": "2026-10-26",
