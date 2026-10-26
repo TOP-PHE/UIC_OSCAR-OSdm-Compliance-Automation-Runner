@@ -606,7 +606,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     UUID (`coverageRunIdOf()`). **Under an after-sale flow only
     `partialRefund:` and `overrule:` elements are rows** (`shownUnder()`): the
     trip, passengers and currency of a refund belong to the sale before it.
-    **#972 PR 1 (1.11.400 / OTST_V2.0.225): by capability.** On a real
+    **#972 PR 1 (1.11.401 / OTST_V2.0.225): by capability.** On a real
     provider the report above read "9 functions failed" for a campaign whose
     tests mostly passed, so `byCapability` (`utils/capabilityCoverage.js`,
     pure) reads it the way an assessment does. Each scenario has one main
@@ -1985,8 +1985,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   both, `scenarioCopy.js` maps it ("CODE (exchange)"), `providerPartOf()`
   keeps it. A new field naming a resource entry goes in `refSlots()`.
   Simulator: the exchange answer names its `trips`; variant
-  `wrong-exchange-keeps-trip`. PR 2 is the editor section, PR 3 the catalogue
-  entry.
+  `wrong-exchange-keeps-trip`. PR 3 is the catalogue entry.
+  **PR 2 (1.11.400): "Exchange to" in Test Config** (`buildExchangeSection()`,
+  EXCHANGE scenarios only; `changeExchange()` before the input and change
+  switches). An emptied field leaves the block, an empty block leaves the
+  scenario; an invalid value keeps the stored one. **The editor's "trips a
+  scenario uses" is `scenarioTripIds()`** (own + exchange): a new place that
+  asks which scenarios use a trip goes through it. The criteria are pinned
+  to the collection's `CRITERIA_KEYS` by `ui-scripts.test.js`.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

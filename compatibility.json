@@ -1,12 +1,12 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.435",
+  "current_release": "2026.436",
   "releases": [
     {
-      "release": "2026.435",
+      "release": "2026.436",
       "date": "2026-10-26",
-      "server": "1.11.400",
+      "server": "1.11.401",
       "collection": "OTST_V2.0.225",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
@@ -14,6 +14,17 @@
         "#972 PR 1: GET /v1/company/coverage also answers the coverage by capability (byCapability): a failed check counts only against the capability its scenario is for, the steps a run went through prove theirs, a catalogue entry is one test whatever its forms and copies, expected refusals are rows of their own, and an optional operation (a withdrawal, the refund receipt, a read the provider does not implement) is its own row. The page shows it in PR 3.",
         "Collection OTST_V2.0.225: each scenario catalogue entry names its capability (capability), read by the report only; no request or check changed.",
         "The coverage by function also counts a product named by words of its name as the declared product (#972 G1), and gives the fare declarations of #937 their rows (#972 G2): a bicycle under a declared fare reservation no longer reads as an undeclared passenger type."
+      ]
+    },
+    {
+      "release": "2026.435",
+      "date": "2026-10-26",
+      "server": "1.11.400",
+      "collection": "OTST_V2.0.224",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Issue #959 (part 2): Test Config shows an \"Exchange to\" section on every EXCHANGE scenario, to set the trip, day, departure time, travel class, service class and flexibility the booking is exchanged for, without editing the data file. A trip used only as an exchange's trip now counts as used by its scenario."
       ]
     },
     {

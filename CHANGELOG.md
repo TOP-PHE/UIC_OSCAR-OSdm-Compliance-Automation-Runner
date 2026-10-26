@@ -93,9 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.400] / [collection-OTST_V2.0.225] — 2026-10-26
+## [server-1.11.401] / [collection-OTST_V2.0.225] — 2026-10-26
 
-Issue #972 (part 1 of 4), release 2026.435. The #956 report read as if nothing worked on a real provider's campaign (9 functions failed), while 34 of its 45 tests passed in every form. Four things caused it:
+Issue #972 (part 1 of 4), release 2026.436. The #956 report read as if nothing worked on a real provider's campaign (9 functions failed), while 34 of its 45 tests passed in every form. Four things caused it:
 - one failure spread to every element its scenario touched;
 - a late failure failed what came before it;
 - negative probes counted against the function they probe;
@@ -137,6 +137,21 @@ Issue #972 (part 1 of 4), release 2026.435. The #956 report read as if nothing w
 - `coverage-routes.test.js`: `byCapability` built from steps stored in the database.
 - Seventeen deliberate breaks each make a test fail: each rule, a step's blocking answer, the step table, the catalogue, G1, G2, and the route reading the steps.
 - Checked on the simulator: gamma's reference, 135 runs through a throwaway OSCAR. Every deliberately wrong scenario counts only against its own capability, and the shared rows (offers by search, reference data, passenger update) stay passed.
+
+---
+
+## [server-1.11.400] / [collection-OTST_V2.0.224] — 2026-10-26
+
+Issue #959 (part 2), release 2026.435.
+
+### Added
+- **Test Config: "Exchange to"**, under the trip of every EXCHANGE scenario (`buildExchangeSection()` in `scenarios.js`): the trip (the sale's, or any trip of the data file; an id the file does not hold is shown as "(not in the data file)", never dropped), the days after the sale's day (-60 to 60), the departure time ("HH:MM"), and the travel classes, service classes and flexibilities asked over the sale's. A field left empty is removed from the block, and an empty block is removed from the scenario, so an untouched scenario saves as before. A value out of range or not a time is not stored: the previous one stays. The criteria are the collection's `CRITERIA_KEYS` (a test pins them). The handler (`changeExchange()`) runs before the input and change switches; its actions are not on the read-only allowlist, so a read-only card shows the section locked.
+
+### Changed
+- **A trip named by an exchange counts as used by its scenario in the editor** (`scenarioTripIds()`): the scenarios a trip edit affects, whether a tester may edit a trip, the cards drawn again after a trip changes, and the next free trip id.
+
+### Tests
+- `ui-scripts.test.js`: the section's helpers, its drawing (unknown id, escaped labels), the handler and its wiring; the change-chain pins in `ui-scripts.test.js`, `osdm-version.test.js` and `offer-search-options.test.js`; `scenarios-load-guard.test.js` and `trip-follows-train.test.js` lift the new helpers. Checked in Chromium on a throwaway server: values shown, a change of trip, day, time and ticks written to the scenario, an emptied field removing the block, nothing shown on a SALE scenario, and the saved file.
 
 ---
 
