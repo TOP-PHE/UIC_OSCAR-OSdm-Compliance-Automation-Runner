@@ -447,7 +447,7 @@ function capabilityCoverageOf({
   const fw = frameworkOf(framework);
   const declaredIds = new Set(declaredFunctions(fw).map((f) => f.id));
   const { items, apart } = scenarioItems({ datafile, catalogue: arr(catalogue), runs: runs || {}, runList: runListOf(datafile) });
-  for (const item of items) item.deviations = item.run ? P.knownDeviationsOf((warnings || {})[item.scenario.code]) : [];
+  for (const item of items) item.deviations = item.run ? P.knownDeviationsOf(warnings?.[item.scenario.code]) : [];
   const links = P.linkFailures(failuresOf(items), { findings, suggestions });
   const { points, truncated, accepted, oscar } = P.pointsOf(seenOf(items), {
     links, findings, capabilities: K.CAPABILITIES.map((c) => c.id), label: (id) => K.CAPABILITY.get(id)?.label || id,
