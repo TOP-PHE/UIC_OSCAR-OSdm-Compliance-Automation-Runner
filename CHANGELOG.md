@@ -93,6 +93,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.404] / [collection-OTST_V2.0.226] — 2026-10-26
+
+Bruno CLI update, release 2026.439. Dependabot's #971. No code changed.
+
+### Changed
+- **`@usebruno/cli` 4.2.1 → 4.3.0** (`Oscar_Server/bruno-cli/package.json` and its lockfile), the engine every run is executed by, hence a server release of its own (#545). The only install script in the tree is still protobufjs's postinstall (skipped by `--ignore-scripts`, as before).
+- **Checked on the simulator:** the 165 `_38` scenarios were recorded with 4.2.1 and with 4.3.0 (`OSDM_Simulator/scripts/replay.js`); the two recordings are the same, check by check.
+
+---
+
 ## [server-1.11.403] / [collection-OTST_V2.0.226] — 2026-10-26
 
 Dependency updates, release 2026.438. Dependabot's #969 and #970, combined (the #547 practice). No code changed.

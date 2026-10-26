@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-bruno-cli-4-3-0",
+    "date": "October 26, 2026",
+    "tag": "Changed",
+    "title": "Test engine update",
+    "summary": "Runs now use Bruno CLI 4.3.0.",
+    "content": "The engine that sends each scenario's requests moves to Bruno CLI 4.3.0. Every simulator scenario was run with the old and the new version and gave the same results."
+  },
+  {
     "id": "2026-10-26-dependency-updates",
     "date": "October 26, 2026",
     "tag": "Changed",
