@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.438",
+  "current_release": "2026.439",
   "releases": [
+    {
+      "release": "2026.439",
+      "date": "2026-10-26",
+      "server": "1.11.404",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Bruno CLI 4.2.1 → 4.3.0 (Dependabot #971), the engine of every run. Replayed on the simulator before the change: the 165 `_38` scenarios give the same checks and results under both versions. No code changed."
+      ]
+    },
     {
       "release": "2026.438",
       "date": "2026-10-26",

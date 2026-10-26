@@ -1294,6 +1294,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (#969, 1.11.403).
   - A new Bruno version is a server release (bump + `compatibility.json`),
     even though no server code changes: it is the engine of every run.
+    **Prove it with the replay first**: record the `_38` scenarios with the
+    old and the new `bru.js` (`REPLAY_BRU_JS`), then `compare`. 4.3.0
+    (#971, 1.11.404) gave the same 165 recordings as 4.2.1; nanoid is still
+    3.3.18 and js-yaml 4.3.2 in its tree.
 - **Several Dependabot npm PRs open at once: combine them** (2026-10-06, #547).
   `main` requires a branch to be up to date before merging, and every npm
   update touches `package-lock.json`, so five PRs mean five rounds of rebase
