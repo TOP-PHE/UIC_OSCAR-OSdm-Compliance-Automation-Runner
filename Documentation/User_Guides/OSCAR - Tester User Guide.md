@@ -1452,7 +1452,9 @@ shows:
   code;
 - the tests and scenario codes that showed it, and the first and last day
   seen;
-- whether it blocked the run;
+- whether it blocked the run: an HTTP status the step did not expect, a script
+  that broke or a missing prerequisite blocks it, any other failed check does
+  not;
 - the finding it is recorded as, and links to its runs.
 
 The points come in four lists:

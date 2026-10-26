@@ -68,6 +68,16 @@ describe('classifyCategory', () => {
     test('"not found" → http_status', () => {
       expect(classifyCategory('not found')).toBe('http_status');
     });
+    test('the collection\'s own status check, in each of its forms → http_status (#982)', () => {
+      for (const name of [
+        'HTTP response status — expected 200, actual: 400',
+        'HTTP response status — known deviation (documented): 04. GET Passenger returns 406',
+        'HTTP response status — not implemented by this provider (auto-detected): 11. GET Refund Offer returns 501',
+        'HTTP response status — 06b. GET Fulfillment returns 404, allowed for a fare reservation (OSDM handling reservations)',
+      ]) expect(classifyCategory(name)).toBe('http_status');
+      // Only a check that starts with it: another text naming it is not a status check.
+      expect(classifyCategory('Booking holds the HTTP response status of the offer')).toBe('business_logic');
+    });
   });
 
   describe('content_type', () => {

@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.442",
+  "current_release": "2026.443",
   "releases": [
+    {
+      "release": "2026.443",
+      "date": "2026-10-26",
+      "server": "1.11.408",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#982: the collection's own status check (\"HTTP response status — expected 200, actual: N\") is classified as an HTTP status check, so a wrong status blocks the run in the coverage reports.",
+        "The coverage reports read a failed check's category again from its text, so runs stored before this release show it too; both reports share one blocking rule."
+      ]
+    },
     {
       "release": "2026.442",
       "date": "2026-10-26",

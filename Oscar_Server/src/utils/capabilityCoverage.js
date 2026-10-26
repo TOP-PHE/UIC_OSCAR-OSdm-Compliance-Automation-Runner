@@ -41,11 +41,12 @@ const P = require('./coveragePoints');
 const { stepKey } = require('./findingSuggestions');
 const { catalogueEntryForScenario } = require('./scenarioCatalogue');
 const { declarationOf } = require('./coverageMatrix');
-const { declaredFunctions, frameworkOf, scenarioHash, toRunAgain } = require('./frameworkCoverage');
+const {
+  declaredFunctions, frameworkOf, isBlockingCheck: isBlocking, scenarioHash, toRunAgain,
+} = require('./frameworkCoverage');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const BLOCKING_CATEGORIES = new Set(['http_status', 'script_error', 'prerequisite']);
 const NOT_IMPLEMENTED_READ = new Set([403, 404, 405, 500, 501]);
 const MAX_CHECK_TEXT = 300;
 const MAX_PROVEN_CODES = 10;
@@ -72,7 +73,6 @@ const DECLARED_NOT_SUPPORTED = Object.freeze({ 'passengers.update': 'passengerUp
 
 // ── One run ─────────────────────────────────────────────────────────────────
 
-const isBlocking = (check) => BLOCKING_CATEGORIES.has(check.category) || check.severity === 'critical';
 const isProbe = (check) => String(check.assertion_name ?? '').trimStart().startsWith('🧪');
 
 // A step answered "not implemented": 501 anywhere, or what #488 reads as

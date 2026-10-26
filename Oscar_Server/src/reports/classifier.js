@@ -27,6 +27,8 @@ function classifyCategory(name) {
        'trip search criteria has at least one leg'].some(k => n.includes(k))) {
     return 'environment_check';
   }
+  // The collection's own status check (#982): "HTTP response status — expected 200, actual: 400".
+  if (n.startsWith('http response status')) return 'http_status';
   if (/status code is \d|→ \d{3}|-> \d{3}|→ unexpected status|server error|unauthorized|forbidden|not found/.test(n)) {
     return 'http_status';
   }
