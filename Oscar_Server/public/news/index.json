@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-dependency-updates",
+    "date": "October 26, 2026",
+    "tag": "Changed",
+    "title": "Dependency updates",
+    "summary": "OSCAR now runs on Node 22.23.4, with an updated mail library.",
+    "content": "The server image moves to Node 22.23.4 and the mail library to its latest minor version. Nothing changes in how OSCAR works."
+  },
+  {
     "id": "2026-10-26-exchange-to-another-route-reference",
     "date": "October 26, 2026",
     "tag": "Added",

@@ -93,6 +93,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.403] / [collection-OTST_V2.0.226] — 2026-10-26
+
+Dependency updates, release 2026.438. Dependabot's #969 and #970, combined (the #547 practice). No code changed.
+
+### Changed
+- **Base image:** both `FROM` lines of `Oscar_Server/Dockerfile` name `node:22-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d` (Node 22.23.4, published 2026-10-21), and so does the simulator's `deploy/docker-compose.yml`, which `OSDM_Simulator/tests/deploy.test.js` holds to the server's digest. Dependabot's #969 changed the Dockerfile only, so that test failed there.
+- **nodemailer** 10.1.7 → 10.2.1 (#970).
+
+---
+
 ## [server-1.11.402] / [collection-OTST_V2.0.226] — 2026-10-26
 
 Issue #959 (part 3), release 2026.437.
