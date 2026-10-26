@@ -64,7 +64,7 @@ describe('a point and its finding', () => {
 
   test('the kind follows the finding, the #735 draft and the check', () => {
     const failures = [{ check, run: at(1), code: 'C1' }];
-    const kindWith = (findings, suggestions) => [...P.linkFailures(failures, { findings, suggestions }).values()][0].kind;
+    const kindWith = (findings, suggestions) => P.pointsOf([seen(1)], { links: P.linkFailures(failures, { findings, suggestions }), findings }).points[0].kind;
     const f = (category, status) => [{ id: 'f', title: 'x', step: check.request_name, category, status, observed: 'price is n' }];
     expect(kindWith([])).toBe('provider');
     expect(kindWith(f('provider_deviation', 'open'))).toBe('provider');
@@ -79,9 +79,9 @@ describe('a point and its finding', () => {
     const findings = [{ id: 'f', title: 'Another problem', step: check.request_name, category: 'provider_deviation', status: 'resolved', scenarioCode: 'C1' }];
     const links = P.linkFailures([{ check, run: at(1), code: 'C1' }], { findings });
     const [link] = links.values();
-    expect(link).toMatchObject({ finding: null, possible: { id: 'f' }, kind: 'provider' });
+    expect(link).toMatchObject({ finding: null, possible: { id: 'f' }, oscar: false });
     const { points } = P.pointsOf([seen(1)], { links, findings });
-    expect(points[0]).toMatchObject({ finding: null, possibleFinding: { id: 'f', title: 'Another problem', category: 'provider_deviation', status: 'resolved' } });
+    expect(points[0]).toMatchObject({ kind: 'provider', finding: null, possibleFinding: { id: 'f', title: 'Another problem', category: 'provider_deviation', status: 'resolved' } });
   });
 
   test('a point keeps 10 runs and its first and last day; the list stops at its maximum', () => {
@@ -97,6 +97,37 @@ describe('a point and its finding', () => {
     expect(capped.points).toHaveLength(P.MAX_POINTS);
     expect(capped.truncated).toBe(true);
     expect(capped.points.at(-1).number).toBe(P.MAX_POINTS);
+  });
+
+  test('one check failing at several steps is one point; a status check keeps its step (maintainer, 2026-10-26)', () => {
+    const at = (step, extra = {}) => ({ ...check, request_name: step, ...extra });
+    const steps = ['10. POST Exchange Offers', '11. POST Exchange Operations', '12. GET Exchange Offer'];
+    const same = steps.map((step, i) => seen(i + 1, { check: at(step) }));
+    const status = (step) => at(step, { assertion_name: 'HTTP response status — expected 200, actual: 500', http_status: 500 });
+    const { points } = P.pointsOf([...same, seen(4, { check: status('02. POST Create Booking') }), seen(5, { check: status('06. POST Obtaining Fulfillments from Booking') })]);
+    expect(points.map((p) => [p.check, p.steps])).toEqual([
+      ['HTTP response status — expected N, actual: N', ['02. POST Create Booking']],
+      ['HTTP response status — expected N, actual: N', ['06. POST Obtaining Fulfillments from Booking']],
+      ['Price is N', steps],
+    ]);
+    expect(points[2]).toMatchObject({ step: steps[0], occurrences: 3, keys: steps.map((s) => P.keyOfCheck(at(s))) });
+  });
+
+  test('a point takes the finding of any of its steps, and its checks are those an acceptance covers', () => {
+    const later = { ...check, request_name: '11. GET Refund Offer' };
+    const failures = [{ check, run: at(1), code: 'C1' }, { check: later, run: at(2), code: 'C2' }];
+    const accepted = [{ id: 'f', title: 'Price', step: later.request_name, category: 'provider_deviation', status: 'resolved', observed: 'price is n' }];
+    const out = P.pointsOf([seen(1), seen(2, { check: later })], { links: P.linkFailures(failures, { findings: accepted }), findings: accepted });
+    expect(out.points).toEqual([expect.objectContaining({ kind: 'accepted', finding: expect.objectContaining({ id: 'f' }), steps: [check.request_name, later.request_name] })]);
+    expect([...out.accepted]).toEqual([check, later]);
+    expect(out.oscar.size).toBe(0);
+    const oscar = P.pointsOf([seen(1)], { links: P.linkFailures([failures[0]], { suggestions: { oscarIssues: [P.keyOfCheck(check)] } }) });
+    expect([...oscar.oscar]).toEqual([check]);
+    expect(oscar.accepted.size).toBe(0);
+    // A #735 draft of the second step marked as OSCAR's makes the whole point OSCAR's.
+    const second = P.pointsOf([seen(1), seen(2, { check: later })], { links: P.linkFailures(failures, { suggestions: { oscarIssues: [P.keyOfCheck(later)] } }) });
+    expect(second.points.map((p) => p.kind)).toEqual(['oscar']);
+    expect([...second.oscar]).toEqual([check, later]);
   });
 
   test('within a capability the blocking points come first', () => {

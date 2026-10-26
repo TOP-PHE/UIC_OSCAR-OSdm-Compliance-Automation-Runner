@@ -166,7 +166,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 /* Vendor capability matrix */
 .cov-summary{font-size:13px;color:#37474f;line-height:1.6;margin-bottom:10px}
 .cov-note{font-size:12px;color:#546e7a;margin:8px 0}
-.cov-list{margin:0;padding-left:16px;font-size:12px}
+.cov-list{margin:0;padding-left:16px;font-size:12px;overflow-wrap:anywhere}
 .cov-state{display:inline-block;white-space:nowrap;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase}
 .cov-passed{background:#e8f5e9;color:#2e7d32}
 .cov-failed{background:#ffebee;color:#c62828}
@@ -177,6 +177,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .cov-not-declared,.cov-declared-not-supported{background:#ede7f6;color:#4527a0}
 .cov-provider{color:#bf360c}
 .cov-group{color:#546e7a}
+.cov-deviation{background:#e3f2fd;color:#0d47a1}
+.cov-points{background:#fff8e1;color:#7a4f01}
+.cov-blocked,.cov-not-refused{background:#ffebee;color:#c62828}
+.cov-not-supported{background:#ede7f6;color:#4527a0}
+.cov-not-tested{background:#fff3e0;color:#bf360c}
+.cov-out-of-scope,.cov-not-run{background:#eceff1;color:#546e7a}
+.cov-refused{background:#e8f5e9;color:#2e7d32}
+.cov-heading{margin:16px 0 6px;font-size:14px;color:#263238}
+.cov-subheading{margin:10px 0 4px;font-size:13px;color:#37474f}
+.cov-points-list{margin:0;padding-left:0;list-style:none;font-size:12px;overflow-wrap:anywhere}
+.cov-points-list>li{padding:6px 0;border-bottom:1px solid #eceff1}
 .cap-table{width:100%;border-collapse:collapse;font-size:13px}
 .cap-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
 .cap-table td{padding:8px 12px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
@@ -407,7 +418,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
         <button class="btn btn-primary btn-sm" id="coverage-btn" type="button">Show coverage</button>
         <label for="coverage-view" style="font-size:13px">View</label>
         <select id="coverage-view">
-          <option value="matrix" selected>By flow and element</option><option value="functions">By function declared</option>
+          <option value="capabilities" selected>By capability</option><option value="matrix">By flow and element</option><option value="functions">By function declared</option>
         </select>
         <button class="btn btn-secondary btn-sm" id="coverage-md-btn" type="button" disabled>Export Markdown</button>
         <button class="btn btn-secondary btn-sm" id="coverage-xlsx-btn" type="button">Download Excel</button>
@@ -1893,6 +1904,16 @@ const COVERAGE_DECLARATIONS = {
   declared: 'Declared', 'not-declared': 'Not declared', 'every-value': 'Every value declared',
   'declared-not-supported': 'Declared not supported'
 };
+// #972: the results of the coverage by capability, and the kinds of points.
+const CAPABILITY_RESULTS = {
+  passed: 'Passed', deviation: 'Passed with deviation', points: 'Passed with points', blocked: 'Blocked',
+  'not-supported': 'Not supported by the provider', 'not-tested': 'Not tested', 'out-of-scope': 'Out of scope',
+  refused: 'Refused as expected', 'not-refused': 'Not refused', 'not-run': 'Not run'
+};
+const POINT_KINDS = {
+  provider: 'For the provider', accepted: 'Accepted deviations', question: 'Questions on the specification',
+  oscar: 'OSCAR\'s own points (not counted against the provider)'
+};
 let coverageData = null;
 
 function coverageStateLabel(state) {
@@ -1940,14 +1961,29 @@ function coverageRowsHtml(functions) {
       group = f.group;
       head = '<tr><th colspan="4">' + escHtml(group) + '</th></tr>';
     }
-    var scenarios = (f.scenarios || []).map(function(s) { return '<li>' + escHtml(coverageScenarioText(s)) + '</li>'; }).join('');
     var findings = (f.findings || []).map(function(x) { return '<li>' + escHtml(coverageFindingText(x)) + '</li>'; }).join('');
     return head + '<tr><td>' + escHtml(f.label) + '</td>'
       + '<td><span class="cov-state cov-' + escHtml(f.state) + '">' + escHtml(coverageStateLabel(f.state)) + '</span>'
       + (f.toRunAgain ? '<br><small>to run again</small>' : '') + '</td>'
-      + '<td>' + (scenarios ? '<ul class="cov-list">' + scenarios + '</ul>' : '-') + '</td>'
+      + '<td>' + coverageFunctionScenariosHtml(f.scenarios) + '</td>'
       + '<td>' + (findings ? '<ul class="cov-list">' + findings + '</ul>' : '-') + '</td></tr>';
   }).join('');
+}
+
+// #972 G3: a function's scenarios as the flow view shows them: the counts,
+// those not passed (ten at most), and the whole list folded.
+function coverageFunctionScenariosHtml(list) {
+  var all = Array.isArray(list) ? list : [];
+  if (all.length === 0) return '-';
+  var count = function(r) { return all.filter(function(s) { return s.result === r; }).length; };
+  var counts = { scenarios: all.length, passed: count('passed'), withDefects: count('defects'), failed: count('failed'), neverRun: count('never-run') };
+  var notPassed = all.filter(function(s) { return s.result !== 'passed'; });
+  var shown = notPassed.slice(0, 10).map(function(s) { return '<li>' + escHtml(coverageScenarioText(s)) + '</li>'; }).join('');
+  if (notPassed.length > 10) shown += '<li>' + escHtml('… and ' + (notPassed.length - 10) + ' more') + '</li>';
+  return escHtml(coverageCountsText(counts))
+    + (shown ? '<ul class="cov-list cov-failed-list">' + shown + '</ul>' : '')
+    + '<details><summary>Scenarios</summary><ul class="cov-list">'
+    + all.map(function(s) { return '<li>' + escHtml(coverageScenarioText(s)) + '</li>'; }).join('') + '</ul></details>';
 }
 
 function coverageNotDeclaredHtml(list) {
@@ -2009,16 +2045,216 @@ function coverageMatrixHtml(rows) {
     + '</tbody></table>';
 }
 
+/* ── Coverage by capability (#972) ─────────────────────────────────────────
+ * The answer's byCapability: one row per capability, the expected refusals,
+ * the numbered points to look at. Every text goes through escHtml(); a run id
+ * is linked only when it is a UUID, a point number only when it is a whole
+ * number.
+ */
+function capabilityResultLabel(result) {
+  return Object.hasOwn(CAPABILITY_RESULTS, result) ? CAPABILITY_RESULTS[result] : String(result || '');
+}
+
+function capabilitySummaryText(summary, days) {
+  var s = summary || {};
+  var r = s.expectedRefusals || {};
+  var p = s.pointsToLookAt || {};
+  var parts = [
+    (s.tested || 0) + ' capability(ies) tested: ' + (s.passed || 0) + ' passed, ' + (s.deviation || 0) + ' passed with deviation, '
+      + (s.points || 0) + ' passed with points, ' + (s.blocked || 0) + ' blocked, ' + (s.notSupported || 0) + ' not supported by the provider',
+    (s.notTested || 0) + ' declared and not tested', (s.outOfScope || 0) + ' out of scope',
+    'expected refusals: ' + (r.refused || 0) + ' of ' + (r.total || 0) + ' refused (' + (r.deviation || 0) + ' accepted deviation, '
+      + (r.notRefused || 0) + ' not refused, ' + (r.notRun || 0) + ' not run)',
+    (p.total || 0) + ' point(s) to look at: ' + (p.provider || 0) + ' for the provider, ' + (p.accepted || 0) + ' accepted deviation(s), '
+      + (p.questions || 0) + ' question(s), ' + (p.oscar || 0) + ' of OSCAR' + (p.truncated ? ' (the first 500 only)' : ''),
+    (s.declaredWithoutScenario || 0) + ' declared function(s) without a scenario run', (s.apart || 0) + ' scenario(s) set apart'
+  ];
+  return parts.join(' · ') + ' — runs of the last ' + days + ' day(s).';
+}
+
+function capabilityPointLinks(numbers) {
+  var list = (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && n > 0; });
+  if (list.length === 0) return '-';
+  return list.map(function(n) { return '<a href="#cov-point-' + n + '">#' + n + '</a>'; }).join(', ');
+}
+
+function capabilityPointNumbers(numbers) {
+  var list = (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && n > 0; });
+  return list.length ? list.map(function(n) { return '#' + n; }).join(', ') : '-';
+}
+
+function capabilityRunLink(code, runId) {
+  var id = coverageRunIdOf(runId);
+  return id ? '<a href="/run-detail.html?id=' + encodeURIComponent(id) + '">' + escHtml(code) + '</a>' : escHtml(code);
+}
+
+function capabilityFormText(f) {
+  var text = (f.form ? ' (' + f.form + ')' : '') + ': ' + capabilityResultLabel(f.result);
+  if (f.step) text += ' at ' + f.step + (f.check ? ' — ' + f.check : '');
+  var again = coverageRunAgainLabel(f.toRunAgain);
+  if (again) text += ', ' + again;
+  return text;
+}
+
+function capabilityFormHtml(f) {
+  return '<li>' + capabilityRunLink(f.code, f.runId) + escHtml(capabilityFormText(f)) + '</li>';
+}
+
+function capabilityTestHtml(t) {
+  return '<li><strong>' + escHtml(t.entry || t.key) + '</strong>: ' + escHtml(capabilityResultLabel(t.result))
+    + (t.purpose ? '<br><small>' + escHtml(t.purpose) + '</small>' : '')
+    + '<ul class="cov-list">' + (t.forms || []).map(capabilityFormHtml).join('') + '</ul></li>';
+}
+
+function capabilityTestedText(row) {
+  var tests = row.tests || [];
+  var forms = tests.reduce(function(n, t) { return n + (t.forms || []).filter(function(f) { return f.result !== 'not-run'; }).length; }, 0);
+  var proven = (row.provenBy && row.provenBy.count) || 0;
+  var parts = [];
+  if (tests.length) parts.push(tests.length + ' test(s), ' + forms + ' form(s) run');
+  if (proven) parts.push('proven on the way by ' + proven + ' run(s)');
+  return parts.length ? parts.join(' · ') : 'No test';
+}
+
+function capabilityTestedHtml(row) {
+  var tests = (row.tests || []).map(capabilityTestHtml).join('');
+  var side = (row.sideProblems || []).map(function(s) { return '<li>' + escHtml(s.code + ': ' + capabilityResultLabel(s.result)) + '</li>'; }).join('');
+  var out = escHtml(capabilityTestedText(row));
+  if (tests) out += '<details><summary>Tests</summary><ul class="cov-list">' + tests + '</ul></details>';
+  if (side) out += '<details><summary>Problems on the way</summary><ul class="cov-list">' + side + '</ul></details>';
+  return out;
+}
+
+function capabilityLabelText(row) {
+  return row.label + (row.optional ? ' (optional)' : '') + (row.declaration ? ' — ' + coverageDeclarationLabel(row.declaration) : '');
+}
+
+function capabilityRowsHtml(rows) {
+  var group = null;
+  return (rows || []).map(function(c) {
+    var head = '';
+    if (c.group !== group) {
+      group = c.group;
+      head = '<tr><th colspan="4">' + escHtml(group) + '</th></tr>';
+    }
+    return head + '<tr><td>' + escHtml(capabilityLabelText(c)) + '</td>'
+      + '<td>' + capabilityTestedHtml(c) + '</td>'
+      + '<td><span class="cov-state cov-' + escHtml(c.result) + '">' + escHtml(capabilityResultLabel(c.result)) + '</span></td>'
+      + '<td>' + capabilityPointLinks(c.points) + '</td></tr>';
+  }).join('');
+}
+
+function capabilityRefusalsHtml(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<h4 class="cov-heading">Expected refusals (' + list.length + ')</h4><table class="cap-table"><thead><tr><th>Expected refusal</th>'
+    + '<th>Capability probed</th><th>Result</th><th>Forms</th><th>Points</th></tr></thead><tbody>'
+    + list.map(function(r) {
+      return '<tr><td><strong>' + escHtml(r.entry || r.key) + '</strong>' + (r.purpose ? '<br><small>' + escHtml(r.purpose) + '</small>' : '') + '</td>'
+        + '<td>' + escHtml(r.capabilityLabel) + '</td>'
+        + '<td><span class="cov-state cov-' + escHtml(r.result) + '">' + escHtml(capabilityResultLabel(r.result)) + '</span></td>'
+        + '<td><ul class="cov-list">' + (r.forms || []).map(capabilityFormHtml).join('') + '</ul></td>'
+        + '<td>' + capabilityPointLinks(r.points) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function capabilityFindingText(f, possible) {
+  if (!f) return '';
+  return (possible ? 'Possibly finding: ' : 'Finding: ') + f.title + ' (' + f.category + ', ' + f.status + ')';
+}
+
+function capabilitySeenText(p) {
+  if (!p.firstSeen) return 'no date';
+  return p.firstSeen === p.lastSeen ? 'on ' + p.firstSeen : 'from ' + p.firstSeen + ' to ' + p.lastSeen;
+}
+
+// What a point is, in one line: where, what, the answer.
+function capabilityProblemText(p) {
+  var steps = (Array.isArray(p.steps) && p.steps.length ? p.steps : [p.step]).join(', ');
+  // A status says something only when the answer was not a success.
+  var answer = [p.status >= 300 ? 'HTTP ' + p.status : '', p.problemCode || ''].filter(Boolean).join(', ');
+  return steps + ': ' + p.check + (answer ? ' (' + answer + ')' : '');
+}
+
+// A test and the codes that showed it, a code that is the test's own name left out.
+function capabilityTestCodes(t) {
+  var name = t.entry || t.key;
+  var others = (t.codes || []).filter(function(c) { return c !== name; });
+  return others.length ? name + ' (' + others.join(', ') + ')' : name;
+}
+
+function capabilityWhereText(p) {
+  var tests = (p.tests || []).map(capabilityTestCodes).join('; ');
+  return 'Seen in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '');
+}
+
+function capabilityPointHtml(p) {
+  var n = Number.isInteger(p.number) ? p.number : 0;
+  var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
+  var runs = (p.runs || []).map(function(r) { return capabilityRunLink(r.code, r.runId); }).join(', ');
+  return '<li id="cov-point-' + n + '"><strong>#' + n + '</strong> ' + escHtml(p.capabilityLabel)
+    + (p.expectedRefusal ? ' <small class="cov-group">(expected refusal)</small>' : '')
+    + (p.blocking ? ' <span class="cov-state cov-blocked">Blocking</span>' : '')
+    + '<br>' + escHtml(capabilityProblemText(p))
+    + (p.note ? '<br><small>' + escHtml(p.note) + '</small>' : '')
+    + '<br><small>' + escHtml(capabilityWhereText(p)) + '</small>'
+    + (finding ? '<br><small>' + escHtml(finding) + '</small>' : '')
+    + (runs ? '<br><small>Runs: ' + runs + '</small>' : '') + '</li>';
+}
+
+function capabilityPointsHtml(points) {
+  var list = Array.isArray(points) ? points : [];
+  if (list.length === 0) return '<h4 class="cov-heading">Points to look at</h4><div class="cov-note">None.</div>';
+  return '<h4 class="cov-heading">Points to look at (' + list.length + ')</h4>' + Object.keys(POINT_KINDS).map(function(kind) {
+    var of = list.filter(function(p) { return p.kind === kind; });
+    if (of.length === 0) return '';
+    return '<h5 class="cov-subheading">' + escHtml(POINT_KINDS[kind]) + ' (' + of.length + ')</h5>'
+      + '<ul class="cov-points-list">' + of.map(capabilityPointHtml).join('') + '</ul>';
+  }).join('');
+}
+
+function capabilityAsideHtml(c) {
+  var notTested = c.notTested || [];
+  var apart = c.apart || [];
+  var out = '';
+  if (notTested.length) {
+    out += '<details class="cov-note"><summary>Declared functions without a scenario run (' + notTested.length + ')</summary><ul class="cov-list">'
+      + notTested.map(function(f) { return '<li>' + escHtml(f.group + ': ' + f.label + ' (' + coverageStateLabel(f.state) + ')') + '</li>'; }).join('')
+      + '</ul></details>';
+  }
+  if (apart.length) {
+    out += '<details class="cov-note"><summary>Scenarios set apart: neither in the run list nor run (' + apart.length + ')</summary><ul class="cov-list">'
+      + apart.map(function(a) { return '<li>' + escHtml(a.code + (a.entry && a.entry !== a.code ? ' (' + a.entry + ')' : '')) + '</li>'; }).join('')
+      + '</ul></details>';
+  }
+  return out;
+}
+
+function capabilityHtml(c) {
+  var data = c || {};
+  return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
+    + capabilityRowsHtml(data.capabilities) + '</tbody></table>'
+    + capabilityRefusalsHtml(data.expectedRefusals) + capabilityPointsHtml(data.points) + capabilityAsideHtml(data);
+}
+
+function coverageViewHtml(data, view) {
+  if (view === 'capabilities') return capabilityHtml(data.byCapability);
+  if (view === 'functions') {
+    return '<table class="cap-table"><thead><tr><th>Function declared</th><th>State</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead>'
+      + '<tbody>' + coverageRowsHtml(data.functions) + '</tbody></table>';
+  }
+  return coverageMatrixHtml(data.matrix);
+}
+
 function coverageHtml(data, view) {
   var notes = [];
   if (!data.framework) notes.push('No Test Framework is stored: nothing is declared beyond product-based distribution.');
   if (!data.datafile) notes.push('No data file is stored: no scenario exercises anything.');
-  return '<div class="cov-summary">' + escHtml(coverageSummaryText(data.summary, data.days)) + '</div>'
+  var summary = view === 'capabilities'
+    ? capabilitySummaryText((data.byCapability || {}).summary, data.days)
+    : coverageSummaryText(data.summary, data.days);
+  return '<div class="cov-summary">' + escHtml(summary) + '</div>'
     + notes.map(function(n) { return '<div class="cov-note">' + escHtml(n) + '</div>'; }).join('')
-    + (view === 'functions'
-      ? '<table class="cap-table"><thead><tr><th>Function declared</th><th>State</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead>'
-        + '<tbody>' + coverageRowsHtml(data.functions) + '</tbody></table>'
-      : coverageMatrixHtml(data.matrix))
+    + coverageViewHtml(data, view)
     + coverageNotDeclaredHtml(data.notDeclared);
 }
 
@@ -2028,21 +2264,86 @@ function mdCell(value) {
     .replaceAll('\\', String.raw`\\`).replaceAll('|', String.raw`\|`).replaceAll('<', String.raw`\<`);
 }
 
-function coverageMarkdown(data, title) {
-  var lines = ['# Test Framework coverage — ' + mdCell(title), '', mdCell(coverageSummaryText(data.summary, data.days)),
-    '', '## By flow and element', '', '| Flow | Element tested | Result | Test Framework | Scenarios | Not passed |', '|---|---|---|---|---|---|'];
+function capabilityPointLine(p) {
+  var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
+  return '#' + p.number + ' ' + p.capabilityLabel + (p.expectedRefusal ? ' (expected refusal)' : '') + (p.blocking ? ', blocking' : '')
+    + ' — ' + capabilityProblemText(p) + '. ' + capabilityWhereText(p) + '.' + (finding ? ' ' + finding + '.' : '') + (p.note ? ' ' + p.note : '');
+}
+
+function capabilityRowsMarkdown(rows) {
+  var lines = [];
+  var group = null;
+  for (const c of rows || []) {
+    if (c.group !== group) {
+      group = c.group;
+      lines.push('', '### ' + mdCell(group), '', '| Capability | Tested | Result | Points |', '|---|---|---|---|');
+    }
+    lines.push('| ' + [capabilityLabelText(c), capabilityTestedText(c), capabilityResultLabel(c.result), capabilityPointNumbers(c.points)].map(mdCell).join(' | ') + ' |');
+  }
+  return lines;
+}
+
+function capabilityRefusalsMarkdown(list) {
+  if (!Array.isArray(list) || list.length === 0) return [];
+  var lines = ['', '## Expected refusals', '', '| Expected refusal | Capability probed | Result | Forms | Points |', '|---|---|---|---|---|'];
+  for (const r of list) {
+    var forms = (r.forms || []).map(function(f) { return f.code + capabilityFormText(f); }).join('; ');
+    lines.push('| ' + [r.entry || r.key, r.capabilityLabel, capabilityResultLabel(r.result), forms, capabilityPointNumbers(r.points)].map(mdCell).join(' | ') + ' |');
+  }
+  return lines;
+}
+
+function capabilityPointsMarkdown(points) {
+  var list = Array.isArray(points) ? points : [];
+  var lines = ['', '## Points to look at'];
+  if (list.length === 0) lines.push('', 'None.');
+  for (const kind of Object.keys(POINT_KINDS)) {
+    var of = list.filter(function(p) { return p.kind === kind; });
+    if (of.length === 0) continue;
+    lines.push('', '### ' + mdCell(POINT_KINDS[kind]), '');
+    for (const p of of) lines.push('- ' + mdCell(capabilityPointLine(p)));
+  }
+  return lines;
+}
+
+function capabilityAsideMarkdown(c) {
+  var lines = [];
+  if ((c.notTested || []).length) {
+    lines.push('', '## Declared functions without a scenario run', '');
+    for (const f of c.notTested) lines.push('- ' + mdCell(f.group + ': ' + f.label + ' (' + coverageStateLabel(f.state) + ')'));
+  }
+  if ((c.apart || []).length) {
+    lines.push('', '## Scenarios set apart (neither in the run list nor run)', '', mdCell(c.apart.map(function(a) { return a.code; }).join(', ')));
+  }
+  return lines;
+}
+
+function capabilityMarkdown(c, days) {
+  var data = c || {};
+  return ['## By capability', '', mdCell(capabilitySummaryText(data.summary, days))]
+    .concat(capabilityRowsMarkdown(data.capabilities), capabilityRefusalsMarkdown(data.expectedRefusals),
+      capabilityPointsMarkdown(data.points), capabilityAsideMarkdown(data));
+}
+
+function coverageMatrixMarkdown(data) {
+  var lines = ['', '## By flow and element', '', mdCell(coverageSummaryText(data.summary, data.days)), '',
+    '| Flow | Element tested | Result | Test Framework | Scenarios | Not passed |', '|---|---|---|---|---|---|'];
   for (const r of data.matrix || []) {
     var result = coverageStateLabel(r.result) + (r.toRunAgain ? ', to run again' : '')
       + (r.providerNotSupported ? ', ' + coverageProviderText(r.providerNotSupported) : '');
     var notPassed = (r.failedScenarios || []).map(function(f) { return f.code + ' (' + coverageStateLabel(f.result) + (f.step ? ' at ' + f.step : '') + ')'; }).join('; ');
     lines.push('| ' + [r.flowLabel, r.group + ': ' + r.label, result, coverageDeclarationLabel(r.declaration), coverageCountsText(r.counts), notPassed].map(mdCell).join(' | ') + ' |');
   }
-  lines.push('', '# By function declared');
+  return lines;
+}
+
+function coverageFunctionsMarkdown(data) {
+  var lines = ['', '## By function declared'];
   var group = null;
   for (const f of data.functions || []) {
     if (f.group !== group) {
       group = f.group;
-      lines.push('', '## ' + mdCell(group), '', '| Function | State | Scenarios | Open findings |', '|---|---|---|---|');
+      lines.push('', '### ' + mdCell(group), '', '| Function | State | Scenarios | Open findings |', '|---|---|---|---|');
     }
     var state = coverageStateLabel(f.state) + (f.toRunAgain ? ', to run again' : '');
     lines.push('| ' + [f.label, state, (f.scenarios || []).map(coverageScenarioText).join('; '),
@@ -2052,6 +2353,12 @@ function coverageMarkdown(data, title) {
     lines.push('', '## Scenarios testing what the Test Framework does not declare', '');
     for (const n of data.notDeclared) lines.push('- ' + mdCell(n.code) + ': ' + mdCell((n.warnings || []).join(', ')));
   }
+  return lines;
+}
+
+function coverageMarkdown(data, title) {
+  var lines = ['# Test Framework coverage — ' + mdCell(title), '']
+    .concat(capabilityMarkdown(data.byCapability, data.days), coverageMatrixMarkdown(data), coverageFunctionsMarkdown(data));
   return lines.join('\n') + '\n';
 }
 

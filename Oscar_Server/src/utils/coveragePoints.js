@@ -11,16 +11,19 @@
  * coveragePoints.js — the points to look at of the coverage by capability
  * (#972 R6 and decision 3). Pure.
  *
- * A point is one distinct problem. Failed checks are grouped with the #735
- * key (`groupKeyOf()`: the step, the check text without the run's values, the
- * HTTP status, and the problem code of an error answer), across forms and
- * runs. A documented known deviation a run applied (its "[WARNING] Known
- * deviation (documented)" log line) is a point too.
+ * A point is one distinct problem, across forms, runs and steps (maintainer,
+ * 2026-10-26): the same check text failing under the same capability, with
+ * the same problem code, is one point listing its steps; a generic HTTP status
+ * check keeps its step. Each failed check still has its #735 key
+ * (`groupKeyOf()`), kept in the point's `keys` for the comparison of reports
+ * (#972 part 4). A documented known deviation a run applied (its "[WARNING]
+ * Known deviation (documented)" log line) is a point too.
  *
- * A point is linked to a finding the way #735 links a group (`matchFinding()`,
- * a sure match only). Its kind:
- *   oscar     the finding is an OSCAR issue, the #735 draft was marked as one,
- *             or the check is OSCAR's own request (#736): listed apart;
+ * A point takes the finding of the first of its keys that #735 links to one
+ * (`matchFinding()`, a sure match only). Its kind:
+ *   oscar     the finding is an OSCAR issue, a #735 draft was marked as one,
+ *             or the check is OSCAR's own request (#736): listed apart, and
+ *             not counted against the provider (maintainer, 2026-10-26);
  *   accepted  an accepted deviation: a finding classified provider_deviation
  *             and resolved (maintainer, 2026-10-26), or a known deviation the
  *             run applied. Its capability reads "Passed with deviation";
@@ -89,13 +92,6 @@ function deviationFinding(dev, findings) {
     && Number(f.expectedStatus ?? f.expected_status) === dev.status) || null;
 }
 
-function kindOf(group, finding, oscarKeys) {
-  if (finding?.category === 'oscar_issue' || oscarKeys.has(group.key) || String(group.check).startsWith('[OSCAR request]')) return 'oscar';
-  if (isAcceptedFinding(finding)) return 'accepted';
-  if (finding?.category === 'spec_question') return 'question';
-  return 'provider';
-}
-
 /** The #735 record of a failed check of a run. */
 function recordOf(check, run, code) {
   return {
@@ -108,10 +104,11 @@ function recordOf(check, run, code) {
 const keyOfCheck = (check) => S.groupKeyOf(recordOf(check, null, null));
 
 /**
- * Every failure group of the runs, linked: Map key → { group, finding,
- * possible, kind }. `failures` are [{ check, run, code }]; `suggestions`
+ * Every #735 failure group of the runs, linked: Map key → { group, finding,
+ * possible, oscar }. `failures` are [{ check, run, code }]; `suggestions`
  * { accepted: { key: findingId }, oscarIssues: [key] } come from the #735
- * drafts.
+ * drafts. `oscar`: the draft was marked as OSCAR's, or the check is OSCAR's
+ * own request (#736).
  */
 function linkFailures(failures, { findings = [], suggestions = {} } = {}) {
   const groups = S.groupFailures(arr(failures).map((f) => recordOf(f.check, f.run, f.code)));
@@ -119,27 +116,73 @@ function linkFailures(failures, { findings = [], suggestions = {} } = {}) {
   const links = new Map();
   for (const group of groups) {
     const m = S.matchFinding(group, arr(findings), suggestions.accepted || {});
-    const finding = m?.strength === 'same' ? m.finding : null;
-    links.set(group.key, { group, finding, possible: m?.strength === 'maybe' ? m.finding : null, kind: kindOf(group, finding, oscarKeys) });
+    links.set(group.key, {
+      group, finding: m?.strength === 'same' ? m.finding : null, possible: m?.strength === 'maybe' ? m.finding : null,
+      oscar: oscarKeys.has(group.key) || String(group.check).startsWith('[OSCAR request]'),
+    });
   }
   return links;
 }
 
-/** The keys of the failures that are accepted deviations. */
-function acceptedKeysOf(links) {
-  return new Set([...links.values()].filter((l) => l.kind === 'accepted').map((l) => l.group.key));
+function kindOf(finding, oscar) {
+  if (oscar || finding?.category === 'oscar_issue') return 'oscar';
+  if (isAcceptedFinding(finding)) return 'accepted';
+  if (finding?.category === 'spec_question') return 'question';
+  return 'provider';
 }
 
 // ── Points ──────────────────────────────────────────────────────────────────
 
+const capabilityPart = (seen) => [seen.capability, seen.refusal ? 'refusal' : ''];
+
+// Where a failed check or known deviation goes: { id, key, step, group }.
+// One problem (maintainer, 2026-10-26) = the capability it counts against, an
+// expected refusal or not, the check text without the run's values and the
+// problem code of an error answer, whatever the step. A generic HTTP status
+// check says nothing without its step, so it keeps it.
+function placeOf(seen, links) {
+  if (seen.deviation) {
+    const key = deviationKey(seen.deviation);
+    return { id: ['deviation', ...capabilityPart(seen), key].join('␟'), key, step: seen.deviation.step, group: null };
+  }
+  const key = keyOfCheck(seen.check);
+  const group = links.get(key)?.group || null;
+  const check = group ? group.check : S.checkText(seen.check.assertion_name);
+  const step = group ? group.step : String(seen.check.request_name ?? '');
+  const own = S.STATUS_CHECK.test(check) ? S.stepKey(step) : '';
+  return { id: ['check', ...capabilityPart(seen), own, check, group?.problemCode || ''].join('␟'), key, step, group };
+}
+
 function newPoint(base) {
   return {
-    ...base, blocking: false, occurrences: 0, tests: [], runs: [], firstSeen: null, lastSeen: null,
+    ...base, keys: [], steps: [], blocking: false, occurrences: 0, tests: [], runs: [], firstSeen: null, lastSeen: null,
   };
 }
 
-function addOccurrence(point, seen) {
+// The point a failed check opens: kind and finding come once all its keys are known.
+function checkPoint(seen, place, label) {
+  return newPoint({
+    kind: 'provider', source: 'check', capability: seen.capability, capabilityLabel: label(seen.capability),
+    step: place.step, check: place.group ? place.group.check : S.checkText(seen.check.assertion_name),
+    status: place.group?.status ?? null, problemCode: place.group?.problemCode ?? null,
+    finding: null, possibleFinding: null, expectedRefusal: Boolean(seen.refusal),
+  });
+}
+
+// The point a known deviation opens.
+function deviationPoint(seen, findings, label) {
+  return newPoint({
+    kind: 'accepted', source: 'known-deviation', capability: seen.capability, capabilityLabel: label(seen.capability),
+    step: seen.deviation.step, check: `Known deviation: answered HTTP ${seen.deviation.status}`, status: seen.deviation.status,
+    problemCode: null, note: seen.deviation.note, finding: findingView(deviationFinding(seen.deviation, findings)), possibleFinding: null,
+    expectedRefusal: Boolean(seen.refusal),
+  });
+}
+
+function addOccurrence(point, seen, place) {
   point.occurrences += 1;
+  if (!point.keys.includes(place.key)) point.keys.push(place.key);
+  if (!point.steps.includes(place.step)) point.steps.push(place.step);
   if (seen.blocking) point.blocking = true;
   let test = point.tests.find((t) => t.key === seen.test.key);
   if (!test) {
@@ -155,34 +198,15 @@ function addOccurrence(point, seen) {
   if (at && (!point.lastSeen || at > point.lastSeen)) point.lastSeen = at;
 }
 
-// The point a failed check belongs to, made the first time.
-function checkPoint(seen, links, label) {
-  const key = keyOfCheck(seen.check);
-  const link = links.get(key);
-  const group = link?.group;
-  return {
-    key,
-    make: () => newPoint({
-      key, kind: link?.kind || 'provider', source: 'check', capability: seen.capability, capabilityLabel: label(seen.capability),
-      step: group?.step ?? String(seen.check.request_name ?? ''), check: group?.check ?? S.checkText(seen.check.assertion_name),
-      status: group?.status ?? null, problemCode: group?.problemCode ?? null,
-      finding: findingView(link?.finding), possibleFinding: findingView(link?.possible), expectedRefusal: Boolean(seen.refusal),
-    }),
-  };
-}
-
-// The point a known deviation belongs to, made the first time.
-function deviationPoint(seen, findings, label) {
-  const key = deviationKey(seen.deviation);
-  return {
-    key,
-    make: () => newPoint({
-      key, kind: 'accepted', source: 'known-deviation', capability: seen.capability, capabilityLabel: label(seen.capability),
-      step: seen.deviation.step, check: `Known deviation: answered HTTP ${seen.deviation.status}`, status: seen.deviation.status,
-      problemCode: null, note: seen.deviation.note, finding: findingView(deviationFinding(seen.deviation, findings)), possibleFinding: null,
-      expectedRefusal: Boolean(seen.refusal),
-    }),
-  };
+// A point of failed checks takes the first finding its keys name, in the
+// order met, and is OSCAR's when any of them is.
+function settle(point, links) {
+  if (point.source !== 'check') return;
+  const parts = point.keys.map((k) => links.get(k)).filter(Boolean);
+  const linked = parts.find((l) => l.finding);
+  point.finding = findingView(linked?.finding);
+  point.possibleFinding = linked ? null : findingView(parts.find((l) => l.possible)?.possible);
+  point.kind = kindOf(linked?.finding, parts.some((l) => l.oscar));
 }
 
 function order(capabilities) {
@@ -203,25 +227,32 @@ function order(capabilities) {
  *            entry }, code, run }], one per failed check or known deviation of
  *            a run; `refusal` when it counts against an expected refusal (R4)
  *   links  linkFailures()'s map
- * -> { points, truncated }
+ * -> { points, truncated, accepted, oscar }: `accepted` and `oscar` hold the
+ *    failed checks (the objects of `seen`) of the accepted deviations and of
+ *    OSCAR's points, which no longer count as points of their capability.
  */
 function pointsOf(seen, { links = new Map(), findings = [], capabilities = [], label = (id) => id } = {}) {
   const points = new Map();
+  const members = new Map();
   for (const s of arr(seen)) {
-    const { key, make } = s.deviation ? deviationPoint(s, findings, label) : checkPoint(s, links, label);
-    // One problem seen under two capabilities, or in an expected refusal and
-    // elsewhere, is two points: each row names its own.
-    const id = `${key}␟${s.capability}␟${s.refusal ? 'refusal' : ''}`;
-    if (!points.has(id)) points.set(id, make());
-    addOccurrence(points.get(id), s);
+    const place = placeOf(s, links);
+    if (!points.has(place.id)) {
+      points.set(place.id, s.deviation ? deviationPoint(s, findings, label) : checkPoint(s, place, label));
+      members.set(place.id, []);
+    }
+    addOccurrence(points.get(place.id), s, place);
+    members.get(place.id).push(s);
   }
+  for (const p of points.values()) settle(p, links);
+  const checksOf = (kind) => new Set([...points].filter(([, p]) => p.kind === kind && p.source === 'check')
+    .flatMap(([id]) => members.get(id).map((s) => s.check)));
   const list = [...points.values()].sort(order(capabilities));
   const kept = list.slice(0, MAX_POINTS);
   kept.forEach((p, i) => { p.number = i + 1; });
-  return { points: kept, truncated: list.length > MAX_POINTS };
+  return { points: kept, truncated: list.length > MAX_POINTS, accepted: checksOf('accepted'), oscar: checksOf('oscar') };
 }
 
 module.exports = {
-  knownDeviationOf, knownDeviationsOf, deviationKey, isAcceptedFinding, keyOfCheck, linkFailures, acceptedKeysOf, pointsOf,
+  knownDeviationOf, knownDeviationsOf, deviationKey, isAcceptedFinding, keyOfCheck, linkFailures, pointsOf,
   KIND_ORDER, MAX_POINTS,
 };

@@ -93,6 +93,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.406] / [collection-OTST_V2.0.226] — 2026-10-26
+
+Issue #972 (part 3 of 4), release 2026.441. The Report Builder shows the coverage by capability, and the exports follow it. Three choices of the maintainer on 2026-10-26 change the points of part 2.
+
+### Added
+- **The coverage opens By capability** (Report Builder, *Test Framework Coverage*), the new first view and the default.
+  - **One row per capability**, grouped as an assessment reads. Each row gives:
+    - what the Test Framework says;
+    - its tests and their forms, folded, each form linked to its run;
+    - how many other runs went through it on the way;
+    - the problems met on the way;
+    - its result;
+    - the numbers of its points, each a link.
+  - **The expected refusals** have a table of their own.
+  - **The points to look at** are numbered, under one heading, in four lists: for the provider, accepted deviations, questions on the specification, OSCAR's own. Each point gives:
+    - the capability, the step or steps, the check, and the HTTP status and problem code of an error answer;
+    - the tests and codes that showed it, and when;
+    - whether it blocked;
+    - its finding, or the finding it may be;
+    - links to its runs.
+  - **Two folded lists:** the declared functions no scenario run tests, and the scenarios set apart.
+- **The exports follow the same order.**
+  - *Export Markdown* starts with the capabilities, the expected refusals and the points, then the two other views.
+  - *Download Excel* has seven sheets: Summary (with the capability counts), Capabilities, Expected refusals, Points to look at, then By flow and element, By scenario and By function.
+
+### Changed
+- **OSCAR's own points no longer count against the provider** (maintainer, 2026-10-26). A capability whose only point is OSCAR's reads "Passed". The point is listed apart, under *OSCAR's own points (not counted against the provider)*. A run that OSCAR's defect stopped is still blocked.
+- **One problem seen at several steps is one point** (maintainer, 2026-10-26).
+  - The same check text failing under the same capability, with the same problem code, is one point, which lists its steps.
+  - A generic HTTP status check keeps its step: "expected 200, actual 500" at the booking and at the fulfilment are two problems.
+  - A point keeps the #735 key of each step (`keys`), for the comparison of reports in part 4. It takes the first finding any of its keys is linked to, and is OSCAR's when any of them is.
+  - On the simulator, 17 points of the provider became 12.
+- **First and last seen** stay read from the latest run of each scenario (maintainer, 2026-10-26).
+- **G3:** the *By function declared* view gives each function's counts, lists ten scenarios not passed at most, and folds the whole list, as the flow view does. A function used to list up to 162 scenarios in one cell.
+- **G4:** in the Markdown, *By function declared* is a level-2 heading and its groups level 3, like *By flow and element*.
+- The coverage lists wrap long scenario codes. The expected refusals overflowed the card on the simulator's codes, and so did the flow view by a few pixels.
+- The welcome page's news and the Tester User Guide (§6, *Test Framework coverage*) describe the view.
+
+### Tests
+- `ui-scripts.test.js`:
+  - the page's results and kinds equal the server's;
+  - the capability view, the refusals and the points, every text escaped;
+  - a point number linked only when whole, a run only for a UUID, a 2xx status not printed;
+  - the Markdown's sections in order (G4);
+  - the folded function view (G3);
+  - the server's own answer drawn.
+  - The section's functions are now lifted into one context, so a new helper needs no wiring in the test.
+- `coverage-points.test.js`: one point across steps; a status check keeps its step; the finding and the OSCAR mark of any step; the checks an acceptance covers.
+- `capability-coverage.test.js`: a capability whose only point is OSCAR's, and a run OSCAR's defect stopped.
+- `coverage-matrix.test.js`: the seven sheets in order, and the capability sheets from the server's own answer.
+- `coverage-routes.test.js`: the sheets of the download, and OSCAR's point no longer counting.
+- Sixteen deliberate breaks each make a test fail. One was missed at first (OSCAR's mark on a second step), and a test was added for it.
+- **On the simulator** (gamma's reference, 135 runs, the PR 2 findings), on a throwaway OSCAR in Chromium:
+  - 44 capabilities, 2 passed with deviation, 14 points;
+  - no view wider than its card;
+  - the point links and the run links work.
+  - The workbook opens in Excel with its seven sheets and no formula.
+
+---
+
 ## [server-1.11.405] / [collection-OTST_V2.0.226] — 2026-10-26
 
 Issue #972 (part 2 of 4), release 2026.440. The coverage by capability now lists the points to look at, each once, and says when a capability passes with an accepted deviation.

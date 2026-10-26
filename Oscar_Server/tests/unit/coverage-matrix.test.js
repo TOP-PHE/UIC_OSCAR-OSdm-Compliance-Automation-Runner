@@ -145,15 +145,43 @@ describe('the Excel workbook', () => {
     expect(X.sheetName('x'.repeat(40), new Set())).toHaveLength(31);
   });
 
-  test('the coverage workbook has its four sheets', () => {
+  test('the coverage workbook has its seven sheets, the capabilities first (#972)', () => {
     const input = { framework, datafile: datafile(scenarios), runs: { SALE_OK: run('r1') } };
     const report = { days: 30, framework: true, datafile: true, collectionVersion: 'V', ...C.coverageOf(input), ...M.coverageMatrixOf(input) };
     const buf = coverageWorkbook(report, { title: 'Gamma <&>', generatedAt: '2026-10-25 10:00:00 UTC' });
     const book = readZipEntry(buf, 'xl/workbook.xml').toString();
-    for (const name of ['Summary', 'By flow and element', 'By scenario', 'By function']) expect(book).toContain(`name="${name}"`);
+    const names = ['Summary', 'Capabilities', 'Expected refusals', 'Points to look at', 'By flow and element', 'By scenario', 'By function'];
+    expect([...book.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1])).toEqual(names);
     expect(sheet(buf, 1)).toContain('Gamma &lt;&amp;&gt;');
-    expect(sheet(buf, 2)).toContain('Not supported (not declared)');
-    expect(sheet(buf, 3)).toContain('SALE_OK');
-    expect(readZipEntry(buf, '[Content_Types].xml').toString()).toContain('/xl/worksheets/sheet4.xml');
+    expect(sheet(buf, 5)).toContain('Not supported (not declared)');
+    expect(sheet(buf, 6)).toContain('SALE_OK');
+    expect(readZipEntry(buf, '[Content_Types].xml').toString()).toContain('/xl/worksheets/sheet7.xml');
+  });
+
+  test('the capability sheets hold the server\'s own coverage by capability (#972)', () => {
+    const { capabilityCoverageOf } = require('../../src/utils/capabilityCoverage');
+    const { KIND_TEXT } = require('../../src/utils/coverageWorkbook');
+    const { KIND_ORDER } = require('../../src/utils/coveragePoints');
+    expect(Object.keys(KIND_TEXT)).toEqual([...KIND_ORDER]);
+    const steps = ['01. POST Get Offer', '02. POST Create Booking', '06. POST Obtaining Fulfillments from Booking'].map((n) => ({ request_name: n, http_status: 200 }));
+    const failed = (code) => ({ id: `run-${code}`, status: 'FAILED', completed_at: '2026-10-24 10:05:00', steps,
+      checks: [{ request_name: '02. POST Create Booking', assertion_name: 'Booking price is <12.50>', category: 'business_logic', severity: 'major', http_status: 200 }] });
+    const df = datafile([
+      { code: 'A', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1 },
+      { code: 'NHF_A', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1, description: 'Must <refuse>' },
+    ]);
+    const byCapability = capabilityCoverageOf({ framework: { salesFlows: ['SALE'] }, datafile: df, runs: { A: failed('A'), NHF_A: failed('NHF_A') } });
+    const buf = coverageWorkbook({ days: 30, summary: {}, byCapability }, {});
+    expect(sheet(buf, 1)).toContain('Passed with points');
+    const caps = sheet(buf, 2);
+    expect(caps).toContain('Sale: pre-booking and confirmation');
+    expect(caps).toContain('A: Passed with points\n  A (SEARCH): Passed with points at 02. POST Create Booking — Booking price is &lt;12.50&gt;');
+    expect(caps).toContain('>#1<');
+    expect(sheet(buf, 3)).toContain('Must &lt;refuse&gt;');
+    const points = sheet(buf, 4);
+    expect(points).toContain('Booking price is &lt;N&gt;');
+    expect(points).toContain('For the provider');
+    expect(points).toContain('run-A');
+    expect(points).not.toContain('<f>');
   });
 });

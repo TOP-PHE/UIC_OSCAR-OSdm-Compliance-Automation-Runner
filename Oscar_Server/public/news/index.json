@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-coverage-by-capability",
+    "date": "October 26, 2026",
+    "tag": "Added",
+    "title": "Coverage by capability, with the points to look at",
+    "summary": "The Test Framework coverage now opens on one row per capability, like an assessment, followed by the expected refusals and the numbered points to look at.",
+    "content": "In the Report Builder, Show coverage now opens By capability: an offer search, a sale, a full refund, a seat near a given place… Each row says what the Test Framework declares, which tests went through it, and its result: passed, passed with deviation, passed with points, blocked, not supported by the provider, not tested, or out of scope. A failed check counts only against the capability its scenario is for, so one defect no longer turns everything it touches red. The steps a run went through count for what they did, even when the run failed later.\n\nThe expected refusals (NHF scenarios and refusal probes) are listed apart. Each problem is listed once, with a number, however many forms, runs and steps showed it, with the tests that showed it and its finding. A finding classified provider deviation and resolved, or a status baselined as a known deviation, makes the capability read Passed with deviation. A finding classified as OSCAR's issue is listed apart and does not count against the provider.\n\nThe flow and function views are still there as the detail. Export Markdown and Download Excel start with the capabilities, the expected refusals and the points. Nothing to do: choose Show coverage again."
+  },
+  {
     "id": "2026-10-26-bruno-cli-4-3-0",
     "date": "October 26, 2026",
     "tag": "Changed",

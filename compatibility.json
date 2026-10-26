@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.440",
+  "current_release": "2026.441",
   "releases": [
+    {
+      "release": "2026.441",
+      "date": "2026-10-26",
+      "server": "1.11.406",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#972 PR 3: the Report Builder's Test Framework coverage opens By capability (one row per capability, the expected refusals, the numbered points to look at), and its Markdown and Excel exports start with the same three parts.",
+        "OSCAR's own points no longer count against the provider, and one problem seen at several steps is one point (maintainer's choices of 2026-10-26). G3: the function view folds its scenarios; G4: its Markdown heading is level 2."
+      ]
+    },
     {
       "release": "2026.440",
       "date": "2026-10-26",

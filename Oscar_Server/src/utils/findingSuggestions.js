@@ -351,6 +351,7 @@ function failuresFromBruReport(report, { runId = null, at = null, scenarioCode =
 
 module.exports = {
   checkText,
+  STATUS_CHECK,
   stepKey,
   problemCodeOf,
   problemOf,
