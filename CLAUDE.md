@@ -632,7 +632,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     bicycle under a fare reservation is that reservation. Parts 3–4: the
     page and exports, and published reports for the certifier (#972's two
     decision comments).
-    **PR 2 (SERVER_VERSION): points to look at and "Passed with deviation".**
+    **PR 2 (1.11.405): points to look at and "Passed with deviation".**
     `byCapability.points` (`utils/coveragePoints.js`, pure): the latest runs'
     failed checks grouped with the #735 key (`groupKeyOf()`, so the route now
     reads each failed check's HTTP status and an error answer's problem code),
@@ -646,7 +646,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     pinned to `noteKnownDeviation()` by `coverage-points.test.js`: change
     both or neither). Its failures move to `step.accepted`; a run that went
     through reads `deviation` ("Passed with deviation"), a blocked one stays
-    blocked. The route reads every finding for this (resolved included); a
+    blocked. A deviation follows its point like a failure (R1): a capability
+    proven on the way takes it only at an optional operation's own step
+    (`sideResult()`; on the simulator a card scenario's accepted 01c failure
+    first marked the offers by search). The route reads every finding for this (resolved included); a
     point shows only id, title, category, status.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in

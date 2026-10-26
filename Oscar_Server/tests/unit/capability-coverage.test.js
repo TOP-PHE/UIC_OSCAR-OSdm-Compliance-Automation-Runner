@@ -426,6 +426,16 @@ describe('an accepted deviation reads "Passed with deviation" (decision 3)', () 
     expect(accepted.summary.pointsToLookAt).toMatchObject({ accepted: 1, provider: 0 });
   });
 
+  test('a deviation at a step every flow shares is the main capability\'s, not one proven on the way', () => {
+    // Seen on the simulator: an accepted failure at a card scenario's offer step made the offers by search read "with deviation".
+    const at01 = '01. POST Get Offer';
+    const runs = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { [at01]: fail('Offer price is the card price') } }) };
+    const accepted = finding('resolved', { step: at01, observed: 'Offer price is the card price' });
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], runs, { findings: [accepted] });
+    expect(row(r, 'sale')).toMatchObject({ result: 'deviation', points: [1] });
+    expect(row(r, 'offers.search')).toMatchObject({ result: 'passed', points: [], provenBy: { count: 1 } });
+  });
+
   test('any other category resolved is not an acceptance', () => {
     for (const category of ['open', 'not_supported', 'spec_question']) {
       const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], sale(), { findings: [finding('resolved', { category })] });

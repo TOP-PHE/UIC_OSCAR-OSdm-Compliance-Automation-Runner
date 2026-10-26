@@ -192,14 +192,16 @@ function mainResult(steps, main, traits, refusal) {
 }
 
 // What a run proves of a capability other than its main one (R1, R2, R7):
-// passed, deviation, not-supported, points (an optional operation's own
-// failures), or nothing (null).
+// passed, not-supported, or an optional operation's own points or deviation;
+// else nothing (null). A failure or deviation at a step every flow shares is
+// the main capability's, as its point is.
 function sideResult(capability, steps, traits) {
   const { def, own, reached } = stepsFor(capability, steps, traits);
   if (!reached || own.length === 0) return null;
   if (own.every((s) => s.notSupported)) return 'not-supported';
-  if (own.some((s) => s.state === 'failed')) return def.optional && def.goal ? 'points' : null;
-  return own.some((s) => s.deviation) ? 'deviation' : 'passed';
+  const ownRow = Boolean(def.optional && def.goal);
+  if (own.some((s) => s.state === 'failed')) return ownRow ? 'points' : null;
+  return ownRow && own.some((s) => s.deviation) ? 'deviation' : 'passed';
 }
 
 /**
