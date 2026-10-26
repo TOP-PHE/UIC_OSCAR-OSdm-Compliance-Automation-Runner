@@ -59,8 +59,9 @@ function knownDeviationOf(line) {
   const digits = rest.slice(from, from + 3);
   if (!/^\d{3}$/.test(digits)) return null;
   const tail = rest.slice(from + 3);
-  const end = tail.indexOf(NOTE_END);
-  const note = tail.startsWith(' — ') ? tail.slice(3, end < 0 ? tail.length : end).trim() : '';
+  const found = tail.indexOf(NOTE_END);
+  const end = found < 0 ? tail.length : found;
+  const note = tail.startsWith(' — ') ? tail.slice(3, end).trim() : '';
   return { step: rest.slice(0, cut).trim(), status: Number(digits), note: note.slice(0, MAX_NOTE) };
 }
 
