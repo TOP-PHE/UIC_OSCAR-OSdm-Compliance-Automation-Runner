@@ -81,18 +81,24 @@ function stepNotSupported(name, statuses) {
  * not-supported), failures (its failed checks, probes apart), blocking }.
  */
 function stepsOf(run) {
-  const steps = new Map();
-  for (const row of arr(run?.steps)) {
-    if (!isObj(row) || typeof row.request_name !== 'string') continue;
-    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [] });
-    const status = Number(row.http_status);
-    if (Number.isInteger(status) && status > 0) steps.get(row.request_name).statuses.push(status);
-  }
+  const steps = stepsByName(run?.steps);
   for (const check of arr(run?.checks)) {
     const step = isObj(check) ? steps.get(check.request_name) : undefined;
     if (step) (isProbe(check) ? step.probes : step.failures).push(check);
   }
   return [...steps.values()].map(withState);
+}
+
+// A run's step rows, one entry per request name in order, with its HTTP statuses.
+function stepsByName(rows) {
+  const steps = new Map();
+  for (const row of arr(rows)) {
+    if (!isObj(row) || typeof row.request_name !== 'string') continue;
+    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [] });
+    const status = Number(row.http_status);
+    if (Number.isInteger(status) && status > 0) steps.get(row.request_name).statuses.push(status);
+  }
+  return steps;
 }
 
 // A step's state, once its statuses and failed checks are known.
