@@ -3795,7 +3795,7 @@ function withExchangeValue(sc, key, value) {
 // The block with `value` ticked or unticked in criterion `key`; an empty
 // list, then an empty criteria object, is removed.
 function withExchangeCriterion(sc, key, value, on) {
-  const criteria = { ...(exchangeBlockOf(sc).offerSearchCriteria || {}) };
+  const criteria = { ...exchangeBlockOf(sc).offerSearchCriteria };
   const list = (Array.isArray(criteria[key]) ? criteria[key] : []).filter(v => v !== value);
   if (on) list.push(value);
   if (list.length > 0) criteria[key] = list;
@@ -3812,21 +3812,28 @@ function exchangeTripLabel(t) {
   return `#${t?.id} ${stop(from)} → ${stop(to)} (${t?.tripType || '?'})`;
 }
 
-// The value typed in a field of the section, or undefined while it is not
-// one the collection takes (ignored mid-edit, as the other number fields).
+// The value typed in a field of the section: { valid, value }, value null
+// for an empty field. Not valid while it is not one the collection takes
+// (ignored mid-edit, as the other number fields).
 function exchangeInputValue(field, raw) {
   const v = String(raw ?? '').trim();
-  if (v === '') return null;
-  if (field === 'dateOffsetDays') {
-    const n = Number(v);
-    return Number.isInteger(n) && Math.abs(n) <= 60 ? n : undefined;
+  let value = v;
+  let valid;
+  if (v === '') {
+    value = null;
+    valid = true;
+  } else if (field === 'dateOffsetDays') {
+    value = Number(v);
+    valid = Number.isInteger(value) && Math.abs(value) <= 60;
+  } else if (field === 'time') {
+    valid = EXCHANGE_TIME.test(v);
+  } else if (field === 'tripRequirementId') {
+    value = Number(v);
+    valid = Number.isSafeInteger(value);
+  } else {
+    valid = false;
   }
-  if (field === 'time') return EXCHANGE_TIME.test(v) ? v : undefined;
-  if (field === 'tripRequirementId') {
-    const n = Number(v);
-    return Number.isSafeInteger(n) ? n : undefined;
-  }
-  return undefined;
+  return { valid, value };
 }
 
 function exchangeCriterionHtml(idx, key, label, values, ex) {
@@ -3850,7 +3857,7 @@ function exchangeCriterionHtml(idx, key, label, values, ex) {
 function buildExchangeSection(idx, sc) {
   if (sc?.scenarioType !== 'EXCHANGE') return '';
   const ex = exchangeBlockOf(sc);
-  const trips = (state.tripRequirements || []).filter(t => t && t.id != null);
+  const trips = (state.tripRequirements || []).filter(t => t?.id != null);
   const chosen = ex.tripRequirementId;
   const known = chosen == null || trips.some(t => t.id === chosen);
   const options = [
@@ -3902,9 +3909,9 @@ function changeExchange(action, el) {
   if (action === 'toggle-exchange-criterion') {
     next = withExchangeCriterion(sc, el.dataset.field, el.dataset.val, el.checked);
   } else {
-    const value = exchangeInputValue(el.dataset.field, el.value);
-    if (value === undefined) return true;
-    next = withExchangeValue(sc, el.dataset.field, value);
+    const typed = exchangeInputValue(el.dataset.field, el.value);
+    if (!typed.valid) return true;
+    next = withExchangeValue(sc, el.dataset.field, typed.value);
   }
   if (next) sc.exchange = next;
   else delete sc.exchange;

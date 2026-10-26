@@ -1620,16 +1620,17 @@ describe('scenarios.js — what an exchange is for (#959)', () => {
   });
 
   test('typed values: what the collection takes, else ignored mid-edit', () => {
-    expect(exchangeInputValue('dateOffsetDays', ' 3 ')).toBe(3);
-    expect(exchangeInputValue('dateOffsetDays', '-60')).toBe(-60);
-    expect(exchangeInputValue('dateOffsetDays', '61')).toBeUndefined();
-    expect(exchangeInputValue('dateOffsetDays', '1.5')).toBeUndefined();
-    expect(exchangeInputValue('time', '12:05')).toBe('12:05');
-    expect(exchangeInputValue('time', '12:0')).toBeUndefined();
-    expect(exchangeInputValue('time', '24:00')).toBeUndefined();
-    expect(exchangeInputValue('tripRequirementId', '7')).toBe(7);
-    expect(exchangeInputValue('tripRequirementId', '')).toBeNull();
-    expect(exchangeInputValue('other', '1')).toBeUndefined();
+    const ok = (value) => ({ valid: true, value });
+    expect(exchangeInputValue('dateOffsetDays', ' 3 ')).toEqual(ok(3));
+    expect(exchangeInputValue('dateOffsetDays', '-60')).toEqual(ok(-60));
+    expect(exchangeInputValue('dateOffsetDays', '61').valid).toBe(false);
+    expect(exchangeInputValue('dateOffsetDays', '1.5').valid).toBe(false);
+    expect(exchangeInputValue('time', '12:05')).toEqual(ok('12:05'));
+    expect(exchangeInputValue('time', '12:0').valid).toBe(false);
+    expect(exchangeInputValue('time', '24:00').valid).toBe(false);
+    expect(exchangeInputValue('tripRequirementId', '7')).toEqual(ok(7));
+    expect(exchangeInputValue('tripRequirementId', '')).toEqual(ok(null));
+    expect(exchangeInputValue('other', '1').valid).toBe(false);
   });
 
   test('the trips a scenario names include its exchange\'s', () => {
