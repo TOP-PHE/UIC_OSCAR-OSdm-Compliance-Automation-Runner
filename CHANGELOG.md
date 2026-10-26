@@ -93,9 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.410] / [collection-OTST_V2.0.226] — 2026-10-27
+## [server-1.11.411] / [collection-OTST_V2.0.226] — 2026-10-27
 
-Issue #984, release 2026.445. In the coverage by capability, a point number opens that point under its row instead of jumping to the long list at the end.
+Issue #984, release 2026.446. In the coverage by capability, a point number opens that point under its row instead of jumping to the long list at the end.
 
 ### Changed
 - **Report Builder, coverage by capability.** A point number (`#1`, `#2`…) in the capability table or the expected refusals table opens that point in a row right under the row clicked. A second click closes it. This works for the live coverage and for a published report.
@@ -117,6 +117,18 @@ Issue #984, release 2026.445. In the coverage by capability, a point number open
   - a second click closes it;
   - `#10` opens the right one of the sale row's 17;
   - a published report's expected refusal opens the same way.
+
+---
+
+## [server-1.11.410] / [collection-OTST_V2.0.226] — 2026-10-27
+
+Coverage: a run's blocking failure read right, release 2026.445 (#988).
+
+### Fixed
+- **An id is not a status.** `classifySeverity()` (`reports/classifier.js`) read `500` and `401` anywhere in a check's text, so "admission[8] has a counterpart in the booking (offer part id=…-15000c27799f…)" was stored critical and the run read "Failed", while its twin with the same failures and other ids read "Passed with defects". UUIDs are now taken out of the text first, and the two numbers count as whole numbers only.
+- **No offer, or no trip to ask offers for, blocks.** "Offers found in response" (a sale with no offer after three tries; "Exchange offers found in response" alike), "Trips collection: a trip to ask offers for — none" and "Trips collection: the scenario's SEARCH trip gives an origin and a destination" stop the scenario: they are a `prerequisite` now, so the run is "Failed", not "Passed with defects".
+- **Stored runs are read again.** `isBlockingCheck()` (`frameworkCoverage.js`) takes the severity from the check's text, as #982 did for the category, so the coverage of runs made before this release changes without running them again.
+- Checked against a real provider's batch of 301 runs: exactly the three runs above change result, each the right way.
 
 ---
 

@@ -600,6 +600,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     checks (`run_assertions` + step): blocking = category `http_status` /
     `script_error` / `prerequisite` or severity critical, else the run is
     `defects` ("Passed with defects"); unread failures count as failed.
+    **Blocking is read again from the check's text** (#982 category, #988
+    severity: a UUID holding "500" made a check critical; no offer / no trip
+    at 01 is a `prerequisite`), so a rule fix changes stored runs' coverage.
+    Checked against a real provider's 301 Bruno result files: test such a
+    change by replaying them through `failureOf()`.
     **The category is read again from the check's text** (`isBlockingCheck()`,
     #982, 1.11.408, shared with `byCapability`): the collection's main status
     check, "HTTP response status — expected 200, actual: N", was stored as
@@ -698,7 +703,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`publishedListHtml()`, `comparisonHtml()`, `publishedHtml()`; a report id
     reaches an address only through `coverageRunIdOf()`); a report shown
     clears the live coverage, so one set of point anchors is on the page.
-    **A point number opens its point under the row** (#984, 1.11.410):
+    **A point number opens its point under the row** (#984, 1.11.411):
     hidden rows drawn with the table (`capabilityPointRows()`, no anchor id,
     so ids stay unique), `toggleCoveragePoint()` on `coverage-body` and
     `published-body`; the number keeps its link to the list at the end.
