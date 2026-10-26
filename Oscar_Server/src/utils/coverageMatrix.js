@@ -44,8 +44,9 @@ const { declarationsOf } = require('./offerOptionDiscovery');
 const { TRIP_SEARCH_PARAMETER_TEXT } = require('./tripSearchParameters');
 const {
   declaredFunctions, functionsOf, scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf, stateOf,
-  SALES_FLOW_TEXT, OPTION_TEXT,
+  SALES_FLOW_TEXT, OPTION_TEXT, FARE_TEXT,
 } = require('./frameworkCoverage');
+const { catalogueEntryForScenario } = require('./scenarioCatalogue');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -84,9 +85,21 @@ const FAMILIES = {
     ? [...declaredProducts(fw), ...declaredGroupProducts(fw)].map((p) => p.code) : undefined) },
   overrule: { group: 'IROPS reason codes', label: (c) => c, listed: (fw) => fw.iropsCodes?.refund },
   fareCluster: { group: 'Fares', label: (c) => `Fare cluster ${c}`, listed: (fw) => fw.fares?.clusters },
+  fareCombination: { group: 'Fares', label: (c) => `Fares combined by ${c}`, listed: (fw) => fw.fares?.combinationModels },
+  fareReservation: { group: 'Fares', label: (r) => `Fare reservation for a ${words(r)}`, listed: (fw) => fw.fares?.reservations },
+  fareSalesFlow: { group: 'Fares', label: (f) => `Fares: ${flowLabel(f).toLowerCase()}`, listed: (fw) => fw.fares?.salesFlows },
+  fare: { group: 'Fares', label: (k) => FARE_TEXT[k] || k, listed: fareFlagsOf },
   limit: { group: 'Limits', label: (k) => LIMIT_TEXT[k] || k,
     listed: (fw) => declaredFunctions(fw).filter((f) => f.id.startsWith('limit:')).map((f) => f.id.slice(6)) },
 };
+// #937's yes/no fare declarations as a list: undefined when the framework has no `fares`.
+function fareFlagsOf(fw) {
+  if (!isObj(fw.fares)) return undefined;
+  const out = [];
+  if (fw.fares.statedRefundFee === true) out.push('statedRefundFee');
+  if (Number.isInteger(fw.fares.freeUnderAge)) out.push('freeUnderAge');
+  return out;
+}
 const GROUP_ORDER = [WHOLE_FLOW, ...Object.values(FAMILIES).map((f) => f.group), 'Offer search options', 'Offer request options', 'Booking'];
 
 const splitId = (id) => {
@@ -235,7 +248,7 @@ function compareRows(a, b) {
 // partial refund scope, its IROPS code): the trip, passengers, currency… of
 // such a scenario belong to the sale before it, and listing them under the
 // refund read as if the refund tested them.
-const AFTER_SALE_ELEMENTS = ['partialRefund:', 'overrule:'];
+const AFTER_SALE_ELEMENTS = ['partialRefund:', 'overrule:', 'fareSalesFlow:REFUND_FULL', 'fare:statedRefundFee', 'fareCombination:'];
 function shownUnder(flow, id) {
   return flow === 'SALE' || AFTER_SALE_ELEMENTS.some((p) => id.startsWith(p));
 }
@@ -273,14 +286,14 @@ function cellsOf(exercised, fw, declaredRows) {
  *   refusals  { code: [warning lines of its latest run] }
  * -> { matrix: [row], scenarios: [row] }
  */
-function coverageMatrixOf({ framework, datafile, runs = {}, findings = [], collectionVersion = null, refusals = {} }) {
+function coverageMatrixOf({ framework, datafile, runs = {}, findings = [], collectionVersion = null, refusals = {}, catalogue = [] }) {
   const fw = frameworkOf(framework);
   const scenarios = arr(datafile?.scenarios).filter((s) => isObj(s) && typeof s.code === 'string' && s.code !== '');
   const defaultCurrency = currenciesOf(fw).default;
   const declaredRows = new Map(declaredFunctions(fw).map((f) => [f.id, f]));
   const warnings = new Map(notDeclaredOf(datafile, framework).map((n) => [n.code, n.warnings]));
   const exercised = scenarios.map((s) => {
-    const ids = withDefaultCurrency(functionsOf(s, datafile), defaultCurrency);
+    const ids = withDefaultCurrency(functionsOf(s, datafile, { framework: fw, entry: catalogueEntryForScenario(s.code, catalogue) }), defaultCurrency);
     return { scenario: s, ids, flow: mainFlowOf(s, ids), warned: warnedElements(warnings.get(s.code), ids) };
   });
   const entries = new Map(scenarios.map((s) => [s.code, scenarioEntry(s, runs[s.code] || null, { collectionVersion })]));

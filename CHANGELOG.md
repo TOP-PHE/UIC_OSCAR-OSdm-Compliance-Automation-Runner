@@ -93,6 +93,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.401] / [collection-OTST_V2.0.225] — 2026-10-26
+
+Issue #972 (part 1 of 4), release 2026.436. The #956 report read as if nothing worked on a real provider's campaign (9 functions failed), while 34 of its 45 tests passed in every form. Four things caused it:
+- one failure spread to every element its scenario touched;
+- a late failure failed what came before it;
+- negative probes counted against the function they probe;
+- copies and forms inflated the counts.
+
+### Added
+- **The coverage by capability**, in `GET /v1/company/coverage` as `byCapability` (`utils/capabilityCoverage.js`, pure). This part is the server; the page shows it in part 3.
+  - **Capabilities** are the lines of an assessment ("Offers by trip search", "Full refund", "Seat near a given place"…). There are 48 of them, in `utils/capabilities.js`, grouped as an assessment reads.
+  - **Each scenario has one main capability.** Its catalogue entry names it, in the new `capability` field. Otherwise it is read from the scenario's fields (`derivedCapability()`). A simulator scenario stands for the catalogue entry it is the source of, in any OSDM version (`catalogueEntryForScenario()`).
+  - **A failed check counts only against that capability** (R1).
+  - **The steps a run went through prove their own capabilities** (R2, decision 1). `STEP_ROLES` says what each request of the collection does. The traits of a stage that went through count too: a return, a card, a seat preference… A step proves only what it did.
+  - **A catalogue entry is one test**, whatever its forms (`_SPEC`, `_TRIPID`) and copies (`_2`) (R3). A scenario that is neither in the run list nor run is set apart, not counted as "never run".
+  - **Expected refusals are rows of their own** (R4): refused, not refused, or not run. They never change the result of the capability they probe, and the steps they went through still prove what they did.
+  - **Results** (R5):
+    - passed;
+    - passed with points;
+    - blocked (no run reached it);
+    - not supported by the provider;
+    - not tested (declared, not run);
+    - out of scope (not declared, or declared not supported).
+  - **An optional operation is its own row** (R7): the reference data reads, the seat map, the fulfilment read, the refund receipt, a withdrawal, Idempotency-Key. It reads "not supported by the provider" on a 501, or on what #488 reads as "not implemented" for an optional read.
+
+### Changed
+- **The coverage by function** (#972 G1, G2):
+  - A product named by words of its name (`expectedProduct`) counts as the declared product, the way the collection takes it (`productIdsOf()`). Before, it read "No scenario" and "Not declared" at the same time.
+  - The fare declarations of #937 have rows once FARE is declared: not only the clusters, but also the combination models, fare reservations, fare sales flows, a stated refund fee and the free age. A bicycle under a declared fare reservation now counts as that reservation, no longer as an undeclared passenger type.
+- `catalogueEntryOf()` moved from `utils/aiAnalysis.js` to `utils/scenarioCatalogue.js` and is re-exported, so both readers use one copy.
+
+### Collection
+- `data_base/scenario_catalogue.json`: each entry names its `capability`. Only the report reads it: no request, check or scenario changed. The catalogue's check refuses an unknown capability.
+
+### Tests
+- `capability-coverage.test.js`:
+  - every request of the collection has a role, and every role names a request;
+  - the optional reads equal the collection's and the report's (#488);
+  - each entry's capability is the one its source's fields give, except seven entries where the provider's data decides, each listed with its reason;
+  - one fixture per mechanism, each showing the result #956 gave and the one given now: a failure spreading, a late failure at an optional operation, a probe, a failed fulfilment read, forms and copies.
+- `framework-coverage.test.js`: G1 and G2.
+- `coverage-routes.test.js`: `byCapability` built from steps stored in the database.
+- Seventeen deliberate breaks each make a test fail: each rule, a step's blocking answer, the step table, the catalogue, G1, G2, and the route reading the steps.
+- Checked on the simulator: gamma's reference, 135 runs through a throwaway OSCAR. Every deliberately wrong scenario counts only against its own capability, and the shared rows (offers by search, reference data, passenger update) stay passed.
+
+---
+
 ## [server-1.11.400] / [collection-OTST_V2.0.224] — 2026-10-26
 
 Issue #959 (part 2), release 2026.435.
