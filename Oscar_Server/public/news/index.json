@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-status-check-blocks",
+    "date": "October 26, 2026",
+    "tag": "Fixed",
+    "title": "A wrong HTTP status blocks the run in the coverage reports",
+    "summary": "The collection's main status check is now read as a status check, so a step answered with an unexpected status counts as blocking, also for runs made before.",
+    "content": "The coverage reports count a failed check as blocking when the step answered an HTTP status it did not expect. The collection's main status check, \"HTTP response status — expected 200, actual: …\", was not recognised as one, so a booking answered 400, for example, read as a point that did not block the run, and the function and flow views showed \"Passed with defects\" instead of \"Failed\".\n\nIt is now recognised for new runs, and the coverage reports read it again from the check's text for runs already made. Show the coverage again to see it. A report already published keeps what it said; publish a new one if needed."
+  },
+  {
     "id": "2026-10-26-published-coverage-reports",
     "date": "October 26, 2026",
     "tag": "Added",

@@ -539,3 +539,26 @@ describe('an accepted deviation reads "Passed with deviation" (decision 3)', () 
     expect(stepsOf({ steps: [{ request_name: at07, http_status: 200 }], checks: [check] })[0]).toMatchObject({ state: 'failed', deviation: false });
   });
 });
+
+// ── #982: the collection's status check, stored before 1.11.408 as business_logic ──
+
+describe('a wrong status read from the check text (#982)', () => {
+  const at02 = '02. POST Create Booking';
+  const status400 = 'HTTP response status — expected 200, actual: 400';
+  const stored = { assertion_name: status400, category: 'business_logic', severity: 'major' };
+
+  test('the step is blocked by a 400 its check names, whatever category was stored', () => {
+    const steps = stepsOf({ steps: [{ request_name: at02, http_status: 400 }], checks: [{ request_name: at02, http_status: 400, ...stored }] });
+    expect(steps[0]).toMatchObject({ state: 'failed', blocking: true });
+    const field = { request_name: at02, http_status: 200, assertion_name: 'Booking id is a non-empty string', category: 'business_logic', severity: 'major' };
+    expect(stepsOf({ steps: [{ request_name: at02, http_status: 200 }], checks: [field] })[0]).toMatchObject({ state: 'failed', blocking: false });
+  });
+
+  test('its point is blocking', () => {
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], {
+      OTST_SALE_ONE_WAY_1ADT: run(SALE, { stopAt: at02, statuses: { [at02]: 400 }, failures: { [at02]: [stored] } }),
+    });
+    expect(r.points).toEqual([expect.objectContaining({ step: at02, check: 'HTTP response status — expected N, actual: N', status: 400, blocking: true })]);
+    expect(row(r, 'sale').result).toBe('blocked');
+  });
+});

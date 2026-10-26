@@ -93,6 +93,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.408] / [collection-OTST_V2.0.226] — 2026-10-26
+
+Issue #982, release 2026.443. The collection's own status check is read as a status check, so a wrong status blocks the run in the coverage reports, for new runs and for runs already stored.
+
+### Fixed
+- **`classifyCategory()`** (`reports/classifier.js`) reads a check starting with *HTTP response status* as `http_status`.
+  - This is the collection's main status check: *HTTP response status — expected 200, actual: N*, in 24 request and library files.
+  - It used to be stored as `business_logic`, because the rule knew only *Status code is N*, *→ N* and a few words.
+  - A check that only names it elsewhere in its text is unchanged.
+- **The coverage reports read a failed check's category again from its text** (`isBlockingCheck()`, `utils/frameworkCoverage.js`), so runs stored before this release are read like new ones.
+  - The rule is now shared by both reports: *By function* and *By flow and element* (#956) and *By capability* (#972). Before, each report had its own copy.
+  - A wrong status other than a 5xx (a booking answered 400, say) now blocks the run:
+    - its point says *Blocking: Yes*;
+    - its step blocks the capability it counts against;
+    - the function and flow views read *Failed* instead of *Passed with defects*.
+  - A published report keeps what it said when it was published.
+- Tester User Guide §6: what blocks a run.
+
+### Tests
+- `classifier.test.js`: each form of the check (expected, known deviation, not implemented, allowed for a fare reservation), and a text that only names it.
+- `framework-coverage.test.js`: a run stored with the check as `business_logic` is blocked.
+- `capability-coverage.test.js`: its step and its point are blocking.
+- Six deliberate breaks each make a test fail: the rule left out, `includes` for `startsWith`, the text not read again in either report, the old local rule back in the capability view, a missing check accepted.
+
+---
+
 ## [server-1.11.407] / [collection-OTST_V2.0.226] — 2026-10-26
 
 Issue #972 (part 4 of 4), release 2026.442. A Test Manager publishes the coverage as a numbered, frozen report and shares it with the certifier, who reads it; each report says what changed since the last one shared (decision 4).

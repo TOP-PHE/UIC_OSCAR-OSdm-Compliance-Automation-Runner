@@ -31,6 +31,7 @@ const {
 } = require('./frameworkGating');
 const { salesFlowsOf, catalogueEntryForScenario } = require('./scenarioCatalogue');
 const { declaredCards } = require('./reductionCards');
+const { classifyCategory } = require('../reports/classifier');
 const { declaredProducts, declaredGroupProducts } = require('./namedProducts');
 const { currenciesOf } = require('./currencies');
 const { distributionModesOf } = require('./distributionModes');
@@ -254,8 +255,13 @@ function scenarioHash(scenario) {
 // A failed check that stops the scenario short of its goal (#956 part 4): a
 // status the step did not expect, a script that broke, a prerequisite
 // missing. Any other failed check (a field, a structure, a consistency) is a
-// defect of a flow that went through.
+// defect of a flow that went through. The category is also read again from
+// the check's text (#982): until 1.11.408 the collection's "HTTP response
+// status — expected 200, actual: N" check was stored as business_logic.
 const BLOCKING_CATEGORIES = new Set(['http_status', 'script_error', 'prerequisite']);
+const isBlockingCheck = (check) => isObj(check) && (check.severity === 'critical'
+  || BLOCKING_CATEGORIES.has(check.category)
+  || BLOCKING_CATEGORIES.has(classifyCategory(String(check.assertion_name ?? ''))));
 const MAX_CHECK_TEXT = 300;
 
 /**
@@ -266,10 +272,9 @@ const MAX_CHECK_TEXT = 300;
 function failureOf(rows) {
   const list = arr(rows).filter(isObj);
   if (list.length === 0) return null;
-  const isBlocking = (r) => BLOCKING_CATEGORIES.has(r.category) || r.severity === 'critical';
-  const first = list.find(isBlocking) || list[0];
+  const first = list.find(isBlockingCheck) || list[0];
   return {
-    blocking: isBlocking(first),
+    blocking: isBlockingCheck(first),
     step: typeof first.request_name === 'string' ? first.request_name : null,
     check: String(first.assertion_name ?? '').slice(0, MAX_CHECK_TEXT),
   };
@@ -390,6 +395,6 @@ function latestRunsOf(rows) {
 }
 
 module.exports = {
-  declaredFunctions, functionsOf, scenarioHash, coverageOf, latestRunsOf, resultOf, toRunAgain, failureOf, stateOf,
+  declaredFunctions, functionsOf, scenarioHash, coverageOf, latestRunsOf, resultOf, toRunAgain, failureOf, isBlockingCheck, stateOf,
   scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf, productIdsOf, SALES_FLOW_TEXT, OPTION_TEXT, FARE_TEXT,
 };

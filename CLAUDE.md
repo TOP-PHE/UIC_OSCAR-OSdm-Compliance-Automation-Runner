@@ -600,6 +600,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     checks (`run_assertions` + step): blocking = category `http_status` /
     `script_error` / `prerequisite` or severity critical, else the run is
     `defects` ("Passed with defects"); unread failures count as failed.
+    **The category is read again from the check's text** (`isBlockingCheck()`,
+    #982, 1.11.408, shared with `byCapability`): the collection's main status
+    check, "HTTP response status — expected 200, actual: N", was stored as
+    `business_logic` until then, so a 400 never blocked.
     `stateOf()` (shared by both views): failed > defects > passed > never
     run. Rows carry `counts.withDefects` and `failedScenarios` (blocked first,
     run id, first failed step and check); the page links a run only for a

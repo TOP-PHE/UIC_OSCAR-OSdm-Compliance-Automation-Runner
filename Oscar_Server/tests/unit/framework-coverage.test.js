@@ -134,6 +134,10 @@ describe('the coverage', () => {
     for (const c of ['script_error', 'prerequisite']) expect(C.failureOf([check(c)]).blocking).toBe(true);
     expect(C.failureOf([check('business_logic', { severity: 'critical' })]).blocking).toBe(true);
     expect(C.failureOf([check('business_logic', { assertion_name: 'y'.repeat(400) })]).check).toHaveLength(300);
+    // #982: a run stored before 1.11.408 holds the collection's status check as business_logic.
+    const status400 = check('business_logic', { request_name: '02. POST Create Booking', assertion_name: 'HTTP response status — expected 200, actual: 400' });
+    expect(C.failureOf([check('field_validation'), status400])).toEqual({ blocking: true, step: '02. POST Create Booking', check: status400.assertion_name });
+    expect(C.isBlockingCheck(null)).toBe(false);
     expect(C.resultOf({ failed: 2, total: 9, failure: { blocking: false } })).toBe('defects');
     expect(C.resultOf({ failed: 2, total: 9, failure: { blocking: true } })).toBe('failed');
     expect(C.resultOf({ failed: 2, total: 9 })).toBe('failed');
