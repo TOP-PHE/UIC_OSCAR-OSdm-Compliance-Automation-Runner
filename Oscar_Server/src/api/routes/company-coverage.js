@@ -16,7 +16,8 @@
  *                                    the open findings, the summary, the
  *                                    scenarios testing what is not declared,
  *                                    and (part 3) the same by flow and element
- *                                    tested (`matrix`) and by scenario.
+ *                                    tested (`matrix`) and by scenario, and
+ *                                    (#972) by capability (`byCapability`).
  *   GET /v1/company/coverage/download?days=   the same as an .xlsx workbook.
  *
  * Read only. Like the data file and the findings it reads, the company's
@@ -30,13 +31,14 @@ const { all, get, colDecrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
-const { readDatafile, Refusal } = require('../helpers/catalogueSource');
+const { readDatafile, readCatalogue, Refusal } = require('../helpers/catalogueSource');
 const { frameworkConfigOf } = require('../helpers/configurationStore');
 const { viewForTester } = require('../../utils/datafileOwnership');
 const { getRunSelection } = require('../../utils/runSelections');
 const { currentCollectionVersion } = require('../../utils/versionInfo');
 const { coverageOf, latestRunsOf, failureOf } = require('../../utils/frameworkCoverage');
 const { coverageMatrixOf } = require('../../utils/coverageMatrix');
+const { capabilityCoverageOf } = require('../../utils/capabilityCoverage');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const log = require('../../utils/logger').child({ module: 'company-coverage' });
 
@@ -53,6 +55,7 @@ const MAX_DAYS = 3650;
 const MAX_RUNS = 20000;
 const MAX_WARNING_EVENTS = 20000;
 const MAX_FAILED_CHECKS = 50000;
+const MAX_STEPS = 200000;
 
 // The window of runs read, in days: a whole number from 1 to 3650.
 function daysOf(raw) {
@@ -78,8 +81,25 @@ function failedChecksOf(ids) {
   return byRun;
 }
 
+// The steps of the runs (#972), by run, in order: { request_name, http_status }.
+function stepsOfRuns(ids) {
+  const byRun = new Map();
+  let read = 0;
+  for (let i = 0; i < ids.length && read < MAX_STEPS; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const rows = all(`SELECT run_id, request_name, http_status FROM run_requests
+                       WHERE run_id IN (${chunk.map(() => '?').join(',')}) ORDER BY id ASC LIMIT ?`, [...chunk, MAX_STEPS - read]);
+    read += rows.length;
+    for (const row of rows) {
+      if (!byRun.has(row.run_id)) byRun.set(row.run_id, []);
+      byRun.get(row.run_id).push({ request_name: row.request_name, http_status: row.http_status });
+    }
+  }
+  return byRun;
+}
+
 // The latest finished run of each scenario of the company within the window,
-// with its check counts.
+// with its check counts, its steps and its failed checks.
 function latestRuns(companyId, days) {
   const rows = all(
     `SELECT id, scenario_code, status, queued_at, completed_at, server_version, collection_version, scenario_hash
@@ -107,7 +127,12 @@ function latestRuns(companyId, days) {
     run.failed = c ? Number(c.failed) : 0;
   }
   const failures = failedChecksOf(ids);
-  for (const run of Object.values(latest)) run.failure = failureOf(failures.get(run.id));
+  const steps = stepsOfRuns(ids);
+  for (const run of Object.values(latest)) {
+    run.failure = failureOf(failures.get(run.id));
+    run.checks = failures.get(run.id) || [];
+    run.steps = steps.get(run.id) || [];
+  }
   return latest;
 }
 
@@ -134,6 +159,18 @@ function warningLinesOf(latest) {
   return out;
 }
 
+// The catalogue's entries (#972: each names its capability). A catalogue that
+// cannot be read leaves every scenario to derivedCapability().
+function catalogueEntries() {
+  try {
+    const entries = readCatalogue().catalogue?.entries;
+    return Array.isArray(entries) ? entries : [];
+  } catch (err) {
+    log.warn({ err: err.message }, 'scenario catalogue not readable for the coverage report');
+    return [];
+  }
+}
+
 // Refuses (res answered, null returned) or builds the report of the request.
 async function reportOf(req, res) {
   if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
@@ -157,12 +194,14 @@ async function reportOf(req, res) {
   const runs = latestRuns(companyId, days);
   const input = {
     framework: framework || {}, datafile: datafile || { scenarios: [] }, runs, findings, collectionVersion: currentCollectionVersion(),
+    catalogue: catalogueEntries(),
   };
   const coverage = coverageOf(input);
   const { matrix, scenarios } = coverageMatrixOf({ ...input, refusals: warningLinesOf(runs) });
+  const byCapability = capabilityCoverageOf({ ...input, functions: coverage.functions });
   return {
     companyId,
-    report: { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios },
+    report: { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios, byCapability },
   };
 }
 

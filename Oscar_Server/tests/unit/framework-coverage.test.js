@@ -154,3 +154,51 @@ describe('the coverage', () => {
     expect(Object.fromEntries(Object.entries(latest).map(([k, v]) => [k, v.id]))).toEqual({ S: 'b' });
   });
 });
+
+describe('#972 G1: a product named by words of its name', () => {
+  const fw = { products: [{ code: 'P_FLEX', name: 'Flexi saver' }, { code: 'P_BOUND', name: 'Train-bound saver' }] };
+
+  test('is the declared product the collection would take, by code first', () => {
+    expect(C.productIdsOf('P_BOUND', fw)).toEqual(['product:P_BOUND']);
+    expect(C.productIdsOf('flexi saver', fw)).toEqual(['product:P_FLEX']);
+    expect(C.productIdsOf('saver', fw)).toEqual(['product:P_FLEX', 'product:P_BOUND']);
+    expect(C.productIdsOf('night', fw)).toEqual(['product:night']);
+  });
+
+  test('so the declared product counts as tested, and nothing reads "not declared"', () => {
+    const df = datafile([{ code: 'S', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1, expectedProduct: 'flexi saver' }]);
+    const c = C.coverageOf({ framework: { ...fw, salesFlows: ['SALE'] }, datafile: df });
+    expect(c.functions.find((f) => f.id === 'product:P_FLEX').state).toBe('never-run');
+    expect([...C.functionsOf(df.scenarios[0], df)]).toContain('product:flexi saver');
+  });
+});
+
+describe('#972 G2: the fare declarations', () => {
+  const fares = { clusters: ['NON_FLEX'], combinationModels: ['CLUSTERING'], statedRefundFee: true, reservations: ['BICYCLE'], salesFlows: ['SALE', 'REFUND_FULL'], freeUnderAge: 6 };
+
+  test('give rows once FARE is declared, none otherwise', () => {
+    const rows = C.declaredFunctions({ distributionModes: ['PRODUCT', 'FARE'], fares }).filter((f) => f.group === 'Fares');
+    expect(rows.map((f) => [f.id, f.label])).toEqual([
+      ['fareCluster:NON_FLEX', 'Fare cluster NON_FLEX'], ['fareCombination:CLUSTERING', 'Fares combined by CLUSTERING'],
+      ['fareReservation:BICYCLE', 'Fare reservation for a bicycle'], ['fareSalesFlow:SALE', 'Fares: sale'],
+      ['fareSalesFlow:REFUND_FULL', 'Fares: full refund'], ['fare:statedRefundFee', 'Refund fee stated by the distributor'],
+      ['fare:freeUnderAge', 'Free under 6'],
+    ]);
+    expect(C.declaredFunctions({ fares }).some((f) => f.group === 'Fares')).toBe(false);
+  });
+
+  test('a bicycle with a fare reservation is that reservation, not a passenger type', () => {
+    const df = datafile([], {
+      passengersList: [{ id: 3, passengers: [{ type: 'PERSON' }, { type: 'BICYCLE' }] }],
+      offerSearchCriteriaList: [{ id: 1, offerSearchCriteria: [{ requestedOfferParts: ['FARE_ADMISSION', 'FARE_RESERVATION'] }] }],
+    });
+    const bike = { code: 'B', scenarioType: 'SALE', tripRequirementId: 2, passengersListId: 3, offerSearchCriteriaListId: 1, requestedSections: [{ startPlace: 'a', endPlace: 'b' }] };
+    const ids = [...C.functionsOf(bike, df)];
+    expect(ids).toEqual(expect.arrayContaining(['fareSalesFlow:SALE', 'fareReservation:BICYCLE', 'passengerType:ADULT']));
+    expect(ids).not.toContain('passengerType:BICYCLE');
+    const refund = { ...bike, code: 'R', scenarioType: 'REFUND', fareRefundFee: 250 };
+    expect([...C.functionsOf(refund, df)]).toEqual(expect.arrayContaining(['fareSalesFlow:REFUND_FULL', 'fare:statedRefundFee', 'fareCombination:CLUSTERING']));
+    const child = [...C.functionsOf(bike, df, { entry: { limit: 'FREE_CHILD', combinationModel: 'COMBINING' } })];
+    expect(child).toEqual(expect.arrayContaining(['fare:freeUnderAge', 'fareCombination:COMBINING']));
+  });
+});

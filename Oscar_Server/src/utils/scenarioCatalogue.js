@@ -127,8 +127,46 @@ function entryProblems(e, at, scenarios, codes) {
   if (String(e.source).startsWith('SIM_FAULT_')) problems.push(`${at}.source asks the simulator for faults (#833)`);
   if (e.limit !== undefined && !LIMITS.includes(e.limit)) problems.push(`${at}.limit "${e.limit}" is not one of ${LIMITS.join(', ')}`);
   if (e.probe !== undefined && !PROBES.includes(e.probe)) problems.push(`${at}.probe "${e.probe}" is not one of ${PROBES.join(', ')}`);
-  problems.push(...combinationModelProblems(e, at), ...needsProblems(e.needs, at));
+  problems.push(...combinationModelProblems(e, at), ...capabilityProblems(e, at), ...needsProblems(e.needs, at));
   return problems;
+}
+
+// #972: the capability of the coverage report the entry counts under.
+function capabilityProblems(e, at) {
+  if (require('./capabilities').CAPABILITY.has(e.capability)) return [];
+  return [`${at}.capability "${e.capability}" is not a capability of utils/capabilities.js`];
+}
+
+/**
+ * The catalogue entry a scenario code comes from: the entry of that code, else
+ * the longest entry code it extends with "_" (a twin by trip specification or
+ * trip id, a copy renamed "_2"). Null when none.
+ */
+function catalogueEntryOf(code, entries) {
+  if (typeof code !== 'string') return null;
+  let best = null;
+  for (const e of entries || []) {
+    if (typeof e?.code !== 'string') continue;
+    if (e.code === code) return e;
+    if (code.startsWith(e.code + '_') && (!best || e.code.length > best.code.length)) best = e;
+  }
+  return best;
+}
+
+// A simulator scenario without its OSDM version suffix (_36, _38, _310…).
+const versionBase = (code) => code.replace(/_\d{2,3}$/, '');
+
+/**
+ * The catalogue entry a scenario stands for (#972): the one its code comes
+ * from (catalogueEntryOf), else the one it is the source of, in any OSDM
+ * version (SIM_SALE_SEARCH_1ADT_36 and _38 are OTST_SALE_ONE_WAY_1ADT's
+ * source). Null when none.
+ */
+function catalogueEntryForScenario(code, entries) {
+  const copied = catalogueEntryOf(code, entries);
+  if (copied || typeof code !== 'string') return copied;
+  const base = versionBase(code);
+  return (entries || []).find((e) => typeof e?.source === 'string' && (e.source === code || versionBase(e.source) === base)) || null;
 }
 
 // #937: the fare combination model the source's fares come in, when it matters.
@@ -706,5 +744,5 @@ function baseEntries(catalogue, simulator, framework) {
 module.exports = {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
   dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, ageRangesOf, freeUnderAgeOf, NEEDS_KEYS, LIMITS,
-  OFFER_OPTION_PROBES, declaredOptionValues, undeclaredOptionValue,
+  OFFER_OPTION_PROBES, declaredOptionValues, undeclaredOptionValue, catalogueEntryOf, catalogueEntryForScenario,
 };

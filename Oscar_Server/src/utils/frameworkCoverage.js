@@ -29,12 +29,13 @@ const {
   offerRequestFormOf, placeSelectionFlowOf, scenarioReturnModel, offerSearchOptionsOf, scenarioOfferCriteria,
   OFFER_REQUEST_TEXT, PLACE_SELECTION_TEXT, annotateDatafile,
 } = require('./frameworkGating');
-const { salesFlowsOf } = require('./scenarioCatalogue');
+const { salesFlowsOf, catalogueEntryForScenario } = require('./scenarioCatalogue');
 const { declaredCards } = require('./reductionCards');
 const { declaredProducts, declaredGroupProducts } = require('./namedProducts');
 const { currenciesOf } = require('./currencies');
 const { distributionModesOf } = require('./distributionModes');
 const { tripSearchParametersOf, TRIP_SEARCH_PARAMETER_TEXT } = require('./tripSearchParameters');
+const { fareRequirementsOf } = require('./fareDeclarations');
 const { canonical } = require('./datafileOwnership');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -94,6 +95,25 @@ function optionRows(fw) {
   return rows;
 }
 
+const FARE_TEXT = Object.freeze({ statedRefundFee: 'Refund fee stated by the distributor', freeUnderAge: 'Free under an age' });
+
+// #937's fare declarations, in force only when FARE is declared (#936): the
+// clusters, the combination models, a stated refund fee, the fare
+// reservations, the fare sales flows and the free age (#972 G2).
+function fareRows(fw, modes) {
+  const fares = isObj(fw.fares) ? fw.fares : {};
+  if (!modes.includes('FARE')) return [];
+  const rows = [
+    ...listRows('Fares', 'fareCluster', fares.clusters, (c) => `Fare cluster ${c}`),
+    ...listRows('Fares', 'fareCombination', fares.combinationModels, (m) => `Fares combined by ${m}`),
+    ...listRows('Fares', 'fareReservation', fares.reservations, (r) => `Fare reservation for a ${words(r)}`),
+    ...listRows('Fares', 'fareSalesFlow', fares.salesFlows, (f) => `Fares: ${(SALES_FLOW_TEXT[f] || words(f)).toLowerCase()}`),
+  ];
+  if (fares.statedRefundFee === true) rows.push({ id: 'fare:statedRefundFee', group: 'Fares', label: FARE_TEXT.statedRefundFee });
+  if (Number.isInteger(fares.freeUnderAge)) rows.push({ id: 'fare:freeUnderAge', group: 'Fares', label: `Free under ${fares.freeUnderAge}` });
+  return rows;
+}
+
 /** The functions a Test Framework declares: [{ id, group, label }], in reading order. */
 function declaredFunctions(framework) {
   const fw = frameworkOf(framework);
@@ -110,7 +130,7 @@ function declaredFunctions(framework) {
     ...listRows('Currencies', 'currency', currenciesOf(fw).sold, (c) => c),
     ...optionRows(fw),
     ...codeRows(fw),
-    ...listRows('Fares', 'fareCluster', fw.fares?.clusters, (c) => `Fare cluster ${c}`),
+    ...fareRows(fw, modes),
     ...limitRows(fw),
   ];
   const byId = new Map();
@@ -144,6 +164,34 @@ function passengerTypesOf(passengers) {
   return strings(passengers.map(typeOf));
 }
 
+/**
+ * The declared products a scenario's `expectedProduct` stands for, as the
+ * collection reads it (library-bruno/products.js): a code, else words of a
+ * name (#972 G1). Undeclared, it stays as written.
+ */
+function productIdsOf(wanted, fw) {
+  const products = [...declaredProducts(fw), ...declaredGroupProducts(fw)];
+  if (products.some((p) => p.code === wanted)) return [`product:${wanted}`];
+  const lower = wanted.toLowerCase();
+  const named = products.filter((p) => typeof p.name === 'string' && p.name.toLowerCase().includes(lower));
+  return named.length > 0 ? named.map((p) => `product:${p.code}`) : [`product:${wanted}`];
+}
+
+// What a fare scenario exercises of #937's declarations (#972 G2), from the
+// scenario and its catalogue entry, as the catalogue requires them.
+function fareFunctions(scenario, datafile, entry) {
+  const parts = arr(scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts).map(String);
+  if (!parts.some((p) => p.startsWith('FARE_'))) return [];
+  const needs = fareRequirementsOf(scenario, parts, isObj(entry) ? entry : {});
+  const ids = ['fareSalesFlow:SALE'];
+  if (needs.salesFlow) ids.push(`fareSalesFlow:${needs.salesFlow}`);
+  if (needs.combinationModel) ids.push(`fareCombination:${needs.combinationModel}`);
+  if (needs.statedRefundFee) ids.push('fare:statedRefundFee');
+  if (needs.reservation) ids.push(`fareReservation:${needs.reservation}`);
+  if (needs.freeUnderAge) ids.push('fare:freeUnderAge');
+  return ids;
+}
+
 // A refund's partial scopes, and the IROPS flow and code of an after-sale
 // asked with an overrule code.
 function afterSaleFunctions(scenario) {
@@ -159,18 +207,27 @@ function afterSaleFunctions(scenario) {
   return out;
 }
 
-/** The ids of the functions a scenario exercises (as declaredFunctions names them). */
-function functionsOf(scenario, datafile) {
+/**
+ * The ids of the functions a scenario exercises (as declaredFunctions names
+ * them). With the framework, a product named by words is its declared code;
+ * with its catalogue entry, a fare scenario's combination model and free age
+ * are known.
+ */
+function functionsOf(scenario, datafile, { framework = null, entry = null } = {}) {
   if (!isObj(scenario)) return new Set();
   const passengers = passengersOf(scenario, datafile);
+  const fares = fareFunctions(scenario, datafile, entry);
+  // A bicycle with a fare reservation is that reservation, not a passenger type.
+  const types = passengerTypesOf(passengers).filter((t) => !fares.includes(`fareReservation:${t}`));
   const ids = [
     ...distributionModesOf(scenario, datafile).map((m) => `distribution:${m}`),
     ...salesFlowsOf(scenario).map((f) => `salesFlow:${f}`),
     `offerRequestForm:${offerRequestFormOf(scenario, datafile)}`,
     ...tripSearchParametersOf(scenario, datafile).map((p) => `tripParameter:${p}`),
-    ...passengerTypesOf(passengers).map((t) => `passengerType:${t}`),
+    ...types.map((t) => `passengerType:${t}`),
     ...cardCodesOf(passengers).map((c) => `card:${c}`),
     ...limitFunctions(scenario, passengers),
+    ...fares,
   ];
   ids.push(...afterSaleFunctions(scenario));
   const model = scenarioReturnModel(scenario);
@@ -181,7 +238,7 @@ function functionsOf(scenario, datafile) {
   if (typeof currency === 'string' && currency) ids.push(`currency:${currency}`);
   else ids.push('currency:default');
   for (const [key, values] of Object.entries(offerSearchOptionsOf(scenario, datafile))) ids.push(...values.map((v) => `offerOption:${key}:${v}`));
-  if (typeof scenario.expectedProduct === 'string' && scenario.expectedProduct.trim()) ids.push(`product:${scenario.expectedProduct.trim()}`);
+  if (typeof scenario.expectedProduct === 'string' && scenario.expectedProduct.trim()) ids.push(...productIdsOf(scenario.expectedProduct.trim(), frameworkOf(framework)));
   if (typeof scenario.desiredFareCluster === 'string' && scenario.desiredFareCluster) ids.push(`fareCluster:${scenario.desiredFareCluster}`);
   if (armed(scenario.offerOptionDiscovery)) ids.push('offerOptionDiscovery');
   return new Set(ids);
@@ -270,11 +327,14 @@ const OPEN_FINDING = (f) => f && f.status !== 'resolved' && typeof f.scenario_co
  *              scenario_hash)
  *   findings   finding rows (id, title, category, status, scenario_code)
  *   collectionVersion  the collection the runs use now
+ *   catalogue  the catalogue's entries (a fare scenario's model and free age)
  */
-function coverageOf({ framework, datafile, runs = {}, findings = [], collectionVersion = null }) {
+function coverageOf({ framework, datafile, runs = {}, findings = [], collectionVersion = null, catalogue = [] }) {
   const scenarios = arr(datafile?.scenarios).filter((s) => isObj(s) && typeof s.code === 'string' && s.code !== '');
   const defaultCurrency = currenciesOf(frameworkOf(framework)).default;
-  const exercised = scenarios.map((s) => ({ scenario: s, ids: withDefaultCurrency(functionsOf(s, datafile), defaultCurrency) }));
+  const exercised = scenarios.map((s) => ({
+    scenario: s, ids: withDefaultCurrency(functionsOf(s, datafile, { framework, entry: catalogueEntryForScenario(s.code, catalogue) }), defaultCurrency),
+  }));
   const entries = new Map(scenarios.map((s) => [s.code, scenarioEntry(s, runs[s.code] || null, { collectionVersion })]));
   const openFindings = arr(findings).filter(OPEN_FINDING);
   const functions = declaredFunctions(framework).map((fn) => {
@@ -331,5 +391,5 @@ function latestRunsOf(rows) {
 
 module.exports = {
   declaredFunctions, functionsOf, scenarioHash, coverageOf, latestRunsOf, resultOf, toRunAgain, failureOf, stateOf,
-  scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf, SALES_FLOW_TEXT, OPTION_TEXT,
+  scenarioEntry, withDefaultCurrency, notDeclaredOf, frameworkOf, productIdsOf, SALES_FLOW_TEXT, OPTION_TEXT, FARE_TEXT,
 };
