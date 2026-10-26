@@ -12,7 +12,8 @@
  * whose profile sets `exchange`.
  *
  *   POST /bookings/{id}/exchange-offers       new offers for the fulfillments
- *                                             named, priced against them
+ *                                             named, priced against them, for
+ *                                             the trip asked, with its trips
  *   POST /bookings/{id}/exchange-operations   one of them taken: PREBOOKED, the
  *                                             parts it replaces EXCHANGE_ONGOING
  *   GET, DELETE .../exchange-operations/{id}  read it; withdraw it while it is
@@ -132,12 +133,22 @@ function exchangeOfferFrom(booking, entry, given, overruleCode, provider) {
  * POST /bookings/{id}/exchange-offers. The request is an offer request (trip,
  * criteria, passengers) plus the fulfillments to give up.
  */
+// #959: the variant that keeps the booking's own trip, whatever trip the
+// request asks for: the offers are asked by the trip ids of the booking.
+function keptTripRequest(booking, body) {
+  if (!variants.has(booking, 'wrong-exchange-keeps-trip') || booking.trips.length === 0) return body;
+  const out = { ...body, tripIds: booking.trips.map((t) => t.id) };
+  delete out.tripSpecifications;
+  delete out.tripSearchCriteria;
+  return out;
+}
+
 function createExchangeOffers(booking, body, provider, nowMs, known) {
   if (booking.fulfillments.length === 0) throw conflict('the booking is not confirmed: it has nothing to exchange');
   const fulfillments = namedFulfillments(booking, body.fulfillmentIds);
   const given = { fulfillments, parts: partsHeldBy(booking, fulfillments) };
   const overruleCode = overruleCodeOf(body, provider);
-  const { remembered } = buildOfferCollection(body, provider, nowMs, known);
+  const { remembered } = buildOfferCollection(keptTripRequest(booking, body), provider, nowMs, known);
   const refs = new Set(booking.passengers.map((p) => p.externalRef));
   const unknown = remembered.flatMap((entry) => entry.offer.passengerRefs).find((ref) => !refs.has(ref));
   if (unknown !== undefined) throw bad(`anonymousPassengerSpecifications: "${unknown}" is not the externalRef of a passenger of this booking`);
@@ -150,6 +161,16 @@ function createExchangeOffers(booking, body, provider, nowMs, known) {
     state.offers.set(exchangeOffer.offerId, { exchangeOffer, entry, fulfillmentIds: fulfillments.map((f) => f.id) });
     return exchangeOffer;
   });
+}
+
+/** #959: the trips the exchange offers given cover, each once. */
+function tripsOfExchangeOffers(booking, exchangeOffers) {
+  const state = exchangesOf(booking);
+  const trips = new Map();
+  for (const offer of exchangeOffers) {
+    for (const trip of state.offers.get(offer.offerId)?.entry.trips || []) trips.set(trip.id, trip);
+  }
+  return [...trips.values()];
 }
 
 const operationNotFound = () => new HttpError(404, 'EXCHANGE_OPERATION_NOT_FOUND', 'Exchange operation not found');
@@ -247,5 +268,5 @@ function confirmExchange(booking, pending, provider, nowMs, bookOffer) {
 
 module.exports = {
   createExchangeOffers, createExchangeOperation, findExchangeOperation, deleteExchangeOperation,
-  pendingExchange, confirmExchange,
+  pendingExchange, confirmExchange, tripsOfExchangeOffers,
 };

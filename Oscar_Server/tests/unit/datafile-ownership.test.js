@@ -15,7 +15,7 @@
  */
 
 const {
-  isOwnedBy, isVisibleTo, canonical, resolveRunList, viewForTester, mergeTesterSave,
+  isOwnedBy, isVisibleTo, canonical, resolveRunList, viewForTester, mergeTesterSave, idAllocator,
 } = require('../../src/utils/datafileOwnership');
 
 const ANA = 'ana@vendor.test';     // the tester saving
@@ -510,5 +510,73 @@ describe('adversarial review — findings pinned', () => {
     sent.scenarios = sent.scenarios.filter(s => s.code !== 'ANA_1');
     const out = mergeTesterSave(stored, sent, ANA).datafile.scenariosToRun;
     expect(resolveRunList(out, codes(companyFile()))).toEqual(['SHARED_1']);
+  });
+});
+
+// #959: an exchange names a second trip (exchange.tripRequirementId); every
+// rule follows it like the scenario's own trip.
+describe('the trip an exchange is for (#959)', () => {
+  const withExchange = (df, code, id) => { byCode(df, code).exchange = { tripRequirementId: id, dateOffsetDays: 1 }; };
+
+  test('the view hides a trip only a hidden scenario\'s exchange names, and keeps one a visible exchange names', () => {
+    const stored = companyFile();
+    stored.tripRequirements.push({ id: 70, tag: 'ben-exchange' }, { id: 71, tag: 'ana-exchange' });
+    withExchange(stored, 'BEN_1', 70);
+    withExchange(stored, 'ANA_1', 71);
+    const ids = viewForTester(stored, ANA, null).tripRequirements.map(e => e.id);
+    expect(ids).not.toContain(70);
+    expect(ids).toContain(71);
+  });
+
+  test('her own exchange trip is kept by her save', () => {
+    const stored = companyFile();
+    stored.tripRequirements.push({ id: 71, tag: 'ana-exchange' });
+    withExchange(stored, 'ANA_1', 71);
+    const sent = clone(viewForTester(stored, ANA, null));
+    sent.tripRequirements.find(e => e.id === 71).tag = 'ana-exchange-edited';
+    const { datafile } = mergeTesterSave(stored, sent, ANA);
+    expect(datafile.tripRequirements.find(e => e.id === 71).tag).toBe('ana-exchange-edited');
+    expect(byCode(datafile, 'ANA_1').exchange).toEqual({ tripRequirementId: 71, dateOffsetDays: 1 });
+  });
+
+  test('an exchange trip id her editor minted that Ben\'s exchange uses is copied to a fresh id', () => {
+    const stored = companyFile();
+    stored.tripRequirements.push({ id: 70, tag: 'ben-exchange' });
+    withExchange(stored, 'BEN_1', 70);
+    const sent = clone(viewForTester(stored, ANA, null));
+    sent.tripRequirements.push({ id: 70, tag: 'ana-exchange' });
+    byCode(sent, 'ANA_1').exchange = { tripRequirementId: 70 };
+    const { datafile, forked } = mergeTesterSave(stored, sent, ANA);
+    expect(datafile.tripRequirements.find(e => e.id === 70).tag).toBe('ben-exchange');
+    const mine = byCode(datafile, 'ANA_1').exchange.tripRequirementId;
+    expect(mine).not.toBe(70);
+    expect(datafile.tripRequirements.find(e => e.id === mine).tag).toBe('ana-exchange');
+    expect(forked).toEqual([{ list: 'tripRequirements', from: 70, to: mine }]);
+  });
+
+  test('a new link from her exchange to a trip only a hidden scenario uses is cut', () => {
+    const stored = companyFile();
+    const sent = clone(viewForTester(stored, ANA, null));
+    byCode(sent, 'ANA_1').exchange = { tripRequirementId: 40, dateOffsetDays: 1 };   // Ben's trip, not in her view
+    const { datafile } = mergeTesterSave(stored, sent, ANA);
+    expect(byCode(datafile, 'ANA_1').exchange).toEqual({ tripRequirementId: null, dateOffsetDays: 1 });
+    expect(datafile.tripRequirements.find(e => e.id === 40).tag).toBe('ben');
+  });
+
+  test('the exchange trip of a shared scenario is not hers to change', () => {
+    const stored = companyFile();
+    stored.tripRequirements.push({ id: 72, tag: 'shared-exchange' });
+    withExchange(stored, 'SHARED_1', 72);
+    const sent = clone(viewForTester(stored, ANA, null));
+    sent.tripRequirements.find(e => e.id === 72).tag = 'hijack';
+    const { datafile } = mergeTesterSave(stored, sent, ANA);
+    expect(datafile.tripRequirements.find(e => e.id === 72).tag).toBe('shared-exchange');
+  });
+
+  test('a fresh id never lands on an exchange trip id, even a dangling one', () => {
+    const stored = companyFile();
+    withExchange(stored, 'BEN_1', 54);                                  // one past every other id, no such entry
+    const next = idAllocator(stored);
+    expect(next()).toBe(55);
   });
 });

@@ -206,12 +206,19 @@ describe('a version per provider (#912)', () => {
     expect(part.scenarios.every(s => s.osdmVersion === '3.9.0')).toBe(true);
     expect(part.scenariosToRun).toBeUndefined();
     expect(part.purchaserList[0]).toEqual(DATAFILE.purchaserList[0]);
-    const tripIds = new Set(part.scenarios.map(s => s.tripRequirementId));
+    const tripIds = new Set(part.scenarios.flatMap(s => [s.tripRequirementId, ...(s.exchange?.tripRequirementId == null ? [] : [s.exchange.tripRequirementId])]));
     expect(part.tripRequirements.map(t => t.id).sort()).toEqual([...tripIds].sort());
     // A trip no scenario of the version names stays out (#914: every trip of gamma's is named by delta's copies too).
     const df = copy();
     df.tripRequirements.push({ id: 9999, tripType: 'SEARCH', trip: { origin: 'urn:uic:stn:0000077', destination: 'urn:uic:stn:0000002' } });
     expect(R.providerPartOf(df, '3.9.0').tripRequirements.some(t => t.id === 9999)).toBe(false);
+  });
+
+  test('its part holds a trip that only an exchange of its scenarios names (#959)', () => {
+    const df = copy();
+    df.tripRequirements.push({ id: 9998, tripType: 'SEARCH', trip: { origin: 'urn:uic:stn:0000077', destination: 'urn:uic:stn:0000002' } });
+    df.scenarios.find(s => s.osdmVersion === '3.9.0').exchange = { tripRequirementId: 9998 };
+    expect(R.providerPartOf(df, '3.9.0').tripRequirements.some(t => t.id === 9998)).toBe(true);
   });
 
   test('its Test Data are the trains of its own trips', () => {

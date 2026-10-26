@@ -93,9 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.399] / [collection-OTST_V2.0.224] — 2026-10-26
+## [server-1.11.400] / [collection-OTST_V2.0.225] — 2026-10-26
 
-Issue #972 (part 1 of 4), release 2026.434. The #956 report read as if nothing worked on a real provider's campaign (9 functions failed), while 34 of its 45 tests passed in every form. Four things caused it:
+Issue #972 (part 1 of 4), release 2026.435. The #956 report read as if nothing worked on a real provider's campaign (9 functions failed), while 34 of its 45 tests passed in every form. Four things caused it:
 - one failure spread to every element its scenario touched;
 - a late failure failed what came before it;
 - negative probes counted against the function they probe;
@@ -137,6 +137,35 @@ Issue #972 (part 1 of 4), release 2026.434. The #956 report read as if nothing w
 - `coverage-routes.test.js`: `byCapability` built from steps stored in the database.
 - Seventeen deliberate breaks each make a test fail: each rule, a step's blocking answer, the step table, the catalogue, G1, G2, and the route reading the steps.
 - Checked on the simulator: gamma's reference, 135 runs through a throwaway OSCAR. Every deliberately wrong scenario counts only against its own capability, and the shared rows (offers by search, reference data, passenger update) stay passed.
+
+---
+
+## [server-1.11.399] / [collection-OTST_V2.0.224] — 2026-10-26
+
+Issue #959 (part 1), release 2026.434. Simulator 0.55.0.
+
+### Added
+- **What an exchange is for.** An EXCHANGE scenario's optional `exchange` block says what the booking is exchanged for; without it the exchange asks for the sale's trip with the sale's criteria, as before, so no existing scenario moves:
+  - `tripRequirementId`: another trip of the data file (another route);
+  - `dateOffsetDays`: the day, counted from the sale's (-60 to 60);
+  - `time`: the departure asked, "HH:MM", for a SEARCH trip (a trip specification takes the times of its legs);
+  - `offerSearchCriteria`: `travelClasses`, `serviceClassTypes` and `flexibilities`, sent over the sale's criteria (its currency kept).
+  The parser builds the exchange trip with the sale's own builders into a store of its own (`exchangeTripType`, `exchangeTripSearchCriteria` or `exchangeTripSpecifications`, `exchangeOfferSearchCriteria`, `__exchangeTripAsked`; in both reset lists), so the sale's variables do not change. Another trip goes on the first day its Test Data trains run (#717); a day the scenario moves to is kept, and warned about when no train runs then. A trip id the data file does not hold fails a check at step 01.
+- **Checks** (`library-bruno/exchangeTrip.js`, pure). Step 10: the exchange offers cover the trip asked (origin, destination, day; UIC codes compared without leading zeros), and the offer that does is taken when the first does not; an answer naming no trip (OSDM's `trips` is optional) leaves the check to step 15. Step 15: the booked offer the confirmed exchange added covers the trip asked, read from `Booking.trips` and its trip coverage; a booking naming no trip is a WARNING. Another train is a WARNING for a search and a failure for a trip specification.
+- Simulator scenarios `SIM_EXCHANGE_OTHER_ROUTE_1ADT_38` (trip 2), `SIM_EXCHANGE_OTHER_DAY_1ADT_38` (next day, 12:00, first class) and `SIM_WRONG_EXCHANGE_KEEPS_TRIP_38` (fails at 10 and 15), with their version copies.
+
+### Simulator 0.55.0
+- The answer to `POST …/exchange-offers` names the trips of its offers (`trips`, OSDM from 3.5). The offers were already built from the trip asked.
+- Variant `wrong-exchange-keeps-trip`: the exchange offers are for the booking's own trip, whatever trip is asked.
+
+### Changed
+- **The server follows the exchange's trip like the scenario's own.** A tester's view and save (`datafileOwnership.js`: `refSlots()` / `refsIn()`) hide, protect, copy on write and cut a link to an entry named by `exchange.tripRequirementId` as they do for `tripRequirementId`; fresh ids avoid it. Copy scenarios asks a mapping for it ("CODE (exchange)") and points the copy at the target's trip. A reference's provider part keeps it.
+- The parser's two trip builders (`specificationTrip()`, `searchTrip()`, and `osdmTripSearchCriteria()` / `osdmTripSpecification()`) write through an `env` argument; the sale passes the run's environment, so its requests are unchanged.
+
+### Tests
+- `bruno-exchange-trip.test.js`: the block, dates and times, both checks, the parser over the simulator's scenarios (the sale's variables unchanged), the request, the step glue and reset lists.
+- `datafile-ownership.test.js`, `scenario-copy.test.js`, `reference-configuration.test.js`: the exchange's trip in each rule.
+- `OSDM_Simulator/tests/exchanges.test.js`: another route and day named and priced, the class asked, the booking after confirmation, the variant.
 
 ---
 

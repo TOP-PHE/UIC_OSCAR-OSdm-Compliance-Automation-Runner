@@ -254,3 +254,47 @@ describe('trip-apply', () => {
     expect(html.indexOf('/js/trip-apply.js')).toBeLessThan(html.indexOf('/js/scenarios.js'));
   });
 });
+
+// #959: the trip an exchange is for is mapped like the sale's.
+describe('the trip an exchange is for (#959)', () => {
+  function withExchange() {
+    const src = source();
+    src.scenarios.push({ code: 'X1', scenarioType: 'EXCHANGE', tripRequirementId: 1, passengersListId: 1,
+      requestedFulfillmentOptionsListId: 1, exchange: { tripRequirementId: 3, dateOffsetDays: 1 } });
+    src.tripRequirements.push({ id: 3, tripType: 'SEARCH', trip: { origin: 'urn:c', destination: 'urn:a' } });
+    return src;
+  }
+  const tripMap = { 1: { type: 'train', train_id: 't1', service_index: 0 }, 3: { type: 'train', train_id: 't2', service_index: 0 } };
+
+  test('the plan asks a mapping for it, named as the exchange\'s', () => {
+    const plan = planCopy(withExchange(), ['X1'], FRAMEWORK);
+    expect(plan.trips.map(t => [t.id, t.usedBy])).toEqual([[1, ['X1']], [3, ['X1 (exchange)']]]);
+  });
+
+  test('the copy points its exchange at the target\'s copy of that trip, and keeps the rest of the block', () => {
+    const { datafile, errors } = applyCopy(withExchange(), target(), opts({ codes: ['X1'], tripMap }));
+    expect(errors).toBeUndefined();
+    const copy = datafile.scenarios.find(s => s.code === 'X1');
+    const trip = datafile.tripRequirements.find(t => t.id === copy.exchange.tripRequirementId);
+    expect(copy.exchange.dateOffsetDays).toBe(1);
+    expect(copy.exchange.tripRequirementId).not.toBe(copy.tripRequirementId);
+    expect(trip.trip.origin).toBe('urn:uic:stn:8727100');
+  });
+
+  test('an exchange trip without a mapping, or not in the source, stops the copy', () => {
+    expect(applyCopy(withExchange(), target(), opts({ codes: ['X1'], tripMap: { 1: tripMap[1] } })).errors)
+      .toEqual(['Trip 3 has no train or journey chosen.']);
+    const src = withExchange();
+    src.scenarios.at(-1).exchange.tripRequirementId = 99;
+    expect(applyCopy(src, target(), opts({ codes: ['X1'], tripMap })).errors)
+      .toEqual(['Scenario X1 is exchanged for a trip the source does not hold.']);
+  });
+
+  test('an exchange on the sale\'s own trip is mapped once', () => {
+    const src = withExchange();
+    src.scenarios.at(-1).exchange = { tripRequirementId: 1 };
+    const { datafile } = applyCopy(src, target(), opts({ codes: ['X1'], tripMap }));
+    const copy = datafile.scenarios.find(s => s.code === 'X1');
+    expect(copy.exchange.tripRequirementId).toBe(copy.tripRequirementId);
+  });
+});

@@ -134,11 +134,16 @@ function planCopy(source, codes, frameworkConfig) {
   const framework = frameworkOf(frameworkConfig);
   const { selected, missing } = selectScenarios(source, codes);
   const trips = new Map();
-  for (const sc of selected) {
-    const entry = findById(source.tripRequirements, sc.tripRequirementId);
-    if (!entry) continue;
+  const use = (entry, by) => {
+    if (!entry) return;
     if (!trips.has(entry.id)) trips.set(entry.id, { ...tripSummary(entry), needsJourney: needsJourney(entry), usedBy: [] });
-    trips.get(entry.id).usedBy.push(sc.code);
+    trips.get(entry.id).usedBy.push(by);
+  };
+  for (const sc of selected) {
+    use(findById(source.tripRequirements, sc.tripRequirementId), sc.code);
+    // #959: the trip an exchange is for is mapped like the sale's.
+    const exchangeTrip = exchangeTripIdOf(sc);
+    if (exchangeTrip != null) use(findById(source.tripRequirements, exchangeTrip), `${sc.code} (exchange)`);
   }
   return {
     scenarios: selected.map(sc => ({
@@ -230,6 +235,35 @@ function moveSections(copy, fromTrip, toTrip) {
   if (Array.isArray(copy.requestedSections)) copy.requestedSections = mappedSections(copy.requestedSections, fromTrip, toTrip);
 }
 
+// #959: the trip a scenario's exchange block names, or null.
+function exchangeTripIdOf(sc) {
+  const id = isObj(sc?.exchange) ? sc.exchange.tripRequirementId : null;
+  return id == null ? null : id;
+}
+
+// The copy's exchange block on the target's trip; false when it cannot be.
+function moveExchangeTrip(ctx, sc, copy) {
+  const id = exchangeTripIdOf(sc);
+  if (id === null) return true;
+  const entry = findById(ctx.source.tripRequirements, id);
+  if (!entry) { ctx.errors.push(`Scenario ${sc.code} is exchanged for a trip the source does not hold.`); return false; }
+  const target = copiedTrip(ctx, entry);
+  if (target === null) return false;
+  copy.exchange = { ...copy.exchange, tripRequirementId: target };
+  return true;
+}
+
+// The copy pointed at copies of the entries of COPIED_LISTS it names; a
+// dangling optional reference is not carried over.
+function copyListEntries(ctx, sc, copy) {
+  for (const [field, list] of COPIED_LISTS) {
+    if (copy[field] == null) continue;
+    const entry = findById(ctx.source[list], sc[field]);
+    if (entry) copy[field] = copiedEntry(ctx, list, entry, e => e);
+    else delete copy[field];
+  }
+}
+
 // `sc` re-pointed at copies of its entries in the target, or null (errors recorded).
 function copiedScenario(ctx, sc) {
   const { source, errors } = ctx;
@@ -242,13 +276,9 @@ function copiedScenario(ctx, sc) {
   for (const k of Object.keys(copy)) if (k.startsWith('__')) delete copy[k];
   copy.tripRequirementId = tripId;
   moveSections(copy, tripEntry, findById(ctx.out.tripRequirements, tripId));
+  if (!moveExchangeTrip(ctx, sc, copy)) return null;
 
-  for (const [field, list] of COPIED_LISTS) {
-    if (copy[field] == null) continue;
-    const entry = findById(source[list], sc[field]);
-    if (entry) copy[field] = copiedEntry(ctx, list, entry, e => e);
-    else delete copy[field];   // a dangling optional reference is not carried over
-  }
+  copyListEntries(ctx, sc, copy);
   let broken = false;
   const fulfillment = findById(source.requestedFulfillmentOptionsList, sc.requestedFulfillmentOptionsListId);
   if (fulfillment) {

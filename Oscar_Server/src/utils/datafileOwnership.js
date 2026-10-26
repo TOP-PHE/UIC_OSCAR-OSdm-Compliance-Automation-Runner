@@ -31,7 +31,8 @@
  * top-level key — is kept exactly as stored.
  *
  * Scenarios point at entries in five resource lists by numeric id
- * (tripRequirementId → tripRequirements[].id, and so on). The editor allocates
+ * (tripRequirementId → tripRequirements[].id, and so on; an exchange's own
+ * trip, exchange.tripRequirementId, is a second reference to tripRequirements). The editor allocates
  * those ids as max+1 over what it can SEE, so a tester's new entry can carry an
  * id that a hidden scenario already uses. The merge therefore never lets a
  * tester's entry replace one that another scenario still references: when the
@@ -54,6 +55,25 @@ const RESOURCE_LISTS = Object.freeze([
   ['requestedFulfillmentOptionsList', 'requestedFulfillmentOptionsListId'],
   ['offerSearchCriteriaList',         'offerSearchCriteriaListId'],
 ]);
+// Where a scenario names an entry of a list. The first slot is the field above;
+// #959 adds the trip an exchange is for (`exchange.tripRequirementId`), which
+// every rule below follows like the scenario's own trip.
+function refSlots(list, ref) {
+  const slots = [{ get: (s) => s?.[ref], set: (s, v) => { s[ref] = v; } }];
+  if (list === 'tripRequirements') {
+    slots.push({
+      get: (s) => (isObj(s?.exchange) ? s.exchange.tripRequirementId : undefined),
+      set: (s, v) => { s.exchange = { ...s.exchange, tripRequirementId: v }; },
+    });
+  }
+  return slots;
+}
+// The ids a scenario names in a list: its own field as it is (as before), and
+// the other slots only when they name one.
+function refsIn(s, slots) {
+  return slots.map((slot) => slot.get(s)).filter((v, i) => i === 0 || v != null);
+}
+
 // The only non-merged keys a tester may set, and only while the file has none:
 // the two plain strings the editor's first-save skeleton carries.
 const FIRST_SAVE_KEYS = Object.freeze(['osdmVersion', 'collection']);
@@ -126,8 +146,12 @@ function collectIds(...datafiles) {
   for (const df of datafiles) {
     if (!isObj(df)) continue;
     for (const [list, ref] of RESOURCE_LISTS) {
+      const slots = refSlots(list, ref);
       for (const e of arr(df[list])) if (isObj(e) && typeof e.id === 'number') ids.add(e.id);
-      for (const s of arr(df.scenarios)) if (isObj(s) && typeof s[ref] === 'number') ids.add(s[ref]);
+      for (const s of arr(df.scenarios)) {
+        if (!isObj(s)) continue;
+        for (const v of refsIn(s, slots)) if (typeof v === 'number') ids.add(v);
+      }
     }
   }
   return ids;
@@ -205,10 +229,11 @@ function viewForTester(datafile, email, selection) {
   const view = { ...datafile, scenarios: visible };
   for (const [list, ref] of RESOURCE_LISTS) {
     if (!Array.isArray(datafile[list])) continue;
-    const usedByVisible = new Set(visible.map(s => s[ref]));
+    const slots = refSlots(list, ref);
+    const usedByVisible = new Set(visible.flatMap(s => refsIn(s, slots)));
     // `hidden` also holds whatever is not a scenario object: a Test Manager's
     // save can store a null there, and reading a field of it would throw.
-    const usedByHidden  = new Set(hidden.map(s => s?.[ref]));
+    const usedByHidden  = new Set(hidden.flatMap(s => refsIn(s, slots)));
     view[list] = datafile[list].filter(e => !(isObj(e) && usedByHidden.has(e.id) && !usedByVisible.has(e.id)));
   }
   const codes = visibleCodes(datafile, email);
@@ -320,30 +345,31 @@ function mergeTesterSave(stored, incoming, email) {
     const storedList = arr(base[list]).filter(isObj);
     const incomingList = arr(inc[list]).filter(isObj);
     if (!(list in base) && !(list in inc)) continue;
+    const slots = refSlots(list, ref);
 
     // Not the tester's to change: entries a non-owned scenario references,
     // stored entries nothing references (company data), and (K) the first
     // purchaser — Bruno reads purchaserList[0] for every scenario, whatever its
     // purchaserListId says, so that entry is everyone's.
-    const referencedInStore = new Set(storedScenarios.map(s => s[ref]));
+    const referencedInStore = new Set(storedScenarios.flatMap(s => refsIn(s, slots)));
     const protectedIds = new Set([
-      ...scenarios.filter(s => !isOwnedBy(s, email)).map(s => s[ref]),
+      ...scenarios.filter(s => !isOwnedBy(s, email)).flatMap(s => refsIn(s, slots)),
       ...storedList.filter(e => !referencedInStore.has(e.id)).map(e => e.id),
       ...(list === 'purchaserList' && storedList.length ? [storedList[0].id] : []),
     ]);
     // (L) Entries only hidden scenarios use. Linking an own scenario to one would
     // put it in the tester's view, so a new link is cut; a link their stored
     // scenario already had (old aliasing, from when everyone saw everything) stays.
-    const visibleUse = new Set(visibleOthers.map(s => s[ref]));
-    const hiddenOnly = new Set(hiddenOthers.map(s => s[ref]).filter(id => !visibleUse.has(id)));
+    const visibleUse = new Set(visibleOthers.flatMap(s => refsIn(s, slots)));
+    const hiddenOnly = new Set(hiddenOthers.flatMap(s => refsIn(s, slots)).filter(id => !visibleUse.has(id)));
 
     const storedById = new Map(storedList.map(e => [e.id, e]));
     const incomingById = new Map(incomingList.map(e => [e.id, e]));
     const ownNeeded = new Map();                 // id -> the entry to keep for the tester's scenarios
     const forkOf = new Map();                    // protected id -> fresh id, one copy per id
     const forkEntries = [];
-    for (const sc of ownIncoming) {
-      const id = sc[ref];
+    for (const sc of ownIncoming) for (const slot of slots) {
+      const id = slot.get(sc);
       if (id === undefined || id === null) continue;
       const mine = incomingById.get(id);
       if (protectedIds.has(id)) {
@@ -358,10 +384,10 @@ function mergeTesterSave(stored, incoming, email) {
             forkEntries.push({ ...mine, id: fresh });
             forked.push({ list, from: id, to: fresh });
           }
-          sc[ref] = forkOf.get(id);
+          slot.set(sc, forkOf.get(id));
         } else if (hiddenOnly.has(id)) {
           const before = ownedStored.get(sc.code);
-          if (!before || before[ref] !== id) sc[ref] = null;
+          if (!before || slot.get(before) !== id) slot.set(sc, null);
         }
         continue;                                // otherwise it shares the protected entry as is
       }
@@ -404,6 +430,8 @@ function mergeTesterSave(stored, incoming, email) {
 
 module.exports = {
   RESOURCE_LISTS,
+  refSlots,
+  refsIn,
   isOwnedBy,
   isVisibleTo,
   canonical,

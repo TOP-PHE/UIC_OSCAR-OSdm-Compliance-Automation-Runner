@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-26-exchange-to-another-trip",
+    "date": "October 26, 2026",
+    "tag": "Added",
+    "title": "Exchange for another trip, day or class",
+    "summary": "An exchange scenario can now say what the booking is exchanged for, and OSCAR checks that the provider offers and books that trip.",
+    "content": "Until now an exchange always asked for the journey that was sold. An exchange scenario can now name another trip of the data file, move the day, ask another departure time, or another class or flexibility. The rest of the scenario stays as it is, so one scenario can be reused with different exchange requests by changing the data only.\n\nOSCAR checks that the exchange offers cover the trip asked, and that the booking holds it once the exchange is confirmed. The section to set this in Test Config comes next; until then the block is set in the data file."
+  },
+  {
     "id": "2026-10-25-coverage-blocking-or-defect",
     "date": "October 25, 2026",
     "tag": "Changed",

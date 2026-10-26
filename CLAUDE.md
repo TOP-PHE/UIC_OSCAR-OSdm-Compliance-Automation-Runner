@@ -606,7 +606,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     UUID (`coverageRunIdOf()`). **Under an after-sale flow only
     `partialRefund:` and `overrule:` elements are rows** (`shownUnder()`): the
     trip, passengers and currency of a refund belong to the sale before it.
-    **#972 PR 1 (1.11.399 / OTST_V2.0.224): by capability.** On a real
+    **#972 PR 1 (1.11.400 / OTST_V2.0.225): by capability.** On a real
     provider the report above read "9 functions failed" for a campaign whose
     tests mostly passed, so `byCapability` (`utils/capabilityCoverage.js`,
     pure) reads it the way an assessment does. Each scenario has one main
@@ -1968,6 +1968,25 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`OfferCollectionRequest`, no key), `matchingOffer()` picks the chosen
   offer's twin and `bookingOnOffer()` drops the old offer's seat choices.
   The simulator books an offer twice, so only the unit tests reach it.
+- **An exchange can name what it is for** (#959, PR 1 = 1.11.399 /
+  OTST_V2.0.224, simulator 0.55.0). An EXCHANGE scenario's `exchange` block:
+  `tripRequirementId` (another trip), `dateOffsetDays` (from the sale's day,
+  -60 to 60), `time` ("HH:MM", SEARCH only), `offerSearchCriteria`
+  (`travelClasses`, `serviceClassTypes`, `flexibilities`, over the sale's).
+  Absent = the sale's trip and criteria, as before. `prepareExchangeTrip()`
+  (`scenarioParser.js`) builds it with the sale's own builders
+  (`specificationTrip()` / `searchTrip()`) **through `envOf(store)`, never the
+  run's environment**: the sale's `leg*`, `trip*` and `offerTrip*` must not
+  move. `exchangeTripAndCriteria()` (`requestsBuilder.js`) sends it;
+  `library-bruno/exchangeTrip.js` (pure) checks the offers at 10 (the one
+  covering the trip asked is taken) and the booked offer added at 15.
+  **`exchange.tripRequirementId` is a second reference to `tripRequirements`**:
+  `refSlots()` / `refsIn()` in `datafileOwnership.js` give every rule there
+  both, `scenarioCopy.js` maps it ("CODE (exchange)"), `providerPartOf()`
+  keeps it. A new field naming a resource entry goes in `refSlots()`.
+  Simulator: the exchange answer names its `trips`; variant
+  `wrong-exchange-keeps-trip`. PR 2 is the editor section, PR 3 the catalogue
+  entry.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two
