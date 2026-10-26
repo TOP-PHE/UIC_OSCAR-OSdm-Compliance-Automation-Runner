@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.439",
+  "current_release": "2026.440",
   "releases": [
+    {
+      "release": "2026.440",
+      "date": "2026-10-26",
+      "server": "1.11.405",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#972 PR 2: the coverage by capability lists the points to look at (byCapability.points), each distinct problem once across forms and runs (the #735 key), with its capability, the tests that showed it, its first and last day seen and its finding; OSCAR's points and the questions on the specification are listed apart.",
+        "A capability now reads \"Passed with deviation\" when its only problems are accepted deviations: a finding classified provider_deviation and resolved, or a known deviation the run applied (#398). The page shows it in PR 3."
+      ]
+    },
     {
       "release": "2026.439",
       "date": "2026-10-26",

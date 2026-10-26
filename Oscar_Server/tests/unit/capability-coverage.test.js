@@ -21,6 +21,8 @@ const yaml = require('js-yaml');
 const K = require('../../src/utils/capabilities');
 const { capabilityCoverageOf, runEvidence, combine, stepsOf } = require('../../src/utils/capabilityCoverage');
 const { coverageOf } = require('../../src/utils/frameworkCoverage');
+const P = require('../../src/utils/coveragePoints');
+const { checkText } = require('../../src/utils/findingSuggestions');
 
 const COLLECTION = path.resolve(__dirname, '../../../Bruno_Collection');
 const catalogue = JSON.parse(fs.readFileSync(path.join(COLLECTION, 'data_base/scenario_catalogue.json'), 'utf8')).entries;
@@ -133,7 +135,7 @@ function run(names, { statuses = {}, failures = {}, stopAt = null } = {}) {
   runCount += 1;
   const end = stopAt ? names.indexOf(stopAt) + 1 : names.length;
   const steps = names.slice(0, end).map((n) => ({ request_name: n, http_status: statuses[n] ?? 200 }));
-  const checks = Object.entries(failures).flatMap(([step, list]) => list.map((c) => ({ request_name: step, ...c })));
+  const checks = Object.entries(failures).flatMap(([step, list]) => list.map((c) => ({ request_name: step, http_status: statuses[step] ?? 200, ...c })));
   return {
     id: `00000000-0000-4000-8000-${String(runCount).padStart(12, '0')}`, status: checks.length > 0 ? 'FAILED' : 'COMPLETED',
     completed_at: '2026-10-26 08:00:00', steps, checks, total: steps.length * 5, failed: checks.length,
@@ -256,7 +258,7 @@ describe('expected refusals are rows of their own (R4)', () => {
     const r = report(scenarios, runs);
     expect(r.expectedRefusals).toMatchObject([{ key: 'NHF_REFUND_TWICE', capability: 'refund.full', result: 'not-refused', forms: [{ step: '14. GET Booking after Patch Refund' }] }]);
     expect(row(r, 'refund.full')).toMatchObject({ result: 'passed', tests: [], provenBy: { count: 1, codes: ['NHF_REFUND_TWICE'] } });
-    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, notRefused: 1, notRun: 0 });
+    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, deviation: 0, notRefused: 1, notRun: 0 });
   });
 });
 
@@ -340,5 +342,183 @@ describe('the pieces', () => {
     expect(e.main.result).toBe('passed');
     expect(e.proven).toMatchObject({ sale: 'passed', 'refund.offer': 'passed', 'offers.search': 'passed' });
     expect(e.proven['refund.technical']).toBeUndefined();
+  });
+});
+
+// ── #972 part 2: points to look at (R6) and accepted deviations (decision 3) ──
+
+describe('points to look at, each once (R6)', () => {
+  const at02 = '02. POST Create Booking';
+  const at07 = '07. GET Booking after Fulfillments';
+  const booking500 = (when) => Object.assign(run(SALE, {
+    stopAt: at02, statuses: { [at02]: 500 }, failures: { [at02]: fail('HTTP response status — expected 200, actual: 500', 'http_status') },
+  }), { completed_at: when });
+  const reservation = (code, extra = {}) => ({ code, scenarioType: 'SALE', tripRequirementId: 2, passengersListId: 2, reservationBookingForm: 'PLACE_SELECTION', ...extra });
+  const ENTRY = 'OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT';
+
+  test('one problem seen in two forms is one numbered point, under the capability it counts against', () => {
+    const scenarios = [reservation(ENTRY), reservation(`${ENTRY}_TRIPID`, { offersByTripIds: 'on' })];
+    const r = report(scenarios, { [ENTRY]: booking500('2026-10-20 08:00:00'), [`${ENTRY}_TRIPID`]: booking500('2026-10-26 08:00:00') });
+    expect(r.points).toEqual([expect.objectContaining({
+      number: 1, kind: 'provider', source: 'check', capability: 'reservation.placeSelection', step: at02,
+      check: 'HTTP response status — expected N, actual: N', status: 500, blocking: true, occurrences: 2,
+      tests: [{ key: ENTRY, entry: ENTRY, codes: [ENTRY, `${ENTRY}_TRIPID`] }],
+      firstSeen: '2026-10-20 08:00:00', lastSeen: '2026-10-26 08:00:00', finding: null, expectedRefusal: false,
+    })]);
+    expect(row(r, 'reservation.placeSelection').points).toEqual([1]);
+    expect(row(r, 'sale').points).toEqual([]);
+    expect(r.summary.pointsToLookAt).toEqual({ total: 1, provider: 1, accepted: 0, questions: 0, oscar: 0, truncated: false });
+  });
+
+  test('OSCAR\'s own problems and the questions on the specification come after the provider\'s', () => {
+    const oscarCheck = '[OSCAR request] The body sent conforms to OSDM';
+    const draftCheck = { request_name: '06b. GET Fulfillment', assertion_name: 'Fulfillment document is a PDF', http_status: 200 };
+    const runs = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: {
+      [at07]: [...fail('Booking summary names the product'), ...fail(oscarCheck), ...fail('The booking holds 2 fulfillments')],
+      '06b. GET Fulfillment': fail('Fulfillment document is a PDF'),
+    } }) };
+    const question = { id: 'q1', title: 'One fulfilment per passenger?', step: at07, category: 'spec_question', status: 'discussing', observed: 'the booking holds n fulfillments' };
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], runs, {
+      findings: [question], suggestions: { oscarIssues: [P.keyOfCheck(draftCheck)] },
+    });
+    expect(r.points.map((p) => [p.number, p.kind, p.check])).toEqual([
+      [1, 'provider', 'Booking summary names the product'],
+      [2, 'question', 'The booking holds N fulfillments'],
+      [3, 'oscar', oscarCheck],
+      [4, 'oscar', 'Fulfillment document is a PDF'],
+    ]);
+    expect(r.points[1].finding).toEqual({ id: 'q1', title: 'One fulfilment per passenger?', category: 'spec_question', status: 'discussing' });
+    expect(r.points[3]).toMatchObject({ capability: 'fulfilment.documents', step: '06b. GET Fulfillment' });
+    // OSCAR's points are listed apart; they still count where they failed.
+    expect(row(r, 'sale')).toMatchObject({ result: 'points', points: [1, 2, 3] });
+    expect(r.summary.pointsToLookAt).toEqual({ total: 4, provider: 1, accepted: 0, questions: 1, oscar: 2, truncated: false });
+  });
+
+  test('a probe not refused is a point of its expected refusal, not of the capability it probes', () => {
+    const scenarios = [{ code: 'NHF_REFUND_TWICE', scenarioType: 'REFUND', scenarioAction: 'PATCH', refundAgainProbe: 'on', tripRequirementId: 1, passengersListId: 1 }];
+    const runs = { NHF_REFUND_TWICE: run([...SALE, ...REFUND], {
+      failures: { '14. GET Booking after Patch Refund': fail('🧪 Refund again [1 refunded fulfillment(s)]: provider rejects with a client error (4xx)') },
+    }) };
+    const r = report(scenarios, runs);
+    expect(r.points).toEqual([expect.objectContaining({ number: 1, capability: 'refund.full', expectedRefusal: true })]);
+    expect(r.expectedRefusals[0].points).toEqual([1]);
+    expect(row(r, 'refund.full').points).toEqual([]);
+  });
+});
+
+describe('an accepted deviation reads "Passed with deviation" (decision 3)', () => {
+  const at07 = '07. GET Booking after Fulfillments';
+  const sale = () => ({ OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { [at07]: fail('Booking summary names the product') } }) });
+  const finding = (status, extra = {}) => ({
+    id: 'f1', title: 'Summary without product', step: at07, category: 'provider_deviation', status,
+    observed: 'Booking summary names the product', scenarioCode: 'OTST_SALE_ONE_WAY_1ADT', ...extra,
+  });
+
+  test('a provider deviation under discussion leaves the point; resolved, it is accepted', () => {
+    const open = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], sale(), { findings: [finding('discussing')] });
+    expect(row(open, 'sale').result).toBe('points');
+    expect(open.points[0]).toMatchObject({ kind: 'provider', finding: { id: 'f1', category: 'provider_deviation', status: 'discussing' } });
+
+    const accepted = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], sale(), { findings: [finding('resolved')] });
+    expect(row(accepted, 'sale')).toMatchObject({ result: 'deviation', points: [1], tests: [{ result: 'deviation', forms: [{ result: 'deviation', step: null }] }] });
+    expect(accepted.points[0]).toMatchObject({ kind: 'accepted', source: 'check', finding: { id: 'f1', status: 'resolved' } });
+    expect(accepted.summary).toMatchObject({ deviation: 1, points: 0, tested: open.summary.tested });
+    expect(accepted.summary.pointsToLookAt).toMatchObject({ accepted: 1, provider: 0 });
+  });
+
+  test('a deviation at a step every flow shares is the main capability\'s, not one proven on the way', () => {
+    // Seen on the simulator: an accepted failure at a card scenario's offer step made the offers by search read "with deviation".
+    const at01 = '01. POST Get Offer';
+    const runs = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { [at01]: fail('Offer price is the card price') } }) };
+    const accepted = finding('resolved', { step: at01, observed: 'Offer price is the card price' });
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], runs, { findings: [accepted] });
+    expect(row(r, 'sale')).toMatchObject({ result: 'deviation', points: [1] });
+    expect(row(r, 'offers.search')).toMatchObject({ result: 'passed', points: [], provenBy: { count: 1 } });
+  });
+
+  test('any other category resolved is not an acceptance', () => {
+    for (const category of ['open', 'not_supported', 'spec_question']) {
+      const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], sale(), { findings: [finding('resolved', { category })] });
+      expect(row(r, 'sale').result).toBe('points');
+    }
+  });
+
+  test('a #735 draft accepted into the finding links it by its key, whatever the finding\'s words', () => {
+    const silent = finding('resolved', { id: 'f2', observed: 'other words', title: 'Other words' });
+    const unlinked = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], sale(), { findings: [silent] });
+    expect(row(unlinked, 'sale').result).toBe('points');
+    const key = P.keyOfCheck({ request_name: at07, assertion_name: 'Booking summary names the product', http_status: 200 });
+    const linked = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], sale(), { findings: [silent], suggestions: { accepted: { [key]: 'f2' } } });
+    expect(row(linked, 'sale').result).toBe('deviation');
+    expect(linked.points[0].finding).toMatchObject({ id: 'f2' });
+  });
+
+  test('a known deviation the run applied reads "Passed with deviation", with the finding that put it in the runs', () => {
+    const scenarios = [{ code: 'R', scenarioType: 'REFUND', scenarioAction: 'PATCH', tripRequirementId: 1, passengersListId: 1 }];
+    const runs = { R: run([...SALE, ...REFUND], { statuses: { '13. PATCH Refund Offer': 409 } }) };
+    const line = '[WARNING] Known deviation (documented): 13. PATCH Refund Offer returned HTTP 409 — Refund confirmed by a second call. Not counted as a failure; surfaced for visibility.';
+    const baseline = { id: 'f3', title: 'Refund confirmed by a second call', step: 'PATCH Refund Offer', expectedStatus: 409, baselineInRun: true, category: 'provider_deviation', status: 'open' };
+    const r = report(scenarios, runs, { warnings: { R: [line] }, findings: [baseline] });
+    expect(row(r, 'refund.full')).toMatchObject({ result: 'deviation', points: [1] });
+    expect(r.points).toEqual([expect.objectContaining({
+      number: 1, kind: 'accepted', source: 'known-deviation', capability: 'refund.full', step: '13. PATCH Refund Offer', status: 409,
+      note: 'Refund confirmed by a second call', finding: { id: 'f3', title: 'Refund confirmed by a second call', category: 'provider_deviation', status: 'open' },
+    })]);
+    expect(row(r, 'sale').result).toBe('passed');
+    expect(row(report(scenarios, runs), 'refund.full')).toMatchObject({ result: 'passed', points: [] });
+  });
+
+  test('a known deviation at an optional operation is that operation\'s; at a 501 the provider does not support it', () => {
+    const lineAt = (step, status) => `[WARNING] Known deviation (documented): ${step} returned HTTP ${status} — x. Not counted as a failure; surfaced for visibility.`;
+    const code = 'OTST_REFUND_WITHDRAWN_1ADT';
+    const withdraw = [{ code, scenarioType: 'REFUND', scenarioAction: 'DELETE', tripRequirementId: 1, passengersListId: 1 }];
+    const at15 = '15. DEL Refund Offer';
+    const r409 = report(withdraw, { [code]: run([...SALE, ...WITHDRAW], { statuses: { [at15]: 409 } }) }, { warnings: { [code]: [lineAt(at15, 409)] } });
+    expect(row(r409, 'refund.withdraw').result).toBe('deviation');
+    expect(row(r409, 'refund.offer').result).toBe('passed');
+    const r501 = report(withdraw, { [code]: run([...SALE, ...WITHDRAW], { statuses: { [at15]: 501 } }) }, { warnings: { [code]: [lineAt(at15, 501)] } });
+    expect(row(r501, 'refund.withdraw').result).toBe('not-supported');
+    // Proven on the way: the fulfilment read of a sale.
+    const at06b = '06b. GET Fulfillment';
+    const s = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], { OTST_SALE_ONE_WAY_1ADT: run(SALE, { statuses: { [at06b]: 409 } }) },
+      { warnings: { OTST_SALE_ONE_WAY_1ADT: [lineAt(at06b, 409)] } });
+    expect(row(s, 'fulfilment.documents')).toMatchObject({ result: 'deviation', provenBy: { count: 1 }, sideProblems: [], points: [1] });
+    expect(row(s, 'sale')).toMatchObject({ result: 'passed', points: [] });
+  });
+
+  test('an accepted deviation does not hide another point of the same capability, nor lift a blocked run', () => {
+    const two = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { [at07]: [...fail('Booking summary names the product'), ...fail('Booking price is the offer price')] } }) };
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], two, { findings: [finding('resolved')] });
+    expect(row(r, 'sale')).toMatchObject({ result: 'points', points: [1, 2] });
+    expect(r.points.map((p) => p.kind)).toEqual(['provider', 'accepted']);
+    const at02 = '02. POST Create Booking';
+    const stopped = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { stopAt: at02, statuses: { [at02]: 500 }, failures: { [at02]: fail('HTTP response status — expected 200, actual: 500', 'http_status') } }) };
+    const accepted500 = { id: 'f4', title: 'Booking answers 500', step: at02, expectedStatus: 500, category: 'provider_deviation', status: 'resolved' };
+    expect(row(report([oneWay('OTST_SALE_ONE_WAY_1ADT')], stopped, { findings: [accepted500] }), 'sale').result).toBe('blocked');
+  });
+
+  test('an expected refusal not refused, as an accepted deviation', () => {
+    const check = '🧪 Refund again [1 refunded fulfillment(s)]: provider rejects with a client error (4xx)';
+    const scenarios = [{ code: 'NHF_REFUND_TWICE', scenarioType: 'REFUND', scenarioAction: 'PATCH', refundAgainProbe: 'on', tripRequirementId: 1, passengersListId: 1 }];
+    const runs = { NHF_REFUND_TWICE: run([...SALE, ...REFUND], { failures: { '14. GET Booking after Patch Refund': fail(check) } }) };
+    const accepted = { id: 'f5', title: 'Second refund accepted', step: '14. GET Booking after Patch Refund', category: 'provider_deviation', status: 'resolved', observed: checkText(check) };
+    const r = report(scenarios, runs, { findings: [accepted] });
+    expect(r.expectedRefusals[0]).toMatchObject({ result: 'deviation', forms: [{ result: 'deviation' }], points: [1] });
+    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, deviation: 1, notRefused: 0, notRun: 0 });
+  });
+
+  test('combine: an accepted deviation is a pass that says so', () => {
+    expect(combine(['passed', 'deviation'])).toBe('deviation');
+    expect(combine(['deviation', 'not-supported'])).toBe('deviation');
+    expect(combine(['deviation', 'blocked'])).toBe('points');
+    expect(combine(['deviation', 'points'])).toBe('points');
+    expect(combine(['deviation'])).toBe('deviation');
+  });
+
+  test('a step\'s accepted failures are kept apart from its failures', () => {
+    const check = { request_name: at07, assertion_name: 'Booking summary names the product', http_status: 200 };
+    const steps = stepsOf({ steps: [{ request_name: at07, http_status: 200 }], checks: [check] }, { accepted: new Set([P.keyOfCheck(check)]) });
+    expect(steps[0]).toMatchObject({ state: 'passed', deviation: true, failures: [], accepted: [check] });
+    expect(stepsOf({ steps: [{ request_name: at07, http_status: 200 }], checks: [check] })[0]).toMatchObject({ state: 'failed', deviation: false });
   });
 });

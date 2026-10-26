@@ -23,15 +23,21 @@
  *   R4  Expected refusals (NHF_, refusal probes) are rows of their own; their
  *       result never changes the capability they probe. The steps they went
  *       through still prove what they did.
- *   R5  Results: passed, points (passed, with failed checks), blocked (no run
+ *   R5  Results: passed, deviation (passed with an accepted deviation,
+ *       decision 3), points (passed, with failed checks), blocked (no run
  *       reached it), not-supported (the provider answered 501, or an optional
  *       read "not implemented" as #488 reads it), not-tested (declared, not
  *       run), out-of-scope (not declared, or declared not supported).
+ *   R6  The points to look at, each once (coveragePoints.js). A failed check
+ *       of an accepted deviation is not a point of its capability: it reads
+ *       "Passed with deviation".
  *   R7  An optional operation is its own row: masterData, the seat map, the
  *       fulfilment read, the refund receipt, a withdrawal, Idempotency-Key.
  */
 
 const K = require('./capabilities');
+const P = require('./coveragePoints');
+const { stepKey } = require('./findingSuggestions');
 const { catalogueEntryForScenario } = require('./scenarioCatalogue');
 const { declarationOf } = require('./coverageMatrix');
 const { declaredFunctions, frameworkOf, scenarioHash, toRunAgain } = require('./frameworkCoverage');
@@ -43,7 +49,7 @@ const NOT_IMPLEMENTED_READ = new Set([403, 404, 405, 500, 501]);
 const MAX_CHECK_TEXT = 300;
 const MAX_PROVEN_CODES = 10;
 const RESULT_TEXT = Object.freeze({
-  passed: 'Passed', points: 'Passed with points', blocked: 'Blocked', 'not-supported': 'Not supported by the provider',
+  passed: 'Passed', deviation: 'Passed with deviation', points: 'Passed with points', blocked: 'Blocked', 'not-supported': 'Not supported by the provider',
   'not-tested': 'Not tested', 'out-of-scope': 'Out of scope', refused: 'Refused as expected', 'not-refused': 'Not refused',
   'not-run': 'Not run',
 });
@@ -78,15 +84,23 @@ function stepNotSupported(name, statuses) {
 
 /**
  * The steps of a run, in order, each once: { name, state (passed / failed /
- * not-supported), failures (its failed checks, probes apart), blocking }.
+ * not-supported), failures (its failed checks, probes apart), accepted (those
+ * of an accepted deviation: `accepted` holds their keys), deviation (an
+ * accepted deviation or a known deviation was met there), blocking }.
  */
-function stepsOf(run) {
+function stepsOf(run, { accepted, deviations } = {}) {
   const steps = stepsByName(run?.steps);
   for (const check of arr(run?.checks)) {
     const step = isObj(check) ? steps.get(check.request_name) : undefined;
-    if (step) (isProbe(check) ? step.probes : step.failures).push(check);
+    if (step) bucketOf(step, check, accepted).push(check);
   }
-  return [...steps.values()].map(withState);
+  const deviated = new Set(arr(deviations).map((d) => stepKey(d.step)));
+  return [...steps.values()].map((s) => withState(s, deviated));
+}
+
+function bucketOf(step, check, accepted) {
+  if (accepted?.size > 0 && accepted.has(P.keyOfCheck(check))) return step.accepted;
+  return isProbe(check) ? step.probes : step.failures;
 }
 
 // A run's step rows, one entry per request name in order, with its HTTP statuses.
@@ -94,7 +108,7 @@ function stepsByName(rows) {
   const steps = new Map();
   for (const row of arr(rows)) {
     if (!isObj(row) || typeof row.request_name !== 'string') continue;
-    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [] });
+    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [], accepted: [] });
     const status = Number(row.http_status);
     if (Number.isInteger(status) && status > 0) steps.get(row.request_name).statuses.push(status);
   }
@@ -102,12 +116,15 @@ function stepsByName(rows) {
 }
 
 // A step's state, once its statuses and failed checks are known.
-function withState(step) {
+function withState(step, deviated = new Set()) {
   const failed = step.failures.length > 0;
   const notSupported = stepNotSupported(step.name, step.statuses);
   let state = failed ? 'failed' : 'passed';
   if (notSupported) state = 'not-supported';
-  return { ...step, notSupported, state, blocking: step.failures.some(isBlocking) || (failed && step.statuses.some((s) => s >= 500)) };
+  return {
+    ...step, notSupported, state, deviation: step.accepted.length > 0 || deviated.has(stepKey(step.name)),
+    blocking: step.failures.some(isBlocking) || (failed && step.statuses.some((s) => s >= 500)),
+  };
 }
 
 const capabilitiesOfStep = (step, traits) => K.stepCapabilities(step.name, traits);
@@ -139,43 +156,62 @@ function chargedTo(step, main, traits) {
 
 const failureText = (check) => (check ? String(check.assertion_name ?? '').slice(0, MAX_CHECK_TEXT) : null);
 
+// A run that went through: points when a check failed, else passed, with an
+// accepted deviation or without (decision 3).
+function passedResult(failures, deviation) {
+  if (failures.length > 0) return 'points';
+  return deviation ? 'deviation' : 'passed';
+}
+
+// An expected refusal (R4): not refused when a check failed, else refused,
+// or not refused as an accepted deviation.
+function refusalOutcome(failures, deviation) {
+  if (failures.length > 0) return 'not-refused';
+  return deviation ? 'deviation' : 'refused';
+}
+
 /**
- * The result of a run for its main capability (R1, R5): passed, points,
- * blocked or not-supported; for a refusal test, refused or not-refused. With
- * the step and check to look at first.
+ * The result of a run for its main capability (R1, R5): passed, deviation,
+ * points, blocked or not-supported; for a refusal test, refused, deviation or
+ * not-refused. With the step and check to look at first.
  */
 function mainResult(steps, main, traits, refusal) {
   const charged = steps.filter((s) => chargedTo(s, main, traits));
   const failures = charged.flatMap((s) => [...s.failures, ...s.probes].map((c) => ({ step: s.name, check: c, blocking: s.blocking || isBlocking(c) })));
+  const deviation = charged.some((s) => s.deviation);
   const first = failures.find((f) => f.blocking) || failures[0] || null;
   const at = first ? { step: first.step, check: failureText(first.check) } : { step: null, check: null };
-  if (refusal) return { result: failures.length > 0 ? 'not-refused' : 'refused', ...at };
+  if (refusal) return { result: refusalOutcome(failures, deviation), ...at };
   const { own, reached, goals } = stepsFor(main, steps, traits);
   if (reached && goals.length > 0 && goals.every((s) => s.notSupported)) {
     return { result: 'not-supported', step: goals[0].name, check: `answered HTTP ${goals[0].statuses.at(-1)}` };
   }
   if (!reached) return { result: 'blocked', step: at.step, check: at.check || 'the run stopped before this capability was reached' };
   if (own.some((s) => s.state === 'failed' && s.blocking && chargedTo(s, main, traits))) return { result: 'blocked', ...at };
-  return { result: failures.length > 0 ? 'points' : 'passed', ...at };
+  return { result: passedResult(failures, deviation), ...at };
 }
 
 // What a run proves of a capability other than its main one (R1, R2, R7):
-// passed, not-supported, points (an optional operation's own failures), or
-// nothing (null).
+// passed, not-supported, or an optional operation's own points or deviation;
+// else nothing (null). A failure or deviation at a step every flow shares is
+// the main capability's, as its point is.
 function sideResult(capability, steps, traits) {
   const { def, own, reached } = stepsFor(capability, steps, traits);
   if (!reached || own.length === 0) return null;
   if (own.every((s) => s.notSupported)) return 'not-supported';
-  if (own.some((s) => s.state === 'failed')) return def.optional && def.goal ? 'points' : null;
-  return 'passed';
+  const ownRow = Boolean(def.optional && def.goal);
+  if (own.some((s) => s.state === 'failed')) return ownRow ? 'points' : null;
+  return ownRow && own.some((s) => s.deviation) ? 'deviation' : 'passed';
 }
 
 /**
- * Everything one run says: its main result, and what it proves of the other
- * capabilities ({ capability: passed | not-supported | points }).
+ * Everything one run says: its main result, what it proves of the other
+ * capabilities ({ capability: passed | deviation | not-supported | points }),
+ * and its steps. `accepted` holds the keys of the failures that are accepted
+ * deviations, `deviations` the known deviations the run applied.
  */
-function runEvidence(run, { main, traits, refusal }) {
-  const steps = stepsOf(run);
+function runEvidence(run, { main, traits, refusal, accepted, deviations }) {
+  const steps = stepsOf(run, { accepted, deviations });
   const side = new Set(steps.flatMap((s) => capabilitiesOfStep(s, traits)));
   for (const f of arr(traits?.features)) side.add(f);
   // A refusal's result is a row of its own (R4): the capability it probes
@@ -186,10 +222,12 @@ function runEvidence(run, { main, traits, refusal }) {
     const result = sideResult(capability, steps, traits);
     if (result) proven[capability] = result;
   }
-  return { main: mainResult(steps, main, traits, refusal), proven };
+  return { main: mainResult(steps, main, traits, refusal), proven, steps };
 }
 
 // ── The report ──────────────────────────────────────────────────────────────
+
+const WENT_THROUGH = new Set(['passed', 'deviation']);
 
 /** The combined result of several results (R5): null when there is none. */
 function combine(results) {
@@ -197,14 +235,15 @@ function combine(results) {
   if (list.length === 0) return null;
   if (list.every((r) => r === 'not-supported')) return 'not-supported';
   const problems = list.filter((r) => r === 'points' || r === 'blocked');
-  if (problems.length === 0) return 'passed';
-  return list.includes('passed') || problems.includes('points') ? 'points' : 'blocked';
+  if (problems.length === 0) return list.includes('deviation') ? 'deviation' : 'passed';
+  return list.some((r) => WENT_THROUGH.has(r)) || problems.includes('points') ? 'points' : 'blocked';
 }
 
 function refusalResult(forms) {
   const run = forms.filter((f) => f.result !== 'not-run');
   if (run.length === 0) return 'not-run';
-  return run.some((f) => f.result === 'not-refused') ? 'not-refused' : 'refused';
+  if (run.some((f) => f.result === 'not-refused')) return 'not-refused';
+  return run.some((f) => f.result === 'deviation') ? 'deviation' : 'refused';
 }
 
 /** What the framework says of a capability: declared, not-declared, every-value, declared-not-supported, or null. */
@@ -231,17 +270,18 @@ function runListOf(datafile) {
 }
 
 // One form of a test: a scenario, its run and its result.
-function formOf(scenario, run, evidence, context) {
+function formOf(item, collectionVersion) {
+  const { scenario, run, evidence } = item;
   const form = {
-    code: scenario.code, form: context.traits.form, result: evidence ? evidence.main.result : 'not-run',
-    toRunAgain: toRunAgain(run, { collectionVersion: context.collectionVersion, hash: scenarioHash(scenario) }),
+    code: scenario.code, form: item.traits.form, result: evidence ? evidence.main.result : 'not-run',
+    toRunAgain: toRunAgain(run, { collectionVersion, hash: scenarioHash(scenario) }),
   };
   if (run) Object.assign(form, { runId: run.id, at: run.completed_at || run.queued_at || null, step: evidence.main.step, check: evidence.main.check });
   return form;
 }
 
 // Each scenario of the report: its test, main capability, traits and run.
-function scenarioItems({ datafile, catalogue, runs, runList, collectionVersion }) {
+function scenarioItems({ datafile, catalogue, runs, runList }) {
   const items = [];
   const apart = [];
   for (const scenario of arr(datafile?.scenarios)) {
@@ -251,28 +291,78 @@ function scenarioItems({ datafile, catalogue, runs, runList, collectionVersion }
       apart.push({ code: scenario.code, entry: entry?.code || null });
       continue;
     }
-    const main = K.CAPABILITY.has(entry?.capability) ? entry.capability : K.derivedCapability(scenario, datafile);
-    const refusal = K.isRefusalTest(scenario);
-    const traits = K.traitsOf(scenario, datafile);
-    const run = runs[scenario.code] || null;
-    const evidence = run ? runEvidence(run, { main, traits, refusal }) : null;
-    items.push({ scenario, entry, main, refusal, evidence, form: formOf(scenario, run, evidence, { traits, collectionVersion }) });
+    items.push({
+      scenario, entry, testKey: entry?.code || scenario.code, run: runs[scenario.code] || null,
+      main: K.CAPABILITY.has(entry?.capability) ? entry.capability : K.derivedCapability(scenario, datafile),
+      refusal: K.isRefusalTest(scenario), traits: K.traitsOf(scenario, datafile),
+    });
   }
   return { items, apart };
+}
+
+// The failed checks of the items' runs, as linkFailures() reads them.
+function failuresOf(items) {
+  return items.filter((item) => item.run).flatMap((item) => arr(item.run.checks).filter(isObj)
+    .map((check) => ({ check, run: item.run, code: item.scenario.code })));
+}
+
+// Each item's evidence and form, once the accepted deviations are known.
+function withEvidence(items, { accepted, warnings, collectionVersion }) {
+  for (const item of items) {
+    item.deviations = item.run ? P.knownDeviationsOf(warnings[item.scenario.code]) : [];
+    item.evidence = item.run
+      ? runEvidence(item.run, { main: item.main, traits: item.traits, refusal: item.refusal, accepted, deviations: item.deviations })
+      : null;
+    item.form = formOf(item, collectionVersion);
+  }
+}
+
+// The capability a step's problems are read under (R1, R7): the main one when
+// they count against it, else the optional operation the step is.
+function capabilityOfStep(step, item) {
+  if (chargedTo(step, item.main, item.traits)) return item.main;
+  const caps = capabilitiesOfStep(step, item.traits);
+  return caps.find((c) => K.CAPABILITY.get(c)?.optional) || caps[0] || item.main;
+}
+
+// One problem seen in a run, as pointsOf() reads it.
+function seenAt(item, step, extra) {
+  const capability = step ? capabilityOfStep(step, item) : item.main;
+  return {
+    ...extra, capability, refusal: item.refusal && capability === item.main,
+    test: { key: item.testKey, entry: item.entry?.code || null }, code: item.scenario.code, run: item.run,
+  };
+}
+
+// Every failed check and known deviation of the items' runs.
+function seenOf(items) {
+  const seen = [];
+  for (const item of items) {
+    const steps = arr(item.evidence?.steps);
+    for (const step of steps) {
+      const severe = step.statuses.some((s) => s >= 500);
+      for (const check of [...step.failures, ...step.probes, ...step.accepted]) {
+        seen.push(seenAt(item, step, { check, blocking: severe || isBlocking(check) }));
+      }
+    }
+    for (const deviation of arr(item.deviations)) {
+      seen.push(seenAt(item, steps.find((s) => stepKey(s.name) === stepKey(deviation.step)), { deviation, blocking: false }));
+    }
+  }
+  return seen;
 }
 
 // The tests (R3): one per catalogue entry, else per scenario, with their forms.
 function testsOf(items) {
   const tests = new Map();
   for (const item of items) {
-    const key = item.entry?.code || item.scenario.code;
-    if (!tests.has(key)) {
-      tests.set(key, {
-        key, entry: item.entry?.code || null, capability: item.main, refusal: item.refusal,
+    if (!tests.has(item.testKey)) {
+      tests.set(item.testKey, {
+        key: item.testKey, entry: item.entry?.code || null, capability: item.main, refusal: item.refusal,
         purpose: item.entry?.purpose || (typeof item.scenario.description === 'string' ? item.scenario.description : ''), forms: [],
       });
     }
-    tests.get(key).forms.push(item.form);
+    tests.get(item.testKey).forms.push(item.form);
   }
   for (const test of tests.values()) {
     test.result = test.refusal ? refusalResult(test.forms) : (combine(test.forms.map((f) => (f.result === 'not-run' ? null : f.result))) || 'not-run');
@@ -292,20 +382,42 @@ function sideEvidenceOf(items) {
   return out;
 }
 
-function capabilityRow(def, tests, side, declaration) {
+function capabilityRow(def, tests, side, { declaration, points }) {
   const formResults = tests.flatMap((t) => t.forms.map((f) => (f.result === 'not-run' ? null : f.result)));
   let result = combine([...formResults, ...side.map((s) => s.result)]) || 'not-tested';
   if (declaration === 'not-declared' || declaration === 'declared-not-supported') result = 'out-of-scope';
-  const proven = side.filter((s) => s.result === 'passed').map((s) => s.code);
+  const proven = side.filter((s) => WENT_THROUGH.has(s.result)).map((s) => s.code);
   return {
     id: def.id, group: def.group, label: def.label, optional: Boolean(def.optional), result, declaration,
     tests: tests.map(({ key, entry, purpose, result: r, forms }) => ({ key, entry, purpose, result: r, forms })),
     provenBy: { count: proven.length, codes: proven.slice(0, MAX_PROVEN_CODES) },
-    sideProblems: side.filter((s) => s.result !== 'passed'),
+    sideProblems: side.filter((s) => !WENT_THROUGH.has(s.result)),
+    points,
   };
 }
 
-const COUNTED = new Set(['passed', 'points', 'blocked', 'not-supported']);
+const COUNTED = new Set(['passed', 'deviation', 'points', 'blocked', 'not-supported']);
+const numbersOf = (points) => points.map((p) => p.number);
+
+function summaryOf({ capabilities, expectedRefusals, notTested, apart, points, truncated }) {
+  const count = (r) => capabilities.filter((c) => c.result === r).length;
+  const kinds = (k) => points.filter((p) => p.kind === k).length;
+  return {
+    tested: capabilities.filter((c) => COUNTED.has(c.result)).length,
+    passed: count('passed'), deviation: count('deviation'), points: count('points'), blocked: count('blocked'),
+    notSupported: count('not-supported'), notTested: count('not-tested'), outOfScope: count('out-of-scope'),
+    expectedRefusals: {
+      total: expectedRefusals.length, refused: expectedRefusals.filter((r) => r.result === 'refused').length,
+      deviation: expectedRefusals.filter((r) => r.result === 'deviation').length,
+      notRefused: expectedRefusals.filter((r) => r.result === 'not-refused').length, notRun: expectedRefusals.filter((r) => r.result === 'not-run').length,
+    },
+    pointsToLookAt: {
+      total: points.length, provider: kinds('provider'), accepted: kinds('accepted'), questions: kinds('question'), oscar: kinds('oscar'),
+      truncated,
+    },
+    declaredWithoutScenario: notTested.length, apart: apart.length,
+  };
+}
 
 /**
  * The coverage by capability.
@@ -314,15 +426,28 @@ const COUNTED = new Set(['passed', 'points', 'blocked', 'not-supported']);
  *   runs                  { code: latest finished run } with `steps` (its
  *                         run_requests: request_name, http_status) and
  *                         `checks` (its failed checks: request_name,
- *                         assertion_name, category, severity), in run order
+ *                         assertion_name, category, severity, http_status,
+ *                         problem_code), in run order
+ *   warnings              { code: [the latest run's [WARNING] lines] }, for
+ *                         the known deviations it applied
+ *   findings              the company's findings, resolved ones included
+ *   suggestions           the #735 drafts: { accepted: { key: findingId },
+ *                         oscarIssues: [key] }
  *   functions             coverageOf()'s functions, for the declared ones
  *                         without a scenario
- * -> { capabilities, expectedRefusals, apart, notTested, summary }
+ * -> { capabilities, expectedRefusals, points, apart, notTested, summary }
  */
-function capabilityCoverageOf({ framework, datafile, catalogue = [], runs = {}, functions = [], collectionVersion = null }) {
+function capabilityCoverageOf({
+  framework, datafile, catalogue = [], runs = {}, warnings = {}, findings = [], suggestions = {}, functions = [], collectionVersion = null,
+}) {
   const fw = frameworkOf(framework);
   const declaredIds = new Set(declaredFunctions(fw).map((f) => f.id));
-  const { items, apart } = scenarioItems({ datafile, catalogue: arr(catalogue), runs: runs || {}, runList: runListOf(datafile), collectionVersion });
+  const { items, apart } = scenarioItems({ datafile, catalogue: arr(catalogue), runs: runs || {}, runList: runListOf(datafile) });
+  const links = P.linkFailures(failuresOf(items), { findings, suggestions });
+  withEvidence(items, { accepted: P.acceptedKeysOf(links), warnings: warnings || {}, collectionVersion });
+  const { points, truncated } = P.pointsOf(seenOf(items), {
+    links, findings, capabilities: K.CAPABILITIES.map((c) => c.id), label: (id) => K.CAPABILITY.get(id)?.label || id,
+  });
   const tests = testsOf(items);
   const side = sideEvidenceOf(items);
   const capabilities = [];
@@ -331,26 +456,18 @@ function capabilityCoverageOf({ framework, datafile, catalogue = [], runs = {}, 
     const evidence = side.get(def.id) || [];
     const declaration = capabilityDeclaration(def.id, fw, declaredIds);
     if (own.length === 0 && evidence.length === 0 && declaration !== 'declared') continue;
-    capabilities.push(capabilityRow(def, own, evidence, declaration));
+    const rowPoints = numbersOf(points.filter((p) => p.capability === def.id && !p.expectedRefusal));
+    capabilities.push(capabilityRow(def, own, evidence, { declaration, points: rowPoints }));
   }
   const expectedRefusals = tests.filter((t) => t.refusal).map(({ key, entry, purpose, capability, result, forms }) => ({
     key, entry, purpose, capability, capabilityLabel: K.CAPABILITY.get(capability)?.label || capability, result, forms,
+    points: numbersOf(points.filter((p) => p.expectedRefusal && p.tests.some((t) => t.key === key))),
   }));
   const notTested = arr(functions).filter((f) => f.state === 'not-covered' || f.state === 'never-run')
     .map((f) => ({ id: f.id, group: f.group, label: f.label, state: f.state }));
-  const count = (r) => capabilities.filter((c) => c.result === r).length;
   return {
-    capabilities, expectedRefusals, apart, notTested,
-    summary: {
-      tested: capabilities.filter((c) => COUNTED.has(c.result)).length,
-      passed: count('passed'), points: count('points'), blocked: count('blocked'), notSupported: count('not-supported'),
-      notTested: count('not-tested'), outOfScope: count('out-of-scope'),
-      expectedRefusals: {
-        total: expectedRefusals.length, refused: expectedRefusals.filter((r) => r.result === 'refused').length,
-        notRefused: expectedRefusals.filter((r) => r.result === 'not-refused').length, notRun: expectedRefusals.filter((r) => r.result === 'not-run').length,
-      },
-      declaredWithoutScenario: notTested.length, apart: apart.length,
-    },
+    capabilities, expectedRefusals, points, apart, notTested,
+    summary: summaryOf({ capabilities, expectedRefusals, notTested, apart, points, truncated }),
   };
 }
 

@@ -93,6 +93,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.405] / [collection-OTST_V2.0.226] — 2026-10-26
+
+Issue #972 (part 2 of 4), release 2026.440. The coverage by capability now lists the points to look at, each once, and says when a capability passes with an accepted deviation.
+
+### Added
+- **Points to look at** (R6), in `byCapability.points` (`utils/coveragePoints.js`, pure).
+  - **One point per distinct problem.** The failed checks of the latest runs are grouped with the #735 key: the step, the check text without the run's values, the HTTP status, and the problem code of an error answer. A problem seen in several forms and runs of a test is one point.
+  - Each point names its capability (the one its failure counts against, R1 and R7), the tests and scenario codes where it was seen, up to 10 runs, its first and last day seen in those runs, and whether it blocked.
+  - **A point is linked to a finding** the way #735 links a group (`matchFinding()`), and only by a sure match. A match by step and scenario alone is named as a possible finding, without changing anything.
+  - **Kinds:** the provider's points first, then the accepted deviations, then the questions on the specification (a `spec_question` finding), then OSCAR's: an `oscar_issue` finding, a #735 draft marked as OSCAR's, or OSCAR's own request (#736). OSCAR's points are listed apart; they still count where they failed.
+  - Points are numbered from 1 in that order, by capability within a kind, blocking first. Each capability row and each expected refusal gives the numbers of its points. A probe not refused is a point of its expected refusal, not of the capability it probes.
+  - At most 500 points; `summary.pointsToLookAt.truncated` says when more were found.
+- **"Passed with deviation"** (decision 3), result `deviation`, in the capability rows, tests, forms and expected refusals.
+  - **An accepted deviation** is a point whose finding is classified `provider_deviation` and resolved (maintainer's decision, 2026-10-26), or a known deviation the run applied. A finding under discussion leaves the point as it is.
+  - **A known deviation** is read from the run's log: the collection writes "[WARNING] Known deviation (documented): <step> returned HTTP <status>" when a baselined status is met (#398). The point names the baselined finding.
+  - The failed checks of an accepted deviation no longer count as points. A run that went through with one reads "Passed with deviation". A run that stopped there is still blocked, and another point of the same capability still makes it "Passed with points".
+  - A deviation follows its point, as a failure does (R1): at a step every flow shares it is the main capability's. A capability proven on the way takes it only at an optional operation's own step.
+  - `summary` counts `deviation` (capabilities), `expectedRefusals.deviation` and `pointsToLookAt` (total, provider, accepted, questions, oscar).
+
+### Changed
+- **The coverage route** reads each failed check's HTTP status and, for an error answer, its problem code (one decryption per request, at most 5,000). It also reads the company's findings, resolved ones included (a point shows only their id, title, category and status), and the Test Manager's decisions on the #735 drafts. The function and matrix views still list open findings only.
+
+### Tests
+- `capability-coverage.test.js`: one point for a problem seen in two forms; the order of the kinds; a probe's point; a provider deviation under discussion and resolved; other categories resolved; a link through an accepted #735 draft; a known deviation at the main capability, at an optional operation, at a 501 and on a capability proven on the way; an accepted deviation next to another point, in a blocked run, and at a shared step; an expected refusal not refused as an accepted deviation; `combine()`; a step's accepted failures.
+- `coverage-points.test.js`: the log line written by the collection's own `noteKnownDeviation()` is read back; lines that are not one; the kinds; a possible finding; the run and point limits; blocking first; the finding a known deviation names.
+- `coverage-routes.test.js`: the points, the problem code read from the stored answer, an accepted deviation, a known deviation from the run's log, a #735 draft marked as OSCAR's, and the fields a finding shows.
+- Thirty-two deliberate breaks each make a test fail: the acceptance rule (status, category), the accepted failures, each place the deviation is read (main, proven on the way, combined, refusals), the kinds and their order, the links, the limits, the log line, and the route's reads (problem code, #735 decisions, resolved findings, warnings).
+- Checked on the simulator: the report of gamma's reference (135 runs) on a throwaway OSCAR.
+  - Without findings, the results are part 1's, with 18 points; the #735 analysis of the same batch gives 18 groups.
+  - The reduction card draft accepted and its finding resolved as a provider deviation: the reduction cards read "Passed with deviation", and the point names the finding.
+  - A known deviation line added to a refund offer run's log: the refund offer reads "Passed with deviation".
+  - That check found a deviation at a shared step reaching a capability proven on the way (the offers by search); fixed and tested.
+
+---
+
 ## [server-1.11.404] / [collection-OTST_V2.0.226] — 2026-10-26
 
 Bruno CLI update, release 2026.439. Dependabot's #971. No code changed.
