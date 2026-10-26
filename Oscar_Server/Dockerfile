@@ -12,7 +12,7 @@
 # tag moves, the digest does not, so two builds of the same commit start from
 # the same image. Dependabot (docker ecosystem) proposes the new digest when
 # the tag moves. To update by hand, see CONTRIBUTING.md.
-FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS builder
+FROM node:22-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS builder
 
 # Build deps for bcrypt native compilation
 RUN apt-get update && \
@@ -33,7 +33,7 @@ RUN npm ci --omit=dev
 #   2. Shrink the runtime image by ~50 MB.
 # OSCAR never invokes npm at runtime — node_modules is already in place
 # (copied from the builder stage below).
-FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+FROM node:22-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d
 
 WORKDIR /app
 
