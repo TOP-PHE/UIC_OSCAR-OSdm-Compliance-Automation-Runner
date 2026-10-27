@@ -35,6 +35,7 @@ const { auditLog } = require('../helpers/shared');
 const { buildCoverage, daysOf, MAX_DAYS } = require('./company-coverage');
 const { runIdsOf, summaryOf, comparisonOf, isRunId, forPublication } = require('../../utils/coverageReports');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
+const { fileNameFor } = require('../../utils/fileNames');
 const log = require('../../utils/logger').child({ module: 'company-coverage-reports' });
 
 const router = express.Router();
@@ -147,13 +148,17 @@ router.get('/coverage/reports/:id/download', readLimiter, (req, res) => {
   return sendWorkbook(res, row, company?.name || '');
 });
 
-/** The workbook of a published report: its own date and number, its comparison. */
-function sendWorkbook(res, row, companyName) {
+/**
+ * The workbook of a published report: its own date and number, its comparison.
+ * Its file name starts with the company or provider it is about (#1002).
+ */
+function sendWorkbook(res, row, companyName, owner = companyName) {
   const file = coverageWorkbook(parse(row.content) || {}, {
     title: `${companyName} — published report ${row.number}`, generatedAt: `${row.created_at} UTC`, comparison: parse(row.comparison),
   });
   res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.set('Content-Disposition', `attachment; filename="oscar-coverage-report-${row.number}.xlsx"`);
+  const name = fileNameFor(owner, `oscar-coverage-report-${row.number}.xlsx`);
+  res.set('Content-Disposition', `attachment; filename="${name}"`);
   return res.send(file);
 }
 

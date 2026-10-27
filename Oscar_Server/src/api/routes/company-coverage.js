@@ -43,6 +43,7 @@ const { armed, ALWAYS_REQUIRED } = require('../../utils/capabilities');
 const { offerOptionCoverageOf, withOfferOptions } = require('../../utils/offerOptionCoverage');
 const { offerOptionReportsOf } = require('../helpers/offerOptionReports');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
+const { fileNameFor } = require('../../utils/fileNames');
 const { problemOf } = require('../../utils/findingSuggestions');
 const { toApiFinding } = require('../helpers/findings');
 const { choices: positionChoices } = require('../../utils/pointPositions');
@@ -295,7 +296,8 @@ router.get('/coverage/download', coverageLimiter, async (req, res) => {
     const now = new Date().toISOString();
     const file = coverageWorkbook(built.report, { title: company?.name || '', generatedAt: now.replace('T', ' ').slice(0, 19) + ' UTC' });
     res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.set('Content-Disposition', `attachment; filename="oscar-coverage-${now.slice(0, 10)}.xlsx"`);
+    const name = fileNameFor(company?.name, `oscar-coverage-${now.slice(0, 10)}.xlsx`);
+    res.set('Content-Disposition', `attachment; filename="${name}"`);
     return res.send(file);
   } catch (err) {
     return failed(res, err, req.companyId);
