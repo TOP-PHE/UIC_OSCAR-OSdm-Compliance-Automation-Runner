@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-runs-by-provider",
+    "date": "October 27, 2026",
+    "tag": "Added",
+    "title": "Runs by company or provider in Grafana",
+    "summary": "Administrators can see each company's or provider's runs going and waiting, and the requests sent to it, in Grafana; the admin page lists who is running what.",
+    "content": "The OSCAR · Overview dashboard has a new row, Runs by company or provider: runs going and waiting, runs ended per minute and requests to the provider per second. Admin → Server Activity lists the runs in progress by user and company or provider."
+  },
+  {
     "id": "2026-10-27-fair-run-queue",
     "date": "October 27, 2026",
     "tag": "Changed",

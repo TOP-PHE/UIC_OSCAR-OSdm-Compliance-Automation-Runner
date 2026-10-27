@@ -423,6 +423,22 @@ router.get('/activity', (req, res) => {
      LIMIT 10`
   );
 
+  // #1017: who is running what now, by user and company or provider. Counts
+  // only; the administrator's page already names submitters by e-mail.
+  const runsInProgress = all(
+    `SELECT u.email AS email, c.name AS company, p.name AS distributor,
+            SUM(CASE WHEN r.status = 'RUNNING' THEN 1 ELSE 0 END) AS running,
+            SUM(CASE WHEN r.status = 'QUEUED'  THEN 1 ELSE 0 END) AS queued
+     FROM runs r
+     JOIN users u ON u.id = r.user_id
+     JOIN companies c ON c.id = r.company_id
+     LEFT JOIN companies p ON p.id = c.parent_id
+     WHERE r.status IN ('RUNNING', 'QUEUED')
+     GROUP BY u.email, c.id
+     ORDER BY running DESC, queued DESC, c.name, u.email
+     LIMIT 200`
+  );
+
   // Optional ?from=&to= (UTC datetimes "YYYY-MM-DD HH:MM:SS") — return login
   // events in that half-open range instead of the most-recent 50. The client
   // computes the range from the LOCAL day the admin picks (local midnight →
@@ -458,6 +474,7 @@ router.get('/activity', (req, res) => {
     failed_logins_last_24h: failedLogins24h,
     run_status_distribution: runStatus,
     top_submitters_last_7d: topSubmitters,
+    runs_in_progress: runsInProgress,
     latest_auth_events: latestLogins,
     auth_events_range: useRange ? { from: fromParam, to: toParam } : null
   });

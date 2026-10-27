@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.460",
+  "current_release": "2026.461",
   "releases": [
+    {
+      "release": "2026.461",
+      "date": "2026-10-27",
+      "server": "1.11.426",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1017: Grafana's OSCAR · Overview gets a row \"Runs by company or provider\": runs going and waiting, runs ended per minute and requests to the provider per second (counted as each run ends), labelled by company and distributor, never by user. Admin → Server Activity lists the runs in progress by user and company or provider."
+      ]
+    },
     {
       "release": "2026.460",
       "date": "2026-10-27",

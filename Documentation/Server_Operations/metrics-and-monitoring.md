@@ -25,6 +25,8 @@ Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
 - Row *OSCAR host* (#1013): the machine's CPU by mode, load against CPUs,
   memory and swap, the container's memory, and the run processes (Bruno)
   with their memory
+- Row *Runs by company or provider* (#1017): runs going and waiting, runs
+  ended per minute, and requests to the provider per second
 
 **OSCAR · Logs** — centralised log aggregation:
 - Errors-only view (regex-matches ERROR / FATAL / PANIC)
@@ -120,6 +122,25 @@ per CPU, as long as runs × 250 MB stays well under the memory available
 without runs: 24 on 6 CPUs and 11 GiB. 50 runs need about 12 CPUs and 16 to
 24 GiB. Above that the machine does no more work, it only shares it out
 more slowly.
+
+### Runs by company or provider (#1017)
+
+Four metrics carry the labels `company` (the company or provider's name) and
+`distributor` (its parent's name, empty for a top-level company):
+
+- `oscar_company_runs_running` and `oscar_company_runs_queued`, read from the
+  queue every 5 seconds. With several providers at work, the runs going
+  should even out between them as runs end (#1015).
+- `oscar_company_runs_finished_total{status}`.
+- `oscar_company_run_requests_total`: the requests a run stored, counted when
+  the run ends. Bruno sends them straight to the provider, so OSCAR cannot
+  count them live. The rate lags by about one run, and requests a script
+  sends itself are not counted.
+
+No metric names a user: an e-mail would be personal data in Prometheus, and
+the series would grow with every user. *Admin → Server Activity → Runs in
+Progress* lists runs going and waiting by user and company or provider. A
+company renamed keeps its old name in the labels until OSCAR restarts.
 
 ### The OSDM simulator (#1005)
 

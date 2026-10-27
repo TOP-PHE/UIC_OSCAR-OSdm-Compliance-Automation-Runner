@@ -93,6 +93,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.426] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1017, release 2026.461.
+
+### Added
+- **Runs by company or provider in Grafana.** OSCAR · Overview showed only server-wide totals, so a campaign on several providers did not show how the run slots were shared (#1015) or how much each provider was asked. Four metrics carry the labels `company` (the company or provider's name) and `distributor` (its parent's, empty for a top-level company), from `utils/companyRunMetrics.js`:
+  - `oscar_company_runs_running` and `oscar_company_runs_queued`, read from the queue every 5 seconds (`queue.companyCounts()`);
+  - `oscar_company_runs_finished_total{status}`;
+  - `oscar_company_run_requests_total`, the requests a run stored, counted when the run ends. Bruno sends them straight to the provider, so the rate lags by about one run. Requests a script sends itself are not counted.
+- **Row *Runs by company or provider*** on OSCAR · Overview: runs going and waiting, requests to the provider per second, and runs ended per minute (failed ones apart).
+- **Admin → Server Activity → Runs in Progress:** runs going and waiting by user and company or provider (`runs_in_progress` in `GET /v1/admin/activity`).
+- No metric names a user. An e-mail would be personal data in Prometheus, and the series would grow with every user. The user / provider pair is on the administrators' page, which already lists submitters by e-mail.
+- `company-run-metrics.test.js` pins the dashboard's metric names to the ones the server writes, and pins the labels.
+
+---
+
 ## [server-1.11.425] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1015, release 2026.460.

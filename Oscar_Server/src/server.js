@@ -66,14 +66,30 @@ process.env.JWT_SECRET = jwtRow.value;
 // ── Attach queue event listeners ──────────────────────────────────────────────
 const queue = require('./worker/queue');
 const metricsForQueue = require('./utils/metrics');
+const companyRunMetrics = require('./utils/companyRunMetrics');
+const companyLabels = companyRunMetrics.labelCache((id) => dbGet(companyRunMetrics.COMPANY_ROW_SQL, [id]));
+// #1017: a run that ended counts for its company, with the requests it stored.
+function countFinishedRun(runId, companyId, status) {
+  try {
+    const labels = companyLabels(companyId);
+    metricsForQueue.companyRunsFinished.inc({ ...labels, status });
+    const stored = dbGet('SELECT COUNT(*) AS n FROM run_requests WHERE run_id = ?', [runId]);
+    if (stored?.n > 0) metricsForQueue.companyRunRequests.inc(labels, stored.n);
+  } catch (e) {
+    log.warn({ runId, err: e.message }, 'Run metrics by company not counted');
+  }
+}
 queue.on('started',   ({ runId }) => log.info({ runId }, 'Run started'));
-queue.on('completed', ({ runId, exitCode }) => {
+queue.on('completed', ({ runId, companyId, exitCode }) => {
   log.info({ runId, exitCode }, 'Run completed');
-  metricsForQueue.runsTotal.inc({ status: exitCode === 0 ? 'COMPLETED' : 'FAILED' });
+  const status = exitCode === 0 ? 'COMPLETED' : 'FAILED';
+  metricsForQueue.runsTotal.inc({ status });
+  countFinishedRun(runId, companyId, status);
 });
-queue.on('failed', ({ runId, error }) => {
+queue.on('failed', ({ runId, companyId, error }) => {
   log.error({ runId, error }, 'Run failed');
   metricsForQueue.runsTotal.inc({ status: 'FAILED' });
+  countFinishedRun(runId, companyId, 'FAILED');
 });
 
 // ── Startup reconciliation — fail runs orphaned by the previous process exit ──
@@ -98,6 +114,14 @@ setInterval(() => {
   try {
     if (typeof queue.depth === 'number')   metricsForQueue.queueDepth.set(queue.depth);
     if (typeof queue.running === 'number') metricsForQueue.activeRuns.set(queue.running);
+    // #1017: by company or provider; a company with nothing left has no series.
+    const samples = companyRunMetrics.gaugeSamples(queue.companyCounts(), companyLabels);
+    metricsForQueue.companyRunsRunning.reset();
+    metricsForQueue.companyRunsQueued.reset();
+    for (const { labels, running, queued } of samples) {
+      metricsForQueue.companyRunsRunning.set(labels, running);
+      metricsForQueue.companyRunsQueued.set(labels, queued);
+    }
   } catch (_e) { /* never let metric collection crash the server */ }
 }, 5000).unref();   // .unref() so the interval doesn't keep Node alive on shutdown
 

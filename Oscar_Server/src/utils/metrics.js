@@ -69,6 +69,35 @@ const activeRuns = new promClient.Gauge({
   registers: [register]
 });
 
+// ─── Runs by company or provider (#1017) ─────────────────────────────────────
+// Labels: the company's name and its distributor's (empty for a top-level
+// company); never a user. See utils/companyRunMetrics.js.
+const COMPANY_LABELS = ['company', 'distributor'];
+const companyRunsRunning = new promClient.Gauge({
+  name: 'oscar_company_runs_running',
+  help: 'Runs going, by company or provider',
+  labelNames: COMPANY_LABELS,
+  registers: [register]
+});
+const companyRunsQueued = new promClient.Gauge({
+  name: 'oscar_company_runs_queued',
+  help: 'Runs waiting for a slot, by company or provider',
+  labelNames: COMPANY_LABELS,
+  registers: [register]
+});
+const companyRunsFinished = new promClient.Counter({
+  name: 'oscar_company_runs_finished_total',
+  help: 'Runs ended, by company or provider and status',
+  labelNames: [...COMPANY_LABELS, 'status'],
+  registers: [register]
+});
+const companyRunRequests = new promClient.Counter({
+  name: 'oscar_company_run_requests_total',
+  help: 'Requests the runs made to the provider, counted when each run ends, by company or provider',
+  labelNames: COMPANY_LABELS,
+  registers: [register]
+});
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 const loginAttempts = new promClient.Counter({
   name: 'oscar_login_attempts_total',
@@ -109,6 +138,10 @@ module.exports = {
   runsTotal,
   queueDepth,
   activeRuns,
+  companyRunsRunning,
+  companyRunsQueued,
+  companyRunsFinished,
+  companyRunRequests,
   loginAttempts,
   smtpSends
 };
