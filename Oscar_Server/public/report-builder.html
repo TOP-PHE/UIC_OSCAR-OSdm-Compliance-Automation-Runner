@@ -2239,7 +2239,8 @@ function capabilityMandatoryText(e) {
 }
 
 function capabilityParameterCells(p) {
-  var value = p.value === undefined || p.value === null ? '' : String(p.value) + (p.source ? ' (' + p.source + ')' : '');
+  var value = '';
+  if (p.value !== undefined && p.value !== null) value = String(p.value) + (p.source ? ' (' + p.source + ')' : '');
   return [p.option, value, Number.isInteger(p.status) ? String(p.status) : '-', p.resultText || p.result || '', capabilityDeclaredText(p.declared), p.message || ''];
 }
 

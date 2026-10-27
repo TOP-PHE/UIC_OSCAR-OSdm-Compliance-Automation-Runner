@@ -145,7 +145,10 @@ const OPTION_DECLARED = (d) => {
   if (d === false) return 'Declared not supported';
   return 'Not declared';
 };
-const valueSent = (p) => (p.value === undefined || p.value === null ? '' : String(p.value) + (p.source ? ` (${p.source})` : ''));
+function valueSent(p) {
+  if (p.value === undefined || p.value === null) return '';
+  return p.source ? `${p.value} (${p.source})` : String(p.value);
+}
 
 function mandatoryRow(e) {
   if (!e.mandatory) return ['Mandatory parameters only', '', '', null, 'Not in the report', '', ''];

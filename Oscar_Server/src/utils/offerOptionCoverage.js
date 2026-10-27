@@ -96,7 +96,8 @@ function summaryOf(report) {
 function summaryText(s) {
   const parts = [];
   if (s.mandatory !== null) parts.push(`mandatory parameters only: ${s.mandatory ? 'answered' : 'NOT answered'}`);
-  parts.push(`${s.parameters} parameter(s)${s.groups.length ? `: ${s.groups.map((g) => `${g.count} ${g.words}`).join(', ')}` : ''}`);
+  const groups = s.groups.map((g) => [g.count, g.words].join(' ')).join(', ');
+  parts.push(groups ? `${s.parameters} parameter(s): ${groups}` : `${s.parameters} parameter(s)`);
   const c = s.combinations;
   if (c.total > 0) {
     const notSent = c.notSent ? `, ${c.notSent} not sent` : '';
