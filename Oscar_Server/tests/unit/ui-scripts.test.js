@@ -1481,7 +1481,8 @@ describe('the Report Builder coverage section', () => {
   const ctx = { escHtml, encodeURIComponent, COVERAGE_STATES, COVERAGE_DECLARATIONS, CAPABILITY_RESULTS, POINT_KINDS, CHANGE_LABELS };
   for (const name of sectionNames) ctx[name] = loadFunction(page, name, ctx);
   const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks,
-    capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml, capabilityPointsHtml, capabilitySentence } = ctx;
+    capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml, capabilityPointsHtml, capabilitySentence,
+    capabilityOptionsHtml, capabilityCombinationText } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1793,6 +1794,74 @@ describe('the Report Builder coverage section', () => {
       + '<br><strong>Seen:</strong> expected 12.4 to equal 12.5<br><small>');
     // A test outside the catalogue is named by its code, once.
     expect(out).toContain('Found in A, on 2026-10-24 10:05:00');
+  });
+
+  // #995: the offer request options' results, from the server module's own answer.
+  describe('the offer request options (#995)', () => {
+    const C = require('../../src/utils/offerOptionCoverage');
+    const { COMBINATION_WORDS } = require('../../src/utils/coverageWorkbook');
+    const report = {
+      version: '3.8.0', budget: 30, used: 6, mandatory: { ok: true, message: '2 offer(s)' },
+      options: [
+        { option: 'offerSearchCriteria.currency', value: 'EUR <e>', source: 'declared', declared: true, status: 200, result: 'honoured', message: 'kept <k>' },
+        { option: 'passenger.gender', declared: false, status: 200, result: 'ignored-silent', message: 'silent' },
+        { option: 'embed<x>', status: 501, result: 'not-implemented' },
+      ],
+      combinations: [
+        { options: ['offerSearchCriteria.currency', 'embed<x>'], status: 400, result: 'refused', message: 'COMBO <c>' },
+        { options: ['offerSearchCriteria.currency', 'passenger.gender'], status: 200, result: 'no-offer-said', message: 'NO <n>' },
+      ],
+      all: { count: 3, status: 200, result: 'accepted' },
+    };
+    const entries = C.offerOptionCoverageOf([{ code: 'OPT_<o>', run: { id: UUID, completed_at: '2026-10-26 20:22:07' }, report }]);
+    const data = C.withOfferOptions({ ...byCapability, capabilities: [...byCapability.capabilities,
+      { id: 'offers.requestOptions', group: 'Offers', label: 'Optional parameters of the offer request', result: 'points', tests: [], provenBy: { count: 0 }, sideProblems: [], points: [] }] }, entries);
+
+    test('the page\'s words are the server\'s', () => {
+      const lines = read(page).split('\n');
+      const start = lines.findIndex((l) => l.startsWith('var OFFER_OPTION_RESULTS = {'));
+      const end = lines.findIndex((l, i) => i > start && l === '};');
+      const pageWords = vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n').replace('var OFFER_OPTION_RESULTS = ', '').replace(/;$/, '')})`);
+      expect({ ...pageWords }).toEqual({ ...C.RESULT_TEXT });
+      expect(Object.keys(COMBINATION_WORDS).sort()).toEqual(Object.keys(C.COMBINATION_TEXT).sort());
+      for (const state of Object.keys(COMBINATION_WORDS)) expect(capabilityCombinationText({ state })).toBe(COMBINATION_WORDS[state]);
+    });
+
+    test('each run is folded under its summary: the mandatory request, every parameter, the combinations', () => {
+      const out = capabilityHtml(data);
+      for (const t of ['<e>', '<k>', '<x>', '<c>', '<n>', '<o>']) expect(out.includes(t)).toBe(false);
+      expect(out).toContain('<h4 class="cov-heading">Optional parameters of the offer request (1 run(s))</h4>');
+      expect(out).toContain('<details class="cov-options"><summary><a href="/run-detail.html?id=' + UUID + '">OPT_&#60;o&#62;</a>, 2026-10-26 20:22:07<br><small>'
+        + 'mandatory parameters only: answered · 3 parameter(s): 1 supported, 1 ignored, 1 refused or not implemented'
+        + ' · 2 combination(s): 0 answered, 1 without offer, 1 refused · every supported parameter at once: answered</small></summary>');
+      expect(out).toContain('<div class="cov-note">Mandatory parameters only: answered — 2 offer(s)</div>');
+      expect(out).toContain('<tr><td>offerSearchCriteria.currency</td><td>EUR &#60;e&#62; (declared)</td><td>200</td><td>Supported, kept to</td><td>Declared</td><td>kept &#60;k&#62;</td></tr>');
+      expect(out).toContain('<tr><td>passenger.gender</td><td></td><td>200</td><td>Ignored, not said</td><td>Declared not supported</td><td>silent</td></tr>');
+      expect(out).toContain('<tr><td>embed&#60;x&#62;</td><td></td><td>501</td><td>Not implemented</td><td>Not declared</td><td></td></tr>');
+      expect(out).toContain('<li>offerSearchCriteria.currency + embed&#60;x&#62;: Refused (a point) (HTTP 400) — COMBO &#60;c&#62;</li>');
+      expect(out).toContain('<li>offerSearchCriteria.currency + passenger.gender: No offer (HTTP 200) — NO &#60;n&#62;</li>');
+      expect(out).toContain('<li>Every supported parameter at once (3): Answered (HTTP 200)</li>');
+      // Between the expected refusals and the points, and the latest run's summary under the capability.
+      expect(out.indexOf('Expected refusals')).toBeLessThan(out.indexOf('Optional parameters of the offer request ('));
+      expect(out.indexOf('Optional parameters of the offer request (')).toBeLessThan(out.indexOf('Points to look at'));
+      expect(out).toContain('<td>Optional parameters of the offer request</td><td>No test<br><small>mandatory parameters only: answered · 3 parameter(s)');
+      expect([capabilityOptionsHtml([]), capabilityOptionsHtml(null), capabilityHtml(byCapability).includes('cov-options')]).toEqual(['', '', false]);
+      const bare = capabilityOptionsHtml([{ code: 'B', runId: 'nope', text: 't', parameters: [], combinations: [] }]);
+      expect(bare).toContain('<summary>B<br><small>t</small></summary><div class="cov-note">Mandatory parameters only: not in the report</div></details>');
+    });
+
+    test('the Markdown has the same, one table per run', () => {
+      const md = coverageMarkdown({ ...answer, byCapability: data }, 'G');
+      expect(md).toContain('\n## Optional parameters of the offer request\n\n### OPT_\\<o>, 2026-10-26 20:22:07\n\nmandatory parameters only: answered · 3 parameter(s)');
+      expect(md).toContain('\nMandatory parameters only: answered — 2 offer(s)\n\n| Parameter | Value sent | HTTP | Result | Test Framework | Detail |\n|---|---|---|---|---|---|\n');
+      expect(md).toContain('| offerSearchCriteria.currency | EUR \\<e> (declared) | 200 | Supported, kept to | Declared | kept \\<k> |');
+      expect(md).toContain('\n\n- offerSearchCriteria.currency + embed\\<x>: Refused (a point) (HTTP 400) — COMBO \\<c>\n');
+      expect(md).toContain('- Every supported parameter at once (3): Answered (HTTP 200)');
+      expect(md).toContain('| Optional parameters of the offer request | No test · mandatory parameters only: answered · 3 parameter(s)');
+      expect(md.indexOf('## Expected refusals')).toBeLessThan(md.indexOf('## Optional parameters of the offer request'));
+      expect(md.indexOf('## Optional parameters of the offer request')).toBeLessThan(md.indexOf('## Points to look at'));
+      expect(md).not.toContain('\n\n\n');
+    });
   });
 
   test('a known deviation is one line; a point of a report published before #990 has no "Seen"', () => {

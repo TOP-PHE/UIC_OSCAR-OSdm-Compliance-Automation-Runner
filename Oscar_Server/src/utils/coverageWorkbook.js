@@ -11,7 +11,9 @@
  * coverageWorkbook.js — the Test Framework coverage as an Excel workbook
  * (#956, part 3). Pure. Seven sheets: Summary, then the coverage by
  * capability (#972 part 3: Capabilities, Expected refusals, Points to look
- * at), then the detail: By flow and element, By scenario, By function.
+ * at, and Offer request parameters when a run of the options scenario holds
+ * a report, #995), then the detail: By flow and element, By scenario, By
+ * function.
  * `report` is the answer of GET /v1/company/coverage.
  */
 
@@ -135,6 +137,46 @@ function pointsSheet(report) {
   };
 }
 
+// #995: the offer request options' results, one row per request, when a run
+// of the options scenario holds a report.
+const COMBINATION_WORDS = Object.freeze({ answered: 'Answered', 'no-offer': 'No offer', refused: 'Refused (a point)', 'not-sent': 'Not sent' });
+const OPTION_DECLARED = (d) => {
+  if (d === true) return 'Declared';
+  if (d === false) return 'Declared not supported';
+  return 'Not declared';
+};
+const valueSent = (p) => (p.value === undefined || p.value === null ? '' : String(p.value) + (p.source ? ` (${p.source})` : ''));
+
+function mandatoryRow(e) {
+  if (!e.mandatory) return ['Mandatory parameters only', '', '', null, 'Not in the report', '', ''];
+  return ['Mandatory parameters only', '', '', null, e.mandatory.ok ? 'Answered' : 'NOT answered', '', e.mandatory.message || ''];
+}
+
+function optionRowsOf(e) {
+  const rows = [['Summary', '', '', null, e.text || '', '', ''], mandatoryRow(e)];
+  for (const p of arr(e.parameters)) rows.push(['One parameter', p.option, valueSent(p), p.status ?? null, p.resultText || p.result || '', OPTION_DECLARED(p.declared), p.message || '']);
+  for (const c of arr(e.combinations)) rows.push(['Combination', arr(c.options).join(' + '), '', c.status ?? null, COMBINATION_WORDS[c.state] || c.state || '', '', c.message || '']);
+  if (e.all) {
+    rows.push(['Every supported parameter at once', e.all.count == null ? '' : String(e.all.count), '', e.all.status ?? null,
+      COMBINATION_WORDS[e.all.state] || e.all.state || '', '', e.all.message || '']);
+  }
+  return rows.map((r) => [e.code, e.runId || '', e.at || '', ...r]);
+}
+
+function optionsSheet(report) {
+  const entries = arr(report.byCapability?.offerOptions);
+  if (entries.length === 0) return null;
+  return {
+    name: 'Offer request parameters',
+    columns: [
+      { title: 'Scenario', width: 36 }, { title: 'Run id', width: 38 }, { title: 'Date', width: 20 }, { title: 'Request', width: 30 },
+      { title: 'Parameter(s)', width: 50 }, { title: 'Value sent', width: 30 }, { title: 'HTTP', width: 8 }, { title: 'Result', width: 34 },
+      { title: 'Test Framework', width: 22 }, { title: 'Detail', width: 70 },
+    ],
+    rows: entries.flatMap(optionRowsOf),
+  };
+}
+
 function matrixSheet(report) {
   return {
     name: 'By flow and element',
@@ -217,9 +259,9 @@ function comparisonSheet(comparison) {
 function coverageWorkbook(report, { title = '', generatedAt = '', comparison = null } = {}) {
   return workbook([
     summarySheet(report, { title, generatedAt }), ...(comparison ? [comparisonSheet(comparison)] : []),
-    capabilitiesSheet(report), refusalsSheet(report), pointsSheet(report),
+    capabilitiesSheet(report), refusalsSheet(report), pointsSheet(report), ...[optionsSheet(report)].filter(Boolean),
     matrixSheet(report), scenarioSheet(report), functionSheet(report),
   ]);
 }
 
-module.exports = { coverageWorkbook, DECLARATION_TEXT, KIND_TEXT, CHANGE_TEXT };
+module.exports = { coverageWorkbook, DECLARATION_TEXT, KIND_TEXT, CHANGE_TEXT, COMBINATION_WORDS };

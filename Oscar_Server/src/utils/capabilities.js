@@ -337,6 +337,6 @@ const roleOf = (stepName) => STEP_ROLES[stepName] || null;
 const isOptionalRead = (stepName) => OPTIONAL_READS.has(stepName);
 
 module.exports = {
-  CAPABILITIES, CAPABILITY, GROUPS, STEP_ROLES, STAGE_ROLES, STAGE_GOAL, SYSTEM_INFO_STEPS, OPTIONAL_READS, SALE_GOAL, OFFER_GOAL,
+  CAPABILITIES, CAPABILITY, GROUPS, STEP_ROLES, STAGE_ROLES, STAGE_GOAL, SYSTEM_INFO_STEPS, OPTIONAL_READS, SALE_GOAL, OFFER_GOAL, armed,
   derivedCapability, traitsOf, stepCapabilities, isRefusalTest, isFareScenario, roleOf, isOptionalRead, refundCapability,
 };

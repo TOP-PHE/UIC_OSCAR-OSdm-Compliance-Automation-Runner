@@ -2172,6 +2172,8 @@ function capabilityTestedHtml(row) {
   var tests = (row.tests || []).map(capabilityTestHtml).join('');
   var side = (row.sideProblems || []).map(function(s) { return '<li>' + escHtml(s.code + ': ' + capabilityResultLabel(s.result)) + '</li>'; }).join('');
   var out = escHtml(capabilityTestedText(row));
+  // #995: the latest run's offer request options, in one line.
+  if (row.parameters) out += '<br><small>' + escHtml(row.parameters) + '</small>';
   if (tests) out += '<details><summary>Tests</summary><ul class="cov-list">' + tests + '</ul></details>';
   if (side) out += '<details><summary>Problems on the way</summary><ul class="cov-list">' + side + '</ul></details>';
   return out;
@@ -2207,6 +2209,77 @@ function capabilityRefusalsHtml(list, points) {
         + '<td><ul class="cov-list">' + (r.forms || []).map(capabilityFormHtml).join('') + '</ul></td>'
         + '<td>' + capabilityPointLinks(r.points) + '</td></tr>' + capabilityPointRows(r.points, points, 5);
     }).join('') + '</tbody></table>';
+}
+
+// #995: the offer request options' results, each stated in words. A point is
+// raised only for the mandatory request not answered, a declared parameter not
+// taken or a refused combination; everything else is stated here.
+function capabilityDeclaredText(declared) {
+  if (declared === true) return 'Declared';
+  if (declared === false) return 'Declared not supported';
+  return 'Not declared';
+}
+
+function capabilityCombinationText(c) {
+  var words = { answered: 'Answered', 'no-offer': 'No offer', refused: 'Refused (a point)', 'not-sent': 'Not sent' };
+  var head = Object.hasOwn(words, c.state) ? words[c.state] : String(c.state || '');
+  return head + (c.status ? ' (HTTP ' + c.status + ')' : '') + (c.message ? ' — ' + c.message : '');
+}
+
+// The combinations and every parameter at once, one text each.
+function capabilityCombinationLines(e) {
+  var lines = (e.combinations || []).map(function(c) { return (c.options || []).join(' + ') + ': ' + capabilityCombinationText(c); });
+  if (e.all) lines.push('Every supported parameter at once' + (Number.isInteger(e.all.count) ? ' (' + e.all.count + ')' : '') + ': ' + capabilityCombinationText(e.all));
+  return lines;
+}
+
+function capabilityMandatoryText(e) {
+  if (!e.mandatory) return 'Mandatory parameters only: not in the report';
+  return 'Mandatory parameters only: ' + (e.mandatory.ok ? 'answered' : 'NOT answered') + (e.mandatory.message ? ' — ' + e.mandatory.message : '');
+}
+
+function capabilityParameterCells(p) {
+  var value = p.value === undefined || p.value === null ? '' : String(p.value) + (p.source ? ' (' + p.source + ')' : '');
+  return [p.option, value, Number.isInteger(p.status) ? String(p.status) : '-', p.resultText || p.result || '', capabilityDeclaredText(p.declared), p.message || ''];
+}
+
+function capabilityOptionsRunHtml(e) {
+  var rows = (e.parameters || []).map(function(p) {
+    return '<tr>' + capabilityParameterCells(p).map(function(c) { return '<td>' + escHtml(c) + '</td>'; }).join('') + '</tr>';
+  }).join('');
+  var lines = capabilityCombinationLines(e);
+  return '<details class="cov-options"><summary>' + capabilityRunLink(e.code, e.runId) + escHtml(e.at ? ', ' + e.at : '')
+    + (e.text ? '<br><small>' + escHtml(e.text) + '</small>' : '') + '</summary>'
+    + '<div class="cov-note">' + escHtml(capabilityMandatoryText(e)) + '</div>'
+    + (rows ? '<table class="cap-table"><thead><tr><th>Parameter</th><th>Value sent</th><th>HTTP</th><th>Result</th><th>Test Framework</th><th>Detail</th></tr></thead><tbody>' + rows + '</tbody></table>' : '')
+    + (lines.length ? '<div class="cov-note">Combinations of the parameters found supported:</div><ul class="cov-list">'
+      + lines.map(function(l) { return '<li>' + escHtml(l) + '</li>'; }).join('') + '</ul>' : '')
+    + '</details>';
+}
+
+function capabilityOptionsHtml(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<h4 class="cov-heading">Optional parameters of the offer request (' + list.length + ' run(s))</h4>'
+    + '<div class="cov-note">' + escHtml('The latest run of each test form: the request with the mandatory parameters only, each optional parameter alone, '
+      + 'combinations of those found supported, and all of them at once. A point is raised only when the mandatory request is not answered, '
+      + 'a declared parameter is not taken, or a combination is refused; everything else is stated here.') + '</div>'
+    + list.map(capabilityOptionsRunHtml).join('');
+}
+
+function capabilityOptionsMarkdown(list) {
+  if (!Array.isArray(list) || list.length === 0) return [];
+  var lines = ['', '## Optional parameters of the offer request'];
+  for (const e of list) {
+    lines.push('', '### ' + mdCell(e.code + (e.at ? ', ' + e.at : '')), '', mdCell(e.text || ''), '', mdCell(capabilityMandatoryText(e)));
+    if ((e.parameters || []).length) {
+      lines.push('', '| Parameter | Value sent | HTTP | Result | Test Framework | Detail |', '|---|---|---|---|---|---|');
+      for (const p of e.parameters) lines.push('| ' + capabilityParameterCells(p).map(mdCell).join(' | ') + ' |');
+    }
+    var combos = capabilityCombinationLines(e);
+    if (combos.length) lines.push('');
+    for (const l of combos) lines.push('- ' + mdCell(l));
+  }
+  return lines;
 }
 
 function capabilityFindingText(f, possible) {
@@ -2308,7 +2381,8 @@ function capabilityHtml(c) {
   var data = c || {};
   return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
     + capabilityRowsHtml(data.capabilities, data.points) + '</tbody></table>'
-    + capabilityRefusalsHtml(data.expectedRefusals, data.points) + capabilityPointsHtml(data.points) + capabilityAsideHtml(data);
+    + capabilityRefusalsHtml(data.expectedRefusals, data.points) + capabilityOptionsHtml(data.offerOptions)
+    + capabilityPointsHtml(data.points) + capabilityAsideHtml(data);
 }
 
 function coverageViewHtml(data, view) {
@@ -2353,7 +2427,8 @@ function capabilityRowsMarkdown(rows) {
       group = c.group;
       lines.push('', '### ' + mdCell(group), '', '| Capability | Tested | Result | Points |', '|---|---|---|---|');
     }
-    lines.push('| ' + [capabilityLabelText(c), capabilityTestedText(c), capabilityResultLabel(c.result), capabilityPointNumbers(c.points)].map(mdCell).join(' | ') + ' |');
+    var tested = capabilityTestedText(c) + (c.parameters ? ' · ' + c.parameters : '');
+    lines.push('| ' + [capabilityLabelText(c), tested, capabilityResultLabel(c.result), capabilityPointNumbers(c.points)].map(mdCell).join(' | ') + ' |');
   }
   return lines;
 }
@@ -2397,7 +2472,7 @@ function capabilityMarkdown(c, days) {
   var data = c || {};
   return ['## By capability', '', mdCell(capabilitySummaryText(data.summary, days))]
     .concat(capabilityRowsMarkdown(data.capabilities), capabilityRefusalsMarkdown(data.expectedRefusals),
-      capabilityPointsMarkdown(data.points), capabilityAsideMarkdown(data));
+      capabilityOptionsMarkdown(data.offerOptions), capabilityPointsMarkdown(data.points), capabilityAsideMarkdown(data));
 }
 
 function coverageMatrixMarkdown(data) {

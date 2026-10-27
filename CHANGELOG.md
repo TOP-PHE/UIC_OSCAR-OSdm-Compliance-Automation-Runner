@@ -93,6 +93,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.416] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #995, release 2026.451. The offer request options' results are stated in the coverage by capability, and a refused combination of parameters is a point.
+
+### Added
+- **Coverage by capability: *Optional parameters of the offer request*.** The options scenario (#227) sends the offer request with the mandatory parameters only, each optional parameter alone, combinations of those found supported, and all of them at once. Only its failed checks reached the coverage, so a reader could not tell whether the other parameters worked, nor whether the combinations did.
+  - Each result is now stated, from the latest run of each form. That covers the mandatory request, each parameter (in the words of the Report Builder's *Offer Request Options* card, with what the Test Framework declares), each combination and all of them at once.
+  - The capability's row carries the latest run's summary in one line, for example "mandatory parameters only: answered · 14 parameter(s): 9 supported, 3 ignored, 1 refused or not implemented, 1 not tested · 3 combination(s): 2 answered, 0 without offer, 1 refused".
+  - Each run is folded under its own line. The Markdown has a section, and the workbook a sheet *Offer request parameters* (only when such a run exists). Published reports carry it.
+  - Read from the runs' logs (`byCapability.offerOptions`, `utils/offerOptionCoverage.js`, `api/helpers/offerOptionReports.js` shared with the Report Builder), in the reader's view of the data file: a tester sees only the scenarios of their view. Runs already stored are shown.
+- **A refused combination is a point** (maintainer, 2026-10-27). The collection fails one check per combination of parameters found supported alone that the provider answers with a 4xx or 5xx, and one for every supported parameter at once: "🧭 Offer request with parameters combined (a + b) — answered, as each was alone" (`refusedCombinations()`).
+  - A combination without offer is only stated: it can be legitimate.
+  - A request that could not be sent is neither.
+  - Undeclared parameters stay information only.
+  - The checks are not blocking (business logic, major).
+
+### Changed
+- The catalogue purpose of `OTST_OFFER_OPTION_DISCOVERY`, the data file schema's description, *What is tested* and the Tester User Guide §6 say what can fail now. The descriptions of the simulator data file's scenarios keep the old sentence: changing them would mark every company following a simulator reference as not up to date.
+
+### Tests
+- `offer-option-coverage.test.js` (new) works on a report the collection writes and the server reads back. It covers the words for every result, combination states, one entry per run, the summary line, the latest run first, the row's summary, and cuts.
+- `coverage-routes.test.js`: the results reach the answer. A scenario without the switch is not read, and a tester sees the shared scenario only.
+- `ui-scripts.test.js`: the section, the row's line, the Markdown, every text escaped, the page's words pinned to the server's.
+- `coverage-matrix.test.js`: the sheet after *Points to look at*, only when needed.
+- `offer-option-discovery.test.js`: a whole run whose combinations are refused fails one check each, plus all at once. Without offer or not sent, nothing fails.
+- 20 deliberate breaks: 19 make a test fail. The 20th removes a guard that changes no result: SQLite answers an empty `IN ()` with no rows.
+- Checked in Chromium on a throwaway server, with a report shaped like a real provider's.
+
+---
+
 ## [server-1.11.414] / [collection-OTST_V2.0.229] — 2026-10-27
 
 Two injected errors of the simulator now fail as they should, release 2026.449 (#991).

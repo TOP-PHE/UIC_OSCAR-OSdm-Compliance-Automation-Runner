@@ -217,6 +217,48 @@ describe('GET /v1/company/coverage', () => {
     }
   });
 
+  test('#995: the offer request options\' results, from the runs\' logs, in the reader\'s view only', async () => {
+    const { reportLines } = require('../../../Bruno_Collection/library-bruno/offerOptions.js');
+    const options = (code) => ({ code, scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1, offerOptionDiscovery: 'on' });
+    const shared = { ...options('SHARED_OPTIONS'), shared: true, created_by: users.TM.email };
+    const own = { ...options('TM_OPTIONS'), created_by: users.TM.email };
+    await writeDatafile({ id: ids.D, slug: `cov-d-${tag}` }, { ...DATAFILE(), scenarios: [...SCENARIOS, shared, own] });
+    const report = (ok) => ({
+      version: '3.8.0', budget: 30, used: 4, seed: 1, mandatory: { ok, message: '2 offer(s)' },
+      options: [{ option: 'offerSearchCriteria.currency', value: 'EUR', source: 'declared', declared: true, status: 200, result: 'honoured', message: 'kept' },
+        { option: 'embed', status: 501, result: 'not-implemented', message: 'HTTP 501' }],
+      combinations: [{ options: ['offerSearchCriteria.currency', 'embed'], status: 400, result: 'refused', message: 'COMBINATION' }],
+      all: null,
+    });
+    const runs = [];
+    // SHARED_SALE does not run the options: lines in its log are not read.
+    for (const [code, at, ok] of [['SHARED_OPTIONS', '2026-10-25 08:00:00', true], ['TM_OPTIONS', '2026-10-26 08:00:00', false], ['SHARED_SALE', '2026-10-27 08:00:00', true]]) {
+      const id = addRun(ids.D, code, 'COMPLETED', 0, { at });
+      runs.push(id);
+      for (const line of reportLines(report(ok))) {
+        run("INSERT INTO run_events (run_id, level, category, message) VALUES (?, 'info', 'offer_options', ?)", [id, colEncrypt(line)]);
+      }
+    }
+    try {
+      const tm = (await request(app).get('/v1/company/coverage').set(as('TM'))).body.byCapability;
+      expect(tm.offerOptions.map((e) => [e.code, e.mandatory.ok])).toEqual([['TM_OPTIONS', false], ['SHARED_OPTIONS', true]]);
+      expect(tm.offerOptions[1]).toMatchObject({ runId: runs[0], at: '2026-10-25 08:00:00', version: '3.8.0',
+        text: 'mandatory parameters only: answered · 2 parameter(s): 1 supported, 1 refused or not implemented · 1 combination(s): 0 answered, 0 without offer, 1 refused' });
+      expect(tm.offerOptions[1].parameters.map((p) => [p.option, p.resultText, p.declared])).toEqual([
+        ['offerSearchCriteria.currency', 'Supported, kept to', true], ['embed', 'Not implemented', undefined]]);
+      // The latest run's summary is on the capability's row.
+      expect(tm.capabilities.find((c) => c.id === 'offers.requestOptions').parameters).toBe(tm.offerOptions[0].text);
+      // A tester sees the shared scenario's run only.
+      const ana = (await request(app).get('/v1/company/coverage').set(as('ANA'))).body.byCapability;
+      expect(ana.offerOptions.map((e) => e.code)).toEqual(['SHARED_OPTIONS']);
+      expect(ana.capabilities.find((c) => c.id === 'offers.requestOptions').parameters).toBe(ana.offerOptions[0].text);
+      expect(require('../../src/api/helpers/offerOptionReports').offerOptionReportsOf([])).toEqual([]);
+    } finally {
+      for (const id of runs) run('DELETE FROM runs WHERE id = ?', [id]);
+      await writeDatafile({ id: ids.D, slug: `cov-d-${tag}` }, DATAFILE());
+    }
+  });
+
   test('the workbook is the same report, for members only', async () => {
     const res = await request(app).get('/v1/company/coverage/download?days=30').set(as('TM'))
       .buffer(true).parse((r, done) => { const parts = []; r.on('data', (c) => parts.push(c)); r.on('end', () => done(null, Buffer.concat(parts))); });

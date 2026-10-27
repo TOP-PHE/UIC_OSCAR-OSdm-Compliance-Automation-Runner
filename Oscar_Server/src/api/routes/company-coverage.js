@@ -39,6 +39,9 @@ const { currentCollectionVersion } = require('../../utils/versionInfo');
 const { coverageOf, latestRunsOf, failureOf } = require('../../utils/frameworkCoverage');
 const { coverageMatrixOf } = require('../../utils/coverageMatrix');
 const { capabilityCoverageOf } = require('../../utils/capabilityCoverage');
+const { armed } = require('../../utils/capabilities');
+const { offerOptionCoverageOf, withOfferOptions } = require('../../utils/offerOptionCoverage');
+const { offerOptionReportsOf } = require('../helpers/offerOptionReports');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const { problemOf } = require('../../utils/findingSuggestions');
 const { toApiFinding } = require('../helpers/findings');
@@ -198,6 +201,18 @@ function suggestionsOf(companyId) {
 
 // The catalogue's entries (#972: each names its capability). A catalogue that
 // cannot be read leaves every scenario to derivedCapability().
+// #995: the offer request options' results of the latest run of each
+// scenario that runs them (`offerOptionDiscovery`), in the reader's view of
+// the data file, from the runs' logs.
+function offerOptionsOf(datafile, runs) {
+  const codes = (Array.isArray(datafile?.scenarios) ? datafile.scenarios : [])
+    .filter((s) => s && typeof s.code === 'string' && armed(s.offerOptionDiscovery) && runs[s.code])
+    .map((s) => s.code);
+  const byRun = new Map(codes.map((code) => [runs[code].id, { code, run: runs[code] }]));
+  if (byRun.size === 0) return [];
+  return offerOptionCoverageOf(offerOptionReportsOf([...byRun.keys()]).map((r) => ({ ...byRun.get(r.run_id), report: r.report })));
+}
+
 function catalogueEntries() {
   try {
     const entries = readCatalogue().catalogue?.entries;
@@ -248,9 +263,9 @@ async function buildCoverage(companyId, days, user) {
   };
   const coverage = coverageOf(input);
   const { matrix, scenarios } = coverageMatrixOf({ ...input, refusals: warnings });
-  const byCapability = capabilityCoverageOf({
+  const byCapability = withOfferOptions(capabilityCoverageOf({
     ...input, functions: coverage.functions, warnings, findings: allFindings.map(toApiFinding), suggestions: suggestionsOf(companyId),
-  });
+  }), offerOptionsOf(input.datafile, runs));
   return { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios, byCapability };
 }
 

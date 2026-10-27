@@ -1442,6 +1442,27 @@ results:
 apart: refused as expected, not refused, or not run. They never change the
 result of the capability they probe.
 
+**Optional parameters of the offer request.** When the offer request options
+scenario (`OTST_OFFER_OPTION_DISCOVERY`) has run, the report states each of
+its results, from the latest run of each form:
+
+- the request with the mandatory parameters only: answered or not;
+- each optional parameter sent alone: supported, ignored, refused, no offer,
+  not tested…, and whether the Test Framework declares it;
+- each combination of parameters found supported, and all of them at once:
+  answered, no offer or refused.
+
+The capability's row gives the latest run's counts in one line; each run is
+folded under its own line. A point is raised only for:
+
+- the mandatory request not answered;
+- a declared parameter the provider does not take;
+- a refused combination (an error status for parameters that each worked
+  alone).
+
+A combination without offer is only stated, since it can be legitimate. The
+Markdown and the workbook (sheet *Offer request parameters*) hold the same.
+
 **Points to look at.** Each distinct problem appears once, with a number,
 however many forms, runs and steps showed it. In the tables, click a point's
 number to open that point under its row, and click it again to close it. The same check failing at

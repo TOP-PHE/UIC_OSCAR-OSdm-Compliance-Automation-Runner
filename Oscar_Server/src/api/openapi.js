@@ -545,7 +545,7 @@ module.exports = {
     '/v1/company/coverage/download': {
       get: { tags: ['Company'], summary: 'The Test Framework coverage as an Excel workbook (#956 part 3)', security: [{ bearerAuth: [] }],
         parameters: [{ name: 'days', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 3650, default: 365 }, description: 'Runs queued within this many days are read' }],
-        description: 'The same report as GET /v1/company/coverage, as an .xlsx file: sheets Summary, Capabilities, Expected refusals, Points to look at, By flow and element, By scenario, By function (#972). Every text is an inline string (never a formula).',
+        description: 'The same report as GET /v1/company/coverage, as an .xlsx file: sheets Summary, Capabilities, Expected refusals, Points to look at, Offer request parameters (only when a run of the offer request options scenario holds a report, #995), By flow and element, By scenario, By function (#972). Every text is an inline string (never a formula).',
         responses: { 200: { description: 'The workbook' }, 400: { description: 'days is not a whole number from 1 to 3650' }, 403: { description: 'Administrators and certifiers have no access' }, 409: { description: 'The data file cannot be read' } } },
     },
     '/v1/company/coverage/reports': {

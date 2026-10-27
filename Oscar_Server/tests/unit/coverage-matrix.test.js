@@ -189,4 +189,29 @@ describe('the Excel workbook', () => {
     expect(points).toContain('run-A');
     expect(points).not.toContain('<f>');
   });
+
+  test('#995: an Offer request parameters sheet after the points, only when a run of the options scenario holds a report', () => {
+    const C = require('../../src/utils/offerOptionCoverage');
+    const names = (buf) => [...readZipEntry(buf, 'xl/workbook.xml').toString().matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]);
+    const report = {
+      mandatory: { ok: false, message: 'HTTP 400 <m>' },
+      options: [{ option: 'offerSearchCriteria.currency', value: 'EUR', source: 'declared', declared: true, status: 200, result: 'honoured', message: 'kept' },
+        { option: 'embed', status: 501, result: 'not-implemented' }],
+      combinations: [{ options: ['offerSearchCriteria.currency', 'embed'], status: 400, result: 'refused', message: 'COMBO <c>' }],
+      all: { count: 2, status: 200, result: 'no-offer-said' },
+    };
+    const entries = C.offerOptionCoverageOf([{ code: 'OPT', run: { id: 'r1', completed_at: '2026-10-26 08:00:00' }, report }]);
+    const byCapability = C.withOfferOptions({ capabilities: [], expectedRefusals: [], points: [] }, entries);
+    const buf = coverageWorkbook({ days: 30, summary: {}, byCapability }, {});
+    expect(names(buf)).toEqual(['Summary', 'Capabilities', 'Expected refusals', 'Points to look at', 'Offer request parameters',
+      'By flow and element', 'By scenario', 'By function']);
+    const xml = sheet(buf, 5);
+    for (const text of ['Request', 'Parameter(s)', 'Test Framework', entries[0].text, 'NOT answered', 'HTTP 400 &lt;m&gt;', 'One parameter',
+      'Supported, kept to', 'Declared', 'Not implemented', 'Not declared', 'Combination', 'offerSearchCriteria.currency + embed',
+      'Refused (a point)', 'COMBO &lt;c&gt;', 'Every supported parameter at once', 'No offer']) {
+      expect(xml).toContain(text);
+    }
+    expect(xml.match(/<row /g)).toHaveLength(1 + 6);
+    expect(names(coverageWorkbook({ days: 30, summary: {}, byCapability: { capabilities: [] } }, {}))).not.toContain('Offer request parameters');
+  });
 });

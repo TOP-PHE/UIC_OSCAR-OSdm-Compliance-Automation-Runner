@@ -18,7 +18,9 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   3. random combinations of the options found supported (seeded, so a run
  *      can be replayed);
  *   4. every supported option at once.
- * Only phase 1 can fail; the others are reported.
+ * Phase 1 can fail, and so can an option the Test Framework declares that the
+ * provider does not take (#227 part 2) and a combination of options found
+ * supported that the provider refuses (#995); everything else is reported.
  *
  * Each answer is read at two levels: the HTTP status (2xx supported, 4xx
  * refused, 501 not implemented, other error), then, for a 2xx, its content:
@@ -588,6 +590,30 @@ const NOT_TAKEN_WORDS = Object.freeze({
 });
 
 /**
+ * #995: the combinations the provider refused (4xx or 5xx), every supported
+ * option at once included. Each option of a combination was found supported
+ * alone, so a refusal is a point; no offer is only stated (it can be
+ * legitimate), and a request that could not be sent (status 0) is neither.
+ * -> [{ title, options, status, result, message }]
+ */
+function refusedCombinations(report) {
+  const refused = (c) => Number.isInteger(c?.status) && c.status >= 400 && c.status <= 599;
+  const optionsOf = (c) => (Array.isArray(c?.options) ? c.options : []);
+  const rows = (Array.isArray(report?.combinations) ? report.combinations : []).filter(refused)
+    .map((c) => ({ ...c, options: optionsOf(c), title: `🧭 Offer request with parameters combined (${optionsOf(c).join(' + ')}) — answered, as each was alone` }));
+  if (refused(report?.all)) {
+    rows.push({ ...report.all, options: optionsOf(report.all), title: '🧭 Offer request with every supported parameter at once — answered, as each was alone' });
+  }
+  return rows;
+}
+
+/** The failure text of a refused combination. */
+function refusedCombinationText(c) {
+  const words = NOT_TAKEN_WORDS[c.result] || String(c.result);
+  return `${words} (HTTP ${c.status}): ${c.message || 'no detail'}. Each of ${c.options.join(', ')} was answered alone; together they are refused.`;
+}
+
+/**
  * The failure text of a declared option the provider does not take: what it
  * got in words, the status, the detail. A detail that already says it in those
  * words ("no offer, and nothing says why …") is not preceded by them again.
@@ -726,6 +752,10 @@ async function runOptionDiscovery(status, body) {
       throw new Error(notTakenText(row));
     });
   }
+  // #995: options each taken alone, refused together.
+  for (const c of refusedCombinations(report)) {
+    test(c.title, () => { throw new Error(refusedCombinationText(c)); });
+  }
   if (undeclared.length > 0) {
     validationLogger(`[INFO] 🧭 Taken by the provider but declared as not supported in the Test Framework: ${undeclared.map((r) => r.option).join(', ')}. The Test Framework could declare them.`);
   }
@@ -739,6 +769,8 @@ module.exports = {
   compareWithDeclarations,
   notTakenText,
   NOT_TAKEN_WORDS,
+  refusedCombinations,
+  refusedCombinationText,
   prepareOptionDiscovery,
   runOptionDiscovery,
   OPTIONS,
