@@ -67,10 +67,10 @@ function parseLoadavg(text) {
 
 /** The "cpu" line of /proc/stat → seconds per mode, all CPUs together. */
 function parseCpuSeconds(text) {
-  const match = /^cpu +(.*)$/m.exec(String(text));
-  const ticks = match && leadingNumbers(match[1], 4);
-  if (!ticks) return null;
-  const all = match[1].trim().split(/\s+/).map(Number);
+  const line = String(text).split('\n').find((l) => l.startsWith('cpu '));
+  const rest = line ? line.slice(4) : '';
+  if (!leadingNumbers(rest, 4)) return null;
+  const all = rest.trim().split(/\s+/).map(Number);
   return Object.fromEntries(CPU_MODES
     .map((mode, i) => [mode, all[i]])
     .filter(([, value]) => Number.isFinite(value))
