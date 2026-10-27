@@ -93,6 +93,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.411] / [collection-OTST_V2.0.226] — 2026-10-27
+
+Issue #984, release 2026.446. In the coverage by capability, a point number opens that point under its row instead of jumping to the long list at the end.
+
+### Changed
+- **Report Builder, coverage by capability.** A point number (`#1`, `#2`…) in the capability table or the expected refusals table opens that point in a row right under the row clicked. A second click closes it. This works for the live coverage and for a published report.
+  - Before, the number jumped to *Points to look at* at the end of the report: with 20 or more points nothing marked the one asked for, and the capability was out of sight.
+  - The rows are drawn hidden with the table (`capabilityPointRows()`); `toggleCoveragePoint()` listens on the live coverage and on the published report.
+  - The list at the end stays, and the number keeps its link to it, for a page that cannot run its script or a middle-click. A point keeps its anchor id there only, so no id appears twice.
+  - Page only, no route changed.
+- Tester User Guide §6: how to open a point.
+
+### Tests
+- `ui-scripts.test.js`:
+  - each row is followed by its points, hidden, without the list's id, in both tables;
+  - the click opens the point of that number among several and closes it, sets `aria-expanded` and keeps the page in place;
+  - a number with no row under it is left to its link;
+  - both views listen.
+- Ten deliberate breaks each make a test fail.
+- **Checked in Chromium** on a throwaway server, with 21 points:
+  - `#1` opens under its row and the page does not move;
+  - a second click closes it;
+  - `#10` opens the right one of the sale row's 17;
+  - a published report's expected refusal opens the same way.
+
+---
+
 ## [server-1.11.410] / [collection-OTST_V2.0.226] — 2026-10-27
 
 Coverage: a run's blocking failure read right, release 2026.445 (#988).

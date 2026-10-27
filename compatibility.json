@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.445",
+  "current_release": "2026.446",
   "releases": [
+    {
+      "release": "2026.446",
+      "date": "2026-10-27",
+      "server": "1.11.411",
+      "collection": "OTST_V2.0.226",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#984: in the coverage by capability, a point number opens that point under the row clicked, and a second click closes it, for the live coverage and for a published report; before, it jumped to the long list at the end."
+      ]
+    },
     {
       "release": "2026.445",
       "date": "2026-10-27",

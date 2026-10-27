@@ -1443,7 +1443,8 @@ apart: refused as expected, not refused, or not run. They never change the
 result of the capability they probe.
 
 **Points to look at.** Each distinct problem appears once, with a number,
-however many forms, runs and steps showed it. The same check failing at
+however many forms, runs and steps showed it. In the tables, click a point's
+number to open that point under its row, and click it again to close it. The same check failing at
 several steps of a test is one point that lists those steps. Each point
 shows:
 

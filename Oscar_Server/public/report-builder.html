@@ -188,6 +188,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .cov-subheading{margin:10px 0 4px;font-size:13px;color:#37474f}
 .cov-points-list{margin:0;padding-left:0;list-style:none;font-size:12px;overflow-wrap:anywhere}
 .cov-points-list>li{padding:6px 0;border-bottom:1px solid #eceff1}
+.cov-point-detail td{background:#fffde7;padding:2px 12px 6px 24px}
+.cov-point-detail .cov-points-list>li{border-bottom:0}
+a[data-cov-point][aria-expanded="true"]{font-weight:700}
 .cap-table{width:100%;border-collapse:collapse;font-size:13px}
 .cap-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
 .cap-table td{padding:8px 12px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
@@ -2097,7 +2100,34 @@ function capabilitySummaryText(summary, days) {
 function capabilityPointLinks(numbers) {
   var list = (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && n > 0; });
   if (list.length === 0) return '-';
-  return list.map(function(n) { return '<a href="#cov-point-' + n + '">#' + n + '</a>'; }).join(', ');
+  return list.map(function(n) { return '<a href="#cov-point-' + n + '" data-cov-point="' + n + '" aria-expanded="false">#' + n + '</a>'; }).join(', ');
+}
+
+// The points a row names, each in a row of its own under it, hidden until
+// its number is clicked (#984).
+function capabilityPointRows(numbers, points, columns) {
+  var byNumber = {};
+  (Array.isArray(points) ? points : []).forEach(function(p) { if (Number.isInteger(p.number)) byNumber[p.number] = p; });
+  return (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && byNumber[n]; }).map(function(n) {
+    return '<tr class="cov-point-detail" data-cov-detail="' + n + '" hidden><td colspan="' + columns + '"><ul class="cov-points-list">'
+      + capabilityPointHtml(byNumber[n], false) + '</ul></td></tr>';
+  }).join('');
+}
+
+// A click on a point number opens that point under its row, a second click
+// closes it. Anything else, or a row drawn without it, is left to the link.
+function toggleCoveragePoint(e) {
+  var link = e.target && typeof e.target.closest === 'function' ? e.target.closest('a[data-cov-point]') : null;
+  if (!link) return;
+  var row = link.closest('tr');
+  var detail = row ? row.nextElementSibling : null;
+  while (detail && detail.classList.contains('cov-point-detail') && detail.dataset.covDetail !== link.dataset.covPoint) {
+    detail = detail.nextElementSibling;
+  }
+  if (!detail || !detail.classList.contains('cov-point-detail')) return;
+  e.preventDefault();
+  detail.hidden = !detail.hidden;
+  link.setAttribute('aria-expanded', String(!detail.hidden));
 }
 
 function capabilityPointNumbers(numbers) {
@@ -2151,7 +2181,7 @@ function capabilityLabelText(row) {
   return row.label + (row.optional ? ' (optional)' : '') + (row.declaration ? ' — ' + coverageDeclarationLabel(row.declaration) : '');
 }
 
-function capabilityRowsHtml(rows) {
+function capabilityRowsHtml(rows, points) {
   var group = null;
   return (rows || []).map(function(c) {
     var head = '';
@@ -2162,11 +2192,11 @@ function capabilityRowsHtml(rows) {
     return head + '<tr><td>' + escHtml(capabilityLabelText(c)) + '</td>'
       + '<td>' + capabilityTestedHtml(c) + '</td>'
       + '<td><span class="cov-state cov-' + escHtml(c.result) + '">' + escHtml(capabilityResultLabel(c.result)) + '</span></td>'
-      + '<td>' + capabilityPointLinks(c.points) + '</td></tr>';
+      + '<td>' + capabilityPointLinks(c.points) + '</td></tr>' + capabilityPointRows(c.points, points, 4);
   }).join('');
 }
 
-function capabilityRefusalsHtml(list) {
+function capabilityRefusalsHtml(list, points) {
   if (!Array.isArray(list) || list.length === 0) return '';
   return '<h4 class="cov-heading">Expected refusals (' + list.length + ')</h4><table class="cap-table"><thead><tr><th>Expected refusal</th>'
     + '<th>Capability probed</th><th>Result</th><th>Forms</th><th>Points</th></tr></thead><tbody>'
@@ -2175,7 +2205,7 @@ function capabilityRefusalsHtml(list) {
         + '<td>' + escHtml(r.capabilityLabel) + '</td>'
         + '<td><span class="cov-state cov-' + escHtml(r.result) + '">' + escHtml(capabilityResultLabel(r.result)) + '</span></td>'
         + '<td><ul class="cov-list">' + (r.forms || []).map(capabilityFormHtml).join('') + '</ul></td>'
-        + '<td>' + capabilityPointLinks(r.points) + '</td></tr>';
+        + '<td>' + capabilityPointLinks(r.points) + '</td></tr>' + capabilityPointRows(r.points, points, 5);
     }).join('') + '</tbody></table>';
 }
 
@@ -2209,11 +2239,12 @@ function capabilityWhereText(p) {
   return 'Seen in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '');
 }
 
-function capabilityPointHtml(p) {
+// A point; `withId` for the list at the end only, which the numbers link to.
+function capabilityPointHtml(p, withId) {
   var n = Number.isInteger(p.number) ? p.number : 0;
   var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
   var runs = (p.runs || []).map(function(r) { return capabilityRunLink(r.code, r.runId); }).join(', ');
-  return '<li id="cov-point-' + n + '"><strong>#' + n + '</strong> ' + escHtml(p.capabilityLabel)
+  return '<li' + (withId ? ' id="cov-point-' + n + '"' : '') + '><strong>#' + n + '</strong> ' + escHtml(p.capabilityLabel)
     + (p.expectedRefusal ? ' <small class="cov-group">(expected refusal)</small>' : '')
     + (p.blocking ? ' <span class="cov-state cov-blocked">Blocking</span>' : '')
     + '<br>' + escHtml(capabilityProblemText(p))
@@ -2230,7 +2261,7 @@ function capabilityPointsHtml(points) {
     var of = list.filter(function(p) { return p.kind === kind; });
     if (of.length === 0) return '';
     return '<h5 class="cov-subheading">' + escHtml(POINT_KINDS[kind]) + ' (' + of.length + ')</h5>'
-      + '<ul class="cov-points-list">' + of.map(capabilityPointHtml).join('') + '</ul>';
+      + '<ul class="cov-points-list">' + of.map(function(p) { return capabilityPointHtml(p, true); }).join('') + '</ul>';
   }).join('');
 }
 
@@ -2254,8 +2285,8 @@ function capabilityAsideHtml(c) {
 function capabilityHtml(c) {
   var data = c || {};
   return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
-    + capabilityRowsHtml(data.capabilities) + '</tbody></table>'
-    + capabilityRefusalsHtml(data.expectedRefusals) + capabilityPointsHtml(data.points) + capabilityAsideHtml(data);
+    + capabilityRowsHtml(data.capabilities, data.points) + '</tbody></table>'
+    + capabilityRefusalsHtml(data.expectedRefusals, data.points) + capabilityPointsHtml(data.points) + capabilityAsideHtml(data);
 }
 
 function coverageViewHtml(data, view) {
@@ -2544,6 +2575,7 @@ if (!isPlatformUser) {
   document.getElementById('coverage-btn').addEventListener('click', function() { loadCoverage().catch(function() {}); });
   document.getElementById('coverage-md-btn').addEventListener('click', exportCoverageMarkdown);
   document.getElementById('coverage-xlsx-btn').addEventListener('click', function() { exportCoverageExcel().catch(function() {}); });
+  document.getElementById('coverage-body').addEventListener('click', toggleCoveragePoint);
   document.getElementById('coverage-view').addEventListener('change', function() {
     if (coverageData) document.getElementById('coverage-body').innerHTML = coverageHtml(coverageData, this.value);
   });
@@ -2658,6 +2690,7 @@ if (canPublish || isCertifier) {
     ? 'A published report is frozen as it was. Sharing it with the certifier also shares its runs; a shared report can be withdrawn. Each report says what changed since the last report shared.'
     : 'The coverage reports companies have shared with you, each frozen as it was published, with what changed since their previous shared report.';
   document.getElementById('published-list').addEventListener('click', onPublishedClick);
+  document.getElementById('published-body').addEventListener('click', toggleCoveragePoint);
   document.getElementById('published-view').addEventListener('change', function() {
     if (publishedShown) document.getElementById('published-body').innerHTML = publishedHtml(publishedShown, this.value);
   });
