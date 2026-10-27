@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-simulator-monitoring",
+    "date": "October 27, 2026",
+    "tag": "Added",
+    "title": "The OSDM simulator in Grafana",
+    "summary": "Administrators can watch the simulator and its host in Grafana, with alerts when it struggles.",
+    "content": "A new Grafana dashboard, OSDM Simulator · Overview, shows whether the simulator answers OSCAR, how fast, and its host's memory, swap, CPU, load and disk. Alerts are sent when it stops answering, swaps, runs out of memory or disk, or refuses OSCAR's requests. It uses the address and key already saved in Admin → OSDM Simulator."
+  },
+  {
     "id": "2026-10-27-fifty-runs",
     "date": "October 27, 2026",
     "tag": "Changed",

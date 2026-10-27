@@ -2965,7 +2965,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the nginx example's `geo $osdm_trusted` sends them to a zone of their own
     (300/s): an empty `limit_req_zone` key is not counted, so each address is
     in one zone only. Checked with a real nginx on a local stub, never with
-    `nginx -t` alone. Watching the simulator's host is #1005.
+    `nginx -t` alone. **The simulator in Grafana (#1005, 1.11.421 /
+    simulator 0.57.0)**: `src/metrics.js` counts requests (provider, method,
+    status, duration; the administration API left out) and 429s, and reads
+    the process and the host's `/proc` at each `GET /admin/api/metrics`.
+    OSCAR relays it at `/metrics?source=simulator` (`services/simulatorMetrics.js`,
+    10 s cache; `utils/simulatorMetricsText.js` writes `osdm_sim_*`, labels a
+    plain word or `other`), so Prometheus (job `osdm-simulator`) holds no key
+    and the simulator opens nothing. Dashboard `osdm-simulator.json`, rules
+    `osdm-simulator-alerts.yml`; `simulator-monitoring-config.test.js` pins
+    their metric names to the relay's: rename on both sides or neither.
+    Checked with promtool and a local Prometheus: a stub serving text needs
+    `fallback_scrape_protocol`, OSCAR's route sends the content type.
   - **Tickets per passenger or per leg are chosen by the trip's stop place**
     (#697, 0.23.0, profile `ticketing`): on `gamma` a trip from
     `urn:uic:stn:0000096` gets one ticket per passenger, one from `0000095`

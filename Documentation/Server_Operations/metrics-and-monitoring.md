@@ -29,7 +29,16 @@ Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
 - Per-container filter (variable dropdown)
 - Log rate timeseries by container
 
-All metrics scraped from OSCAR's `/metrics` at 15s intervals (15-day retention).
+**OSDM Simulator · Overview** (#1005) — the simulator and its host, when
+Admin → OSDM Simulator holds its address and key:
+- Whether it answers OSCAR, its version, request rate and P95 answer time
+- Host memory used, swap used, CPU by mode, load, data disk
+- Requests per second by status and by provider, refusals of its rate limit
+  (429, trusted address or not)
+- Its process: memory, CPU, event-loop delay; offers and bookings it keeps
+
+All metrics scraped from OSCAR's `/metrics` at 15s intervals (15-day retention);
+the simulator's every 30 s, see *The OSDM simulator* below.
 All logs shipped via Promtail from container stdout/stderr (indefinite retention by
 default — adjust in `OSCAR_Deploy/loki/loki-config.yaml` if disk pressure).
 
@@ -74,6 +83,29 @@ Full operational guide: [`OSCAR - Server Admin Guide.md` § 14](OSCAR%20-%20Serv
   email — Grafana auto-creates a matching user (Viewer by default,
   promote to Editor / Admin in the Grafana UI).
 - Prometheus has no public port at all.
+
+### The OSDM simulator (#1005)
+
+The simulator runs on a host of its own and is read **through OSCAR**: the
+job `osdm-simulator` scrapes `http://oscar:3001/metrics?source=simulator`,
+and OSCAR asks the simulator's administration API (`GET /admin/api/metrics`)
+with the address and key saved in Admin → OSDM Simulator, then writes the
+answer in Prometheus's format (`osdm_sim_*`). So Prometheus holds no key,
+nothing new is opened on the simulator's host, and nginx's
+`location = /metrics` 404 covers the path (a query string does not change
+that match). OSCAR reads the simulator at most once every 10 s.
+
+What the simulator reports: requests by provider, method and status and
+their duration (its administration API left out), refusals of its rate
+limit, its process (memory, CPU, event-loop delay), and its host as `/proc`
+shows it: memory, swap, load, CPU time by mode, and the disk of its data
+folder. Never an account, a token or a body.
+
+`oscar_simulator_configured` is 0 while no simulator is set up, and nothing
+fires. Once set up, `oscar_simulator_up` says whether it answered. The rules
+are in `prometheus/alerts/osdm-simulator-alerts.yml`: unreachable (critical),
+swap over 256 MiB, memory over 90 %, P95 over 1 s, 429s to the OSCAR server,
+disk under 10 %, event-loop delay over 200 ms.
 
 ---
 

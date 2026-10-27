@@ -85,7 +85,7 @@ const isKeyDigest = (value) => typeof value === 'string' && SHA256_HEX.test(valu
  * `keySha256`: the hex SHA-256 of the key. `accounts`: the data folder's
  * accounts (accounts.js).
  */
-function createAdmin({ keySha256, accounts, stats = null, now = Date.now }) {
+function createAdmin({ keySha256, accounts, stats = null, metrics = null, now = Date.now }) {
   if (!isKeyDigest(keySha256)) throw new Error('createAdmin needs the SHA-256 of the key, in hex');
   const expected = Buffer.from(keySha256, 'hex');
   const failures = createFailureCounter(FAILURES_PER_ADDRESS, now);
@@ -169,6 +169,12 @@ function createAdmin({ keySha256, accounts, stats = null, now = Date.now }) {
       return 200;
     }
     if (what === 'stats' && more.length === 0 && stats) return statsRoute(req, res);
+    // #1005: the process, the host and the requests, for OSCAR's Prometheus.
+    if (what === 'metrics' && more.length === 0 && metrics) {
+      requireMethod(req, 'GET');
+      sendJson(res, 200, metrics.snapshot());
+      return 200;
+    }
     if (what !== 'accounts') throw notFound();
     try {
       return await accountsRoute(req, res, actor, more);

@@ -1,0 +1,91 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# OSDM simulator alert rules (#1005). The metrics come from the simulator's
+# administration API, relayed by OSCAR (job osdm-simulator); nothing fires
+# while no simulator is set up in Admin → OSDM Simulator.
+#
+# Severity convention as in oscar-alerts.yml: critical = act now, warning =
+# look within the day. A load test is the moment these matter: the simulator's
+# host may give way before OSCAR does.
+
+groups:
+  - name: osdm-simulator
+    interval: 30s
+    rules:
+
+      - alert: SimulatorUnreachable
+        # OSCAR has an address and key, but the simulator does not answer
+        # them: down, its nginx refusing, or the key changed on one side.
+        expr: oscar_simulator_configured == 1 and on() oscar_simulator_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The OSDM simulator does not answer OSCAR"
+          description: "OSCAR could not read the simulator's metrics for 5 minutes. Admin → OSDM Simulator says whether the key is refused; else check the simulator host (`docker compose ps`, `curl -s localhost:3002/healthz`)."
+          runbook: "Documentation/Server_Operations/OSCAR - OSDM Simulator.md#monitoring"
+
+      - alert: SimulatorSwapInUse
+        # The host is short of memory and the kernel pages out: answers slow
+        # down for every run at once.
+        expr: (osdm_sim_host_swap_total_bytes - osdm_sim_host_swap_free_bytes) > 268435456
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Simulator host uses {{ $value | humanize1024 }}B of swap"
+          description: "Over 256 MiB of swap in use for 10 minutes. Fewer parallel runs (Max Concurrent Runs), or more memory for the simulator's host."
+          runbook: "Documentation/Server_Operations/OSCAR - OSDM Simulator.md#monitoring"
+
+      - alert: SimulatorMemoryHigh
+        expr: 1 - osdm_sim_host_memory_available_bytes / osdm_sim_host_memory_total_bytes > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Simulator host memory over 90 % ({{ $value | humanizePercentage }})"
+          description: "Less than 10 % of the simulator host's memory is available. The simulator keeps offers and bookings for an hour (SIM_TTL_SECONDS); a load test fills them."
+          runbook: "Documentation/Server_Operations/OSCAR - OSDM Simulator.md#monitoring"
+
+      - alert: SimulatorSlowAnswers
+        expr: histogram_quantile(0.95, sum by (le) (rate(osdm_sim_request_duration_seconds_bucket[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Simulator answers take over 1 s (p95)"
+          description: "The simulator answers in a few milliseconds when at rest. A p95 over a second means its host is saturated (CPU, swap) or its event loop is blocked."
+          runbook: "Documentation/Server_Operations/OSCAR - OSDM Simulator.md#monitoring"
+
+      - alert: SimulatorRefusingOscar
+        # 429s to a trusted address (the OSCAR server, #1004) mean runs fail
+        # because of the simulator's limit, not because of OSCAR or a provider.
+        expr: increase(osdm_sim_rate_limited_total{trusted="true"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The simulator refuses OSCAR's requests (429)"
+          description: "The OSCAR server's address reached SIM_TRUSTED_REQUESTS_PER_MINUTE or nginx's trusted zone. Runs failing now are the limit's: raise it, or lower Max Concurrent Runs."
+          runbook: "Documentation/Server_Operations/OSCAR - OSDM Simulator.md#monitoring"
+
+      - alert: SimulatorDiskLow
+        expr: osdm_sim_host_disk_free_bytes / osdm_sim_host_disk_total_bytes < 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Simulator data disk under 10 % free"
+          description: "The disk holding the simulator's data folder (accounts, audit, statistics) is nearly full."
+          runbook: "Documentation/Server_Operations/OSCAR - OSDM Simulator.md#monitoring"
+
+      - alert: SimulatorEventLoopLag
+        expr: osdm_sim_event_loop_delay_p99_seconds > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Simulator event loop delayed over 200 ms (p99)"
+          description: "The simulator's Node process is blocked by CPU work. Check the host's CPU and the number of parallel runs."
+          runbook: "Documentation/Server_Operations/OSCAR - OSDM Simulator.md#monitoring"

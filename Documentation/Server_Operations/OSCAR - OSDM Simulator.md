@@ -557,6 +557,35 @@ After a test, `docker compose logs --since 1h | grep -c ' 429 '` counts the
 simulator's refusals; nginx's are in `/var/log/nginx/error.log` ("limiting
 requests").
 
+### Monitoring
+
+Since #1005 (simulator 0.57.0) OSCAR's Grafana has a dashboard *OSDM
+Simulator · Overview*: whether the simulator answers OSCAR, its answer time,
+its requests by status and provider, its rate-limit refusals, and its host's
+memory, swap, CPU, load and disk. Use it during a load test: the simulator's
+host may give way before OSCAR does. The alerts (unreachable, swap in use,
+memory over 90 %, slow answers, 429s to OSCAR, disk nearly full, event loop
+delayed) go to OSCAR's administrators by e-mail like OSCAR's own.
+
+Nothing is installed on this host for it. OSCAR reads `GET
+/admin/api/metrics` with the administration key it already holds (Admin →
+OSDM Simulator), and relays the figures to its Prometheus. So it works once
+the administration API is set up (section 7, *Accounts while it runs*)
+and the simulator is at 0.57.0 or later. The host's
+figures come from `/proc`, which the container reads as the host's: memory,
+swap, load and CPU time are the host's own, the disk is that of the data
+folder.
+
+To see the figures by hand, from the OSCAR server (the key never goes
+anywhere else):
+
+```bash
+docker exec oscar node -e "fetch('http://localhost:3001/metrics?source=simulator').then(r=>r.text()).then(console.log)"
+```
+
+`oscar_simulator_up 0` with `oscar_simulator_configured 1`: OSCAR could not
+read the simulator. Admin → OSDM Simulator says whether the key is refused.
+
 ## 8. When something does not work
 
 | What you see | Why |
