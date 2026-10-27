@@ -35,6 +35,8 @@ const { createTokenService } = require(path.join(SIM, 'tokens'));
 const { createStore } = require(path.join(SIM, 'store'));
 const { createApp } = require(path.join(SIM, 'app'));
 const { createStats } = require(path.join(SIM, 'stats'));
+const { createMetrics } = require(path.join(SIM, 'metrics'));
+const simulatorMetrics = require('../../src/services/simulatorMetrics');
 
 const app = buildAppWithRoute('/v1/admin/simulator', '../../src/api/routes/admin-simulator');
 const companyId = crypto.randomUUID();
@@ -58,12 +60,14 @@ beforeAll(async () => {
   const providers = loadProviders(path.join(SIM, '..', 'providers'));
   const accounts = createAccounts({ dataDir, providers, clientsFile });
   const stats = createStats({ dataDir, providers, flushMs: 0 });
+  const metrics = createMetrics({ version: 'test', dataDir });
   const simApp = createApp({
     stats,
+    metrics,
     providers,
     clients: accounts.clients,
     accounts,
-    admin: createAdmin({ keySha256: crypto.createHash('sha256').update(KEY).digest('hex'), accounts, stats }),
+    admin: createAdmin({ keySha256: crypto.createHash('sha256').update(KEY).digest('hex'), accounts, stats, metrics }),
     tokens: createTokenService(),
     store: createStore({ limits: { offer: 50, trip: 50, booking: 5, fulfillment: 50, idempotency: 50 }, ttlMs: 3600000 }),
     limits: { bodyBytes: 65536, offersPerClient: 50, bookingsPerClient: 5, ttlSeconds: 3600, requestsPerMinute: 10000 },
@@ -129,6 +133,10 @@ test('a wrong key, a wrong address or a bad value is tried and not saved', async
   expect((await asAdmin(request(app).get('/v1/admin/simulator/config'))).body).toEqual({ url: null, keySet: false });
   // Nothing of what was tried stays behind.
   expect(get("SELECT COUNT(*) AS n FROM server_config WHERE key LIKE 'SIMULATOR_ADMIN_%'").n).toBe(0);
+  simulatorMetrics.forgetCache();
+  expect(await simulatorMetrics.simulatorMetricsText()).toBe(
+    '# HELP oscar_simulator_configured Whether OSCAR has a simulator address and key (Admin, OSDM Simulator).\n'
+    + '# TYPE oscar_simulator_configured gauge\noscar_simulator_configured 0\n');
 });
 
 test('the right key is saved encrypted and never returned', async () => {
@@ -254,12 +262,36 @@ test('the simulator\'s refusals come back with their status; bad values never re
   expect(before).toBeGreaterThan(0);
 });
 
+test('#1005: Prometheus reads the simulator through OSCAR: its requests, process and host, never a secret', async () => {
+  simulatorMetrics.forgetCache();
+  const text = await simulatorMetrics.simulatorMetricsText();
+  expect(text).toContain('oscar_simulator_configured 1');
+  expect(text).toContain('oscar_simulator_up 1');
+  expect(text).toContain('osdm_sim_info{version="test"} 1');
+  // The token requests of the tests above, counted by the simulator.
+  expect(text).toMatch(/osdm_sim_requests_total\{provider="gamma",method="POST",status="200"\} \d+/);
+  expect(text).toMatch(/osdm_sim_request_duration_seconds_bucket\{provider="gamma",le="\+Inf"\} \d+/);
+  expect(text).toMatch(/osdm_sim_process_resident_memory_bytes \d+/);
+  if (process.platform === 'linux') expect(text).toMatch(/osdm_sim_host_memory_available_bytes \d+/);
+  for (const secret of [KEY, SECRET, 'gamma-one']) expect(text).not.toContain(secret);
+  // Read once for every scrape within ten seconds.
+  expect(await simulatorMetrics.simulatorMetricsText()).toBe(text);
+});
+
 test('a key that stopped working is said plainly, and forgetting the set-up removes the key', async () => {
   run("UPDATE server_config SET value = ? WHERE key = 'SIMULATOR_ADMIN_KEY_ENC'", [require('../../src/db/db').encrypt('y'.repeat(64))]);
   const res = await asAdmin(request(app).get('/v1/admin/simulator/accounts'));
   expect(res.status).toBe(502);
   expect(res.body.detail).toMatch(/refused the key/);
+  simulatorMetrics.forgetCache();
+  const refused = await simulatorMetrics.simulatorMetricsText();
+  expect(refused).toContain('oscar_simulator_up 0');
+  expect(refused).not.toContain('osdm_sim_');
   const gone = await asAdmin(request(app).delete('/v1/admin/simulator/config'));
   expect(gone.body).toEqual({ url: null, keySet: false });
   expect(get("SELECT COUNT(*) AS n FROM server_config WHERE key LIKE 'SIMULATOR_ADMIN_%'").n).toBe(0);
+  simulatorMetrics.forgetCache();
+  expect(await simulatorMetrics.simulatorMetricsText()).toBe(
+    '# HELP oscar_simulator_configured Whether OSCAR has a simulator address and key (Admin, OSDM Simulator).\n'
+    + '# TYPE oscar_simulator_configured gauge\noscar_simulator_configured 0\n');
 });

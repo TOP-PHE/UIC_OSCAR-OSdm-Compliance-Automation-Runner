@@ -93,6 +93,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.421] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1005, release 2026.456. Simulator 0.57.0.
+
+### Added
+- **The simulator in OSCAR's Grafana.** A dashboard *OSDM Simulator · Overview* (`OSCAR_Deploy/grafana/dashboards/osdm-simulator.json`), in the layout of *OSCAR · Overview*:
+  - whether the simulator answers OSCAR, its version, request rate and P95 answer time;
+  - its host's memory, swap, CPU by mode, load and data disk;
+  - requests by status and by provider, and refusals of its rate limit;
+  - its process's memory, CPU and event-loop delay, and the offers and bookings it keeps.
+- **Seven alerts** (`prometheus/alerts/osdm-simulator-alerts.yml`), mailed like OSCAR's own: unreachable (critical); swap over 256 MiB; memory over 90 %; P95 over 1 s; 429s to the OSCAR server; disk under 10 %; event-loop delay over 200 ms. Nothing fires while no simulator is set up.
+- **Read through OSCAR.** Prometheus's new job `osdm-simulator` scrapes `oscar:3001/metrics?source=simulator`. OSCAR asks the simulator with the address and key of Admin → OSDM Simulator (`services/simulatorMetrics.js`, at most once every 10 s) and writes the answer in Prometheus's format (`utils/simulatorMetricsText.js`, pure).
+  - Prometheus holds no key, and nothing new is opened on the simulator's host.
+  - nginx's `location = /metrics` 404 covers the path.
+  - A value that is not a number is left out, and a label that is not a plain word is written `other`, so the simulator's answer cannot add a line.
+  - `oscar_simulator_configured` and `oscar_simulator_up` say whether it is set up and answering.
+- Checked with promtool (config, rules, the relayed text). A local Prometheus scraping the relayed text answered every query of the dashboard and the alerts. A test pins every metric name the dashboard and the alerts use to the names the relay writes.
+
+### Simulator 0.57.0
+- **`GET /admin/api/metrics`** (administration key, as the other administration routes): a JSON snapshot (`src/metrics.js`).
+  - Counted since the start: requests by provider, method and status, and their duration by provider (a histogram); the administration API is left out, so OSCAR's reads do not count. Also the rate limiter's refusals, trusted address or not.
+  - Read at each snapshot: the process (memory, CPU, event-loop delay), the host as `/proc` shows it (memory, swap, load, CPU time by mode, the data folder's disk), and the offers and bookings kept.
+  - Never an account, a token or a body. Without `/proc` the host part is null.
+
+---
+
 ## [server-1.11.420] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1004, release 2026.455. Simulator 0.56.0.

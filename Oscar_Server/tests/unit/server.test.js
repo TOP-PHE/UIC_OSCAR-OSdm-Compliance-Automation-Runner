@@ -149,6 +149,16 @@ describe('GET /metrics', () => {
     expect(res.text).toEqual(expect.any(String));
     expect(res.text.length).toBeGreaterThan(0);
   });
+
+  test('#1005: ?source=simulator answers the simulator gauges in Prometheus text; another source is 404', async () => {
+    require('../../src/services/simulatorMetrics').forgetCache();
+    const res = await request(app).get('/metrics?source=simulator');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^text\/plain; version=0\.0\.4/);
+    // No simulator is set up in this test database.
+    expect(res.text).toContain('oscar_simulator_configured 0');
+    expect((await request(app).get('/metrics?source=elsewhere')).status).toBe(404);
+  });
 });
 
 // ── /json_validator/datafile.schema.json ─────────────────────────────────────

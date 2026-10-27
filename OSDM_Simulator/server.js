@@ -25,6 +25,7 @@ const { createApp } = require('./src/app');
 const { createAccounts } = require('./src/accounts');
 const { createAdmin } = require('./src/admin');
 const { createStats } = require('./src/stats');
+const { createMetrics } = require('./src/metrics');
 const { version } = require('./package.json');
 
 // What came from the caller is reduced to printable ASCII before it is
@@ -46,7 +47,7 @@ function logLine(entry) {
 // Without a data folder, the clients file as before: read once, never changed.
 // With one (#930), the accounts kept there, made from the clients file on the
 // first start, and the administration API when its key is set.
-function accountsOf(settings, providers) {
+function accountsOf(settings, providers, metrics = null) {
   if (!settings.dataDir) return { clients: loadClients(settings.clientsFile, providers), accounts: null, admin: null, stats: null };
   const accounts = createAccounts({ dataDir: settings.dataDir, providers, clientsFile: settings.clientsFile, log: logLine });
   if (accounts.count() === 0 && !settings.adminKeySha256) {
@@ -59,24 +60,28 @@ function accountsOf(settings, providers) {
     console.log('No administration key (SIM_ADMIN_KEY_SHA256): the administration API is closed.');
     return { clients: accounts.clients, accounts, admin: null, stats };
   }
-  return { clients: accounts.clients, accounts, admin: createAdmin({ keySha256: settings.adminKeySha256, accounts, stats }), stats };
+  return { clients: accounts.clients, accounts, admin: createAdmin({ keySha256: settings.adminKeySha256, accounts, stats, metrics }), stats };
 }
 
 function start(env = process.env, baseDir = __dirname) {
   const settings = loadSettings(env, baseDir);
   const providers = loadProviders(settings.providersDir);
-  const { clients, accounts, admin, stats } = accountsOf(settings, providers);
+  const store = createStore({
+    limits: { offer: settings.limits.offersPerClient, trip: settings.limits.offersPerClient, booking: settings.limits.bookingsPerClient, fulfillment: settings.limits.offersPerClient, idempotency: settings.limits.offersPerClient },
+    ttlMs: settings.limits.ttlSeconds * 1000,
+  });
+  // #1005: read by OSCAR through the administration API only.
+  const metrics = createMetrics({ version, store, dataDir: settings.dataDir });
+  const { clients, accounts, admin, stats } = accountsOf(settings, providers, metrics);
   const app = createApp({
     providers,
     clients,
     accounts,
     admin,
     stats,
+    metrics,
     tokens: createTokenService(),
-    store: createStore({
-      limits: { offer: settings.limits.offersPerClient, trip: settings.limits.offersPerClient, booking: settings.limits.bookingsPerClient, fulfillment: settings.limits.offersPerClient, idempotency: settings.limits.offersPerClient },
-      ttlMs: settings.limits.ttlSeconds * 1000,
-    }),
+    store,
     limits: settings.limits,
     trustProxy: settings.trustProxy,
     log: logLine,
