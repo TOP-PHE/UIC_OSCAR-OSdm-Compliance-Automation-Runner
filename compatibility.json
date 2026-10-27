@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.459",
+  "current_release": "2026.460",
   "releases": [
+    {
+      "release": "2026.460",
+      "date": "2026-10-27",
+      "server": "1.11.425",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1015: a free run slot goes to the company or provider with the fewest runs going, then to its batch with the fewest (ties to the one waiting longest), not to the first queued run: a provider launched after another gets its share as the first one's runs end, instead of waiting for its whole batch. A running run is never stopped. PARALLEL_STAGGER_MS was never applied by the queue; the documents now say so."
+      ]
+    },
     {
       "release": "2026.459",
       "date": "2026-10-27",

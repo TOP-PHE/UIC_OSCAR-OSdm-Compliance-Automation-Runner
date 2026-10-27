@@ -93,6 +93,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.425] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1015, release 2026.460.
+
+### Changed
+- **Run slots are shared fairly between companies and providers, then between batches.** The queue used to start the first queued run whose company was under its own limit. A company that launched first therefore took back every slot its runs freed, and a provider launched a minute later waited until the first one's whole batch had run (seen with four simulator providers in a 36-slot campaign). Now a free slot goes to the company or provider with the fewest runs going among those with queued work and under their limit (a tie: the one waiting longest), and within it to the batch with the fewest runs going (a run started alone is its own batch). A running run is never stopped: the shares even out as runs end. The rule is `nextJobIndex()` in `worker/queue.js`, pure; `queue-fairness.test.js` checks it and replays a campaign of three providers (each gets an even share once all three have work, and every run starts once).
+- `PARALLEL_STAGGER_MS` is read but no launch waits on it, and never did: the Specification and the Server Admin Guide said otherwise. They now say so.
+
+---
+
 ## [server-1.11.424] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1013, release 2026.459.

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-fair-run-queue",
+    "date": "October 27, 2026",
+    "tag": "Changed",
+    "title": "Run slots shared fairly between providers",
+    "summary": "When several companies or providers run tests at once, each gets its share of the server's run slots instead of waiting for the first one's batch to end.",
+    "content": "A free run slot now goes to the company or provider with the fewest tests running, then to its batch with the fewest. A provider launched after another starts running as soon as the first one's tests end, instead of waiting for the whole batch. Running tests are never interrupted."
+  },
+  {
     "id": "2026-10-27-oscar-host-monitoring",
     "date": "October 27, 2026",
     "tag": "Added",

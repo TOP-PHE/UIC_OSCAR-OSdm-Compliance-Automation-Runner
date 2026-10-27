@@ -17,8 +17,17 @@
  * Jobs are never refused — they stay in the queue until a slot opens.
  * A company at its limit doesn't block other companies' jobs.
  *
- * For batch jobs, a stagger delay (PARALLEL_STAGGER_MS) spaces out launches
- * to avoid overwhelming the provider API.
+ * A free slot is shared fairly (#1015), not first come, first served: it goes
+ * to the company with the fewest runs going among those with queued work and
+ * under their limit (a tie: the one waiting longest), and within it to the
+ * batch with the fewest runs going (a tie: the oldest). Before, the company
+ * whose batch arrived first took back every slot its runs freed, and a
+ * provider launched later waited for the others' whole batches. A running run
+ * is never stopped: the shares even out as runs end. `nextJobIndex()` is the
+ * rule, pure.
+ *
+ * PARALLEL_STAGGER_MS (Admin → Server Config) is read by `staggerMs` but no
+ * launch waits on it: jobs start as soon as a slot is free.
  *
  * Job object: { runId, companyId, concurrentLimit, scenarioOverride?, batchId?, scenarioCode?, userId? }
  */
@@ -28,12 +37,47 @@ const { executeRun } = require('./runner');
 const { getConfig }  = require('../db/db');
 const log = require('../utils/logger').child({ module: 'queue' });
 
+// A job's batch, or the job itself when it was started alone.
+const batchKeyOf = (job) => (job.batchId ? `batch:${job.batchId}` : `run:${job.runId}`);
+
+// The lowest (running, first queued position) of a map's values.
+function fairest(candidates) {
+  let best = null;
+  for (const c of candidates) {
+    if (!best || c.running < best.running || (c.running === best.running && c.first < best.first)) best = c;
+  }
+  return best;
+}
+
+/**
+ * Index in `queue` of the next job to start, or -1 when every queued job's
+ * company is at its limit. Fair share (#1015): the company with the fewest
+ * runs going, then its batch with the fewest, each tie to the oldest queued.
+ */
+function nextJobIndex(queue, runningByCompany, runningByBatch) {
+  const companies = new Map();
+  queue.forEach((job, index) => {
+    const running = runningByCompany.get(job.companyId) || 0;
+    if (running >= (job.concurrentLimit || 1)) return;
+    let company = companies.get(job.companyId);
+    if (!company) {
+      company = { first: index, running, batches: new Map() };
+      companies.set(job.companyId, company);
+    }
+    const key = batchKeyOf(job);
+    if (!company.batches.has(key)) company.batches.set(key, { first: index, running: runningByBatch.get(key) || 0 });
+  });
+  const company = fairest(companies.values());
+  return company ? fairest(company.batches.values()).first : -1;
+}
+
 class RunQueue extends EventEmitter {
   constructor() {
     super();
     this._queue             = [];       // pending jobs
     this._running           = 0;        // global active count
     this._runningByCompany  = new Map(); // companyId → active job count
+    this._runningByBatch    = new Map(); // batch key → active job count
   }
 
   // Read config dynamically from DB on every drain — admin changes take effect immediately
@@ -64,13 +108,8 @@ class RunQueue extends EventEmitter {
     let launched = 0;
 
     while (this._running < this.maxConcurrent && this._queue.length > 0) {
-      // Find next job whose company hasn't hit its concurrent limit
-      const jobIdx = this._queue.findIndex(job => {
-        const companyRunning = this._runningByCompany.get(job.companyId) || 0;
-        const limit = job.concurrentLimit || 1;
-        log.debug({ runId: job.runId, companyRunning, limit, eligible: companyRunning < limit }, 'Drain check');
-        return companyRunning < limit;
-      });
+      // The fairest eligible job (#1015): fewest running per company, then per batch.
+      const jobIdx = nextJobIndex(this._queue, this._runningByCompany, this._runningByBatch);
 
       if (jobIdx === -1) {
         log.debug({ queue: this._queue.length, running: this._running }, 'No eligible jobs (all at company limit)');
@@ -85,6 +124,8 @@ class RunQueue extends EventEmitter {
         job.companyId,
         (this._runningByCompany.get(job.companyId) || 0) + 1
       );
+      const batchKey = batchKeyOf(job);
+      this._runningByBatch.set(batchKey, (this._runningByBatch.get(batchKey) || 0) + 1);
 
       log.info({ runId: job.runId, scenario: job.scenarioCode || 'all', launched, running: this._running, queue: this._queue.length }, 'Scheduling job');
       setImmediate(() => this._launchJob(job));
@@ -100,6 +141,7 @@ class RunQueue extends EventEmitter {
     executeRun(job)
       .then(result => {
         this._decrementCompany(job.companyId);
+        this._decrementBatch(job);
         this._running--;
         log.info({ runId: job.runId, scenario: job.scenarioCode || 'all', exitCode: result.exitCode }, 'Job completed');
         this.emit('completed', { ...job, ...result });
@@ -107,6 +149,7 @@ class RunQueue extends EventEmitter {
       })
       .catch(err => {
         this._decrementCompany(job.companyId);
+        this._decrementBatch(job);
         this._running--;
         const errMsg = err instanceof Error ? err.message : String(err);
         log.error({ runId: job.runId, err: errMsg }, 'Job errored');
@@ -122,6 +165,13 @@ class RunQueue extends EventEmitter {
     } else {
       this._runningByCompany.set(companyId, current - 1);
     }
+  }
+
+  _decrementBatch(job) {
+    const key = batchKeyOf(job);
+    const current = this._runningByBatch.get(key) || 0;
+    if (current <= 1) this._runningByBatch.delete(key);
+    else this._runningByBatch.set(key, current - 1);
   }
 
   /**
@@ -167,3 +217,4 @@ class RunQueue extends EventEmitter {
 }
 
 module.exports = new RunQueue();
+module.exports.nextJobIndex = nextJobIndex;
