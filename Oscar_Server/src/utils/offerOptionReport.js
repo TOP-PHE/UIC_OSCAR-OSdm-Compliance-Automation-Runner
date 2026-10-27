@@ -125,18 +125,23 @@ function phaseRequestOf(text) {
   return { label: text.slice(0, colon), ...statusAndResult(answer), ...(message ? { message } : {}) };
 }
 
-const PHASE_1 = 'Phase 1, mandatory members only: ';
+// #990 says "parameters"; the logs of earlier runs say "members", and stay readable.
+const PHASE_1 = 'Phase 1, mandatory parameters only: ';
+const PHASE_1_BEFORE_990 = 'Phase 1, mandatory members only: ';
 const SILENT = 'Offer request options taken without a word: ';
 const withMessage = (message) => (message ? { message } : {});
+
+const readPhase1 = (prefix) => (text, report) => {
+  const [answer, message] = splitMessage(text.slice(prefix.length));
+  report.mandatory = { ok: answer === 'answered', message };
+};
 
 // The lines after the report's first one: { prefix, read: how it goes into the report }.
 const PHASE_3 = 'Phase 3, ';
 const PHASE_4 = 'Phase 4, every supported option';
 const LINE_READERS = [
-  { prefix: PHASE_1, read: (text, report) => {
-    const [answer, message] = splitMessage(text.slice(PHASE_1.length));
-    report.mandatory = { ok: answer === 'answered', message };
-  } },
+  { prefix: PHASE_1, read: readPhase1(PHASE_1) },
+  { prefix: PHASE_1_BEFORE_990, read: readPhase1(PHASE_1_BEFORE_990) },
   { prefix: PHASE_3, read: (text, report) => {
     const combo = phaseRequestOf(text.slice(PHASE_3.length));
     if (combo) report.combinations.push({ options: combo.label.split(' + '), status: combo.status, result: combo.result, ...withMessage(combo.message) });

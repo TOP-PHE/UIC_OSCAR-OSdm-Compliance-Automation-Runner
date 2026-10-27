@@ -7,12 +7,12 @@ http://www.apache.org/licenses/LICENSE-2.0
 'use strict';
 
 /**
- * offerOptions.js — which optional members of the offer request does a
+ * offerOptions.js — which optional parameters of the offer request does a
  * provider support? (#227)
  *
  * One scenario (`offerOptionDiscovery`) runs four phases:
- *   1. the request with the mandatory members only (the passengers' externalRef
- *      and type, and the trip): a refusal or no offer FAILS, an optional member
+ *   1. the request with the mandatory parameters only (the passengers' externalRef
+ *      and type, and the trip): a refusal or no offer FAILS, an optional parameter
  *      cannot be required;
  *   2. the same request plus one option, for each option;
  *   3. random combinations of the options found supported (seeded, so a run
@@ -29,7 +29,7 @@ http://www.apache.org/licenses/LICENSE-2.0
  * said, and taken silently is reported.
  *
  * The options are those of the scenario's OSDM version: an option is offered
- * only when its member is in that version's request schema
+ * only when its parameter is in that version's request schema
  * (osdmRequestSchemas.js, generated).
  *
  * The pure part has no Bruno globals; the glue at the bottom has.
@@ -123,7 +123,7 @@ function departureOf(request) {
 }
 
 /**
- * The request with the mandatory members only: each passenger's externalRef
+ * The request with the mandatory parameters only: each passenger's externalRef
  * and type, and the trip. A search keeps its origin, destination and time
  * (a search with no time is not a trip); a specification or trip ids are kept
  * as they are.
@@ -367,7 +367,7 @@ const pointersOf = (p) => (Array.isArray(p.pointers) ? p.pointers : [])
   .map((x) => (typeof x === 'string' ? x : x?.requestPointer || x?.pointer || x?.responsePointer))
   .filter((x) => typeof x === 'string');
 
-/** A problem as one line: code, title, detail and the request members it points at. */
+/** A problem as one line: code, title, detail and the request parameters it points at. */
 const problemText = (p) => {
   const at = pointersOf(p);
   const where = at.length > 0 ? ` (at ${at.join(', ')})` : '';
@@ -385,7 +385,7 @@ function statusClass(status) {
 
 /**
  * Level 2, for a 2xx: what the answer did with the options of `picks`.
- * ignoredNames: the members the answer says it ignored, lower-cased
+ * ignoredNames: the parameters the answer says it ignored, lower-cased
  * (ignoredParameters.js).
  * @returns {{ result, message }}
  *   result: 'honoured' | 'accepted' | 'ignored-said' | 'ignored-silent' |
@@ -442,8 +442,8 @@ const isSupported = (row) => row.source !== 'invalid' && SUPPORTED_RESULTS.has(r
 function mandatoryOutcome(status, body) {
   const level1 = statusClass(status);
   const offers = Array.isArray(body?.offers) ? body.offers.filter(Boolean).length : 0;
-  if (level1 !== 'supported') return { ok: false, message: `HTTP ${status}: the request holding only the mandatory members is not answered (${problemsOf(body).map(problemText).join(' | ') || 'no problem given'})` };
-  if (offers === 0) return { ok: false, message: `HTTP ${status} but no offer for the request holding only the mandatory members (${problemsOf(body).map(problemText).join(' | ') || 'nothing says why'})` };
+  if (level1 !== 'supported') return { ok: false, message: `HTTP ${status}: the request holding only the mandatory parameters is not answered (${problemsOf(body).map(problemText).join(' | ') || 'no problem given'})` };
+  if (offers === 0) return { ok: false, message: `HTTP ${status} but no offer for the request holding only the mandatory parameters (${problemsOf(body).map(problemText).join(' | ') || 'nothing says why'})` };
   return { ok: true, message: `${offers} offer(s)` };
 }
 
@@ -548,7 +548,7 @@ function reportLines(report) {
   const answered = report.mandatory.ok ? 'answered' : 'NOT answered';
   const lines = [
     `[INFO] 🧭 Offer request options (#227) — OSDM ${report.version}, budget ${report.budget} request(s), ${report.used} used, seed ${report.seed}.`,
-    `[INFO] 🧭 Phase 1, mandatory members only: ${answered} — ${report.mandatory.message}`,
+    `[INFO] 🧭 Phase 1, mandatory parameters only: ${answered} — ${report.mandatory.message}`,
   ];
   const counts = {};
   for (const row of report.options) counts[row.result] = (counts[row.result] || 0) + 1;
@@ -573,6 +573,32 @@ const declaredOf = (declared, key) => (typeof declared?.[key] === 'boolean' ? { 
 // What a declared option must not get: the provider refuses it, ignores it or
 // gives no offer for it.
 const NOT_TAKEN = new Set(['refused', 'not-implemented', 'error', 'ignored-said', 'ignored-silent', 'no-offer-said', 'no-offer-silent']);
+
+// What a declared option got, in words, for its failed check (#990): the
+// coverage report shows that text as what was seen. The report lines keep the
+// codes, which the server reads back (offerOptionReport.js).
+const NOT_TAKEN_WORDS = Object.freeze({
+  refused: 'refused',
+  'not-implemented': 'not implemented',
+  error: 'answered with an error',
+  'ignored-said': 'ignored, and the answer says so',
+  'ignored-silent': 'ignored without saying so',
+  'no-offer-said': 'no offer, and the answer says why',
+  'no-offer-silent': 'no offer, and nothing says why',
+});
+
+/**
+ * The failure text of a declared option the provider does not take: what it
+ * got in words, the status, the detail. A detail that already says it in those
+ * words ("no offer, and nothing says why …") is not preceded by them again.
+ */
+function notTakenText(row) {
+  const words = NOT_TAKEN_WORDS[row.result] || String(row.result);
+  const detail = row.message || 'no detail';
+  const status = row.status ? `HTTP ${row.status}` : '';
+  const head = detail.startsWith(words) ? status : [words, status && `(${status})`].filter(Boolean).join(' ');
+  return `${head ? `${head}: ` : ''}${detail}. Either the provider does not take it, and the Test Framework should not declare it, or the provider should.`;
+}
 
 /**
  * The rows the framework contradicts: `declared` options the provider does not
@@ -647,14 +673,14 @@ function envJson(name, fallback) {
 
 /**
  * Step 01, before the request: keeps the scenario's whole request and sends
- * the one with the mandatory members only (phase 1).
+ * the one with the mandatory parameters only (phase 1).
  */
 function prepareOptionDiscovery() {
   if (!armed()) return;
   const full = envJson('OfferCollectionRequest', {});
   bru.setEnvVar('__offerOptionFull', JSON.stringify(full));
   bru.setEnvVar('OfferCollectionRequest', JSON.stringify(mandatoryRequest(full)));
-  validationLogger('[INFO] 🧭 Offer request options (#227) — phase 1: POST /offers with the mandatory members only (passengers\' externalRef and type, and the trip).');
+  validationLogger('[INFO] 🧭 Offer request options (#227) — phase 1: POST /offers with the mandatory parameters only (passengers\' externalRef and type, and the trip).');
 }
 
 async function sendOffers(body) {
@@ -675,7 +701,7 @@ async function sendOffers(body) {
 async function runOptionDiscovery(status, body) {
   if (!armed()) return false;
   const mandatory = mandatoryOutcome(status, body);
-  test(`🧭 Offer request with the mandatory members only — answered with offers (HTTP ${status})`, () => {
+  test(`🧭 Offer request with the mandatory parameters only — answered with offers (HTTP ${status})`, () => {
     if (!mandatory.ok) throw new Error(`${mandatory.message}. OSDM requires only the passengers and the trip: a provider must answer such a request.`);
   });
   const { ignoredParameters } = require('./ignoredParameters.js');
@@ -696,10 +722,8 @@ async function runOptionDiscovery(status, body) {
   // #227 part 2: what the Test Framework declares, held to the answers.
   const { contradicted, undeclared } = compareWithDeclarations(report);
   for (const row of contradicted) {
-    const at = row.status ? ` (HTTP ${row.status})` : '';
-    const detail = row.message || 'no detail';
     test(`🧭 Offer request option ${row.option} — declared in the Test Framework, taken by the provider`, () => {
-      throw new Error(`${row.result}${at}: ${detail}. Either the provider does not take it, and the Test Framework should not declare it, or the provider should.`);
+      throw new Error(notTakenText(row));
     });
   }
   if (undeclared.length > 0) {
@@ -713,6 +737,8 @@ module.exports = {
   DEFAULT_MAX_REQUESTS,
   discover,
   compareWithDeclarations,
+  notTakenText,
+  NOT_TAKEN_WORDS,
   prepareOptionDiscovery,
   runOptionDiscovery,
   OPTIONS,

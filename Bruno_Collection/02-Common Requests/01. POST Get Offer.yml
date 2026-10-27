@@ -70,8 +70,8 @@ runtime:
         require(bru.getEnvVar("library_base") + "fares.js").prepareSectionCheck();
         // #703: negative probe, the offer request with no passenger.
         require(bru.getEnvVar("library_base") + "passengerLimit.js").prepareEmptyPassengers();
-        // #227: which optional members of the request the provider supports;
-        // this request is sent with the mandatory members only.
+        // #227: which optional parameters of the request the provider supports;
+        // this request is sent with the mandatory parameters only.
         require(bru.getEnvVar("library_base") + "offerOptions.js").prepareOptionDiscovery();
     - type: after-response
       code: |-

@@ -19,6 +19,11 @@
  * (#972 part 4). A documented known deviation a run applied (its "[WARNING]
  * Known deviation (documented)" log line) is a point too.
  *
+ * A point of failed checks says what its check expects (`check`, its text
+ * without a leading pictograph) and what the latest run saw (`observed`, the
+ * check's failure text, #990): the check's text alone left the reader to guess
+ * the problem from the intent.
+ *
  * A point takes the finding of the first of its keys that #735 links to one
  * (`matchFinding()`, a sure match only). Its kind:
  *   oscar     the finding is an OSCAR issue, a #735 draft was marked as one,
@@ -37,6 +42,7 @@ const MARK = '[WARNING] Known deviation (documented): ';
 const RETURNED = ' returned HTTP ';
 const NOTE_END = '. Not counted as a failure';
 const MAX_NOTE = 300;
+const MAX_OBSERVED = 500;
 const MAX_POINTS = 500;
 const MAX_POINT_RUNS = 10;
 const MAX_POINT_CODES = 20;
@@ -44,6 +50,16 @@ const KIND_ORDER = Object.freeze(['provider', 'accepted', 'question', 'oscar']);
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const atOf = (run) => run?.completed_at || run?.queued_at || null;
+
+// A check's text without a leading pictograph: the 🧭 of #227's checks reads
+// as a "forbidden" sign at the size of a point.
+const plainCheck = (text) => String(text ?? '').replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '');
+
+/** What a failed check saw: its failure text on one line, cut; '' when none was kept. */
+function observedText(check) {
+  const text = String(check?.error_msg ?? '').replace(/\s+/g, ' ').trim();
+  return text.length > MAX_OBSERVED ? `${text.slice(0, MAX_OBSERVED - 1)}…` : text;
+}
 
 // ── Known deviations ────────────────────────────────────────────────────────
 
@@ -156,6 +172,7 @@ function placeOf(seen, links) {
 function newPoint(base) {
   return {
     ...base, keys: [], steps: [], blocking: false, occurrences: 0, tests: [], runs: [], firstSeen: null, lastSeen: null,
+    observed: null,
   };
 }
 
@@ -163,7 +180,7 @@ function newPoint(base) {
 function checkPoint(seen, place, label) {
   return newPoint({
     kind: 'provider', source: 'check', capability: seen.capability, capabilityLabel: label(seen.capability),
-    step: place.step, check: place.group ? place.group.check : S.checkText(seen.check.assertion_name),
+    step: place.step, check: plainCheck(place.group ? place.group.check : S.checkText(seen.check.assertion_name)),
     status: place.group?.status ?? null, problemCode: place.group?.problemCode ?? null,
     finding: null, possibleFinding: null, expectedRefusal: Boolean(seen.refusal),
   });
@@ -196,6 +213,11 @@ function addOccurrence(point, seen, place) {
   const at = atOf(seen.run);
   if (at && (!point.firstSeen || at < point.firstSeen)) point.firstSeen = at;
   if (at && (!point.lastSeen || at > point.lastSeen)) point.lastSeen = at;
+  // What the latest run saw: its first failure text, in the order met.
+  const text = seen.check ? observedText(seen.check) : '';
+  if (text && (!point.observed || (at && (!point.observed.at || at > point.observed.at)))) {
+    point.observed = { text, at, code: seen.code };
+  }
 }
 
 // A point of failed checks takes the first finding its keys name, in the
@@ -254,5 +276,5 @@ function pointsOf(seen, { links = new Map(), findings = [], capabilities = [], l
 
 module.exports = {
   knownDeviationOf, knownDeviationsOf, deviationKey, isAcceptedFinding, keyOfCheck, linkFailures, pointsOf,
-  KIND_ORDER, MAX_POINTS,
+  observedText, plainCheck, KIND_ORDER, MAX_POINTS, MAX_OBSERVED,
 };

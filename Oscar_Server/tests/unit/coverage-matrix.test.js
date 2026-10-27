@@ -165,7 +165,8 @@ describe('the Excel workbook', () => {
     expect(Object.keys(KIND_TEXT)).toEqual([...KIND_ORDER]);
     const steps = ['01. POST Get Offer', '02. POST Create Booking', '06. POST Obtaining Fulfillments from Booking'].map((n) => ({ request_name: n, http_status: 200 }));
     const failed = (code) => ({ id: `run-${code}`, status: 'FAILED', completed_at: '2026-10-24 10:05:00', steps,
-      checks: [{ request_name: '02. POST Create Booking', assertion_name: 'Booking price is <12.50>', category: 'business_logic', severity: 'major', http_status: 200 }] });
+      checks: [{ request_name: '02. POST Create Booking', assertion_name: 'Booking price is <12.50>', category: 'business_logic', severity: 'major', http_status: 200,
+        error_msg: 'expected <12.40> to equal <12.50>' }] });
     const df = datafile([
       { code: 'A', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1 },
       { code: 'NHF_A', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1, description: 'Must <refuse>' },
@@ -180,6 +181,10 @@ describe('the Excel workbook', () => {
     expect(sheet(buf, 3)).toContain('Must &lt;refuse&gt;');
     const points = sheet(buf, 4);
     expect(points).toContain('Booking price is &lt;N&gt;');
+    // #990: the check is what was expected, the run's failure text what was seen.
+    expect(points).toContain('Expected (the check)');
+    expect(points).toContain('Seen (latest run)');
+    expect(points).toContain('expected &lt;12.40&gt; to equal &lt;12.50&gt;');
     expect(points).toContain('For the provider');
     expect(points).toContain('run-A');
     expect(points).not.toContain('<f>');

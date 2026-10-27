@@ -871,7 +871,7 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("currencyExpectRejection", _flagOn(scenario.currencyExpectRejection) ? "true" : "false");
       // #780 PR C: the probe asking for an offer search option value the framework leaves out.
       bru.setEnvVar("offerOptionExpectRejection", _flagOn(scenario.offerOptionExpectRejection) ? "true" : "false");
-      // #227: which optional members of the offer request the provider supports.
+      // #227: which optional parameters of the offer request the provider supports.
       bru.setEnvVar("offerOptionDiscovery", _flagOn(scenario.offerOptionDiscovery) ? "true" : "false");
       const _optionBudget = Number.parseInt(scenario.offerOptionMaxRequests, 10);
       bru.setEnvVar("offerOptionMaxRequests", Number.isFinite(_optionBudget) ? String(_optionBudget) : null);

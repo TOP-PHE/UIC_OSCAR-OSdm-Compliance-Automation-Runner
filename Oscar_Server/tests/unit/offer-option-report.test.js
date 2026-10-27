@@ -100,6 +100,17 @@ describe('the report read back from the collection\'s log lines', () => {
     expect(reportOf(['[INFO] 🧭 Offer set: 3 offer(s).'])).toBeNull();
     expect(reportOf(null)).toBeNull();
   });
+
+  test('phase 1 says "parameters" (#990); a log written before still reads', () => {
+    const report = reportFrom(3);
+    const lines = reportLines(report);
+    expect(lines[1]).toContain('Phase 1, mandatory parameters only: ');
+    const before = lines.map((l) => l.replace('mandatory parameters only', 'mandatory members only'));
+    expect(before[1]).toContain('Phase 1, mandatory members only: ');
+    for (const written of [lines, before]) {
+      expect(reportOf(written).mandatory).toEqual({ ok: report.mandatory.ok, message: '3 offer(s)' });
+    }
+  });
 });
 
 describe('the runner files the report\'s lines apart', () => {

@@ -115,7 +115,8 @@ function pointsSheet(report) {
     name: 'Points to look at',
     columns: [
       { title: 'Point', width: 8 }, { title: 'Kind', width: 26 }, { title: 'Capability', width: 36 }, { title: 'Expected refusal', width: 10 },
-      { title: 'Steps', width: 40 }, { title: 'Check', width: 70 }, { title: 'HTTP status', width: 10 }, { title: 'Problem code', width: 24 },
+      { title: 'Steps', width: 40 }, { title: 'Expected (the check)', width: 70 }, { title: 'Seen (latest run)', width: 70 },
+      { title: 'HTTP status', width: 10 }, { title: 'Problem code', width: 24 },
       { title: 'Blocking', width: 10 }, { title: 'Times seen', width: 10 }, { title: 'Tests', width: 40 }, { title: 'Scenario codes', width: 50 },
       { title: 'First seen', width: 20 }, { title: 'Last seen', width: 20 }, { title: 'Finding', width: 40 }, { title: 'Finding category', width: 18 },
       { title: 'Finding status', width: 14 }, { title: 'Finding is only possible', width: 12 }, { title: 'Note', width: 40 }, { title: 'Run ids', width: 38 },
@@ -124,7 +125,7 @@ function pointsSheet(report) {
       const finding = findingOf(p);
       return [
         p.number, KIND_TEXT[p.kind] || p.kind || '', p.capabilityLabel, yesNo(Boolean(p.expectedRefusal)),
-        arr(p.steps).length ? arr(p.steps).join('\n') : (p.step || ''), p.check, p.status ?? null, p.problemCode || '',
+        arr(p.steps).length ? arr(p.steps).join('\n') : (p.step || ''), p.check, p.observed?.text || '', p.status ?? null, p.problemCode || '',
         yesNo(Boolean(p.blocking)), p.occurrences ?? 0, arr(p.tests).map((x) => x.entry || x.key).join('\n'),
         arr(p.tests).flatMap((x) => arr(x.codes)).join('\n'), p.firstSeen || '', p.lastSeen || '',
         finding ? finding.title : '', finding ? finding.category : '', finding ? finding.status : '',

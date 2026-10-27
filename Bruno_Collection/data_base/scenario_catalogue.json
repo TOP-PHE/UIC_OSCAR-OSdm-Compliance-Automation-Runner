@@ -930,7 +930,7 @@
     {
       "code": "OTST_OFFER_OPTION_DISCOVERY",
       "source": "SIM_OFFER_OPTION_DISCOVERY_38",
-      "purpose": "Offer request options: the offer request with the mandatory members only (the passengers' externalRef and type, and the trip) must be answered with offers; then each optional member of the version's OfferCollectionRequest alone, random combinations of those found supported, and all of them, each answer classified (supported, refused, not implemented, error; honoured, ignored said or silent, no offer said or silent, accepted). A code only the provider can give (card, corporate or promotion code, product) is made up when none is declared, and must be refused or said. Only the first request can fail; the rest is a report. The scenario ends after the offer.",
+      "purpose": "Offer request options: the offer request with the mandatory parameters only (the passengers' externalRef and type, and the trip) must be answered with offers; then each optional parameter of the version's OfferCollectionRequest alone, random combinations of those found supported, and all of them, each answer classified (supported, refused, not implemented, error; honoured, ignored said or silent, no offer said or silent, accepted). A code only the provider can give (card, corporate or promotion code, product) is made up when none is declared, and must be refused or said. Only the first request can fail; the rest is a report. The scenario ends after the offer.",
       "capability": "offers.requestOptions",
       "checks": 70,
       "needs": {

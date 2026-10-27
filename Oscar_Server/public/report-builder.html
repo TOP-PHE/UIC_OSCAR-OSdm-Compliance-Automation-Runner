@@ -1106,7 +1106,7 @@ function renderCapabilityMatrix(rows) {
 
 /* ── Offer request options (#227) ──────────────────────────────────────────
  * One table per run of the offer request options scenario: what the provider
- * did with each optional member of the offer request, sent alone, then the
+ * did with each optional parameter of the offer request, sent alone, then the
  * combinations and every supported option at once.
  */
 var OFFER_OPTION_RESULTS = {
@@ -1151,7 +1151,7 @@ function offerOptionRunHtml(entry) {
   return '<div style="margin-bottom:18px">'
     + '<div style="font-size:13px;color:#37474f;line-height:1.6;margin-bottom:8px"><strong>' + escHtml(entry.scenario_code || entry.run_id) + '</strong>'
     + ' &middot; OSDM ' + escHtml(r.version || '?') + ' &middot; ' + escHtml(r.used) + ' of ' + escHtml(r.budget) + ' request(s) &middot; seed ' + escHtml(r.seed)
-    + '<br>Mandatory members only: ' + escHtml(mandatory) + '</div>'
+    + '<br>Mandatory parameters only: ' + escHtml(mandatory) + '</div>'
     + '<table class="cap-table"><thead><tr><th>Option</th><th>Value sent</th><th>HTTP</th><th>Result</th><th>Test Framework</th><th>Detail</th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table>'
     + (requests.length ? '<ul style="font-size:12px;color:#37474f;margin:8px 0 0 18px">' + requests.join('') + '</ul>' : '')
@@ -2219,12 +2219,34 @@ function capabilitySeenText(p) {
   return p.firstSeen === p.lastSeen ? 'on ' + p.firstSeen : 'from ' + p.firstSeen + ' to ' + p.lastSeen;
 }
 
-// What a point is, in one line: where, what, the answer.
-function capabilityProblemText(p) {
+// Where a point was met, and the answer when it was not a success.
+function capabilityStepText(p) {
   var steps = (Array.isArray(p.steps) && p.steps.length ? p.steps : [p.step]).join(', ');
   // A status says something only when the answer was not a success.
   var answer = [p.status >= 300 ? 'HTTP ' + p.status : '', p.problemCode || ''].filter(Boolean).join(', ');
-  return steps + ': ' + p.check + (answer ? ' (' + answer + ')' : '');
+  return steps + (answer ? ' (' + answer + ')' : '');
+}
+
+// What a point is (#990): a failed check says what it expected and what the
+// latest run saw; a known deviation is one line. A report published before
+// #990 has no "Seen".
+function capabilityProblemLines(p) {
+  if (p.source === 'known-deviation') return [capabilityStepText(p) + ': ' + p.check];
+  var lines = [capabilityStepText(p), 'Expected: ' + p.check];
+  if (p.observed && p.observed.text) lines.push('Seen: ' + p.observed.text);
+  return lines;
+}
+
+// A line of a point, its "Expected:" or "Seen:" label in bold.
+function capabilityLineHtml(line) {
+  var label = /^(Expected|Seen): /.exec(line);
+  return label ? '<strong>' + label[1] + ':</strong> ' + escHtml(line.slice(label[0].length)) : escHtml(line);
+}
+
+// A text ending as a sentence, for the Markdown's one line per point.
+function capabilitySentence(text) {
+  var t = String(text);
+  return /[.!?…]$/.test(t) ? t : t + '.';
 }
 
 // A test and the codes that showed it, a code that is the test's own name left out.
@@ -2236,7 +2258,7 @@ function capabilityTestCodes(t) {
 
 function capabilityWhereText(p) {
   var tests = (p.tests || []).map(capabilityTestCodes).join('; ');
-  return 'Seen in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '');
+  return 'Found in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '');
 }
 
 // A point; `withId` for the list at the end only, which the numbers link to.
@@ -2247,7 +2269,7 @@ function capabilityPointHtml(p, withId) {
   return '<li' + (withId ? ' id="cov-point-' + n + '"' : '') + '><strong>#' + n + '</strong> ' + escHtml(p.capabilityLabel)
     + (p.expectedRefusal ? ' <small class="cov-group">(expected refusal)</small>' : '')
     + (p.blocking ? ' <span class="cov-state cov-blocked">Blocking</span>' : '')
-    + '<br>' + escHtml(capabilityProblemText(p))
+    + '<br>' + capabilityProblemLines(p).map(capabilityLineHtml).join('<br>')
     + (p.note ? '<br><small>' + escHtml(p.note) + '</small>' : '')
     + '<br><small>' + escHtml(capabilityWhereText(p)) + '</small>'
     + (finding ? '<br><small>' + escHtml(finding) + '</small>' : '')
@@ -2320,7 +2342,7 @@ function mdCell(value) {
 function capabilityPointLine(p) {
   var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
   return '#' + p.number + ' ' + p.capabilityLabel + (p.expectedRefusal ? ' (expected refusal)' : '') + (p.blocking ? ', blocking' : '')
-    + ' — ' + capabilityProblemText(p) + '. ' + capabilityWhereText(p) + '.' + (finding ? ' ' + finding + '.' : '') + (p.note ? ' ' + p.note : '');
+    + ' — ' + capabilityProblemLines(p).map(capabilitySentence).join(' ') + ' ' + capabilityWhereText(p) + '.' + (finding ? ' ' + finding + '.' : '') + (p.note ? ' ' + p.note : '');
 }
 
 function capabilityRowsMarkdown(rows) {

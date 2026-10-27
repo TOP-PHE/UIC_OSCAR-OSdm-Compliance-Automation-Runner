@@ -152,3 +152,55 @@ describe('a point and its finding', () => {
     expect(points.map((p) => [p.number, p.capability, p.expectedRefusal])).toEqual([[1, 'sale', false], [2, 'sale', true], [3, 'fulfilment.documents', false]]);
   });
 });
+
+describe('what a point\'s latest run saw (#990)', () => {
+  const at = (n) => ({ id: `run-${n}`, completed_at: `2026-10-2${n} 08:00:00` });
+  const failed = (text, extra = {}) => ({
+    request_name: '01. POST Get Offer', assertion_name: 'Offer request: the offers keep to the flexibilities asked (FULL_FLEXIBLE)', http_status: 200, error_msg: text, ...extra,
+  });
+  const seen = (n, check, extra = {}) => ({ check, capability: 'offers.search', blocking: false, test: { key: 'T', entry: null }, code: `C${n}`, run: at(n), ...extra });
+
+  test('a point keeps the failure text of its latest run, whatever the order its runs come in', () => {
+    const { points } = P.pointsOf([
+      seen(2, failed('2 of 2 offer(s) do not (offer a: NON_FLEXIBLE)')),
+      seen(3, failed('3 of 3 offer(s) do not (offer b: SEMI_FLEXIBLE)')),
+      seen(1, failed('1 of 1 offer(s) do not (offer c: NON_FLEXIBLE)')),
+    ]);
+    expect(points).toHaveLength(1);
+    expect(points[0].check).toBe('Offer request: the offers keep to the flexibilities asked (FULL_FLEXIBLE)');
+    expect(points[0].observed).toEqual({ text: '3 of 3 offer(s) do not (offer b: SEMI_FLEXIBLE)', at: '2026-10-23 08:00:00', code: 'C3' });
+  });
+
+  test('in one run the first text met stays; a run that kept no text does not erase another\'s', () => {
+    const other = { request_name: '02. POST Create Booking' };
+    const first = P.pointsOf([seen(2, failed('first')), seen(2, failed('second', other))]).points;
+    expect(first[0].observed.text).toBe('first');
+    const kept = P.pointsOf([seen(1, failed('older')), seen(2, failed(null)), seen(3, failed('  '))]).points;
+    expect(kept[0].observed).toEqual({ text: 'older', at: '2026-10-21 08:00:00', code: 'C1' });
+    expect(P.pointsOf([seen(1, failed(undefined))]).points[0].observed).toBeNull();
+    const dev = { deviation: { step: '13. PATCH Refund Offer', status: 409, note: '' }, capability: 'refund.full', test: { key: 'T', entry: null }, code: 'C', run: at(1) };
+    expect(P.pointsOf([dev]).points[0].observed).toBeNull();
+  });
+
+  test('the text is one line, cut at its maximum', () => {
+    expect(P.observedText({ error_msg: '  a\n  b\tc  ' })).toBe('a b c');
+    const long = P.observedText({ error_msg: `${'x'.repeat(P.MAX_OBSERVED)}\ny` });
+    expect(long).toHaveLength(P.MAX_OBSERVED);
+    expect(long.endsWith('…')).toBe(true);
+    expect(P.observedText({ error_msg: 'x'.repeat(P.MAX_OBSERVED) })).toHaveLength(P.MAX_OBSERVED);
+    expect([P.observedText(null), P.observedText({}), P.observedText({ error_msg: 42 })]).toEqual(['', '', '42']);
+  });
+
+  test('a check loses its leading pictograph, not its key', () => {
+    const compass = String.fromCodePoint(0x1F9ED);
+    const tagged = failed('refused (HTTP 400): X', { assertion_name: `${compass} Offer request option offerSearchCriteria.currency — declared in the Test Framework, taken by the provider` });
+    const { points } = P.pointsOf([seen(1, tagged)]);
+    expect(points[0].check).toBe('Offer request option offerSearchCriteria.currency — declared in the Test Framework, taken by the provider');
+    expect(points[0].keys).toEqual([P.keyOfCheck(tagged)]);
+    // The key is still that of the text the run stored, not of the text shown.
+    expect(points[0].keys[0]).not.toBe(P.keyOfCheck({ ...tagged, assertion_name: points[0].check }));
+    expect(P.plainCheck(`${String.fromCodePoint(0x26A0, 0xFE0F)}  Warn`)).toBe('Warn');
+    expect(P.plainCheck('[OSCAR request] 12 ok')).toBe('[OSCAR request] 12 ok');
+    expect(P.plainCheck(null)).toBe('');
+  });
+});

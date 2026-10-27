@@ -1,11 +1,11 @@
 'use strict';
 
 /**
- * requestOptions.js — what the provider does with optional members of the
+ * requestOptions.js — what the provider does with optional parameters of the
  * offer request (#227), for trips from one stop place (`requestOptions.from`
  * in the profile).
  *
- * OSCAR's offer request options scenario sends each optional member alone and
+ * OSCAR's offer request options scenario sends each optional parameter alone and
  * classifies the answer; each behaviour here gives one of its classes:
  *   ignore-silent   the member is dropped, nothing said (offers do not keep to it)
  *   ignore-said     the member is dropped, a PARAMETER_NOT_SUPPORTED warning names it

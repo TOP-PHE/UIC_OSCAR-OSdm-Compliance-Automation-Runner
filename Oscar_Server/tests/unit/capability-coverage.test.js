@@ -71,6 +71,11 @@ describe('the capabilities and the step table', () => {
     }
   });
 
+  test('the fields of a request are its parameters, as OSDM names them, never "members" (#990)', () => {
+    expect(K.CAPABILITY.get('offers.requestOptions').label).toBe('Optional parameters of the offer request');
+    expect(K.CAPABILITIES.filter((c) => /\bmembers?\b/i.test(c.label)).map((c) => c.id)).toEqual([]);
+  });
+
   test('every request of the collection has a role, and every role names a request', () => {
     const names = requestNames();
     expect(names.filter((n) => !K.STEP_ROLES[n])).toEqual([]);

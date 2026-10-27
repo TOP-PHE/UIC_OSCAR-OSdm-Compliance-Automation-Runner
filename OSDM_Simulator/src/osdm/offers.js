@@ -757,7 +757,7 @@ function applyStopPlaceVariants(trips, provider, offers, remembered) {
 
 function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
   const trips = tripsOf(asked, providerAsIs, known);
-  // #227: optional members this provider ignores, refuses or answers without offers.
+  // #227: optional parameters this provider ignores, refuses or answers without offers.
   const options = applyRequestOptions(asked, trips, providerAsIs);
   const { body } = options;
   // #780: the variant stop place answers as if no criteria were sent.

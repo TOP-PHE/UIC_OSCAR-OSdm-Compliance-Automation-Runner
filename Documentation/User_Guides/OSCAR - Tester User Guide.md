@@ -1449,10 +1449,13 @@ several steps of a test is one point that lists those steps. Each point
 shows:
 
 - the capability it counts against;
-- the step(s), the check and, for an error answer, the HTTP status and problem
-  code;
+- the step(s) and, for an error answer, the HTTP status and problem code;
+- **Expected:** what the check expects, as its title says it;
+- **Seen:** what the latest run that showed it got instead, as that run's
+  failure text gives it (for example the flexibilities the offers came back
+  with). A report published before 1.11.413 has no *Seen* line;
 - the tests and scenario codes that showed it, and the first and last day
-  seen;
+  it was found;
 - whether it blocked the run: an HTTP status the step did not expect, a script
   that broke or a missing prerequisite blocks it, any other failed check does
   not;

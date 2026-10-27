@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-point-expected-seen",
+    "date": "October 27, 2026",
+    "tag": "Improvement",
+    "title": "A point to look at says what was seen",
+    "summary": "In the coverage by capability, each point now shows what its check expected and what the latest run saw instead.",
+    "content": "A point to look at used to show only the title of the check that failed, which says what the check expects. You had to guess the problem from it, and an offer request option's title read like a pass.\n\nEach point now has two lines: Expected, the check, and Seen, what the latest run that showed it got instead, for example the flexibilities the offers came back with. It is on the page, in the Markdown and in the Excel workbook, and it works for runs already stored: show the coverage again to see it.\n\nThe fields of a request are now called parameters, as OSDM names them, instead of members: for example the capability Optional parameters of the offer request."
+  },
+  {
     "id": "2026-10-27-point-under-row",
     "date": "October 27, 2026",
     "tag": "Improvement",

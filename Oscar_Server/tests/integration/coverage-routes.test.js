@@ -169,10 +169,10 @@ describe('GET /v1/company/coverage', () => {
       requests[name] = run('INSERT INTO run_requests (suite_id, run_id, company_id, request_name, http_status, response_body) VALUES (?, ?, ?, ?, ?, ?)',
         [suite, id, ids.D, name, status, body || null]).lastInsertRowid;
     }
-    const failCheck = (name, text) => run(`INSERT INTO run_assertions (request_id, suite_id, run_id, company_id, assertion_key, assertion_name, type, category, passed)
-         VALUES (?, ?, ?, ?, ?, ?, 'test', 'business_logic', 0)`, [requests[name], suite, id, ids.D, `k-${text}`, text]);
+    const failCheck = (name, text, error = null) => run(`INSERT INTO run_assertions (request_id, suite_id, run_id, company_id, assertion_key, assertion_name, type, category, passed, error_msg)
+         VALUES (?, ?, ?, ?, ?, ?, 'test', 'business_logic', 0, ?)`, [requests[name], suite, id, ids.D, `k-${text}`, text, error]);
     failCheck('07. GET Booking after Fulfillments', 'Booking summary names the product');
-    failCheck('06b. GET Fulfillment', 'Fulfillment status is FULFILLED');
+    failCheck('06b. GET Fulfillment', 'Fulfillment status is FULFILLED', 'expected \'AVAILABLE\' to equal \'FULFILLED\'');
     failCheck('07. GET Booking after Fulfillments', 'Booking holds the ticket');
     // A #735 draft of that failure the Test Manager marked as OSCAR's issue.
     const oscarKey = groupKeyOf({ step: '07. GET Booking after Fulfillments', check: 'Booking holds the ticket', status: 200, problemCode: null });
@@ -194,6 +194,9 @@ describe('GET /v1/company/coverage', () => {
       expect(cap('fulfilment.documents')).toMatchObject({ result: 'points' });
       const pointAt = (step) => r.points.find((p) => p.step === step);
       expect(pointAt('06b. GET Fulfillment')).toMatchObject({ kind: 'provider', status: 422, problemCode: 'FULFILLMENT_NOT_READY', capability: 'fulfilment.documents' });
+      // #990: what the run saw, from the check's stored failure text; none stored, none said.
+      expect(pointAt('06b. GET Fulfillment').observed).toMatchObject({ text: 'expected \'AVAILABLE\' to equal \'FULFILLED\'', code: 'SHARED_SALE' });
+      expect(pointAt('07. GET Booking after Fulfillments').observed).toBeNull();
       expect(pointAt('07. GET Booking after Fulfillments')).toMatchObject({
         kind: 'accepted', source: 'check', capability: 'sale', finding: { id: accepted, title: 'No product in the summary', category: 'provider_deviation', status: 'resolved' },
       });

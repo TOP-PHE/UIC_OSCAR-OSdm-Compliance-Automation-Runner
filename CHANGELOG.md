@@ -93,6 +93,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.413] / [collection-OTST_V2.0.228] — 2026-10-27
+
+Issue #990, release 2026.448. A point to look at says what its check expected and what the run saw; the fields of a request are "parameters", OSDM's own word, not "members".
+
+### Changed
+- **Coverage by capability: Expected / Seen.** A point showed only the title of the check that failed, which says what the check expects. The reader had to guess the problem, and an offer request option's title ("declared in the Test Framework, taken by the provider") read like a pass.
+  - Each point now shows **Expected:** (the check) and **Seen:** (the failure text of the latest run that showed it, as stored with the check: `run_assertions.error_msg`), on the page, in the Markdown and in the workbook (new column *Seen (latest run)*; *Check* is now *Expected (the check)*).
+  - Runs already stored get it: the text was always stored, the coverage report did not read it. A report published before this release has no *Seen* line.
+  - Points are grouped as before: a point's #735 keys are those of the stored check text, so comparisons with earlier published reports do not move.
+  - The certifier sees nothing new: the text is what the run page shows for that check, and publishing a report shares its runs.
+  - A known deviation stays one line. The "Seen in …" line is now "Found in …".
+  - A check's leading pictograph (the 🧭 of the offer request options) is left out of the point: at that size it read as a "forbidden" sign.
+- **A declared offer request option the provider does not take fails in words**: "ignored without saying so (HTTP 200): …" instead of the code `ignored-silent` (`notTakenText()`). A detail that already says it in those words is not preceded by them again. The check names and the run log's report lines do not change.
+- **"Parameters", not "members".** OSDM 3.8 describes `OfferCollectionRequest` as "the parameters needed to request an offer", and a provider reports an ignored one as `PARAMETER_NOT_SUPPORTED`; the specification never says "member".
+  - Renamed: the capability (*Optional parameters of the offer request*), the function row, the Report Builder's option card, the run log lines, the check "Offer request with the mandatory parameters only — answered with offers", the catalogue purpose, the data file schema's description, Test Config's help, and the documents.
+  - Points and findings of that one check start a new grouping key. Option reports of earlier runs stay readable: the server reads both wordings of the phase 1 line.
+  - Left as they are: response fields ("optional member" in the passenger checks: they are not parameters), and the descriptions of the simulator data file's scenarios (changing them would mark every company following a simulator reference as not up to date).
+- Tester User Guide §6: the *Expected* and *Seen* lines.
+
+### Tests
+- `coverage-points.test.js`: the latest run's text whatever the order of the runs, the first text of a run, a run without text erasing nothing, one line cut at 500, the pictograph left out with the key kept.
+- `coverage-routes.test.js`: a stored failure text reaches the answer; none stored, none said.
+- `ui-scripts.test.js`: Expected / Seen with bold labels, escaped, in the page and the Markdown; a known deviation; a report published before.
+- `coverage-matrix.test.js`: the workbook's *Seen (latest run)* column.
+- `offer-option-report.test.js`: the phase 1 line in both wordings. `offer-option-discovery.test.js`: words for every result that fails a declared option. `capability-coverage.test.js`: no capability says "members".
+- 24 deliberate breaks each make a test fail. Checked in Chromium on a throwaway server with points shaped like a real provider's.
+
+---
+
 ## [server-1.11.411] / [collection-OTST_V2.0.226] — 2026-10-27
 
 Issue #984, release 2026.446. In the coverage by capability, a point number opens that point under its row instead of jumping to the long list at the end.

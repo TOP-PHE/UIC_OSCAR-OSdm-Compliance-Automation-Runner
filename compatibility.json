@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.446",
+  "current_release": "2026.448",
   "releases": [
+    {
+      "release": "2026.448",
+      "date": "2026-10-27",
+      "server": "1.11.413",
+      "collection": "OTST_V2.0.228",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#990: a point to look at in the coverage by capability says what its check expected and what the latest run saw (the check's stored failure text), on the page, in the Markdown and in the workbook; runs already stored get it, and points are grouped as before.",
+        "A declared offer request option the provider does not take fails in words (\"ignored without saying so\") instead of a code.",
+        "The fields of a request are called parameters, as OSDM names them, not members: the capability, the option card, the run log lines and one check name; option reports of earlier runs stay readable."
+      ]
+    },
     {
       "release": "2026.446",
       "date": "2026-10-27",
