@@ -151,6 +151,31 @@ describe('suggestTrip', () => {
     expect(suggestTrip({ legs: 4, needsJourney: true }, testData)).toBeNull();
   });
 
+  // #1019: on the simulator the stop places choose what a scenario tests.
+  test('a trip of one leg goes on a train of its own route when there is one', () => {
+    const trains = [
+      { id: 'X', origin: 'urn:uic:stn:0000001', destination: 'urn:uic:stn:0000002', services: [{ index: 0 }] },
+      { id: 'Y', origin: '96', destination: '0000002', services: [{ index: 0 }, { index: 1 }] },
+    ];
+    expect(suggestTrip({ legs: 1, origin: 'urn:uic:stn:0000096', destination: 'urn:uic:stn:0000002' }, { trains, journeys: [] })).toBe('train::Y::0');
+    expect(suggestTrip({ legs: 1, origin: 'urn:uic:stn:0000095', destination: 'urn:uic:stn:0000002' }, { trains, journeys: [] })).toBe('train::X::0');
+    expect(suggestTrip({ legs: 1, origin: 'urn:uic:stn:0000002', destination: 'urn:uic:stn:0000096' }, { trains, journeys: [] })).toBe('train::X::0');
+  });
+
+  // #1019: a trip specification sends its train's number and carrier (DatedJourney).
+  test('a trip specification goes only on a service naming its number and operator code', () => {
+    const trains = [
+      { id: 'P', origin: '1', destination: '2', operatorCode: '', services: [{ index: 0, vehicleNumber: '9001' }] },
+      { id: 'Q', origin: '1', destination: '2', operatorCode: 'urn:x:op', services: [{ index: 0, vehicleNumber: '' }, { index: 1, vehicleNumber: '17' }] },
+      { id: 'R', origin: '3', destination: '4', operatorCode: 'urn:x:op', services: [{ index: 0, vehicleNumber: '21' }] },
+    ];
+    const spec = { legs: 1, tripType: 'SPECIFICATION', origin: '1', destination: '2' };
+    expect(suggestTrip(spec, { trains, journeys: [] })).toBe('train::Q::1');
+    expect(suggestTrip({ ...spec, origin: '5' }, { trains, journeys: [] })).toBe('train::Q::1');
+    expect(suggestTrip(spec, { trains: [trains[0]], journeys: [] })).toBeNull();
+    expect(suggestTrip({ ...spec, tripType: 'SEARCH' }, { trains: [trains[0]], journeys: [] })).toBe('train::P::0');
+  });
+
   test('a trip of one leg gets the first train\'s first service, else a journey, else nothing', () => {
     expect(suggestTrip({ legs: 1 }, testData)).toBe('train::T1::0');
     expect(suggestTrip({ legs: 1 }, { trains: [{ id: 'T2', services: [] }], journeys: [] })).toBe('train::T2::0');
@@ -178,6 +203,17 @@ describe('suggestTrips', () => {
   test('an exchange\'s trip goes on another route than its sale trip; a train of the same route under another id does not count', () => {
     const trips = [{ id: 1, legs: 1, usedBy: ['E'] }, { id: 2, legs: 1, usedBy: ['E (exchange)'] }];
     expect(suggestTrips(trips, testData)).toEqual({ 1: 'train::A::0', 2: 'train::C::4' });
+  });
+
+  test('an exchange\'s trip takes its own route among the other routes when the Test Data has it (#1019)', () => {
+    const trains = [
+      { id: 'A', origin: '1', destination: '2', services: [{ index: 0 }] },
+      { id: 'D', origin: '5', destination: '6', services: [{ index: 0 }] },
+      { id: 'C', origin: '0000003', destination: '0000001', services: [{ index: 4 }] },
+    ];
+    const trips = [{ id: 1, legs: 1, origin: '1', destination: '2', usedBy: ['E'] },
+      { id: 2, legs: 1, origin: 'urn:uic:stn:0000003', destination: 'urn:uic:stn:0000001', usedBy: ['E (exchange)'] }];
+    expect(suggestTrips(trips, { trains, journeys: [] })).toEqual({ 1: 'train::A::0', 2: 'train::C::4' });
   });
 
   test('a trip that is a sale trip too still goes on another route than the exchanging scenario\'s sale', () => {

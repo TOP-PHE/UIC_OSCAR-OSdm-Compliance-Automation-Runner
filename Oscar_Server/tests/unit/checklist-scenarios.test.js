@@ -22,7 +22,7 @@ const catalogue = JSON.parse(fs.readFileSync(path.join(base, 'scenario_catalogue
 const simulator = JSON.parse(fs.readFileSync(path.join(base, 'simulator_datafile.json'), 'utf8'));
 const framework = JSON.parse(fs.readFileSync(path.join(base, 'reference', 'simulator-gamma.json'), 'utf8')).framework;
 
-const train = { id: 't1', label: 'T', origin: 'A', destination: 'B', services: [{ index: 0, vehicleNumber: '1', departureTime: '08:00', arrivalTime: '09:00' }] };
+const train = { id: 't1', label: 'T', origin: 'A', destination: 'B', operatorCode: 'urn:x:op', services: [{ index: 0, vehicleNumber: '1', departureTime: '08:00', arrivalTime: '09:00' }] };
 const journey2 = { id: 'j2', label: 'J', legs: 2 };
 const plan = (testData, existingCodes = []) => CS.scenarioPlan({ catalogue, simulator, framework, testData, existingCodes });
 
@@ -32,6 +32,7 @@ test('a train and a journey of two legs: every entry the framework declares is c
   expect(p.copy.map(c => c.code)).toEqual(allowed);
   expect(p.noJourney).toEqual([]);
   expect(p.noTestData).toEqual([]);
+  expect(p.noNamedTrain).toEqual([]);
   const mappings = Object.values(p.tripMap);
   expect(mappings).toContainEqual({ type: 'train', train_id: 't1', service_index: 0 });
   expect(mappings).toContainEqual({ type: 'journey', journey_id: 'j2' });
@@ -44,6 +45,18 @@ test('no journey of two legs: the scenarios with such a trip are left out, and s
   const left = new Set(p.noJourney.map(n => n.code));
   for (const c of p.copy) expect(left.has(c.code)).toBe(false);
   expect(p.noJourney[0].legs).toEqual([2]);
+});
+
+test('a train naming no operator code: the trip specifications are left out, and said so (#1019)', () => {
+  const p = plan({ trains: [{ ...train, operatorCode: '' }], journeys: [journey2] });
+  // A specification copy, and an entry whose own trip is a one-leg specification (a seat map).
+  expect(p.noNamedTrain).toEqual(expect.arrayContaining(['OTST_SALE_ONE_WAY_1ADT_SPEC', 'OTST_SALE_NAMED_PLACE_2ADT']));
+  expect(p.noNamedTrain).not.toContain('OTST_SALE_ONE_WAY_1ADT');
+  expect(p.copy.map(c => c.code)).toEqual(expect.arrayContaining(['OTST_SALE_ONE_WAY_1ADT', 'OTST_SALE_ONE_WAY_1ADT_TRIPID']));
+  expect(p.noTestData).toEqual([]);
+  const left = new Set(p.noNamedTrain);
+  for (const c of p.copy) expect(left.has(c.code)).toBe(false);
+  expect(p.copy.some(c => c.code.endsWith('_TRIPID'))).toBe(true);
 });
 
 test('no Test Data at all: nothing is copied', () => {
@@ -62,7 +75,7 @@ test('codes the data file holds are already there, not copied again', () => {
 
 test('the page sees the plan without the source data file and the trip map', () => {
   const shown = CS.shownPlan(plan({ trains: [train], journeys: [] }), 'none');
-  expect(Object.keys(shown).sort()).toEqual(['alreadyThere', 'choice', 'copy', 'noJourney', 'noTestData', 'notDeclared']);
+  expect(Object.keys(shown).sort()).toEqual(['alreadyThere', 'choice', 'copy', 'noJourney', 'noNamedTrain', 'noTestData', 'notDeclared']);
   expect(shown.choice).toBe('none');
 });
 

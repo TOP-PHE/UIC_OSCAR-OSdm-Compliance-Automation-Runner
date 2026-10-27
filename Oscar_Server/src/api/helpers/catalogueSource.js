@@ -62,7 +62,7 @@ function testDataChoices(resources) {
   const trains = resources.filter(r => r.resource_type === 'TRAIN').map(r => {
     const d = TripApply.normalizeTrainData(r.data);
     return {
-      id: r.id, label: r.label, origin: d.originURN || '', destination: d.destinationURN || '',
+      id: r.id, label: r.label, origin: d.originURN || '', destination: d.destinationURN || '', operatorCode: d.operatorCode || '',
       services: d.services.map((s, index) => ({ index, vehicleNumber: s.vehicleNumber, departureTime: s.departureTime, arrivalTime: s.arrivalTime })),
     };
   });

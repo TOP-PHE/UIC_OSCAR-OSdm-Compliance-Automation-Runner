@@ -176,6 +176,13 @@ describe('#862 PR 2 the reference scenarios', () => {
     expect(html).toContain('OTST_TWO_LEGS: no journey of 2 legs');
   });
 
+  test('a trip specification with no train naming its number and operator code is said apart (#1019)', () => {
+    const html = P.checklistScenariosHtml({ ...scenarios, noTestData: ['OTST_X'], noNamedTrain: ['OTST_SALE_ONE_WAY_1ADT_SPEC', 'OTST_SALE_NAMED_PLACE_2ADT'] });
+    expect(html).toContain('Not copied, no train set in the Test Data: 1.');
+    expect(html).toContain('Not copied, no train of the Test Data names its number and operator code, which a trip specification sends: 2.');
+    expect(P.checklistScenariosHtml(scenarios)).not.toContain('names its number and operator code');
+  });
+
   test('"do not copy" says how many could be; unavailable says why', () => {
     const html = P.checklistScenariosHtml({ ...scenarios, choice: 'none' });
     expect(html).toContain('value="none" data-checklist-action="scenarios" checked');

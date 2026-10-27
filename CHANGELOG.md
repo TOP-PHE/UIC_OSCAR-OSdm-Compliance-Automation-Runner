@@ -93,6 +93,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.427] / [collection-OTST_V2.0.231] — 2026-10-27
+
+Issue #1019, release 2026.462. Catalogue copies go on trains that can run them; a leg without carrier is no longer counted again as OSCAR's.
+
+### Fixed
+- **Where a catalogue copy goes.** The full runs of 2026-10-27 on the simulator placed every copy on the Test Data's first train.
+  - **`_SPEC` copies:** that train named no train number and no operator code, so they sent a trip specification with `vehicleNumbers: [null]` and no `carriers`. 24 to 35 scenarios per provider.
+  - **Partial refunds by passenger or by leg:** they ran on a trip sold as one ticket. From OSDM 3.8 the simulator refused them (400 `PARTIAL_REFUND_NOT_SUPPORTED`); below 3.8 everything was refunded.
+  - **The sales horizon and departure-in-the-past probes:** they ran where the simulator applies neither.
+  - **The fix:** a one-leg trip now goes on a train of its source's own route when the Test Data has one (`suggestTrip()` / `suggestTrips()`, `trainServicesFor()`). A trip specification goes only on a service naming its number and operator code (`testDataChoices()` carries `operatorCode`).
+  - Without such a train, the copy preview marks the scenario "to complete", and the checklist apply leaves it out with its own reason (`noNamedTrain`).
+- **The simulator references' Test Data:** every train names a number and an operator code (`namedTrains()`). A search trip's train gets the provider's carrier and a number of its own (`9000 + id`). All six references are regenerated, so every simulator company reads "not up to date" until it is updated.
+- **One defect, one check:** a trip specification leg without carrier is reported by the scenario's data check "Trip specification leg N names its carrier". The `[OSCAR request]` conformance check no longer counts it again as OSCAR's (`isDataGap()`): with nothing else wrong it passes, and says the scenario's data lacks something. Another problem in the same request still fails it, without the carrier.
+- **A leg without train number** gets a data check of its own, "Trip specification leg N names its train number", with what to do. OSDM's VehicleNumber is nullable, so the conformance check never saw `[null]`.
+- Tester User Guide (reference scenarios), CLAUDE.md.
+
+### Upgrade
+Companies set up before this release keep their copies as they are. To run them again: update from the reference, delete the copies, and copy them again.
+
+### Tests
+- `catalogue-match.test.js`: the own route first (an exchange's other route too); a specification only on a service naming both.
+- `checklist-scenarios.test.js`, `checklist-config-page.test.js`: the `noNamedTrain` list and its line.
+- `scenario-catalogue-routes.test.js`: "to complete" without a named train; with one, every specification is proposed it.
+- `reference-configuration.test.js`: every train named, a search trip's from the provider.
+- `bruno-request-schema.test.js`: the data gap passes and says so, another problem still fails without it.
+- `provider-declarations.test.js`: the number check (absent, empty, blank).
+- 14 deliberate breaks each make a test fail.
+- **Checked on gamma's new reference:** each copy that failed in the 2026-10-27 runs is proposed a train on its own route that names both, and every trip gets one. The simulator's own scenarios all name number and carrier, so their checks do not move.
+
+---
+
 ## [server-1.11.426] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1017, release 2026.461.

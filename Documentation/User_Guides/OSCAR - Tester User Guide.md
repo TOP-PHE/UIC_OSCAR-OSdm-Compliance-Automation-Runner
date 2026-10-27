@@ -471,6 +471,16 @@ What decides which scenarios you get:
 - **Your Test Data.** A trip of several legs needs a journey of as many legs;
   without one the scenario is greyed out ("no journey of N legs"). A scenario
   with no train set at all is not copied.
+- **Which train is proposed.** OSCAR proposes a train on the reference
+  scenario's own route when your Test Data has one (on the OSDM simulator,
+  the stop places choose what a scenario tests: tickets per passenger, the
+  sales horizon, the expiries…), else the first train.
+- **A trip specification needs a named train.** A scenario that sends its
+  trip as a specification (the `_SPEC` copies, the seat-map scenarios) names
+  the train number and the operator code. It is proposed only a train whose
+  Test Data names both. Without one, it is "to complete" in Copy scenarios,
+  and the checklist leaves it out ("no train of the Test Data names its
+  number and operator code"). Give a train both, then copy again.
 - **Some entries become several scenarios**, following what you declared:
   - one per offer request form (search, specification, trip ids);
   - one per currency sold;

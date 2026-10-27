@@ -71,6 +71,26 @@ describe('#809 a trip specification names its carrier, or says why it cannot', (
       expect(mockLogs.some((l) => l.startsWith('[ERROR] Leg 1 (train '))).toBe(true);
     });
 
+  // #1019: a specification names its train, which OSDM lets be null.
+  const numberChecks = (checks) => checks.filter(([name]) => name.includes('names its train number'));
+
+  test('with a train number: no check is added (#1019)', () => {
+    const { spec, checks } = parse(() => {});
+    expect(spec.legs[0].timedLeg.service.vehicleNumbers).toEqual([expect.any(String)]);
+    expect(numberChecks(checks)).toEqual([]);
+  });
+
+  test.each([['absent', (leg) => { delete leg.vehicleNumber; }], ['empty', (leg) => { leg.vehicleNumber = ''; }], ['blank', (leg) => { leg.vehicleNumber = '  '; }]])(
+    'train number %s: a failed check and an [ERROR] naming the fix (#1019)', (_, f) => {
+      const { checks } = parse((trip) => f(trip.legs[0]));
+      const [check] = numberChecks(checks);
+      expect(check[0]).toBe('Trip specification leg 1 names its train number');
+      expect(check[1]).toBe(false);
+      expect(check[2]).toContain('Give the train its number in Test Data');
+      expect(mockLogs.some((l) => l.startsWith('[ERROR] Leg 1 (') && l.includes('has no train number'))).toBe(true);
+      expect(carrierChecks(checks)).toEqual([]);
+    });
+
   test('every specification trip of the simulator names its carrier', () => {
     for (const trip of simulatorFile().tripRequirements.filter((t) => t.tripType === 'SPECIFICATION')) {
       for (const leg of trip.legs) expect(leg.operatorCode).toBe('urn:x_osdm_simulator:carrier:gamma');

@@ -281,18 +281,18 @@
     {
       "id": 1,
       "resource_type": "TRAIN",
-      "label": "Trip 1 0000001–0000002",
+      "label": "Train 9001 0000001–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000001",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9001",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -307,18 +307,18 @@
     {
       "id": 2,
       "resource_type": "TRAIN",
-      "label": "Trip 2 0000003–0000001",
+      "label": "Train 9002 0000003–0000001",
       "data": {
         "originURN": "urn:uic:stn:0000003",
         "destinationURN": "urn:uic:stn:0000001",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9002",
             "departureTime": "14:30:00+01:00",
             "arrivalTime": "19:00:00+01:00"
           }
@@ -441,7 +441,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000001",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
@@ -463,18 +463,18 @@
     {
       "id": 8,
       "resource_type": "TRAIN",
-      "label": "Trip 7 0000099–0000002",
+      "label": "Train 9008 0000099–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000099",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9008",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -489,18 +489,18 @@
     {
       "id": 9,
       "resource_type": "TRAIN",
-      "label": "Trip 8 0000098–0000002",
+      "label": "Train 9009 0000098–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000098",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9009",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -515,18 +515,18 @@
     {
       "id": 10,
       "resource_type": "TRAIN",
-      "label": "Trip 9 0000097–0000002",
+      "label": "Train 9010 0000097–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000097",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9010",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -541,18 +541,18 @@
     {
       "id": 11,
       "resource_type": "TRAIN",
-      "label": "Trip 10 0000096–0000002",
+      "label": "Train 9011 0000096–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000096",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9011",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -593,18 +593,18 @@
     {
       "id": 13,
       "resource_type": "TRAIN",
-      "label": "Trip 12 0000094–0000002",
+      "label": "Train 9013 0000094–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000094",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9013",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -619,18 +619,18 @@
     {
       "id": 14,
       "resource_type": "TRAIN",
-      "label": "Trip 13 0000093–0000002",
+      "label": "Train 9014 0000093–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000093",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9014",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -649,7 +649,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000001",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
@@ -775,18 +775,18 @@
     {
       "id": 20,
       "resource_type": "TRAIN",
-      "label": "Trip 19 0000090–0000002",
+      "label": "Train 9020 0000090–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000090",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9020",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -1087,18 +1087,18 @@
     {
       "id": 32,
       "resource_type": "TRAIN",
-      "label": "Trip 34 0000078–0000002",
+      "label": "Train 9032 0000078–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000078",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "",
+        "operatorCode": "urn:x_osdm_simulator:carrier:delta",
         "productCategoryRef": "",
         "productCategoryName": "",
         "productCategoryShortName": "",
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "",
+            "vehicleNumber": "9032",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
