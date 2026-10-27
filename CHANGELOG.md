@@ -93,6 +93,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.419] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1002, release 2026.454. A coverage export's file name starts with the company or provider it is about.
+
+### Changed
+- **Coverage export file names.** They were `oscar-coverage-<date>.md` / `.xlsx` and `oscar-coverage-report-<n>.xlsx` whatever the provider, so a distributor testing several providers could not tell the files apart. Each now starts with the name of the company or provider: `Provider-A-oscar-coverage-2026-10-27.xlsx`.
+  - The name keeps letters and digits only: accents are dropped and any other run of characters becomes one dash, 60 characters at most. A name with nothing left keeps the file name as before (`utils/fileNames.js`, `fileNameFor()`).
+  - Both workbook routes name the file (Content-Disposition), and the page takes that name (`downloadFileName()`, plain names only). A certifier's file is named after the report's provider, not its distributor.
+  - The Markdown, made in the page, takes the provider selected (`coverageFilePrefix()`, the server's rule).
+- Tester User Guide §6, CLAUDE.md.
+
+### Tests
+- `file-names.test.js`: accents, symbols, quotes and line breaks, a path, a name with nothing left, the 60-character cut, a long name in linear time.
+- `ui-scripts.test.js`: the page's rule equals the server's over the same names (`tests/helpers/file-name-samples.js`); a workbook takes the server's name only when it is a plain file name; the three downloads use them.
+- `coverage-routes.test.js`, `coverage-reports-routes.test.js`: each route's name, the certifier's after the provider.
+- Six deliberate breaks each make a test fail.
+
+---
+
 ## [server-1.11.418] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #994, release 2026.453. The provider takes a position on a point of the coverage by capability.

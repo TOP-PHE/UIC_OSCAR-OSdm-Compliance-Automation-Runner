@@ -765,6 +765,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     logs. Response fields are not parameters: the passenger checks' "optional
     member" stays. The simulator data file's descriptions keep "members":
     changing them would move every simulator reference's version.
+    **Export file names start with the company or provider** (#1002,
+    1.11.419): `utils/fileNames.js` `fileNameFor()` (letters and digits,
+    accents dropped, other runs one dash, 60 characters), used by both
+    workbook routes (a certifier's file takes the report's provider, not the
+    distributor). The page takes the workbook's name from Content-Disposition
+    (`downloadFileName()`, plain names only) and builds the Markdown's with
+    `coverageFilePrefix()`, pinned to the server's by `ui-scripts.test.js`
+    over `tests/helpers/file-name-samples.js`.
     **An expected refusal's forms are folded** (#996, 1.11.415): counts in a
     fixed order, every form under *Forms* (`capabilityRefusalFormsHtml()`), as
     the function view folds its scenarios (G3). The forms not refused are one

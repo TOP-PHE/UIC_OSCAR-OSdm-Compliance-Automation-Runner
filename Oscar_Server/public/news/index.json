@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-export-names",
+    "date": "October 27, 2026",
+    "tag": "Improvement",
+    "title": "Coverage files named after the provider",
+    "summary": "The coverage exports now start with the name of the company or provider they are about.",
+    "content": "Export Markdown, Download Excel and a published report's Excel file were all named oscar-coverage-… whatever the provider, so a distributor testing several providers could not tell them apart.\n\nEach file name now starts with the company or provider, for example Provider-A-oscar-coverage-2026-10-27.xlsx. Accents are dropped, and any character other than a letter or a digit becomes a dash. A certifier's file is named after the provider the report is about."
+  },
+  {
     "id": "2026-10-27-point-positions",
     "date": "October 27, 2026",
     "tag": "New Feature",

@@ -163,7 +163,8 @@ describe('published coverage reports (#972 part 4)', () => {
 
     const xlsx = await binary(request(app).get(`/v1/company/coverage/reports/${res.body.id}/download`).set(as('TM')));
     expect(xlsx.status).toBe(200);
-    expect(xlsx.headers['content-disposition']).toBe('attachment; filename="oscar-coverage-report-2.xlsx"');
+    // #1002: the file name starts with the company's name.
+    expect(xlsx.headers['content-disposition']).toBe('attachment; filename="Dist-D-oscar-coverage-report-2.xlsx"');
     const book = readZipEntry(xlsx.body, 'xl/workbook.xml').toString();
     expect([...book.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]).slice(0, 3)).toEqual(['Summary', 'Since report 1', 'Capabilities']);
     expect(readZipEntry(xlsx.body, 'xl/worksheets/sheet2.xml').toString()).toContain('Fixed');
@@ -204,5 +205,9 @@ describe('published coverage reports (#972 part 4)', () => {
     const xlsx = await binary(request(app).get(`/v1/certifier/coverage-reports/${res.body.id}/download`).set(as('CERT')));
     expect(xlsx.status).toBe(200);
     expect(readZipEntry(xlsx.body, 'xl/worksheets/sheet1.xml').toString()).toContain('Dist &lt;D&gt; — Prov P1 — published report 1');
+    // #1002: the certifier's file is named after the provider the report is about.
+    expect(xlsx.headers['content-disposition']).toBe('attachment; filename="Prov-P1-oscar-coverage-report-1.xlsx"');
+    const tm = await binary(request(app).get(`/v1/company/coverage/reports/${res.body.id}/download`).set(as('TM', 'P1')));
+    expect(tm.headers['content-disposition']).toBe('attachment; filename="Prov-P1-oscar-coverage-report-1.xlsx"');
   });
 });
