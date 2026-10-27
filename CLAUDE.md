@@ -3012,6 +3012,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     text. **The load has a `period` label the CPU count has not: divide with
     `ignoring(period)`** (found on a local Prometheus, pinned by the test).
     One run ≈ 0.2 CPU and 250 MB: *Max Concurrent Runs* ≈ 4 per CPU.
+    **A free run slot is shared fairly** (#1015, 1.11.425): `nextJobIndex()`
+    (`worker/queue.js`, pure) gives it to the company or provider with the
+    fewest runs going (under its limit; a tie to the oldest queued), then to
+    its batch with the fewest (`batchKeyOf()`: a run alone is its own batch).
+    Before, the first queued eligible run won, so a provider launched first
+    kept every slot its runs freed. `PARALLEL_STAGGER_MS` is read, never
+    applied. `queue-fairness.test.js` replays a three-provider campaign.
   - **Tickets per passenger or per leg are chosen by the trip's stop place**
     (#697, 0.23.0, profile `ticketing`): on `gamma` a trip from
     `urn:uic:stn:0000096` gets one ticket per passenger, one from `0000095`

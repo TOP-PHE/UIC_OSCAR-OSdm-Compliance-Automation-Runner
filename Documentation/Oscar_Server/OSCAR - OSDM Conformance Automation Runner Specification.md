@@ -841,7 +841,9 @@ The job queue enforces both global and per-company limits:
 
 Jobs are never refused — they wait in the queue until a slot opens. A company at its limit does not block other companies' jobs from starting.
 
-**Stagger delay**: Within a batch, jobs are started with a configurable delay (`PARALLEL_STAGGER_MS`, default 2000ms) to avoid overwhelming the provider API with simultaneous requests.
+**Fair share** (#1015): a free slot goes to the company or provider with the fewest runs going among those with queued work and under their limit (a tie: the one waiting longest), then to its batch with the fewest runs going. A running run is never stopped; the shares even out as runs end.
+
+**Stagger delay**: `PARALLEL_STAGGER_MS` is read but no launch waits on it: a job starts as soon as a slot is free.
 
 ### 13.7 API Endpoints
 
@@ -856,7 +858,7 @@ Jobs are never refused — they wait in the queue until a slot opens. A company 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `MAX_CONCURRENT_RUNS` | `5` | Global server-wide max concurrent Bruno processes |
-| `PARALLEL_STAGGER_MS` | `2000` | Delay (ms) between parallel launches within a batch |
+| `PARALLEL_STAGGER_MS` | `2000` | Not applied: read, but no launch waits on it |
 
 | Framework Config Field | Default | Description |
 |----------------------|---------|-------------|
