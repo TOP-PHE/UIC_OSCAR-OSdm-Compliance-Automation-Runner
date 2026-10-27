@@ -148,6 +148,10 @@ describe('GET /metrics', () => {
     expect(res.status).toBe(200);
     expect(res.text).toEqual(expect.any(String));
     expect(res.text.length).toBeGreaterThan(0);
+    // #1013: the machine and the runs' processes follow the registry's own.
+    expect(res.text).toContain('oscar_node_process_cpu_seconds_total');
+    expect(res.text).toMatch(/\noscar_host_cpus \d+\n/);
+    expect(res.text).toMatch(/\noscar_run_processes \d+\n/);
   });
 
   test('#1005: ?source=simulator answers the simulator gauges in Prometheus text; another source is 404', async () => {

@@ -22,6 +22,9 @@ Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
 - Auth + SMTP success/failure rates
 - Process memory (RSS, heap used, heap total)
 - Process CPU + Node.js event-loop lag
+- Row *OSCAR host* (#1013): the machine's CPU by mode, load against CPUs,
+  memory and swap, the container's memory, and the run processes (Bruno)
+  with their memory
 
 **OSCAR · Logs** — centralised log aggregation:
 - Errors-only view (regex-matches ERROR / FATAL / PANIC)
@@ -83,6 +86,40 @@ Full operational guide: [`OSCAR - Server Admin Guide.md` § 14](OSCAR%20-%20Serv
   email — Grafana auto-creates a matching user (Viewer by default,
   promote to Editor / Admin in the Grafana UI).
 - Prometheus has no public port at all.
+
+### The OSCAR server's machine (#1013)
+
+Each run is a Bruno process, a child of the server: its CPU and memory do not
+show in the server process's own metrics (`oscar_node_process_*`). A load
+test of 36 parallel runs saturated a 6-CPU machine (load 29.7, 2.6 GiB of
+memory available, no swap) while the dashboard showed none of it. Since
+1.11.424 OSCAR's `/metrics` also writes, read at each scrape:
+
+- `oscar_host_*`: memory total and available, swap total and free, load
+  (1, 5, 15 minutes), CPU count, CPU time by mode, from `/proc` as the
+  container sees it (on a VM, the VM's own figures);
+- `oscar_container_memory_bytes` and, when the container has one, its limit
+  (cgroup);
+- `oscar_run_processes` and their total resident memory: the server's own
+  child processes (Bruno, report merge), counted. No name, path or argument
+  of a process is written.
+
+The row *OSCAR host* of *OSCAR · Overview* shows them. How to read it:
+
+- **Load per CPU** over 1 means processes wait for a CPU. Pages and runs
+  slow down together. Over 2 for 10 minutes fires `OscarHostOverloaded`.
+- **Memory available** under 10 % for 5 minutes fires `OscarHostMemoryLow`
+  (critical). Past it the machine swaps or the kernel kills a process, the
+  OSCAR server included.
+- **Swap used** over 1 GiB for 10 minutes fires `OscarHostSwapping`.
+
+**How many parallel runs a machine holds.** A run costs about 0.2 CPU and
+250 MB (measured on the simulator, up to 430 MB for a long scenario). So
+*Max Concurrent Runs* (Admin → Server Config, applied at once) is about 4
+per CPU, as long as runs × 250 MB stays well under the memory available
+without runs: 24 on 6 CPUs and 11 GiB. 50 runs need about 12 CPUs and 16 to
+24 GiB. Above that the machine does no more work, it only shares it out
+more slowly.
 
 ### The OSDM simulator (#1005)
 

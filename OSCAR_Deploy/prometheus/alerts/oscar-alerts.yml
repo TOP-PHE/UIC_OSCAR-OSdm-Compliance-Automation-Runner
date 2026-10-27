@@ -117,3 +117,52 @@ groups:
         annotations:
           summary: "OSCAR event loop lag > 200 ms (p99)"
           description: "The Node event loop is being blocked. Likely a heavy synchronous report-builder query or a tight loop. Check active runs + report rendering load."
+
+      # #1013: the machine, not only the server process. Each run is a Bruno
+      # process (about 0.2 CPU and 250 MB), a child the process metrics above
+      # do not see. Runbook: metrics-and-monitoring.md, "The OSCAR server's
+      # machine".
+      - alert: OscarHostOverloaded
+        # Twice as many processes wanting a CPU as there are CPUs: runs and
+        # pages slow down together. Lower Max Concurrent Runs.
+        expr: oscar_host_load{period="5m"} / ignoring(period) oscar_host_cpus > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OSCAR's machine is overloaded (load {{ $value | humanize }} per CPU)"
+          description: "The 5-minute load is over twice the number of CPUs for 10 minutes. Runs and pages slow down. Lower Max Concurrent Runs (Admin → Server Config), about 4 runs per CPU, or give the machine more CPUs."
+          runbook: "Documentation/Server_Operations/metrics-and-monitoring.md#the-oscar-servers-machine-1013"
+
+      - alert: OscarHostMemoryLow
+        # Under 10 % available: the next runs may push the machine into swap,
+        # or the kernel may kill a process, OSCAR included.
+        expr: oscar_host_memory_available_bytes / oscar_host_memory_total_bytes < 0.10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OSCAR's machine has {{ $value | humanizePercentage }} of its memory available"
+          description: "Less than 10 % of the memory is available for 5 minutes. Each run takes about 250 MB. Lower Max Concurrent Runs (Admin → Server Config) now, or the kernel may kill a process."
+          runbook: "Documentation/Server_Operations/metrics-and-monitoring.md#the-oscar-servers-machine-1013"
+
+      - alert: OscarHostSwapping
+        expr: (oscar_host_swap_total_bytes - oscar_host_swap_free_bytes) > 1073741824
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OSCAR's machine uses {{ $value | humanize1024 }}B of swap"
+          description: "Over 1 GiB of swap in use for 10 minutes: the machine is short of memory and everything slows down. Lower Max Concurrent Runs (Admin → Server Config)."
+          runbook: "Documentation/Server_Operations/metrics-and-monitoring.md#the-oscar-servers-machine-1013"
+
+      - alert: OscarContainerMemoryNearLimit
+        # Only when the container has a memory limit.
+        expr: oscar_container_memory_bytes / oscar_container_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The OSCAR container uses {{ $value | humanizePercentage }} of its memory limit"
+          description: "Over 90 % of the container's memory limit for 5 minutes. Past the limit Docker kills the container. Lower Max Concurrent Runs or raise the limit."
+          runbook: "Documentation/Server_Operations/metrics-and-monitoring.md#the-oscar-servers-machine-1013"

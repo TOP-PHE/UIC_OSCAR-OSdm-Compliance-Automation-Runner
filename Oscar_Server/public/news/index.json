@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-oscar-host-monitoring",
+    "date": "October 27, 2026",
+    "tag": "Added",
+    "title": "The OSCAR server's machine in Grafana",
+    "summary": "Administrators can see the OSCAR machine's CPU, memory and swap, and the processes the runs use, with alerts when it is overloaded.",
+    "content": "The OSCAR · Overview dashboard has a new row, OSCAR host: load per CPU, memory available, swap, and the Bruno processes of the running tests with their memory. Alerts are sent when the machine is overloaded, short of memory or swapping. The operations guide says how many parallel runs a machine holds: about four per CPU."
+  },
+  {
     "id": "2026-10-27-simulator-version",
     "date": "October 27, 2026",
     "tag": "Added",

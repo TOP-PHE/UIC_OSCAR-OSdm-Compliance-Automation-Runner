@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.458",
+  "current_release": "2026.459",
   "releases": [
+    {
+      "release": "2026.459",
+      "date": "2026-10-27",
+      "server": "1.11.424",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1013: OSCAR's /metrics also writes its machine (oscar_host_*: memory, swap, load, CPUs, CPU time from /proc), its container's memory (cgroup) and the run processes it started (oscar_run_processes, their memory); row \"OSCAR host\" on OSCAR · Overview and four alerts (load per CPU over 2, memory available under 10 %, swap over 1 GiB, container near its limit)."
+      ]
+    },
     {
       "release": "2026.458",
       "date": "2026-10-27",

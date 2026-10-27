@@ -3000,6 +3000,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     their metric names to the relay's: rename on both sides or neither.
     Checked with promtool and a local Prometheus: a stub serving text needs
     `fallback_scrape_protocol`, OSCAR's route sends the content type.
+    **The OSCAR server's machine (#1013, 1.11.424)**: a run is a Bruno child
+    process, invisible to `oscar_node_process_*`. `utils/hostMetrics.js`
+    (parsers pure, `snapshot()` takes the reader) appends to `/metrics` the
+    machine (`oscar_host_*` from `/proc`), the container's memory (cgroup)
+    and `oscar_run_processes` (the server's direct children, counted, their
+    VmRSS added; never a name or argument). It is plain text after the
+    registry's, not prom-client gauges: an unreadable file gives no line,
+    where a reset gauge would read 0 and fire an alert. Row *OSCAR host* and
+    four `oscar.host` alerts; `host-metrics.test.js` pins their names to the
+    text. **The load has a `period` label the CPU count has not: divide with
+    `ignoring(period)`** (found on a local Prometheus, pinned by the test).
+    One run ≈ 0.2 CPU and 250 MB: *Max Concurrent Runs* ≈ 4 per CPU.
   - **Tickets per passenger or per leg are chosen by the trip's stop place**
     (#697, 0.23.0, profile `ticketing`): on `gamma` a trip from
     `urn:uic:stn:0000096` gets one ticket per passenger, one from `0000095`
