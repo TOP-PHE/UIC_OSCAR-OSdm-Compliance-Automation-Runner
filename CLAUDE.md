@@ -243,7 +243,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     **Offer request options (#227, PR 1 = 1.11.392 / OTST_V2.0.221,
     simulator 0.54.0):** `offerOptionDiscovery` on a scenario makes step 01
     a discovery (`library-bruno/offerOptions.js`). 01's before-request keeps
-    the whole request in `__offerOptionFull` and sends the mandatory members
+    the whole request in `__offerOptionFull` and sends the mandatory parameters
     only (`mandatoryRequest()`: passengers' externalRef + type, the trip):
     the one check, which fails on a refusal or no offer. The after-response
     (`runOptionDiscovery()`, before the other probes) sends from the script
@@ -707,6 +707,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     hidden rows drawn with the table (`capabilityPointRows()`, no anchor id,
     so ids stay unique), `toggleCoveragePoint()` on `coverage-body` and
     `published-body`; the number keeps its link to the list at the end.
+    **A point says what it expected and what was seen** (#990, 1.11.413 /
+    OTST_V2.0.228): `observed` { text, at, code } is the failure text
+    (`run_assertions.error_msg`, one line, 500 characters) of the latest run
+    that met the point, the first met in that run; `check` loses a leading
+    pictograph (`plainCheck()`) but the #735 keys keep the stored text, so
+    comparisons of published reports do not move. The page draws
+    **Expected:** / **Seen:** (`capabilityProblemLines()`), a known deviation
+    stays one line, a report published before has no *Seen*. Rows of
+    `failedChecksOf()` now hold `error_msg`: every reader picks named
+    fields, never the whole row; keep it so. A declared option the provider
+    does not take fails in words (`notTakenText()`, `NOT_TAKEN_WORDS`); the
+    report lines keep the result codes, which `offerOptionReport.js` reads
+    back. **"Parameters", not "members"** (maintainer, 2026-10-27; OSDM's own
+    word, `PARAMETER_NOT_SUPPORTED`) for the fields of a request wherever a
+    reader sees them; `reportOf()` still reads the phase 1 line of earlier
+    logs. Response fields are not parameters: the passenger checks' "optional
+    member" stays. The simulator data file's descriptions keep "members":
+    changing them would move every simulator reference's version.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

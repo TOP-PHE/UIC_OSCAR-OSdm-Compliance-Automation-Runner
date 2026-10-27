@@ -168,6 +168,21 @@ describe('the collection holds the answers to the declarations', () => {
       expect.stringMatching(/^refused \(HTTP 400\): CORPORATE_CODE_UNKNOWN\. Either the provider/)]]);
     expect(logs.some((l) => /declared as not supported in the Test Framework: passenger\.gender\b/.test(l))).toBe(true);
   });
+
+  test('a declared option not taken fails in words, for every result that counts (#990)', () => {
+    const results = ['honoured', 'accepted', 'ignored-said', 'ignored-silent', 'no-offer-said', 'no-offer-silent',
+      'invalid-said', 'invalid-silent', 'refused', 'not-implemented', 'error', 'not-tested', 'not-reached'];
+    const counted = results.filter((result) => o.compareWithDeclarations({ options: [{ option: 'x', declared: true, result }] }).contradicted.length === 1);
+    expect(Object.keys(o.NOT_TAKEN_WORDS).sort()).toEqual(counted.sort());
+    expect(o.notTakenText({ result: 'ignored-silent', status: 200, message: 'the offers do not keep to currency, and nothing says so' }))
+      .toBe('ignored without saying so (HTTP 200): the offers do not keep to currency, and nothing says so. Either the provider does not take it, and the Test Framework should not declare it, or the provider should.');
+    expect(o.notTakenText({ result: 'error' })).toMatch(/^answered with an error: no detail\. /);
+    expect(o.notTakenText({ result: 'unknown-code', status: 500, message: 'm' })).toMatch(/^unknown-code \(HTTP 500\): m\. /);
+    // A detail already in those words is not preceded by them again.
+    const silent = { result: 'no-offer-silent', status: 200, message: 'no offer, and nothing says why (OSDM: the answer should say no offer fits the options, or offer others)' };
+    expect(o.notTakenText(silent)).toMatch(/^HTTP 200: no offer, and nothing says why \(OSDM: /);
+    expect(o.notTakenText({ ...silent, status: 0 })).toMatch(/^no offer, and nothing says why \(OSDM: /);
+  });
 });
 
 // #227 part 3: the checklist's questions A2.5, P1.19–P1.21.

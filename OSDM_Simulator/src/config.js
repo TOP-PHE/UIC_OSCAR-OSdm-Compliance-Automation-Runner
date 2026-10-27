@@ -281,7 +281,7 @@ function checkAgeTariffs(value, bad) {
   return { ageTariffs: { from: value.from, bands } };
 }
 
-// #227: what the provider does with optional members of the offer request,
+// #227: what the provider does with optional parameters of the offer request,
 // for trips from one stop place (`from`): `members` maps a member (as the
 // collection names it) to a behaviour of REQUEST_OPTION_BEHAVIOURS;
 // `promotionCodes` lists the codes it knows. Absent: no such behaviour.

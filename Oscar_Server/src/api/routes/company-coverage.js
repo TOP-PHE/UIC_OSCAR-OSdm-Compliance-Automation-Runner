@@ -68,13 +68,14 @@ function daysOf(raw) {
 }
 
 // The failed checks of the runs, by run, in order, with their step, its HTTP
-// status and, for an error answer, its problem code (#972 R6: the #735 key).
+// status and, for an error answer, its problem code (#972 R6: the #735 key),
+// and what each saw (#990: the point's "Seen" line).
 function failedChecksOf(ids) {
   const byRun = new Map();
   const rows = [];
   for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);
-    rows.push(...all(`SELECT a.run_id, a.assertion_name, a.category, a.severity, q.request_name, q.http_status, q.id AS request_id
+    rows.push(...all(`SELECT a.run_id, a.assertion_name, a.error_msg, a.category, a.severity, q.request_name, q.http_status, q.id AS request_id
                         FROM run_assertions a JOIN run_requests q ON q.id = a.request_id
                        WHERE a.passed = 0 AND a.run_id IN (${chunk.map(() => '?').join(',')})
                        ORDER BY a.id ASC LIMIT ${MAX_FAILED_CHECKS}`, chunk));

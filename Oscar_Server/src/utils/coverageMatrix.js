@@ -117,7 +117,7 @@ function describe(id, declaredRows) {
     const [key, v] = splitId(value);
     return { group: 'Offer search options', label: `${OPTION_TEXT[key] || capital(words(key))} ${v}` };
   }
-  if (prefix === 'offerOptionDiscovery') return { group: 'Offer search options', label: 'Offer request options (which optional members the provider takes)' };
+  if (prefix === 'offerOptionDiscovery') return { group: 'Offer search options', label: 'Offer request options (which optional parameters the provider takes)' };
   const family = FAMILIES[prefix];
   return family ? { group: family.group, label: family.label(value) } : { group: 'Other', label: id };
 }

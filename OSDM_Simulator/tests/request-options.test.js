@@ -8,7 +8,7 @@
 'use strict';
 
 /**
- * #227: from the stop place of `requestOptions`, each optional member of the
+ * #227: from the stop place of `requestOptions`, each optional parameter of the
  * profile is ignored, refused or answered without offers, so OSCAR's offer
  * request options scenario meets every class of answer. Elsewhere the same
  * members change nothing.
@@ -35,7 +35,7 @@ function request(from, change) {
 const ask = (from, change) => call(sim.base, token, 'POST', '/gamma/offers', request(from, change));
 const each = (member) => (b) => { for (const p of b.anonymousPassengerSpecifications) p[member] = member === 'prmNeeds' ? ['WHEELCHAIR'] : 'FR'; };
 
-test('the mandatory members alone are answered with offers', async () => {
+test('the mandatory parameters alone are answered with offers', async () => {
   const res = await ask(FROM, (b) => { b.anonymousPassengerSpecifications = b.anonymousPassengerSpecifications.map((p) => ({ externalRef: p.externalRef, type: p.type })); });
   assert.equal(res.status, 200);
   assert.ok(res.body.offers.length > 0);

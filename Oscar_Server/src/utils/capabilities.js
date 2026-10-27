@@ -57,7 +57,7 @@ const CAPABILITIES = Object.freeze([
   { id: 'offers.tripIds', group: 'Offers', label: 'Offers by trip id', goal: [OFFER_GOAL] },
   { id: 'offers.tripParameters', group: 'Offers', label: 'Trip search parameters (train filter, transfers, vias…)', stage: 'offer' },
   { id: 'offers.options', group: 'Offers', label: 'Offer search options (classes, flexibility, offer parts…)', stage: 'offer' },
-  { id: 'offers.requestOptions', group: 'Offers', label: 'Optional members of the offer request', stage: 'offer' },
+  { id: 'offers.requestOptions', group: 'Offers', label: 'Optional parameters of the offer request', stage: 'offer' },
   { id: 'sale', group: 'Sale', label: 'Sale: pre-booking and confirmation', goal: [SALE_GOAL] },
   { id: 'sale.products', group: 'Sale', label: 'Named products and tariff choice', stage: 'sale' },
   { id: 'sale.groupTariff', group: 'Sale', label: 'Group tariff', stage: 'sale' },

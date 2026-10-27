@@ -8,7 +8,7 @@
 'use strict';
 
 /**
- * #227: which optional members of the offer request a provider supports.
+ * #227: which optional parameters of the offer request a provider supports.
  * The pure part of library-bruno/offerOptions.js.
  */
 
@@ -321,7 +321,7 @@ describe('the Bruno glue', () => {
     o.prepareOptionDiscovery();
     expect(JSON.parse(env.OfferCollectionRequest)).toEqual(o.mandatoryRequest(searchRequest()));
     expect(await o.runOptionDiscovery(200, { offers: [{ offerId: 'O' }] })).toBe(true);
-    expect(checks).toEqual([[expect.stringMatching(/mandatory members only/), 'pass']]);
+    expect(checks).toEqual([[expect.stringMatching(/mandatory parameters only/), 'pass']]);
     const report = JSON.parse(env.__offerOptionReport);
     expect(report.used).toBe(12);
     expect(report.seed).toBe(o.seedOf('S'));

@@ -377,7 +377,7 @@
             "enum": ["on", "off", true, false, "", null]
           },
           "offerOptionDiscovery": {
-            "description": "Offer request options (#227). When on, step 01 finds which optional members of the offer request the provider supports: first the request with the mandatory members only (the passengers' externalRef and type, and the trip), which must be answered with offers; then each option alone, random combinations of the options found supported, and every supported option at once. Each answer is classified (supported, refused, not implemented, error; then honoured, ignored said or silent, no offer said or silent, accepted). Only the first request can fail; the rest is reported. The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "description": "Offer request options (#227). When on, step 01 finds which optional parameters of the offer request the provider supports: first the request with the mandatory parameters only (the passengers' externalRef and type, and the trip), which must be answered with offers; then each option alone, random combinations of the options found supported, and every supported option at once. Each answer is classified (supported, refused, not implemented, error; then honoured, ignored said or silent, no offer said or silent, accepted). Only the first request can fail; the rest is reported. The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },

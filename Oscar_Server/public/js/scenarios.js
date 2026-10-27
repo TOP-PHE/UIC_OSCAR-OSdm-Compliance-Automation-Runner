@@ -4348,7 +4348,7 @@ function fwOfferOptionsHtml(fw) {
   return `<div class="fw-subsection">
         <label class="fw-subsection-label" for="fw-option-max-requests" style="display:block;margin:0 0 8px">
           Offer request options: most requests
-          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — what the scenario finding which optional members of the offer request the provider supports may send (3 to 200; empty = 30)</span>
+          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — what the scenario finding which optional parameters of the offer request the provider supports may send (3 to 200; empty = 30)</span>
         </label>
         <input type="number" id="fw-option-max-requests" min="3" max="200" value="${Number.isInteger(settings.maxRequests) ? settings.maxRequests : ''}" data-action="fw-option-max-requests" style="width:90px">
         <label class="fw-subsection-label" for="fw-option-invalid-values" style="display:block;margin:12px 0 8px">Options only the provider can give a value for, when none is declared</label>

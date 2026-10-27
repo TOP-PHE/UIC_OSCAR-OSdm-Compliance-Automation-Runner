@@ -92,7 +92,7 @@ function optionRows(fw) {
     rows.push(...listRows('Offer search options', `offerOption:${key}`, fw.offerSearchOptions?.[key], (v) => `${label} ${v}`));
   }
   const discovery = isObj(fw.offerOptionDiscovery) || Array.isArray(fw.corporateCodes) || Array.isArray(fw.promotionCodes);
-  if (discovery) rows.push({ id: 'offerOptionDiscovery', group: 'Offer search options', label: 'Offer request options (which optional members the provider takes)' });
+  if (discovery) rows.push({ id: 'offerOptionDiscovery', group: 'Offer search options', label: 'Offer request options (which optional parameters the provider takes)' });
   return rows;
 }
 

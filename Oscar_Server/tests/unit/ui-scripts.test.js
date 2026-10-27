@@ -1481,7 +1481,7 @@ describe('the Report Builder coverage section', () => {
   const ctx = { escHtml, encodeURIComponent, COVERAGE_STATES, COVERAGE_DECLARATIONS, CAPABILITY_RESULTS, POINT_KINDS, CHANGE_LABELS };
   for (const name of sectionNames) ctx[name] = loadFunction(page, name, ctx);
   const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks,
-    capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml } = ctx;
+    capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml, capabilityPointsHtml, capabilitySentence } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1602,6 +1602,7 @@ describe('the Report Builder coverage section', () => {
       { number: 1, kind: 'provider', source: 'check', capability: 'sale', capabilityLabel: 'Sale <l>', step: '02. <s>', steps: ['02. <s>', '05. <t>'],
         check: 'X <c>', status: 500, problemCode: 'P<q>', blocking: true, occurrences: 2, tests: [{ key: 'K', entry: 'OTST_<e>', codes: ['C_<1>'] }],
         runs: [{ runId: UUID, code: 'C_<1>' }, { runId: 'nope', code: 'C2' }], firstSeen: '2026-10-20', lastSeen: '2026-10-26',
+        observed: { text: 'Got <n> instead', at: '2026-10-26', code: 'C_<1>' },
         finding: { id: 'f', title: 'T <f>', category: 'provider_deviation', status: 'open' }, possibleFinding: null, expectedRefusal: false },
       { number: 2, kind: 'oscar', source: 'check', capability: 'refund.full', capabilityLabel: 'Full <refund>', step: '14. <u>', steps: ['14. <u>'],
         check: '[OSCAR request] <o>', status: 200, problemCode: null, blocking: false, occurrences: 1, tests: [{ key: 'NHF_<r>', entry: null, codes: ['NHF_<r>'] }],
@@ -1610,7 +1611,7 @@ describe('the Report Builder coverage section', () => {
     ],
     apart: [{ code: 'A_2', entry: 'A' }], notTested: [{ id: 'x', group: 'Cards', label: 'Card <k>', state: 'not-covered' }],
   };
-  const TAGS = ['<g>', '<l>', '<e>', '<p>', '<1>', '<s>', '<c>', '<z>', '<r>', '<refuse>', '<refund>', '<x>', '<t>', '<q>', '<f>', '<m>', '<k>', '<u>', '<o>'];
+  const TAGS = ['<g>', '<l>', '<e>', '<p>', '<1>', '<s>', '<c>', '<z>', '<r>', '<refuse>', '<refund>', '<x>', '<t>', '<q>', '<f>', '<m>', '<k>', '<u>', '<o>', '<n>'];
 
   test('the results and kinds are the server\'s, named alike', () => {
     const { RESULT_TEXT } = require('../../src/utils/capabilityCoverage');
@@ -1633,8 +1634,8 @@ describe('the Report Builder coverage section', () => {
     expect(out).toContain('cov-deviation">Passed with deviation');
     expect(out).toContain('<td><strong>NHF_&#60;r&#62;</strong><br><small>Must &#60;refuse&#62;</small></td><td>Full &#60;refund&#62;</td>');
     expect(out).not.toContain('bad"');
-    expect(out).toContain('<li id="cov-point-1"><strong>#1</strong> Sale &#60;l&#62; <span class="cov-state cov-blocked">Blocking</span><br>02. &#60;s&#62;, 05. &#60;t&#62;: X &#60;c&#62; (HTTP 500, P&#60;q&#62;)');
-    expect(out).toContain('Seen in OTST_&#60;e&#62; (C_&#60;1&#62;), from 2026-10-20 to 2026-10-26, 2 times');
+    expect(out).toContain('<li id="cov-point-1"><strong>#1</strong> Sale &#60;l&#62; <span class="cov-state cov-blocked">Blocking</span><br>02. &#60;s&#62;, 05. &#60;t&#62; (HTTP 500, P&#60;q&#62;)'
+      + '<br><strong>Expected:</strong> X &#60;c&#62;<br><strong>Seen:</strong> Got &#60;n&#62; instead<br><small>Found in OTST_&#60;e&#62; (C_&#60;1&#62;), from 2026-10-20 to 2026-10-26, 2 times</small>');
     expect(out).toContain('Finding: T &#60;f&#62; (provider_deviation, open)');
     expect(out).toContain('Runs: <a href="/run-detail.html?id=' + UUID + '">C_&#60;1&#62;</a>, C2');
     expect(out).toContain('<h4 class="cov-heading">Points to look at (2)</h4><h5 class="cov-subheading">For the provider (1)</h5>');
@@ -1692,7 +1693,8 @@ describe('the Report Builder coverage section', () => {
       '## By flow and element', '## By function declared', '## Scenarios testing what the Test Framework does not declare']);
     expect(md).toContain('| Sale \\<l> — Declared | 1 test(s), 1 form(s) run · proven on the way by 3 run(s) | Passed with points | #1 |');
     expect(md).toContain('| NHF_\\<r> | Full \\<refund> | Not refused | NHF_\\<r>: Not refused | #2 |');
-    expect(md).toContain('- #1 Sale \\<l>, blocking — 02. \\<s>, 05. \\<t>: X \\<c> (HTTP 500, P\\<q>). Seen in OTST_\\<e> (C_\\<1>), from 2026-10-20 to 2026-10-26, 2 times. Finding: T \\<f> (provider_deviation, open).');
+    expect(md).toContain('- #1 Sale \\<l>, blocking — 02. \\<s>, 05. \\<t> (HTTP 500, P\\<q>). Expected: X \\<c>. Seen: Got \\<n> instead.'
+      + ' Found in OTST_\\<e> (C_\\<1>), from 2026-10-20 to 2026-10-26, 2 times. Finding: T \\<f> (provider_deviation, open).');
     expect(md).toContain('## Points to look at\n\n### For the provider\n');
     expect(md).toContain('### OSCAR\'s own points (not counted against the provider)');
     expect(md).toContain('### Sales \\<flows>');
@@ -1780,15 +1782,31 @@ describe('the Report Builder coverage section', () => {
         tripRequirements: [{ id: 1, tripType: 'SEARCH', trip: {} }], passengersList: [{ id: 1, passengers: [{ type: 'PERSON' }] }] },
       runs: { A: { id: UUID, status: 'FAILED', completed_at: '2026-10-24 10:05:00',
         steps: ['01. POST Get Offer', '02. POST Create Booking', '06. POST Obtaining Fulfillments from Booking'].map((n) => ({ request_name: n, http_status: 200 })),
-        checks: [{ request_name: '02. POST Create Booking', assertion_name: 'Booking price is 12.50', category: 'business_logic', severity: 'major', http_status: 200 }] } },
+        checks: [{ request_name: '02. POST Create Booking', assertion_name: 'Booking price is 12.50', category: 'business_logic', severity: 'major', http_status: 200,
+          error_msg: 'expected 12.4 to equal 12.5' }] } },
     });
     const out = capabilityHtml(report);
     expect(out).toContain('<td>Sale: pre-booking and confirmation — Declared</td>');
     expect(out).toContain('cov-points">Passed with points</span></td><td><a href="#cov-point-1" data-cov-point="1" aria-expanded="false">#1</a></td>');
-    // A 2xx status is not printed: the answer was a success.
-    expect(out).toContain('<li id="cov-point-1"><strong>#1</strong> Sale: pre-booking and confirmation<br>02. POST Create Booking: Booking price is N<br><small>');
+    // A 2xx status is not printed: the answer was a success. What the run saw is the check's failure text (#990).
+    expect(out).toContain('<li id="cov-point-1"><strong>#1</strong> Sale: pre-booking and confirmation<br>02. POST Create Booking<br><strong>Expected:</strong> Booking price is N'
+      + '<br><strong>Seen:</strong> expected 12.4 to equal 12.5<br><small>');
     // A test outside the catalogue is named by its code, once.
-    expect(out).toContain('Seen in A, on 2026-10-24 10:05:00');
+    expect(out).toContain('Found in A, on 2026-10-24 10:05:00');
+  });
+
+  test('a known deviation is one line; a point of a report published before #990 has no "Seen"', () => {
+    const base = { number: 1, kind: 'accepted', capability: 'sale', capabilityLabel: 'Sale', steps: ['02. <b>'], status: 202, problemCode: null, occurrences: 1, tests: [], runs: [] };
+    const deviation = capabilityPointsHtml([{ ...base, source: 'known-deviation', check: 'Known deviation: answered HTTP 202', note: 'Later <x>' }]);
+    expect(deviation).toContain('<br>02. &#60;b&#62;: Known deviation: answered HTTP 202<br><small>Later &#60;x&#62;</small>');
+    expect(deviation).not.toContain('Expected:');
+    const before = capabilityPointsHtml([{ ...base, kind: 'provider', source: 'check', check: 'Price <c>', status: 200 }]);
+    expect(before).toContain('<br>02. &#60;b&#62;<br><strong>Expected:</strong> Price &#60;c&#62;<br><small>Found in no test');
+    expect(before).not.toContain('Seen:');
+    // Only a line's own label is set in bold; the rest of it is text.
+    const label = capabilityPointsHtml([{ ...base, kind: 'provider', source: 'check', check: 'Seen: <b>', status: 200, observed: { text: 'Expected: <i>' } }]);
+    expect(label).toContain('<br><strong>Expected:</strong> Seen: &#60;b&#62;<br><strong>Seen:</strong> Expected: &#60;i&#62;<br>');
+    expect([capabilitySentence('a'), capabilitySentence('b.'), capabilitySentence('c…'), capabilitySentence('d?')]).toEqual(['a.', 'b.', 'c…', 'd?']);
   });
 });
 
