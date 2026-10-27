@@ -584,7 +584,8 @@ app.get('/metrics', async (req, res) => {
     res.set('Content-Type', metrics.register.contentType);
     // #1013: the machine and the runs' processes, read at each scrape.
     const own = await metrics.register.metrics();
-    res.end(`${own.endsWith('\n') ? own : `${own}\n`}${hostMetrics.hostMetricsText(hostMetrics.snapshot())}`);
+    const separator = own.endsWith('\n') ? '' : '\n';
+    res.end(own + separator + hostMetrics.hostMetricsText(hostMetrics.snapshot()));
   } catch (err) {
     log.error({ err: err.message }, 'Failed to render /metrics');
     res.status(500).send('# Failed to render metrics\n');
