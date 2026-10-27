@@ -93,9 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.421] / [collection-OTST_V2.0.230] — 2026-10-27
+## [server-1.11.422] / [collection-OTST_V2.0.230] — 2026-10-27
 
-Issue #1008, release 2026.456. In the coverage by capability, "Blocked" and "Passed with points" always say why.
+Issue #1008, release 2026.457. In the coverage by capability, "Blocked" and "Passed with points" always say why.
 
 ### Fixed
 - **"Blocked" and "Passed with points" with no point to open.** A company testing the simulator read "28 blocked, 11 passed with points, 0 point(s) to look at". A capability was read blocked whenever the latest run of its scenario did not reach the capability's step, and the reason was looked for only among the checks counted against that capability. Now:
@@ -109,6 +109,32 @@ Issue #1008, release 2026.456. In the coverage by capability, "Blocked" and "Pas
 - `capability-coverage.test.js`: a run with no request (a sale and an expected refusal); a run a 401 at an optional read stopped, alone and next to a form that passed; a run that ended as it is written; one that stopped with no failed check; a refusal probing an optional capability. Over 2,000 drawn data files: a blocked form always has a step, a check and a point, and a row "Passed with points" or "Blocked" always names a point. The seven tests fail on the code before.
 - `coverage-routes.test.js`: the refund whose run stopped with no failed check reads *Not run*, not blocked.
 - Reproduced on a throwaway OSCAR with the local simulator (gamma's reference, 126 runs): before, "Group tariff" and "Travel class per leg" read "Passed with points" with no point, and "Mandatory reservation" "Blocked" with no step, check or point; after, each names the 401 at the products read and its point.
+
+---
+
+## [server-1.11.421] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1005, release 2026.456. Simulator 0.57.0.
+
+### Added
+- **The simulator in OSCAR's Grafana.** A dashboard *OSDM Simulator · Overview* (`OSCAR_Deploy/grafana/dashboards/osdm-simulator.json`), in the layout of *OSCAR · Overview*:
+  - whether the simulator answers OSCAR, its version, request rate and P95 answer time;
+  - its host's memory, swap, CPU by mode, load and data disk;
+  - requests by status and by provider, and refusals of its rate limit;
+  - its process's memory, CPU and event-loop delay, and the offers and bookings it keeps.
+- **Seven alerts** (`prometheus/alerts/osdm-simulator-alerts.yml`), mailed like OSCAR's own: unreachable (critical); swap over 256 MiB; memory over 90 %; P95 over 1 s; 429s to the OSCAR server; disk under 10 %; event-loop delay over 200 ms. Nothing fires while no simulator is set up.
+- **Read through OSCAR.** Prometheus's new job `osdm-simulator` scrapes `oscar:3001/metrics?source=simulator`. OSCAR asks the simulator with the address and key of Admin → OSDM Simulator (`services/simulatorMetrics.js`, at most once every 10 s) and writes the answer in Prometheus's format (`utils/simulatorMetricsText.js`, pure).
+  - Prometheus holds no key, and nothing new is opened on the simulator's host.
+  - nginx's `location = /metrics` 404 covers the path.
+  - A value that is not a number is left out, and a label that is not a plain word is written `other`, so the simulator's answer cannot add a line.
+  - `oscar_simulator_configured` and `oscar_simulator_up` say whether it is set up and answering.
+- Checked with promtool (config, rules, the relayed text). A local Prometheus scraping the relayed text answered every query of the dashboard and the alerts. A test pins every metric name the dashboard and the alerts use to the names the relay writes.
+
+### Simulator 0.57.0
+- **`GET /admin/api/metrics`** (administration key, as the other administration routes): a JSON snapshot (`src/metrics.js`).
+  - Counted since the start: requests by provider, method and status, and their duration by provider (a histogram); the administration API is left out, so OSCAR's reads do not count. Also the rate limiter's refusals, trusted address or not.
+  - Read at each snapshot: the process (memory, CPU, event-loop delay), the host as `/proc` shows it (memory, swap, load, CPU time by mode, the data folder's disk), and the offers and bookings kept.
+  - Never an account, a token or a body. Without `/proc` the host part is null.
 
 ---
 

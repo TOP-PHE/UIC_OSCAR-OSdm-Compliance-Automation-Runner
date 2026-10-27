@@ -106,6 +106,7 @@ setInterval(() => {
 // Endpoint is exposed below; nginx blocks /metrics externally so only the
 // Prometheus container in the same Docker network can scrape it.
 const metrics = require('./utils/metrics');
+const simulatorMetrics = require('./services/simulatorMetrics');
 
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
@@ -569,8 +570,16 @@ app.get('/artifacts/:runId/:filename', fileDownloadLimiter, (req, res) => {
 // for external requests, so only the Prometheus container in the same Docker
 // network (which reaches OSCAR via the internal hostname `oscar:3001`) can
 // actually scrape this. See Documentation/Server_Operations/metrics-and-monitoring.md.
-app.get('/metrics', async (_req, res) => {
+app.get('/metrics', async (req, res) => {
   try {
+    // #1005: the simulator's metrics, read through Admin → OSDM Simulator's
+    // address and key. The same path, so nginx's `location = /metrics` 404
+    // covers it too.
+    if (req.query.source !== undefined) {
+      if (req.query.source !== 'simulator') return res.status(404).send('# Unknown source\n');
+      res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+      return res.end(await simulatorMetrics.simulatorMetricsText());
+    }
     res.set('Content-Type', metrics.register.contentType);
     res.end(await metrics.register.metrics());
   } catch (err) {
