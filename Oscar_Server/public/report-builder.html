@@ -2203,9 +2203,12 @@ function capabilityRowsHtml(rows, points, positions) {
 }
 
 // #996: an expected refusal's forms as the rest of the report shows them: the
-// counts, those not refused open (ten at most), and every form folded.
+// counts, the forms not refused grouped by the step they went through (three
+// lines at most: the copies of a test fail the same way, and listing each
+// made a row dozens of lines tall), and every form folded. What failed is in
+// the folded forms and in the row's point.
 function capabilityRefusalFormsHtml(forms) {
-  var REFUSAL_FORMS_OPEN = 10;
+  var REFUSAL_GROUPS_OPEN = 3;
   var all = Array.isArray(forms) ? forms : [];
   if (all.length === 0) return '-';
   var counts = {};
@@ -2216,9 +2219,17 @@ function capabilityRefusalFormsHtml(forms) {
   var text = all.length + ' form(s): ' + Object.keys(counts).sort(function(a, b) { return rank(a) - rank(b); }).map(function(k) {
     return counts[k] + ' ' + capabilityResultLabel(k).toLowerCase();
   }).join(', ');
-  var notRefused = all.filter(function(f) { return f.result === 'not-refused'; });
-  var shown = notRefused.slice(0, REFUSAL_FORMS_OPEN).map(capabilityFormHtml).join('');
-  if (notRefused.length > REFUSAL_FORMS_OPEN) shown += '<li>' + escHtml('… and ' + (notRefused.length - REFUSAL_FORMS_OPEN) + ' more') + '</li>';
+  var groups = [];
+  all.filter(function(f) { return f.result === 'not-refused'; }).forEach(function(f) {
+    var step = f.step || '';
+    var group = groups.find(function(g) { return g.step === step; });
+    if (group) group.count += 1;
+    else groups.push({ step: step, count: 1 });
+  });
+  var shown = groups.slice(0, REFUSAL_GROUPS_OPEN).map(function(g) {
+    return '<li>' + escHtml('Not refused' + (g.step ? ' at ' + g.step : '') + ' (' + g.count + ' form(s))') + '</li>';
+  }).join('');
+  if (groups.length > REFUSAL_GROUPS_OPEN) shown += '<li>' + escHtml('… and ' + (groups.length - REFUSAL_GROUPS_OPEN) + ' more step(s)') + '</li>';
   return escHtml(text)
     + (shown ? '<ul class="cov-list cov-failed-list">' + shown + '</ul>' : '')
     + '<details><summary>Forms</summary><ul class="cov-list">' + all.map(capabilityFormHtml).join('') + '</ul></details>';

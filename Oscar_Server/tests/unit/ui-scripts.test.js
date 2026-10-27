@@ -1946,23 +1946,25 @@ describe('the Report Builder coverage section', () => {
     });
   });
 
-  test('an expected refusal\'s forms: the counts, those not refused open, every form folded (#996)', () => {
-    const form = (code, result) => ({ code, form: 'SEARCH', result, runId: UUID });
+  test('an expected refusal\'s forms: the counts, those not refused by step, every form folded (#996)', () => {
+    const form = (code, result, step) => ({ code, form: 'SEARCH', result, runId: UUID, step, check: step ? `Check at <${step}>` : undefined });
     const refused = Array.from({ length: 9 }, (_, i) => form(`NHF_<a>${i}`, 'refused'));
     const all = capabilityRefusalFormsHtml(refused);
     expect(all.startsWith('9 form(s): 9 refused as expected<details><summary>Forms</summary><ul class="cov-list"><li>')).toBe(true);
     expect(all).not.toContain('cov-failed-list');
     expect(all.match(/<li>/g)).toHaveLength(9);
     expect(all.includes('<a>')).toBe(false);
-    // The counts keep one order, whatever order the forms come in.
-    const mixed = capabilityRefusalFormsHtml([form('C', 'not-run'), ...Array.from({ length: 12 }, (_, i) => form(`B${i}`, 'not-refused')), ...refused.slice(0, 2)]);
-    expect(mixed).toContain('15 form(s): 2 refused as expected, 12 not refused, 1 not run<ul class="cov-list cov-failed-list"><li>');
+    // The counts keep one order, whatever order the forms come in. The forms not
+    // refused are one line per step (three at most), never one line per form.
+    const steps = ['14. GET <s>', '14. GET <s>', '14. GET <s>', '14. GET <s>', '14. GET <s>', '14. GET <s>', '02. POST', '02. POST', '02. POST', '13. PATCH', '10. POST', undefined];
+    const mixed = capabilityRefusalFormsHtml([form('C', 'not-run'), ...steps.map((s, i) => form(`B${i}`, 'not-refused', s)), ...refused.slice(0, 2)]);
+    expect(mixed).toContain('15 form(s): 2 refused as expected, 12 not refused, 1 not run<ul class="cov-list cov-failed-list">'
+      + '<li>Not refused at 14. GET &#60;s&#62; (6 form(s))</li><li>Not refused at 02. POST (3 form(s))</li><li>Not refused at 13. PATCH (1 form(s))</li>'
+      + '<li>… and 2 more step(s)</li></ul><details>');
     const open = mixed.split('<details>')[0];
-    expect(open.match(/<li>/g)).toHaveLength(11);
-    expect(open).not.toContain('NHF_');
-    expect(open).not.toContain('>C<');
-    expect(open.endsWith('<li>… and 2 more</li></ul>')).toBe(true);
+    for (const hidden of ['NHF_', 'B0', '>C<', 'Check at']) expect(open).not.toContain(hidden);
     expect(mixed.split('<details>')[1].match(/<li>/g)).toHaveLength(15);
+    expect(capabilityRefusalFormsHtml([form('A', 'not-refused')])).toContain('<li>Not refused (1 form(s))</li></ul>');
     expect([capabilityRefusalFormsHtml([]), capabilityRefusalFormsHtml(null)]).toEqual(['-', '-']);
     // In the table, the column holds the folded forms.
     const out = capabilityHtml({ expectedRefusals: [{ key: 'NHF_X', capabilityLabel: 'Sale', result: 'refused', forms: refused, points: [] }], points: [] });

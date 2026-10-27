@@ -766,9 +766,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     member" stays. The simulator data file's descriptions keep "members":
     changing them would move every simulator reference's version.
     **An expected refusal's forms are folded** (#996, 1.11.415): counts in a
-    fixed order, the forms not refused open (ten at most), every form under
-    *Forms* (`capabilityRefusalFormsHtml()`), as the function view folds its
-    scenarios (G3). A helper of the coverage section keeps its constants
+    fixed order, every form under *Forms* (`capabilityRefusalFormsHtml()`), as
+    the function view folds its scenarios (G3). The forms not refused are one
+    line per step (#999, 1.11.417; three at most): one line per form made a
+    not-refused row dozens of lines tall, its copies failing the same way. A helper of the coverage section keeps its constants
     inside it: `ui-scripts.test.js` lifts the section's functions only.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in

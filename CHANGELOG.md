@@ -124,6 +124,23 @@ Issue #994, release 2026.453. The provider takes a position on a point of the co
 
 ---
 
+## [server-1.11.417] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #999, release 2026.452. An expected refusal's forms not refused are one line per step, not one per form.
+
+### Fixed
+- **Coverage by capability, Expected refusals.** #996 folded the forms, but kept those *not refused* open, one line each with the whole failure text. A refusal run in three forms and copied twice, not refused, still took dozens of lines: every such row, since the copies fail the same way.
+  - The forms not refused are now one line per step they failed at, for example "Not refused at 14. GET Booking after Patch Refund (9 form(s))", three lines at most, then "… and N more step(s)".
+  - What failed stays under *Forms* and in the row's point (the Points column). Every row is a few lines tall, refused or not.
+  - Page only.
+- Tester User Guide §6.
+
+### Tests
+- `ui-scripts.test.js`: one line per step with its count, three at most, the forms' codes and checks only under *Forms*, a form without step, every text escaped.
+- Four deliberate breaks each make a test fail. Checked in Chromium on a throwaway server, with refusals shaped like a real provider's, refused and not refused alternating.
+
+---
+
 ## [server-1.11.416] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #995, release 2026.451. The offer request options' results are stated in the coverage by capability, and a refused combination of parameters is a point.
