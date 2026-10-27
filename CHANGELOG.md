@@ -93,6 +93,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.420] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1004, release 2026.455. Simulator 0.56.0.
+
+### Changed
+- **Up to 50 runs at once.** Admin → Server Config → *Max Concurrent Runs* (`MAX_CONCURRENT_RUNS`) accepts 1 to 50; it stopped at 20. The default does not change. A test of every simulator provider at once ran 18 runs with the OSCAR server at 0.3 CPU and 190 MiB, so the ceiling, not the server, set the pace. Each run is a Bruno process on the host, which the server's own metrics do not show: the Server Admin Guide says to raise it in steps and watch the host's memory and CPU. Each company stays within its *Concurrent Session Limit* (1 to 10), which is what protects a real provider.
+
+### Simulator 0.56.0
+- **The OSCAR server gets a limit of its own.** All of a server's runs come from its one address, about 4 requests a second per run, so beyond some 10 runs it got 429 from a limit meant for strangers. `SIM_TRUSTED_ADDRESSES` (IP addresses only, at most 20; a host name stops the start) get `SIM_TRUSTED_REQUESTS_PER_MINUTE` (default 30,000) instead of `SIM_REQUESTS_PER_MINUTE`; an IPv4 address given by a dual-stack socket (`::ffff:…`) counts as itself. Every other address keeps 3,000 a minute. Both settings pass through `deploy/docker-compose.yml` from `./.env`.
+- **nginx example:** a `geo` block marks the trusted addresses, and two keyed zones count each address in one zone only: 50 a second (burst 100) for the others, 300 a second (burst 300) for the OSCAR servers. Checked with nginx on a local stub: 250 requests at once from an untrusted address, 129 refused; from a trusted one, none.
+- *OSCAR - OSDM Simulator*, section 7: the temporary raise and put-back of the limits for a load test becomes a set-up done once.
+
+---
+
+## [server-1.11.419] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1002, release 2026.454. A coverage export's file name starts with the company or provider it is about.
+
+### Changed
+- **Coverage export file names.** They were `oscar-coverage-<date>.md` / `.xlsx` and `oscar-coverage-report-<n>.xlsx` whatever the provider, so a distributor testing several providers could not tell the files apart. Each now starts with the name of the company or provider: `Provider-A-oscar-coverage-2026-10-27.xlsx`.
+  - The name keeps letters and digits only: accents are dropped and any other run of characters becomes one dash, 60 characters at most. A name with nothing left keeps the file name as before (`utils/fileNames.js`, `fileNameFor()`).
+  - Both workbook routes name the file (Content-Disposition), and the page takes that name (`downloadFileName()`, plain names only). A certifier's file is named after the report's provider, not its distributor.
+  - The Markdown, made in the page, takes the provider selected (`coverageFilePrefix()`, the server's rule).
+- Tester User Guide §6, CLAUDE.md.
+
+### Tests
+- `file-names.test.js`: accents, symbols, quotes and line breaks, a path, a name with nothing left, the 60-character cut, a long name in linear time.
+- `ui-scripts.test.js`: the page's rule equals the server's over the same names (`tests/helpers/file-name-samples.js`); a workbook takes the server's name only when it is a plain file name; the three downloads use them.
+- `coverage-routes.test.js`, `coverage-reports-routes.test.js`: each route's name, the certifier's after the provider.
+- Six deliberate breaks each make a test fail.
+
+---
+
 ## [server-1.11.418] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #994, release 2026.453. The provider takes a position on a point of the coverage by capability.

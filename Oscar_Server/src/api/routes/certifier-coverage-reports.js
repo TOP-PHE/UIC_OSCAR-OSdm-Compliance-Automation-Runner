@@ -83,7 +83,7 @@ router.get('/coverage-reports/:id/download', (req, res) => {
   const row = sharedRow(req.params.id);
   if (!row) return res.status(404).json(NOT_FOUND);
   const name = row.distributor_name ? `${row.distributor_name} — ${row.company_name}` : row.company_name;
-  return sendWorkbook(res, row, name || '');
+  return sendWorkbook(res, row, name || '', row.company_name || '');
 });
 
 module.exports = router;

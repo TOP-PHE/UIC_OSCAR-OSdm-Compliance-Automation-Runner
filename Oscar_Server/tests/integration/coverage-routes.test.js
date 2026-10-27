@@ -269,7 +269,8 @@ describe('GET /v1/company/coverage', () => {
       .buffer(true).parse((r, done) => { const parts = []; r.on('data', (c) => parts.push(c)); r.on('end', () => done(null, Buffer.concat(parts))); });
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('spreadsheetml.sheet');
-    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="oscar-coverage-\d{4}-\d{2}-\d{2}\.xlsx"$/);
+    // #1002: the file name starts with the company's name.
+    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="D-oscar-coverage-\d{4}-\d{2}-\d{2}\.xlsx"$/);
     const { readZipEntry } = require('../../src/utils/zip');
     // Summary, then the coverage by capability, then the detail (#972): By scenario is the sixth sheet.
     expect(readZipEntry(res.body, 'xl/worksheets/sheet6.xml').toString()).toContain('TM_REFUND');

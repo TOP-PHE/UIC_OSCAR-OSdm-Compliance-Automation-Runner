@@ -1,8 +1,30 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.453",
+  "current_release": "2026.455",
   "releases": [
+    {
+      "release": "2026.455",
+      "date": "2026-10-27",
+      "server": "1.11.420",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1004: up to 50 runs at once (Max Concurrent Runs 1 to 50, was 20; default unchanged); simulator 0.56.0 gives the OSCAR servers' addresses (SIM_TRUSTED_ADDRESSES, and a zone of their own in the nginx example) a limit of their own, so a load test no longer meets 429."
+      ]
+    },
+    {
+      "release": "2026.454",
+      "date": "2026-10-27",
+      "server": "1.11.419",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1002: a coverage export's file name starts with the company or provider it is about (Markdown, Excel and a published report's workbook; a certifier's file after the report's provider), so files for several providers keep apart."
+      ]
+    },
     {
       "release": "2026.453",
       "date": "2026-10-27",

@@ -18,6 +18,7 @@
 
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const net = require('node:net');
 const path = require('node:path');
 
 const PROVIDER_KEY = /^[a-z][a-z0-9-]{1,30}$/;
@@ -491,6 +492,19 @@ function intFromEnv(env, name, fallback, min, max) {
   return n;
 }
 
+// #1004: addresses given a limit of their own (the OSCAR servers), separated
+// by commas or spaces. Each must be an IP address: a host name would be
+// looked up nowhere, and a mistyped one would silently trust nothing.
+function trustedAddressesOf(env) {
+  const raw = String(env.SIM_TRUSTED_ADDRESSES || '').trim();
+  if (raw === '') return [];
+  const list = raw.split(/[\s,]+/).filter(Boolean);
+  const wrong = list.filter((a) => net.isIP(a) === 0);
+  if (wrong.length > 0) throw new ConfigError(`SIM_TRUSTED_ADDRESSES must list IP addresses only, not: ${wrong.join(', ')}`);
+  if (list.length > 20) throw new ConfigError('SIM_TRUSTED_ADDRESSES lists at most 20 addresses');
+  return [...new Set(list.map((a) => a.toLowerCase()))];
+}
+
 function adminKeyOf(env) {
   const value = env.SIM_ADMIN_KEY_SHA256;
   if (value === undefined || value === '') return null;
@@ -523,6 +537,8 @@ function loadSettings(env, baseDir) {
       bookingsPerClient: intFromEnv(env, 'SIM_MAX_BOOKINGS_PER_CLIENT', 200, 1, 100000),
       ttlSeconds: intFromEnv(env, 'SIM_TTL_SECONDS', 3600, 60, 86400),
       requestsPerMinute: intFromEnv(env, 'SIM_REQUESTS_PER_MINUTE', 3000, 10, 1000000),
+      trustedAddresses: trustedAddressesOf(env),
+      trustedRequestsPerMinute: intFromEnv(env, 'SIM_TRUSTED_REQUESTS_PER_MINUTE', 30000, 10, 1000000),
     },
   };
 }

@@ -765,6 +765,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     logs. Response fields are not parameters: the passenger checks' "optional
     member" stays. The simulator data file's descriptions keep "members":
     changing them would move every simulator reference's version.
+    **Export file names start with the company or provider** (#1002,
+    1.11.419): `utils/fileNames.js` `fileNameFor()` (letters and digits,
+    accents dropped, other runs one dash, 60 characters), used by both
+    workbook routes (a certifier's file takes the report's provider, not the
+    distributor). The page takes the workbook's name from Content-Disposition
+    (`downloadFileName()`, plain names only) and builds the Markdown's with
+    `coverageFilePrefix()`, pinned to the server's by `ui-scripts.test.js`
+    over `tests/helpers/file-name-samples.js`.
     **An expected refusal's forms are folded** (#996, 1.11.415): counts in a
     fixed order, every form under *Forms* (`capabilityRefusalFormsHtml()`), as
     the function view folds its scenarios (G3). The forms not refused are one
@@ -2950,6 +2958,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (git-ignored, so the update's `pull --ff-only` still works; applied by
     `up -d`, never by `restart`) and puts them back. OSCAR caps first: 10 per
     company (Test Framework), 20 per server (`MAX_CONCURRENT_RUNS`).
+    **Since #1004 (1.11.420 / simulator 0.56.0) the server's ceiling is 50
+    and the OSCAR server is trusted once**: `SIM_TRUSTED_ADDRESSES` (IP
+    addresses only, `::ffff:` read as IPv4, `plainAddress()`) get
+    `SIM_TRUSTED_REQUESTS_PER_MINUTE` (30,000) in `createRateLimiter()`, and
+    the nginx example's `geo $osdm_trusted` sends them to a zone of their own
+    (300/s): an empty `limit_req_zone` key is not counted, so each address is
+    in one zone only. Checked with a real nginx on a local stub, never with
+    `nginx -t` alone. Watching the simulator's host is #1005.
   - **Tickets per passenger or per leg are chosen by the trip's stop place**
     (#697, 0.23.0, profile `ticketing`): on `gamma` a trip from
     `urn:uic:stn:0000096` gets one ticket per passenger, one from `0000095`

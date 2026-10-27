@@ -2693,6 +2693,27 @@ function publishedHtml(d, view) {
     + '<h5 class="cov-subheading">The report</h5>' + coverageHtml(d.report || {}, view);
 }
 
+// The start of a coverage file's name (#1002): the company or provider's
+// name, letters and digits only, accents dropped, any other run one dash,
+// 60 characters at most. The server's fileNamePrefix() is the same rule.
+function coverageFilePrefix(name) {
+  var plain = String(name ?? '').normalize('NFKD').replace(/\p{M}/gu, '');
+  return plain.replace(/[^A-Za-z0-9]+/g, '-').slice(0, 60).replace(/^-|-$/g, '');
+}
+
+function coverageFileName(name, rest) {
+  var prefix = coverageFilePrefix(name);
+  return prefix ? prefix + '-' + rest : rest;
+}
+
+// The name the server gave a download (it starts with the provider's), else
+// `fallback`. Only a plain file name is taken.
+function downloadFileName(res, fallback) {
+  var header = res && res.headers && typeof res.headers.get === 'function' ? res.headers.get('Content-Disposition') : '';
+  var found = /filename="([A-Za-z0-9._-]{1,120})"/.exec(header || '');
+  return found ? found[1] : fallback;
+}
+
 function coverageTitle() {
   var provider = typeof window.oscarSelectedProvider === 'function' ? window.oscarSelectedProvider() : null;
   return (provider && provider.name) || company.name || 'company';
@@ -2808,7 +2829,7 @@ async function exportCoverageExcel() {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    a.download = downloadFileName(res, coverageFileName(coverageTitle(), 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.xlsx'));
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
     msg.textContent = '';
@@ -2823,7 +2844,7 @@ function exportCoverageMarkdown() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.md';
+  a.download = coverageFileName(coverageTitle(), 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.md');
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
 }
@@ -2908,7 +2929,7 @@ async function downloadPublished(id, number) {
   var url = URL.createObjectURL(await res.blob());
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'oscar-coverage-report-' + number + '.xlsx';
+  a.download = downloadFileName(res, 'oscar-coverage-report-' + number + '.xlsx');
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
 }

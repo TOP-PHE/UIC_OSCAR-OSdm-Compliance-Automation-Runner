@@ -1483,7 +1483,7 @@ describe('the Report Builder coverage section', () => {
   const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks,
     capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml, capabilityPointsHtml, capabilitySentence,
     capabilityOptionsHtml, capabilityCombinationText, capabilityRefusalFormsHtml, capabilityPointHtml, capabilityPositionText, capabilityPositionChoices,
-    capabilityPositionButtonHtml, capabilityPositionFormHtml, capabilityPointLine } = ctx;
+    capabilityPositionButtonHtml, capabilityPositionFormHtml, capabilityPointLine, coverageFilePrefix, coverageFileName, downloadFileName } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1795,6 +1795,39 @@ describe('the Report Builder coverage section', () => {
       + '<br><strong>Seen:</strong> expected 12.4 to equal 12.5<br><small>');
     // A test outside the catalogue is named by its code, once.
     expect(out).toContain('Found in A, on 2026-10-24 10:05:00');
+  });
+
+  // #1002: an export's file name starts with the provider's.
+  describe('the export file names (#1002)', () => {
+    const { fileNamePrefix } = require('../../src/utils/fileNames');
+    const { SAMPLES } = require('../helpers/file-name-samples');
+
+    test('the page makes the same start as the server', () => {
+      for (const [name, prefix] of SAMPLES) {
+        expect(coverageFilePrefix(name)).toBe(prefix);
+        expect(coverageFilePrefix(name)).toBe(fileNamePrefix(name));
+      }
+      expect(coverageFilePrefix('a'.repeat(59) + ' b')).toBe(fileNamePrefix('a'.repeat(59) + ' b'));
+      expect(coverageFileName('ČD Test', 'oscar-coverage-2026-10-27.md')).toBe('CD-Test-oscar-coverage-2026-10-27.md');
+      expect(coverageFileName('', 'oscar-coverage-2026-10-27.md')).toBe('oscar-coverage-2026-10-27.md');
+    });
+
+    test('a workbook takes the server\'s name, when it is a plain file name', () => {
+      const answer = (value) => ({ headers: { get: (h) => (h === 'Content-Disposition' ? value : null) } });
+      expect(downloadFileName(answer('attachment; filename="Prov-P1-oscar-coverage-report-1.xlsx"'), 'x.xlsx')).toBe('Prov-P1-oscar-coverage-report-1.xlsx');
+      expect(downloadFileName(answer('attachment; filename="../evil.xlsx"'), 'x.xlsx')).toBe('x.xlsx');
+      expect(downloadFileName(answer('attachment; filename="a b.xlsx"'), 'x.xlsx')).toBe('x.xlsx');
+      expect(downloadFileName(answer(null), 'x.xlsx')).toBe('x.xlsx');
+      expect(downloadFileName({}, 'x.xlsx')).toBe('x.xlsx');
+    });
+
+    test('the three downloads use them', () => {
+      const source = read(page);
+      expect(source).toContain("a.download = downloadFileName(res, coverageFileName(coverageTitle(), 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.xlsx'));");
+      expect(source).toContain("a.download = coverageFileName(coverageTitle(), 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.md');");
+      expect(source).toContain("a.download = downloadFileName(res, 'oscar-coverage-report-' + number + '.xlsx');");
+      expect(source).not.toContain("a.download = 'oscar-coverage");
+    });
   });
 
   // #994: the provider's position on a point.

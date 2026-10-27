@@ -50,6 +50,10 @@ services:
       SIM_CLIENTS_FILE: /run/osdm-simulator/clients.json
       SIM_DATA_DIR: /var/lib/osdm-simulator
       SIM_ADMIN_KEY_SHA256: ${SIM_ADMIN_KEY_SHA256:-}
+      # #1004: the OSCAR servers' addresses (./.env), which get a limit of their
+      # own: all of a server's runs come from its one address.
+      SIM_TRUSTED_ADDRESSES: ${SIM_TRUSTED_ADDRESSES:-}
+      SIM_TRUSTED_REQUESTS_PER_MINUTE: ${SIM_TRUSTED_REQUESTS_PER_MINUTE:-30000}
     ports:
       - "127.0.0.1:3002:3002"
     volumes:

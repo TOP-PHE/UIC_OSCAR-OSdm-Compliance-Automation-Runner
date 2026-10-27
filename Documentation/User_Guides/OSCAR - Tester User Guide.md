@@ -1535,6 +1535,10 @@ at first, then the two detailed views. The workbook has seven sheets: Summary,
 Capabilities, Expected refusals, Points to look at, By flow and element, By
 scenario, By function.
 
+Each file's name starts with the company or provider it is about, for example
+`Provider-A-oscar-coverage-2026-10-27.xlsx`. Accents are dropped, and any
+character other than a letter or a digit becomes a dash.
+
 ### Published coverage reports (Test Managers and certifiers)
 
 A Test Manager can **publish** the coverage shown, with *Publish this
@@ -1552,7 +1556,8 @@ In the **Published Coverage Reports** card:
   stays in the list, marked withdrawn, and its runs stay shared; unshare a
   run on its own page if needed. Sharing and withdrawing are recorded in the
   audit log.
-- **View** shows the report as it was published. **Excel** downloads it.
+- **View** shows the report as it was published. **Excel** downloads it, as
+  `<provider>-oscar-coverage-report-<number>.xlsx`.
 
 **What changed.** Each report is compared with the last report shared with
 the certifier and not withdrawn, at the moment it is published:

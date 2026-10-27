@@ -11,9 +11,19 @@
 # certificate is not optional.
 
 # At most 50 requests a second per caller address, with room for a burst.
-# OSCAR's runs of one company come from one address: keep this well above what
-# a batch of parallel runs sends (about 3 requests a second per run).
-limit_req_zone $binary_remote_addr zone=osdm_simulator:10m rate=50r/s;
+# #1004: the OSCAR servers get a zone of their own. All of a server's runs come
+# from its one address, about 4 requests a second per run, so 50 parallel runs
+# send some 200. Put each OSCAR server's address below, and the same list in
+# SIM_TRUSTED_ADDRESSES (./.env of the simulator).
+geo $osdm_trusted {
+    default        0;
+    # 203.0.113.10 1;                           # <- an OSCAR server's address
+}
+# An empty key is not counted: each address is counted in one zone only.
+map $osdm_trusted $osdm_public_key  { 0 $binary_remote_addr; 1 ""; }
+map $osdm_trusted $osdm_trusted_key { 0 "";                  1 $binary_remote_addr; }
+limit_req_zone $osdm_public_key  zone=osdm_simulator:10m rate=50r/s;
+limit_req_zone $osdm_trusted_key zone=osdm_simulator_trusted:1m rate=300r/s;
 # The administration (#930): the OSCAR server, a few requests at a time.
 limit_req_zone $binary_remote_addr zone=osdm_simulator_admin:1m rate=5r/s;
 
@@ -26,6 +36,7 @@ server {
 
     location / {
         limit_req zone=osdm_simulator burst=100 nodelay;
+        limit_req zone=osdm_simulator_trusted burst=300 nodelay;
         limit_req_status 429;
 
         proxy_pass         http://127.0.0.1:3002;

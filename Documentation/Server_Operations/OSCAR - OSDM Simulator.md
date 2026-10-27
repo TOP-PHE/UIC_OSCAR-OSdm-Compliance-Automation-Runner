@@ -503,56 +503,55 @@ place, delete the old file:
 rm /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json.old
 ```
 
-**Load test of OSCAR** (#676). Every run of OSCAR reaches the simulator from
-one address, the OSCAR server's, and makes about 25 requests in a few
-seconds: some 4 requests a second per run. Two limits apply per address: 50 a
-second in nginx (burst 100) and 3,000 a minute in the simulator
-(`SIM_REQUESTS_PER_MINUTE`). Beyond about 10 runs in parallel, requests get
-429 and the runs report failures that are the limit's, not OSCAR's.
+**Load test of OSCAR** (#676, #1004). Every run of OSCAR reaches the
+simulator from one address, the OSCAR server's, and makes about 25 requests in
+a few seconds: some 4 requests a second per run. Two limits apply per address:
+50 a second in nginx (burst 100) and 3,000 a minute in the simulator
+(`SIM_REQUESTS_PER_MINUTE`). Beyond about 10 runs in parallel, an address that
+is not trusted gets 429, and the runs report failures that are the limit's, not
+OSCAR's.
 
 OSCAR has its own ceilings, and they come first:
 
 | Where | Setting | Default | Allowed |
 |---|---|---|---|
 | Test Config → Test Framework → *Concurrent Session Limit* (each company or provider) | runs of one company at the same time | 1 | 1 to 10 |
-| Admin → *Server Config* → *Max Concurrent Runs* (`MAX_CONCURRENT_RUNS`; takes effect at once) | runs of the whole server at the same time | the server's `.env` | 1 to 20 |
+| Admin → *Server Config* → *Max Concurrent Runs* (`MAX_CONCURRENT_RUNS`; takes effect at once) | runs of the whole server at the same time | the server's `.env` | 1 to 50 |
 
-So 20 runs at once at most, and 10 per company: for 20, use two companies or
+So 50 runs at once at most, and 10 per company: for 50, use five companies or
 providers pointing at the simulator. Each run is a Bruno process on the OSCAR
 server; watch its memory (`docker stats`) as the number goes up.
 
-Raising the simulator's limits, as root on this host:
+**Trusting the OSCAR server's address, once** (#1004). The OSCAR server gets
+limits of its own; every other address keeps 50 a second and 3,000 a minute.
+As root on this host:
 
 ```bash
+OSCAR_IP=203.0.113.10       # <- the OSCAR server's public address
 cd /opt/osdm-simulator/OSDM_Simulator/deploy
-# 1. The simulator: a setting of its own in an override file. Docker Compose
-#    reads it next to docker-compose.yml; git ignores it, so the automatic
-#    update still pulls.
-cat > docker-compose.override.yml <<'YAML'
-services:
-  osdm-simulator:
-    environment:
-      SIM_REQUESTS_PER_MINUTE: "20000"
-YAML
+# 1. The simulator: 30,000 a minute for that address (500 a second).
+echo "SIM_TRUSTED_ADDRESSES=$OSCAR_IP" >> .env
 docker compose up -d        # re-creates the container; "restart" would keep the old setting
-docker compose exec osdm-simulator printenv SIM_REQUESTS_PER_MINUTE   # 20000
-# 2. nginx: 300 a second, burst 300.
-sed -i -e 's|rate=50r/s|rate=300r/s|' -e 's|burst=100 |burst=300 |' /etc/nginx/sites-available/osdm-simulator
-grep -n 'limit_req' /etc/nginx/sites-available/osdm-simulator   # rate=300r/s and burst=300
+docker compose exec osdm-simulator printenv SIM_TRUSTED_ADDRESSES   # the address
+# 2. nginx: that address in the "geo" block of the site, in place of the
+#    example line, gets the trusted zone (300 a second, burst 300).
+sed -i "s|^    # 203.0.113.10 1;.*|    $OSCAR_IP 1;|" /etc/nginx/sites-available/osdm-simulator
+grep -n -A3 'geo \$osdm_trusted' /etc/nginx/sites-available/osdm-simulator
 nginx -t && systemctl reload nginx
 ```
+
+A site set up before #1004 has no `geo` block: copy the lines from `geo` to
+the second `limit_req_zone` of `deploy/nginx-osdm-simulator.conf.example` over
+its one `limit_req_zone osdm_simulator` line, and add the line
+`limit_req zone=osdm_simulator_trusted burst=300 nodelay;` under the first
+`limit_req` of `location /`. `nginx -t` says whether it reads.
 
 `docker compose up -d` re-creates the container: bookings and tokens are lost,
-as with a restart. Start the load test after it.
-
-Putting them back when the test is over (the limits protect a public host):
-
-```bash
-cd /opt/osdm-simulator/OSDM_Simulator/deploy
-rm docker-compose.override.yml && docker compose up -d
-sed -i -e 's|rate=300r/s|rate=50r/s|' -e 's|burst=300 |burst=100 |' /etc/nginx/sites-available/osdm-simulator
-nginx -t && systemctl reload nginx
-```
+as with a restart. Several OSCAR servers: list their addresses separated by
+commas in `SIM_TRUSTED_ADDRESSES`, and one line each in the `geo` block. The
+simulator's own limit for them is `SIM_TRUSTED_REQUESTS_PER_MINUTE` (default
+30000). Only IP addresses are accepted: the simulator does not start with a
+host name in the list.
 
 After a test, `docker compose logs --since 1h | grep -c ' 429 '` counts the
 simulator's refusals; nginx's are in `/var/log/nginx/error.log` ("limiting
@@ -565,7 +564,7 @@ requests").
 | OSCAR refuses the endpoint or the token URL: "must be an https address on a public host" | the address is `http`, or the name does not resolve to a public address. The simulator has to be reachable the way a real provider is. |
 | "Auth" fails at the start of a run, the simulator's log shows `POST /<provider>/oauth/token 401` | wrong secret, or the client belongs to another provider than the one in the token URL |
 | A request gets 401 in the middle of a run on `beta` | `beta`'s tokens last two minutes; OSCAR refreshes the token at the start of each scenario, so one scenario that lasts longer than that ends with an expired token |
-| 429 | more than 50 requests a second from one address (nginx), or 3,000 a minute (the simulator, `SIM_REQUESTS_PER_MINUTE`); for a load test see "Load test of OSCAR" in section 7 |
+| 429 | more than 50 requests a second from one address (nginx), or 3,000 a minute (the simulator, `SIM_REQUESTS_PER_MINUTE`), from an address not in `SIM_TRUSTED_ADDRESSES`; for OSCAR's own server see "Load test of OSCAR" in section 7 |
 | The container restarts in a loop, its log says "not started: the clients file cannot be read" | `clients.json` is missing from the deploy folder, or not readable by user 1000 (`chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json`) |
 | On the host, a command answers `No such file or directory` about `clients.json`, or `docker compose` answers `no configuration file provided: not found` | the command was run from another folder than the deploy one, which is where a new session starts. `cd /opt/osdm-simulator/OSDM_Simulator/deploy` first. |
 | The container restarts in a loop, its log says "not started: the data folder does not exist" or "cannot be written by this user" | `deploy/data` is missing, or Docker made it as root: `install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data` (or `chown 1000:1000` it), then `docker compose up -d` |
