@@ -334,7 +334,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000001",
         "destinationURN": "urn:uic:stn:0000004",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
         "productCategoryName": "InterCity",
         "productCategoryShortName": "IC",
@@ -360,7 +360,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000004",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -386,7 +386,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000001",
         "destinationURN": "urn:uic:stn:0000005",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:SC",
         "productCategoryName": "SuperCity",
         "productCategoryShortName": "SC",
@@ -412,7 +412,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000005",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
         "productCategoryName": "EuroCity",
         "productCategoryShortName": "EC",
@@ -568,7 +568,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000095",
         "destinationURN": "urn:uic:stn:0000004",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
         "productCategoryName": "InterCity",
         "productCategoryShortName": "IC",
@@ -672,7 +672,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000092",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:SC",
         "productCategoryName": "SuperCity",
         "productCategoryShortName": "SC",
@@ -698,7 +698,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000091",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:SC",
         "productCategoryName": "SuperCity",
         "productCategoryShortName": "SC",
@@ -724,7 +724,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000091",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
         "productCategoryName": "EuroCity",
         "productCategoryShortName": "EC",
@@ -750,7 +750,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000092",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:EC",
         "productCategoryName": "EuroCity",
         "productCategoryShortName": "EC",
@@ -802,7 +802,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000001",
         "destinationURN": "urn:uic:stn:0000004",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
         "productCategoryName": "InterCity",
         "productCategoryShortName": "IC",
@@ -828,7 +828,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000004",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -854,7 +854,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000080",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -880,7 +880,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000081",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -906,7 +906,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000082",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -932,7 +932,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000083",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -958,7 +958,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000084",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -984,7 +984,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000085",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -1010,7 +1010,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000086",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",
@@ -1036,7 +1036,7 @@
       "data": {
         "originURN": "urn:uic:stn:0000087",
         "destinationURN": "urn:uic:stn:0000002",
-        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
         "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
         "productCategoryName": "Regional",
         "productCategoryShortName": "R",

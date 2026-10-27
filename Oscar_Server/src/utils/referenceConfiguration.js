@@ -298,17 +298,18 @@ const SPARE_NUMBER = 9000;
 /**
  * The trains of a reference, each able to carry a trip specification (#1019):
  * one names its train number and its carrier (OSDM DatedJourney), and a copy
- * sent in that form takes both from the train it goes on. The data file's
- * search trips name neither, so their trains get the provider's carrier and
- * a number of their own (9000 + the train's id); a train naming them keeps
- * its own. Journeys are left as they are.
+ * sent in that form takes both from the train it goes on. Every train names
+ * the provider's own carrier (#1021: the data file's specification legs name
+ * gamma's in every version, and a copy asked zeta for a train of gamma's). A
+ * train of a search trip, which names no number, gets one of its own (9000 +
+ * the train's id); one naming a number keeps it. Journeys are left as they are.
  */
 function namedTrains(resources, carrier) {
   return resources.map((r) => {
     if (r.resource_type !== 'TRAIN') return r;
     const id = r.id;
     const services = r.data.services.map((s) => (s.vehicleNumber ? s : { ...s, vehicleNumber: String(SPARE_NUMBER + id) }));
-    const data = { ...r.data, operatorCode: r.data.operatorCode || carrier || '', services };
+    const data = { ...r.data, operatorCode: carrier || r.data.operatorCode || '', services };
     const numbered = services.length > 0 && !r.data.services[0].vehicleNumber;
     const route = `${stationOf(data.originURN)}–${stationOf(data.destinationURN)}`;
     return { ...r, label: numbered ? `Train ${services[0].vehicleNumber} ${route}` : r.label, data };

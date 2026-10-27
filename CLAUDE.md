@@ -2541,7 +2541,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   data lacks", when nothing else is wrong: it was counted a second time, as
   OSCAR's. A leg without train number gets its own data check ("names its
   train number"); OSDM's VehicleNumber is nullable, so the conformance check
-  never saw `[null]`.
+  never saw `[null]`. **A provider answering another carrier is warned**
+  (#1021, `library-bruno/specifiedCarriers.js`, from `validateTripsAndLegs()`):
+  leg by leg against the trip the chosen offer covers, without case, only
+  when both sides name carriers. The simulator answers its own carrier
+  whatever is asked, so a scenario asking another's warns there.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says
@@ -2585,8 +2589,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`namesBoth()`; `testDataChoices()` carries `operatorCode`), else gets
   none: the copy preview marks it to complete, the checklist apply leaves it
   out as `noNamedTrain`. The simulator references' trains all name both
-  (`namedTrains()` in `buildReference()`: the provider's carrier and
-  `9000 + id` for a search trip's train; `testResourcesFromDatafile()`
+  (`namedTrains()` in `buildReference()`: the provider's own carrier on
+  every train, #1021, and `9000 + id` for a search trip's train; `testResourcesFromDatafile()`
   stays the data file's image, pinned to the page's `trainFromTrip`).
   **Part 3 (1.11.256): the copy report, `public/js/copy-report.js`** (browser
   global and CommonJS, like `trip-apply.js`): ready / to complete / not
