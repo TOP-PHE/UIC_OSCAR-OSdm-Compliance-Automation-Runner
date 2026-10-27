@@ -39,12 +39,13 @@ const { currentCollectionVersion } = require('../../utils/versionInfo');
 const { coverageOf, latestRunsOf, failureOf } = require('../../utils/frameworkCoverage');
 const { coverageMatrixOf } = require('../../utils/coverageMatrix');
 const { capabilityCoverageOf } = require('../../utils/capabilityCoverage');
-const { armed } = require('../../utils/capabilities');
+const { armed, ALWAYS_REQUIRED } = require('../../utils/capabilities');
 const { offerOptionCoverageOf, withOfferOptions } = require('../../utils/offerOptionCoverage');
 const { offerOptionReportsOf } = require('../helpers/offerOptionReports');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const { problemOf } = require('../../utils/findingSuggestions');
 const { toApiFinding } = require('../helpers/findings');
+const { choices: positionChoices } = require('../../utils/pointPositions');
 const log = require('../../utils/logger').child({ module: 'company-coverage' });
 
 const router = express.Router();
@@ -266,6 +267,8 @@ async function buildCoverage(companyId, days, user) {
   const byCapability = withOfferOptions(capabilityCoverageOf({
     ...input, functions: coverage.functions, warnings, findings: allFindings.map(toApiFinding), suggestions: suggestionsOf(companyId),
   }), offerOptionsOf(input.datafile, runs));
+  // #994: what the reader may answer on a point (POST /coverage/positions).
+  byCapability.positions = { choices: positionChoices(), alwaysRequired: [...ALWAYS_REQUIRED] };
   return { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios, byCapability };
 }
 

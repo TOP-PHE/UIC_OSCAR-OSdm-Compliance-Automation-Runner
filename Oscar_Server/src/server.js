@@ -594,6 +594,7 @@ app.use('/v1/company',         require('./api/routes/company-findings'));
 app.use('/v1/company',         require('./api/routes/company-scenario-copy'));
 app.use('/v1/company',         require('./api/routes/company-coverage'));
 app.use('/v1/company',         require('./api/routes/company-coverage-reports'));   // published reports (#972)
+app.use('/v1/company',         require('./api/routes/company-coverage-positions')); // the provider's position on a point (#994)
 app.use('/v1/company',         require('./api/routes/company-ai-analysis'));
 app.use('/v1/company',         require('./api/routes/company-ai-analysis-results'));
 app.use('/v1/company',         require('./api/routes/company-ai-checklist'));

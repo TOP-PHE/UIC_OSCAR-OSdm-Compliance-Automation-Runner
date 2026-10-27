@@ -372,7 +372,7 @@ describe('points to look at, each once (R6)', () => {
     })]);
     expect(row(r, 'reservation.placeSelection').points).toEqual([1]);
     expect(row(r, 'sale').points).toEqual([]);
-    expect(r.summary.pointsToLookAt).toEqual({ total: 1, provider: 1, accepted: 0, questions: 0, oscar: 0, truncated: false });
+    expect(r.summary.pointsToLookAt).toEqual({ total: 1, provider: 1, accepted: 0, unsupported: 0, questions: 0, oscar: 0, truncated: false });
   });
 
   test('OSCAR\'s own problems and the questions on the specification come after the provider\'s', () => {
@@ -392,12 +392,12 @@ describe('points to look at, each once (R6)', () => {
       [3, 'oscar', oscarCheck],
       [4, 'oscar', 'Fulfillment document is a PDF'],
     ]);
-    expect(r.points[1].finding).toEqual({ id: 'q1', title: 'One fulfilment per passenger?', category: 'spec_question', status: 'discussing' });
+    expect(r.points[1].finding).toEqual({ id: 'q1', title: 'One fulfilment per passenger?', category: 'spec_question', status: 'discussing', position: null });
     expect(r.points[3]).toMatchObject({ capability: 'fulfilment.documents', step: '06b. GET Fulfillment' });
     // OSCAR's points are listed apart and do not count against the provider (maintainer, 2026-10-26).
     expect(row(r, 'sale')).toMatchObject({ result: 'points', points: [1, 2, 3] });
     expect(row(r, 'fulfilment.documents')).toMatchObject({ result: 'passed', points: [4] });
-    expect(r.summary.pointsToLookAt).toEqual({ total: 4, provider: 1, accepted: 0, questions: 1, oscar: 2, truncated: false });
+    expect(r.summary.pointsToLookAt).toEqual({ total: 4, provider: 1, accepted: 0, unsupported: 0, questions: 1, oscar: 2, truncated: false });
   });
 
   test('a probe not refused is a point of its expected refusal, not of the capability it probes', () => {
@@ -565,5 +565,74 @@ describe('a wrong status read from the check text (#982)', () => {
     });
     expect(r.points).toEqual([expect.objectContaining({ step: at02, check: 'HTTP response status — expected N, actual: N', status: 400, blocking: true })]);
     expect(row(r, 'sale').result).toBe('blocked');
+  });
+});
+
+// ── #994: what the provider says it does not support ─────────────────────────
+
+describe('a point the provider does not support (#994)', () => {
+  const at06b = '06b. GET Fulfillment';
+  const at13 = '13. PATCH Refund Offer';
+  const notSupported = (extra) => ({ id: 'ns', title: 'Not supported', category: 'not_supported', status: 'discussing', ...extra });
+  const refund = [{ code: 'R', scenarioType: 'REFUND', scenarioAction: 'PATCH', tripRequirementId: 1, passengersListId: 1 }];
+
+  test('at an optional operation: not counted, and the operation reads "not supported"', () => {
+    const runs = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { [at06b]: fail('Fulfillment document is a PDF') } }) };
+    const before = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], runs);
+    expect(row(before, 'fulfilment.documents').result).toBe('points');
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], runs, { findings: [notSupported({ step: at06b, observed: 'Fulfillment document is a PDF' })] });
+    expect(r.points[0]).toMatchObject({ kind: 'unsupported', capability: 'fulfilment.documents', finding: { id: 'ns', position: null } });
+    expect(row(r, 'fulfilment.documents')).toMatchObject({ result: 'not-supported', points: [1] });
+    expect(row(r, 'sale').result).toBe('passed');
+    expect(r.summary.pointsToLookAt).toMatchObject({ unsupported: 1, provider: 0 });
+  });
+
+  test('under the scenario\'s own capability: "not supported", even when the run stopped on it', () => {
+    const runs = { R: run([...SALE, ...REFUND], {
+      stopAt: at13, statuses: { [at13]: 400 }, failures: { [at13]: fail('HTTP response status — expected 200, actual: 400', 'http_status') },
+    }) };
+    expect(row(report(refund, runs), 'refund.full').result).toBe('blocked');
+    const r = report(refund, runs, { findings: [notSupported({ step: at13, expectedStatus: 400 })] });
+    expect(row(r, 'refund.full')).toMatchObject({
+      result: 'not-supported', tests: [{ key: 'R', result: 'not-supported', forms: [{ result: 'not-supported', step: at13 }] }],
+    });
+    expect(row(r, 'sale').result).toBe('passed');
+    // Another failure of the same capability still counts.
+    const two = { R: run([...SALE, ...REFUND], { failures: { [at13]: fail('Refund amount is the price'), '14. GET Booking after Patch Refund': fail('Booking is REFUNDED') } }) };
+    const both = report(refund, two, { findings: [notSupported({ step: at13, observed: 'Refund amount is the price' })] });
+    expect(row(both, 'refund.full').result).toBe('points');
+    expect(both.points.map((p) => p.kind)).toEqual(['provider', 'unsupported']);
+  });
+
+  test('never under the sale or the offers by search, never for an expected refusal: the point stays the provider\'s', () => {
+    const at07 = '07. GET Booking after Fulfillments';
+    const sale = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { [at07]: fail('Booking summary names the product') } }) };
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], sale, { findings: [notSupported({ step: at07, observed: 'Booking summary names the product' })] });
+    expect(r.points[0]).toMatchObject({ kind: 'provider', capability: 'sale' });
+    expect(row(r, 'sale').result).toBe('points');
+    const check = '🧪 Refund again [1 refunded fulfillment(s)]: provider rejects with a client error (4xx)';
+    const probe = [{ code: 'NHF_REFUND_TWICE', scenarioType: 'REFUND', scenarioAction: 'PATCH', refundAgainProbe: 'on', tripRequirementId: 1, passengersListId: 1 }];
+    const runs = { NHF_REFUND_TWICE: run([...SALE, ...REFUND], { failures: { '14. GET Booking after Patch Refund': fail(check) } }) };
+    const refusal = report(probe, runs, { findings: [notSupported({ step: '14. GET Booking after Patch Refund', observed: checkText(check) })] });
+    expect(refusal.points[0]).toMatchObject({ kind: 'provider', expectedRefusal: true });
+    expect(refusal.expectedRefusals[0].result).toBe('not-refused');
+  });
+
+  test('a point carries the position taken on its finding', () => {
+    const runs = { OTST_SALE_ONE_WAY_1ADT: run(SALE, { failures: { [at06b]: fail('Fulfillment document is a PDF') } }) };
+    const finding = notSupported({
+      step: at06b, observed: 'Fulfillment document is a PDF', position: 'notSupported', positionBy: 'ana@x.example', positionRole: 'company_user',
+      positionAt: '2026-10-27 09:00:00', positionComment: 'Mobile tickets only.',
+    });
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], runs, { findings: [finding] });
+    expect(r.points[0].finding.position).toEqual({
+      value: 'notSupported', label: 'Not supported: optional, not a blocker', by: 'ana@x.example', role: 'tester', at: '2026-10-27 09:00:00', comment: 'Mobile tickets only.',
+    });
+  });
+
+  test('a step\'s failures the provider does not support are kept apart', () => {
+    const check = { request_name: at06b, assertion_name: 'Fulfillment document is a PDF', http_status: 200 };
+    const steps = stepsOf({ steps: [{ request_name: at06b, http_status: 200 }], checks: [check] }, { unsupported: new Set([check]) });
+    expect(steps[0]).toMatchObject({ state: 'passed', deviation: false, failures: [], unsupported: [check] });
   });
 });

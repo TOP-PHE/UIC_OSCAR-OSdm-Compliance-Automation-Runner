@@ -190,6 +190,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .cov-points-list>li{padding:6px 0;border-bottom:1px solid #eceff1}
 .cov-point-detail td{background:#fffde7;padding:2px 12px 6px 24px}
 .cov-point-detail .cov-points-list>li{border-bottom:0}
+.cov-position-form{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:flex-end;margin:6px 0;padding:8px;background:#f5f7f8;border-radius:4px}
+.cov-position-form label{display:flex;flex-direction:column;gap:2px;font-size:12px}
+.cov-position-form textarea{width:min(560px,100%);font:inherit}
+.cov-position-msg{font-size:12px}
 a[data-cov-point][aria-expanded="true"]{font-weight:700}
 .cap-table{width:100%;border-collapse:collapse;font-size:13px}
 .cap-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
@@ -1936,8 +1940,8 @@ const CHANGE_LABELS = {
   fixed: 'Fixed', still: 'Still open', new: 'New', notRetested: 'Not run again'
 };
 const POINT_KINDS = {
-  provider: 'For the provider', accepted: 'Accepted deviations', question: 'Questions on the specification',
-  oscar: 'OSCAR\'s own points (not counted against the provider)'
+  provider: 'For the provider', accepted: 'Accepted deviations', unsupported: 'Not supported by the provider (not counted against it)',
+  question: 'Questions on the specification', oscar: 'OSCAR\'s own points (not counted against the provider)'
 };
 let coverageData = null;
 
@@ -2091,7 +2095,7 @@ function capabilitySummaryText(summary, days) {
     'expected refusals: ' + (r.refused || 0) + ' of ' + (r.total || 0) + ' refused (' + (r.deviation || 0) + ' accepted deviation, '
       + (r.notRefused || 0) + ' not refused, ' + (r.notRun || 0) + ' not run)',
     (p.total || 0) + ' point(s) to look at: ' + (p.provider || 0) + ' for the provider, ' + (p.accepted || 0) + ' accepted deviation(s), '
-      + (p.questions || 0) + ' question(s), ' + (p.oscar || 0) + ' of OSCAR' + (p.truncated ? ' (the first 500 only)' : ''),
+      + (p.unsupported || 0) + ' not supported, ' + (p.questions || 0) + ' question(s), ' + (p.oscar || 0) + ' of OSCAR' + (p.truncated ? ' (the first 500 only)' : ''),
     (s.declaredWithoutScenario || 0) + ' declared function(s) without a scenario run', (s.apart || 0) + ' scenario(s) set apart'
   ];
   return parts.join(' · ') + ' — runs of the last ' + days + ' day(s).';
@@ -2105,12 +2109,12 @@ function capabilityPointLinks(numbers) {
 
 // The points a row names, each in a row of its own under it, hidden until
 // its number is clicked (#984).
-function capabilityPointRows(numbers, points, columns) {
+function capabilityPointRows(numbers, points, columns, positions) {
   var byNumber = {};
   (Array.isArray(points) ? points : []).forEach(function(p) { if (Number.isInteger(p.number)) byNumber[p.number] = p; });
   return (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && byNumber[n]; }).map(function(n) {
     return '<tr class="cov-point-detail" data-cov-detail="' + n + '" hidden><td colspan="' + columns + '"><ul class="cov-points-list">'
-      + capabilityPointHtml(byNumber[n], false) + '</ul></td></tr>';
+      + capabilityPointHtml(byNumber[n], false, positions) + '</ul></td></tr>';
   }).join('');
 }
 
@@ -2183,7 +2187,7 @@ function capabilityLabelText(row) {
   return row.label + (row.optional ? ' (optional)' : '') + (row.declaration ? ' — ' + coverageDeclarationLabel(row.declaration) : '');
 }
 
-function capabilityRowsHtml(rows, points) {
+function capabilityRowsHtml(rows, points, positions) {
   var group = null;
   return (rows || []).map(function(c) {
     var head = '';
@@ -2194,7 +2198,7 @@ function capabilityRowsHtml(rows, points) {
     return head + '<tr><td>' + escHtml(capabilityLabelText(c)) + '</td>'
       + '<td>' + capabilityTestedHtml(c) + '</td>'
       + '<td><span class="cov-state cov-' + escHtml(c.result) + '">' + escHtml(capabilityResultLabel(c.result)) + '</span></td>'
-      + '<td>' + capabilityPointLinks(c.points) + '</td></tr>' + capabilityPointRows(c.points, points, 4);
+      + '<td>' + capabilityPointLinks(c.points) + '</td></tr>' + capabilityPointRows(c.points, points, 4, positions);
   }).join('');
 }
 
@@ -2231,7 +2235,7 @@ function capabilityRefusalFormsHtml(forms) {
     + '<details><summary>Forms</summary><ul class="cov-list">' + all.map(capabilityFormHtml).join('') + '</ul></details>';
 }
 
-function capabilityRefusalsHtml(list, points) {
+function capabilityRefusalsHtml(list, points, positions) {
   if (!Array.isArray(list) || list.length === 0) return '';
   return '<h4 class="cov-heading">Expected refusals (' + list.length + ')</h4><table class="cap-table"><thead><tr><th>Expected refusal</th>'
     + '<th>Capability probed</th><th>Result</th><th>Forms</th><th>Points</th></tr></thead><tbody>'
@@ -2240,7 +2244,7 @@ function capabilityRefusalsHtml(list, points) {
         + '<td>' + escHtml(r.capabilityLabel) + '</td>'
         + '<td><span class="cov-state cov-' + escHtml(r.result) + '">' + escHtml(capabilityResultLabel(r.result)) + '</span></td>'
         + '<td>' + capabilityRefusalFormsHtml(r.forms) + '</td>'
-        + '<td>' + capabilityPointLinks(r.points) + '</td></tr>' + capabilityPointRows(r.points, points, 5);
+        + '<td>' + capabilityPointLinks(r.points) + '</td></tr>' + capabilityPointRows(r.points, points, 5, positions);
     }).join('') + '</tbody></table>';
 }
 
@@ -2368,10 +2372,55 @@ function capabilityWhereText(p) {
   return 'Found in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '');
 }
 
-// A point; `withId` for the list at the end only, which the numbers link to.
-function capabilityPointHtml(p, withId) {
+// The provider's position on a point (#994), on one line: what, who and
+// when, then why. A published report names the role only, without comment.
+function capabilityPositionText(position) {
+  if (!position || !position.label) return '';
+  var who = [position.by, position.role ? '(' + position.role + ')' : ''].filter(Boolean).join(' ');
+  var signed = [who, position.at].filter(Boolean).join(', ');
+  var text = 'Position: ' + position.label + (signed ? ' — ' + signed : '');
+  return position.comment ? text + ': ' + position.comment : text;
+}
+
+// The positions the reader may take on a point (#994): none on a published
+// report (it has no `positions`), on a known deviation or on a point OSCAR
+// owns; "not supported" never under a capability every provider must have,
+// nor for an expected refusal. The server holds the same rule.
+function capabilityPositionChoices(p, positions) {
+  if (!positions || !Array.isArray(positions.choices)) return [];
+  if (p.source !== 'check' || !/^[0-9a-f]{32}$/.test(String(p.id || ''))) return [];
+  if (p.kind === 'oscar' && !(p.finding && p.finding.category === 'oscar_issue')) return [];
+  var required = Array.isArray(positions.alwaysRequired) ? positions.alwaysRequired : [];
+  return positions.choices.filter(function(c) {
+    return c.key !== 'notSupported' || (!p.expectedRefusal && !required.includes(p.capability));
+  });
+}
+
+function capabilityPositionButtonHtml(p, positions) {
+  if (capabilityPositionChoices(p, positions).length === 0) return '';
+  return '<br><button type="button" class="btn btn-secondary btn-sm" data-cov-position="' + p.id + '">'
+    + (p.finding && p.finding.position ? 'Change the position' : 'Take a position') + '</button>';
+}
+
+// The form a point's button opens: the choices, a comment, Save.
+function capabilityPositionFormHtml(p, positions) {
+  var options = capabilityPositionChoices(p, positions).map(function(c) {
+    return '<option value="' + escHtml(c.key) + '">' + escHtml(c.label) + '</option>';
+  }).join('');
+  return '<form class="cov-position-form" data-cov-position-form="' + p.id + '">'
+    + '<label>Position<select name="position">' + options + '</select></label>'
+    + '<label>Comment (kept in the finding\'s thread)<textarea name="comment" rows="3" maxlength="4000" required></textarea></label>'
+    + '<span><button type="submit" class="btn btn-primary btn-sm">Save the position</button> '
+    + '<button type="button" class="btn btn-secondary btn-sm" data-cov-position-cancel="1">Cancel</button></span>'
+    + '<span class="cov-position-msg" role="status"></span></form>';
+}
+
+// A point; `withId` for the list at the end only, which the numbers link to;
+// `positions` on the live coverage only, where a position can be taken (#994).
+function capabilityPointHtml(p, withId, positions) {
   var n = Number.isInteger(p.number) ? p.number : 0;
   var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
+  var position = capabilityPositionText(p.finding && p.finding.position);
   var runs = (p.runs || []).map(function(r) { return capabilityRunLink(r.code, r.runId); }).join(', ');
   return '<li' + (withId ? ' id="cov-point-' + n + '"' : '') + '><strong>#' + n + '</strong> ' + escHtml(p.capabilityLabel)
     + (p.expectedRefusal ? ' <small class="cov-group">(expected refusal)</small>' : '')
@@ -2380,17 +2429,18 @@ function capabilityPointHtml(p, withId) {
     + (p.note ? '<br><small>' + escHtml(p.note) + '</small>' : '')
     + '<br><small>' + escHtml(capabilityWhereText(p)) + '</small>'
     + (finding ? '<br><small>' + escHtml(finding) + '</small>' : '')
-    + (runs ? '<br><small>Runs: ' + runs + '</small>' : '') + '</li>';
+    + (position ? '<br><small>' + escHtml(position) + '</small>' : '')
+    + (runs ? '<br><small>Runs: ' + runs + '</small>' : '') + capabilityPositionButtonHtml(p, positions) + '</li>';
 }
 
-function capabilityPointsHtml(points) {
+function capabilityPointsHtml(points, positions) {
   var list = Array.isArray(points) ? points : [];
   if (list.length === 0) return '<h4 class="cov-heading">Points to look at</h4><div class="cov-note">None.</div>';
   return '<h4 class="cov-heading">Points to look at (' + list.length + ')</h4>' + Object.keys(POINT_KINDS).map(function(kind) {
     var of = list.filter(function(p) { return p.kind === kind; });
     if (of.length === 0) return '';
     return '<h5 class="cov-subheading">' + escHtml(POINT_KINDS[kind]) + ' (' + of.length + ')</h5>'
-      + '<ul class="cov-points-list">' + of.map(function(p) { return capabilityPointHtml(p, true); }).join('') + '</ul>';
+      + '<ul class="cov-points-list">' + of.map(function(p) { return capabilityPointHtml(p, true, positions); }).join('') + '</ul>';
   }).join('');
 }
 
@@ -2414,9 +2464,9 @@ function capabilityAsideHtml(c) {
 function capabilityHtml(c) {
   var data = c || {};
   return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
-    + capabilityRowsHtml(data.capabilities, data.points) + '</tbody></table>'
-    + capabilityRefusalsHtml(data.expectedRefusals, data.points) + capabilityOptionsHtml(data.offerOptions)
-    + capabilityPointsHtml(data.points) + capabilityAsideHtml(data);
+    + capabilityRowsHtml(data.capabilities, data.points, data.positions) + '</tbody></table>'
+    + capabilityRefusalsHtml(data.expectedRefusals, data.points, data.positions) + capabilityOptionsHtml(data.offerOptions)
+    + capabilityPointsHtml(data.points, data.positions) + capabilityAsideHtml(data);
 }
 
 function coverageViewHtml(data, view) {
@@ -2449,8 +2499,9 @@ function mdCell(value) {
 
 function capabilityPointLine(p) {
   var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
+  var position = capabilityPositionText(p.finding && p.finding.position);
   return '#' + p.number + ' ' + p.capabilityLabel + (p.expectedRefusal ? ' (expected refusal)' : '') + (p.blocking ? ', blocking' : '')
-    + ' — ' + capabilityProblemLines(p).map(capabilitySentence).join(' ') + ' ' + capabilityWhereText(p) + '.' + (finding ? ' ' + finding + '.' : '') + (p.note ? ' ' + p.note : '');
+    + ' — ' + capabilityProblemLines(p).map(capabilitySentence).join(' ') + ' ' + capabilityWhereText(p) + '.' + (finding ? ' ' + finding + '.' : '') + (position ? ' ' + capabilitySentence(position) : '') + (p.note ? ' ' + p.note : '');
 }
 
 function capabilityRowsMarkdown(rows) {
@@ -2667,6 +2718,79 @@ async function loadCoverage() {
   }
 }
 
+// The live coverage's point of that id (#994), or null.
+function coveragePointById(id) {
+  var points = coverageData && coverageData.byCapability ? coverageData.byCapability.points : null;
+  return (Array.isArray(points) ? points : []).find(function(p) { return p.id === id; }) || null;
+}
+
+// "Take a position" opens its form under it, a second click or Cancel closes it (#994).
+function toggleCoveragePosition(e) {
+  var target = e.target && typeof e.target.closest === 'function' ? e.target : null;
+  if (!target) return;
+  var cancel = target.closest('button[data-cov-position-cancel]');
+  if (cancel) {
+    cancel.closest('form').remove();
+    return;
+  }
+  var button = target.closest('button[data-cov-position]');
+  if (!button) return;
+  var open = button.nextElementSibling;
+  if (open && open.classList.contains('cov-position-form')) {
+    open.remove();
+    return;
+  }
+  var point = coveragePointById(button.dataset.covPosition);
+  if (point) button.insertAdjacentHTML('afterend', capabilityPositionFormHtml(point, coverageData.byCapability.positions));
+}
+
+// The coverage drawn again after a position, at that point (its number may
+// have moved with its kind).
+async function redrawCoverageAt(pointId) {
+  var res = await fetch('/v1/company/coverage?days=' + encodeURIComponent(document.getElementById('coverage-days').value), {});
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) return false;
+  coverageData = data;
+  document.getElementById('coverage-body').innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);
+  var point = coveragePointById(pointId);
+  var at = point && Number.isInteger(point.number) ? document.getElementById('cov-point-' + point.number) : null;
+  if (at) at.scrollIntoView({ block: 'center' });
+  return true;
+}
+
+// What a position form asks, or null when it is not one of the coverage's points.
+function coveragePositionAsked(form) {
+  var id = form.dataset.covPositionForm;
+  if (!/^[0-9a-f]{32}$/.test(String(id || '')) || !coverageData) return null;
+  return { point: id, days: coverageData.days, position: form.elements.position.value, comment: form.elements.comment.value };
+}
+
+async function saveCoveragePosition(e) {
+  var form = e.target && typeof e.target.closest === 'function' ? e.target.closest('form.cov-position-form') : null;
+  if (!form) return;
+  e.preventDefault();
+  var asked = coveragePositionAsked(form);
+  var msg = form.querySelector('.cov-position-msg');
+  if (!asked) return;
+  msg.textContent = 'Saving...';
+  try {
+    var res = await fetch('/v1/company/coverage/positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(asked)
+    });
+    var data = await res.json().catch(function() { return null; });
+    if (!res.ok) {
+      msg.textContent = capabilitySentence('Not saved: ' + ((data && data.detail) || ('HTTP ' + res.status)));
+      return;
+    }
+    msg.textContent = 'Saved.';
+    if (!(await redrawCoverageAt(asked.point))) msg.textContent = 'Saved. Show the coverage again to see it.';
+  } catch (err) {
+    msg.textContent = capabilitySentence('Not saved: ' + err.message);
+  }
+}
+
 async function exportCoverageExcel() {
   var msg = document.getElementById('coverage-xlsx-msg');
   msg.textContent = 'Preparing the workbook...';
@@ -2707,6 +2831,8 @@ if (!isPlatformUser) {
   document.getElementById('coverage-md-btn').addEventListener('click', exportCoverageMarkdown);
   document.getElementById('coverage-xlsx-btn').addEventListener('click', function() { exportCoverageExcel().catch(function() {}); });
   document.getElementById('coverage-body').addEventListener('click', toggleCoveragePoint);
+  document.getElementById('coverage-body').addEventListener('click', toggleCoveragePosition);
+  document.getElementById('coverage-body').addEventListener('submit', function(e) { saveCoveragePosition(e).catch(function() {}); });
   document.getElementById('coverage-view').addEventListener('change', function() {
     if (coverageData) document.getElementById('coverage-body').innerHTML = coverageHtml(coverageData, this.value);
   });

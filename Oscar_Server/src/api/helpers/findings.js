@@ -38,7 +38,13 @@ function toApiFinding(f) {
     evidence:       f.evidence || '',
     createdBy:      f.created_by || null,
     createdAt:      f.created_at,
-    updatedAt:      f.updated_at
+    updatedAt:      f.updated_at,
+    // The provider's position taken on its coverage point (#994).
+    position:        f.position || null,
+    positionBy:      f.position_by || null,
+    positionRole:    f.position_role || null,
+    positionAt:      f.position_at || null,
+    positionComment: f.position_comment || ''
   };
 }
 

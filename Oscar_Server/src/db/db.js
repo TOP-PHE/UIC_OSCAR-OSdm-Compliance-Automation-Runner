@@ -949,6 +949,17 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_coverage_report_shared ON coverage_report(shared_at)');
   }},
+  { version: 44, name: 'finding-positions', up: () => {
+      // #994 - the provider's position on a point of the coverage, kept on
+      // the point's finding: which one (pointPositions.js), who took it (the
+      // user's e-mail and role) and when, with its comment (also in the
+      // finding's thread).
+      _safeAlter('ALTER TABLE finding ADD COLUMN position TEXT');
+      _safeAlter('ALTER TABLE finding ADD COLUMN position_by TEXT');
+      _safeAlter('ALTER TABLE finding ADD COLUMN position_role TEXT');
+      _safeAlter('ALTER TABLE finding ADD COLUMN position_at TEXT');
+      _safeAlter('ALTER TABLE finding ADD COLUMN position_comment TEXT');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

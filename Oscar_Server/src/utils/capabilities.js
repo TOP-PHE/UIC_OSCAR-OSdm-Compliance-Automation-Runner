@@ -336,7 +336,11 @@ function stepCapabilities(stepName, traits) {
 const roleOf = (stepName) => STEP_ROLES[stepName] || null;
 const isOptionalRead = (stepName) => OPTIONAL_READS.has(stepName);
 
+// The capabilities every provider must have: a point under them can never be
+// answered "not supported" (#994, maintainer, 2026-10-27).
+const ALWAYS_REQUIRED = Object.freeze(['sale', 'offers.search']);
+
 module.exports = {
-  CAPABILITIES, CAPABILITY, GROUPS, STEP_ROLES, STAGE_ROLES, STAGE_GOAL, SYSTEM_INFO_STEPS, OPTIONAL_READS, SALE_GOAL, OFFER_GOAL, armed,
+  CAPABILITIES, CAPABILITY, GROUPS, STEP_ROLES, STAGE_ROLES, STAGE_GOAL, SYSTEM_INFO_STEPS, OPTIONAL_READS, SALE_GOAL, OFFER_GOAL, ALWAYS_REQUIRED, armed,
   derivedCapability, traitsOf, stepCapabilities, isRefusalTest, isFareScenario, roleOf, isOptionalRead, refundCapability,
 };

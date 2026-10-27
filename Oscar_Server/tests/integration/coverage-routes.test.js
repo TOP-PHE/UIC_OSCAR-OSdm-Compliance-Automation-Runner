@@ -201,8 +201,8 @@ describe('GET /v1/company/coverage', () => {
         kind: 'accepted', source: 'check', capability: 'sale', finding: { id: accepted, title: 'No product in the summary', category: 'provider_deviation', status: 'resolved' },
       });
       expect(pointAt('02. POST Create Booking')).toMatchObject({ kind: 'accepted', source: 'known-deviation', status: 202, note: 'Booking confirmed later', finding: { id: baseline } });
-      // A point names its finding by id, title, category and status only.
-      expect(Object.keys(pointAt('07. GET Booking after Fulfillments').finding).sort()).toEqual(['category', 'id', 'status', 'title']);
+      // A point names its finding by id, title, category, status and the position taken on it (#994) only.
+      expect(Object.keys(pointAt('07. GET Booking after Fulfillments').finding).sort()).toEqual(['category', 'id', 'position', 'status', 'title']);
       expect(r.points.find((p) => p.check === 'Booking holds the ticket')).toMatchObject({ kind: 'oscar', capability: 'sale' });
       expect(r.summary).toMatchObject({ pointsToLookAt: { total: 4, provider: 1, accepted: 2, oscar: 1 } });
       // The function view still lists open findings only, by these fields.

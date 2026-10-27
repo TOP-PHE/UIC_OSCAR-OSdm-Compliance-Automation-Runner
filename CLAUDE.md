@@ -726,6 +726,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     hidden rows drawn with the table (`capabilityPointRows()`, no anchor id,
     so ids stay unique), `toggleCoveragePoint()` on `coverage-body` and
     `published-body`; the number keeps its link to the list at the end.
+    **The provider takes a position on a point** (#994, 1.11.418):
+    `POST /v1/company/coverage/positions` (`company-coverage-positions.js`,
+    Test Managers and testers, members only) finds the point again by its
+    `id` (sha256 of its `placeOf()` id, the same while the problem is) in
+    `buildCoverage()` as the caller reads it (a tester's view), then puts
+    the position on its finding, opened from the point when it has none
+    (`utils/pointPositions.js`, pure: seven positions, each a category and a
+    status; only "on purpose" resolves, since a resolved provider_deviation
+    is an accepted one), links its #735 keys as accepted drafts and puts the
+    comment in the thread. Migration 44: `finding.position`,
+    `position_by`, `position_role`, `position_at`, `position_comment`.
+    It counts at once (maintainer, 2026-10-27). A finding `not_supported`
+    makes the point kind `unsupported` (`step.unsupported`, not counted;
+    the capability reads not-supported when nothing else failed, even when
+    the run stopped on it), **never under `ALWAYS_REQUIRED`**
+    (`capabilities.js`: sale, offers.search) **nor for an expected
+    refusal**: there it stays the provider's, and the route refuses it.
+    `forPublication()` (`coverageReports.js`) freezes a report without the
+    author's e-mail, the comment and the `positions` choices. The page's
+    `capabilityPositionChoices()` is pinned to `positionRefusal()` by
+    `ui-scripts.test.js`.
     **A point says what it expected and what was seen** (#990, 1.11.413 /
     OTST_V2.0.228): `observed` { text, at, code } is the failure text
     (`run_assertions.error_msg`, one line, 500 characters) of the latest run
