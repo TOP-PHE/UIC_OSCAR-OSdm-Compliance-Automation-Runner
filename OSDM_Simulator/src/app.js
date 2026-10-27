@@ -60,7 +60,9 @@ const methodNotAllowed = (allowed) => new HttpError(405, 'METHOD_NOT_ALLOWED', '
 
 // A fixed window per caller address. It protects the process, not the
 // credentials: those are long random secrets.
-function createRateLimiter({ perMinute, now }) {
+// #1004: the addresses in `trusted` (the OSCAR servers, whose runs all come
+// from one address) get `trustedPerMinute` instead of `perMinute`.
+function createRateLimiter({ perMinute, trustedPerMinute = perMinute, trusted = new Set(), now }) {
   const MAX_TRACKED = 20000;
   let windowStart = now();
   let counts = new Map();
@@ -74,8 +76,15 @@ function createRateLimiter({ perMinute, now }) {
     if (!counts.has(address) && counts.size >= MAX_TRACKED) return false;
     const n = (counts.get(address) || 0) + 1;
     counts.set(address, n);
-    return n <= perMinute;
+    return n <= (trusted.has(plainAddress(address)) ? trustedPerMinute : perMinute);
   };
+}
+
+// An IPv4 address as Node gives it on a dual-stack socket ("::ffff:1.2.3.4")
+// is the IPv4 address.
+function plainAddress(address) {
+  const text = String(address);
+  return text.toLowerCase().startsWith('::ffff:') && text.includes('.') ? text.slice(7) : text;
 }
 
 // Refuse a method the route does not have, naming the ones it has.
@@ -167,7 +176,12 @@ function servesTripSearch(provider, resource) {
 // `clients` is the accounts' own Map, which an administrator changes while
 // the simulator runs.
 function createApp({ providers, clients, accounts = null, admin = null, stats = null, tokens, store, limits, trustProxy = false, now = Date.now, log = () => {} }) {
-  const allow = createRateLimiter({ perMinute: limits.requestsPerMinute, now });
+  const allow = createRateLimiter({
+    perMinute: limits.requestsPerMinute,
+    trustedPerMinute: limits.trustedRequestsPerMinute,
+    trusted: new Set(limits.trustedAddresses || []),
+    now,
+  });
 
   function callerAddress(req) {
     if (trustProxy) {
@@ -584,4 +598,4 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
   };
 }
 
-module.exports = { createApp, createRateLimiter };
+module.exports = { createApp, createRateLimiter, plainAddress };
