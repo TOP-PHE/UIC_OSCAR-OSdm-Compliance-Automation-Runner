@@ -403,10 +403,34 @@ describe('F7 provisionalPrice', () => {
     expect(check(run(() => bookings.checkProvisionalPrice({ amount: 5000, currency: 'CHF', scale: 2 }, price(5000), booking(5000)))).ok).toBe(false);
   });
 
-  test('a provisionalPrice that differs from the pre-booked parts is a WARNING', () => {
-    const r = run(() => bookings.checkProvisionalPrice(price(5500), price(5000), booking(5000)));
+  // #991: it was a WARNING ("fees would explain it"), so SIM_WRONG_BOOKING_PRICE
+  // failed nothing. Fees and fares are parts with a price: they are summed.
+  const sumCheck = (r) => named(r, 'provisionalPrice is the sum of the pre-booked parts')[0];
+  test('a provisionalPrice that differs from the pre-booked parts fails (#991)', () => {
+    const r = run(() => bookings.checkProvisionalPrice(price(5001), price(5000), booking(5000)));
     expect(check(r).ok).toBe(true);
-    expect(warned(r, 'sum of the pre-booked parts')).toBe(true);
+    expect(sumCheck(r).ok).toBe(false);
+    expect(sumCheck(run(() => bookings.checkProvisionalPrice(price(6000), price(5000), booking(5000, 1000)))).ok).toBe(true);
+  });
+
+  test('fees and fares are parts of the sum; a part not PREBOOKED is not (#991)', () => {
+    const withFee = { bookedOffers: [{
+      admissions: [{ id: 'a', status: 'PREBOOKED', price: price(5000) }, { id: 'c', status: 'CONFIRMED', price: price(900) }],
+      fees: [{ id: 'f', status: 'PREBOOKED', price: price(250) }],
+      fares: [{ id: 'r', status: 'PREBOOKED', price: price(100) }],
+    }] };
+    expect(sumCheck(run(() => bookings.checkProvisionalPrice(price(5350), price(5000), withFee))).ok).toBe(true);
+    expect(sumCheck(run(() => bookings.checkProvisionalPrice(price(5000), price(5000), withFee))).ok).toBe(false);
+    expect(bookings.prebookedSum(withFee, 'EUR')).toEqual({ amount: 5350, count: 3 });
+  });
+
+  test('a part without a price in that currency, or no part, asserts nothing (#991)', () => {
+    const odd = { bookedOffers: [{ admissions: [{ id: 'a', status: 'PREBOOKED', price: price(5000) }, { id: 'b', status: 'PREBOOKED' }] }] };
+    expect(sumCheck(run(() => bookings.checkProvisionalPrice(price(1), price(1), odd)))).toBeUndefined();
+    const chf = { bookedOffers: [{ admissions: [{ id: 'a', status: 'PREBOOKED', price: price(5000, { currency: 'CHF' }) }] }] };
+    expect(bookings.prebookedSum(chf, 'EUR')).toBeNull();
+    expect(bookings.prebookedSum({ bookedOffers: [] }, 'EUR')).toBeNull();
+    expect(bookings.prebookedSum(null, 'EUR')).toBeNull();
   });
 
   // Old code: `${prov.amount}` in the title and `selectedOffer.offerSummary.minimalPrice`

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-provisional-price",
+    "date": "October 27, 2026",
+    "tag": "Fixed",
+    "title": "A booking's provisional price is checked",
+    "summary": "A booking whose provisional price is not the sum of its pre-booked parts now fails a check.",
+    "content": "OSDM defines a booking's provisionalPrice as the price of all its unconfirmed pre-booked parts. OSCAR only warned when the two differed, and the warning was never shown. It is now a failed check after the booking is created and when it is read before fulfilment. Fees and fares are counted with admissions, reservations and ancillaries."
+  },
+  {
     "id": "2026-10-27-point-expected-seen",
     "date": "October 27, 2026",
     "tag": "Improvement",

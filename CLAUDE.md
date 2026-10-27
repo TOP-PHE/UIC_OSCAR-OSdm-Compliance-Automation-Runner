@@ -279,7 +279,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `offerOptionDeclared`; `compareWithDeclarations()` (`offerOptions.js`):
     a declared option refused, ignored or without offer is a failed check
     `🧭 Offer request option <key> — declared…` (so a #735 draft), a
-    supported one declared unsupported an INFO line. Editor: under the
+    supported one declared unsupported an INFO line. **A scenario's own
+    `offerOptionDeclared`** is laid over the framework's, key by key
+    (`declaredOptionsOf()`, #991): `SIM_WRONG_OFFER_OPTION_DECLARED_IGNORED_*`
+    declares four options the simulator does not take, and fails each.
+    Editor: under the
     tariff section (`fwOfferOptionsHtml()`, `changeOfferOptionDiscovery()`
     before the change switch; the code lists are `FW_LISTS` `corporate` /
     `promotion`).
@@ -2873,9 +2877,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`Simvariant-<name>`, #611, 0.17.0), because offers are anonymous; a
     variant holds for the booking's life (hidden `Symbol`). The
     `SIM_WRONG_*` scenarios fail on purpose and stay out of the run list;
-    `SIM_WRONG_BOOKING_PRICE_38` fails nothing today (the collection does not
-    compare `provisionalPrice` with the parts) — when such a check lands, it
-    must start failing.
+    `SIM_WRONG_BOOKING_PRICE_38` fails "provisionalPrice is the sum of the
+    pre-booked parts" at 02 and 05 since #991 (1.11.414): `prebookedSum()`
+    (`bookings.js`) adds every PREBOOKED admission, reservation, ancillary,
+    fee and fare, and compares nothing when a part is unpriced or in another
+    currency. Until then it was a WARNING that never showed, and the
+    scenario passed: a WRONG scenario with no failed check is a gap to close.
   - **The replay is the before/after check for `library-bruno/`** (#611,
     0.19.0): `node scripts/replay.js record before|after`, `compare`,
     `coverage`, in `OSDM_Simulator/`. Two recordings of one commit compare
