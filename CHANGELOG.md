@@ -93,6 +93,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.421] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1008, release 2026.456. In the coverage by capability, "Blocked" and "Passed with points" always say why.
+
+### Fixed
+- **"Blocked" and "Passed with points" with no point to open.** A company testing the simulator read "28 blocked, 11 passed with points, 0 point(s) to look at". A capability was read blocked whenever the latest run of its scenario did not reach the capability's step, and the reason was looked for only among the checks counted against that capability. Now:
+  - A run that did not reach its capability is blocked only by a failed check: one of its own capability first, else one of the last step the run went through, whatever it counts against. A refused access token at an optional read (`08. GET Products`) stops the whole run; its point is *Reference data*'s, and the scenario's capability now names it. The form gives that step, check and point number; the row lists the point.
+  - A run that made no request to the provider (stopped before Bruno ran: access token not obtained, no data file, a refusal rule; or stopped before its results were stored) reads *Not run*, never blocked, and never "Refused as expected" for an expected refusal. Its form says so and links the run.
+  - A run that ended before its capability with nothing failed, as its scenario is written, reads passed for what it went through, at the step where it ended. With a failed status and no failed check, it reads *Not run*, at the step it stopped after.
+  - An expected refusal's failure at the steps of the capability it probes stays the refusal's point; that capability no longer reads "Passed with points" from it.
+- The page, the Markdown and the workbook give a blocked form's point number. Tester User Guide §6, OpenAPI, CLAUDE.md.
+
+### Tests
+- `capability-coverage.test.js`: a run with no request (a sale and an expected refusal); a run a 401 at an optional read stopped, alone and next to a form that passed; a run that ended as it is written; one that stopped with no failed check; a refusal probing an optional capability. Over 2,000 drawn data files: a blocked form always has a step, a check and a point, and a row "Passed with points" or "Blocked" always names a point. The seven tests fail on the code before.
+- `coverage-routes.test.js`: the refund whose run stopped with no failed check reads *Not run*, not blocked.
+- Reproduced on a throwaway OSCAR with the local simulator (gamma's reference, 126 runs): before, "Group tariff" and "Travel class per leg" read "Passed with points" with no point, and "Mandatory reservation" "Blocked" with no step, check or point; after, each names the 401 at the products read and its point.
+
+---
+
 ## [server-1.11.420] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1004, release 2026.455. Simulator 0.56.0.

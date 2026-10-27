@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-blocked-says-why",
+    "date": "October 27, 2026",
+    "tag": "Fixed",
+    "title": "A blocked capability says what blocked it",
+    "summary": "In the coverage by capability, \"Blocked\" and \"Passed with points\" now always name the point to open.",
+    "content": "In the Test Framework coverage, by capability, a capability read \"Blocked\" or \"Passed with points\" with no point to open when the run of its scenario stopped on a check counted elsewhere (a refused access token at an optional read, for example), or when the run made no request to the provider at all. Expected refusals held by such a run read \"Refused as expected\" though nothing was sent.\n\nNow a blocked form names the step and the check that stopped its run, with the number of its point, and the capability lists that point. A run that made no request to the provider reads \"Not run\": open the run to see why, and run it again. A run that ended before its capability with nothing failed, as its scenario is written, reads passed, at the step where it ended.\n\nNothing to do: the next coverage report you show reads your latest runs this way. A report published before keeps what it said."
+  },
+  {
     "id": "2026-10-27-fifty-runs",
     "date": "October 27, 2026",
     "tag": "Changed",

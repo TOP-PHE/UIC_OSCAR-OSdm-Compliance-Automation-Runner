@@ -779,6 +779,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     line per step (#999, 1.11.417; three at most): one line per form made a
     not-refused row dozens of lines tall, its copies failing the same way. A helper of the coverage section keeps its constants
     inside it: `ui-scripts.test.js` lifts the section's functions only.
+    **"Blocked" needs a failed check, and names it** (#1008, 1.11.421). A
+    simulator company read "28 blocked, 11 passed with points, 0 points to
+    look at": `mainResult()` read any run that did not reach its capability's
+    step as blocked, and looked for a reason only among the checks charged to
+    that capability. Now `notReached()`: the charged failure, else a failed
+    check of the *last* step the run went through, whatever it counts against
+    (`stoppingCheck()`: a 401 at an optional read stops the run, its point is
+    *Reference data*'s); the form carries that point's number (`point`, from
+    `pointsOf()`'s `pointOf` map) and the row lists it (`rowPointsOf()`). **A
+    run with no stored step made no request** (refused before Bruno, token not
+    obtained, killed before its report): `not-run`, never blocked, never
+    "refused as expected". A COMPLETED run that ended before its capability
+    with nothing failed reads passed, at the step it ended (as written); a
+    FAILED one, `not-run`. A refusal's failure at the steps of the capability
+    it probes never gives that capability "points". A drawn-runs test in
+    `capability-coverage.test.js` holds both promises.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
