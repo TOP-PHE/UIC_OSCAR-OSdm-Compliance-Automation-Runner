@@ -79,7 +79,7 @@ const clip = (text, n) => (text.length > n ? `${text.slice(0, n - 1)}…` : text
 const isError = (status) => Number.isInteger(status) && status >= 400;
 
 function runLine(r) {
-  return `Run ${r.runId} (${r.code}${r.at ? `, ${r.at}` : ''})`;
+  return `Run ${r.runId} (${[r.code, r.at].filter(Boolean).join(', ')})`;
 }
 
 /**

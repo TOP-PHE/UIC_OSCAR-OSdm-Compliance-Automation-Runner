@@ -2381,7 +2381,7 @@ function capabilityPositionChoices(p, positions) {
   if (p.kind === 'oscar' && !(p.finding && p.finding.category === 'oscar_issue')) return [];
   var required = Array.isArray(positions.alwaysRequired) ? positions.alwaysRequired : [];
   return positions.choices.filter(function(c) {
-    return c.key !== 'notSupported' || (!p.expectedRefusal && required.indexOf(p.capability) < 0);
+    return c.key !== 'notSupported' || (!p.expectedRefusal && !required.includes(p.capability));
   });
 }
 

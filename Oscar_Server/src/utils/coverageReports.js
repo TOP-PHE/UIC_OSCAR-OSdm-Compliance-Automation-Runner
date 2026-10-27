@@ -127,14 +127,18 @@ function comparisonOf(current, previous) {
  * the comment (both stay in the finding's thread, for the members); and no
  * position can be taken from it.
  */
+function frozenPoint(p) {
+  const position = p?.finding?.position;
+  if (!position) return p;
+  return { ...p, finding: { ...p.finding, position: { value: position.value, label: position.label, role: position.role, at: position.at } } };
+}
+
 function forPublication(report) {
   const c = report?.byCapability;
   if (!c) return report;
-  const { positions: _positions, ...rest } = c;
-  const point = (p) => (p?.finding?.position
-    ? { ...p, finding: { ...p.finding, position: { value: p.finding.position.value, label: p.finding.position.label, role: p.finding.position.role, at: p.finding.position.at } } }
-    : p);
-  return { ...report, byCapability: { ...rest, points: arr(c.points).map(point) } };
+  const frozen = { ...c, points: arr(c.points).map(frozenPoint) };
+  delete frozen.positions;
+  return { ...report, byCapability: frozen };
 }
 
 module.exports = { runIdsOf, summaryOf, comparisonOf, isRunId, forPublication };
