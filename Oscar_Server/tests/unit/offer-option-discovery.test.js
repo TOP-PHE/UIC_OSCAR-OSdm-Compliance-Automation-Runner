@@ -169,6 +169,85 @@ describe('the collection holds the answers to the declarations', () => {
     expect(logs.some((l) => /declared as not supported in the Test Framework: passenger\.gender\b/.test(l))).toBe(true);
   });
 
+  // #995: options each answered alone, combined. `answer(count)` answers a
+  // request holding `count` optional parameters.
+  async function runWithCombinations(answer) {
+    const env = {
+      offerOptionDiscovery: 'true', osdmVersion: '3.8.0', api_base: 'https://x', access_token: 't', scenarioCode: 'S',
+      __offerOptionFull: JSON.stringify({
+        anonymousPassengerSpecifications: [{ externalRef: 'P1', type: 'PERSON' }],
+        tripSearchCriteria: { origin: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:1' }, destination: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:2' }, departureTime: '2026-11-10T08:00:00' },
+      }),
+      offerOptionValues: JSON.stringify({}),
+      offerOptionDeclared: JSON.stringify({}),
+      offerOptionInvalidValues: 'skip',
+    };
+    const MANDATORY = { root: ['anonymousPassengerSpecifications', 'tripSearchCriteria'], passenger: ['externalRef', 'type'], trip: ['origin', 'destination', 'departureTime'] };
+    const countOf = (body) => Object.keys(body).filter((k) => !MANDATORY.root.includes(k) && k !== 'offerSearchCriteria').length
+      + Object.keys(body.offerSearchCriteria || {}).length
+      + Object.keys(body.anonymousPassengerSpecifications?.[0] || {}).filter((k) => !MANDATORY.passenger.includes(k)).length
+      + Object.keys(body.tripSearchCriteria || {}).filter((k) => !MANDATORY.trip.includes(k)).length;
+    const checks = [];
+    global.bru = {
+      getEnvVar: (k) => env[k],
+      setEnvVar: (k, v) => { env[k] = v; },
+      sendRequest: (req, cb) => answer(countOf(JSON.parse(req.data)), cb),
+    };
+    global.test = (name, fn) => { try { fn(); checks.push([name, 'pass']); } catch (e) { checks.push([name, e.message]); } };
+    global.validationLogger = () => {};
+    try {
+      expect(await o.runOptionDiscovery(200, { offers: [{ offerId: 'O' }] })).toBe(true);
+    } finally {
+      delete global.bru; delete global.test; delete global.validationLogger;
+    }
+    return { checks, report: JSON.parse(env.__offerOptionReport) };
+  }
+  const offers = (cb) => cb(null, { status: 200, data: { offers: [{ offerId: 'O' }] } });
+
+  test('a combination of options each answered alone, refused together, fails a check; every option at once too (#995)', async () => {
+    const { checks, report } = await runWithCombinations((count, cb) => (count >= 2
+      ? cb({ response: { status: 400, data: { code: 'COMBINATION_NOT_SUPPORTED' } } }) : offers(cb)));
+    expect(report.combinations.length).toBeGreaterThan(0);
+    expect(report.all).toMatchObject({ status: 400 });
+    const failed = checks.filter(([, r]) => r !== 'pass');
+    expect(failed).toHaveLength(report.combinations.length + 1);
+    const [first] = report.combinations;
+    expect(failed[0]).toEqual([`🧭 Offer request with parameters combined (${first.options.join(' + ')}) — answered, as each was alone`,
+      `refused (HTTP 400): COMBINATION_NOT_SUPPORTED. Each of ${first.options.join(', ')} was answered alone; together they are refused.`]);
+    expect(failed.at(-1)[0]).toBe('🧭 Offer request with every supported parameter at once — answered, as each was alone');
+    expect(failed.at(-1)[1]).toMatch(/^refused \(HTTP 400\): COMBINATION_NOT_SUPPORTED\. Each of .+, .+ was answered alone/);
+  });
+
+  test('a combination without offer, or not sent, is only stated (#995)', async () => {
+    const none = await runWithCombinations((count, cb) => (count >= 2 ? cb(null, { status: 200, data: { offers: [] } }) : offers(cb)));
+    expect(none.report.combinations.every((c) => c.result === 'no-offer-silent')).toBe(true);
+    expect(none.checks.filter(([, r]) => r !== 'pass')).toEqual([]);
+    const down = await runWithCombinations((count, cb) => (count >= 2 ? cb(new Error('socket hang up')) : offers(cb)));
+    expect(down.report.combinations.every((c) => c.status === 0)).toBe(true);
+    expect(down.checks.filter(([, r]) => r !== 'pass')).toEqual([]);
+  });
+
+  test('refused combinations: 4xx and 5xx only, every option at once included (#995)', () => {
+    const report = {
+      combinations: [
+        { options: ['a', 'b'], status: 400, result: 'refused', message: 'X' },
+        { options: ['a', 'c'], status: 501, result: 'not-implemented' },
+        { options: ['b', 'c'], status: 503, result: 'error' },
+        { options: ['a', 'd'], status: 200, result: 'no-offer-said' },
+        { options: ['c', 'd'], status: 0, result: 'error' },
+        { options: ['b', 'd'], status: 399, result: 'error' },
+      ],
+      all: { options: ['a', 'b', 'c', 'd'], status: 600, result: 'error' },
+    };
+    expect(o.refusedCombinations(report).map((c) => c.options.join('+'))).toEqual(['a+b', 'a+c', 'b+c']);
+    expect(o.refusedCombinations({ ...report, combinations: [], all: { ...report.all, status: 500 } }).map((c) => c.title))
+      .toEqual(['🧭 Offer request with every supported parameter at once — answered, as each was alone']);
+    expect(o.refusedCombinations({ combinations: [{ status: 400 }] })[0].options).toEqual([]);
+    expect([o.refusedCombinations(null), o.refusedCombinations({})]).toEqual([[], []]);
+    expect(o.refusedCombinationText(o.refusedCombinations(report)[1])).toBe('not implemented (HTTP 501): no detail. Each of a, c was answered alone; together they are refused.');
+    expect(o.refusedCombinationText(o.refusedCombinations(report)[2])).toMatch(/^answered with an error \(HTTP 503\)/);
+  });
+
   test('a declared option not taken fails in words, for every result that counts (#990)', () => {
     const results = ['honoured', 'accepted', 'ignored-said', 'ignored-silent', 'no-offer-said', 'no-offer-silent',
       'invalid-said', 'invalid-silent', 'refused', 'not-implemented', 'error', 'not-tested', 'not-reached'];

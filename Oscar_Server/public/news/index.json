@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-offer-options-in-coverage",
+    "date": "October 27, 2026",
+    "tag": "Improvement",
+    "title": "Every offer request parameter, stated in the coverage",
+    "summary": "The coverage by capability now says what the provider did with each optional parameter of the offer request, and with each combination of them.",
+    "content": "The offer request options scenario sends the offer request with the mandatory parameters only, then each optional parameter alone, combinations of those that worked, and all of them at once. The coverage used to show only its failures, so you could not tell whether the other parameters worked.\n\nThe capability Optional parameters of the offer request now gives the counts in one line, and a section lists every result: each parameter (supported, ignored, refused, no offer, not tested) with what the Test Framework declares, and each combination. The Markdown and the Excel workbook hold the same.\n\nA combination the provider refuses, although each of its parameters worked alone, is now a point to look at. A combination that gets no offer is only stated, since that can be legitimate."
+  },
+  {
     "id": "2026-10-27-refusal-forms-folded",
     "date": "October 27, 2026",
     "tag": "Improvement",

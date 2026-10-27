@@ -303,6 +303,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `POST /v1/reports/configured` answers `offer_options` (run, scenario,
     counts, report); the page's *Offer Request Options* card and the CSV's
     section show it. Runs from before 1.11.394 have no such lines.
+    **In the coverage by capability** (#995, 1.11.416 / OTST_V2.0.230):
+    `byCapability.offerOptions` (`utils/offerOptionCoverage.js`, pure) holds one
+    entry per latest run of a scenario with `offerOptionDiscovery` on, in the
+    reader's view of the data file, read with
+    `api/helpers/offerOptionReports.js` (moved out of `reports.js`, shared).
+    Each parameter's result is in words (`RESULT_TEXT`, pinned to the page's
+    `OFFER_OPTION_RESULTS`). Each combination's `state` is answered / no-offer
+    / refused / not-sent. A one-line summary goes on the
+    `offers.requestOptions` row (`withOfferOptions()`). The page section, the
+    Markdown and the workbook sheet *Offer request parameters* (only when an
+    entry exists) state it all. **A refused combination is a point**
+    (maintainer, 2026-10-27): the collection fails a check per combination
+    (and for every option at once) answered 4xx/5xx (`refusedCombinations()`,
+    `offerOptions.js`). No offer is only stated; a request not sent
+    (status 0) is neither. Undeclared parameters stay information only.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`

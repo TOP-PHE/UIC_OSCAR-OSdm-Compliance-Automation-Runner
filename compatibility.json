@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.450",
+  "current_release": "2026.451",
   "releases": [
+    {
+      "release": "2026.451",
+      "date": "2026-10-27",
+      "server": "1.11.416",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#995: the coverage by capability states each result of the offer request options scenario (the mandatory request, each parameter, each combination and all at once), from the runs' logs; on the page, in the Markdown, in a workbook sheet Offer request parameters and in published reports.",
+        "A combination of parameters each supported alone that the provider refuses (4xx/5xx) now fails a check, so it is a point; a combination without offer is only stated."
+      ]
+    },
     {
       "release": "2026.450",
       "date": "2026-10-27",
