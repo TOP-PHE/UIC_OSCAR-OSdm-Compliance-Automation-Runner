@@ -27,7 +27,8 @@ const word = (v) => (typeof v === 'string' && WORD.test(v) ? v : 'other');
 function labelsOf(labels) {
   const entries = Object.entries(labels);
   if (entries.length === 0) return '';
-  return `{${entries.map(([k, v]) => `${k}="${word(String(v))}"`).join(',')}}`;
+  const pairs = entries.map(([k, v]) => `${k}="${word(String(v))}"`);
+  return `{${pairs.join(',')}}`;
 }
 
 /** A writer that gives each family one HELP and TYPE, then its samples. */
@@ -96,7 +97,7 @@ function addRequests(w, snapshot) {
   }
   const d = snapshot.durations || {};
   const buckets = Array.isArray(d.buckets) ? d.buckets.map(num) : [];
-  if (buckets.some((b) => b === null)) return;
+  if (buckets.includes(null)) return;
   for (const [provider, h] of Object.entries(d.byProvider || {})) {
     if (!h || !Array.isArray(h.counts) || h.counts.length !== buckets.length) continue;
     const name = `${PREFIX}request_duration_seconds`;

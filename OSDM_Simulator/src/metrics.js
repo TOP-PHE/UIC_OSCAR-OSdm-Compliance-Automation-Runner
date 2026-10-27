@@ -82,7 +82,7 @@ function hostOf({ readFile, statfs, dataDir }) {
   } catch { disk = null; }
   if (!memory && loadavgText === null && statText === null && !disk) return null;
   return {
-    ...(memory || {}),
+    ...memory,
     load: loadavgText === null ? null : parseLoadavg(loadavgText),
     cpuSeconds: statText === null ? null : parseCpuSeconds(statText),
     cpus: os.cpus().length,
