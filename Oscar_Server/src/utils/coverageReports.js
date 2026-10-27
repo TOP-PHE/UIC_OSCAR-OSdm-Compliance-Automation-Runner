@@ -121,4 +121,20 @@ function comparisonOf(current, previous) {
   };
 }
 
-module.exports = { runIdsOf, summaryOf, comparisonOf, isRunId };
+/**
+ * The report as it is frozen for the certifier (#994): a provider's position
+ * keeps what it is, the role of who took it and when, never their e-mail nor
+ * the comment (both stay in the finding's thread, for the members); and no
+ * position can be taken from it.
+ */
+function forPublication(report) {
+  const c = report?.byCapability;
+  if (!c) return report;
+  const { positions: _positions, ...rest } = c;
+  const point = (p) => (p?.finding?.position
+    ? { ...p, finding: { ...p.finding, position: { value: p.finding.position.value, label: p.finding.position.label, role: p.finding.position.role, at: p.finding.position.at } } }
+    : p);
+  return { ...report, byCapability: { ...rest, points: arr(c.points).map(point) } };
+}
+
+module.exports = { runIdsOf, summaryOf, comparisonOf, isRunId, forPublication };

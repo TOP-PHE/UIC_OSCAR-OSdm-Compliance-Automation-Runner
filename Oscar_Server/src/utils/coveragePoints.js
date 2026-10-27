@@ -32,11 +32,22 @@
  *   accepted  an accepted deviation: a finding classified provider_deviation
  *             and resolved (maintainer, 2026-10-26), or a known deviation the
  *             run applied. Its capability reads "Passed with deviation";
+ *   unsupported  the finding says the provider does not support it (#994):
+ *             not counted against the provider, its capability reads "Not
+ *             supported by the provider". Never under a capability every
+ *             provider must have, nor for an expected refusal: such a point
+ *             stays the provider's;
  *   question  the finding is a question on the specification;
  *   provider  any other.
+ *
+ * A point has an `id` that stays the same from one report to the next while
+ * the problem is the same (a hash of what makes it one problem): the provider
+ * answers a point by it (#994). Its sure finding carries the position taken.
  */
 
+const crypto = require('node:crypto');
 const S = require('./findingSuggestions');
+const { notSupportedAllowed, positionView } = require('./pointPositions');
 
 const MARK = '[WARNING] Known deviation (documented): ';
 const RETURNED = ' returned HTTP ';
@@ -46,7 +57,7 @@ const MAX_OBSERVED = 500;
 const MAX_POINTS = 500;
 const MAX_POINT_RUNS = 10;
 const MAX_POINT_CODES = 20;
-const KIND_ORDER = Object.freeze(['provider', 'accepted', 'question', 'oscar']);
+const KIND_ORDER = Object.freeze(['provider', 'accepted', 'unsupported', 'question', 'oscar']);
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const atOf = (run) => run?.completed_at || run?.queued_at || null;
@@ -100,6 +111,8 @@ function knownDeviationsOf(lines) {
 
 const isAcceptedFinding = (f) => f?.category === 'provider_deviation' && f.status === 'resolved';
 const findingView = (f) => (f ? { id: f.id, title: f.title, category: f.category, status: f.status } : null);
+// A point's sure finding, with the position taken on it (#994).
+const linkedFindingView = (f) => (f ? { ...findingView(f), position: positionView(f) } : null);
 const baselined = (f) => Boolean(f?.baselineInRun ?? f?.baseline_in_run);
 
 // The finding that put a known deviation in the runs: baselined, same step and status.
@@ -140,9 +153,10 @@ function linkFailures(failures, { findings = [], suggestions = {} } = {}) {
   return links;
 }
 
-function kindOf(finding, oscar) {
+function kindOf(finding, oscar, point) {
   if (oscar || finding?.category === 'oscar_issue') return 'oscar';
   if (isAcceptedFinding(finding)) return 'accepted';
+  if (finding?.category === 'not_supported' && notSupportedAllowed(point)) return 'unsupported';
   if (finding?.category === 'spec_question') return 'question';
   return 'provider';
 }
@@ -168,6 +182,9 @@ function placeOf(seen, links) {
   const own = S.STATUS_CHECK.test(check) ? S.stepKey(step) : '';
   return { id: ['check', ...capabilityPart(seen), own, check, group?.problemCode || ''].join('␟'), key, step, group };
 }
+
+// The point's id: the same while the problem is the same (#994).
+const pointId = (placeId) => crypto.createHash('sha256').update(placeId).digest('hex').slice(0, 32);
 
 function newPoint(base) {
   return {
@@ -226,9 +243,9 @@ function settle(point, links) {
   if (point.source !== 'check') return;
   const parts = point.keys.map((k) => links.get(k)).filter(Boolean);
   const linked = parts.find((l) => l.finding);
-  point.finding = findingView(linked?.finding);
+  point.finding = linkedFindingView(linked?.finding);
   point.possibleFinding = linked ? null : findingView(parts.find((l) => l.possible)?.possible);
-  point.kind = kindOf(linked?.finding, parts.some((l) => l.oscar));
+  point.kind = kindOf(linked?.finding, parts.some((l) => l.oscar), point);
 }
 
 function order(capabilities) {
@@ -249,9 +266,10 @@ function order(capabilities) {
  *            entry }, code, run }], one per failed check or known deviation of
  *            a run; `refusal` when it counts against an expected refusal (R4)
  *   links  linkFailures()'s map
- * -> { points, truncated, accepted, oscar }: `accepted` and `oscar` hold the
- *    failed checks (the objects of `seen`) of the accepted deviations and of
- *    OSCAR's points, which no longer count as points of their capability.
+ * -> { points, truncated, accepted, unsupported, oscar }: `accepted`,
+ *    `unsupported` and `oscar` hold the failed checks (the objects of `seen`)
+ *    of the accepted deviations, of what the provider does not support (#994)
+ *    and of OSCAR's points, which no longer count as points of their capability.
  */
 function pointsOf(seen, { links = new Map(), findings = [], capabilities = [], label = (id) => id } = {}) {
   const points = new Map();
@@ -259,7 +277,7 @@ function pointsOf(seen, { links = new Map(), findings = [], capabilities = [], l
   for (const s of arr(seen)) {
     const place = placeOf(s, links);
     if (!points.has(place.id)) {
-      points.set(place.id, s.deviation ? deviationPoint(s, findings, label) : checkPoint(s, place, label));
+      points.set(place.id, { id: pointId(place.id), ...(s.deviation ? deviationPoint(s, findings, label) : checkPoint(s, place, label)) });
       members.set(place.id, []);
     }
     addOccurrence(points.get(place.id), s, place);
@@ -271,10 +289,12 @@ function pointsOf(seen, { links = new Map(), findings = [], capabilities = [], l
   const list = [...points.values()].sort(order(capabilities));
   const kept = list.slice(0, MAX_POINTS);
   kept.forEach((p, i) => { p.number = i + 1; });
-  return { points: kept, truncated: list.length > MAX_POINTS, accepted: checksOf('accepted'), oscar: checksOf('oscar') };
+  return {
+    points: kept, truncated: list.length > MAX_POINTS, accepted: checksOf('accepted'), unsupported: checksOf('unsupported'), oscar: checksOf('oscar'),
+  };
 }
 
 module.exports = {
   knownDeviationOf, knownDeviationsOf, deviationKey, isAcceptedFinding, keyOfCheck, linkFailures, pointsOf,
-  observedText, plainCheck, KIND_ORDER, MAX_POINTS, MAX_OBSERVED,
+  observedText, plainCheck, pointId, KIND_ORDER, MAX_POINTS, MAX_OBSERVED,
 };

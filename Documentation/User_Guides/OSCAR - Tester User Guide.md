@@ -1434,7 +1434,7 @@ results:
 | Passed with deviation | It passed, except for deviations that are accepted (see below). |
 | Passed with points | It went through, with checks to look at. |
 | Blocked | No run got as far as this capability. |
-| Not supported by the provider | The provider answered 501, or "not implemented" on an optional read. |
+| Not supported by the provider | The provider answered 501, or "not implemented" on an optional read, or it said so on a point (see *Taking a position* below). |
 | Not tested | Declared in the Test Framework, but no run reached it. |
 | Out of scope | Not declared, or declared as not supported. |
 
@@ -1483,16 +1483,40 @@ shows:
   not;
 - the finding it is recorded as, and links to its runs.
 
-The points come in four lists:
+The points come in five lists:
 
 - **For the provider**: the provider's points.
 - **Accepted deviations**: the finding is classified *provider deviation* and
   resolved, or the run met a status baselined as a known deviation. The
   capability then reads *Passed with deviation*.
+- **Not supported by the provider**: the finding is classified *not
+  supported*. These do not count against the provider; when nothing else
+  failed, the capability reads *Not supported by the provider*.
 - **Questions on the specification**: the finding is a *spec question*.
 - **OSCAR's own points**: the finding is an *OSCAR issue*, the suggested
   finding was marked as OSCAR's, or the check is OSCAR's own request check.
   These do not count against the provider.
+
+**Taking a position on a point.** A Test Manager or a tester of the company
+or provider can answer a point: *Take a position* under it (in the list at
+the end, or under its row). Choose one of:
+
+| Position | What it does |
+|---|---|
+| Agreed, we will fix it | The point stays the provider's until a run no longer shows it. |
+| Not supported: optional, not a blocker | The point moves to *Not supported by the provider*. Refused for the sale itself, the offers by search, and an expected refusal. |
+| Done this way on purpose | The point becomes an accepted deviation: *Passed with deviation*. |
+| OSCAR's test is wrong | The point moves to OSCAR's own points. |
+| The OSDM specification is unclear | The point moves to the questions on the specification. |
+| Our declaration was wrong (Test Framework or Test Data) | The point stays the provider's until the Test Framework or Test Data is corrected and the test runs again. |
+| Fixed, please run again | The point stays the provider's until a run no longer shows it. |
+
+Write a comment: it is required. The position counts at once. It is kept on
+the point's finding (opened from the point when it has none, with what was
+expected and seen), signed with who took it and when, and the comment goes
+in the finding's thread on *Test Findings & Open Points*. A later position
+changes the same finding. The Test Manager can change the finding's
+category there to confirm or reopen it.
 
 Below the points, two folded lists:
 
@@ -1520,7 +1544,9 @@ a new one.
 In the **Published Coverage Reports** card:
 
 - **Share with the certifier** gives the certifier the report and every run
-  it reads. A report is shared once.
+  it reads. A report is shared once. A provider's position on a point shows
+  there with the role of who took it and the date, never their e-mail or the
+  comment.
 - **Withdraw** takes a shared report away from the certifier. The report
   stays in the list, marked withdrawn, and its runs stay shared; unshare a
   run on its own page if needed. Sharing and withdrawing are recorded in the

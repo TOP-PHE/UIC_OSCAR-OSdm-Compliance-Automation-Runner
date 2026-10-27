@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-point-positions",
+    "date": "October 27, 2026",
+    "tag": "New Feature",
+    "title": "The provider answers a coverage point",
+    "summary": "Test Managers and testers take a position on a point of the coverage by capability: to fix, not supported, on purpose, and more.",
+    "content": "In the coverage by capability, Take a position under a point lets a Test Manager or a tester of the company or provider answer it: agreed, we will fix it; not supported (optional, not a blocker); done this way on purpose; OSCAR's test is wrong; the OSDM specification is unclear; our declaration was wrong; fixed, please run again. A comment is required.\n\nThe position counts at once. It is kept on the point's finding in Test Findings & Open Points, opened from the point when it has none, and the comment goes in its thread. A point the provider does not support is listed apart and no longer counts against it, except for the sale itself and the offers by search. Done on purpose makes it an accepted deviation.\n\nA published report shows the position with the role and the date, without the e-mail or the comment."
+  },
+  {
     "id": "2026-10-27-offer-options-in-coverage",
     "date": "October 27, 2026",
     "tag": "Improvement",

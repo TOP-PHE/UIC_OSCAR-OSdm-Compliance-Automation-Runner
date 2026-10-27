@@ -40,9 +40,15 @@ const failedText = (list) => arr(list).map(failedLine).join('\n');
 const findingsText = (list) => arr(list).map((f) => `${f.title} (${f.category}, ${f.status})`).join('\n');
 const capabilityText = (r) => CAPABILITY_TEXT[r] || String(r || '');
 const KIND_TEXT = Object.freeze({
-  provider: 'For the provider', accepted: 'Accepted deviation', question: 'Question on the specification',
-  oscar: "OSCAR's own (not counted against the provider)",
+  provider: 'For the provider', accepted: 'Accepted deviation', unsupported: 'Not supported by the provider (not counted against it)',
+  question: 'Question on the specification', oscar: "OSCAR's own (not counted against the provider)",
 });
+// The provider's position on a point (#994): who took it, as the report shows
+// it (a published report names the role only), and when.
+function positionBy(position) {
+  if (!position) return '';
+  return [position.by, position.role ? `(${position.role})` : ''].filter(Boolean).join(' ');
+}
 const numbersText = (list) => arr(list).filter((n) => Number.isInteger(n)).map((n) => `#${n}`).join(', ');
 const formsRun = (tests) => arr(tests).reduce((n, t) => n + arr(t.forms).filter((x) => x.result !== 'not-run').length, 0);
 // "CODE (FORM): Result at <step> — <check>", one line per form.
@@ -65,7 +71,8 @@ function capabilitySummaryRows(report) {
     ['Expected refusals', r.total ?? 0], ['  Refused as expected', r.refused ?? 0], ['  Not refused, accepted deviation', r.deviation ?? 0],
     ['  Not refused', r.notRefused ?? 0], ['  Not run', r.notRun ?? 0],
     ['Points to look at', (p.total ?? 0) + (p.truncated ? ' (the first 500 only)' : '')], ['  For the provider', p.provider ?? 0],
-    ['  Accepted deviations', p.accepted ?? 0], ['  Questions on the specification', p.questions ?? 0], ["  OSCAR's own", p.oscar ?? 0],
+    ['  Accepted deviations', p.accepted ?? 0], ['  Not supported by the provider', p.unsupported ?? 0],
+    ['  Questions on the specification', p.questions ?? 0], ["  OSCAR's own", p.oscar ?? 0],
     ['Scenarios set apart (neither in the run list nor run)', s.apart ?? 0],
   ];
 }
@@ -121,17 +128,21 @@ function pointsSheet(report) {
       { title: 'HTTP status', width: 10 }, { title: 'Problem code', width: 24 },
       { title: 'Blocking', width: 10 }, { title: 'Times seen', width: 10 }, { title: 'Tests', width: 40 }, { title: 'Scenario codes', width: 50 },
       { title: 'First seen', width: 20 }, { title: 'Last seen', width: 20 }, { title: 'Finding', width: 40 }, { title: 'Finding category', width: 18 },
-      { title: 'Finding status', width: 14 }, { title: 'Finding is only possible', width: 12 }, { title: 'Note', width: 40 }, { title: 'Run ids', width: 38 },
+      { title: 'Finding status', width: 14 }, { title: 'Finding is only possible', width: 12 }, { title: 'Provider position', width: 36 },
+      { title: 'Position taken by', width: 30 }, { title: 'Position date', width: 20 }, { title: 'Position comment', width: 60 },
+      { title: 'Note', width: 40 }, { title: 'Run ids', width: 38 },
     ],
     rows: arr(report.byCapability?.points).map((p) => {
       const finding = findingOf(p);
+      const position = p.finding?.position || null;
       return [
         p.number, KIND_TEXT[p.kind] || p.kind || '', p.capabilityLabel, yesNo(Boolean(p.expectedRefusal)),
         arr(p.steps).length ? arr(p.steps).join('\n') : (p.step || ''), p.check, p.observed?.text || '', p.status ?? null, p.problemCode || '',
         yesNo(Boolean(p.blocking)), p.occurrences ?? 0, arr(p.tests).map((x) => x.entry || x.key).join('\n'),
         arr(p.tests).flatMap((x) => arr(x.codes)).join('\n'), p.firstSeen || '', p.lastSeen || '',
         finding ? finding.title : '', finding ? finding.category : '', finding ? finding.status : '',
-        finding ? yesNo(!p.finding) : '', p.note || '', arr(p.runs).map((r) => r.runId).join('\n'),
+        finding ? yesNo(!p.finding) : '', position ? position.label : '', positionBy(position), position?.at || '', position?.comment || '',
+        p.note || '', arr(p.runs).map((r) => r.runId).join('\n'),
       ];
     }),
   };

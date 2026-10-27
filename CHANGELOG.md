@@ -93,6 +93,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.418] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #994, release 2026.453. The provider takes a position on a point of the coverage by capability.
+
+### Added
+- **A position on a point.** A Test Manager or a tester of the company or provider answers a point of the coverage by capability, with a comment: *Take a position* under the point, in the list at the end or under its row.
+  - Seven positions: agreed, we will fix it; not supported (optional, not a blocker); done this way on purpose; OSCAR's test is wrong; the OSDM specification is unclear; our declaration was wrong; fixed, please run again.
+  - The position goes on the point's finding (Test Findings & Open Points). A point without a finding gets one, opened from the point with what was expected and seen. The point's #735 keys are linked to that finding, and the comment goes in its thread.
+  - It counts at once (maintainer, 2026-10-27). Each position sets the finding's category; only "on purpose" resolves it, which makes the point an accepted deviation. A later position changes the same finding, and the Test Manager can still change the finding on Test Findings.
+  - `POST /v1/company/coverage/positions` (`company-coverage-positions.js`): the point is found again by its `id` in the coverage as the person reads it, so a tester answers only the points of their view. Administrators and certifiers get 403.
+- **Points the provider does not support.** A point whose finding is classified *not supported* is listed under *Not supported by the provider* and no longer counts against the provider. Its capability reads *Not supported by the provider* when nothing else failed, even when the run stopped on it.
+  - Never under the sale or the offers by search (`ALWAYS_REQUIRED`), nor for an expected refusal: such a point stays the provider's, and the route refuses the position.
+  - Before, a finding classified *not supported* changed nothing in the coverage.
+- **Each point has an `id`**, the same from one report to the next while the problem is the same.
+- Migration 44: `finding.position`, `position_by`, `position_role`, `position_at`, `position_comment`.
+
+### Changed
+- **Published reports** keep a position with the role of who took it and the date, never their e-mail or the comment (`forPublication()`).
+- **Workbook**: *Points to look at* gains the position, who took it, when and the comment; the summary counts the points not supported. The page's summary and the Markdown say them too.
+- Tester User Guide §6, OpenAPI, CLAUDE.md.
+
+### Tests
+- `point-positions.test.js`: the positions, where each is refused, the finding a first position opens.
+- `capability-coverage.test.js`: a point not supported at an optional operation and under the scenario's own capability (a stopped run included); never under the sale nor for an expected refusal.
+- `coverage-positions-routes.test.js`: a tester's position opens a finding, links the keys and the thread; "not supported" refused on the sale; "on purpose" then "fix" change the same finding; a tester cannot answer a point outside their view; other company, administrator, certifier; the body checks; a published report frozen without e-mail or comment.
+- `ui-scripts.test.js`: the position on its point, escaped; the page's choices equal the server's for every capability; the button and the form; none on a published report.
+- 20 deliberate breaks: 19 make a test fail. The other, letting certifiers through the route's own role check, is stopped by the company scope check before it.
+- Checked in Chromium on a throwaway server: a tester's "not supported" moves the point and its capability, and the sale's refusal shows its reason.
+
+---
+
 ## [server-1.11.416] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #995, release 2026.451. The offer request options' results are stated in the coverage by capability, and a refused combination of parameters is a point.

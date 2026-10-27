@@ -31,7 +31,9 @@
  *   R6  The points to look at, each once (coveragePoints.js). A failed check
  *       of an accepted deviation is not a point of its capability: it reads
  *       "Passed with deviation". One of OSCAR's points does not count against
- *       the provider at all (maintainer, 2026-10-26).
+ *       the provider at all (maintainer, 2026-10-26). Nor does one the
+ *       provider says it does not support (#994): its capability reads "Not
+ *       supported by the provider" when nothing else failed.
  *   R7  An optional operation is its own row: masterData, the seat map, the
  *       fulfilment read, the refund receipt, a withdrawal, Idempotency-Key.
  */
@@ -86,22 +88,24 @@ function stepNotSupported(name, statuses) {
 /**
  * The steps of a run, in order, each once: { name, state (passed / failed /
  * not-supported), failures (its failed checks, probes apart), accepted (those
- * of an accepted deviation), oscar (those of OSCAR's points), deviation (an
- * accepted deviation or a known deviation was met there), blocking }.
- * `accepted` and `oscar` are sets of the run's check objects.
+ * of an accepted deviation), unsupported (those of what the provider does not
+ * support, #994), oscar (those of OSCAR's points), deviation (an accepted
+ * deviation or a known deviation was met there), blocking }. `accepted`,
+ * `unsupported` and `oscar` are sets of the run's check objects.
  */
-function stepsOf(run, { accepted, oscar, deviations } = {}) {
+function stepsOf(run, { accepted, unsupported, oscar, deviations } = {}) {
   const steps = stepsByName(run?.steps);
   for (const check of arr(run?.checks)) {
     const step = isObj(check) ? steps.get(check.request_name) : undefined;
-    if (step) bucketOf(step, check, { accepted, oscar }).push(check);
+    if (step) bucketOf(step, check, { accepted, unsupported, oscar }).push(check);
   }
   const deviated = new Set(arr(deviations).map((d) => stepKey(d.step)));
   return [...steps.values()].map((s) => withState(s, deviated));
 }
 
-function bucketOf(step, check, { accepted, oscar }) {
+function bucketOf(step, check, { accepted, unsupported, oscar }) {
   if (accepted?.has(check)) return step.accepted;
+  if (unsupported?.has(check)) return step.unsupported;
   if (oscar?.has(check)) return step.oscar;
   return isProbe(check) ? step.probes : step.failures;
 }
@@ -111,7 +115,7 @@ function stepsByName(rows) {
   const steps = new Map();
   for (const row of arr(rows)) {
     if (!isObj(row) || typeof row.request_name !== 'string') continue;
-    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [], accepted: [], oscar: [] });
+    if (!steps.has(row.request_name)) steps.set(row.request_name, { name: row.request_name, statuses: [], failures: [], probes: [], accepted: [], unsupported: [], oscar: [] });
     const status = Number(row.http_status);
     if (Number.isInteger(status) && status > 0) steps.get(row.request_name).statuses.push(status);
   }
@@ -173,6 +177,13 @@ function refusalOutcome(failures, deviation) {
   return deviation ? 'deviation' : 'refused';
 }
 
+// Nothing failed but what the provider says it does not support (#994), even
+// when the run stopped on it: "not supported", at its first such step; else null.
+function declinedResult(charged, failures) {
+  const declined = failures.length === 0 ? charged.find((s) => s.unsupported.length > 0) : null;
+  return declined ? { result: 'not-supported', step: declined.name, check: failureText(declined.unsupported[0]) } : null;
+}
+
 /**
  * The result of a run for its main capability (R1, R5): passed, deviation,
  * points, blocked or not-supported; for a refusal test, refused, deviation or
@@ -189,6 +200,8 @@ function mainResult(steps, main, traits, refusal) {
   if (reached && goals.length > 0 && goals.every((s) => s.notSupported)) {
     return { result: 'not-supported', step: goals[0].name, check: `answered HTTP ${goals[0].statuses.at(-1)}` };
   }
+  const declined = declinedResult(charged, failures);
+  if (declined) return declined;
   if (!reached) return { result: 'blocked', step: at.step, check: at.check || 'the run stopped before this capability was reached' };
   if (own.some((s) => s.state === 'failed' && s.blocking && chargedTo(s, main, traits))) return { result: 'blocked', ...at };
   return { result: passedResult(failures, deviation), ...at };
@@ -204,18 +217,19 @@ function sideResult(capability, steps, traits) {
   if (own.every((s) => s.notSupported)) return 'not-supported';
   const ownRow = Boolean(def.optional && def.goal);
   if (own.some((s) => s.state === 'failed')) return ownRow ? 'points' : null;
+  if (ownRow && own.some((s) => s.unsupported.length > 0)) return 'not-supported';
   return ownRow && own.some((s) => s.deviation) ? 'deviation' : 'passed';
 }
 
 /**
  * Everything one run says: its main result, what it proves of the other
  * capabilities ({ capability: passed | deviation | not-supported | points }),
- * and its steps. `accepted` and `oscar` hold the failed checks of accepted
- * deviations and of OSCAR's points, `deviations` the known deviations the run
- * applied.
+ * and its steps. `accepted`, `unsupported` and `oscar` hold the failed checks
+ * of accepted deviations, of what the provider does not support and of
+ * OSCAR's points, `deviations` the known deviations the run applied.
  */
-function runEvidence(run, { main, traits, refusal, accepted, oscar, deviations }) {
-  const steps = stepsOf(run, { accepted, oscar, deviations });
+function runEvidence(run, { main, traits, refusal, accepted, unsupported, oscar, deviations }) {
+  const steps = stepsOf(run, { accepted, unsupported, oscar, deviations });
   const side = new Set(steps.flatMap((s) => capabilitiesOfStep(s, traits)));
   for (const f of arr(traits?.features)) side.add(f);
   // A refusal's result is a row of its own (R4): the capability it probes
@@ -312,10 +326,10 @@ function failuresOf(items) {
 
 // Each item's evidence and form, once the accepted deviations and OSCAR's
 // points are known.
-function withEvidence(items, { accepted, oscar, collectionVersion }) {
+function withEvidence(items, { accepted, unsupported, oscar, collectionVersion }) {
   for (const item of items) {
     item.evidence = item.run
-      ? runEvidence(item.run, { main: item.main, traits: item.traits, refusal: item.refusal, accepted, oscar, deviations: item.deviations })
+      ? runEvidence(item.run, { main: item.main, traits: item.traits, refusal: item.refusal, accepted, unsupported, oscar, deviations: item.deviations })
       : null;
     item.form = formOf(item, collectionVersion);
   }
@@ -416,7 +430,8 @@ function summaryOf({ capabilities, expectedRefusals, notTested, apart, points, t
       notRefused: expectedRefusals.filter((r) => r.result === 'not-refused').length, notRun: expectedRefusals.filter((r) => r.result === 'not-run').length,
     },
     pointsToLookAt: {
-      total: points.length, provider: kinds('provider'), accepted: kinds('accepted'), questions: kinds('question'), oscar: kinds('oscar'),
+      total: points.length, provider: kinds('provider'), accepted: kinds('accepted'), unsupported: kinds('unsupported'), questions: kinds('question'),
+      oscar: kinds('oscar'),
       truncated,
     },
     declaredWithoutScenario: notTested.length, apart: apart.length,
@@ -449,10 +464,10 @@ function capabilityCoverageOf({
   const { items, apart } = scenarioItems({ datafile, catalogue: arr(catalogue), runs: runs || {}, runList: runListOf(datafile) });
   for (const item of items) item.deviations = item.run ? P.knownDeviationsOf(warnings?.[item.scenario.code]) : [];
   const links = P.linkFailures(failuresOf(items), { findings, suggestions });
-  const { points, truncated, accepted, oscar } = P.pointsOf(seenOf(items), {
+  const { points, truncated, accepted, unsupported, oscar } = P.pointsOf(seenOf(items), {
     links, findings, capabilities: K.CAPABILITIES.map((c) => c.id), label: (id) => K.CAPABILITY.get(id)?.label || id,
   });
-  withEvidence(items, { accepted, oscar, collectionVersion });
+  withEvidence(items, { accepted, unsupported, oscar, collectionVersion });
   const tests = testsOf(items);
   const side = sideEvidenceOf(items);
   const capabilities = [];

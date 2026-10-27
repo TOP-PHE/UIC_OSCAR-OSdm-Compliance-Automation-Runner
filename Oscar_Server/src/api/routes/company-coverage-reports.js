@@ -33,7 +33,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
 const { buildCoverage, daysOf, MAX_DAYS } = require('./company-coverage');
-const { runIdsOf, summaryOf, comparisonOf, isRunId } = require('../../utils/coverageReports');
+const { runIdsOf, summaryOf, comparisonOf, isRunId, forPublication } = require('../../utils/coverageReports');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const log = require('../../utils/logger').child({ module: 'company-coverage-reports' });
 
@@ -101,7 +101,7 @@ router.post('/coverage/reports', publishLimiter, async (req, res) => {
   const days = daysOf(raw === undefined ? undefined : String(raw));
   if (days === null) return res.status(400).json({ status: 400, title: 'Bad Request', detail: `days must be a whole number from 1 to ${MAX_DAYS}.` });
   try {
-    const report = await buildCoverage(companyId, days, req.user);
+    const report = forPublication(await buildCoverage(companyId, days, req.user));
     const previous = previousShared(companyId);
     const comparison = comparisonOf(report, previous);
     const id = crypto.randomUUID();

@@ -1482,7 +1482,8 @@ describe('the Report Builder coverage section', () => {
   for (const name of sectionNames) ctx[name] = loadFunction(page, name, ctx);
   const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks,
     capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml, capabilityPointsHtml, capabilitySentence,
-    capabilityOptionsHtml, capabilityCombinationText, capabilityRefusalFormsHtml } = ctx;
+    capabilityOptionsHtml, capabilityCombinationText, capabilityRefusalFormsHtml, capabilityPointHtml, capabilityPositionText, capabilityPositionChoices,
+    capabilityPositionButtonHtml, capabilityPositionFormHtml, capabilityPointLine } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1625,7 +1626,7 @@ describe('the Report Builder coverage section', () => {
     const out = coverageHtml({ ...answer, byCapability }, 'capabilities');
     for (const tag of TAGS) expect(out.includes(tag)).toBe(false);
     expect(out).toContain('2 capability(ies) tested: 0 passed, 1 passed with deviation, 1 passed with points, 0 blocked, 0 not supported by the provider');
-    expect(out).toContain('2 point(s) to look at: 1 for the provider, 0 accepted deviation(s), 0 question(s), 1 of OSCAR');
+    expect(out).toContain('2 point(s) to look at: 1 for the provider, 0 accepted deviation(s), 0 not supported, 0 question(s), 1 of OSCAR');
     expect(out.split('<tr><th colspan="4">Sale &#60;g&#62;</th></tr>').length).toBe(2);
     expect(out).toContain('<td>Sale &#60;l&#62; — Declared</td><td>1 test(s), 1 form(s) run · proven on the way by 3 run(s)<details><summary>Tests</summary>');
     expect(out).toContain('<a href="/run-detail.html?id=' + UUID + '">C_&#60;1&#62;</a> (SEARCH): Passed with points at 02. &#60;s&#62; — X &#60;c&#62;, to run again');
@@ -1794,6 +1795,87 @@ describe('the Report Builder coverage section', () => {
       + '<br><strong>Seen:</strong> expected 12.4 to equal 12.5<br><small>');
     // A test outside the catalogue is named by its code, once.
     expect(out).toContain('Found in A, on 2026-10-24 10:05:00');
+  });
+
+  // #994: the provider's position on a point.
+  describe('a position on a point (#994)', () => {
+    const PP = require('../../src/utils/pointPositions');
+    const K = require('../../src/utils/capabilities');
+    const positions = { choices: PP.choices(), alwaysRequired: [...K.ALWAYS_REQUIRED] };
+    const ID = '0123456789abcdef0123456789abcdef';
+    const point = (extra = {}) => ({
+      ...byCapability.points[0], id: ID, kind: 'provider', capability: 'fulfilment.documents', capabilityLabel: 'Documents <d>', expectedRefusal: false,
+      finding: { id: 'f', title: 'T <f>', category: 'not_supported', status: 'discussing',
+        position: { value: 'notSupported', label: 'Not supported: optional, not a blocker', by: 'ana<a>', role: 'tester', at: '2026-10-27 09:00:00', comment: 'Mobile <only>' } },
+      ...extra,
+    });
+    const keys = (p) => capabilityPositionChoices(p, positions).map((c) => c.key);
+
+    test('the position is said on its point, signed and escaped, in the page and in the Markdown', () => {
+      expect(capabilityPositionText(point().finding.position))
+        .toBe('Position: Not supported: optional, not a blocker — ana<a> (tester), 2026-10-27 09:00:00: Mobile <only>');
+      // A published report names the role and the date only.
+      expect(capabilityPositionText({ value: 'fix', label: 'Agreed, we will fix it', role: 'Test Manager', at: '2026-10-27' }))
+        .toBe('Position: Agreed, we will fix it — (Test Manager), 2026-10-27');
+      expect(capabilityPositionText(null)).toBe('');
+      const out = capabilityPointHtml(point(), true, positions);
+      expect(out).toContain('<br><small>Position: Not supported: optional, not a blocker — ana&#60;a&#62; (tester), 2026-10-27 09:00:00: Mobile &#60;only&#62;</small>');
+      expect(out).not.toContain('<only>');
+      expect(capabilityPointLine(point())).toContain(' Position: Not supported: optional, not a blocker — ana<a> (tester), 2026-10-27 09:00:00: Mobile <only>.');
+    });
+
+    test('the choices are those the server takes: "not supported" never under the sale, the offers by search, nor for an expected refusal', () => {
+      expect(keys(point())).toEqual(PP.choices().map((c) => c.key));
+      for (const def of K.CAPABILITIES) {
+        for (const expectedRefusal of [false, true]) {
+          const p = point({ capability: def.id, expectedRefusal });
+          const taken = PP.choices().map((c) => c.key).filter((key) => PP.positionRefusal(p, key) === null);
+          expect(keys(p)).toEqual(taken);
+        }
+      }
+      expect(keys(point({ capability: 'sale' }))).not.toContain('notSupported');
+      // None on a known deviation, a point OSCAR owns, an id that is not one, or a published report.
+      expect(keys(point({ source: 'known-deviation' }))).toEqual([]);
+      expect(keys(point({ kind: 'oscar', finding: null }))).toEqual([]);
+      expect(keys(point({ kind: 'oscar', finding: { category: 'oscar_issue' } }))).toContain('fix');
+      expect(keys(point({ id: '"><x>' }))).toEqual([]);
+      expect(capabilityPositionChoices(point(), undefined)).toEqual([]);
+    });
+
+    test('the button and the form', () => {
+      expect(capabilityPositionButtonHtml(point(), positions))
+        .toBe('<br><button type="button" class="btn btn-secondary btn-sm" data-cov-position="' + ID + '">Change the position</button>');
+      expect(capabilityPositionButtonHtml(point({ finding: null }), positions)).toContain('>Take a position</button>');
+      expect(capabilityPositionButtonHtml(point(), undefined)).toBe('');
+      const form = capabilityPositionFormHtml(point({ capability: 'sale' }), { ...positions, choices: [...positions.choices, { key: 'x"', label: 'L <l>' }] });
+      expect(form).toContain('<form class="cov-position-form" data-cov-position-form="' + ID + '">');
+      expect(form).toContain('<option value="fix">Agreed, we will fix it</option>');
+      expect(form).not.toContain('value="notSupported"');
+      expect(form).toContain('<option value="x&#34;">L &#60;l&#62;</option>');
+      expect(form).toContain('<textarea name="comment" rows="3" maxlength="4000" required></textarea>');
+    });
+
+    test('the live coverage offers a position on every point, under its row and in the list; a published report on none', () => {
+      const points = [point({ number: 1 })];
+      const live = capabilityHtml({ ...byCapability, points, positions });
+      expect(live.split('data-cov-position="' + ID + '"').length).toBe(3);
+      expect(capabilityHtml({ ...byCapability, points })).not.toContain('data-cov-position=');
+      expect(capabilityPointsHtml(points)).not.toContain('data-cov-position=');
+      expect(capabilityHtml({ ...byCapability, points: [point({ number: 1, kind: 'unsupported' })], positions }))
+        .toContain('<h5 class="cov-subheading">Not supported by the provider (not counted against it) (1)</h5>');
+    });
+
+    test('the page sends the position and draws the coverage again at its point', () => {
+      const source = read(page);
+      expect(source).toContain("document.getElementById('coverage-body').addEventListener('click', toggleCoveragePosition);");
+      expect(source).toContain("document.getElementById('coverage-body').addEventListener('submit', function(e) { saveCoveragePosition(e).catch(function() {}); });");
+      expect(source).toContain("var res = await fetch('/v1/company/coverage/positions', {\n      method: 'POST',");
+      expect(source).toContain('return { point: id, days: coverageData.days, position: form.elements.position.value, comment: form.elements.comment.value };');
+      expect(source).toContain('      body: JSON.stringify(asked)');
+      // The server's sentence ends with its own full stop.
+      expect(source).toContain("msg.textContent = capabilitySentence('Not saved: ' + ((data && data.detail) || ('HTTP ' + res.status)));");
+      expect(capabilitySentence('Not saved: it cannot be "not supported".')).toBe('Not saved: it cannot be "not supported".');
+    });
   });
 
   // #995: the offer request options' results, from the server module's own answer.
