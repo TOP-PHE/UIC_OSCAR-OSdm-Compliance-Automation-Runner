@@ -1440,8 +1440,9 @@ results:
 
 **Expected refusals** (the `NHF_` scenarios and the refusal probes) are listed
 apart: refused as expected, not refused, or not run. They never change the
-result of the capability they probe. Each one counts its forms by result; the
-forms not refused are shown, and every form is under *Forms*.
+result of the capability they probe. Each one counts its forms by result,
+says at which step the forms not refused went through (one line per step),
+and keeps every form under *Forms*; what failed is in the row's point.
 
 **Optional parameters of the offer request.** When the offer request options
 scenario (`OTST_OFFER_OPTION_DISCOVERY`) has run, the report states each of
