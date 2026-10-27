@@ -55,6 +55,9 @@ const formsRun = (tests) => arr(tests).reduce((n, t) => n + arr(t.forms).filter(
 function formLine(x) {
   let line = x.code + (x.form ? ` (${x.form})` : '') + ': ' + capabilityText(x.result);
   if (x.step) line += ' at ' + x.step + (x.check ? ' — ' + x.check : '');
+  else if (x.check) line += ' — ' + x.check;
+  // #1008: the point of the check that blocked it.
+  if (Number.isInteger(x.point) && x.point > 0) line += ` (point #${x.point})`;
   return line;
 }
 const testsText = (tests) => arr(tests).map((x) => `${x.entry || x.key}: ${capabilityText(x.result)}\n${arr(x.forms).map((y) => '  ' + formLine(y)).join('\n')}`).join('\n');

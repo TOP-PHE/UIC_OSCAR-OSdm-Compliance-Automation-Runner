@@ -133,7 +133,7 @@ describe('GET /v1/company/coverage', () => {
     run('DELETE FROM runs WHERE id = ?', [failed]);
   });
 
-  test('by capability (#972): the run\'s steps prove the sale, a refund stopped early is blocked', async () => {
+  test('by capability (#972): the run\'s steps prove the sale; a refund whose run stopped without a failed check is not run (#1008)', async () => {
     const id = addRun(ids.D, 'SHARED_SALE', 'COMPLETED', 0, { at: '2026-10-25 10:00:00' });
     const suite = get('SELECT id FROM run_suites WHERE run_id = ?', [id]).id;
     for (const [name, status] of [['01. POST Get Offer', 200], ['02. POST Create Booking', 200], ['06. POST Obtaining Fulfillments from Booking', 200],
@@ -146,12 +146,17 @@ describe('GET /v1/company/coverage', () => {
       expect(cap('sale')).toMatchObject({ result: 'passed', tests: [{ key: 'SHARED_SALE', result: 'passed', forms: [{ code: 'SHARED_SALE', form: 'SEARCH', runId: id }] }] });
       expect(cap('offers.search')).toMatchObject({ result: 'passed', provenBy: { count: 1 } });
       expect(cap('fulfilment.documents').result).toBe('not-supported');
-      // TM_REFUND asks a refund offer; its latest run has no known step, so the refund was never reached.
-      expect(cap('refund.offer')).toMatchObject({ result: 'blocked', tests: [{ key: 'TM_REFUND' }] });
+      // TM_REFUND asks a refund offer; its latest run FAILED after one request the collection does not
+      // know ('r'), with no failed check: it stopped, nothing blocked it. Until #1008 it read "Blocked",
+      // with no step, check or point to open.
+      expect(cap('refund.offer')).toMatchObject({
+        result: 'not-tested', points: [],
+        tests: [{ key: 'TM_REFUND', result: 'not-run', forms: [{ result: 'not-run', step: 'r', check: expect.stringContaining('without a failed check') }] }],
+      });
       // Declared, with no test of their own: the full refund (TM_REFUND only asks the offer) and the exchange.
       expect(cap('refund.full')).toMatchObject({ result: 'not-tested', tests: [] });
       expect(cap('exchange.full')).toMatchObject({ result: 'not-tested' });
-      expect(res.body.byCapability.summary).toMatchObject({ passed: 2, blocked: 1, notSupported: 1, notTested: 2, expectedRefusals: { total: 0 } });
+      expect(res.body.byCapability.summary).toMatchObject({ passed: 2, blocked: 0, notSupported: 1, notTested: 3, expectedRefusals: { total: 0 } });
       const ana = await request(app).get('/v1/company/coverage').set(as('ANA'));
       expect(ana.body.byCapability.capabilities.some((x) => x.tests.some((t) => t.key === 'TM_REFUND'))).toBe(false);
     } finally {

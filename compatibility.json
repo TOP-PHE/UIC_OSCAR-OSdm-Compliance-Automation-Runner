@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.456",
+  "current_release": "2026.457",
   "releases": [
+    {
+      "release": "2026.457",
+      "date": "2026-10-27",
+      "server": "1.11.422",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1008: in the coverage by capability, \"Blocked\" names the failed check that stopped the run (its step, check and point, also when the check counts against another capability, such as a 401 at an optional read), and \"Passed with points\" always names a point. A run that made no request to the provider reads \"Not run\", never blocked nor \"refused as expected\"; a run that ended before its capability with nothing failed reads passed, at the step where it ended."
+      ]
+    },
     {
       "release": "2026.456",
       "date": "2026-10-27",

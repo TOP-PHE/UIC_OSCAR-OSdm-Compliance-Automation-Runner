@@ -1433,10 +1433,28 @@ results:
 | Passed | Every run that reached it passed. |
 | Passed with deviation | It passed, except for deviations that are accepted (see below). |
 | Passed with points | It went through, with checks to look at. |
-| Blocked | No run got as far as this capability. |
+| Blocked | No run got as far as this capability: a failed check stopped it. |
 | Not supported by the provider | The provider answered 501, or "not implemented" on an optional read, or it said so on a point (see *Taking a position* below). |
 | Not tested | Declared in the Test Framework, but no run reached it. |
 | Out of scope | Not declared, or declared as not supported. |
+
+A blocked form names the step and the check that stopped its run, with the
+number of its point, and the row lists that point. The check may count against
+another capability: a refused access token at a reference data read stops the
+whole run, so the scenario's own capability is blocked by that read's point.
+"Passed with points" always names at least one point.
+
+Two kinds of run block nothing:
+
+- **A run that made no request to the provider** (it stopped before Bruno
+  ran: an access token not obtained, no data file…; or it was stopped before
+  its results were stored) reads *Not run*. It tested nothing, so it is never
+  blocked, and an expected refusal it held is never "refused". Open the run to
+  see why, and run it again.
+- **A run that ended before its capability with nothing failed**, as its
+  scenario is written, reads *Passed*, at the step where it ended. One that
+  stopped with no failed check and a failed status reads *Not run*, at the step
+  it stopped after: its log says why.
 
 **Expected refusals** (the `NHF_` scenarios and the refusal probes) are listed
 apart: refused as expected, not refused, or not run. They never change the

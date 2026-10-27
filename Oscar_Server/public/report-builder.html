@@ -2147,6 +2147,9 @@ function capabilityRunLink(code, runId) {
 function capabilityFormText(f) {
   var text = (f.form ? ' (' + f.form + ')' : '') + ': ' + capabilityResultLabel(f.result);
   if (f.step) text += ' at ' + f.step + (f.check ? ' — ' + f.check : '');
+  else if (f.check) text += ' — ' + f.check;
+  // #1008: the point of the check that blocked it, listed with the row's.
+  if (Number.isInteger(f.point) && f.point > 0) text += ' (point #' + f.point + ')';
   var again = coverageRunAgainLabel(f.toRunAgain);
   if (again) text += ', ' + again;
   return text;
