@@ -123,6 +123,22 @@ Issue #995, release 2026.451. The offer request options' results are stated in t
 
 ---
 
+## [server-1.11.415] / [collection-OTST_V2.0.229] — 2026-10-27
+
+Issue #996, release 2026.450. An expected refusal's forms are folded, as a capability's tests are.
+
+### Changed
+- **Coverage by capability, Expected refusals.** The *Forms* column listed every form open in a narrow column. A refusal run in three forms and copied twice took nine forms, many lines tall, with codes broken in the middle, while the capability table above folds the same detail behind *Tests*.
+  - It now reads like the rest of the report: one line of counts in a fixed order ("9 form(s): 9 refused as expected"), the forms not refused open (ten at most, then "… and N more"), and every form under *Forms* (`capabilityRefusalFormsHtml()`), as the function view folds its scenarios (#972 G3).
+  - Page only: the Markdown and the workbook keep their one cell per refusal.
+- Tester User Guide §6: how the forms of a refusal are shown.
+
+### Tests
+- `ui-scripts.test.js`: the counts line, every form folded, only the forms not refused open, ten at most, the counts in one order whatever the forms' order, every text escaped, and the column in the table.
+- Six deliberate breaks each make a test fail. Checked in Chromium on a throwaway server, with refusals shaped like a real provider's.
+
+---
+
 ## [server-1.11.414] / [collection-OTST_V2.0.229] — 2026-10-27
 
 Two injected errors of the simulator now fail as they should, release 2026.449 (#991).

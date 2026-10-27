@@ -1482,7 +1482,7 @@ describe('the Report Builder coverage section', () => {
   for (const name of sectionNames) ctx[name] = loadFunction(page, name, ctx);
   const { coverageRunIdOf, coverageFailedHtml, coverageHtml, mdCell, coverageMarkdown, capabilityHtml, capabilityPointLinks,
     capabilityPointRows, toggleCoveragePoint, publishedListHtml, comparisonHtml, publishedHtml, capabilityPointsHtml, capabilitySentence,
-    capabilityOptionsHtml, capabilityCombinationText } = ctx;
+    capabilityOptionsHtml, capabilityCombinationText, capabilityRefusalFormsHtml } = ctx;
 
   const answer = {
     days: 30, framework: true, datafile: true,
@@ -1862,6 +1862,29 @@ describe('the Report Builder coverage section', () => {
       expect(md.indexOf('## Optional parameters of the offer request')).toBeLessThan(md.indexOf('## Points to look at'));
       expect(md).not.toContain('\n\n\n');
     });
+  });
+
+  test('an expected refusal\'s forms: the counts, those not refused open, every form folded (#996)', () => {
+    const form = (code, result) => ({ code, form: 'SEARCH', result, runId: UUID });
+    const refused = Array.from({ length: 9 }, (_, i) => form(`NHF_<a>${i}`, 'refused'));
+    const all = capabilityRefusalFormsHtml(refused);
+    expect(all.startsWith('9 form(s): 9 refused as expected<details><summary>Forms</summary><ul class="cov-list"><li>')).toBe(true);
+    expect(all).not.toContain('cov-failed-list');
+    expect(all.match(/<li>/g)).toHaveLength(9);
+    expect(all.includes('<a>')).toBe(false);
+    // The counts keep one order, whatever order the forms come in.
+    const mixed = capabilityRefusalFormsHtml([form('C', 'not-run'), ...Array.from({ length: 12 }, (_, i) => form(`B${i}`, 'not-refused')), ...refused.slice(0, 2)]);
+    expect(mixed).toContain('15 form(s): 2 refused as expected, 12 not refused, 1 not run<ul class="cov-list cov-failed-list"><li>');
+    const open = mixed.split('<details>')[0];
+    expect(open.match(/<li>/g)).toHaveLength(11);
+    expect(open).not.toContain('NHF_');
+    expect(open).not.toContain('>C<');
+    expect(open.endsWith('<li>… and 2 more</li></ul>')).toBe(true);
+    expect(mixed.split('<details>')[1].match(/<li>/g)).toHaveLength(15);
+    expect([capabilityRefusalFormsHtml([]), capabilityRefusalFormsHtml(null)]).toEqual(['-', '-']);
+    // In the table, the column holds the folded forms.
+    const out = capabilityHtml({ expectedRefusals: [{ key: 'NHF_X', capabilityLabel: 'Sale', result: 'refused', forms: refused, points: [] }], points: [] });
+    expect(out).toContain('<td>9 form(s): 9 refused as expected<details><summary>Forms</summary>');
   });
 
   test('a known deviation is one line; a point of a report published before #990 has no "Seen"', () => {

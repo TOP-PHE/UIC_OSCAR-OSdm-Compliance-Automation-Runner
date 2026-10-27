@@ -744,6 +744,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     logs. Response fields are not parameters: the passenger checks' "optional
     member" stays. The simulator data file's descriptions keep "members":
     changing them would move every simulator reference's version.
+    **An expected refusal's forms are folded** (#996, 1.11.415): counts in a
+    fixed order, the forms not refused open (ten at most), every form under
+    *Forms* (`capabilityRefusalFormsHtml()`), as the function view folds its
+    scenarios (G3). A helper of the coverage section keeps its constants
+    inside it: `ui-scripts.test.js` lifts the section's functions only.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
