@@ -106,6 +106,7 @@ setInterval(() => {
 // Endpoint is exposed below; nginx blocks /metrics externally so only the
 // Prometheus container in the same Docker network can scrape it.
 const metrics = require('./utils/metrics');
+const hostMetrics = require('./utils/hostMetrics');
 const simulatorMetrics = require('./services/simulatorMetrics');
 
 // ── Express app ───────────────────────────────────────────────────────────────
@@ -581,7 +582,9 @@ app.get('/metrics', async (req, res) => {
       return res.end(await simulatorMetrics.simulatorMetricsText());
     }
     res.set('Content-Type', metrics.register.contentType);
-    res.end(await metrics.register.metrics());
+    // #1013: the machine and the runs' processes, read at each scrape.
+    const own = await metrics.register.metrics();
+    res.end(`${own.endsWith('\n') ? own : `${own}\n`}${hostMetrics.hostMetricsText(hostMetrics.snapshot())}`);
   } catch (err) {
     log.error({ err: err.message }, 'Failed to render /metrics');
     res.status(500).send('# Failed to render metrics\n');

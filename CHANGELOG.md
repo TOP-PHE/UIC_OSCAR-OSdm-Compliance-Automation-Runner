@@ -93,6 +93,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.424] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1013, release 2026.459.
+
+### Added
+- **The OSCAR server's machine in Grafana.** A run is a Bruno process, a child of the server, so its CPU and memory never showed in the server's own metrics. A load test of 36 parallel runs saturated a 6-CPU machine (load 29.7, 2.6 GiB of memory available, no swap) while the dashboard showed nothing. OSCAR's `/metrics` now also writes, read at each scrape (`utils/hostMetrics.js`):
+  - `oscar_host_*`: memory total and available, swap, load (1/5/15 min), CPUs, CPU time by mode, from `/proc`;
+  - `oscar_container_memory_bytes` and its limit when there is one (cgroup v2, else v1);
+  - `oscar_run_processes` and their resident memory: the server's own child processes, counted. No name, path or argument of a process is written.
+  - A file that cannot be read gives no line, never a 0 an alert would take for real.
+- **Row *OSCAR host* on *OSCAR · Overview*:** load per CPU, memory available, run processes, swap used; CPU by mode, load against CPUs, memory and swap with the container's, run processes against active runs, their memory in all and per process.
+- **Four alerts** (`oscar.host`):
+  - `OscarHostOverloaded`: load over twice the CPUs for 10 min;
+  - `OscarHostMemoryLow`: memory available under 10 % for 5 min (critical);
+  - `OscarHostSwapping`: swap over 1 GiB for 10 min;
+  - `OscarContainerMemoryNearLimit`: container over 90 % of its limit.
+- *metrics-and-monitoring.md*: how to read the row, and how many parallel runs a machine holds (about 4 per CPU, 250 MB each).
+- Checked with promtool and a local Prometheus scraping the text. The local check found that the load, which carries a `period` label, divided by the CPU count matched nothing: the queries use `ignoring(period)`, and a test pins it.
+
+---
+
 ## [server-1.11.423] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1010, release 2026.458.
