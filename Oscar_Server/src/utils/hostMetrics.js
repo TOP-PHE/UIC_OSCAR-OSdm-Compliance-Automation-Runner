@@ -52,23 +52,29 @@ function parseMeminfo(text) {
   };
 }
 
+// The first numbers of a line of text, or null when fewer than `count`.
+function leadingNumbers(text, count) {
+  const fields = String(text).trim().split(/\s+/);
+  if (fields.length < count) return null;
+  const numbers = fields.slice(0, count).map(Number);
+  return numbers.some((n) => !Number.isFinite(n)) ? null : numbers;
+}
+
 /** /proc/loadavg → [1, 5, 15] minutes; null when unreadable. */
 function parseLoadavg(text) {
-  const parts = String(text).trim().split(/\s+/).slice(0, 3).map(Number);
-  return parts.length === 3 && parts.every(Number.isFinite) ? parts : null;
+  return leadingNumbers(text, 3);
 }
 
 /** The "cpu" line of /proc/stat → seconds per mode, all CPUs together. */
 function parseCpuSeconds(text) {
-  const line = String(text).split('\n').find((l) => l.startsWith('cpu '));
-  if (!line) return null;
-  const values = line.trim().split(/\s+/).slice(1).map(Number);
-  if (values.length < 4 || !values.every(Number.isFinite)) return null;
-  const seconds = {};
-  CPU_MODES.forEach((mode, i) => {
-    if (i < values.length) seconds[mode] = values[i] / TICKS_PER_SECOND;
-  });
-  return seconds;
+  const match = /^cpu +(.*)$/m.exec(String(text));
+  const ticks = match && leadingNumbers(match[1], 4);
+  if (!ticks) return null;
+  const all = match[1].trim().split(/\s+/).map(Number);
+  return Object.fromEntries(CPU_MODES
+    .map((mode, i) => [mode, all[i]])
+    .filter(([, value]) => Number.isFinite(value))
+    .map(([mode, value]) => [mode, value / TICKS_PER_SECOND]));
 }
 
 /** /proc/<pid>/stat → its parent's pid; the name in brackets may hold anything. */
