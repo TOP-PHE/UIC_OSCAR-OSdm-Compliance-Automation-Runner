@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-fifty-runs",
+    "date": "October 27, 2026",
+    "tag": "Changed",
+    "title": "Up to 50 runs at once",
+    "summary": "An administrator can let the server run up to 50 scenarios at the same time, instead of 20.",
+    "content": "Admin → Server Config → Max Concurrent Runs now accepts up to 50. Raise it in steps and watch the host's memory and CPU: each run is a separate process. Each company still runs at most as many scenarios at once as its Concurrent Session Limit allows."
+  },
+  {
     "id": "2026-10-27-export-names",
     "date": "October 27, 2026",
     "tag": "Improvement",

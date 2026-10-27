@@ -795,6 +795,23 @@ describe('PATCH /v1/admin/config', () => {
     expect(row.value).toBe('7');
   });
 
+  test('MAX_CONCURRENT_RUNS takes 50 and refuses 51 (#1004)', async () => {
+    const token = makeToken('administrator');
+    const ok = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ MAX_CONCURRENT_RUNS: 50 });
+    expect(ok.status).toBe(200);
+    expect(ok.body.config.MAX_CONCURRENT_RUNS.value).toBe('50');
+    const over = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ MAX_CONCURRENT_RUNS: 51 });
+    expect(over.status).toBe(400);
+    expect(JSON.stringify(over.body)).toMatch(/MAX_CONCURRENT_RUNS/);
+    expect(get(`SELECT value FROM server_config WHERE key = 'MAX_CONCURRENT_RUNS'`).value).toBe('50');
+  });
+
   test('400 when the only submitted key is unknown', async () => {
     const token = makeToken('administrator');
     const res = await request(app)

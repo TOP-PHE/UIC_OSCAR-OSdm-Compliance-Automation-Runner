@@ -249,7 +249,7 @@ MAX_CONCURRENT_RUNS=1
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
-| `MAX_CONCURRENT_RUNS` | `10` | Global cap on parallel runs (also editable in admin UI) |
+| `MAX_CONCURRENT_RUNS` | `10` | Global cap on parallel runs, 1 to 50 (also editable in admin UI). Each run is a Bruno process on the host: raise it in steps (20, 30, 40, 50) and at each step watch the host's memory and CPU (`docker stats`, `top`), which OSCAR's own metrics do not show. Stop when the runs finished a minute no longer go up. Each company also stays within its own *Concurrent Session Limit* (1 to 10) (#1004) |
 | `PARALLEL_STAGGER_MS` | `2000` | Delay between batch job launches (ms) |
 | `RUN_TIMEOUT_MS` | `600000` | Hard timeout per run (ms, default 10 min). A scenario can request a longer wait via `expiredBookingMaxWaitMinutes` (#204) — see the next row for the cap. |
 | `RUN_HARD_MAX_TIMEOUT_MS` | `1800000` | **Server-wide ceiling** for the per-run hard timeout when a scenario opts into a longer wait (`expiredBookingMaxWaitMinutes` on the expired-booking test, #204). The runner extends the worker SIGTERM to `max(RUN_TIMEOUT_MS, scenario wait + buffer)` but never above this value. Default 30 min. Raise it if you need to test providers with confirmation deadlines longer than ~25 min — e.g. an expired-OFFER test against a provider whose `preBookableUntil` is offer +30 min needs ≥ `1920000`. Since #394 also editable in the admin panel (Server Config → "Run Budget Ceiling (ms)"); a value saved there is stored in `server_config` and **overrides this env var**. |

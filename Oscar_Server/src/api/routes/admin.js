@@ -654,7 +654,10 @@ router.post('/ai-access-requests/:id/:decision', (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 const CONFIG_SCHEMA = {
-  MAX_CONCURRENT_RUNS: { description: 'Max parallel runs (server-wide)', type: 'number', min: 1, max: 20 },
+  // #1004: up to 50. Each run is a Bruno process on this host: raise it in
+  // steps and watch the host's memory and CPU, which the server's own metrics
+  // do not show. Each company stays at its own Concurrent Session Limit (≤ 10).
+  MAX_CONCURRENT_RUNS: { description: 'Max parallel runs (server-wide). Each run is a Bruno process on this host: raise it in steps and watch the host\'s memory and CPU', type: 'number', min: 1, max: 50 },
   PARALLEL_STAGGER_MS: { description: 'Delay between batch launches (ms)', type: 'number', min: 0, max: 30000 },
   RUN_TIMEOUT_MS:      { description: 'Hard timeout per run (ms) — the effective budget is additionally clamped at the Run Budget Ceiling below', type: 'number', min: 60000, max: 3600000 },
   // #394: the runner's hard ceiling was env-only and invisible here, so the

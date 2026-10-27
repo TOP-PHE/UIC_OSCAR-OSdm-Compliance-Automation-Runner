@@ -93,6 +93,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.420] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1004, release 2026.455. Simulator 0.56.0.
+
+### Changed
+- **Up to 50 runs at once.** Admin → Server Config → *Max Concurrent Runs* (`MAX_CONCURRENT_RUNS`) accepts 1 to 50; it stopped at 20. The default does not change. A test of every simulator provider at once ran 18 runs with the OSCAR server at 0.3 CPU and 190 MiB, so the ceiling, not the server, set the pace. Each run is a Bruno process on the host, which the server's own metrics do not show: the Server Admin Guide says to raise it in steps and watch the host's memory and CPU. Each company stays within its *Concurrent Session Limit* (1 to 10), which is what protects a real provider.
+
+### Simulator 0.56.0
+- **The OSCAR server gets a limit of its own.** All of a server's runs come from its one address, about 4 requests a second per run, so beyond some 10 runs it got 429 from a limit meant for strangers. `SIM_TRUSTED_ADDRESSES` (IP addresses only, at most 20; a host name stops the start) get `SIM_TRUSTED_REQUESTS_PER_MINUTE` (default 30,000) instead of `SIM_REQUESTS_PER_MINUTE`; an IPv4 address given by a dual-stack socket (`::ffff:…`) counts as itself. Every other address keeps 3,000 a minute. Both settings pass through `deploy/docker-compose.yml` from `./.env`.
+- **nginx example:** a `geo` block marks the trusted addresses, and two keyed zones count each address in one zone only: 50 a second (burst 100) for the others, 300 a second (burst 300) for the OSCAR servers. Checked with nginx on a local stub: 250 requests at once from an untrusted address, 129 refused; from a trusted one, none.
+- *OSCAR - OSDM Simulator*, section 7: the temporary raise and put-back of the limits for a load test becomes a set-up done once.
+
+---
+
 ## [server-1.11.419] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1002, release 2026.454. A coverage export's file name starts with the company or provider it is about.
