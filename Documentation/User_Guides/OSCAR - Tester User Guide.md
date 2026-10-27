@@ -1440,7 +1440,8 @@ results:
 
 **Expected refusals** (the `NHF_` scenarios and the refusal probes) are listed
 apart: refused as expected, not refused, or not run. They never change the
-result of the capability they probe.
+result of the capability they probe. Each one counts its forms by result; the
+forms not refused are shown, and every form is under *Forms*.
 
 **Points to look at.** Each distinct problem appears once, with a number,
 however many forms, runs and steps showed it. In the tables, click a point's

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.449",
+  "current_release": "2026.450",
   "releases": [
+    {
+      "release": "2026.450",
+      "date": "2026-10-27",
+      "server": "1.11.415",
+      "collection": "OTST_V2.0.229",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#996: in the coverage by capability, an expected refusal's forms are counted on one line, those not refused are shown, and every form is folded under Forms, as a capability's tests are; before, every form was listed open in a narrow column."
+      ]
+    },
     {
       "release": "2026.449",
       "date": "2026-10-27",

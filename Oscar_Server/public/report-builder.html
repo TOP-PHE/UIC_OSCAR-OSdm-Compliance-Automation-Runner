@@ -2196,6 +2196,28 @@ function capabilityRowsHtml(rows, points) {
   }).join('');
 }
 
+// #996: an expected refusal's forms as the rest of the report shows them: the
+// counts, those not refused open (ten at most), and every form folded.
+function capabilityRefusalFormsHtml(forms) {
+  var REFUSAL_FORMS_OPEN = 10;
+  var all = Array.isArray(forms) ? forms : [];
+  if (all.length === 0) return '-';
+  var counts = {};
+  all.forEach(function(f) { counts[f.result] = (counts[f.result] || 0) + 1; });
+  // Always in one order, whatever order the forms come in.
+  var order = ['refused', 'deviation', 'not-refused', 'not-run'];
+  var rank = function(k) { var i = order.indexOf(k); return i < 0 ? order.length : i; };
+  var text = all.length + ' form(s): ' + Object.keys(counts).sort(function(a, b) { return rank(a) - rank(b); }).map(function(k) {
+    return counts[k] + ' ' + capabilityResultLabel(k).toLowerCase();
+  }).join(', ');
+  var notRefused = all.filter(function(f) { return f.result === 'not-refused'; });
+  var shown = notRefused.slice(0, REFUSAL_FORMS_OPEN).map(capabilityFormHtml).join('');
+  if (notRefused.length > REFUSAL_FORMS_OPEN) shown += '<li>' + escHtml('… and ' + (notRefused.length - REFUSAL_FORMS_OPEN) + ' more') + '</li>';
+  return escHtml(text)
+    + (shown ? '<ul class="cov-list cov-failed-list">' + shown + '</ul>' : '')
+    + '<details><summary>Forms</summary><ul class="cov-list">' + all.map(capabilityFormHtml).join('') + '</ul></details>';
+}
+
 function capabilityRefusalsHtml(list, points) {
   if (!Array.isArray(list) || list.length === 0) return '';
   return '<h4 class="cov-heading">Expected refusals (' + list.length + ')</h4><table class="cap-table"><thead><tr><th>Expected refusal</th>'
@@ -2204,7 +2226,7 @@ function capabilityRefusalsHtml(list, points) {
       return '<tr><td><strong>' + escHtml(r.entry || r.key) + '</strong>' + (r.purpose ? '<br><small>' + escHtml(r.purpose) + '</small>' : '') + '</td>'
         + '<td>' + escHtml(r.capabilityLabel) + '</td>'
         + '<td><span class="cov-state cov-' + escHtml(r.result) + '">' + escHtml(capabilityResultLabel(r.result)) + '</span></td>'
-        + '<td><ul class="cov-list">' + (r.forms || []).map(capabilityFormHtml).join('') + '</ul></td>'
+        + '<td>' + capabilityRefusalFormsHtml(r.forms) + '</td>'
         + '<td>' + capabilityPointLinks(r.points) + '</td></tr>' + capabilityPointRows(r.points, points, 5);
     }).join('') + '</tbody></table>';
 }

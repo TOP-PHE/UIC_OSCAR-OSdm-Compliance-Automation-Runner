@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-refusal-forms-folded",
+    "date": "October 27, 2026",
+    "tag": "Improvement",
+    "title": "Expected refusals read like the capabilities",
+    "summary": "In the coverage by capability, an expected refusal now counts its forms on one line and folds them, as a capability folds its tests.",
+    "content": "The Expected refusals table listed every form of a refusal, open, in a narrow column: a refusal run in three forms and copied twice took nine forms and many lines.\n\nEach refusal now says how many forms it ran and how they ended, for example 9 form(s): 9 refused as expected. The forms that were not refused are shown right away, and every form is under Forms, as the tests of a capability are."
+  },
+  {
     "id": "2026-10-27-provisional-price",
     "date": "October 27, 2026",
     "tag": "Fixed",
