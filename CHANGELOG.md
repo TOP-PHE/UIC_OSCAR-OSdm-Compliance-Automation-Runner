@@ -93,6 +93,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.423] / [collection-OTST_V2.0.230] — 2026-10-27
+
+Issue #1010, release 2026.458.
+
+### Added
+- **Admin → OSDM Simulator shows the simulator's version.** The Connection card says "Simulator version 0.57.0." under the address. A simulator too old for something OSCAR relies on is named in red, with what it lacks: the trusted address of the OSCAR server (0.56.0, #1004) and the figures in Grafana (0.57.0, #1005).
+- `GET /v1/admin/simulator/version` (administrators only): OSCAR reads the simulator's public `GET /healthz` at the saved address, through the same guards as the administration calls (`urlPolicy`, `redirect: 'manual'`, 15 s, 256 KB). **The key is not sent**: `/healthz` needs none. The answer is built field by field: the version only when it is `N.N.N`, the versions each need, and whether this one has them.
+
+### Documentation
+- *OSCAR - OSDM Simulator*: the automatic update had failed since simulator 0.52.0 on the installed host with `open …/deploy/.env: permission denied`. The `.env` holding the administration key's SHA-256 was made by root after the update's user `simdeploy` was set up, so `docker compose` could not read it, and the simulator stayed at 0.51.0. The key's set-up now gives `.env` to `simdeploy`, and the table of problems says how to repair an installed host.
+
+---
+
 ## [server-1.11.422] / [collection-OTST_V2.0.230] — 2026-10-27
 
 Issue #1008, release 2026.457. In the coverage by capability, "Blocked" and "Passed with points" always say why.

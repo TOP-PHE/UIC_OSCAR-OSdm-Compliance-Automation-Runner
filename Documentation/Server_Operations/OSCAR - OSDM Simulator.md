@@ -111,6 +111,7 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 install -d -m 700 -o 1000 -g 1000 data
 KEY=$(openssl rand -hex 32)
 printf 'SIM_ADMIN_KEY_SHA256=%s\n' "$(printf %s "$KEY" | sha256sum | cut -d' ' -f1)" > .env && chmod 600 .env
+id simdeploy >/dev/null 2>&1 && chown simdeploy .env   # the automatic update (section 7) reads it
 echo "$KEY"      # copy it into OSCAR now; it is kept nowhere on this host
 unset KEY
 ```
@@ -598,6 +599,7 @@ read the simulator. Admin → OSDM Simulator says whether the key is refused.
 | On the host, a command answers `No such file or directory` about `clients.json`, or `docker compose` answers `no configuration file provided: not found` | the command was run from another folder than the deploy one, which is where a new session starts. `cd /opt/osdm-simulator/OSDM_Simulator/deploy` first. |
 | The container restarts in a loop, its log says "not started: the data folder does not exist" or "cannot be written by this user" | `deploy/data` is missing, or Docker made it as root: `install -d -m 700 -o 1000 -g 1000 /opt/osdm-simulator/OSDM_Simulator/deploy/data` (or `chown 1000:1000` it), then `docker compose up -d` |
 | The administration answers `404` | no key (`.env` missing, or made after the last `up -d`), or the container runs without the data folder (made before 0.51.0): see "Moving an installed simulator to a data folder" in section 7 |
+| The workflow *Simulator · update the installed simulator* fails with `open …/deploy/.env: permission denied`, and `/healthz` keeps an old version | `.env` was made by root after the automatic update was set up: `docker compose`, run by `simdeploy`, cannot read it. `chown simdeploy /opt/osdm-simulator/OSDM_Simulator/deploy/.env` (it stays `600`), then run the workflow by hand or `docker compose up -d` |
 | The administration answers `401` | OSCAR holds another key than the one whose SHA-256 is in `.env` |
 | The administration answers `429` | 10 wrong keys from that address in 15 minutes: wait, and correct the key in OSCAR |
 | The administration answers `403` (nginx) | the `allow` lines of the `/admin/` location do not name the OSCAR server's address |

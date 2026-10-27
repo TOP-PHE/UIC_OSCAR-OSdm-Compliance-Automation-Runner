@@ -2923,6 +2923,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     a run's requests, so no provider gets a header it does not know. Counts
     only, per provider and user e-mail (the admin dashboard already lists
     submitters by e-mail).
+    **The simulator's version (#1010, 1.11.423):** `GET
+    /v1/admin/simulator/version` reads the public `/healthz` at the saved
+    address through `S.health()`, which sends no key (`send()` adds
+    `Authorization` and `X-Admin-Actor` only with a secret). `versionView()`
+    keeps `N.N.N` only and says which of `NEEDS` (trusted address 0.56.0,
+    Grafana 0.57.0) it has; the page's `VERSION_NEEDS` is pinned to it. A
+    new OSCAR feature that needs a newer simulator adds its line to both.
   - **`node --test` takes a glob, not a directory**, on Node 22 and later
     (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
     destination directory. Sonar's coverage run starts from the repository root

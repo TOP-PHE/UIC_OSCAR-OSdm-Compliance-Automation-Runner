@@ -14,6 +14,7 @@
  * GET    /v1/admin/simulator/config                           — the address, and whether a key is saved
  * PUT    /v1/admin/simulator/config                           — { url, key? }: tried, then saved
  * DELETE /v1/admin/simulator/config                           — forget the address and the key
+ * GET    /v1/admin/simulator/version                          — the simulator's version, from its /healthz (#1010)
  * GET    /v1/admin/simulator/accounts                         — every provider and its accounts
  * POST   /v1/admin/simulator/accounts/:provider               — { clientId } or { kind }: a new account and its secret, once
  * DELETE /v1/admin/simulator/accounts/:provider/:clientId     — delete it
@@ -125,6 +126,35 @@ router.delete('/config', (req, res) => {
   S.removeConfig();
   auditLog(req.user.id, null, req.user.email, 'simulator_config_removed');
   return res.json(S.configView());
+});
+
+// #1010: what each simulator version brings that OSCAR relies on.
+const NEEDS = Object.freeze({ trustedAddress: '0.56.0', metrics: '0.57.0' });
+const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
+
+/** a >= b, both "N.N.N". */
+function atLeast(a, b) {
+  const x = a.split('.').map(Number);
+  const y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    if (x[i] !== y[i]) return x[i] > y[i];
+  }
+  return true;
+}
+
+// The version, field by field: only "N.N.N" is kept.
+function versionView(body) {
+  const version = typeof body?.version === 'string' && VERSION.test(body.version) ? body.version : null;
+  const supports = Object.fromEntries(Object.entries(NEEDS).map(([what, from]) => [what, version ? atLeast(version, from) : null]));
+  return { version, needs: { ...NEEDS }, supports };
+}
+
+router.get('/version', async (req, res) => {
+  try {
+    return res.json(versionView(await S.health()));
+  } catch (err) {
+    return failed(res, err);
+  }
 });
 
 router.get('/accounts', async (req, res) => {
@@ -264,4 +294,4 @@ router.get('/runs', (req, res) => {
 });
 
 module.exports = router;
-module.exports.views = { accountsView, secretView, auditView, statsView, periodOf };
+module.exports.views = { accountsView, secretView, auditView, statsView, periodOf, versionView, atLeast };

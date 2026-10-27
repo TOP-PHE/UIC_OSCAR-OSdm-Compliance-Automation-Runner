@@ -196,3 +196,21 @@ test('the page never keeps the key: the key field is cleared after a save and ne
   expect(SOURCE).not.toMatch(/sim-key'\)\.value\s*=\s*cfg/);
   expect(SOURCE).not.toMatch(/localStorage|sessionStorage/);
 });
+
+// #1010: the simulator's version, and what an older one lacks.
+test('the version line says what a simulator too old for OSCAR lacks, from the route\'s own answer', () => {
+  const lines = SOURCE.split('\n');
+  const start = lines.findIndex(l => l.startsWith('const VERSION_NEEDS'));
+  const VERSION_NEEDS = vm.runInNewContext(`${lines[start]}\nVERSION_NEEDS`);
+  const versionText = lift('versionText', { VERSION_NEEDS, Object });
+  const { versionView } = require('../../src/api/routes/admin-simulator').views;
+  // Every need the route names has its words on the page.
+  expect(Object.keys(VERSION_NEEDS)).toEqual(Object.keys(versionView({ version: '1.0.0' }).needs));
+  expect(versionText(versionView({ version: '0.57.0' }))).toEqual({ text: 'Simulator version 0.57.0.', warn: false });
+  expect(versionText(versionView({ version: '0.56.3' }))).toEqual({
+    text: 'Simulator version 0.56.3: too old for the figures in Grafana (0.57.0). Update the simulator.', warn: true });
+  expect(versionText(versionView({ version: '0.55.0' })).text).toBe(
+    'Simulator version 0.55.0: too old for the trusted address of the OSCAR server (0.56.0) and the figures in Grafana (0.57.0). Update the simulator.');
+  expect(versionText(versionView({ status: 'ok' }))).toEqual({ text: 'Simulator version: not given (before 0.15.0).', warn: true });
+  expect(versionText(versionView({ version: '<b>1</b>' })).warn).toBe(true);
+});

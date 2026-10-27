@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-simulator-version",
+    "date": "October 27, 2026",
+    "tag": "Added",
+    "title": "The simulator's version in Admin",
+    "summary": "Admin → OSDM Simulator now shows which version of the simulator answers, and what an older one lacks.",
+    "content": "The Connection card of Admin → OSDM Simulator shows the simulator's version. When it is too old for the Grafana figures (0.57.0) or for the trusted address of the OSCAR server (0.56.0), the page says so in red."
+  },
+  {
     "id": "2026-10-27-blocked-says-why",
     "date": "October 27, 2026",
     "tag": "Fixed",

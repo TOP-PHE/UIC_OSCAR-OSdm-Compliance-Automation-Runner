@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.457",
+  "current_release": "2026.458",
   "releases": [
+    {
+      "release": "2026.458",
+      "date": "2026-10-27",
+      "server": "1.11.423",
+      "collection": "OTST_V2.0.230",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1010: Admin → OSDM Simulator shows the simulator's version (GET /v1/admin/simulator/version, from its public /healthz, without the key) and what a simulator older than 0.56.0 (trusted address) or 0.57.0 (Grafana figures) lacks."
+      ]
+    },
     {
       "release": "2026.457",
       "date": "2026-10-27",
