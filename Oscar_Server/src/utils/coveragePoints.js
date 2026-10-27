@@ -266,10 +266,12 @@ function order(capabilities) {
  *            entry }, code, run }], one per failed check or known deviation of
  *            a run; `refusal` when it counts against an expected refusal (R4)
  *   links  linkFailures()'s map
- * -> { points, truncated, accepted, unsupported, oscar }: `accepted`,
+ * -> { points, truncated, accepted, unsupported, oscar, pointOf }: `accepted`,
  *    `unsupported` and `oscar` hold the failed checks (the objects of `seen`)
  *    of the accepted deviations, of what the provider does not support (#994)
- *    and of OSCAR's points, which no longer count as points of their capability.
+ *    and of OSCAR's points, which no longer count as points of their capability;
+ *    `pointOf` maps each failed check to its point (#1008: a blocked run names
+ *    the point that blocked it).
  */
 function pointsOf(seen, { links = new Map(), findings = [], capabilities = [], label = (id) => id } = {}) {
   const points = new Map();
@@ -289,8 +291,10 @@ function pointsOf(seen, { links = new Map(), findings = [], capabilities = [], l
   const list = [...points.values()].sort(order(capabilities));
   const kept = list.slice(0, MAX_POINTS);
   kept.forEach((p, i) => { p.number = i + 1; });
+  const pointOf = new Map();
+  for (const [id, seenThere] of members) for (const s of seenThere) if (s.check) pointOf.set(s.check, points.get(id));
   return {
-    points: kept, truncated: list.length > MAX_POINTS, accepted: checksOf('accepted'), unsupported: checksOf('unsupported'), oscar: checksOf('oscar'),
+    points: kept, truncated: list.length > MAX_POINTS, accepted: checksOf('accepted'), unsupported: checksOf('unsupported'), oscar: checksOf('oscar'), pointOf,
   };
 }
 

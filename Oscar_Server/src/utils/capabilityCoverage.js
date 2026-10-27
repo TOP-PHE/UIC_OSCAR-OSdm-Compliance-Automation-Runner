@@ -28,6 +28,12 @@
  *       reached it), not-supported (the provider answered 501, or an optional
  *       read "not implemented" as #488 reads it), not-tested (declared, not
  *       run), out-of-scope (not declared, or declared not supported).
+ *       A run is blocked only by a failed check, which it names with its step
+ *       and point, whatever capability that check counts against (a 401 at an
+ *       optional read stops a run too). A run that made no request to the
+ *       provider tested nothing: not run. A run that ended before its
+ *       capability with nothing failed ended as it is written: passed for
+ *       what it went through (#1008).
  *   R6  The points to look at, each once (coveragePoints.js). A failed check
  *       of an accepted deviation is not a point of its capability: it reads
  *       "Passed with deviation". One of OSCAR's points does not count against
@@ -184,17 +190,54 @@ function declinedResult(charged, failures) {
   return declined ? { result: 'not-supported', step: declined.name, check: failureText(declined.unsupported[0]) } : null;
 }
 
+// What a run that never reached its capability says, when no failed check of
+// its own capability says it (#1008).
+const NO_REQUEST = 'The run made no request to the provider: it stopped before Bruno ran, or its results were not stored. Its log says why.';
+const ENDED_AS_WRITTEN = 'The scenario ended after this step, as it is written: no check failed.';
+const STOPPED_SILENTLY = 'The run stopped after this step without a failed check. Its log says why.';
+
+// Every failed check of a step, whatever it counts against: its failures and
+// probes, and those of an accepted deviation, of what the provider does not
+// support and of OSCAR's points.
+const allChecksOf = (step) => [...step.failures, ...step.probes, ...step.accepted, ...step.unsupported, ...step.oscar];
+
+// The failed check that stopped a run: one of the last step it went through,
+// a blocking one first. A failure the run went on after did not stop it.
+function stoppingCheck(steps) {
+  const last = steps.at(-1);
+  const checks = last ? allChecksOf(last) : [];
+  if (checks.length === 0) return null;
+  const severe = last.statuses.some((s) => s >= 500);
+  return { step: last.name, check: checks.find((c) => severe || isBlocking(c)) || checks[0] };
+}
+
+// A run that did not reach its capability: blocked by the failed check that
+// stopped it (one of its capability's own first), not run when it made no
+// request, else it ended there as it is written (a COMPLETED run: passed for
+// what it went through) or stopped without a check (not run).
+function notReached(steps, first, { deviation, status }) {
+  const stop = first || stoppingCheck(steps);
+  if (stop) return { result: 'blocked', step: stop.step, check: failureText(stop.check), stopCheck: stop.check };
+  if (steps.length === 0) return { result: 'not-run', step: null, check: NO_REQUEST };
+  const step = steps.at(-1).name;
+  if (status === 'COMPLETED') return { result: passedResult([], deviation), step, check: ENDED_AS_WRITTEN };
+  return { result: 'not-run', step, check: STOPPED_SILENTLY };
+}
+
 /**
  * The result of a run for its main capability (R1, R5): passed, deviation,
- * points, blocked or not-supported; for a refusal test, refused, deviation or
- * not-refused. With the step and check to look at first.
+ * points, blocked, not-supported or not-run; for a refusal test, refused,
+ * deviation, not-refused or not-run. With the step and check to look at
+ * first, and for a blocked run the check that blocked it (`stopCheck`).
  */
-function mainResult(steps, main, traits, refusal) {
+function mainResult(steps, main, traits, { refusal, status }) {
   const charged = steps.filter((s) => chargedTo(s, main, traits));
   const failures = charged.flatMap((s) => [...s.failures, ...s.probes].map((c) => ({ step: s.name, check: c, blocking: s.blocking || isBlocking(c) })));
   const deviation = charged.some((s) => s.deviation);
   const first = failures.find((f) => f.blocking) || failures[0] || null;
   const at = first ? { step: first.step, check: failureText(first.check) } : { step: null, check: null };
+  // A run that made no request refused nothing, and proved nothing (#1008).
+  if (steps.length === 0) return { result: 'not-run', step: null, check: NO_REQUEST };
   if (refusal) return { result: refusalOutcome(failures, deviation), ...at };
   const { own, reached, goals } = stepsFor(main, steps, traits);
   if (reached && goals.length > 0 && goals.every((s) => s.notSupported)) {
@@ -202,8 +245,8 @@ function mainResult(steps, main, traits, refusal) {
   }
   const declined = declinedResult(charged, failures);
   if (declined) return declined;
-  if (!reached) return { result: 'blocked', step: at.step, check: at.check || 'the run stopped before this capability was reached' };
-  if (own.some((s) => s.state === 'failed' && s.blocking && chargedTo(s, main, traits))) return { result: 'blocked', ...at };
+  if (!reached) return notReached(steps, first, { deviation, status });
+  if (own.some((s) => s.state === 'failed' && s.blocking && chargedTo(s, main, traits))) return { result: 'blocked', ...at, stopCheck: first.check };
   return { result: passedResult(failures, deviation), ...at };
 }
 
@@ -238,9 +281,11 @@ function runEvidence(run, { main, traits, refusal, accepted, unsupported, oscar,
   const proven = {};
   for (const capability of side) {
     const result = sideResult(capability, steps, traits);
-    if (result) proven[capability] = result;
+    // A failure at the steps of the capability a refusal probes is the
+    // refusal's point (R4): that capability takes only what went through.
+    if (result && !(refusal && capability === main && result === 'points')) proven[capability] = result;
   }
-  return { main: mainResult(steps, main, traits, refusal), proven, steps };
+  return { main: mainResult(steps, main, traits, { refusal, status: run?.status }), proven, steps };
 }
 
 // ── The report ──────────────────────────────────────────────────────────────
@@ -287,14 +332,18 @@ function runListOf(datafile) {
   return list == null || list === 'ALL' ? null : new Set(arr(list).filter((c) => typeof c === 'string'));
 }
 
-// One form of a test: a scenario, its run and its result.
-function formOf(item, collectionVersion) {
+// One form of a test: a scenario, its run and its result. A blocked form
+// names the point of the check that blocked it (#1008), whatever capability
+// that point counts against.
+function formOf(item, { collectionVersion, pointOf }) {
   const { scenario, run, evidence } = item;
   const form = {
     code: scenario.code, form: item.traits.form, result: evidence ? evidence.main.result : 'not-run',
     toRunAgain: toRunAgain(run, { collectionVersion, hash: scenarioHash(scenario) }),
   };
   if (run) Object.assign(form, { runId: run.id, at: run.completed_at || run.queued_at || null, step: evidence.main.step, check: evidence.main.check });
+  const point = evidence?.main.stopCheck ? pointOf?.get(evidence.main.stopCheck) : null;
+  if (Number.isInteger(point?.number)) form.point = point.number;
   return form;
 }
 
@@ -326,12 +375,12 @@ function failuresOf(items) {
 
 // Each item's evidence and form, once the accepted deviations and OSCAR's
 // points are known.
-function withEvidence(items, { accepted, unsupported, oscar, collectionVersion }) {
+function withEvidence(items, { accepted, unsupported, oscar, pointOf, collectionVersion }) {
   for (const item of items) {
     item.evidence = item.run
       ? runEvidence(item.run, { main: item.main, traits: item.traits, refusal: item.refusal, accepted, unsupported, oscar, deviations: item.deviations })
       : null;
-    item.form = formOf(item, collectionVersion);
+    item.form = formOf(item, { collectionVersion, pointOf });
   }
 }
 
@@ -400,6 +449,14 @@ function sideEvidenceOf(items) {
   return out;
 }
 
+// A row's points: those counted against it, and those that blocked one of its
+// forms (#1008: a 401 at an optional read blocks the scenario after it, and
+// its point is that read's), each once, in order.
+function rowPointsOf(points, tests) {
+  const blocking = tests.flatMap((t) => t.forms.map((f) => f.point)).filter(Number.isInteger);
+  return [...new Set([...points, ...blocking])].sort((a, b) => a - b);
+}
+
 function capabilityRow(def, tests, side, { declaration, points }) {
   const formResults = tests.flatMap((t) => t.forms.map((f) => (f.result === 'not-run' ? null : f.result)));
   let result = combine([...formResults, ...side.map((s) => s.result)]) || 'not-tested';
@@ -410,7 +467,7 @@ function capabilityRow(def, tests, side, { declaration, points }) {
     tests: tests.map(({ key, entry, purpose, result: r, forms }) => ({ key, entry, purpose, result: r, forms })),
     provenBy: { count: proven.length, codes: proven.slice(0, MAX_PROVEN_CODES) },
     sideProblems: side.filter((s) => !WENT_THROUGH.has(s.result)),
-    points,
+    points: rowPointsOf(points, tests),
   };
 }
 
@@ -464,10 +521,10 @@ function capabilityCoverageOf({
   const { items, apart } = scenarioItems({ datafile, catalogue: arr(catalogue), runs: runs || {}, runList: runListOf(datafile) });
   for (const item of items) item.deviations = item.run ? P.knownDeviationsOf(warnings?.[item.scenario.code]) : [];
   const links = P.linkFailures(failuresOf(items), { findings, suggestions });
-  const { points, truncated, accepted, unsupported, oscar } = P.pointsOf(seenOf(items), {
+  const { points, truncated, accepted, unsupported, oscar, pointOf } = P.pointsOf(seenOf(items), {
     links, findings, capabilities: K.CAPABILITIES.map((c) => c.id), label: (id) => K.CAPABILITY.get(id)?.label || id,
   });
-  withEvidence(items, { accepted, unsupported, oscar, collectionVersion });
+  withEvidence(items, { accepted, unsupported, oscar, pointOf, collectionVersion });
   const tests = testsOf(items);
   const side = sideEvidenceOf(items);
   const capabilities = [];

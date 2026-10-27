@@ -636,3 +636,158 @@ describe('a point the provider does not support (#994)', () => {
     expect(steps[0]).toMatchObject({ state: 'passed', deviation: false, failures: [], unsupported: [check] });
   });
 });
+
+// ── #1008: a blocked result says why, and "with points" names a point ───────
+
+describe('a blocked result names what blocked it; a run that tested nothing is not run (#1008)', () => {
+  const at01 = '01. POST Get Offer';
+  const at09 = '09. GET Product By ProductId';
+  const MASTER = ['00. GET System Version Check', '08. GET Products', at09];
+  const status401 = 'GET /products/{productId} → 401 Unauthorized (FAIL)';
+  // A refused token stops the run at the read it met (auth.js): an optional
+  // read, whose failure counts against the reference data, not the scenario.
+  const stoppedAt09 = () => run([...MASTER, ...SALE], {
+    stopAt: at09, statuses: { [at09]: 401 },
+    failures: { [at09]: [...fail(status401, 'http_status'), ...fail(`Authentication accepted on "${at09}"`)] },
+  });
+  const noRequest = () => Object.assign(run([]), { status: 'FAILED' });
+  const refusal = { code: 'NHF_REFUND_TWICE', scenarioType: 'REFUND', scenarioAction: 'PATCH', refundAgainProbe: 'on', tripRequirementId: 1, passengersListId: 1 };
+  const placeSelection = { code: 'OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT', scenarioType: 'SALE', tripRequirementId: 2, passengersListId: 2, reservationBookingForm: 'PLACE_SELECTION' };
+
+  test('a run that made no request is not run: neither blocked nor, for an expected refusal, refused', () => {
+    // Before: the sale read "Blocked" with no step, check or point, and the refusal "Refused as expected".
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT'), refusal], { OTST_SALE_ONE_WAY_1ADT: noRequest(), NHF_REFUND_TWICE: noRequest() });
+    expect(row(r, 'sale')).toMatchObject({
+      result: 'not-tested', points: [],
+      tests: [{ result: 'not-run', forms: [{ result: 'not-run', step: null, check: expect.stringContaining('made no request to the provider'), runId: expect.any(String) }] }],
+    });
+    expect(r.expectedRefusals[0]).toMatchObject({ result: 'not-run', forms: [{ result: 'not-run', check: expect.stringContaining('made no request') }] });
+    expect(r.summary).toMatchObject({ blocked: 0, expectedRefusals: { refused: 0, notRun: 1 } });
+  });
+
+  test('a run an optional read stopped is blocked there, and the row names that read\'s point', () => {
+    // Before: "Blocked", step null, "the run stopped before this capability was reached", no point.
+    const r = report([placeSelection], { [placeSelection.code]: stoppedAt09() });
+    const form = row(r, 'reservation.placeSelection').tests[0].forms[0];
+    expect(form).toMatchObject({ result: 'blocked', step: at09, check: status401, point: expect.any(Number) });
+    const point = r.points.find((p) => p.number === form.point);
+    expect(point).toMatchObject({ capability: 'masterData', step: at09, status: 401, blocking: true });
+    expect(row(r, 'reservation.placeSelection')).toMatchObject({ result: 'blocked', points: [form.point] });
+    expect(row(r, 'masterData').points).toContain(form.point);
+  });
+
+  test('a capability passed by one form and blocked by another names the point that blocked it', () => {
+    // Before: "Passed with points" with no point at all.
+    const scenarios = [oneWay('OTST_SALE_ONE_WAY_1ADT'), oneWay('OTST_SALE_ONE_WAY_1ADT_SPEC', { tripRequirementId: 2 })];
+    const r = report(scenarios, { OTST_SALE_ONE_WAY_1ADT: run([...MASTER, ...SALE]), OTST_SALE_ONE_WAY_1ADT_SPEC: stoppedAt09() });
+    const sale = row(r, 'sale');
+    const blocked = sale.tests[0].forms.find((f) => f.result === 'blocked');
+    expect(sale.result).toBe('points');
+    expect(blocked).toMatchObject({ step: at09, point: expect.any(Number) });
+    expect(sale.points).toEqual([blocked.point]);
+  });
+
+  test('a run that ended before its capability with nothing failed ended as it is written: passed for what it went through', () => {
+    const later = [{ code: 'L', scenarioType: 'SALE', reservationBookingForm: 'ADD_LATER', tripRequirementId: 2, passengersListId: 2 }];
+    const r = report(later, { L: run([...MASTER, ...SALE]) });
+    expect(row(r, 'reservation.addLater')).toMatchObject({
+      result: 'passed', points: [],
+      tests: [{ forms: [{ result: 'passed', step: '07. GET Booking after Fulfillments', check: expect.stringContaining('as it is written') }] }],
+    });
+    expect(row(r, 'sale').result).toBe('passed');
+    // An early end on purpose, before the sale: the offers it went through still pass.
+    const probe = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], { OTST_SALE_ONE_WAY_1ADT: run([...MASTER, ...SALE], { stopAt: at01 }) });
+    expect(row(probe, 'sale')).toMatchObject({ result: 'passed', tests: [{ forms: [{ step: at01 }] }] });
+    expect(row(probe, 'offers.search').result).toBe('passed');
+  });
+
+  test('a run that stopped without a failed check is not run, at the step it stopped after', () => {
+    const stopped = Object.assign(run([...MASTER, ...SALE], { stopAt: '02. POST Create Booking' }), { status: 'FAILED' });
+    const r = report([oneWay('OTST_SALE_ONE_WAY_1ADT')], { OTST_SALE_ONE_WAY_1ADT: stopped });
+    expect(row(r, 'sale')).toMatchObject({
+      result: 'not-tested', tests: [{ forms: [{ result: 'not-run', step: '02. POST Create Booking', check: expect.stringContaining('without a failed check') }] }],
+    });
+    expect(row(r, 'offers.search').result).toBe('passed');
+  });
+
+  test('an expected refusal\'s failure at the steps it probes is the refusal\'s point, not that capability\'s', () => {
+    const withdraw = [{ code: 'W', scenarioType: 'REFUND', scenarioAction: 'DELETE', refundAgainProbe: 'on', tripRequirementId: 1, passengersListId: 1 }];
+    const r = report(withdraw, { W: run([...SALE, ...WITHDRAW], { failures: { '15. DEL Refund Offer': fail('Status code is 204, offer is deleted') } }) });
+    expect(r.expectedRefusals[0]).toMatchObject({ capability: 'refund.withdraw', result: 'not-refused', points: [1] });
+    // Before: the withdrawal read "Passed with points", its only point being the refusal's.
+    expect(r.capabilities.filter((c) => c.result === 'points').map((c) => [c.id, c.points])).toEqual([]);
+    expect(row(r, 'refund.offer').result).toBe('passed');
+  });
+});
+
+describe('over drawn runs, "Blocked" and "Passed with points" always say why (#1008)', () => {
+  // mulberry32, as the offer combinations draw (utils/offerCombinations.js).
+  function random(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const MASTER = ['00. GET System Version Check', '08. GET Products', '09. GET Product By ProductId'];
+  const KINDS = [
+    { fields: { scenarioType: 'SALE' }, steps: SALE },
+    { fields: { scenarioType: 'SALE', reservationBookingForm: 'ADD_LATER' }, steps: [...SALE, '09. POST Add Reservation to Booking'] },
+    { fields: { scenarioType: 'SALE', offerSearchProbe: 'on' }, steps: ['01. POST Get Offer'] },
+    { fields: { scenarioType: 'REFUND', scenarioAction: 'PATCH' }, steps: [...SALE, ...REFUND] },
+    { fields: { scenarioType: 'REFUND', scenarioAction: 'DELETE' }, steps: [...SALE, ...WITHDRAW] },
+    { fields: { scenarioType: 'REFUND', scenarioAction: 'PATCH', refundAgainProbe: 'on' }, steps: [...SALE, ...REFUND] },
+    { fields: { scenarioType: 'REFUND', scenarioAction: 'DELETE', refundAgainProbe: 'on' }, steps: [...SALE, ...WITHDRAW] },
+  ];
+  const CHECKS = [
+    'HTTP response status — expected 200, actual: 400', 'Booking summary names the product',
+    '🧪 Refund again: provider rejects with a client error (4xx)', '[OSCAR request] The body sent conforms to OSDM', 'Authentication accepted',
+  ];
+  const CATEGORIES = ['http_status', 'business_logic', 'business_logic'];
+  const STATUSES = [200, 200, 200, 400, 401, 404, 500, 501];
+  const pick = (rnd, list) => list[Math.floor(rnd() * list.length)];
+
+  function drawRun(rnd, kind) {
+    if (rnd() < 0.08) return Object.assign(run([]), { status: pick(rnd, ['FAILED', 'COMPLETED']) });
+    const names = [...(rnd() < 0.7 ? MASTER : []), ...kind.steps];
+    const stopAt = rnd() < 0.5 ? pick(rnd, names) : null;
+    const reached = stopAt ? names.slice(0, names.indexOf(stopAt) + 1) : names;
+    const statuses = {};
+    const failures = {};
+    for (const name of reached) {
+      if (rnd() < 0.15) statuses[name] = pick(rnd, STATUSES);
+      if (rnd() < 0.15) failures[name] = [{ assertion_name: pick(rnd, CHECKS), category: pick(rnd, CATEGORIES), severity: 'major' }];
+    }
+    const r = run(names, { stopAt, statuses, failures });
+    if (rnd() < 0.2) r.status = r.status === 'FAILED' ? 'COMPLETED' : 'FAILED';
+    return r;
+  }
+
+  test('2,000 drawn data files: a blocked form has a step, a check and a point; a row with points or blocked names one', () => {
+    const rnd = random(1008);
+    for (let n = 0; n < 2000; n += 1) {
+      const scenarios = [];
+      const runs = {};
+      const size = 1 + Math.floor(rnd() * 4);
+      for (let i = 0; i < size; i += 1) {
+        const kind = pick(rnd, KINDS);
+        const code = `S${n}_${i}`;
+        scenarios.push({ code, tripRequirementId: pick(rnd, [1, 2]), passengersListId: 1, ...kind.fields });
+        if (rnd() < 0.9) runs[code] = drawRun(rnd, kind);
+      }
+      const r = report(scenarios, runs);
+      for (const c of r.capabilities) {
+        for (const f of c.tests.flatMap((t) => t.forms).filter((x) => x.result === 'blocked')) {
+          expect([n, c.id, f.code, Boolean(f.step && f.check), Number.isInteger(f.point)]).toEqual([n, c.id, f.code, true, true]);
+        }
+        if (c.result === 'points' || c.result === 'blocked') expect([n, c.id, c.result, c.points.length > 0]).toEqual([n, c.id, c.result, true]);
+      }
+      for (const e of r.expectedRefusals) {
+        for (const f of e.forms) if (runs[f.code]?.steps.length === 0) expect([n, f.code, f.result]).toEqual([n, f.code, 'not-run']);
+      }
+    }
+  });
+});
