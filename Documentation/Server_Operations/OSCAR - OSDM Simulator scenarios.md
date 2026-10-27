@@ -62,16 +62,22 @@ everything the simulator does. A copy is the `_38` scenario with its code,
 `osdmVersion` and description changed, and gamma's currencies replaced by
 its provider's (gamma's CZK by the provider's own, EUR by its second one:
 alpha EUR / CHF, beta CHF / EUR, delta PLN / EUR, epsilon SEK / EUR, zeta NOK / EUR); the six providers have the
-same functions (#824). It tests the same thing, the simulator answers it
+same functions (#824). A trip specification names the carrier of each
+leg, so a copy rides its provider's own copy of that trip, naming the
+provider's carrier (#1022): trip 4 is trip 3604 for alpha, 3704 for beta,
+3904 for delta, 31004 for epsilon and 31204 for zeta. Search trips name no
+carrier and are shared. It tests the same thing, the simulator answers it
 the same way in the shapes of its own version (#833), and a run shows the
 same result as its `_38` row, with the differences listed below. The
 deliberately wrong and fault scenarios are copied too, and stay out of the
 run lists like gamma's.
 
-`OSDM_Simulator/scripts/version-copies.js` appends the copies that are
-missing (`version-copies-lib.js` holds the rules), and
-`OSDM_Simulator/tests/datafile.test.js` fails until every `_38` scenario has
-them: add a scenario for gamma, then run the script. The copies have no row of
+`OSDM_Simulator/scripts/version-copies.js` brings the copies up to date
+(`version-copies-lib.js` holds the rules): it adds what is missing and
+rewrites a copy, or a trip copy, whose source changed, leaving the rest of
+the file as it is. `OSDM_Simulator/tests/datafile.test.js` fails until every
+`_38` scenario has them: add or change a scenario or a trip for gamma, then
+run the script. The copies have no row of
 their own here.
 
 **Not possible on a version**, so not copied:

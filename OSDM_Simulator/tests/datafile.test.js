@@ -20,18 +20,25 @@ const { PROVIDERS_DIR } = require('./helpers');
 
 const collection = path.join(__dirname, '..', '..', 'Bruno_Collection');
 const fullDatafile = require(path.join(collection, 'data_base', 'simulator_datafile.json'));
-const { VERSIONS, NOT_POSSIBLE, reasonNotPossible, baseOf, copyOf } = require('../scripts/version-copies-lib');
+const { VERSIONS, NOT_POSSIBLE, reasonNotPossible, baseOf, copyOf, carrierOf, tripCopies, isTripCopyId, syncedText } = require('../scripts/version-copies-lib');
 
 // #914: every `_38` scenario has its copies for 3.6, 3.7, 3.9, 3.10 (#920) and 3.12 (#925), made by
 // scripts/version-copies.js and checked by their own test below. The other
 // tests read the file without them: what they pin of a gamma scenario holds
-// for its copies, which differ from it in code, version and description only.
+// for its copies, which differ from it in code, version, description, and the
+// carrier of their trips (#1022). The same goes for the trip copies.
 const sourceOf = new Map(fullDatafile.scenarios.filter((s) => s.osdmVersion === '3.8.0').map((s) => [baseOf(s.code), s]));
 const isGeneratedCopy = (s) => {
   const source = sourceOf.get(baseOf(s.code));
-  return s.osdmVersion !== '3.8.0' && !!source && JSON.stringify(copyOf(source, s.osdmVersion)) === JSON.stringify(s);
+  return s.osdmVersion !== '3.8.0' && !!source && JSON.stringify(copyOf(source, s.osdmVersion, fullDatafile.tripRequirements)) === JSON.stringify(s);
 };
-const datafile = { ...fullDatafile, scenarios: fullDatafile.scenarios.filter((s) => !isGeneratedCopy(s)) };
+const wantedTrips = tripCopies(fullDatafile);
+const isGeneratedTrip = (t) => wantedTrips.has(t.id) && JSON.stringify(wantedTrips.get(t.id)) === JSON.stringify(t);
+const datafile = {
+  ...fullDatafile,
+  scenarios: fullDatafile.scenarios.filter((s) => !isGeneratedCopy(s)),
+  tripRequirements: fullDatafile.tripRequirements.filter((t) => !isGeneratedTrip(t)),
+};
 
 test('the ready-made data file is valid against the collection\'s data file schema', () => {
   // Checked with the copy of Ajv that the collection carries, so the simulator
@@ -93,7 +100,7 @@ test('each provider\'s OSDM version has every scenario of gamma its version can 
     if (scenario.osdmVersion === '3.8.0') continue;
     const source = sourceOf.get(baseOf(scenario.code));
     assert.ok(source, `${scenario.code}: no _38 scenario it is a copy of`);
-    assert.equal(strip(scenario), strip(copyOf(source, scenario.osdmVersion)), `${scenario.code} differs from the copy of ${source.code} in more than its description: run scripts/version-copies.js`);
+    assert.equal(strip(scenario), strip(copyOf(source, scenario.osdmVersion, fullDatafile.tripRequirements)), `${scenario.code} differs from the copy of ${source.code} in more than its description: run scripts/version-copies.js`);
   }
   for (const [version, { suffix }] of Object.entries(VERSIONS)) {
     for (const [base, source] of sourceOf) {
@@ -109,6 +116,37 @@ test('each provider\'s OSDM version has every scenario of gamma its version can 
   // fail on purpose: not in the run list.
   assert.deepEqual(fullDatafile.scenariosToRun, fullDatafile.scenarios
     .filter((s) => s.osdmVersion === gamma.osdmVersion && !s.code.startsWith('SIM_WRONG_') && !s.code.startsWith('SIM_FAULT_')).map((s) => s.code));
+});
+
+test('a copy asks its own provider for a train of its own carrier, never gamma\'s (#1022)', () => {
+  // A trip specification names the carrier whose train it asks for. The
+  // simulator answers with its own whatever is asked, so only this test sees
+  // a copy asking for gamma's.
+  const providers = new Map([...loadProviders(PROVIDERS_DIR).values()].map((p) => [p.osdmVersion, p]));
+  const tripOf = new Map(fullDatafile.tripRequirements.map((t) => [t.id, t]));
+  const carriersIn = (trip) => [trip.trip, ...(trip.legs || [])].map((leg) => leg?.operatorCode).filter(Boolean);
+  let checked = 0;
+  for (const scenario of fullDatafile.scenarios) {
+    const own = providers.get(scenario.osdmVersion).carrier.ref;
+    for (const id of [scenario.tripRequirementId, scenario.exchange?.tripRequirementId].filter((v) => v != null)) {
+      for (const carrier of carriersIn(tripOf.get(id))) {
+        assert.equal(carrier, own, `${scenario.code}: trip ${id} names ${carrier}`);
+        checked += 1;
+      }
+    }
+  }
+  assert.ok(checked > 200, `only ${checked} legs naming a carrier`);
+  for (const version of Object.keys(VERSIONS)) assert.equal(carrierOf(VERSIONS[version].provider), providers.get(version).carrier.ref);
+});
+
+test('the trip copies are those the scenario copies go on, and the script has nothing left to do (#1022)', () => {
+  const copies = fullDatafile.tripRequirements.filter((t) => isTripCopyId(t.id));
+  assert.deepEqual(copies.map((t) => t.id).sort((a, b) => a - b), [...wantedTrips.keys()].sort((a, b) => a - b), 'run scripts/version-copies.js');
+  for (const trip of copies) assert.ok(isGeneratedTrip(trip), `trip ${trip.id} differs from its copy: run scripts/version-copies.js`);
+  // Gamma's own trips stay under 100, where no copy goes.
+  for (const trip of datafile.tripRequirements) assert.ok(trip.id >= 1 && trip.id <= 99, `trip ${trip.id}`);
+  const text = require('node:fs').readFileSync(path.join(collection, 'data_base', 'simulator_datafile.json'), 'utf8');
+  assert.deepEqual(syncedText(text).done, { tripsAdded: 0, tripsChanged: 0, tripsRemoved: 0, added: 0, changed: 0 });
 });
 
 test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {

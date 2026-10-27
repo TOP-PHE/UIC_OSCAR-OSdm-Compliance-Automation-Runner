@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.462",
+  "current_release": "2026.463",
   "releases": [
+    {
+      "release": "2026.463",
+      "date": "2026-10-27",
+      "server": "1.11.427",
+      "collection": "OTST_V2.0.232",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1022: in the simulator data file, each version copy of a gamma scenario rides its provider's own copy of a trip naming a carrier, so a trip specification asks alpha, beta, delta, epsilon or zeta for a train of its own carrier, never gamma's. scripts/version-copies.js now keeps the copies in step with their sources. The five non-gamma simulator references are regenerated and read \"not up to date\" until updated. Collection data only; server unchanged."
+      ]
+    },
     {
       "release": "2026.462",
       "date": "2026-10-27",
