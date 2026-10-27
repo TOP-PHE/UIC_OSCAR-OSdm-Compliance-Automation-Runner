@@ -212,6 +212,18 @@ class RunQueue extends EventEmitter {
     };
   }
 
+  /** companyId → { running, queued }, for the metrics by company (#1017). */
+  companyCounts() {
+    const counts = new Map();
+    const of = (id) => {
+      if (!counts.has(id)) counts.set(id, { running: 0, queued: 0 });
+      return counts.get(id);
+    };
+    for (const [id, running] of this._runningByCompany) of(id).running = running;
+    for (const job of this._queue) of(job.companyId).queued += 1;
+    return counts;
+  }
+
   get depth()   { return this._queue.length; }
   get running() { return this._running; }
 }

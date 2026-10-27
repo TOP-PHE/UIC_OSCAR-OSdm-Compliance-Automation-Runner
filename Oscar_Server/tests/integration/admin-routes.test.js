@@ -441,6 +441,36 @@ describe('GET /v1/admin/activity', () => {
     expect(Array.isArray(res.body.top_submitters_last_7d)).toBe(true);
     expect(Array.isArray(res.body.latest_auth_events)).toBe(true);
   });
+
+  test('runs in progress: one row per user and company or provider, counts only (#1017)', async () => {
+    const providerId = uuidv4();
+    run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'Admin Test Provider', ?, ?)`, [providerId, `admin-tmp-${providerId.slice(0, 8)}`, companyId]);
+    const runIds = [];
+    const addRun = (cid, status) => {
+      const id = uuidv4();
+      runIds.push(id);
+      run(`INSERT INTO runs (id, company_id, user_id, status, scenario_code, queued_at) VALUES (?, ?, ?, ?, 'X', datetime('now'))`, [id, cid, adminId, status]);
+    };
+    addRun(providerId, 'RUNNING');
+    addRun(providerId, 'RUNNING');
+    addRun(providerId, 'QUEUED');
+    addRun(companyId, 'QUEUED');
+    addRun(companyId, 'COMPLETED');
+    try {
+      const res = await request(app)
+        .get('/v1/admin/activity')
+        .set('Authorization', `Bearer ${makeToken('administrator')}`);
+      expect(res.status).toBe(200);
+      const mine = res.body.runs_in_progress.filter((r) => r.email === 'admin@admin-test.com');
+      expect(mine).toEqual([
+        { email: 'admin@admin-test.com', company: 'Admin Test Provider', distributor: 'Admin Test Co', running: 2, queued: 1 },
+        { email: 'admin@admin-test.com', company: 'Admin Test Co', distributor: null, running: 0, queued: 1 },
+      ]);
+    } finally {
+      for (const id of runIds) run('DELETE FROM runs WHERE id = ?', [id]);
+      run('DELETE FROM companies WHERE id = ?', [providerId]);
+    }
+  });
 });
 
 // ── GET /v1/admin/companies ────────────────────────────────────────────────────
