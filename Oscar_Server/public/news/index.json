@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-refusal-forms-by-step",
+    "date": "October 27, 2026",
+    "tag": "Fixed",
+    "title": "Expected refusals not refused, in a few lines",
+    "summary": "An expected refusal that was not refused now says at which step, in one line, instead of listing every form.",
+    "content": "In the coverage by capability, an expected refusal that was not refused still listed each of its forms with the whole failure text, so the row took dozens of lines.\n\nIt now says at which step the forms were not refused, in one line per step, for example Not refused at 14. GET Booking after Patch Refund (9 form(s)). Every form is still under Forms, and what failed is in the row's point."
+  },
+  {
     "id": "2026-10-27-offer-options-in-coverage",
     "date": "October 27, 2026",
     "tag": "Improvement",
