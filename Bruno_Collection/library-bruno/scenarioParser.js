@@ -1769,6 +1769,13 @@ function carrierMissingText(n, legDef) {
     'Give the train its operator code in Test Data (e.g. urn:uic:rics:1185), then Apply test data to this trip.';
 }
 
+// #1019: why a trip specification leg has no train number, and what to do.
+function numberMissingText(n, legDef) {
+  return `Leg ${n} (${legDef.startStopPlaceRef} → ${legDef.endStopPlaceRef}) has no train number. ` +
+    'A trip specification names its train (DatedJourney.vehicleNumbers): without one the provider cannot tell which train is meant. ' +
+    'Give the train its number in Test Data, then Apply test data to this trip.';
+}
+
 // Function to set trip specifications
 function osdmTripSpecification(legDefinitions, returnOpts, env = saleEnv) {
   test('Trip Specification has at least one leg', function () {
@@ -1818,6 +1825,15 @@ function osdmTripSpecification(legDefinitions, returnOpts, env = saleEnv) {
       validationLogger(`[ERROR] ${carrierMissingText(n, legDef)}`);
       test(`Trip specification leg ${n} names its carrier (operator code)`, function () {
         expect(carrier, carrierMissingText(n, legDef)).to.be.a('string');
+      });
+    }
+    // #1019: OSDM lets the number be null, but no provider can tell the train
+    // without it. A check only when it is missing, as for the carrier.
+    const number = legDef.vehicleNumber == null ? '' : String(legDef.vehicleNumber).trim();
+    if (!number) {
+      validationLogger(`[ERROR] ${numberMissingText(n, legDef)}`);
+      test(`Trip specification leg ${n} names its train number`, function () {
+        expect(number || null, numberMissingText(n, legDef)).to.be.a('string');
       });
     }
     const datedJourney = new DatedJourney(productCategory, [legDef.vehicleNumber], carrier ? [new NamedCompany(carrier)] : undefined);

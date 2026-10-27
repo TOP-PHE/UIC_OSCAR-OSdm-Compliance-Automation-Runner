@@ -40,6 +40,7 @@ const { writeDatafile } = require('../../utils/datafileWrite');
 const { planCopy, applyCopy } = require('../../utils/scenarioCopy');
 const { catalogueDatafile, catalogueFor } = require('../../utils/scenarioCatalogue');
 const { adaptCatalogueDatafile, suggestTrips, journeysMissing } = require('../../utils/catalogueMatch');
+const NO_NAMED_TRAIN = 'a train of the Test Data naming its number and operator code: a trip specification sends both';
 const { Refusal, readDatafile, readCatalogue, testDataChoices } = require('../helpers/catalogueSource');
 const { copyReport } = require('../../../public/js/copy-report');
 const { getRunSelection } = require('../../utils/runSelections');
@@ -166,6 +167,11 @@ router.post('/scenario-copy/preview', previewLimiter, async (req, res) => {
     // #959: an exchange's own trip goes on another route than its sale's.
     const suggested = suggestTrips(plan.trips, testData);
     plan.trips = plan.trips.map(t => ({ ...t, suggested: suggested[t.id] }));
+    // #1019: a trip specification names its train's number and operator code;
+    // with no train of the Test Data naming both, nothing is proposed.
+    const unnamed = new Set(plan.trips.filter(t => t.tripType === 'SPECIFICATION' && !t.needsJourney && !t.suggested && testData.trains.length)
+      .flatMap(t => t.usedBy).map(u => u.replace(/ \(exchange\)$/, '')));
+    plan.scenarios = plan.scenarios.map(s => (unnamed.has(s.code) ? { ...s, toComplete: [...(s.toComplete || []), NO_NAMED_TRAIN] } : s));
     // #799: a trip of several legs needs a journey of as many in the Test Data.
     const noJourney = journeysMissing(plan.trips, testData);
     plan.scenarios = plan.scenarios.map(s => ({ ...s, journeyLegsMissing: noJourney[s.code] || [] }));

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.461",
+  "current_release": "2026.462",
   "releases": [
+    {
+      "release": "2026.462",
+      "date": "2026-10-27",
+      "server": "1.11.427",
+      "collection": "OTST_V2.0.231",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1019: a catalogue copy goes on a train of its own route, and a trip specification only on a train naming its number and operator code (else \"to complete\"); the simulator references' trains all name both; a leg without carrier is no longer counted again as OSCAR's request, and a leg without train number gets its own data check."
+      ]
+    },
     {
       "release": "2026.461",
       "date": "2026-10-27",

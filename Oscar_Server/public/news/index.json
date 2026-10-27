@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-copies-on-trains-that-run-them",
+    "date": "October 27, 2026",
+    "tag": "Fixed",
+    "title": "Reference scenarios copied onto trains that can run them",
+    "summary": "Copy scenarios now proposes a train on the reference scenario's own route, and one naming its number and operator code for a trip specification.",
+    "content": "Copying the reference scenarios put every one on the first train of the Test Data. On the OSDM simulator that broke the trip specification copies (no train number, no carrier), the partial refunds and the sales horizon probes, and the missing carrier was then reported as an OSCAR problem.\n\nA copy now goes on a train of its own route when the Test Data has one. A trip specification goes only on a train naming its number and operator code; without one, it is marked to complete. The simulator references give every train both: update your simulator companies from their reference, then copy the scenarios again.\n\nA leg without carrier is reported once, by the scenario's own check, and a leg without train number gets a check of its own."
+  },
+  {
     "id": "2026-10-27-runs-by-provider",
     "date": "October 27, 2026",
     "tag": "Added",

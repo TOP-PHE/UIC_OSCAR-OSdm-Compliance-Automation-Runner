@@ -45,7 +45,9 @@ function codesOf(datafile) {
  *
  * { copy: [{ code, kind, purpose, toComplete }], alreadyThere: [code],
  *   notDeclared: [{ code, missing }], noJourney: [{ code, legs }],
- *   noTestData: [code], source, tripMap }
+ *   noTestData: [code], noNamedTrain: [code], source, tripMap }
+ * noNamedTrain (#1019): sent as a trip specification, which names its train's
+ * number and operator code, while no train of the Test Data names both.
  */
 function scenarioPlan({ catalogue, simulator, framework, testData, existingCodes }) {
   const entries = catalogueFor(catalogue, simulator, framework || {});
@@ -58,14 +60,19 @@ function scenarioPlan({ catalogue, simulator, framework, testData, existingCodes
   const legsMissing = journeysMissing(plan.trips, testData);
   const tripMap = {};
   const noTestData = new Set();
+  const noNamedTrain = new Set();
   const suggestions = suggestTrips(plan.trips, testData);
+  const hasTrains = arr(testData?.trains).length > 0;
   for (const trip of plan.trips) {
     const suggested = suggestions[trip.id];
     if (suggested) tripMap[String(trip.id)] = mappingOf(suggested);
-    else if (!trip.needsJourney && (Number(trip.legs) || 1) === 1) trip.usedBy.forEach(code => noTestData.add(code));
+    else if (!trip.needsJourney && (Number(trip.legs) || 1) === 1) {
+      const why = trip.tripType === 'SPECIFICATION' && hasTrains ? noNamedTrain : noTestData;
+      trip.usedBy.forEach(code => why.add(code));
+    }
   }
   // A scenario some of whose trips cannot be placed is not copied at all.
-  const blocked = code => code in legsMissing || noTestData.has(code);
+  const blocked = code => code in legsMissing || noTestData.has(code) || noNamedTrain.has(code);
   return {
     copy: candidates.filter(e => !blocked(e.code)).map(e => ({
       code: e.code, kind: e.kind, purpose: e.purpose, toComplete: adapted.notes[e.code]?.toComplete || [],
@@ -74,6 +81,7 @@ function scenarioPlan({ catalogue, simulator, framework, testData, existingCodes
     notDeclared: entries.filter(e => e.missing.length > 0).map(e => ({ code: e.code, missing: e.missing })),
     noJourney: Object.entries(legsMissing).map(([code, legs]) => ({ code, legs })),
     noTestData: [...noTestData],
+    noNamedTrain: [...noNamedTrain],
     source: adapted.datafile,
     tripMap,
   };
@@ -88,6 +96,7 @@ function shownPlan(plan, choice) {
     notDeclared: plan.notDeclared,
     noJourney: plan.noJourney,
     noTestData: plan.noTestData,
+    noNamedTrain: plan.noNamedTrain,
   };
 }
 

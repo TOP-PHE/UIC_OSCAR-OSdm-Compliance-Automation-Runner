@@ -15,7 +15,7 @@ const fs = require('node:fs');
 
 const LIB = path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno');
 const {
-  pickVersion, operationFor, requestIssues, negativeTestOf, checkRequestBody, recordRequestConformance, TAG,
+  pickVersion, operationFor, requestIssues, negativeTestOf, checkRequestBody, recordRequestConformance, isDataGap, TAG,
 } = require(path.join(LIB, 'osdmRequestSchema.js'));
 const { requestSchemas } = require(path.join(LIB, 'osdmRequestSchemas.js'));
 
@@ -148,6 +148,42 @@ describe('#736 the two bodies a real provider refused', () => {
     const body = bookingBody();
     body.offers[0].placeSelections = [{ reservationId: 'RES-1', tripLegCoverage: { tripId: 'T1', legId: 'L1' } }];
     expect(checkRequestBody('POST', `${BASE}/bookings`, body, '3.8.0')).toMatchObject({ ok: true, message: '' });
+  });
+});
+
+// #1019: one defect, one check. A leg without carrier is the scenario's data,
+// which the data check "Trip specification leg N names its carrier" reports.
+describe('#1019 what the scenario\'s data lacks is not counted again as OSCAR\'s', () => {
+  const withoutCarrier = () => {
+    const body = tripSpecBody(undefined);
+    delete body.tripSpecifications[0].legs[0].timedLeg.service.productCategory;
+    delete body.tripSpecifications[0].legs[0].timedLeg.service.carriers;
+    return body;
+  };
+
+  test('a leg without carrier passes, and says why', () => {
+    const check = checkRequestBody('POST', `${BASE}/offers`, withoutCarrier(), '3.8.0');
+    expect(check).toMatchObject({ ok: true, message: '', dataGaps: 1 });
+    expect(check.name).toBe(`${TAG} POST /offers conforms to OSDM 3.8.0 OfferCollectionRequest, but for what the scenario's data lacks (its own check says so)`);
+    expect(checkRequestBody('POST', `${BASE}/offers`, withoutCarrier(), '3.6.0').ok).toBe(true);
+  });
+
+  test('another problem in the same request still fails, without the carrier', () => {
+    const body = withoutCarrier();
+    body.tripSpecifications[0].legs[0].timedLeg.service.productCategory = {};
+    const check = checkRequestBody('POST', `${BASE}/offers`, body, '3.8.0');
+    expect(check.ok).toBe(false);
+    expect(check.name).toBe(`${TAG} POST /offers conforms to OSDM 3.8.0 OfferCollectionRequest`);
+    expect(check.message).toContain('productCategory: missing');
+    expect(check.message).not.toContain('missing carriers');
+  });
+
+  test('only a missing carrier of a trip specification leg is the data\'s', () => {
+    expect(isDataGap('tripSpecifications[0].legs[0].timedLeg.service: missing carriers')).toBe(true);
+    expect(isDataGap('tripSpecifications[1].legs[12].timedLeg.service: missing carriers')).toBe(true);
+    expect(isDataGap('tripSpecifications[0].legs[0].timedLeg.service: missing vehicleNumbers, carriers')).toBe(false);
+    expect(isDataGap('offers[0].placeSelections[0].tripLegCoverage: missing tripId, legId')).toBe(false);
+    expect(isDataGap('x tripSpecifications[0].legs[0].timedLeg.service: missing carriers')).toBe(false);
   });
 });
 

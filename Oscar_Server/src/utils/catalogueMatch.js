@@ -481,11 +481,41 @@ function salesHorizonOf(framework) {
   return Number.isInteger(n) && n >= 1 && n <= 1000 ? n : null;
 }
 
+// #1019: a train on the trip's own route (stop places compared without the
+// URN prefix or leading zeros). On the simulator the stop places choose what
+// a scenario tests: tickets per passenger or per leg, the sales horizon…
+const sameRoute = (train, trip) => Boolean(trip?.origin)
+  && stopKey(train.origin) === stopKey(trip.origin) && stopKey(train.destination) === stopKey(trip.destination);
+
+// #1019: a trip specification sends its train's number and carrier (OSDM
+// DatedJourney): it can go only on a service naming both.
+const namesBoth = (train, service) => Boolean(train.operatorCode) && Boolean(service?.vehicleNumber);
+
+/**
+ * The services of the Test Data a one-leg trip may go on, { train, index }:
+ * every service of every train, but for a trip specification only those
+ * naming their number and carrier; those of the trip's own route first.
+ */
+function trainServicesFor(trip, trains) {
+  const spec = trip?.tripType === 'SPECIFICATION';
+  const out = [];
+  for (const train of arr(trains)) {
+    const services = arr(train.services).length ? arr(train.services) : [{ index: 0 }];
+    for (const s of services) {
+      if (!spec || namesBoth(train, s)) out.push({ train, index: s.index ?? 0 });
+    }
+  }
+  return [...out.filter((c) => sameRoute(c.train, trip)), ...out.filter((c) => !sameRoute(c.train, trip))];
+}
+
 /**
  * The train or journey of the Test Data to propose for a trip of the copy, as
  * the copy page writes it ("train::<id>::<service>" or "journey::<id>"), or
  * null when the Test Data has nothing that fits. `trip` is one of planCopy's
- * trips (`legs`, `needsJourney`); `testData` the route's testDataChoices.
+ * trips (`legs`, `needsJourney`, `tripType`, `origin`, `destination`);
+ * `testData` the route's testDataChoices. A one-leg trip goes on a train of
+ * its own route when there is one (#1019), a trip specification only on a
+ * service naming its number and operator code.
  */
 function suggestTrip(trip, testData) {
   const legs = Number(trip?.legs) || 1;
@@ -494,10 +524,10 @@ function suggestTrip(trip, testData) {
     const same = journeys.find((j) => j.legs === legs);
     return same ? `journey::${same.id}` : null;
   }
-  const train = arr(testData?.trains)[0];
-  if (!train) return journeys[0] ? `journey::${journeys[0].id}` : null;
-  const service = arr(train.services)[0];
-  return `train::${train.id}::${service ? service.index : 0}`;
+  const trains = arr(testData?.trains);
+  if (!trains.length) return journeys[0] ? `journey::${journeys[0].id}` : null;
+  const first = trainServicesFor(trip, trains)[0];
+  return first ? `train::${first.train.id}::${first.index}` : null;
 }
 
 // #959: the label planCopy() gives a trip an exchange is for.
@@ -518,10 +548,9 @@ function otherRouteFor(trip, testData, avoid) {
   const trains = arr(testData?.trains);
   const takenIds = new Set(avoid.filter((s) => s.startsWith('train::')).map((s) => s.split('::')[1]));
   const takenRoutes = new Set(trains.filter((t) => takenIds.has(String(t.id))).map(routeOf));
-  const other = trains.find((t) => !takenIds.has(String(t.id)) && !takenRoutes.has(routeOf(t)));
-  if (!other) return null;
-  const service = arr(other.services)[0];
-  return `train::${other.id}::${service ? service.index : 0}`;
+  // #1019: its own route first, and a trip specification on a named service.
+  const other = trainServicesFor(trip, trains).find(({ train }) => !takenIds.has(String(train.id)) && !takenRoutes.has(routeOf(train)));
+  return other ? `train::${other.train.id}::${other.index}` : null;
 }
 
 /**

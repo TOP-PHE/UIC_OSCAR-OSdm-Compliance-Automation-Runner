@@ -183,7 +183,15 @@ describe('copy from the catalogue', () => {
   // #681: the company's values replace the simulator's, and the page is told what is left.
   test('the preview proposes the company\'s train and says what is left to complete or check', async () => {
     const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
-    for (const t of preview.trips.filter(x => !x.needsJourney)) expect(t.suggested).toBe(`train::${train(ids.P)[0]}::0`);
+    // #1019: this train names no operator code, so a trip specification gets none and its scenario is to complete.
+    for (const t of preview.trips.filter(x => !x.needsJourney)) {
+      expect(t.suggested).toBe(t.tripType === 'SPECIFICATION' ? null : `train::${train(ids.P)[0]}::0`);
+    }
+    const NO_NAMED = 'a train of the Test Data naming its number and operator code: a trip specification sends both';
+    const specUsers = new Set(preview.trips.filter(t => t.tripType === 'SPECIFICATION' && !t.needsJourney).flatMap(t => t.usedBy));
+    expect(specUsers.size).toBeGreaterThan(0);
+    for (const s of preview.scenarios) expect(s.toComplete.includes(NO_NAMED)).toBe(specUsers.has(s.code));
+    expect(preview.scenarios.find(s => s.code === 'OTST_SALE_ONE_WAY_1ADT').toComplete).toEqual([]);
     expect(preview.trips.filter(x => x.needsJourney).every(t => t.suggested === null)).toBe(true);
     // #799: no journey in this Test Data, so a scenario with a multi-leg trip says so.
     const multi = new Set(preview.trips.filter(t => t.needsJourney).flatMap(t => t.usedBy));
@@ -196,6 +204,26 @@ describe('copy from the catalogue', () => {
     expect(preview.scenarios.find(s => s.code === 'OTST_SALE_RESERVATION_MANDATORY_2ADT').toCheck)
       .toEqual(['the chosen train must carry a mandatory seat reservation']);
     expect(preview.runsAll).toBe(false);
+  });
+
+  // #1019: the Test Data choices carry the operator code, so a train naming it carries a specification.
+  test('a train naming its number and operator code is proposed for a trip specification too (#1019)', async () => {
+    const named = colEncrypt(JSON.stringify({
+      originURN: 'urn:c:a', destinationURN: 'urn:c:b', operatorCode: 'urn:x:op', services: [{ vehicleNumber: 'C-7', departureTime: '09:00:00Z', arrivalTime: '10:00:00Z' }],
+    }));
+    const [id] = train(ids.P);
+    const before = get('SELECT data FROM test_resources WHERE id = ?', [id]).data;
+    run('UPDATE test_resources SET data = ? WHERE id = ?', [named, id]);
+    try {
+      const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
+      expect(preview.testData.trains.find(t => t.id === id).operatorCode).toBe('urn:x:op');
+      const specs = preview.trips.filter(t => t.tripType === 'SPECIFICATION' && !t.needsJourney);
+      expect(specs.length).toBeGreaterThan(0);
+      for (const t of specs) expect(t.suggested).toBe(`train::${id}::0`);
+      expect(preview.scenarios.every(s => !s.toComplete.some(x => x.includes('operator code')))).toBe(true);
+    } finally {
+      run('UPDATE test_resources SET data = ? WHERE id = ?', [before, id]);
+    }
   });
 
   test('a reference scenario with an overrule code is copied with none when the framework declares none, and says so', async () => {

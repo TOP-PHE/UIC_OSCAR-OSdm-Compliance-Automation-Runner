@@ -2535,7 +2535,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   without `carriers`** (OSDM requires a `ref`; `[{}]` was refused as a whole
   request), with a failed check and an `[ERROR]` only then, so other runs
   keep their check counts; the simulator's specification trips name gamma's
-  carrier.
+  carrier. **One defect, one check** (#1019): the `[OSCAR request]`
+  conformance check leaves that missing carrier out (`isDataGap()` in
+  `osdmRequestSchema.js`) and passes, named "but for what the scenario's
+  data lacks", when nothing else is wrong: it was counted a second time, as
+  OSCAR's. A leg without train number gets its own data check ("names its
+  train number"); OSDM's VehicleNumber is nullable, so the conformance check
+  never saw `[null]`.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says
@@ -2569,6 +2575,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   default three. `suggestTrip()` preselects a journey
   of as many legs, else the first train; Test Data carries no reservation or
   class, so those needs come back as `toCheck`, never guessed.
+  **Where a copy goes (#1019, 1.11.427 / OTST_V2.0.231).** `suggestTrip()`
+  and `otherRouteFor()` go through `trainServicesFor()`: a one-leg trip
+  takes a train of its source's own route first (`sameRoute()`, stop places
+  by `stopKey()`): on the simulator the stop places choose what is tested
+  (`0000094` horizon, `0000095`/`96` ticketing, `0000099` expiry…), and
+  placing every copy on the first train broke them. A trip specification
+  goes only on a service naming its number and operator code
+  (`namesBoth()`; `testDataChoices()` carries `operatorCode`), else gets
+  none: the copy preview marks it to complete, the checklist apply leaves it
+  out as `noNamedTrain`. The simulator references' trains all name both
+  (`namedTrains()` in `buildReference()`: the provider's carrier and
+  `9000 + id` for a search trip's train; `testResourcesFromDatafile()`
+  stays the data file's image, pinned to the page's `trainFromTrip`).
   **Part 3 (1.11.256): the copy report, `public/js/copy-report.js`** (browser
   global and CommonJS, like `trip-apply.js`): ready / to complete / not
   allowed, shown live in Copy scenarios and returned by the copy. A copy never

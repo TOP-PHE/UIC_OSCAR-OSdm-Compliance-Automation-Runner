@@ -189,6 +189,9 @@ function checklistScenariosHtml(sc) {
   }
   const noTestData = Array.isArray(sc.noTestData) ? sc.noTestData : [];
   if (noTestData.length) html.push(`<div style="font-size:12px;color:#7a4f01">Not copied, no train set in the Test Data: ${checklistCount(noTestData)}.</div>`);
+  // #1019: sent as a trip specification, which names the train's number and operator code.
+  const noNamedTrain = Array.isArray(sc.noNamedTrain) ? sc.noNamedTrain : [];
+  if (noNamedTrain.length) html.push(`<div style="font-size:12px;color:#7a4f01">Not copied, no train of the Test Data names its number and operator code, which a trip specification sends: ${checklistCount(noNamedTrain)}.</div>`);
   return html.join('');
 }
 

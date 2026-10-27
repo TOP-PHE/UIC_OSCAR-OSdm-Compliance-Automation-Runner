@@ -33,6 +33,14 @@ const { requestSchemas } = require('./osdmRequestSchemas.js');
 const { getComplianceVersion, versionScore } = require('./osdmVersion.js');
 
 const TAG = '[OSCAR request]';
+
+// #1019: what a request lacks because the scenario's data lacks it, which the
+// scenario's own check reports: a trip specification leg without carrier. The
+// collection leaves `carriers` out only when the leg's train has no operator
+// code (#809), and "Trip specification leg N names its carrier (operator
+// code)" fails for it. One defect, one check: not counted again as OSCAR's.
+const DATA_GAP = /^tripSpecifications\[\d+\]\.legs\[\d+\]\.timedLeg\.service: missing carriers$/;
+const isDataGap = (issue) => DATA_GAP.test(issue);
 const MAX_SHOWN = 10;
 const MAX_DEPTH = 64;
 
@@ -229,8 +237,13 @@ function checkRequestBody(method, url, body, version, readVariable) {
     const onPurpose = `${TAG} ${op.method} ${op.path} does not conform to OSDM ${op.version} ${op.schema}, on purpose (negative test: ${negative})`;
     return { name: onPurpose, ok: true, message: '', negative };
   }
-  const shown = issues.slice(0, MAX_SHOWN).join('; ');
-  const more = issues.length > MAX_SHOWN ? `; and ${issues.length - MAX_SHOWN} more` : '';
+  const own = issues.filter((issue) => !isDataGap(issue));
+  if (!own.length) {
+    const dataName = `${TAG} ${op.method} ${op.path} conforms to OSDM ${op.version} ${op.schema}, but for what the scenario's data lacks (its own check says so)`;
+    return { name: dataName, ok: true, message: '', dataGaps: issues.length };
+  }
+  const shown = own.slice(0, MAX_SHOWN).join('; ');
+  const more = own.length > MAX_SHOWN ? `; and ${own.length - MAX_SHOWN} more` : '';
   return {
     name,
     ok: false,
@@ -263,4 +276,5 @@ module.exports = {
   negativeTestOf,
   checkRequestBody,
   recordRequestConformance,
+  isDataGap,
 };
