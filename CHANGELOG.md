@@ -93,6 +93,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.414] / [collection-OTST_V2.0.229] — 2026-10-27
+
+Two injected errors of the simulator now fail as they should, release 2026.449 (#991).
+
+### Fixed
+- **`provisionalPrice` is held to the pre-booked parts.** `checkProvisionalPrice()` (`library-bruno/bookings.js`) warned when the booking's `provisionalPrice` was not the sum of its parts, and that warning never appeared: `SIM_WRONG_BOOKING_PRICE_*` (one cent too much) passed every check. It is a failed check now, "provisionalPrice is the sum of the pre-booked parts", at `02. POST Create Booking` and `05. GET Booking before Fulfillments`. The sum is `prebookedSum()`: every PREBOOKED admission, reservation, ancillary, fee and fare of the booked offers (OSDM 3.8: "Price of all unconfirmed pre-booked parts in the booking"). Nothing is compared when no part is PREBOOKED or one is priced in another currency or not at all.
+
+### Added
+- **A scenario can declare its offer request options itself.** `offerOptionDeclared` { option key: true | false } on a scenario is laid over the Test Framework's declarations, key by key (`declaredOptionsOf()`, `scenarioParser.js`; schema field added). `SIM_WRONG_OFFER_OPTION_DECLARED_IGNORED_38` and its five version copies declare four options the simulator does not take from station `0000078` (flexibilities, residency, prmNeeds, embed): each fails "Offer request option <key> — declared in the Test Framework, taken by the provider". Before, no simulator scenario proved that #227's comparison fails.
+
+---
+
 ## [server-1.11.413] / [collection-OTST_V2.0.228] — 2026-10-27
 
 Issue #990, release 2026.448. A point to look at says what its check expected and what the run saw; the fields of a request are "parameters", OSDM's own word, not "members".

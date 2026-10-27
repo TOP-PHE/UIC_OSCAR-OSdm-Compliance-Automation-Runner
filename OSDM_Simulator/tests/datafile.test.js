@@ -258,6 +258,8 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_TRIP_PROBE_VIA_TRANSFER_LIMIT_38: [],
     SIM_WRONG_OFFER_PROBE_NOT_DECLARED_SOLD_38: [],
     SIM_WRONG_CURRENCY_DEFAULT_38: [],
+    // #991: the station of the discovery's trip, not a passenger, makes it wrong.
+    SIM_WRONG_OFFER_OPTION_DECLARED_IGNORED_38: [],
     // #903: the fare variants are chosen by the section's start station.
     SIM_WRONG_FARE_PASSENGER_WITHOUT_FARE_38: [],
     SIM_WRONG_FARE_UNKNOWN_CLUSTER_38: [],

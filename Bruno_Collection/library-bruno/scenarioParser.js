@@ -27,6 +27,23 @@ const {
 // S2245): an externalRef needs to be unique, not secret, but there is no
 // reason to use a weak generator when a strong one is at hand.
 let uuidCounter = 0;
+// #227 part 2 / #991: which options are declared supported, by option key.
+// The run's copy carries the Test Framework's (`__offerOptionDeclared`); the
+// scenario's own `offerOptionDeclared` is laid over it, as `offerOptionValues`
+// is, so a scenario can hold the provider to a declaration on its own (the
+// simulator's, run without a framework). Only true and false count.
+function declaredOptionsOf(scenario) {
+  const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const out = {};
+  for (const source of [scenario.__offerOptionDeclared, scenario.offerOptionDeclared]) {
+    if (!isMap(source)) continue;
+    for (const [key, value] of Object.entries(source)) {
+      if (typeof value === "boolean") out[key] = value;
+    }
+  }
+  return Object.keys(out).length > 0 ? JSON.stringify(out) : null;
+}
+
 function randomUUID() {
   try {
     return require('node:crypto').randomUUID();
@@ -57,7 +74,8 @@ module.exports = {
   scenarioTripDate,
   tripDateFor,
   productCategoryOf,
-  arrivalAfterDeparture
+  arrivalAfterDeparture,
+  declaredOptionsOf
 };
 
 // Which passengers step 03 updates: "MAIN" (the first only) when the scenario
@@ -880,7 +898,7 @@ function parseScenarioData(jsonData) {
       const _optionSeed = Number.parseInt(scenario.offerOptionSeed, 10);
       bru.setEnvVar("offerOptionSeed", Number.isFinite(_optionSeed) ? String(_optionSeed >>> 0) : null);
       // #227 part 2: which options the Test Framework says the provider supports (the run's copy).
-      bru.setEnvVar("offerOptionDeclared", scenario.__offerOptionDeclared && typeof scenario.__offerOptionDeclared === "object" ? JSON.stringify(scenario.__offerOptionDeclared) : null);
+      bru.setEnvVar("offerOptionDeclared", declaredOptionsOf(scenario));
       // #700: after-sale requests that must be refused.
       bru.setEnvVar("refundAgainProbe", _flagOn(scenario.refundAgainProbe) ? "true" : "false");
       bru.setEnvVar("exchangeRefundedProbe", _flagOn(scenario.exchangeRefundedProbe) ? "true" : "false");

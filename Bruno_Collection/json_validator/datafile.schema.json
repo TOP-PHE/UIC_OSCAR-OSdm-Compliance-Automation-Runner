@@ -389,6 +389,10 @@
             "description": "Offer request options (#227): the values to send, by option name (\"passenger.cards\", \"corporateCodes\", \"promotionCodes\", \"offerSearchCriteria.productSelections\", \"tripSearchCriteria.vias\"…), as OSDM writes the member. An option without a value takes the scenario's own, else an OSDM value valid for any provider, else (codes the provider defines) a made-up one.",
             "type": ["object", "null"]
           },
+          "offerOptionDeclared": {
+            "description": "Offer request options (#991): which options the provider is held to, by option name (true: declared supported, false: declared not supported), laid over what the Test Framework declares. A declared option the provider does not take is a failed check.",
+            "type": ["object", "null"]
+          },
           "offerOptionInvalidValues": {
             "description": "Offer request options (#227): what to do with an option whose value only the provider can give (a card, a corporate or promotion code, a product) when none is declared. 'random' (default) sends a made-up code, which must be refused or said; 'skip' leaves the option 'not tested'.",
             "type": ["string", "null"],

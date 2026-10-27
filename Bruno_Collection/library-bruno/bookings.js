@@ -16,6 +16,7 @@ module.exports = {
   validateFulfillments,
   checkFulfillmentSummaryStatus,
   checkProvisionalPrice,
+  prebookedSum,
   alignPassengerIdsToSubmittedOrder,
   isPostConfirmationStage,
   pairOfferParts,
@@ -1222,9 +1223,10 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
 // EQUAL the offer's minimalPrice, which is false as soon as a reservation or an
 // ancillary is added, or a return books two offers. What holds instead: it is
 // not below the minimal price of the selected offer (same currency and scale),
-// and it matches the sum of the pre-booked parts, unless fees explain the
-// difference (logged, not failed). The values are read inside the check, so a
-// missing member fails the check instead of throwing in the title.
+// and it matches the sum of the pre-booked parts (#991: a failed check; fees
+// and fares are parts of a booked offer too, so they are in the sum). The
+// values are read inside the check, so a missing member fails the check
+// instead of throwing in the title.
 function checkProvisionalPrice(prov, mini, booking) {
   test(`provisionalPrice is not below the offer's minimalPrice - provisional: ${prov?.amount} ${prov?.currency}, minimal: ${mini?.amount} ${mini?.currency}`, () => {
     expect(prov, 'provisionalPrice missing').to.exist;
@@ -1239,18 +1241,25 @@ function checkProvisionalPrice(prov, mini, booking) {
     expect(prov.amount, 'provisionalPrice is below the minimal price of the offer').to.be.at.least(mini.amount);
   });
   if (!prov || typeof prov.amount !== 'number') return;
-  const parts = (booking.bookedOffers || []).flatMap((bo) => [
-    ...(bo.admissions || []), ...(bo.reservations || []), ...(bo.ancillaries || []),
-  ]).filter((p) => p?.status === 'PREBOOKED');
-  const priced = parts.filter((p) => p.price && typeof p.price.amount === 'number' && p.price.currency === prov.currency);
-  if (parts.length > 0 && priced.length === parts.length) {
-    const sum = priced.reduce((acc, p) => acc + p.price.amount, 0);
-    if (sum !== prov.amount) {
-      validationLogger(`[WARNING] provisionalPrice ${prov.amount} ${prov.currency} differs from the sum of the pre-booked parts (${sum}): OSDM defines it as the price of all unconfirmed pre-booked parts. Booking fees, if any, would explain the difference.`);
-    } else {
-      validationLogger(`[DEBUG] provisionalPrice ${prov.amount} = sum of the ${parts.length} pre-booked part(s)`);
-    }
+  const sum = prebookedSum(booking, prov.currency);
+  if (sum === null) {
+    validationLogger(`[DEBUG] provisionalPrice not compared with the pre-booked parts: none, or one without a price in ${prov.currency}.`);
+    return;
   }
+  test(`provisionalPrice is the sum of the pre-booked parts - provisional: ${prov.amount} ${prov.currency}, sum: ${sum.amount} (${sum.count} part(s))`, () => {
+    expect(prov.amount, 'OSDM: provisionalPrice is the price of all unconfirmed pre-booked parts (admissions, reservations, ancillaries, fees, fares)').to.eql(sum.amount);
+  });
+}
+
+// #991: the PREBOOKED parts of every booked offer, fees and fares included.
+// The sum, or null when there is none or one has no price in `currency`.
+const PRICED_PARTS = ['admissions', 'reservations', 'ancillaries', 'fees', 'fares'];
+function prebookedSum(booking, currency) {
+  const parts = (booking?.bookedOffers || []).flatMap((bo) => PRICED_PARTS.flatMap((k) => (Array.isArray(bo?.[k]) ? bo[k] : [])))
+    .filter((p) => p?.status === 'PREBOOKED');
+  if (parts.length === 0) return null;
+  if (!parts.every((p) => typeof p.price?.amount === 'number' && p.price.currency === currency)) return null;
+  return { amount: parts.reduce((acc, p) => acc + p.price.amount, 0), count: parts.length };
 }
 
 const FULFILLMENT_SUMMARY_STATUSES = ['PENDING', 'CREATED', 'COMPLETE'];
