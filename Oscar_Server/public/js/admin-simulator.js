@@ -17,8 +17,8 @@
  *
  * Everything an answer holds is drawn as text, through the DOM, never as
  * HTML. whenText(), el(), accountRow(), providerNode(), secretNode(),
- * auditWhat() and auditNode() are top-level functions, lifted by the page
- * test with a small stand-in document; the rest is wiring.
+ * auditWhat(), versionText() and auditNode() are top-level functions,
+ * lifted by the page test with a small stand-in document; the rest is wiring.
  */
 
 function whenText(value) {
@@ -168,6 +168,17 @@ function runsNode(doc, body) {
   }));
 }
 
+// #1010: the simulator's version, and what an older one lacks.
+const VERSION_NEEDS = { trustedAddress: 'the trusted address of the OSCAR server', metrics: 'the figures in Grafana' };
+
+function versionText(v) {
+  if (!v?.version) return { text: 'Simulator version: not given (before 0.15.0).', warn: true };
+  const lacking = Object.keys(VERSION_NEEDS).filter((k) => v.supports?.[k] === false)
+    .map((k) => VERSION_NEEDS[k] + ' (' + (v.needs?.[k] || '?') + ')');
+  if (lacking.length === 0) return { text: 'Simulator version ' + v.version + '.', warn: false };
+  return { text: 'Simulator version ' + v.version + ': too old for ' + lacking.join(' and ') + '. Update the simulator.', warn: true };
+}
+
 function auditNode(doc, entries) {
   if (!entries.length) return el(doc, 'div', { class: 'empty', text: 'Nothing yet.' });
   const head = el(doc, 'tr', {}, ['When', 'Who', 'What'].map((t) => el(doc, 'th', { text: t })));
@@ -203,7 +214,20 @@ function auditNode(doc, entries) {
     const cfg = await res.json();
     document.getElementById('sim-url').value = cfg.url || '';
     document.getElementById('config-state').textContent = cfg.keySet ? 'Key saved.' : 'Not set up yet.';
+    loadVersion(cfg).catch(reportError);
     return cfg;
+  }
+
+  async function loadVersion(cfg) {
+    const box = document.getElementById('sim-version');
+    box.textContent = '';
+    box.style.color = '';
+    if (!cfg.url) return;
+    const res = await fetch(BASE + '/version');
+    if (!res.ok) { box.textContent = 'Simulator version: ' + await readError(res, 'could not be read.'); box.style.color = '#c62828'; return; }
+    const shown = versionText(await res.json());
+    box.textContent = shown.text;
+    if (shown.warn) box.style.color = '#c62828';
   }
 
   async function loadAccounts() {

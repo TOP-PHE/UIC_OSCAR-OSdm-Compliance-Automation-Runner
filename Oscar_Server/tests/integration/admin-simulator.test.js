@@ -262,6 +262,30 @@ test('the simulator\'s refusals come back with their status; bad values never re
   expect(before).toBeGreaterThan(0);
 });
 
+test('#1010: the simulator\'s version, read from its /healthz without the key; a version is only N.N.N', async () => {
+  const seen = [];
+  const realFetch = global.fetch;
+  global.fetch = (url, init) => { seen.push({ url: String(url), headers: init?.headers || {} }); return realFetch(url, init); };
+  try {
+    const res = await asAdmin(request(app).get('/v1/admin/simulator/version'));
+    expect(res.status).toBe(200);
+    const { version } = require(path.join(SIM, '..', 'package.json'));
+    expect(res.body.version).toBe(version);
+    expect(res.body.supports).toEqual({ trustedAddress: true, metrics: true });
+  } finally {
+    global.fetch = realFetch;
+  }
+  expect(seen.map((s) => s.url)).toEqual([`${base}/healthz`]);
+  expect(seen[0].headers.Authorization).toBeUndefined();
+  expect(JSON.stringify(seen)).not.toContain(KEY);
+  const { versionView, atLeast } = require('../../src/api/routes/admin-simulator').views;
+  expect(versionView({ version: '0.9.10' }).supports).toEqual({ trustedAddress: false, metrics: false });
+  expect(versionView({ version: '1.0.0' }).supports).toEqual({ trustedAddress: true, metrics: true });
+  expect(versionView({ version: '0.57.0-beta' }).version).toBeNull();
+  expect(atLeast('0.100.0', '0.57.0')).toBe(true);
+  expect(atLeast('0.56.9', '0.57.0')).toBe(false);
+});
+
 test('#1005: Prometheus reads the simulator through OSCAR: its requests, process and host, never a secret', async () => {
   simulatorMetrics.forgetCache();
   const text = await simulatorMetrics.simulatorMetricsText();

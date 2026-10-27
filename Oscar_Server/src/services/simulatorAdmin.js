@@ -149,8 +149,8 @@ async function send(address, { method, body, actor, secret }) {
     const res = await fetch(address, {
       method,
       headers: {
-        Authorization: `Bearer ${secret}`,
-        'X-Admin-Actor': actor,
+        // The public /healthz is read without the key (#1010).
+        ...(secret ? { Authorization: `Bearer ${secret}`, 'X-Admin-Actor': actor } : {}),
         Accept: 'application/json',
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
@@ -195,6 +195,20 @@ async function call({ method, path, body, actor, pending = false }) {
 }
 
 /**
+ * The simulator's public `GET /healthz` at the saved address (#1010): its
+ * version. The key is not sent: /healthz needs none. Returns the body, or
+ * throws a SimulatorError.
+ */
+async function health() {
+  const url = configValue(URL_KEY);
+  if (!url) throw new SimulatorError(409, 'No simulator is set up yet: enter its address and key first.');
+  const address = `${url}/healthz`;
+  const refusal = await usableUrlRefusal(address, 'simulator address');
+  if (refusal) throw new SimulatorError(422, refusal);
+  return judge(await send(address, { method: 'GET', secret: null }), null);
+}
+
+/**
  * Save the simulator's address and key, after trying them: the list of
  * accounts must answer. No key = keep the saved one, for the same address only.
  */
@@ -233,4 +247,4 @@ function removeConfig() {
   run(`DELETE FROM server_config WHERE key IN (${ALL_KEYS.map(() => '?').join(', ')})`, ALL_KEYS);
 }
 
-module.exports = { call, saveConfig, removeConfig, configView, normaliseUrl, SimulatorError, URL_KEY, KEY_KEY, KEY_URL_KEY };
+module.exports = { call, health, saveConfig, removeConfig, configView, normaliseUrl, SimulatorError, URL_KEY, KEY_KEY, KEY_URL_KEY };
