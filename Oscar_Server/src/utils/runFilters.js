@@ -183,7 +183,12 @@ function valuesText(values, all, text, many) {
   if (values.length > 3) return `${values.length} ${many}`;
   return values.map((v) => text[v] || v).join(' + ');
 }
-const key = (list) => [...list].sort().join('|');
+// Code-unit order: the same list in any order gives the same key.
+function byCodeUnits(a, b) {
+  if (a === b) return 0;
+  return String(a) < String(b) ? -1 : 1;
+}
+const key = (list) => [...list].sort(byCodeUnits).join('|');
 
 /**
  * What a batch ran, in words (#1029 PR 3): "Expected refusals · Refund",
@@ -194,8 +199,10 @@ function selectionLabel(selection) {
   const s = withDefaults(selection);
   const parts = [];
   if (s.base === 'list') parts.push('Run list');
-  parts.push(s.categories.length === CATEGORIES.length ? 'Every category' : s.categories.map((c) => CATEGORY_TEXT[c] || c).join(' + '));
-  parts.push(valuesText(s.groups, K.GROUPS, {}, 'capabilities'), valuesText(s.forms, FORMS, FORM_TEXT, 'forms'));
+  const categories = s.categories.length === CATEGORIES.length
+    ? 'Every category'
+    : s.categories.map((c) => CATEGORY_TEXT[c] || c).join(' + ');
+  parts.push(categories, valuesText(s.groups, K.GROUPS, {}, 'capabilities'), valuesText(s.forms, FORMS, FORM_TEXT, 'forms'));
   if (s.lastRun !== 'all') parts.push(LAST_RUN_TEXT[s.lastRun]);
   return parts.filter(Boolean).join(' · ');
 }
