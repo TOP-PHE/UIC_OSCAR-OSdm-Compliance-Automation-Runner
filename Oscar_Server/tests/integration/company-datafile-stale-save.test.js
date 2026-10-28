@@ -13,8 +13,8 @@
  * through GET /datafile and PUT /datafile/json.
  *
  * One company, two testers (Ana, Ben) and a Test Manager. The file is seeded
- * to disk before every test. datafileMutationLimiter allows twenty writes per
- * app instance; this file makes fewer.
+ * to disk before every test. datafileMutationLimiter allows 60 writes per user
+ * and company per app instance; this file makes fewer.
  */
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-stale-save';

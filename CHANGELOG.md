@@ -113,6 +113,18 @@ Issue #1022, release 2026.464. Collection data, the simulator's copy script and 
 
 ---
 
+## [server-1.11.429] / [collection-OTST_V2.0.233] — 2026-10-28
+
+Issue #1025, release 2026.465.
+
+### Fixed
+- **"Too many datafile upload attempts" while setting up providers.** Every route that writes a data file shares one limiter: Test Config's Save & Apply, upload, restore, delete, the reference choice and *Update from the reference*, and the configuration import. It allowed 20 writes per 15 minutes per address, for every company and provider together. A Test Manager setting up several simulator providers in a row used at least two writes per provider before saving anything, and their next save was refused with a 429 that talked about an upload. Two people behind one address shared the same 20.
+  - The limit is now counted per user and per company or provider: 60 writes per 15 minutes (`utils/datafileWriteLimit.js`). The address counts only for a request without a user.
+  - The 429 says what was refused, in how many minutes to try again, and that unsaved edits stay on the page.
+  - `company-datafile-write-limit.test.js` spends one user's 60 writes on the company, then checks that the same user on a provider and a colleague on the company still write. With the old per-address key the test fails.
+
+---
+
 ## [server-1.11.428] / [collection-OTST_V2.0.232] — 2026-10-27
 
 Issue #1021, release 2026.463. Each simulator reference's trains name their own provider's carrier; a provider answering another carrier than the one asked is warned.

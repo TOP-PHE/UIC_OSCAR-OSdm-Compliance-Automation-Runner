@@ -22,8 +22,8 @@
  *   - all of it follows the provider the request names (#540).
  *
  * Every refusal is checked against the stored file, not only the status.
- * datafileMutationLimiter allows twenty writes per app instance: this file
- * makes fewer. The schema is read from the repository's collection.
+ * datafileMutationLimiter allows 60 writes per user and company per app
+ * instance: this file makes fewer. The schema is read from the repository's collection.
  */
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-datafile-round-trip';

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28-datafile-write-limit",
+    "date": "October 28, 2026",
+    "tag": "Fixed",
+    "title": "No more 429 when setting up several providers",
+    "summary": "The limit on data file changes is now counted per person and per company or provider, and its message says how long to wait.",
+    "content": "Saving in Test Config, uploading, restoring, choosing or updating a reference and importing a configuration share one limit. It was 20 changes per 15 minutes for everything coming from one address, and setting up several providers in a row reached it. It is now 60 per 15 minutes for each person and each company or provider. If it is reached, the message says in how many minutes to try again, and the unsaved edits stay on the page."
+  },
+  {
     "id": "2026-10-27-carrier-per-provider",
     "date": "October 27, 2026",
     "tag": "Fixed",

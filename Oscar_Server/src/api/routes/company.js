@@ -32,6 +32,8 @@ const fs        = require('node:fs');
 const crypto    = require('node:crypto');
 const multer    = require('multer');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
+const WRITE_LIMIT = require('../../utils/datafileWriteLimit');
 const db = require('../../db/db');
 const { get, all, run, colDecrypt, colEncrypt } = db;
 const { annotateDatafile } = require('../../utils/frameworkGating');
@@ -60,14 +62,15 @@ router.use(requireAuth, enforceTenant);
 
 // ── Rate limiter for datafile write operations ────────────────────────────────
 // Prevents a leaked session token from being used to hammer the filesystem.
-// Limit is generous enough (20 uploads per 15 min) to not affect normal usage.
+// Counted per user and company or provider (#1025), 60 per 15 min: one person
+// setting up several providers used to exhaust a per-address limit of 20.
 const datafileMutationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15-minute window
-  max: 20,
+  windowMs: WRITE_LIMIT.WINDOW_MS,
+  max: WRITE_LIMIT.MAX_WRITES,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { status: 429, title: 'Too Many Requests',
-             detail: 'Too many datafile upload attempts. Please wait before trying again.' }
+  keyGenerator: (req) => WRITE_LIMIT.writeKeyOf(req, ipKeyGenerator(req.ip || '')),
+  handler: (req, res) => res.status(429).json(WRITE_LIMIT.limitProblem(req.rateLimit?.resetTime)),
 });
 
 // Read-side rate limiter for GET /datafile (CodeQL js/missing-rate-limiting).

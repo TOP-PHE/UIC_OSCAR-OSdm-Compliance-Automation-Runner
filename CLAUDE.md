@@ -1275,7 +1275,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **Left alone on purpose:** dedicated headers (templates are their
     documented use) and the two root keys only a Test Manager writes.
   - Two test files cover the routes because `datafileMutationLimiter` allows
-    twenty writes per app instance: a test file that makes more gets 429.
+    a set number of writes per app instance: a test file that makes more gets
+    429. **Since #1025 (1.11.429) it counts per user and company or provider**,
+    60 per 15 minutes (`utils/datafileWriteLimit.js`, the address only without
+    a user): a Test Manager setting up six providers ran out of the old 20 per
+    address. Every data file writer shares it (save, upload, restore, delete,
+    `PUT /reference`, `/reference/apply`, configuration import). Note that
+    `ipKeyGenerator()` takes the IP string, not `(req, res)`.
 - **An upload replaces the data file and nothing else; Download JSON is the
   stored file** (#549, v1.11.221). Rules that will bite:
   - **The upload's schema check is the collection's, not JSON Schema.**
