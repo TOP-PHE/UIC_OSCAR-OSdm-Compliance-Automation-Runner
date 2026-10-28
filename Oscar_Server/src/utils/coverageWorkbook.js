@@ -12,12 +12,13 @@
  * (#956, part 3). Pure. Seven sheets: Summary, then the coverage by
  * capability (#972 part 3: Capabilities, Expected refusals, Points to look
  * at, and Offer request parameters when a run of the options scenario holds
- * a report, #995), then the detail: By flow and element, By scenario, By
- * function.
+ * a report, #995, and Simulated errors when the data file holds some,
+ * #1029), then the detail: By flow and element, By scenario, By function.
  * `report` is the answer of GET /v1/company/coverage.
  */
 
 const { workbook } = require('./xlsxWorkbook');
+const SE = require('./simulatedErrors');
 const { RESULT_TEXT } = require('./coverageMatrix');
 const { RESULT_TEXT: CAPABILITY_TEXT } = require('./capabilityCoverage');
 
@@ -194,6 +195,25 @@ function optionsSheet(report) {
   };
 }
 
+// #1029: the simulator's deliberate errors, apart from the provider's coverage.
+function simulatedSheet(report) {
+  const entries = arr(report.byCapability?.simulatedErrors?.entries);
+  if (entries.length === 0) return null;
+  const what = (e) => {
+    if (e.result === 'not-run') return '';
+    if (e.kind === 'fault') return [arr(e.faults).map((x) => x.code + (x.detected ? '' : ' (not reported)')).join(', '), e.check].filter(Boolean).join(' — ');
+    return [e.step, e.check].filter(Boolean).join(' — ');
+  };
+  return {
+    name: 'Simulated errors',
+    columns: [
+      { title: 'Scenario', width: 46 }, { title: 'Kind', width: 14 }, { title: 'Result', width: 12 },
+      { title: 'What OSCAR reported', width: 80 }, { title: 'Run id', width: 38 }, { title: 'Date', width: 20 },
+    ],
+    rows: entries.map((e) => [e.code, SE.KIND_TEXT[e.kind] || e.kind, SE.RESULT_TEXT[e.result] || e.result, what(e), e.runId || '', e.at || '']),
+  };
+}
+
 function matrixSheet(report) {
   return {
     name: 'By flow and element',
@@ -276,7 +296,7 @@ function comparisonSheet(comparison) {
 function coverageWorkbook(report, { title = '', generatedAt = '', comparison = null } = {}) {
   return workbook([
     summarySheet(report, { title, generatedAt }), ...(comparison ? [comparisonSheet(comparison)] : []),
-    capabilitiesSheet(report), refusalsSheet(report), pointsSheet(report), ...[optionsSheet(report)].filter(Boolean),
+    capabilitiesSheet(report), refusalsSheet(report), pointsSheet(report), ...[optionsSheet(report), simulatedSheet(report)].filter(Boolean),
     matrixSheet(report), scenarioSheet(report), functionSheet(report),
   ]);
 }

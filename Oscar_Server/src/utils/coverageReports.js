@@ -138,6 +138,8 @@ function forPublication(report) {
   if (!c) return report;
   const frozen = { ...c, points: arr(c.points).map(frozenPoint) };
   delete frozen.positions;
+  // #1029: the simulator's deliberate errors are OSCAR's own check, never the certifier's.
+  delete frozen.simulatedErrors;
   return { ...report, byCapability: frozen };
 }
 

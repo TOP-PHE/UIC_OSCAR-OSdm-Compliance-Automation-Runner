@@ -2464,12 +2464,63 @@ function capabilityAsideHtml(c) {
   return out;
 }
 
+// #1029: the simulator's deliberate errors, kept out of the provider's
+// coverage: did OSCAR see each one? The words are the server's RESULT_TEXT and
+// KIND_TEXT (utils/simulatedErrors.js), pinned by ui-scripts.test.js.
+function simulatedErrorsLabels() {
+  return {
+    results: { detected: 'Detected', missed: 'Missed', 'not-run': 'Not run' },
+    kinds: { wrong: 'Wrong answer', fault: 'Fault' }
+  };
+}
+
+function simulatedErrorsSummaryText(s) {
+  var sum = s || {};
+  return (sum.detected || 0) + ' of ' + (sum.total || 0) + ' detected (' + (sum.missed || 0) + ' missed, ' + (sum.notRun || 0) + ' not run)';
+}
+
+function simulatedErrorWhatText(e) {
+  if (e.result === 'not-run') return '';
+  if (e.kind === 'fault') {
+    var faults = (e.faults || []).map(function(x) { return x.code + (x.detected ? '' : ' (not reported)'); }).join(', ');
+    return faults + (e.check ? ' — ' + e.check : '');
+  }
+  return (e.step ? e.step + ' — ' : '') + (e.check || '');
+}
+
+function simulatedErrorsHtml(se) {
+  var list = (se && se.entries) || [];
+  if (list.length === 0) return '';
+  var labels = simulatedErrorsLabels();
+  return '<h4 class="cov-heading">Simulated errors (' + list.length + ')</h4>'
+    + '<div class="cov-note">' + escHtml('The simulator\'s deliberate errors (SIM_WRONG_, SIM_FAULT_): not counted in the provider\'s coverage, nor in a published report. '
+      + simulatedErrorsSummaryText(se.summary) + '.') + '</div>'
+    + '<table class="cap-table"><thead><tr><th>Scenario</th><th>Kind</th><th>Result</th><th>What OSCAR reported</th></tr></thead><tbody>'
+    + list.map(function(e) {
+      return '<tr><td>' + capabilityRunLink(e.code, e.runId) + '</td><td>' + escHtml(labels.kinds[e.kind] || e.kind) + '</td>'
+        + '<td class="cov-' + (e.result === 'detected' ? 'passed' : (e.result === 'missed' ? 'blocked' : 'never-run')) + '">' + escHtml(labels.results[e.result] || e.result) + '</td>'
+        + '<td>' + escHtml(simulatedErrorWhatText(e)) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function simulatedErrorsMarkdown(se) {
+  var list = (se && se.entries) || [];
+  if (list.length === 0) return [];
+  var labels = simulatedErrorsLabels();
+  var lines = ['', '## Simulated errors', '', mdCell('Not counted in the provider\'s coverage. ' + simulatedErrorsSummaryText(se.summary) + '.'), '',
+    '| Scenario | Kind | Result | What OSCAR reported |', '|---|---|---|---|'];
+  for (const e of list) {
+    lines.push('| ' + [e.code, labels.kinds[e.kind] || e.kind, labels.results[e.result] || e.result, simulatedErrorWhatText(e)].map(mdCell).join(' | ') + ' |');
+  }
+  return lines;
+}
+
 function capabilityHtml(c) {
   var data = c || {};
   return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
     + capabilityRowsHtml(data.capabilities, data.points, data.positions) + '</tbody></table>'
     + capabilityRefusalsHtml(data.expectedRefusals, data.points, data.positions) + capabilityOptionsHtml(data.offerOptions)
-    + capabilityPointsHtml(data.points, data.positions) + capabilityAsideHtml(data);
+    + capabilityPointsHtml(data.points, data.positions) + simulatedErrorsHtml(data.simulatedErrors) + capabilityAsideHtml(data);
 }
 
 function coverageViewHtml(data, view) {
@@ -2560,7 +2611,8 @@ function capabilityMarkdown(c, days) {
   var data = c || {};
   return ['## By capability', '', mdCell(capabilitySummaryText(data.summary, days))]
     .concat(capabilityRowsMarkdown(data.capabilities), capabilityRefusalsMarkdown(data.expectedRefusals),
-      capabilityOptionsMarkdown(data.offerOptions), capabilityPointsMarkdown(data.points), capabilityAsideMarkdown(data));
+      capabilityOptionsMarkdown(data.offerOptions), capabilityPointsMarkdown(data.points), simulatedErrorsMarkdown(data.simulatedErrors),
+      capabilityAsideMarkdown(data));
 }
 
 function coverageMatrixMarkdown(data) {

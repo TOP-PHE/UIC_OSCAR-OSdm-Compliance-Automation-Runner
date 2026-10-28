@@ -1648,6 +1648,11 @@ describe('the Report Builder coverage section', () => {
     expect(out).toContain('<li>A_2 (A)</li>');
     expect(capabilityPointLinks([1, 'x', 2.5, -1])).toBe('<a href="#cov-point-1" data-cov-point="1" aria-expanded="false">#1</a>');
     expect(capabilityHtml({ points: [] })).toContain('<div class="cov-note">None.</div>');
+    // #1029: the simulator's deliberate errors have a section of their own, after the points.
+    const withSimulated = capabilityHtml({ points: [], simulatedErrors: { summary: { total: 1, detected: 1 }, entries: [{ code: 'SIM_WRONG_A_38', kind: 'wrong', result: 'detected' }] } });
+    expect(withSimulated).toContain('<h4 class="cov-heading">Simulated errors (1)</h4>');
+    expect(withSimulated.indexOf('Simulated errors (1)')).toBeGreaterThan(withSimulated.indexOf('None.'));
+    expect(capabilityHtml({ points: [] })).not.toContain('Simulated errors');
   });
 
   test('a point number opens that point under its row, and closes it (#984)', () => {
