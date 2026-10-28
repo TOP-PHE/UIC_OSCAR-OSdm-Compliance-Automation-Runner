@@ -21,8 +21,8 @@
  *   - a refused import changes nothing, in any of the three stores, and an
  *     import whose database step fails puts the data file back.
  *
- * datafileMutationLimiter allows twenty writes per app instance: this file
- * makes fewer. The schema is read from the repository's collection.
+ * datafileMutationLimiter allows 60 writes per user and company per app
+ * instance: this file makes fewer. The schema is read from the repository's collection.
  */
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-company-configuration';

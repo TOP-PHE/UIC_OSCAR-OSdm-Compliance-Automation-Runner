@@ -23,7 +23,7 @@
  * company whatever ?company_id= / X-Company-Id says.
  *
  * Kept apart from company-routes.test.js on purpose. Every request here goes
- * through datafileMutationLimiter (20 per 15 min per client), and a module
+ * through datafileMutationLimiter (60 per 15 min per user and company), and a module
  * registry of its own gives this file its own bucket. For the same reason the
  * per-test baseline is seeded straight to disk + DB rather than through the
  * rate-limited route. The company slug is unique per run because

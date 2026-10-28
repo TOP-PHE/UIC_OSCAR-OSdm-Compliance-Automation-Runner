@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.464",
+  "current_release": "2026.465",
   "releases": [
+    {
+      "release": "2026.465",
+      "date": "2026-10-28",
+      "server": "1.11.429",
+      "collection": "OTST_V2.0.233",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1025: data file writes (save, upload, restore, delete, reference choice and update, configuration import) are counted per user and company or provider, 60 per 15 minutes, instead of 20 per address for everything; the 429 says how many minutes to wait and that unsaved edits stay on the page."
+      ]
+    },
     {
       "release": "2026.464",
       "date": "2026-10-28",
