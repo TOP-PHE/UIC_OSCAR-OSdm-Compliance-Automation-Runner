@@ -235,12 +235,12 @@ describe('a version per provider (#912)', () => {
     const carrier = JSON.parse(fs.readFileSync(path.join(REPO, 'OSDM_Simulator', 'providers', 'delta.json'), 'utf8')).carrier.ref;
     expect(ref.testResources).toEqual(R.namedTrains(R.testResourcesFromDatafile(R.providerPartOf(DATAFILE, '3.9.0')), carrier));
     for (const train of ref.testResources.filter(r => r.resource_type === 'TRAIN')) {
-      expect(train.data.operatorCode).not.toBe('');
+      expect(train.data.operatorCode).toBe(carrier);
       for (const s of train.data.services) expect(s.vehicleNumber).not.toBe('');
     }
   });
 
-  test('a train of a search trip gets the carrier of the provider and a number of its own; one naming them keeps its own (#1019)', () => {
+  test('every train names the carrier of the provider; a train of a search trip gets a number of its own, one naming it keeps it (#1019, #1021)', () => {
     const plain = { id: 4, resource_type: 'TRAIN', label: 'Trip 7 0000001–0000002', data: { originURN: 'urn:uic:stn:0000001', destinationURN: 'urn:uic:stn:0000002',
       operatorCode: '', services: [{ vehicleNumber: '', departureTime: '08:00:00+01:00', arrivalTime: '12:00:00+01:00' }] } };
     const named = { id: 5, resource_type: 'TRAIN', label: 'Train 1854 0000004–0000005', data: { originURN: 'urn:uic:stn:0000004', destinationURN: 'urn:uic:stn:0000005',
@@ -248,8 +248,9 @@ describe('a version per provider (#912)', () => {
     const journey = { id: 6, resource_type: 'JOURNEY', label: 'Trip 9', data: { legs: [{ trainResourceId: 4, serviceIndex: 0 }] } };
     const [a, b, c] = R.namedTrains([plain, named, journey], 'urn:x:sim');
     expect(a).toMatchObject({ label: 'Train 9004 0000001–0000002', data: { operatorCode: 'urn:x:sim', services: [{ vehicleNumber: '9004', departureTime: '08:00:00+01:00' }] } });
-    expect(b).toEqual(named);
+    expect(b).toEqual({ ...named, data: { ...named.data, operatorCode: 'urn:x:sim' } });
     expect(c).toBe(journey);
+    expect(R.namedTrains([named], undefined)[0].data.operatorCode).toBe('urn:x:own');
     expect(plain.data.operatorCode).toBe('');
   });
 });
