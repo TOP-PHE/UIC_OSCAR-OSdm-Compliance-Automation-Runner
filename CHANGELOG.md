@@ -93,6 +93,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.434] / [collection-OTST_V2.0.234] — 2026-10-28
+
+Issue #1033, release 2026.470. Server only; collection unchanged.
+
+### Fixed
+- **Simulated errors meant to warn only read as detected.** Gamma's full campaign of 28/10/2026 read 35 of 40 simulated errors detected and 5 missed in the coverage report. OSCAR had seen all five:
+  - they are the `SIM_WRONG_FARE_` scenarios that expect a WARNING and no failed check (an unknown or too wide cluster, an overlap, a document with a fare, a combining fee: checks O10, O11, O8, F2, R3);
+  - the rule for a wrong answer counted only a failed check.
+- Such a scenario now reads as detected when its run gave that warning, and the row quotes it (`WARNING_ONLY` in `simulatedErrors.js`, by code without its version suffix). Another warning does not count.
+- Tester User Guide, CLAUDE.md.
+
+### Tests
+- `simulated-errors.test.js`:
+  - a warning-only scenario is detected by its own warning, in any version, and missed with another warning;
+  - one that failed a check is detected by that failure;
+  - the table equals the rows of *OSCAR - OSDM Simulator scenarios* that expect "no failed check", each naming its check, and each is a scenario of the simulator's data file.
+- `coverage-simulated-errors.test.js`: through `GET /v1/company/coverage`, a warning-only scenario detected from its run's warning, another missed.
+- 7 deliberate breaks, one per change, each make a test fail.
+
+---
+
 ## [server-1.11.433] / [collection-OTST_V2.0.234] — 2026-10-28
 
 Issue #1029, PR 3 of 3, release 2026.469. Server only; collection unchanged.

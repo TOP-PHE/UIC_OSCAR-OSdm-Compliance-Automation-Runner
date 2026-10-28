@@ -1586,7 +1586,10 @@ lists each one:
 
 - **Detected**: a `SIM_WRONG_` scenario whose latest finished run failed a
   check, or a `SIM_FAULT_` scenario whose every fault OSCAR reported as the
-  simulator's catalogue expects (the rule of the fault detection report);
+  simulator's catalogue expects (the rule of the fault detection report). Five
+  `SIM_WRONG_FARE_` scenarios are meant to give a WARNING only (an unknown or
+  too wide cluster, an overlap, a document with a fare, a combining fee):
+  each is detected when its run gave that warning, and the row quotes it;
 - **Missed**: it ran, and OSCAR did not see the error; the row says which
   fault was not reported;
 - **Not run**: no finished run yet.

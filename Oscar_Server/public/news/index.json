@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28-simulated-warnings-detected",
+    "date": "October 28, 2026",
+    "tag": "Fixed",
+    "title": "Simulated errors meant to warn only read as detected",
+    "summary": "Five simulator fare scenarios are meant to give a warning, not a failure: the coverage report now reads them as detected when that warning was given.",
+    "content": "In the coverage report, the Simulated errors section read five SIM_WRONG_FARE_ scenarios (an unknown or too wide cluster, an overlap, a document with a fare, a combining fee) as missed, although OSCAR had seen each of them. They are meant to give a WARNING only, with no failed check. Each now reads as detected when its run gave that warning, and the row quotes it."
+  },
+  {
     "id": "2026-10-28-batch-says-what",
     "date": "October 28, 2026",
     "tag": "Improved",
