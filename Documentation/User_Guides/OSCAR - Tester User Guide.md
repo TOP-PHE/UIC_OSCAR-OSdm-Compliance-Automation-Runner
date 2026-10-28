@@ -1377,6 +1377,12 @@ log volume only — never assertion outcomes.
   run. Nothing is tagged by hand: the categories come from the codes and the
   probes. By default the happy flows and the expected refusals run, the
   simulated errors do not.
+
+  On the dashboard, a batch started this way says what it ran under its date,
+  for example *🎯 Expected refusals · Refund* or *🎯 Run list · Simulated
+  errors · Failed at the last run*. A filter that keeps every value is not
+  named; the categories always are. A batch started from the run list without
+  a choice, or before server 1.11.433, has no such line.
 - **Concurrency** — OSCAR can run several sessions in parallel up to the global
   limit **and** the per‑company limit (the lower wins). If a vendor misbehaves
   under parallel load, set that company's limit to **1** to serialise.

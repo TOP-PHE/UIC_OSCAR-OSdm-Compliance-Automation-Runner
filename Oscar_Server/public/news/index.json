@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28-batch-says-what",
+    "date": "October 28, 2026",
+    "tag": "Improved",
+    "title": "The dashboard says what a batch ran",
+    "summary": "A batch started on New Run with a choice of category, capability, offer request or last run now says that choice on the dashboard.",
+    "content": "Under the date of a batch, the dashboard now shows what it was chosen by on New Run, for example Expected refusals · Refund, or Run list · Simulated errors · Failed at the last run. A filter that keeps every value is not named; the categories always are. Batches started from the run list without a choice, and those started before this release, show no such line."
+  },
+  {
     "id": "2026-10-28-simulated-errors-apart",
     "date": "October 28, 2026",
     "tag": "Improved",

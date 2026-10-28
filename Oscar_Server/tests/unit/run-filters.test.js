@@ -144,3 +144,29 @@ describe('a selection', () => {
     expect(f[1]).toMatchObject({ group: 'Sale', form: 'SEARCH', lastRun: 'never', toRunAgain: true });
   });
 });
+
+describe('what a batch ran, in words (#1029 PR 3)', () => {
+  test('the categories are always said, a filter keeping every value is not', () => {
+    expect(RF.selectionLabel({})).toBe('Happy flows + Expected refusals');
+    expect(RF.selectionLabel(RF.DEFAULT_SELECTION)).toBe('Happy flows + Expected refusals');
+    expect(RF.selectionLabel({ categories: [...RF.CATEGORIES] })).toBe('Every category');
+    expect(RF.selectionLabel({ categories: ['simulated'] })).toBe('Simulated errors');
+  });
+
+  test('the run list, the groups, the forms and the last run, in that order', () => {
+    expect(RF.selectionLabel({ categories: ['refusal'], groups: ['Refund'] })).toBe('Expected refusals · Refund');
+    expect(RF.selectionLabel({
+      base: 'list', categories: ['simulated'], groups: ['Sale', 'Refund', 'Exchange', 'Fares'], forms: ['TRIP_IDS', 'SEARCH'], lastRun: 'failed',
+    })).toBe('Run list · Simulated errors · 4 capabilities · Trip id + Search · Failed at the last run');
+    expect(RF.selectionLabel({ lastRun: 'toRunAgain', forms: ['SPECIFICATION'] })).toBe('Happy flows + Expected refusals · Specification · To run again');
+  });
+
+  test('every value of a filter in another order is still every value', () => {
+    expect(RF.selectionLabel({ groups: [...K.GROUPS].reverse(), forms: [...RF.FORMS].reverse() })).toBe('Happy flows + Expected refusals');
+  });
+
+  test('up to three values are named, more are counted', () => {
+    expect(RF.selectionLabel({ groups: K.GROUPS.slice(0, 3) })).toBe(`Happy flows + Expected refusals · ${K.GROUPS.slice(0, 3).join(' + ')}`);
+    expect(RF.selectionLabel({ groups: K.GROUPS.slice(0, 4) })).toBe('Happy flows + Expected refusals · 4 capabilities');
+  });
+});

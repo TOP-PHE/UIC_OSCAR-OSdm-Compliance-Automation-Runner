@@ -339,6 +339,11 @@ router.post('/', runSubmitLimiter, (req, res) => {
       );
       runs.push({ runId, code });
     }
+    // #1029 PR 3: what the batch was chosen by, for the dashboard to say it.
+    if (req.body?.selection !== undefined) {
+      dbRun('INSERT INTO run_batch (batch_id, company_id, selection) VALUES (?, ?, ?)',
+        [batchId, targetCompanyId, JSON.stringify(RF.withDefaults(req.body.selection))]);
+    }
   });
 
   // Enqueue all jobs (queue will respect concurrentLimit)
@@ -494,9 +499,25 @@ router.get('/', (req, res) => {
   // whole_batches=1 the other runs of each batch on the page are added, read
   // under the same rule as the page.
   if (req.query.whole_batches === '1') rows = withWholeBatches(rows, listed);
+  rows = withBatchLabels(rows);
 
   return res.json({ total: total.n, limit, offset, runs: rows });
 });
+
+// #1029 PR 3: each run of a batch chosen at launch carries what it was
+// chosen by, in words (runFilters.selectionLabel()); null otherwise.
+function withBatchLabels(rows) {
+  const batchIds = [...new Set(rows.map(r => r.batch_id).filter(Boolean))];
+  if (batchIds.length === 0) return rows;
+  const labels = new Map();
+  for (let i = 0; i < batchIds.length; i += 500) {
+    const chunk = batchIds.slice(i, i + 500);
+    for (const b of all(`SELECT batch_id, selection FROM run_batch WHERE batch_id IN (${chunk.map(() => '?').join(', ')})`, chunk)) {
+      try { labels.set(b.batch_id, RF.selectionLabel(JSON.parse(b.selection))); } catch { /* a stored selection not read is said as none */ }
+    }
+  }
+  return rows.map(r => ({ ...r, batch_label: (r.batch_id && labels.get(r.batch_id)) || null }));
+}
 
 // Every batch is at most one run per scenario of a data file; this bounds
 // what one answer can add if that ever stops being true.
