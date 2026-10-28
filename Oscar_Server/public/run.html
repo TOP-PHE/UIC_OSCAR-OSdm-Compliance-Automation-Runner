@@ -37,6 +37,14 @@ label{display:block;font-size:12px;font-weight:700;color:#546e7a;margin-bottom:5
 .warn-box a{color:#0090D4;font-weight:700}
 .info-box{background:#e3f2fd;border:1px solid #90caf9;color:#1565c0;padding:11px 15px;border-radius:6px;margin-bottom:16px;font-size:13px}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.sel{border:1px solid #eceff1;border-radius:6px;padding:8px 12px 10px;margin-bottom:12px}
+.sel legend{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;padding:0 4px}
+label.opt{display:inline-flex;align-items:center;gap:5px;margin:4px 14px 0 0;font-size:13px;font-weight:400;color:#37474f;text-transform:none;letter-spacing:0;cursor:pointer}
+label.opt.none{color:#b0bec5}
+.sel-count{color:#90a4ae;font-size:12px}
+.sel-links{float:right;font-size:11px}
+.sel-links button{background:none;border:none;color:#0090D4;cursor:pointer;font-size:11px;padding:0 0 0 8px}
+.sel-summary{font-size:13px;color:#37474f;margin:4px 0 12px}
 </style>
 </head>
 <body>
@@ -102,7 +110,10 @@ label{display:block;font-size:12px;font-weight:700;color:#546e7a;margin-bottom:5
     </p>
     <p style="color:#78909c;font-size:12px;margin-bottom:14px">
       Each scenario runs independently in parallel. Concurrency is controlled by your test framework configuration.
+      Choose below what this batch runs: every box you tick adds to its filter, and the filters add up.
     </p>
+    <div id="select-panel"></div>
+    <div id="sel-summary" class="sel-summary"></div>
     <button class="btn btn-run" id="run-btn" data-action="start-run" disabled>&#9654; Start Conformance Test Run</button>
   </div>
 </div>
@@ -216,12 +227,12 @@ async function loadProfile() {
         } else if (toRun.length === 0) {
           toRunDesc     = '⚠ 0 scenarios selected — run will fall back to ALL. <a href="/scenarios.html">Fix in Test Config</a>';
           toRunBadgeClass = 'badge-warn';
-          warnings.push('scenariosToRun is empty — the runner will fall back to running ALL scenarios. <a href="/scenarios.html">Update Test Config</a>.');
         } else {
-          toRunDesc     = toRun.length + ' of ' + totalCount + ' scenario(s) selected';
+          toRunDesc     = toRun.length + ' of ' + totalCount + ' scenario(s) in your run list';
           toRunBadgeClass = 'badge-ok';
-          testReady = true;
         }
+        // #1029: a batch is chosen below, from the whole file or the run list.
+        testReady = true;
 
         dfEl.innerHTML =
           `<span class="badge ${toRunBadgeClass}">✓ Configured</span> ` +
@@ -251,9 +262,107 @@ async function loadProfile() {
     warnEl.style.display = 'block';
   }
 
-  const ready = apiReady && testReady;
-  document.getElementById('run-btn').disabled = !ready;
+  launchReady = apiReady && testReady;
+  if (testReady) await loadSelection(null);
+  updateLaunchButton();
 }
+
+/* ── What this batch runs (#1029) ──
+ * The filters, their values, labels and counts come from the server's preview
+ * (POST /v1/runs/preview, utils/runFilters.js): the page only draws them and
+ * sends back what is ticked. */
+const SELECT_FILTERS = [['categories', 'Category'], ['groups', 'Capability'], ['forms', 'Offer request']];
+let launchReady = false;
+let runSelection = null;
+let selectedCount = 0;
+
+function selectOptionHtml(type, key, value, label, count, checked) {
+  const none = Number(count) === 0 ? ' none' : '';
+  return '<label class="opt' + none + '"><input type="' + type + '" name="sel-' + esc(key) + '" value="' + esc(value) + '" data-select="' + esc(key) + '"'
+    + (checked ? ' checked' : '') + '> ' + esc(label) + ' <span class="sel-count">(' + Number(count || 0) + ')</span></label>';
+}
+
+function selectionPanelHtml(preview) {
+  const p = preview || {};
+  const sel = p.selection || {};
+  const counts = p.counts || {};
+  const labels = p.labels || {};
+  let html = '<fieldset class="sel"><legend>Scenarios</legend>'
+    + selectOptionHtml('radio', 'base', 'all', 'Every scenario of the data file', p.seen, sel.base !== 'list')
+    + selectOptionHtml('radio', 'base', 'list', 'My run list (Test Config)', p.runList, sel.base === 'list')
+    + '</fieldset>';
+  for (const [key, title] of SELECT_FILTERS) {
+    const values = Object.keys(counts[key] || {}).filter(function(v) { return key !== 'categories' || v !== 'simulated' || counts[key][v] > 0; });
+    const links = key === 'groups'
+      ? '<span class="sel-links"><button type="button" data-action="sel-all" data-key="groups">All</button><button type="button" data-action="sel-none" data-key="groups">None</button></span>'
+      : '';
+    html += '<fieldset class="sel"><legend>' + esc(title) + '</legend>' + links + values.map(function(v) {
+      return selectOptionHtml('checkbox', key, v, (labels[key] || {})[v] || v, counts[key][v], (sel[key] || []).includes(v));
+    }).join('') + '</fieldset>';
+  }
+  const last = counts.lastRun || {};
+  html += '<fieldset class="sel"><legend>Last run</legend>' + Object.keys(last).map(function(v) {
+    return selectOptionHtml('radio', 'lastRun', v, (labels.lastRun || {})[v] || v, last[v], (sel.lastRun || 'all') === v);
+  }).join('') + '</fieldset>';
+  return html;
+}
+
+// The selection the panel shows, as the server takes it.
+function selectionFromPanel(root) {
+  const picked = function(key) {
+    return Array.from(root.querySelectorAll('input[data-select="' + key + '"]')).filter(function(i) { return i.checked; }).map(function(i) { return i.value; });
+  };
+  const out = { base: picked('base')[0] || 'all', lastRun: picked('lastRun')[0] || 'all' };
+  for (const [key] of SELECT_FILTERS) out[key] = picked(key);
+  // A value the panel does not show (the simulated errors of a file without any) stays out.
+  return out;
+}
+
+function launchButtonText(count) {
+  return '\u25B6 Run ' + count + ' scenario(s)';
+}
+
+function updateLaunchButton() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = !(launchReady && selectedCount > 0);
+  btn.textContent = runSelection ? launchButtonText(selectedCount) : '\u25B6 Start Conformance Test Run';
+}
+
+async function loadSelection(selection) {
+  const panel = document.getElementById('select-panel');
+  const summary = document.getElementById('sel-summary');
+  try {
+    const res = await fetch('/v1/runs/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selection ? { selection: selection } : {})
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      summary.textContent = data.detail || data.title || 'The choice of scenarios could not be read.';
+      return;
+    }
+    runSelection = data.selection;
+    selectedCount = data.selected;
+    panel.innerHTML = selectionPanelHtml(data);
+    summary.textContent = data.selected + ' of ' + data.total + ' scenario(s) will run.';
+  } catch (e) {
+    summary.textContent = 'The choice of scenarios could not be read: ' + e.message;
+  }
+  updateLaunchButton();
+}
+
+let selectionTimer = null;
+document.getElementById('select-panel').addEventListener('change', function() {
+  const selection = selectionFromPanel(document.getElementById('select-panel'));
+  clearTimeout(selectionTimer);
+  selectionTimer = setTimeout(function() { loadSelection(selection).catch(function() { /* shown in the summary */ }); }, 200);
+});
+document.getElementById('select-panel').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action="sel-all"], [data-action="sel-none"]');
+  if (!btn) return;
+  const on = btn.dataset.action === 'sel-all';
+  document.querySelectorAll('#select-panel input[data-select="' + btn.dataset.key + '"]').forEach(function(i) { i.checked = on; });
+  document.getElementById('select-panel').dispatchEvent(new Event('change'));
+});
 
 async function startRun() {
   const btn = document.getElementById('run-btn');
@@ -263,13 +372,12 @@ async function startRun() {
   const res = await fetch('/v1/runs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parallel: true })
+    body: JSON.stringify(runSelection ? { parallel: true, selection: runSelection } : { parallel: true })
   });
   const data = await res.json();
   if (!res.ok) {
-    showWarn(data.detail || data.title || 'Failed to start run.');
-    btn.disabled = false;
-    btn.textContent = '\u25B6 Start Conformance Test Run';
+    showWarn(esc(data.detail || data.title || 'Failed to start run.'));
+    updateLaunchButton();
     return;
   }
 

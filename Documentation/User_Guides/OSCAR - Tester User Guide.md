@@ -522,8 +522,9 @@ your run list.
 
 #### Step 5. Choose what to run
 
-Tick **✓ In run** on the scenarios to run (§5). Your run list is yours, and
-copies are never added to it. If your run list is **ALL**, every copied
+On **New Run**, choose the scenarios by category, capability, offer request
+and last run (§5), or tick **✓ In run** in Test Config and choose **My run
+list**. Your run list is yours, and copies are never added to it. If your run list is **ALL**, every copied
 scenario runs, including the ones still to complete, and those fail until
 they are completed. The copy report warns you when this is the case.
 
@@ -1356,6 +1357,26 @@ log volume only — never assertion outcomes.
   are your own selection, taken from your scenarios and the shared ones. Another
   tester's ticks never change what you run, and yours never change theirs. Until
   you tick anything, you start from your Test Manager's selection.
+- **Choose what a batch runs on New Run, without ticking scenarios one by
+  one.** The **Launch** card starts from **Every scenario of the data file**
+  you see, or from **My run list**, and narrows it with four filters. Within a
+  filter, every box you tick adds to the batch; the filters then add up (a
+  scenario runs only if each filter keeps it):
+  - **Category**: *Happy flows*, *Expected refusals* (the `NHF_` scenarios and
+    the refusal probes) and, when the data file holds some, *Simulated errors*
+    (the simulator's `SIM_WRONG_` and `SIM_FAULT_` scenarios, which fail on
+    purpose);
+  - **Capability**: the group of what each scenario tests (Offers, Sale,
+    Refund, Exchange, Fares…), as the coverage report reads it;
+  - **Offer request**: by search, by specification or by trip id;
+  - **Last run**: all, only those *to run again* (never run, or run before the
+    current collection or the scenario's last change), or only those that
+    *failed at the last run*.
+
+  Each box shows how many scenarios it holds, and the button says how many will
+  run. Nothing is tagged by hand: the categories come from the codes and the
+  probes. By default the happy flows and the expected refusals run, the
+  simulated errors do not.
 - **Concurrency** — OSCAR can run several sessions in parallel up to the global
   limit **and** the per‑company limit (the lower wins). If a vendor misbehaves
   under parallel load, set that company's limit to **1** to serialise.
@@ -1768,8 +1789,9 @@ Three ways to ask for faults:
 - **Ready-made scenarios** (gamma): the data file holds one scenario per
   fault, `SIM_FAULT_<CODE>_38` (for example
   `SIM_FAULT_BOOKING_PASSENGER_DROPPED_38`). They are not in the run list,
-  because they fail on purpose: tick the ones you want in the run list in
-  Test Config, then start the run from **New Run**.
+  because they fail on purpose: on **New Run**, tick **Simulated errors** only
+  (§5) and start the batch. Keep them in the data file: updating from the
+  reference brings them.
 - **On a scenario of your own**: in Test Config, open the scenario and fill in
   **Simulator faults** with one or more codes separated by commas, for
   example `offer.price-below-parts, booking.passenger-dropped`. Every request

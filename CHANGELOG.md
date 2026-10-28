@@ -93,6 +93,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.431] / [collection-OTST_V2.0.234] — 2026-10-28
+
+Issue #1029, PR 1 of 3, release 2026.466 → 2026.467. Server only; collection unchanged.
+
+### Added
+- **New Run chooses what a batch runs.** Before, a batch ran the run list ticked in Test Config. Running only the expected refusals, or only the simulator's deliberate errors, meant ticking and unticking hundreds of scenarios.
+  - The **Launch** card now starts from every scenario of the data file the person sees (a tester: their own and the shared ones), or from their run list.
+  - It narrows that base with four filters. Within one filter the ticked values add up; between filters, a scenario must be kept by each.
+  - Each value shows how many scenarios it holds, and the button says how many will run.
+  - Nothing is tagged by hand (`utils/runFilters.js`, pure):
+    - **Category**: *Simulated errors* (a `SIM_WRONG_` / `SIM_FAULT_` code, or a scenario naming `simulatorFaults`), *Expected refusals* (`isRefusalTest()`), else *Happy flows*.
+    - **Capability**: the group of the scenario's main capability, as the coverage report reads it.
+    - **Offer request**: `offerRequestFormOf()`.
+    - **Last run**: all; *to run again* (never run, older than the collection or the scenario, or not known); *failed at the last run* (the latest finished run ended FAILED or failed a check).
+  - By default the happy flows and the expected refusals run, not the simulated errors. Simulated errors are offered only when the file holds some.
+- `POST /v1/runs` takes `selection: { base, categories, groups, forms, lastRun }`.
+  - Every key is optional, an unknown key or value is a 400, and a selection that keeps nothing is a 400 before anything is queued.
+  - Without `selection`, the run list runs as before, so every other caller is unchanged.
+- `POST /v1/runs/preview` (60 a minute per user, nothing written) answers the counts per value, how many the selection keeps, the person's visible scenarios and run list, and the labels the page draws.
+  - The latest finished runs are read by `api/helpers/runCandidates.js`.
+- The launch's error message is now escaped on the page (it was put in as HTML).
+- API description (`RunSelection`, `/v1/runs/preview`), Tester User Guide (§5, §9.3, the first-run steps), CLAUDE.md.
+
+### Tests
+- `run-filters.test.js` (new):
+  - every `SIM_WRONG_` / `SIM_FAULT_` scenario of the simulator data file is a simulated error, and nothing else is;
+  - the group equals the one `capabilityCoverageOf()` gives the same scenario;
+  - the last-run rules, the selection checks, and what a selection keeps.
+- `runs-selection.test.js` (new), through the real routes:
+  - the run list without a selection; the default selection;
+  - simulated errors and refusals alone; group, form and the run list as base;
+  - a tester never sees a colleague's private scenario;
+  - refused selections queue nothing;
+  - "failed at the last run" follows the newest finished run;
+  - "to run again" compares versions; the preview counts and writes nothing.
+- `run-selection-page.test.js` (new): the page's own functions draw the server's preview, read it back as the same selection, escape what they draw, and send it at launch.
+- 15 deliberate breaks, one per change, each make a test fail.
+- Checked in a browser on a throwaway server, as a Test Manager with the simulator's 166 `_38` scenarios:
+  - 126 by default, 40 with *Simulated errors* alone, none with *None*;
+  - the launch queued exactly the 40 `SIM_WRONG_` / `SIM_FAULT_` runs.
+
+---
+
 ## [server-1.11.430] / [collection-OTST_V2.0.234] — 2026-10-28
 
 Issue #1027, release 2026.466. From the simulator campaigns of 28/10 (alpha to zeta, after #1023 and #1024). The carrier is fixed: every `_SPEC` run asks its provider's own carrier, and failed checks dropped from 136–159 per provider to 43–45. Of these, 42–44 come from four defects of OSCAR, fixed here.

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28-choose-at-launch",
+    "date": "October 28, 2026",
+    "tag": "New",
+    "title": "Choose what a batch runs on New Run",
+    "summary": "Run only the happy flows, only the expected refusals, the simulated errors, one capability, one form of offer request, or what failed last time, without ticking scenarios one by one.",
+    "content": "The Launch card of New Run now starts from every scenario of your data file, or from your run list, and narrows it with four filters: category (happy flows, expected refusals and, on the simulator, the simulated errors), capability (offers, sale, refund, exchange, fares…), form of the offer request (search, specification, trip id) and last run (all, to run again, failed at the last run). Each box shows how many scenarios it holds, and the button says how many will run. Nothing is to tag: the categories come from the scenarios themselves. By default the happy flows and the expected refusals run."
+  },
+  {
     "id": "2026-10-28-simulator-campaign-fixes",
     "date": "October 28, 2026",
     "tag": "Fixed",
