@@ -993,6 +993,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   reported, `faultDetection.detect()`), missed or not run, on the page,
   in the Markdown and a workbook sheet. `forPublication()` drops it. The
   page's words are pinned to `RESULT_TEXT` / `KIND_TEXT`.
+  **A batch says what it ran** (PR 3 = 1.11.433): `POST /v1/runs` with a
+  selection stores it, defaults filled in, in `run_batch` (migration 45, one
+  row per batch, no person); `GET /v1/runs` adds `batch_label` to each run
+  (`withBatchLabels()`, `runFilters.selectionLabel()`, null without a row
+  or for one not read) and the dashboard draws it under the batch date
+  (`batchLabelHtml()`, escaped). A filter keeping every value is not named.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

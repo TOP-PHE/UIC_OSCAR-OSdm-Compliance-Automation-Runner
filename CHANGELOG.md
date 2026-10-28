@@ -93,6 +93,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.433] / [collection-OTST_V2.0.234] — 2026-10-28
+
+Issue #1029, PR 3 of 3, release 2026.469. Server only; collection unchanged.
+
+### Added
+- **The dashboard says what a batch ran.** A batch started on New Run with a choice (category, capability, offer request, last run) shows it under its date, for example *🎯 Expected refusals · Refund* or *🎯 Run list · Simulated errors · Failed at the last run*.
+  - `POST /v1/runs` with a selection stores it, every default filled in, in `run_batch` (migration 45: batch, company, selection; no person, no secret).
+  - `GET /v1/runs` gives each run `batch_label` (`withBatchLabels()`), the words of `runFilters.selectionLabel()`: the run list when it was the base, the categories always, the capabilities and forms only when not all are kept (three named, more counted), the last run when not *All*.
+  - A batch from the run list without a selection, one from before this release, or a stored selection that cannot be read, has none (`null`).
+  - The dashboard draws it escaped (`batchLabelHtml()`).
+- Tester User Guide, API description, CLAUDE.md.
+
+### Tests
+- `run-filters.test.js`: the label, filter by filter, every value in another order, three values named and four counted.
+- `runs-selection.test.js`, through the real routes:
+  - a batch chosen at launch carries its label in `GET /v1/runs`, one from the run list does not;
+  - what is stored is the selection with its defaults, for the runs' company;
+  - a tester reads their own batch's label;
+  - a refused launch stores nothing, and a stored selection that cannot be read gives `null`, not a 500.
+- `dashboard-batch-label.test.js` (new): the page's helper draws the server's words, escaped, nothing for no label, in the batch header.
+- 13 deliberate breaks, one per change, each make a test fail.
+
+---
+
 ## [server-1.11.432] / [collection-OTST_V2.0.234] — 2026-10-28
 
 Issue #1029, PR 2 of 3, release 2026.468. Server only; collection unchanged.

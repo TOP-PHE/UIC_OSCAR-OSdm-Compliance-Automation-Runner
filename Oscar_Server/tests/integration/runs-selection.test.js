@@ -97,6 +97,7 @@ afterAll(() => {
     try { fs.unlinkSync(path.join(path.dirname(LIVE_PATH), f)); } catch { /* ignore */ }
   }
   const safe = (sql, p) => { try { run(sql, p); } catch { /* ignore */ } };
+  safe('DELETE FROM run_batch WHERE company_id = ?', [companyId]);
   safe('DELETE FROM runs WHERE company_id = ?', [companyId]);
   safe('DELETE FROM companies WHERE id = ?', [companyId]);
   safe('DELETE FROM users WHERE company_id = ?', [companyId]);
@@ -195,5 +196,47 @@ describe('POST /v1/runs/preview', () => {
     expect(res.body.seen).toBe(6);
     expect((await preview(CERT, {})).status).toBe(403);
     expect((await preview(TM, { selection: { base: 'some' } })).status).toBe(400);
+  });
+});
+
+describe('the batch says what it ran (#1029 PR 3)', () => {
+  const list = (u) => request(runsApp).get('/v1/runs?limit=100&whole_batches=1').set('Authorization', `Bearer ${token(u)}`);
+  const labelsOf = (body, batchId) => [...new Set(body.runs.filter((r) => r.batch_id === batchId).map((r) => r.batch_label))];
+
+  test('a batch chosen at launch carries its selection in words; one from the run list carries none', async () => {
+    const chosen = await launch(TM, { selection: { groups: ['Refund'] } });
+    const plain = await launch(TM, {});
+    const res = await list(TM);
+    expect(res.status).toBe(200);
+    expect(labelsOf(res.body, chosen.body.batch_id)).toEqual(['Happy flows + Expected refusals · Refund']);
+    expect(labelsOf(res.body, plain.body.batch_id)).toEqual([null]);
+    // What is stored is the selection used, every default filled in, for the company of the runs.
+    const stored = get('SELECT company_id, selection FROM run_batch WHERE batch_id = ?', [chosen.body.batch_id]);
+    expect(stored.company_id).toBe(companyId);
+    expect(JSON.parse(stored.selection)).toEqual({
+      base: 'all', categories: ['happy', 'refusal'], groups: ['Refund'], forms: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'], lastRun: 'all',
+    });
+    expect(get('SELECT COUNT(*) AS n FROM run_batch WHERE batch_id = ?', [plain.body.batch_id]).n).toBe(0);
+  });
+
+  test('a tester reads the label of their own batch too', async () => {
+    const mine = await launch(ANA, { selection: { categories: ['simulated'], base: 'list' } });
+    const res = await list(ANA);
+    expect(labelsOf(res.body, mine.body.batch_id)).toEqual(['Run list · Simulated errors']);
+  });
+
+  test('a refused launch stores no selection; a stored one that cannot be read is said as none', async () => {
+    const before = get('SELECT COUNT(*) AS n FROM run_batch WHERE company_id = ?', [companyId]).n;
+    expect((await launch(TM, { selection: { categories: [] } })).status).toBe(400);
+    expect((await launch(TM, { selection: { lastRun: 'yesterday' } })).status).toBe(400);
+    expect(get('SELECT COUNT(*) AS n FROM run_batch WHERE company_id = ?', [companyId]).n).toBe(before);
+
+    const batchId = crypto.randomUUID();
+    run(`INSERT INTO runs (id, company_id, user_id, status, batch_id, scenario_code, queued_at)
+         VALUES (?, ?, ?, 'COMPLETED', ?, 'OTST_SALE_A', datetime('now'))`, [crypto.randomUUID(), companyId, TM.id, batchId]);
+    run('INSERT INTO run_batch (batch_id, company_id, selection) VALUES (?, ?, ?)', [batchId, companyId, '{not json']);
+    const res = await list(TM);
+    expect(res.status).toBe(200);
+    expect(labelsOf(res.body, batchId)).toEqual([null]);
   });
 });

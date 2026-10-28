@@ -960,6 +960,18 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE finding ADD COLUMN position_at TEXT');
       _safeAlter('ALTER TABLE finding ADD COLUMN position_comment TEXT');
   }},
+  { version: 45, name: 'run-batch-selection', up: () => {
+      // #1029 PR 3 - what a batch chosen at launch ran: its selection (the
+      // filters and values of utils/runFilters.js, no person, no secret), so
+      // that the dashboard can say it. One row per batch launched with a
+      // selection; a batch from the run list has none.
+      db.exec(`CREATE TABLE IF NOT EXISTS run_batch (
+        batch_id    TEXT PRIMARY KEY,
+        company_id  TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        selection   TEXT NOT NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

@@ -176,7 +176,32 @@ function previewOf(facets, selection) {
   };
 }
 
+// How the values of one filter read: nothing when it keeps every value, the
+// values when there are three or fewer, else how many.
+function valuesText(values, all, text, many) {
+  if (values.length === all.length && key(values) === key(all)) return null;
+  if (values.length > 3) return `${values.length} ${many}`;
+  return values.map((v) => text[v] || v).join(' + ');
+}
+const key = (list) => [...list].sort().join('|');
+
+/**
+ * What a batch ran, in words (#1029 PR 3): "Expected refusals · Refund",
+ * "Run list · Happy flows + Expected refusals · Failed at the last run". A
+ * filter that keeps everything is not said, the categories always are.
+ */
+function selectionLabel(selection) {
+  const s = withDefaults(selection);
+  const parts = [];
+  if (s.base === 'list') parts.push('Run list');
+  parts.push(s.categories.length === CATEGORIES.length ? 'Every category' : s.categories.map((c) => CATEGORY_TEXT[c] || c).join(' + '));
+  parts.push(valuesText(s.groups, K.GROUPS, {}, 'capabilities'), valuesText(s.forms, FORMS, FORM_TEXT, 'forms'));
+  if (s.lastRun !== 'all') parts.push(LAST_RUN_TEXT[s.lastRun]);
+  return parts.filter(Boolean).join(' · ');
+}
+
 module.exports = {
+  selectionLabel,
   CATEGORIES, CATEGORY_TEXT, FORMS, FORM_TEXT, BASES, LAST_RUNS, LAST_RUN_TEXT, DEFAULT_SELECTION,
   categoryOf, groupOf, formOf, lastRunOf, facetsOf, selectionProblem, withDefaults, selectCodes, previewOf,
 };
