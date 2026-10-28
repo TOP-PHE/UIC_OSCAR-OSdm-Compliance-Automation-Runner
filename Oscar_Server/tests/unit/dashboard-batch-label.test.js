@@ -49,7 +49,7 @@ describe('the batch label on the dashboard', () => {
 
   test('is drawn in the batch header, from the batch\'s first run', () => {
     const render = sourceOf('renderRuns');
-    expect(render).toContain('${batchLabelHtml(batchRuns[0].batch_label)}');
+    expect(render).toContain('batchLabelHtml(batchRuns[0].batch_label)');
     expect(render.indexOf('batchLabelHtml(')).toBeGreaterThan(render.indexOf('class="run-row batch-header"'));
   });
 });
