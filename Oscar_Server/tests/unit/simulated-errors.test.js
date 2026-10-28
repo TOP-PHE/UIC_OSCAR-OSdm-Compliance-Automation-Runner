@@ -107,7 +107,7 @@ describe('the Report Builder page', () => {
     ctx[name] = vm.runInNewContext(`(${PAGE.slice(start, end + 1).join('\n')})`, ctx);
     return ctx[name];
   };
-  for (const name of ['coverageRunIdOf', 'capabilityRunLink', 'mdCell', 'simulatedErrorsLabels', 'simulatedErrorsSummaryText', 'simulatedErrorWhatText', 'simulatedErrorsHtml', 'simulatedErrorsMarkdown']) lift(name);
+  for (const name of ['coverageRunIdOf', 'capabilityRunLink', 'mdCell', 'simulatedErrorsLabels', 'simulatedErrorsSummaryText', 'simulatedErrorWhatText', 'simulatedErrorClass', 'simulatedErrorsHtml', 'simulatedErrorsMarkdown']) lift(name);
 
   test('its words are the server\'s', () => {
     const labels = ctx.simulatedErrorsLabels();
@@ -133,6 +133,8 @@ describe('the Report Builder page', () => {
     expect(html).toContain('href="/run-detail.html?id=0f0e8a2c-1b3d-4e5f-8a9b-0c1d2e3f4a5b"');
     expect(html).not.toContain('not-a-uuid"');
     expect(html).toContain('answer.html (not reported)');
+    // Detected reads as passed, missed as blocked, not run as never run, in that order.
+    expect([...html.matchAll(/<td class="cov-([a-z-]+)">/g)].map((m) => m[1])).toEqual(['passed', 'blocked', 'never-run']);
     expect(ctx.simulatedErrorsHtml({ entries: [] })).toBe('');
   });
 

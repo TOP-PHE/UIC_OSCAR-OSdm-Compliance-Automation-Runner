@@ -2488,6 +2488,13 @@ function simulatedErrorWhatText(e) {
   return (e.step ? e.step + ' — ' : '') + (e.check || '');
 }
 
+// The colour of a simulated error's result: detected reads as passed, missed as blocked.
+function simulatedErrorClass(result) {
+  if (result === 'detected') return 'passed';
+  if (result === 'missed') return 'blocked';
+  return 'never-run';
+}
+
 function simulatedErrorsHtml(se) {
   var list = (se && se.entries) || [];
   if (list.length === 0) return '';
@@ -2498,7 +2505,7 @@ function simulatedErrorsHtml(se) {
     + '<table class="cap-table"><thead><tr><th>Scenario</th><th>Kind</th><th>Result</th><th>What OSCAR reported</th></tr></thead><tbody>'
     + list.map(function(e) {
       return '<tr><td>' + capabilityRunLink(e.code, e.runId) + '</td><td>' + escHtml(labels.kinds[e.kind] || e.kind) + '</td>'
-        + '<td class="cov-' + (e.result === 'detected' ? 'passed' : (e.result === 'missed' ? 'blocked' : 'never-run')) + '">' + escHtml(labels.results[e.result] || e.result) + '</td>'
+        + '<td class="cov-' + simulatedErrorClass(e.result) + '">' + escHtml(labels.results[e.result] || e.result) + '</td>'
         + '<td>' + escHtml(simulatedErrorWhatText(e)) + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
