@@ -129,7 +129,7 @@ describe('the collection holds the answers to the declarations', () => {
     const { contradicted, undeclared } = o.compareWithDeclarations(report);
     expect(contradicted.map((r) => r.option)).toEqual(['corporateCodes']);
     expect(undeclared.map((r) => r.option)).toEqual(['tripSearchCriteria.arrivalTime']);
-    expect(o.compareWithDeclarations(null)).toEqual({ contradicted: [], undeclared: [] });
+    expect(o.compareWithDeclarations(null)).toEqual({ contradicted: [], warned: [], undeclared: [] });
     const lines = o.reportLines({ version: '3.8.0', budget: 30, used: 1, seed: 1, mandatory: { ok: true, message: '' }, options: report.options, combinations: [], all: null });
     expect(lines.some((l) => l.includes('corporateCodes [declared]:'))).toBe(true);
     expect(lines.some((l) => l.includes('promotionCodes [declared not supported]:'))).toBe(true);
@@ -167,6 +167,62 @@ describe('the collection holds the answers to the declarations', () => {
     expect(failed).toEqual([['🧭 Offer request option corporateCodes — declared in the Test Framework, taken by the provider',
       expect.stringMatching(/^refused \(HTTP 400\): CORPORATE_CODE_UNKNOWN\. Either the provider/)]]);
     expect(logs.some((l) => /declared as not supported in the Test Framework: passenger\.gender\b/.test(l))).toBe(true);
+  });
+
+  // #1035: a declared flexibility answered in another flexibility.
+  async function runFlexibility(answerFlexible) {
+    const env = {
+      offerOptionDiscovery: 'true', osdmVersion: '3.8.0', api_base: 'https://x', access_token: 't', scenarioCode: 'S',
+      __offerOptionFull: JSON.stringify({
+        anonymousPassengerSpecifications: [{ externalRef: 'P1', type: 'PERSON' }],
+        tripSearchCriteria: { origin: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:1' }, destination: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:2' }, departureTime: '2026-11-10T08:00:00' },
+      }),
+      offerOptionValues: JSON.stringify({ 'offerSearchCriteria.flexibilities': ['NON_FLEXIBLE'] }),
+      offerOptionDeclared: JSON.stringify({ 'offerSearchCriteria.flexibilities': true }),
+      offerOptionInvalidValues: 'skip',
+    };
+    const fullFlex = { offerId: 'O', products: [{ id: 'P', type: 'ADMISSION_POINT2POINT', flexibility: 'FULL_FLEXIBLE' }], admissionOfferParts: [{ id: 'A', products: [{ productId: 'P' }] }] };
+    const checks = [];
+    const logs = [];
+    global.bru = {
+      getEnvVar: (k) => env[k],
+      setEnvVar: (k, v) => { env[k] = v; },
+      sendRequest: (req, cb) => {
+        const body = JSON.parse(req.data);
+        if (body.offerSearchCriteria?.flexibilities) answerFlexible(cb, fullFlex);
+        else cb(null, { status: 200, data: { offers: [fullFlex] } });
+      },
+    };
+    global.test = (name, fn) => { try { fn(); checks.push([name, 'pass']); } catch (e) { checks.push([name, e.message]); } };
+    global.validationLogger = (line) => logs.push(line);
+    try {
+      expect(await o.runOptionDiscovery(200, { offers: [fullFlex] })).toBe(true);
+    } finally {
+      delete global.bru; delete global.test; delete global.validationLogger;
+    }
+    return { failed: checks.filter(([, r]) => r !== 'pass'), warnings: logs.filter((l) => l.startsWith('[WARNING]')) };
+  }
+
+  test('a declared flexibility answered in another flexibility, without a word: two warnings, no failure (#1035)', async () => {
+    const { failed, warnings } = await runFlexibility((cb, offer) => cb(null, { status: 200, data: { offers: [offer] } }));
+    expect(failed).toEqual([]);
+    // The second warning is the report's line of the parameters taken without a word.
+    expect(warnings.filter((l) => l.includes('🧭'))).toEqual([
+      '[WARNING] 🧭 Offer request options taken without a word: offerSearchCriteria.flexibilities — a distributor cannot tell what the offers answer.',
+      expect.stringMatching(/^\[WARNING\] 🧭 Offer request option offerSearchCriteria\.flexibilities — declared in the Test Framework, ignored without saying so \(HTTP 200\): .*another flexibility: a warning, not a failure/),
+    ]);
+  });
+
+  test('said by the answer: one warning; refused: a failure, as before (#1035)', async () => {
+    const said = await runFlexibility((cb, offer) => cb(null, { status: 200, data: {
+      offers: [offer], problems: [{ code: 'PARAMETER_NOT_SUPPORTED', title: "Parameter 'offerSearchCriteria.flexibilities' was ignored." }] } }));
+    expect(said.failed).toEqual([]);
+    expect(said.warnings.filter((l) => l.includes('🧭'))).toEqual([
+      expect.stringMatching(/^\[WARNING\] 🧭 Offer request option offerSearchCriteria\.flexibilities — declared in the Test Framework, ignored, and the answer says so/),
+    ]);
+    const refused = await runFlexibility((cb) => cb({ response: { status: 400, data: { code: 'FLEXIBILITY_UNKNOWN' } } }));
+    expect(refused.failed).toEqual([['🧭 Offer request option offerSearchCriteria.flexibilities — declared in the Test Framework, taken by the provider',
+      expect.stringMatching(/^refused \(HTTP 400\)/)]]);
   });
 
   // #995: options each answered alone, combined. `answer(count)` answers a

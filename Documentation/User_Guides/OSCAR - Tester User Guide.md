@@ -761,7 +761,14 @@ framework authorised.
   RFC-9457 Problem). The scenario ends there.
 - **Requested offer parts** — `ADMISSION`, `RESERVATION`, `ANCILLARY`, `FARE_*`,
   `CONTINUOUS_SERVICE`, `ALL`. (Include `RESERVATION` if you intend to pick seats.)
-- **Flexibility** — `FULL_FLEXIBLE`, `SEMI_FLEXIBLE`, `NON_FLEXIBLE`.
+- **Flexibility** — `FULL_FLEXIBLE`, `SEMI_FLEXIBLE`, `NON_FLEXIBLE`. Offers
+  in another flexibility than the one asked are a warning, never a failure:
+  asked for non-flexible, a provider may have only fully flexible places left
+  and offer those. The same goes for the classes, offer parts and other
+  search options, except in an offer search probe, whose purpose is to test
+  exactly that. When no offer keeps to a parameter and the answer does
+  not name it as not taken (OSDM `PARAMETER_NOT_SUPPORTED`), a second
+  warning lists every such parameter.
 - **Expected product** (#598) — the product (tariff) the offer must hold: its
   code, as `GET /products` or an offer lists it (matched exactly), or else
   words of its name (matched in the product's summary, then description,
@@ -1517,7 +1524,10 @@ The capability's row gives the latest run's counts in one line; each run is
 folded under its own line. A point is raised only for:
 
 - the mandatory request not answered;
-- a declared parameter the provider does not take;
+- a declared parameter the provider does not take. One exception: a
+  declared flexibility answered with offers in another flexibility, whether
+  the answer says so or not, is a warning only, since the provider offers
+  what it has. A refusal, an error or no offer for it still raises a point;
 - a refused combination (an error status for parameters that each worked
   alone).
 

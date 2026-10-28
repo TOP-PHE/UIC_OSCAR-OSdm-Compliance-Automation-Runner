@@ -174,7 +174,10 @@ describe('collection: the trips keep to the parameters sent', () => {
     };
     const env = { offerTripSearchCriteria: JSON.stringify({ parameters: { transferLimit: 0 } }) };
     const response = { offers: [], trips: [trip('v', [A, V, B])] };
-    expect(run(env, response).logs).toEqual(['[WARNING] Trip search: the trips keep to the transfer limit asked (0) — 1 of 1 trip(s) do not (trip v: 1 transfer(s))']);
+    expect(run(env, response).logs).toEqual([
+      '[WARNING] Trip search: the trips keep to the transfer limit asked (0) — 1 of 1 trip(s) do not (trip v: 1 transfer(s))',
+      '[WARNING] Offer request: the answer names the parameters it did not take (PARAMETER_NOT_SUPPORTED) — kept by no offer or trip, and not named in the answer: tripSearchCriteria.parameters.transferLimit',
+    ]);
     expect(run({ ...env, offerSearchProbe: 'true' }, response).results).toEqual([
       ['Trip search: the trips keep to the transfer limit asked (0)', 'fail', '1 of 1 trip(s) do not (trip v: 1 transfer(s))'],
     ]);

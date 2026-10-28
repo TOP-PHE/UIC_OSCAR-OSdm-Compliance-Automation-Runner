@@ -2215,13 +2215,14 @@ function checkOfferSearchCriteria(jsonData) {
     try { criteria = JSON.parse(raw); } catch { criteria = null; }
   }
   const { ignoredParameters } = require('./ignoredParameters.js');
-  const { checkOfferCriteria } = require('./offerCriteria.js');
+  const { checkOfferCriteria, unsaidCheck } = require('./offerCriteria.js');
   const probe = String(bru.getEnvVar("offerSearchProbe")) === "true";
   // #780 PR B: the trips keep to the trip search parameters sent.
   const { checkTripParameters } = require('./tripParameters.js');
   const tripCriteria = parseEnvJson("offerTripSearchCriteria", null);
   const ignored = ignoredParameters(jsonData);
-  [...checkOfferCriteria(criteria, jsonData, ignored), ...checkTripParameters(tripCriteria, jsonData, ignored)].forEach((c) => {
+  const checks = [...checkOfferCriteria(criteria, jsonData, ignored), ...checkTripParameters(tripCriteria, jsonData, ignored)];
+  checks.forEach((c) => {
     if (probe) {
       if (!c.ok && c.level !== 'warn') validationLogger(`[INFO] ${c.name} — ${c.message}`);
       test(c.name, () => { if (!c.ok && c.level === 'warn') throw new Error(c.message); });
@@ -2231,6 +2232,10 @@ function checkOfferSearchCriteria(jsonData) {
       validationLogger(`[${c.level === 'warn' ? 'WARNING' : 'INFO'}] ${c.name} — ${c.message}`);
     }
   });
+  // #1035: besides the warning of each, one WARNING when the answer names none
+  // of the parameters no offer kept to (a warning in a probe too, never a test).
+  const unsaid = unsaidCheck(checks);
+  if (unsaid) validationLogger(`[WARNING] ${unsaid.name} — ${unsaid.message}`);
 }
 
 /** #781: after 01, the offers are in the currency expected, and the sale's is kept. */

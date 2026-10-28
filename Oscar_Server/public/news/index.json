@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28-flexibility-warning",
+    "date": "October 28, 2026",
+    "tag": "Changed",
+    "title": "Offers in another flexibility: a warning, not a failure",
+    "summary": "A flexibility the Test Framework declares, answered with offers in another flexibility, is now a warning in the offer request discovery; and an answer that does not name the parameters it did not take gets a warning of its own.",
+    "content": "Asked for non-flexible, a provider may have only fully flexible places left and offer those: in the offer request discovery, a declared flexibility answered that way is now a warning, whether the answer says so or not. A refusal, an error or no offer for it still fails. After the offer step of any scenario, when no offer or trip keeps to a search parameter and the answer does not name it as not taken (OSDM PARAMETER_NOT_SUPPORTED), one more warning lists every such parameter."
+  },
+  {
     "id": "2026-10-28-simulated-warnings-detected",
     "date": "October 28, 2026",
     "tag": "Fixed",

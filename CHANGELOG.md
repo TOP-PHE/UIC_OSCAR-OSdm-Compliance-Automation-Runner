@@ -93,6 +93,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.434] / [collection-OTST_V2.0.235] — 2026-10-28
+
+Issue #1035, release 2026.471. Collection only; server unchanged.
+
+### Changed
+- **A declared flexibility answered in another flexibility is a warning, not a failure** (maintainer, 28/10/2026). Asked for non-flexible, a provider may have only full-flex left and offer it; it may say so in the answer.
+  - In the offer request discovery, a flexibility the Test Framework declares and the provider ignores, said or not, is a WARNING (`warned` of `compareWithDeclarations()`, `WARN_WHEN_IGNORED`).
+  - A refusal, an error or no offer for it still fails. Every other declared parameter keeps the rule of #227 part 2.
+  - Gamma's campaign of 28/10 failed the discovery once on it: the reference declares the three flexibilities gamma sells, and from station `0000078` the simulator ignores the parameter on purpose. The discovery now passes there with a warning, as its document expects.
+
+### Added
+- **One more WARNING when the answer does not name what it did not take.** After step 01, each offer search option and trip search parameter no offer or trip keeps to is a warning, as before; when the answer names none of them as not taken (OSDM `PARAMETER_NOT_SUPPORTED`), one more WARNING lists them all (`unsaidCheck()`, `offerCriteria.js`). It is a warning in an offer search probe too, never a test. In the discovery, that second warning is the report's existing "taken without a word" line.
+- Each criteria check names its `parameter` and whether the answer `said` it was not taken (`offerCriteria.js`, `tripParameters.js`).
+- Tester User Guide, the simulator scenarios document, CLAUDE.md.
+
+### Tests
+- `bruno-declared-options.test.js`: a declared flexibility ignored warns, refused / in error / without offer fails, any other declared parameter ignored fails.
+- `offer-option-discovery.test.js`: a discovery run with a declared flexibility answered in another flexibility gives no failed check and its two warnings when silent, one when said; refused, a failed check.
+- `offer-search-options.test.js`, `trip-search-parameters.test.js`: the parameters not kept and not named are listed once, offer and trip search alike; not when the answer names them or some offers keep to them.
+- 9 deliberate breaks, one per change, each make a test fail.
+
+---
+
 ## [server-1.11.434] / [collection-OTST_V2.0.234] — 2026-10-28
 
 Issue #1033, release 2026.470. Server only; collection unchanged.

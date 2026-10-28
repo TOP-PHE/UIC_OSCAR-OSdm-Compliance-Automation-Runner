@@ -189,7 +189,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`scenarioOfferCriteria()`: own, else the list entry's first). After 01,
     `checkOfferSearchCriteria()` (`offerCriteria.js`) says whether the offers
     keep to each option sent: never a failure (OSDM: classes may differ),
-    WARNING when no offer does, INFO when some do not. The page's
+    WARNING when no offer does, INFO when some do not; one more WARNING
+    lists the parameters no offer or trip kept to that the answer does not
+    name as not taken (`unsaidCheck()`, each check's `parameter` / `said`,
+    #1035; a warning in a probe too). The page's
     `FW_OFFER_SEARCH_OPTIONS` is pinned to `OFFER_SEARCH_OPTIONS`.
     **PR 2 (1.11.307): probes.** `offerSearchProbe` on: those checks are tests
     (failed when no offer keeps to the option or it is ignored) and the
@@ -282,7 +285,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     supported one declared unsupported an INFO line. **A scenario's own
     `offerOptionDeclared`** is laid over the framework's, key by key
     (`declaredOptionsOf()`, #991): `SIM_WRONG_OFFER_OPTION_DECLARED_IGNORED_*`
-    declares four options the simulator does not take, and fails each.
+    declares four options the simulator does not take, and fails three:
+    **a declared flexibility answered in another flexibility, said or not,
+    is a WARNING only** (#1035, maintainer 2026-10-28: the provider offers
+    what it has; `WARN_WHEN_IGNORED`, `warned` of `compareWithDeclarations()`).
+    A refusal, an error or no offer for it still fails.
     Editor: under the
     tariff section (`fwOfferOptionsHtml()`, `changeOfferOptionDiscovery()`
     before the change switch; the code lists are `FW_LISTS` `corporate` /

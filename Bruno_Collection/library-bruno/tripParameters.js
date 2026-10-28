@@ -121,9 +121,10 @@ function checkTripParameters(criteria, response, ignored = []) {
       grade: () => ({ ok, level: 'warn', message: ok ? '' : `${trips.length} trips given` }),
     });
   }
+  // #1035: each check names its parameter, and whether the answer said it was not taken.
   return wanted.map(({ name, member, key, grade }) => (ignored.includes(key)
-    ? { name, ok: false, level: 'warn', message: `the provider says it ignored tripSearchCriteria.${member} (PARAMETER_NOT_SUPPORTED): not supported` }
-    : { name, ...grade() }));
+    ? { name, parameter: `tripSearchCriteria.${member}`, said: true, ok: false, level: 'warn', message: `the provider says it ignored tripSearchCriteria.${member} (PARAMETER_NOT_SUPPORTED): not supported` }
+    : { name, parameter: `tripSearchCriteria.${member}`, said: false, ...grade() }));
 }
 
 module.exports = { askedParameters, transfersOf, placesPassed, checkTripParameters };

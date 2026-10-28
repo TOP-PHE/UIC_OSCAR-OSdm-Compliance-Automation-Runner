@@ -108,7 +108,29 @@ describe('collection: checkOfferCriteria', () => {
 
   test('an option the provider says it ignored is a warning saying so', () => {
     const [c] = checkOfferCriteria({ serviceClassTypes: ['HIGH'] }, { offers: [offer('o1')] }, ['serviceclasstypes']);
-    expect(c).toEqual({ name: 'Offer request: the offers keep to the service classes asked (HIGH)', ok: false, level: 'warn', message: 'the provider says it ignored offerSearchCriteria.serviceClassTypes (PARAMETER_NOT_SUPPORTED): not supported' });
+    expect(c).toEqual({ name: 'Offer request: the offers keep to the service classes asked (HIGH)', parameter: 'offerSearchCriteria.serviceClassTypes', said: true, ok: false, level: 'warn', message: 'the provider says it ignored offerSearchCriteria.serviceClassTypes (PARAMETER_NOT_SUPPORTED): not supported' });
+  });
+
+  test('the parameters not kept and not named are listed once, offer and trip search alike (#1035)', () => {
+    const { unsaidCheck } = require(path.join(LIB, 'offerCriteria.js'));
+    const { checkTripParameters } = require(path.join(LIB, 'tripParameters.js'));
+    const offers = { offers: [offer('o1', { travelClass: 'FIRST' })], trips: [{ id: 't1' }, { id: 't2' }] };
+    const checks = [
+      ...checkOfferCriteria({ travelClasses: ['SECOND'], flexibilities: ['NON_FLEXIBLE'], serviceClassTypes: ['HIGH'] }, offers, ['serviceclasstypes']),
+      ...checkTripParameters({ parameters: { numberOfResults: 1 } }, offers, []),
+    ];
+    expect(checks.map((c) => [c.parameter, c.said])).toEqual([
+      ['offerSearchCriteria.flexibilities', false], ['offerSearchCriteria.travelClasses', false],
+      ['offerSearchCriteria.serviceClassTypes', true], ['tripSearchCriteria.parameters.numberOfResults', false],
+    ]);
+    expect(unsaidCheck(checks)).toEqual({
+      name: 'Offer request: the answer names the parameters it did not take (PARAMETER_NOT_SUPPORTED)', ok: false, level: 'warn',
+      message: 'kept by no offer or trip, and not named in the answer: offerSearchCriteria.flexibilities, offerSearchCriteria.travelClasses, tripSearchCriteria.parameters.numberOfResults',
+    });
+    // Named by the answer, kept by some offer, or nothing asked: no such warning.
+    expect(unsaidCheck(checkOfferCriteria({ serviceClassTypes: ['HIGH'] }, offers, ['serviceclasstypes']))).toBeNull();
+    expect(unsaidCheck([{ ok: false, level: 'info', said: false, parameter: 'p' }, { ok: true, level: 'warn', said: false, parameter: 'q' }])).toBeNull();
+    expect(unsaidCheck(null)).toBeNull();
   });
 
   test('nothing asked, no offer, or an offer that says nothing: no warning', () => {
@@ -143,6 +165,8 @@ describe('collection: after 01', () => {
       '[INFO] ✔ Offer request: the offers keep to the flexibilities asked (FULL_FLEXIBLE)',
       '[WARNING] Offer request: the offers keep to the travel classes asked (SECOND) — 2 of 2 offer(s) do not (offer o1: FIRST; offer o2: FIRST)',
       '[INFO] Offer request: the offers keep to the service classes asked (STANDARD) — 1 of 2 offer(s) do not (offer o2: HIGH)',
+      // #1035: the travel classes no offer kept to, and the answer does not name; the offer mode it names, and the service class some kept to, are not listed.
+      '[WARNING] Offer request: the answer names the parameters it did not take (PARAMETER_NOT_SUPPORTED) — kept by no offer or trip, and not named in the answer: offerSearchCriteria.travelClasses',
     ]);
   });
 
