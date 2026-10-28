@@ -1998,6 +1998,11 @@ describe('the Report Builder coverage section', () => {
     for (const hidden of ['NHF_', 'B0', '>C<', 'Check at']) expect(open).not.toContain(hidden);
     expect(mixed.split('<details>')[1].match(/<li>/g)).toHaveLength(15);
     expect(capabilityRefusalFormsHtml([form('A', 'not-refused')])).toContain('<li>Not refused (1 form(s))</li></ul>');
+    // #1027: a form stopped before it asked is blocked, counted after the forms not refused.
+    expect(capabilityRefusalFormsHtml([form('Z', 'not-run'), form('Y', 'blocked', '01. POST'), ...refused.slice(0, 1)]))
+      .toContain('3 form(s): 1 refused as expected, 1 blocked, 1 not run<details>');
+    expect(ctx.capabilitySummaryText({ expectedRefusals: { total: 3, refused: 1, deviation: 0, notRefused: 0, blocked: 2, notRun: 0 } }, 30))
+      .toContain('expected refusals: 1 of 3 refused (0 accepted deviation, 0 not refused, 2 blocked, 0 not run)');
     expect([capabilityRefusalFormsHtml([]), capabilityRefusalFormsHtml(null)]).toEqual(['-', '-']);
     // In the table, the column holds the folded forms.
     const out = capabilityHtml({ expectedRefusals: [{ key: 'NHF_X', capabilityLabel: 'Sale', result: 'refused', forms: refused, points: [] }], points: [] });

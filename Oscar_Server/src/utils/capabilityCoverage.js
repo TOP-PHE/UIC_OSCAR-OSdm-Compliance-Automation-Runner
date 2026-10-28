@@ -48,6 +48,7 @@ const K = require('./capabilities');
 const P = require('./coveragePoints');
 const { stepKey } = require('./findingSuggestions');
 const { catalogueEntryForScenario } = require('./scenarioCatalogue');
+const { classifyCategory } = require('../reports/classifier');
 const { declarationOf } = require('./coverageMatrix');
 const {
   declaredFunctions, frameworkOf, isBlockingCheck: isBlocking, scenarioHash, toRunAgain,
@@ -176,10 +177,17 @@ function passedResult(failures, deviation) {
   return deviation ? 'deviation' : 'passed';
 }
 
+// A failed check of a prerequisite (no trip, no offer…): the scenario could
+// not go on to what it tests.
+const isPrerequisite = (check) => isObj(check)
+  && (check.category === 'prerequisite' || classifyCategory(String(check.assertion_name ?? '')) === 'prerequisite');
+
 // An expected refusal (R4): not refused when a check failed, else refused,
-// or not refused as an accepted deviation.
+// or not refused as an accepted deviation. A run whose failed checks are all
+// prerequisites stopped before it asked what should be refused: blocked
+// (#1027: a trip-id form with no trip to ask for read "not refused").
 function refusalOutcome(failures, deviation) {
-  if (failures.length > 0) return 'not-refused';
+  if (failures.length > 0) return failures.every((f) => isPrerequisite(f.check)) ? 'blocked' : 'not-refused';
   return deviation ? 'deviation' : 'refused';
 }
 
@@ -227,7 +235,7 @@ function notReached(steps, first, { deviation, status }) {
 /**
  * The result of a run for its main capability (R1, R5): passed, deviation,
  * points, blocked, not-supported or not-run; for a refusal test, refused,
- * deviation, not-refused or not-run. With the step and check to look at
+ * deviation, not-refused, blocked (#1027) or not-run. With the step and check to look at
  * first, and for a blocked run the check that blocked it (`stopCheck`).
  */
 function mainResult(steps, main, traits, { refusal, status }) {
@@ -238,7 +246,10 @@ function mainResult(steps, main, traits, { refusal, status }) {
   const at = first ? { step: first.step, check: failureText(first.check) } : { step: null, check: null };
   // A run that made no request refused nothing, and proved nothing (#1008).
   if (steps.length === 0) return { result: 'not-run', step: null, check: NO_REQUEST };
-  if (refusal) return { result: refusalOutcome(failures, deviation), ...at };
+  if (refusal) {
+    const result = refusalOutcome(failures, deviation);
+    return result === 'blocked' ? { result, ...at, stopCheck: first.check } : { result, ...at };
+  }
   const { own, reached, goals } = stepsFor(main, steps, traits);
   if (reached && goals.length > 0 && goals.every((s) => s.notSupported)) {
     return { result: 'not-supported', step: goals[0].name, check: `answered HTTP ${goals[0].statuses.at(-1)}` };
@@ -302,11 +313,16 @@ function combine(results) {
   return list.some((r) => WENT_THROUGH.has(r)) || problems.includes('points') ? 'points' : 'blocked';
 }
 
+// An expected refusal's result from its forms: not refused when a form was
+// not; else what the forms that asked say; blocked when every form run
+// stopped before it asked (#1027). A blocked form stays listed with its point.
 function refusalResult(forms) {
   const run = forms.filter((f) => f.result !== 'not-run');
   if (run.length === 0) return 'not-run';
   if (run.some((f) => f.result === 'not-refused')) return 'not-refused';
-  return run.some((f) => f.result === 'deviation') ? 'deviation' : 'refused';
+  const asked = run.filter((f) => f.result !== 'blocked');
+  if (asked.length === 0) return 'blocked';
+  return asked.some((f) => f.result === 'deviation') ? 'deviation' : 'refused';
 }
 
 /** What the framework says of a capability: declared, not-declared, every-value, declared-not-supported, or null. */
@@ -484,7 +500,8 @@ function summaryOf({ capabilities, expectedRefusals, notTested, apart, points, t
     expectedRefusals: {
       total: expectedRefusals.length, refused: expectedRefusals.filter((r) => r.result === 'refused').length,
       deviation: expectedRefusals.filter((r) => r.result === 'deviation').length,
-      notRefused: expectedRefusals.filter((r) => r.result === 'not-refused').length, notRun: expectedRefusals.filter((r) => r.result === 'not-run').length,
+      notRefused: expectedRefusals.filter((r) => r.result === 'not-refused').length, blocked: expectedRefusals.filter((r) => r.result === 'blocked').length,
+      notRun: expectedRefusals.filter((r) => r.result === 'not-run').length,
     },
     pointsToLookAt: {
       total: points.length, provider: kinds('provider'), accepted: kinds('accepted'), unsupported: kinds('unsupported'), questions: kinds('question'),

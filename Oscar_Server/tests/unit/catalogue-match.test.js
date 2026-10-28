@@ -151,6 +151,21 @@ describe('suggestTrip', () => {
     expect(suggestTrip({ legs: 4, needsJourney: true }, testData)).toBeNull();
   });
 
+  // #1027: the partial refund by leg rides 0000095, where the simulator gives a
+  // ticket per leg; the first two-leg journey of the Test Data went elsewhere.
+  test('a trip of several legs goes on a journey of its own route first', () => {
+    const journeys = [
+      { id: 'A', legs: 2, origin: 'urn:uic:stn:0000001', destination: 'urn:uic:stn:0000002' },
+      { id: 'B', legs: 3, origin: 'urn:uic:stn:0000095', destination: 'urn:uic:stn:0000002' },
+      { id: 'C', legs: 2, origin: '95', destination: '0000002' },
+    ];
+    const trip = { legs: 2, needsJourney: true, origin: 'urn:uic:stn:0000095', destination: 'urn:uic:stn:0000002' };
+    expect(suggestTrip(trip, { trains: [], journeys })).toBe('journey::C');
+    expect(suggestTrip({ ...trip, origin: 'urn:uic:stn:0000007' }, { trains: [], journeys })).toBe('journey::A');
+    expect(suggestTrip({ ...trip, destination: 'urn:uic:stn:0000095', origin: 'urn:uic:stn:0000002' }, { trains: [], journeys })).toBe('journey::A');
+    expect(suggestTrip({ legs: 2, needsJourney: true }, { trains: [], journeys })).toBe('journey::A');
+  });
+
   // #1019: on the simulator the stop places choose what a scenario tests.
   test('a trip of one leg goes on a train of its own route when there is one', () => {
     const trains = [
@@ -233,6 +248,13 @@ describe('suggestTrips', () => {
     const trips = [{ id: 1, legs: 2, needsJourney: true, usedBy: ['E'] }, { id: 2, legs: 2, needsJourney: true, usedBy: ['E (exchange)'] }];
     expect(suggestTrips(trips, testData)).toEqual({ 1: 'journey::J1', 2: 'journey::J2' });
     expect(suggestTrips(trips, { trains: [], journeys: [{ id: 'J1', legs: 2 }] })[2]).toBeNull();
+  });
+
+  test('an exchange\'s journey not taken by its sale takes its own route first (#1027)', () => {
+    const journeys = [{ id: 'J1', legs: 2, origin: '1', destination: '2' }, { id: 'J2', legs: 2, origin: '1', destination: '2' }, { id: 'J3', legs: 2, origin: '3', destination: '1' }];
+    const trips = [{ id: 1, legs: 2, needsJourney: true, origin: '1', destination: '2', usedBy: ['E'] },
+      { id: 2, legs: 2, needsJourney: true, origin: '3', destination: '1', usedBy: ['E (exchange)'] }];
+    expect(suggestTrips(trips, { trains: [], journeys })).toEqual({ 1: 'journey::J1', 2: 'journey::J3' });
   });
 
   test('the catalogue\'s exchange to another route: two trips, two routes', () => {
@@ -400,5 +422,30 @@ describe('#709 a provider without the passenger update', () => {
       const { datafile } = adaptCatalogueDatafile(source, catalogueFor(catalogue, simulator, config), config);
       expect(patching(datafile)).toBe(patching(source));
     }
+  });
+});
+
+// #1027: the reference copies, end to end. On the simulator a copy must go on
+// the trains and journeys its source rides, as each reference holds them.
+describe('the catalogue copied on a simulator reference', () => {
+  const { testDataChoices } = require('../../src/api/helpers/catalogueSource');
+  const { planCopy } = require('../../src/utils/scenarioCopy');
+  const choicesOf = (provider) => {
+    const ref = require(path.join(DATA, 'reference', `simulator-${provider}.json`));
+    return testDataChoices(ref.testResources);
+  };
+
+  test('a journey states its first and last stop places', () => {
+    const { journeys } = choicesOf('zeta');
+    expect(journeys.length).toBeGreaterThan(0);
+    for (const j of journeys) expect(j).toEqual(expect.objectContaining({ origin: expect.stringMatching(/^urn:uic:stn:\d+$/), destination: expect.stringMatching(/^urn:uic:stn:\d+$/) }));
+  });
+
+  test.each(['alpha', 'zeta'])('the partial refund by leg goes on the journey from 0000095 on %s', (provider) => {
+    const testData = choicesOf(provider);
+    const plan = planCopy(catalogueDatafile(catalogue, simulator), ['OTST_REFUND_PARTIAL_LEG_1ADT'], {});
+    const suggested = suggestTrips(plan.trips, testData);
+    const journey = testData.journeys.find((j) => `journey::${j.id}` === suggested[plan.trips[0].id]);
+    expect(journey).toMatchObject({ legs: 2, origin: 'urn:uic:stn:0000095', destination: 'urn:uic:stn:0000002' });
   });
 });

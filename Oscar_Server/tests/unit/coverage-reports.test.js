@@ -81,7 +81,7 @@ describe('what a report keeps beside its content', () => {
     const s = R.summaryOf(report({ points: [point(1, ['k'])] }));
     expect(s).toEqual({
       tested: 3, passed: 1, deviation: 0, points: 2, blocked: 0, notSupported: 0, notTested: 0, outOfScope: 0,
-      expectedRefusals: { total: 1, refused: 1, notRefused: 0 },
+      expectedRefusals: { total: 1, refused: 1, notRefused: 0, blocked: 0 },
       pointsToLookAt: { total: 1, provider: 1, accepted: 0, questions: 0, oscar: 0 },
     });
     expect(R.summaryOf({ byCapability: { summary: { tested: 'x<script>' } } }).tested).toBe(0);

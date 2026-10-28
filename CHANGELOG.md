@@ -93,6 +93,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.430] / [collection-OTST_V2.0.234] — 2026-10-28
+
+Issue #1027, release 2026.466. From the simulator campaigns of 28/10 (alpha to zeta, after #1023 and #1024). The carrier is fixed: every `_SPEC` run asks its provider's own carrier, and failed checks dropped from 136–159 per provider to 43–45. Of these, 42–44 come from four defects of OSCAR, fixed here.
+
+### Fixed
+- **Every trip-id copy failed at 01** (40 checks per provider): `Trips collection: a trip to ask offers for — none`, "no trip of the answer runs train 9001". #1019 gave a search trip's train in the simulator references a number of OSCAR's own (9000 + the train's id), and a trip-id copy asks for its train in the simulator's answer, which never runs it. Before #1019 these trains had no number, and OSCAR took the first trip at the time asked.
+  - Such a train now takes the number the simulator runs on its route at the time asked (`simulatorTrainNumber()` in `referenceConfiguration.js`: sha256 of the two stop places, as `tripFromSearch()` does). For example 1817 for 0000001 → 0000002, where the answer lists 1780, 1817, 1854, 1891.
+  - The trip-id form keeps its strict rule: on a real provider, a Test Data train missing from the answer is worth a failure.
+  - The six references are regenerated, gamma's too. Their companies read "not up to date" until updated.
+- **The partial refund by leg went on the wrong journey** (`OTST_REFUND_PARTIAL_LEG_1ADT`): gamma to zeta answered 400 `PARTIAL_REFUND_NOT_SUPPORTED`, alpha and beta refunded the whole booking.
+  - The copy took the first two-leg journey of the Test Data (0000001 → 0000004 → 0000002). Its source rides 0000095 → 0000004 → 0000002, where the simulator gives one ticket per leg.
+  - #1019 made a one-leg trip prefer its own route; a trip of several legs now does too (`journeysFor()` in `catalogueMatch.js`, for both `suggestTrip()` and an exchange's trip). `testDataChoices()` gives each journey its first and last stop places.
+- **A named compartment was copied to OSDM 3.6 and 3.7** (`OTST_SALE_NAMED_COMPARTMENT_2ADT` on alpha and beta). OSCAR's own conformance check failed it as OSCAR's: `PlaceSelection.compartments` exists from 3.8.
+  - `requirementsOf()` now asks OSDM 3.8 for a scenario naming a compartment (`requestVersionOf()`), as the simulator's version copies already do. The catalogue refuses the copy below ("OSDM 3.8 or later").
+- **An expected refusal stopped before its probe read "Not refused".** 17 of 26 refusals read so in each report, only because their trip-id form found no trip.
+  - A form whose failed checks are all missing prerequisites (no trip, no offer: the classifier's `prerequisite` category) now reads **Blocked**, with its check and its point. The provider was never asked.
+  - The refusal's result comes from the forms that asked. It is Blocked only when every form run was, and a form not refused still makes it Not refused.
+  - The summary counts blocked refusals on the page, in the Markdown, in the workbook ("Blocked before the request to refuse") and in a published report's counts.
+- Tester User Guide (Expected refusals), API description, CLAUDE.md.
+
+### Left as it is, on purpose
+`OTST_OFFER_OPTION_DISCOVERY` still fails `offerSearchCriteria.flexibilities — declared in the Test Framework, taken by the provider`. The simulator codes that parameter as ignored without saying so, from 0000078, and the references declare flexibilities. The six other coded parameters read exactly as coded. After this release, that one check should be the only failure of a simulator company's catalogue campaign.
+
+### Upgrade
+Update the simulator companies from their reference, delete the old catalogue copies, and copy again.
+
+### Tests
+- `reference-configuration.test.js`: on every train of every reference, the number is one the data file names, else the simulator's own, read from `tripFromSearch()` at two times of day.
+- `catalogue-match.test.js`: a trip of several legs goes on a journey of its own route first (stop places compared as `stopKey()` does), and so does an exchange's. End to end, the partial refund by leg goes on the 0000095 journey of alpha's and zeta's references, and every journey choice names its stop places.
+- `scenario-catalogue.test.js`: a named compartment needs 3.8, and on alpha's framework the catalogue refuses it at 3.6 and 3.7, not at 3.8.
+- `capability-coverage.test.js`: blocked form with its point, refusal blocked when every form is, still not refused when a form asked and was not refused or failed another check too. The page, workbook and published-summary tests check the counts.
+- 15 deliberate breaks, one per change, each make a test fail.
+
+---
+
 ## [collection-OTST_V2.0.233] — 2026-10-28
 
 Issue #1022, release 2026.464. Collection data, the simulator's copy script and tests; server unchanged (1.11.428), simulator unchanged. The data file half of #1021.

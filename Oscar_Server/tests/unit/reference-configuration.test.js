@@ -240,17 +240,56 @@ describe('a version per provider (#912)', () => {
     }
   });
 
-  test('every train names the carrier of the provider; a train of a search trip gets a number of its own, one naming it keeps it (#1019, #1021)', () => {
+  test('every train names the carrier of the provider; a train of a search trip gets the simulator\'s number on its route, one naming it keeps it (#1019, #1021, #1027)', () => {
     const plain = { id: 4, resource_type: 'TRAIN', label: 'Trip 7 0000001–0000002', data: { originURN: 'urn:uic:stn:0000001', destinationURN: 'urn:uic:stn:0000002',
       operatorCode: '', services: [{ vehicleNumber: '', departureTime: '08:00:00+01:00', arrivalTime: '12:00:00+01:00' }] } };
     const named = { id: 5, resource_type: 'TRAIN', label: 'Train 1854 0000004–0000005', data: { originURN: 'urn:uic:stn:0000004', destinationURN: 'urn:uic:stn:0000005',
       operatorCode: 'urn:x:own', services: [{ vehicleNumber: '1854', departureTime: '09:00:00+01:00', arrivalTime: '10:00:00+01:00' }] } };
     const journey = { id: 6, resource_type: 'JOURNEY', label: 'Trip 9', data: { legs: [{ trainResourceId: 4, serviceIndex: 0 }] } };
     const [a, b, c] = R.namedTrains([plain, named, journey], 'urn:x:sim');
-    expect(a).toMatchObject({ label: 'Train 9004 0000001–0000002', data: { operatorCode: 'urn:x:sim', services: [{ vehicleNumber: '9004', departureTime: '08:00:00+01:00' }] } });
+    expect(a).toMatchObject({ label: 'Train 1817 0000001–0000002', data: { operatorCode: 'urn:x:sim', services: [{ vehicleNumber: '1817', departureTime: '08:00:00+01:00' }] } });
     expect(b).toEqual({ ...named, data: { ...named.data, operatorCode: 'urn:x:sim' } });
     expect(c).toBe(journey);
     expect(R.namedTrains([named], undefined)[0].data.operatorCode).toBe('urn:x:own');
     expect(plain.data.operatorCode).toBe('');
+  });
+
+  // #1027: a copy asked by trip id looks for its train in the simulator's
+  // answer, and a number of OSCAR's own (9000 + id) was in none.
+  test('a train is one the data file names, else the one the simulator runs on its route at the time asked (#1027)', () => {
+    const { loadProviders } = require(path.join(REPO, 'OSDM_Simulator', 'src', 'config'));
+    const { tripFromSearch } = require(path.join(REPO, 'OSDM_Simulator', 'src', 'osdm', 'offers'));
+    const providers = loadProviders(path.join(REPO, 'OSDM_Simulator', 'providers'));
+    // The numbers the data file names, by route.
+    const named = new Map();
+    const name = (from, to, number) => {
+      if (!number) return;
+      const key = `${from}|${to}`;
+      if (!named.has(key)) named.set(key, new Set());
+      named.get(key).add(String(number));
+    };
+    for (const trip of DATAFILE.tripRequirements) {
+      if (trip?.trip) name(trip.trip.origin, trip.trip.destination, trip.trip.vehicleNumber);
+      for (const leg of Array.isArray(trip?.legs) ? trip.legs : []) name(leg.origin, leg.destination, leg.vehicleNumber);
+    }
+    let simulators = 0;
+    for (const provider of R.PROVIDERS) {
+      const sim = providers.get(provider);
+      for (const train of JSON.parse(storedOf(provider)).testResources.filter(r => r.resource_type === 'TRAIN')) {
+        const { originURN: from, destinationURN: to } = train.data;
+        const expected = R.simulatorTrainNumber(from, to);
+        // The simulator's own rule, at two times of the day.
+        for (const time of ['08:00:00', '16:30:00']) {
+          const trip = tripFromSearch({ origin: { stopPlaceRef: from }, destination: { stopPlaceRef: to }, departureTime: `2026-11-07T${time}` }, sim);
+          expect(trip.legs[0].timedLeg.service.vehicleNumbers[0]).toBe(expected);
+        }
+        for (const { vehicleNumber } of train.data.services) {
+          if (named.get(`${from}|${to}`)?.has(vehicleNumber)) continue;
+          expect([train.label, vehicleNumber]).toEqual([train.label, expected]);
+          simulators += 1;
+        }
+      }
+    }
+    expect(simulators).toBeGreaterThan(30);
   });
 });

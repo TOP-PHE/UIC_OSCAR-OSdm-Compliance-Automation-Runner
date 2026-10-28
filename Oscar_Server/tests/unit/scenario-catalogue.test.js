@@ -113,6 +113,24 @@ describe('requirements and the golden rule', () => {
       .toEqual(['sales flow SALE', 'sales flow REFUND_FULL']);
   });
 
+  // #1027: PlaceSelection.compartments exists from OSDM 3.8; on alpha (3.6)
+  // and beta (3.7) the copy's booking request did not conform.
+  test('a named compartment needs OSDM 3.8, the catalogue entry with it is refused below', () => {
+    const fw = (osdmVersion) => ({ salesFlows: ['SALE'], osdmVersion, passengerTypes: ['ADULT'], placeSelectionFlows: ['MANUAL_PLACE_SELECTION_WITHOUT_FEE'] });
+    const compartment = requirementsOf({ scenarioType: 'SALE', namedPlaceKind: 'COMPARTMENT', placeSelectionFlow: 'MANUAL_PLACE_SELECTION_WITHOUT_FEE' }, {});
+    expect(compartment.minOsdmVersion).toBe('3.8');
+    expect(missingFor(compartment, fw('3.7.0'))).toEqual(['OSDM 3.8 or later']);
+    expect(missingFor(compartment, fw('3.8.0'))).toEqual([]);
+    expect(requirementsOf({ scenarioType: 'SALE', namedPlaceKind: 'PLACE', placeSelectionFlow: 'MANUAL_PLACE_SELECTION_WITHOUT_FEE' }, {}).minOsdmVersion).toBeNull();
+    // On alpha's own framework, at its version and at 3.8.
+    const alpha = require(path.join(DATA, 'reference', 'simulator-alpha.json')).framework;
+    const missingOn = (osdmVersion) => catalogueFor(catalogue, simulator, { ...alpha, osdmVersion })
+      .find((e) => e.code === 'OTST_SALE_NAMED_COMPARTMENT_2ADT').missing;
+    expect(missingOn('3.6.0')).toContain('OSDM 3.8 or later');
+    expect(missingOn('3.7.0')).toContain('OSDM 3.8 or later');
+    expect(missingOn('3.8.0')).not.toContain('OSDM 3.8 or later');
+  });
+
   test('#713: a partial refund needs its scope declared, when the framework lists scopes', () => {
     const df = { passengersList: [{ id: 1, passengers: [{ type: 'ADULT' }] }] };
     const byPax = requirementsOf({ scenarioType: 'REFUND', passengersListId: 1, partialRefundByPax: 'on' }, df);

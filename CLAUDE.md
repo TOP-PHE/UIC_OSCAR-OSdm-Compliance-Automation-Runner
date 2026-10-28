@@ -795,6 +795,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     FAILED one, `not-run`. A refusal's failure at the steps of the capability
     it probes never gives that capability "points". A drawn-runs test in
     `capability-coverage.test.js` holds both promises.
+    **A refusal stopped before it asked is blocked** (#1027, 1.11.430): a
+    form whose failed checks are all prerequisites (the classifier's
+    category: no trip, no offer) reads `blocked` with its point
+    (`refusalOutcome()`), not `not-refused`; `refusalResult()` takes the
+    forms that asked, `blocked` only when every form run was. The summary's
+    `expectedRefusals.blocked` is on the page, in the Markdown, the workbook
+    and a published report's counts.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
@@ -2596,8 +2603,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   none: the copy preview marks it to complete, the checklist apply leaves it
   out as `noNamedTrain`. The simulator references' trains all name both
   (`namedTrains()` in `buildReference()`: the provider's own carrier on
-  every train, #1021, and `9000 + id` for a search trip's train; `testResourcesFromDatafile()`
-  stays the data file's image, pinned to the page's `trainFromTrip`).
+  every train, #1021; a search trip's train the number the simulator runs on
+  its route, `simulatorTrainNumber()`, pinned to its `tripFromSearch()`,
+  #1027: a number of OSCAR's own was in no answer, and every trip-id copy
+  failed at 01; `testResourcesFromDatafile()`
+  stays the data file's image, pinned to the page's `trainFromTrip`). A trip
+  of several legs goes on a journey of as many legs, its own route first
+  (`journeysFor()`, #1027: the partial refund by leg needs 0000095's ticket
+  per leg); `testDataChoices()` gives journeys their `origin` and
+  `destination`. A scenario naming a compartment needs OSDM 3.8 in the
+  catalogue (`requestVersionOf()` in `scenarioCatalogue.js`, as the
+  simulator's `reasonNotPossible()`).
   **Part 3 (1.11.256): the copy report, `public/js/copy-report.js`** (browser
   global and CommonJS, like `trip-apply.js`): ready / to complete / not
   allowed, shown live in Copy scenarios and returned by the copy. A copy never

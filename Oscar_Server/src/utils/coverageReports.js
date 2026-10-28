@@ -54,7 +54,7 @@ function summaryOf(report) {
   return {
     tested: n(s.tested), passed: n(s.passed), deviation: n(s.deviation), points: n(s.points), blocked: n(s.blocked),
     notSupported: n(s.notSupported), notTested: n(s.notTested), outOfScope: n(s.outOfScope),
-    expectedRefusals: { total: n(r.total), refused: n(r.refused), notRefused: n(r.notRefused) },
+    expectedRefusals: { total: n(r.total), refused: n(r.refused), notRefused: n(r.notRefused), blocked: n(r.blocked) },
     pointsToLookAt: { total: n(p.total), provider: n(p.provider), accepted: n(p.accepted), questions: n(p.questions), oscar: n(p.oscar) },
   };
 }

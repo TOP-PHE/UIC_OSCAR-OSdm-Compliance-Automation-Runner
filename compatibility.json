@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.465",
+  "current_release": "2026.466",
   "releases": [
+    {
+      "release": "2026.466",
+      "date": "2026-10-28",
+      "server": "1.11.430",
+      "collection": "OTST_V2.0.234",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1027: a search trip's train in the simulator references takes the number the simulator runs on its route (trip-id copies failed \"no trip of the answer runs train 9001\"); a trip of several legs is copied onto a journey of its own route first; a named compartment needs OSDM 3.8 in the catalogue; an expected refusal stopped on a missing prerequisite before its probe reads Blocked, not Not refused."
+      ]
+    },
     {
       "release": "2026.465",
       "date": "2026-10-28",

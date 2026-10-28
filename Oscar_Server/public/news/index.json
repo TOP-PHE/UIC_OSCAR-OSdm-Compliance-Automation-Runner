@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28-simulator-campaign-fixes",
+    "date": "October 28, 2026",
+    "tag": "Fixed",
+    "title": "Simulator campaigns: trip-id copies run again",
+    "summary": "Copies asked by trip id find their train on the simulator, the partial refund by leg goes on its own journey, and a refusal stopped before its probe reads Blocked.",
+    "content": "The simulator campaigns of 28/10 showed four defects of OSCAR. Every copy asked by trip id failed because the simulator references gave search trains a number the simulator never runs; they now name the simulator's own train. A partial refund by leg is copied onto a journey of its own route, as one-leg trips already were. A scenario naming a compartment is offered only from OSDM 3.8, where a booking request can name one.\n\nIn the coverage report, an expected refusal whose form stopped on a missing prerequisite (no trip, no offer) before asking what should be refused now reads Blocked instead of Not refused: the provider was never asked. Update your simulator companies from their reference, then copy the scenarios again."
+  },
+  {
     "id": "2026-10-28-datafile-write-limit",
     "date": "October 28, 2026",
     "tag": "Fixed",

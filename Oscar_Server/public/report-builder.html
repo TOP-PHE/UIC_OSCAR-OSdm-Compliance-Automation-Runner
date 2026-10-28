@@ -2093,7 +2093,7 @@ function capabilitySummaryText(summary, days) {
       + (s.points || 0) + ' passed with points, ' + (s.blocked || 0) + ' blocked, ' + (s.notSupported || 0) + ' not supported by the provider',
     (s.notTested || 0) + ' declared and not tested', (s.outOfScope || 0) + ' out of scope',
     'expected refusals: ' + (r.refused || 0) + ' of ' + (r.total || 0) + ' refused (' + (r.deviation || 0) + ' accepted deviation, '
-      + (r.notRefused || 0) + ' not refused, ' + (r.notRun || 0) + ' not run)',
+      + (r.notRefused || 0) + ' not refused, ' + (r.blocked || 0) + ' blocked, ' + (r.notRun || 0) + ' not run)',
     (p.total || 0) + ' point(s) to look at: ' + (p.provider || 0) + ' for the provider, ' + (p.accepted || 0) + ' accepted deviation(s), '
       + (p.unsupported || 0) + ' not supported, ' + (p.questions || 0) + ' question(s), ' + (p.oscar || 0) + ' of OSCAR' + (p.truncated ? ' (the first 500 only)' : ''),
     (s.declaredWithoutScenario || 0) + ' declared function(s) without a scenario run', (s.apart || 0) + ' scenario(s) set apart'
@@ -2217,7 +2217,7 @@ function capabilityRefusalFormsHtml(forms) {
   var counts = {};
   all.forEach(function(f) { counts[f.result] = (counts[f.result] || 0) + 1; });
   // Always in one order, whatever order the forms come in.
-  var order = ['refused', 'deviation', 'not-refused', 'not-run'];
+  var order = ['refused', 'deviation', 'not-refused', 'blocked', 'not-run'];
   var rank = function(k) { var i = order.indexOf(k); return i < 0 ? order.length : i; };
   var text = all.length + ' form(s): ' + Object.keys(counts).sort(function(a, b) { return rank(a) - rank(b); }).map(function(k) {
     return counts[k] + ' ' + capabilityResultLabel(k).toLowerCase();
