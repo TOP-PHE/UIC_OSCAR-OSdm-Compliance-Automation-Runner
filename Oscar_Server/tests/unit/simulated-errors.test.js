@@ -61,6 +61,31 @@ describe('detected, missed or not run', () => {
     expect(r.summary).toEqual({ total: 3, detected: 1, missed: 1, notRun: 1 });
   });
 
+  test('a wrong answer meant to warn only is detected by its own warning, not by another', () => {
+    const codes = ['SIM_WRONG_FARE_OVERLAP_38', 'SIM_WRONG_FARE_OVERLAP_36', 'SIM_WRONG_FARE_UNKNOWN_CLUSTER_38', 'SIM_WRONG_A_38', 'SIM_WRONG_FARE_COMBINING_FEE_38'];
+    const warnings = {
+      SIM_WRONG_FARE_OVERLAP_38: ['[run] [WARNING] [fares O8] Each passenger fares do not overlap — fares covering a part of the section twice'],
+      SIM_WRONG_FARE_OVERLAP_36: ['[WARNING] [fares O8] Each passenger fares do not overlap'],
+      SIM_WRONG_FARE_UNKNOWN_CLUSTER_38: ['[WARNING] [fares O11] CLUSTERING: no allowed cluster is more flexible'],
+      SIM_WRONG_A_38: ['[WARNING] [fares O8] a warning, but this wrong answer is meant to fail'],
+    };
+    const runs = Object.fromEntries(codes.map((c) => [c, runOf(c)]));
+    const r = SE.simulatedErrorsOf(codes.map((code) => ({ code })), runs, warnings);
+    expect(r.entries.map((e) => [e.code, e.result])).toEqual([
+      ['SIM_WRONG_FARE_OVERLAP_38', 'detected'], ['SIM_WRONG_FARE_OVERLAP_36', 'detected'],
+      ['SIM_WRONG_FARE_UNKNOWN_CLUSTER_38', 'missed'], ['SIM_WRONG_A_38', 'missed'], ['SIM_WRONG_FARE_COMBINING_FEE_38', 'missed'],
+    ]);
+    expect(r.entries[0]).toMatchObject({ step: null, check: '[WARNING] [fares O8] Each passenger fares do not overlap — fares covering a part of the section twice' });
+    expect(r.entries[2].check).toBe('The run passed every check and gave no [fares O10] warning: OSCAR did not see the error.');
+    expect(r.entries[3].check).toBe('The run passed every check: OSCAR did not see the error.');
+    expect(r.summary).toEqual({ total: 5, detected: 2, missed: 3, notRun: 0 });
+  });
+
+  test('a wrong answer meant to warn only that failed a check is detected by that failure', () => {
+    const r = SE.simulatedErrorsOf([{ code: 'SIM_WRONG_FARE_OVERLAP_38' }], { SIM_WRONG_FARE_OVERLAP_38: runOf('O', [['01. POST Get Offer', '[fares O8] gap']]) }, {});
+    expect(r.entries[0]).toMatchObject({ result: 'detected', step: '01. POST Get Offer', check: '[fares O8] gap' });
+  });
+
   test('every fault of the replay is detected, by the fault detection report\'s own rule', () => {
     const faults = simulator.scenarios.filter((s) => s.code in replay);
     expect(faults).toHaveLength(Object.keys(replay).length);
@@ -75,6 +100,26 @@ describe('detected, missed or not run', () => {
     const r = SE.simulatedErrorsOf([scenario], { [scenario.code]: runOf(scenario.code, [['01. POST Get Offer', 'something else']]) });
     expect(r.entries[0]).toMatchObject({ kind: 'fault', result: 'missed', check: expect.stringMatching(/^Not reported: /) });
     expect(r.entries[0].faults.every((f) => f.detected === false)).toBe(true);
+  });
+});
+
+describe('the wrong answers meant to warn only', () => {
+  const DOC = path.resolve(__dirname, '../../../Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md');
+  const base = (code) => code.replace(/_\d{2,3}$/, '');
+
+  test('are exactly those the simulator scenarios document expects with no failed check, each warning on the check it names', () => {
+    const rows = fs.readFileSync(DOC, 'utf8').split('\n').filter((l) => l.startsWith('| `SIM_WRONG_')).map((l) => l.split('|'));
+    expect(rows.length).toBeGreaterThan(20);
+    const warnOnly = rows.filter((c) => /no failed check/i.test(c[4] || '')).map((c) => ({ code: c[1].trim().replaceAll('`', ''), expected: c[4] }));
+    expect(warnOnly.map((w) => base(w.code)).sort()).toEqual(Object.keys(SE.WARNING_ONLY).sort());
+    for (const { code, expected } of warnOnly) {
+      const id = /^\[fares (\w+)\]$/.exec(SE.WARNING_ONLY[base(code)])[1];
+      expect(expected).toContain('check ' + id + ' ');
+    }
+  });
+
+  test('each is a scenario of the simulator data file', () => {
+    for (const code of Object.keys(SE.WARNING_ONLY)) expect(simulator.scenarios.some((s) => s.code === code + '_38')).toBe(true);
   });
 });
 

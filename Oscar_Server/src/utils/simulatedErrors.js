@@ -17,9 +17,11 @@
  * faults. Their failures say how well OSCAR sees an error, not how the
  * provider conforms: they are left out of every coverage view and of a
  * published report, and listed on their own, each one
- *  - **detected**: a wrong scenario whose latest finished run failed a check;
- *    a fault scenario whose every fault OSCAR reported as its catalogue
- *    expects (`faultDetection.detect()`, the fault detection report's rule);
+ *  - **detected**: a wrong scenario whose latest finished run failed a check,
+ *    or, for the few OSCAR is meant to see as a WARNING only
+ *    (`WARNING_ONLY`), whose run gave that WARNING; a fault scenario whose
+ *    every fault OSCAR reported as its catalogue expects
+ *    (`faultDetection.detect()`, the fault detection report's rule);
  *  - **missed**: it ran, and that did not happen;
  *  - **not run**: no finished run.
  */
@@ -53,10 +55,32 @@ const firstFailure = (run) => {
   return check ? { step: check.request_name || null, check: String(check.assertion_name ?? '').slice(0, 300) } : { step: null, check: null };
 };
 
-// A wrong-answer scenario: detected when a check failed.
-function wrongEntry(scenario, run) {
-  const failed = Number(run.failed) > 0 || arr(run.checks).length > 0;
-  return { result: failed ? 'detected' : 'missed', ...(failed ? firstFailure(run) : { step: null, check: 'The run passed every check: OSCAR did not see the error.' }) };
+/**
+ * The wrong answers OSCAR is meant to see as a WARNING only, by code without
+ * its version suffix, each with the tag of the check that warns. The
+ * simulator's scenarios document says "no failed check" for exactly these:
+ * simulated-errors.test.js holds the two together.
+ */
+const WARNING_ONLY = Object.freeze({
+  SIM_WRONG_FARE_UNKNOWN_CLUSTER: '[fares O10]',
+  SIM_WRONG_FARE_WIDER_CLUSTERS: '[fares O11]',
+  SIM_WRONG_FARE_OVERLAP: '[fares O8]',
+  SIM_WRONG_FARE_FULFILLMENT_DOCUMENT: '[fares F2]',
+  SIM_WRONG_FARE_COMBINING_FEE: '[fares R3]',
+});
+const baseCode = (code) => String(code).replace(/_\d{2,3}$/, '');
+
+// A wrong-answer scenario: detected when a check failed, or when it is meant
+// to warn only and its run gave that warning.
+function wrongEntry(scenario, run, warnings) {
+  if (Number(run.failed) > 0 || arr(run.checks).length > 0) return { result: 'detected', ...firstFailure(run) };
+  const tag = Object.hasOwn(WARNING_ONLY, baseCode(scenario.code)) ? WARNING_ONLY[baseCode(scenario.code)] : null;
+  const line = tag ? arr(warnings).find((l) => typeof l === 'string' && l.includes(tag)) : undefined;
+  if (line) return { result: 'detected', step: null, check: line.slice(line.indexOf('[WARNING]')).slice(0, 300) };
+  const check = tag
+    ? `The run passed every check and gave no ${tag} warning: OSCAR did not see the error.`
+    : 'The run passed every check: OSCAR did not see the error.';
+  return { result: 'missed', step: null, check };
 }
 
 // A fault scenario: detected when every fault was reported as expected.
@@ -88,11 +112,11 @@ function simulatedErrorsOf(simulated, runs = {}, warnings = {}) {
     const run = runs?.[scenario.code];
     const base = { code: scenario.code, kind, description: typeof scenario.description === 'string' ? scenario.description : '' };
     if (!isObj(run)) return { ...base, result: 'not-run', faults: faults.map((code) => ({ code })), step: null, check: null, runId: null, at: null };
-    const seen = kind === 'fault' ? faultEntry(scenario, run, warnings?.[scenario.code]) : { ...wrongEntry(scenario, run), faults: [] };
+    const seen = kind === 'fault' ? faultEntry(scenario, run, warnings?.[scenario.code]) : { ...wrongEntry(scenario, run, warnings?.[scenario.code]), faults: [] };
     return { ...base, ...seen, runId: run.id ?? null, at: run.completed_at || run.queued_at || null };
   });
   const count = (r) => entries.filter((e) => e.result === r).length;
   return { summary: { total: entries.length, detected: count('detected'), missed: count('missed'), notRun: count('not-run') }, entries };
 }
 
-module.exports = { RESULTS, RESULT_TEXT, KIND_TEXT, splitSimulated, simulatedErrorsOf };
+module.exports = { RESULTS, RESULT_TEXT, KIND_TEXT, WARNING_ONLY, splitSimulated, simulatedErrorsOf };

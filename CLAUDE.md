@@ -999,6 +999,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`withBatchLabels()`, `runFilters.selectionLabel()`, null without a row
   or for one not read) and the dashboard draws it under the batch date
   (`batchLabelHtml()`, escaped). A filter keeping every value is not named.
+  **A wrong answer meant to warn only** (#1033, 1.11.434): five
+  `SIM_WRONG_FARE_` scenarios expect a WARNING and no failed check
+  (`WARNING_ONLY` in `simulatedErrors.js`, the tag of the check by code
+  without its version suffix); each is detected when its run gave that
+  warning. `simulated-errors.test.js` holds the table to the rows of *OSCAR -
+  OSDM Simulator scenarios* that say "no failed check": a new such scenario
+  goes in both.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that
