@@ -84,7 +84,18 @@ module.exports = {
       bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       apiKeyAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'oscar_<prefix>_<secret>', description: 'A read-only API key (#503), on the /v1/api routes only.' },
     },
-    schemas: { Error: errorSchema, User: userSchema, Run: runSchema },
+    schemas: { Error: errorSchema, User: userSchema, Run: runSchema, RunSelection: {
+        type: 'object',
+        description: 'What a batch runs (#1029). Every key is optional; a missing one takes its default.',
+        additionalProperties: false,
+        properties: {
+          base: { type: 'string', enum: ['all', 'list'], default: 'all', description: 'all = every scenario the caller sees; list = the run list' },
+          categories: { type: 'array', items: { type: 'string', enum: ['happy', 'refusal', 'simulated'] }, default: ['happy', 'refusal'], description: 'simulated = the simulator\'s deliberate errors (SIM_WRONG_, SIM_FAULT_); refusal = the expected refusals (NHF_ and refusal probes)' },
+          groups: { type: 'array', items: { type: 'string' }, description: 'groups of the main capability; default every group' },
+          forms: { type: 'array', items: { type: 'string', enum: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'] }, description: 'forms of the offer request; default every form' },
+          lastRun: { type: 'string', enum: ['all', 'toRunAgain', 'failed'], default: 'all', description: 'toRunAgain = never run, or older than the collection or the scenario; failed = the latest finished run failed a check' },
+        },
+      } },
   },
   tags: [
     { name: 'Auth',    description: 'Registration, login, JWT issuance' },
@@ -201,9 +212,9 @@ module.exports = {
         tags: ['Runs'],
         summary: 'Submit a new batch of runs (one per scenario, parallel)',
         security: [{ bearerAuth: [] }],
-        description: 'Reads scenarios from the company datafile and enqueues one run per scenario. Rate limited to 30 batches/hour/user.',
+        description: 'Reads scenarios from the company datafile and enqueues one run per scenario. Rate limited to 30 batches/hour/user. Without a selection, the run list runs (a tester\'s personal list, else the company\'s). With one (#1029), the base (every scenario the caller sees, or the run list) cut by its filters: AND between filters, OR within one.',
         requestBody: { content: { 'application/json': { schema: {
-          type: 'object', properties: { parallel: { type: 'boolean', default: true } },
+          type: 'object', properties: { parallel: { type: 'boolean', default: true }, selection: { $ref: '#/components/schemas/RunSelection' } },
         } } } },
         responses: {
           202: { description: 'Batch accepted', content: { 'application/json': { schema: {
@@ -216,6 +227,34 @@ module.exports = {
             },
           } } } },
           400: { description: 'Company config invalid (no datafile, missing creds, etc.)' },
+          403: { description: 'certification_user cannot start runs' },
+          429: { description: 'Rate limit exceeded' },
+        },
+      },
+    },
+    '/v1/runs/preview': {
+      post: {
+        tags: ['Runs'],
+        summary: 'What a selection would run, before the launch (#1029)',
+        security: [{ bearerAuth: [] }],
+        description: 'Counts, for the base of the selection, what each value of each filter holds, and how many scenarios the selection keeps. Nothing is written. Rate limited to 60 a minute per user.',
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object', properties: { selection: { $ref: '#/components/schemas/RunSelection' } },
+        } } } },
+        responses: {
+          200: { description: 'The preview', content: { 'application/json': { schema: {
+            type: 'object',
+            properties: {
+              selection: { $ref: '#/components/schemas/RunSelection' },
+              total: { type: 'integer', description: 'scenarios of the base' },
+              selected: { type: 'integer', description: 'scenarios the selection keeps' },
+              seen: { type: 'integer', description: 'scenarios the caller sees in the data file' },
+              runList: { type: 'integer', description: 'scenarios of the caller\'s run list' },
+              counts: { type: 'object', description: '{ categories, groups, forms, lastRun }: for each value, the scenarios of the base it holds' },
+              labels: { type: 'object', description: 'the words the page shows for each value' },
+            },
+          } } } },
+          400: { description: 'No data file, or a selection that is not one' },
           403: { description: 'certification_user cannot start runs' },
           429: { description: 'Rate limit exceeded' },
         },

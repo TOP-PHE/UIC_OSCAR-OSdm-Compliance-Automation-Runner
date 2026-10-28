@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.466",
+  "current_release": "2026.467",
   "releases": [
+    {
+      "release": "2026.467",
+      "date": "2026-10-28",
+      "server": "1.11.431",
+      "collection": "OTST_V2.0.234",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1029 PR 1: New Run chooses what a batch runs, from every scenario seen or the run list, by category (happy flows, expected refusals, simulated errors), capability group, offer request form and last run (to run again, failed); POST /v1/runs takes a selection, POST /v1/runs/preview counts it. Without a selection, the run list runs as before."
+      ]
+    },
     {
       "release": "2026.466",
       "date": "2026-10-28",

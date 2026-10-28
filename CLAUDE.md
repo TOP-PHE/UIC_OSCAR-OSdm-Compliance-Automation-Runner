@@ -968,6 +968,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   page with the page's own query (`listed.sql` + `listed.params`, so scope
   and hidden statuses cannot drift); rows may exceed `limit`. Any page that
   groups runs by batch asks for it.
+- **A batch is chosen at launch** (#1029, PR 1 = 1.11.431). `POST /v1/runs`
+  takes `selection: { base, categories, groups, forms, lastRun }`; without it
+  the run list runs, as before (every other caller, the API key's included).
+  `utils/runFilters.js` (pure) computes each scenario's facets, none tagged:
+  category `simulated` (`SIM_WRONG_` / `SIM_FAULT_`, or `simulatorFaults`),
+  `refusal` (`isRefusalTest()`), else `happy`; the group of the main
+  capability, read as `capabilityCoverage` reads it (a test compares them);
+  `offerRequestFormOf()`; the latest finished run (`api/helpers/
+  runCandidates.js`: failed = FAILED or a failed check; to run again = never,
+  older, or not known). The base `all` is what the person sees
+  (`visibleCodes()` for a tester), `list` the run list. `POST
+  /v1/runs/preview` counts with the same functions (its own limiter, nothing
+  written). The Run page draws what the preview answers (values and labels
+  are the server's, `run-selection-page.test.js` reads the drawing back)
+  and sends the selection; the button is ready once a data file exists,
+  whatever the run list holds.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

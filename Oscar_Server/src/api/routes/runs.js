@@ -10,7 +10,8 @@
 /**
  * runs.js — Run management routes
  *
- * POST /v1/runs                         — submit a new run
+ * POST /v1/runs                         — submit a new run (a selection chooses what, #1029)
+ * POST /v1/runs/preview                 — what a selection would run, before the launch (#1029)
  * GET  /v1/runs                         — list runs for authenticated company
  * POST /v1/runs/bulk-delete             — tester soft-delete (→ DELETION_REQUESTED)
  * POST /v1/runs/bulk-admin-action       — admin batch actions (soft_delete / confirm_delete / purge / restore)
@@ -47,6 +48,8 @@ const { resolveRunList, visibleCodes } = require('../../utils/datafileOwnership'
 const { getRunSelection } = require('../../utils/runSelections');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const runner = require('../../worker/runner');
+const RF = require('../../utils/runFilters');
+const { facetsFor } = require('../helpers/runCandidates');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
@@ -149,26 +152,100 @@ function inferRestoreStatus(run) {
   return 'CANCELLED';
 }
 
-// ── POST /v1/runs ─────────────────────────────────────────────────────────────
-router.post('/', runSubmitLimiter, (req, res) => {
-  if (req.user.role === 'certification_user') {
-    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot start runs.' });
-  }
+// ── What a batch runs ─────────────────────────────────────────────────────────
 
+// The run list, as before #1029: a tester's personal list, else the company's.
+function runListOf(req, datafile, companyId) {
+  const allCodes = (datafile.scenarios || []).map(s => s.code);
+  if (req.user.role === 'company_user') {
+    // v1.11.197: a tester runs their personal run list (what they ticked in Test
+    // Config), limited to scenarios they can see — their own and the shared
+    // ones. Until they tick anything, the Test Manager's company list is the
+    // default. Another tester's ticks never change this. See
+    // utils/runSelections.js and utils/datafileOwnership.js.
+    const personal = getRunSelection(companyId, req.user.id);
+    const fallback = datafile.scenariosToRun == null ? 'ALL' : datafile.scenariosToRun;
+    return resolveRunList(personal == null ? fallback : personal, visibleCodes(datafile, req.user.email));
+  }
+  if (Array.isArray(datafile.scenariosToRun)) return datafile.scenariosToRun.filter(c => allCodes.includes(c));
+  return allCodes;
+}
+
+// #1029: every scenario the person sees (a tester: their own and the shared ones).
+function seenCodes(req, datafile) {
+  if (req.user.role === 'company_user') return visibleCodes(datafile, req.user.email);
+  return (datafile.scenarios || []).map(s => s.code);
+}
+
+// #1029: the base a selection cuts: every scenario seen, or the run list.
+function selectionBase(req, datafile, companyId, selection) {
+  return selection.base === 'list' ? runListOf(req, datafile, companyId) : seenCodes(req, datafile);
+}
+
+// The codes of a launch: the run list without a selection, else what the
+// selection keeps of its base (#1029).
+function launchCodes(req, datafile, companyId) {
+  if (req.body?.selection === undefined) return runListOf(req, datafile, companyId);
+  const selection = RF.withDefaults(req.body.selection);
+  const base = selectionBase(req, datafile, companyId, selection);
+  return RF.selectCodes(facetsFor(companyId, datafile, base), selection);
+}
+
+// The company a launch or its preview is for: { company } or { refusal: [status, body] }.
+function launchCompany(req) {
+  if (req.user.role === 'certification_user') {
+    return { refusal: [403, { status: 403, title: 'Forbidden', detail: 'certification_user cannot start runs.' }] };
+  }
+  const selection = req.body?.selection;
+  const problem = selection === undefined ? null : RF.selectionProblem(selection);
+  if (problem) return { refusal: [400, { status: 400, title: 'Bad Request', detail: problem }] };
   // A platform role may name the company in the body; everyone else gets their own.
   const requestedCompanyId = isPlatformRole(req.user.role) ? req.body?.company_id : null;
   const targetCompanyId = requestedCompanyId || req.companyId;
-
   if (!targetCompanyId) {
-    return res.status(400).json({
-      status: 400,
-      title: 'Bad Request',
-      detail: 'company_id is required for platform users when creating runs.'
-    });
+    return { refusal: [400, { status: 400, title: 'Bad Request', detail: 'company_id is required for platform users when creating runs.' }] };
   }
-
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company) return res.status(404).json({ status: 404, title: 'Company not found.' });
+  if (!company) return { refusal: [404, { status: 404, title: 'Company not found.' }] };
+  return { company, targetCompanyId };
+}
+
+// ── POST /v1/runs/preview (#1029) ─────────────────────────────────────────────
+// What a selection would run, and what each value of each filter holds, before
+// the launch. Nothing is written.
+const runPreviewLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req, res) => req.user?.id || ipKeyGenerator(req, res),
+  message: { status: 429, title: 'Too Many Requests', detail: 'Rate limit: max 60 previews a minute.' }
+});
+
+router.post('/preview', runPreviewLimiter, (req, res) => {
+  const { company, targetCompanyId, refusal } = launchCompany(req);
+  if (refusal) return res.status(refusal[0]).json(refusal[1]);
+  if (!company.datafile_path || !fs.existsSync(company.datafile_path)) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No data file: set one up in Test Config.' });
+  }
+  let datafile;
+  try {
+    const { decryptFromFile } = require('../../utils/at-rest');
+    datafile = JSON.parse(decryptFromFile(company.datafile_path).toString('utf8'));
+  } catch (err) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Could not parse data file: ' + err.message });
+  }
+  const selection = RF.withDefaults(req.body?.selection);
+  const base = selectionBase(req, datafile, targetCompanyId, selection).filter(code => typeof code === 'string' && code !== '');
+  const preview = RF.previewOf(facetsFor(targetCompanyId, datafile, base), selection);
+  return res.json({ selection, ...preview, seen: seenCodes(req, datafile).length, runList: runListOf(req, datafile, targetCompanyId).length });
+});
+
+// ── POST /v1/runs ─────────────────────────────────────────────────────────────
+router.post('/', runSubmitLimiter, (req, res) => {
+  const launch = launchCompany(req);
+  if (launch.refusal) return res.status(launch.refusal[0]).json(launch.refusal[1]);
+  const { company, targetCompanyId } = launch;
 
   // Per-tester credentials, for the company the run targets (#540: per user
   // and company). The runner reads the same row when the job is dequeued;
@@ -234,34 +311,18 @@ router.post('/', runSubmitLimiter, (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Could not parse data file: ' + err.message });
   }
 
-  // Resolve scenariosToRun list
-  const allCodes = (datafile.scenarios || []).map(s => s.code);
-  let scenarioList;
-  if (req.user.role === 'company_user') {
-    // v1.11.197: a tester runs their personal run list (what they ticked in Test
-    // Config), limited to scenarios they can see — their own and the shared
-    // ones. Until they tick anything, the Test Manager's company list is the
-    // default. Another tester's ticks never change this. See
-    // utils/runSelections.js and utils/datafileOwnership.js.
-    const selection = getRunSelection(targetCompanyId, req.user.id);
-    const fallback = datafile.scenariosToRun == null ? 'ALL' : datafile.scenariosToRun;
-    scenarioList = resolveRunList(selection == null ? fallback : selection, visibleCodes(datafile, req.user.email));
-  } else if (datafile.scenariosToRun === 'ALL') {
-    scenarioList = allCodes;
-  } else if (Array.isArray(datafile.scenariosToRun)) {
-    scenarioList = datafile.scenariosToRun.filter(c => allCodes.includes(c));
-  } else {
-    scenarioList = allCodes;
-  }
-
-  // PR-03: a code is whatever JSON was stored, and only text can be a run's
-  // scenario. An object or a list cannot be written to the runs table: the
-  // insert threw and the whole batch answered 500, so one tester's scenario
-  // stopped the Test Manager's "ALL". Anything that is not text is left out.
-  scenarioList = scenarioList.filter(code => typeof code === 'string' && code !== '');
+  // The run list, or what the selection keeps (#1029). PR-03: a code is
+  // whatever JSON was stored, and only text can be a run's scenario. An object
+  // or a list cannot be written to the runs table: the insert threw and the
+  // whole batch answered 500, so one tester's scenario stopped the Test
+  // Manager's "ALL". Anything that is not text is left out.
+  const scenarioList = launchCodes(req, datafile, targetCompanyId).filter(code => typeof code === 'string' && code !== '');
 
   if (scenarioList.length === 0) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No scenarios to run. Check scenariosToRun in your data file.' });
+    const detail = req.body?.selection === undefined
+      ? 'No scenarios to run. Check scenariosToRun in your data file.'
+      : 'No scenario of the data file fits this selection.';
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail });
   }
 
   const batchId = uuidv4();
