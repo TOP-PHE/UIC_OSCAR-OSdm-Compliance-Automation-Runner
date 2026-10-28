@@ -278,7 +278,7 @@
     {
       "id": 1,
       "resource_type": "TRAIN",
-      "label": "Train 9001 0000001–0000002",
+      "label": "Train 1817 0000001–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000001",
         "destinationURN": "urn:uic:stn:0000002",
@@ -289,7 +289,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9001",
+            "vehicleNumber": "1817",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -304,7 +304,7 @@
     {
       "id": 2,
       "resource_type": "TRAIN",
-      "label": "Train 9002 0000003–0000001",
+      "label": "Train 4934 0000003–0000001",
       "data": {
         "originURN": "urn:uic:stn:0000003",
         "destinationURN": "urn:uic:stn:0000001",
@@ -315,7 +315,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9002",
+            "vehicleNumber": "4934",
             "departureTime": "14:30:00+01:00",
             "arrivalTime": "19:00:00+01:00"
           }
@@ -356,7 +356,7 @@
     {
       "id": 4,
       "resource_type": "TRAIN",
-      "label": "Train 9004 0000099–0000002",
+      "label": "Train 7813 0000099–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000099",
         "destinationURN": "urn:uic:stn:0000002",
@@ -367,7 +367,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9004",
+            "vehicleNumber": "7813",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -382,7 +382,7 @@
     {
       "id": 5,
       "resource_type": "TRAIN",
-      "label": "Train 9005 0000098–0000002",
+      "label": "Train 3851 0000098–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000098",
         "destinationURN": "urn:uic:stn:0000002",
@@ -393,7 +393,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9005",
+            "vehicleNumber": "3851",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -408,7 +408,7 @@
     {
       "id": 6,
       "resource_type": "TRAIN",
-      "label": "Train 9006 0000097–0000002",
+      "label": "Train 8239 0000097–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000097",
         "destinationURN": "urn:uic:stn:0000002",
@@ -419,7 +419,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9006",
+            "vehicleNumber": "8239",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -434,7 +434,7 @@
     {
       "id": 7,
       "resource_type": "TRAIN",
-      "label": "Train 9007 0000096–0000002",
+      "label": "Train 6800 0000096–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000096",
         "destinationURN": "urn:uic:stn:0000002",
@@ -445,7 +445,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9007",
+            "vehicleNumber": "6800",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -460,7 +460,7 @@
     {
       "id": 8,
       "resource_type": "TRAIN",
-      "label": "Train 9008 0000094–0000002",
+      "label": "Train 6872 0000094–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000094",
         "destinationURN": "urn:uic:stn:0000002",
@@ -471,7 +471,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9008",
+            "vehicleNumber": "6872",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -486,7 +486,7 @@
     {
       "id": 9,
       "resource_type": "TRAIN",
-      "label": "Train 9009 0000093–0000002",
+      "label": "Train 5991 0000093–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000093",
         "destinationURN": "urn:uic:stn:0000002",
@@ -497,7 +497,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9009",
+            "vehicleNumber": "5991",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -538,7 +538,7 @@
     {
       "id": 11,
       "resource_type": "TRAIN",
-      "label": "Train 9011 0000090–0000002",
+      "label": "Train 3733 0000090–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000090",
         "destinationURN": "urn:uic:stn:0000002",
@@ -549,7 +549,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9011",
+            "vehicleNumber": "3733",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }
@@ -564,7 +564,7 @@
     {
       "id": 12,
       "resource_type": "TRAIN",
-      "label": "Train 9012 0000078–0000002",
+      "label": "Train 6200 0000078–0000002",
       "data": {
         "originURN": "urn:uic:stn:0000078",
         "destinationURN": "urn:uic:stn:0000002",
@@ -575,7 +575,7 @@
         "daysOfWeek": [],
         "services": [
           {
-            "vehicleNumber": "9012",
+            "vehicleNumber": "6200",
             "departureTime": "08:00:00+01:00",
             "arrivalTime": "12:00:00+01:00"
           }

@@ -509,19 +509,31 @@ function trainServicesFor(trip, trains) {
 }
 
 /**
+ * The journeys of the Test Data a trip of `legs` legs may go on: those of as
+ * many legs, those of the trip's own route first (#1027: from its first stop
+ * place to its last; on the simulator a two-leg journey from 0000095 gives a
+ * ticket per leg, and a partial refund by leg needs it).
+ */
+function journeysFor(trip, journeys, legs) {
+  const fit = arr(journeys).filter((j) => j.legs === legs);
+  return [...fit.filter((j) => sameRoute(j, trip)), ...fit.filter((j) => !sameRoute(j, trip))];
+}
+
+/**
  * The train or journey of the Test Data to propose for a trip of the copy, as
  * the copy page writes it ("train::<id>::<service>" or "journey::<id>"), or
  * null when the Test Data has nothing that fits. `trip` is one of planCopy's
  * trips (`legs`, `needsJourney`, `tripType`, `origin`, `destination`);
  * `testData` the route's testDataChoices. A one-leg trip goes on a train of
  * its own route when there is one (#1019), a trip specification only on a
- * service naming its number and operator code.
+ * service naming its number and operator code; a trip of several legs on a
+ * journey of as many, of its own route first (#1027).
  */
 function suggestTrip(trip, testData) {
   const legs = Number(trip?.legs) || 1;
   const journeys = arr(testData?.journeys);
   if (trip?.needsJourney || legs > 1) {
-    const same = journeys.find((j) => j.legs === legs);
+    const same = journeysFor(trip, journeys, legs)[0];
     return same ? `journey::${same.id}` : null;
   }
   const trains = arr(testData?.trains);
@@ -542,7 +554,7 @@ function otherRouteFor(trip, testData, avoid) {
   const legs = Number(trip?.legs) || 1;
   if (trip?.needsJourney || legs > 1) {
     const taken = new Set(avoid.filter((s) => s.startsWith('journey::')).map((s) => s.split('::')[1]));
-    const other = arr(testData?.journeys).find((j) => j.legs === legs && !taken.has(String(j.id)));
+    const other = journeysFor(trip, testData?.journeys, legs).find((j) => !taken.has(String(j.id)));
     return other ? `journey::${other.id}` : null;
   }
   const trains = arr(testData?.trains);

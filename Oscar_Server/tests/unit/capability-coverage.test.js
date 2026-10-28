@@ -263,7 +263,43 @@ describe('expected refusals are rows of their own (R4)', () => {
     const r = report(scenarios, runs);
     expect(r.expectedRefusals).toMatchObject([{ key: 'NHF_REFUND_TWICE', capability: 'refund.full', result: 'not-refused', forms: [{ step: '14. GET Booking after Patch Refund' }] }]);
     expect(row(r, 'refund.full')).toMatchObject({ result: 'passed', tests: [], provenBy: { count: 1, codes: ['NHF_REFUND_TWICE'] } });
-    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, deviation: 0, notRefused: 1, notRun: 0 });
+    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, deviation: 0, notRefused: 1, blocked: 0, notRun: 0 });
+  });
+});
+
+// #1027: a refusal's trip-id form found no trip to ask offers for. The
+// provider was never asked, and the refusal read "not refused".
+describe('a refusal stopped before it asked is blocked, not "not refused"', () => {
+  const twice = (code, extra = {}) => ({ code, scenarioType: 'REFUND', scenarioAction: 'PATCH', refundAgainProbe: 'on', tripRequirementId: 1, passengersListId: 1, ...extra });
+  const NO_TRIP = 'Trips collection: a trip to ask offers for — none';
+  const blockedRun = () => run([...SALE, ...REFUND], { stopAt: '01. POST Get Offer', failures: { '01. POST Get Offer': fail(NO_TRIP) } });
+  const notRefusedRun = () => run([...SALE, ...REFUND], {
+    failures: { '14. GET Booking after Patch Refund': fail('🧪 Refund again [1 refunded fulfillment(s)]: provider rejects with a client error (4xx)') },
+  });
+
+  test('a form whose failures are all missing prerequisites reads blocked, with its point; the forms that asked give the result', () => {
+    const scenarios = [twice('NHF_REFUND_TWICE'), twice('NHF_REFUND_TWICE_TRIPID', { offersByTripIds: 'on' })];
+    const r = report(scenarios, { NHF_REFUND_TWICE: run([...SALE, ...REFUND]), NHF_REFUND_TWICE_TRIPID: blockedRun() });
+    const [refusal] = r.expectedRefusals;
+    expect(refusal.result).toBe('refused');
+    const form = refusal.forms.find((x) => x.code === 'NHF_REFUND_TWICE_TRIPID');
+    expect(form).toMatchObject({ result: 'blocked', step: '01. POST Get Offer', check: NO_TRIP });
+    expect(Number.isInteger(form.point)).toBe(true);
+    expect(refusal.points).toContain(form.point);
+    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 1, deviation: 0, notRefused: 0, blocked: 0, notRun: 0 });
+  });
+
+  test('blocked when every form run stopped before it asked', () => {
+    const r = report([twice('NHF_REFUND_TWICE_TRIPID', { offersByTripIds: 'on' })], { NHF_REFUND_TWICE_TRIPID: blockedRun() });
+    expect(r.expectedRefusals[0].result).toBe('blocked');
+    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, deviation: 0, notRefused: 0, blocked: 1, notRun: 0 });
+  });
+
+  test('still not refused when a form asked and was not refused, or failed another check with the prerequisite', () => {
+    const scenarios = [twice('NHF_REFUND_TWICE'), twice('NHF_REFUND_TWICE_TRIPID', { offersByTripIds: 'on' })];
+    expect(report(scenarios, { NHF_REFUND_TWICE: notRefusedRun(), NHF_REFUND_TWICE_TRIPID: blockedRun() }).expectedRefusals[0].result).toBe('not-refused');
+    const both = run([...SALE, ...REFUND], { stopAt: '01. POST Get Offer', failures: { '01. POST Get Offer': [...fail(NO_TRIP), ...fail('The offers keep to the departure date asked')] } });
+    expect(report([twice('NHF_REFUND_TWICE')], { NHF_REFUND_TWICE: both }).expectedRefusals[0].forms[0].result).toBe('not-refused');
   });
 });
 
@@ -524,7 +560,7 @@ describe('an accepted deviation reads "Passed with deviation" (decision 3)', () 
     const accepted = { id: 'f5', title: 'Second refund accepted', step: '14. GET Booking after Patch Refund', category: 'provider_deviation', status: 'resolved', observed: checkText(check) };
     const r = report(scenarios, runs, { findings: [accepted] });
     expect(r.expectedRefusals[0]).toMatchObject({ result: 'deviation', forms: [{ result: 'deviation' }], points: [1] });
-    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, deviation: 1, notRefused: 0, notRun: 0 });
+    expect(r.summary.expectedRefusals).toEqual({ total: 1, refused: 0, deviation: 1, notRefused: 0, blocked: 0, notRun: 0 });
   });
 
   test('combine: an accepted deviation is a pass that says so', () => {

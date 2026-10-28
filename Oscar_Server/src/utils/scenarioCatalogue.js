@@ -228,6 +228,16 @@ function minimumVersionOf(requirements) {
   return versions[0] || null;
 }
 
+// The OSDM version a scenario's own request needs, or null: a COMBINED return
+// names the outbound trip (3.7); a named compartment needs
+// PlaceSelection.compartments (3.8, #1027: copied to a 3.6 or 3.7 provider,
+// the booking request did not conform). As `reasonNotPossible()` of the
+// simulator's version copies (`version-copies-lib.js`) rules it.
+function requestVersionOf(scenario, model) {
+  if (scenario.namedPlaceKind === 'COMPARTMENT') return '3.8';
+  return model === 'COMBINED' ? '3.7' : null;
+}
+
 /** What a reference scenario needs the Test Framework to declare. */
 function requirementsOf(scenario, datafile) {
   const list = arr(datafile.passengersList).find((l) => isObj(l) && l.id === scenario.passengersListId);
@@ -237,7 +247,7 @@ function requirementsOf(scenario, datafile) {
     salesFlows: salesFlowsOf(scenario),
     partialRefundScopes: partialRefundScopesOf(scenario),
     returnModel: model,
-    minOsdmVersion: model === 'COMBINED' ? '3.7' : null,
+    minOsdmVersion: requestVersionOf(scenario, model),
     passengerTypes: types,
     offerRequest: offerRequestOf(scenario, datafile),
     placeSelectionFlow: placeSelectionFlowOf(scenario),

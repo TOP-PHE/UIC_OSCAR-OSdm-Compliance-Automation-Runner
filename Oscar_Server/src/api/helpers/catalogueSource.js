@@ -66,9 +66,11 @@ function testDataChoices(resources) {
       services: d.services.map((s, index) => ({ index, vehicleNumber: s.vehicleNumber, departureTime: s.departureTime, arrivalTime: s.arrivalTime })),
     };
   });
-  const journeys = resources.filter(r => r.resource_type === 'JOURNEY').map(r => ({
-    id: r.id, label: r.label, legs: TripApply.journeyToTripLegs(r, resources).length,
-  }));
+  // #1027: a journey's ends, so that a trip of several legs goes on its own route first.
+  const journeys = resources.filter(r => r.resource_type === 'JOURNEY').map(r => {
+    const legs = TripApply.journeyToTripLegs(r, resources);
+    return { id: r.id, label: r.label, legs: legs.length, origin: legs[0]?.origin || '', destination: legs.at(-1)?.destination || '' };
+  });
   return { trains, journeys };
 }
 

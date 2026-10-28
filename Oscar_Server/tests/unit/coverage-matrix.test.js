@@ -174,6 +174,8 @@ describe('the Excel workbook', () => {
     const byCapability = capabilityCoverageOf({ framework: { salesFlows: ['SALE'] }, datafile: df, runs: { A: failed('A'), NHF_A: failed('NHF_A') } });
     const buf = coverageWorkbook({ days: 30, summary: {}, byCapability }, {});
     expect(sheet(buf, 1)).toContain('Passed with points');
+    // #1027: the refusals blocked before the request to refuse have their row.
+    expect(sheet(buf, 1)).toContain('Blocked before the request to refuse');
     const caps = sheet(buf, 2);
     expect(caps).toContain('Sale: pre-booking and confirmation');
     expect(caps).toContain('A: Passed with points\n  A (SEARCH): Passed with points at 02. POST Create Booking — Booking price is &lt;12.50&gt;');

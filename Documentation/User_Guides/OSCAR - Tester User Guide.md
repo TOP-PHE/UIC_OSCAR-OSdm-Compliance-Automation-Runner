@@ -1467,10 +1467,14 @@ Two kinds of run block nothing:
   it stopped after: its log says why.
 
 **Expected refusals** (the `NHF_` scenarios and the refusal probes) are listed
-apart: refused as expected, not refused, or not run. They never change the
-result of the capability they probe. Each one counts its forms by result,
+apart: refused as expected, not refused, blocked, or not run. They never change
+the result of the capability they probe. Each one counts its forms by result,
 says at which step the forms not refused went through (one line per step),
 and keeps every form under *Forms*; what failed is in the row's point.
+A form whose only failures are missing prerequisites (no trip to ask offers
+for, no offer) is *Blocked*: it stopped before it asked what should be
+refused, so the provider was never asked. The refusal's result comes from
+the forms that did ask; it is *Blocked* only when every form run was.
 
 **Optional parameters of the offer request.** When the offer request options
 scenario (`OTST_OFFER_OPTION_DISCOVERY`) has run, the report states each of

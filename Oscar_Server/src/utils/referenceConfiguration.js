@@ -292,8 +292,17 @@ function testResourcesFromDatafile(datafile) {
   return [...trains, ...journeys.map((j, i) => ({ id: trains.length + i + 1, ...j }))];
 }
 
-// #1019: a number above any the simulator's data file names.
-const SPARE_NUMBER = 9000;
+/**
+ * The number of the train the simulator runs from `origin` to `destination`
+ * at the time a search asks (#1027): as `tripFromSearch()` in
+ * `OSDM_Simulator/src/osdm/offers.js` gives it, pinned to it by a test. Two
+ * bytes of sha256("<origin>|<destination>") make it, so it is the same at
+ * every time and on every provider.
+ */
+function simulatorTrainNumber(origin, destination) {
+  const seed = crypto.createHash('sha256').update(`${origin}|${destination}`, 'utf8').digest();
+  return String(1000 + (seed.readUInt16BE(2) % 9000));
+}
 
 /**
  * The trains of a reference, each able to carry a trip specification (#1019):
@@ -301,14 +310,17 @@ const SPARE_NUMBER = 9000;
  * sent in that form takes both from the train it goes on. Every train names
  * the provider's own carrier (#1021: the data file's specification legs name
  * gamma's in every version, and a copy asked zeta for a train of gamma's). A
- * train of a search trip, which names no number, gets one of its own (9000 +
- * the train's id); one naming a number keeps it. Journeys are left as they are.
+ * train of a search trip, which names no number, gets the one the simulator
+ * runs on its route at the time asked (#1027: a number of OSCAR's own, 9000 +
+ * the train's id, was in no answer, and every copy asked by trip id failed
+ * "no trip of the answer runs train 9001"); one naming a number keeps it.
+ * Journeys are left as they are.
  */
 function namedTrains(resources, carrier) {
   return resources.map((r) => {
     if (r.resource_type !== 'TRAIN') return r;
-    const id = r.id;
-    const services = r.data.services.map((s) => (s.vehicleNumber ? s : { ...s, vehicleNumber: String(SPARE_NUMBER + id) }));
+    const number = simulatorTrainNumber(r.data.originURN, r.data.destinationURN);
+    const services = r.data.services.map((s) => (s.vehicleNumber ? s : { ...s, vehicleNumber: number }));
     const data = { ...r.data, operatorCode: carrier || r.data.operatorCode || '', services };
     const numbered = services.length > 0 && !r.data.services[0].vehicleNumber;
     const route = `${stationOf(data.originURN)}–${stationOf(data.destinationURN)}`;
@@ -444,6 +456,6 @@ function configurationOf(reference, datafile, { version, at } = {}) {
 
 module.exports = {
   REFERENCE_KEY, REFERENCE_FORMAT, PROVIDERS, DATAFILE_NAME, IROPS_MANDATORY, ANCILLARY_TYPES,
-  referenceName, defaultFramework, frameworkFromChecklist, questionsOf, testResourcesFromDatafile, namedTrains, providerPartOf, runListFor,
+  referenceName, defaultFramework, frameworkFromChecklist, questionsOf, testResourcesFromDatafile, namedTrains, simulatorTrainNumber, providerPartOf, runListFor,
   buildReference, versionOf, configurationOf,
 };

@@ -72,7 +72,7 @@ function capabilitySummaryRows(report) {
     ['  Passed with points', s.points ?? 0], ['  Blocked', s.blocked ?? 0], ['  Not supported by the provider', s.notSupported ?? 0],
     ['Capabilities declared and not tested', s.notTested ?? 0], ['Capabilities out of scope', s.outOfScope ?? 0],
     ['Expected refusals', r.total ?? 0], ['  Refused as expected', r.refused ?? 0], ['  Not refused, accepted deviation', r.deviation ?? 0],
-    ['  Not refused', r.notRefused ?? 0], ['  Not run', r.notRun ?? 0],
+    ['  Not refused', r.notRefused ?? 0], ['  Blocked before the request to refuse', r.blocked ?? 0], ['  Not run', r.notRun ?? 0],
     ['Points to look at', (p.total ?? 0) + (p.truncated ? ' (the first 500 only)' : '')], ['  For the provider', p.provider ?? 0],
     ['  Accepted deviations', p.accepted ?? 0], ['  Not supported by the provider', p.unsupported ?? 0],
     ['  Questions on the specification', p.questions ?? 0], ["  OSCAR's own", p.oscar ?? 0],
