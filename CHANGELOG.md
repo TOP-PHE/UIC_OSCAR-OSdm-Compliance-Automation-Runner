@@ -93,6 +93,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.233] — 2026-10-28
+
+Issue #1022, release 2026.464. Collection data, the simulator's copy script and tests; server unchanged (1.11.428), simulator unchanged. The data file half of #1021.
+
+### Fixed
+- **A version copy asked for gamma's train.** The simulator data file's trips are shared by every OSDM version, and every trip specification leg named gamma's carrier (`operatorCode: urn:x_osdm_simulator:carrier:gamma`). So the copies of the `_38` scenarios (`_36` alpha, `_37` beta, `_39` delta, `_310` epsilon, `_312` zeta) asked their provider for a train of gamma's carrier. The simulator answers with its own carrier whatever is asked, so no check failed; since 1.11.428 / OTST_V2.0.232 (#1021) step 01 warned about it on those copies, and that warning is now gone.
+- **Each provider has its copy of a trip naming a carrier** (`tripCopyOf()` in `OSDM_Simulator/scripts/version-copies-lib.js`), naming its own carrier (`carrier.ref` of its profile) where gamma's trip names gamma's. Its id is the version's suffix, then the trip's id on two digits: trip 4 is 3604 for alpha, 3704 beta, 3904 delta, 31004 epsilon, 31204 zeta. A scenario copy goes on it, an exchange's trip included. 83 trip copies: 17 trips for delta, epsilon and zeta, 16 for alpha and beta (trip 33 carries only fare reservations, which have no copy below 3.8). Search trips name no carrier and stay shared.
+- **`scripts/version-copies.js` keeps the copies in step** (`syncedText()`): it adds what is missing, and rewrites or removes a copy's block of text whose source changed, each scenario copy keeping its own description. Before, it only appended, so a changed gamma scenario or trip never reached its copies. The rest of the file is never re-dumped.
+- **Other gamma values a copy keeps:** none that is compared. The data file names no card issuer (the collection takes it from the provider at step 06), and its products, cards, overrule codes and product categories are the same in every profile (#824). The copies' descriptions still say "gamma" where they explain what the simulator does (218 scenario copies); every provider does it alike. The trip copies' descriptions name their own provider.
+- The five non-gamma simulator references are regenerated. Their trains already named their provider's carrier (`namedTrains()`, #1021); now the trips behind them do too, and their Test Data is in another order (the trip copies come after the search trips; journeys are named after them, "Trip 3904"). Their companies read "not up to date" until updated. Gamma's reference is unchanged.
+- CLAUDE.md, *OSCAR - OSDM Simulator scenarios*, the simulator README.
+
+### Tests
+- `OSDM_Simulator/tests/datafile.test.js`: every leg a scenario rides names its own provider's carrier (more than 200 legs checked); the trip copies are exactly those the scenario copies go on; the script has nothing left to do. Its other tests read gamma's trips only (`isGeneratedTrip`). Run against `main`'s data file, the new tests fail.
+- `provider-declarations.test.js`: each specification trip names the carrier of the one provider whose scenarios use it.
+- `reference-configuration.test.js`: the page's `trainFromTrip()` is compared provider by provider, as a reference is made (`trainKey()` does not tell a trip from its copies by carrier), and every trip is checked.
+- Checked with `carrierDifferences()` (`specifiedCarriers.js`): in each provider's part of the data file, no specification leg differs from the provider's own carrier.
+
+---
+
 ## [server-1.11.428] / [collection-OTST_V2.0.232] — 2026-10-27
 
 Issue #1021, release 2026.463. Each simulator reference's trains name their own provider's carrier; a provider answering another carrier than the one asked is warned.

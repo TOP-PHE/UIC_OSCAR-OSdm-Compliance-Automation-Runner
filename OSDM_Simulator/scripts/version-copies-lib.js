@@ -15,10 +15,12 @@
  * A copy is the `_38` scenario with its code, `osdmVersion` and description
  * changed, and gamma's currencies replaced by its provider's (CZK → its own,
  * EUR → its second one): the four providers have the same functions (#824),
- * so the same scenario tests the same thing on each. `NOT_POSSIBLE` lists,
- * per version, the scenarios left out and why; `tests/datafile.test.js`
- * holds the data file to it, and `scripts/version-copies.js` appends the
- * copies that are missing.
+ * so the same scenario tests the same thing on each. A trip naming gamma's
+ * carrier (a trip specification's `operatorCode`) has a copy per provider
+ * naming that provider's carrier, and a scenario's copy goes on its
+ * provider's (#1022). `NOT_POSSIBLE` lists, per version, the scenarios left
+ * out and why; `tests/datafile.test.js` holds the data file to it, and
+ * `scripts/version-copies.js` brings the copies up to date.
  */
 
 const SOURCE_VERSION = '3.8.0';
@@ -58,6 +60,49 @@ function withCurrencies(value, from, to) {
   }));
 }
 
+// #1022: a provider's carrier, from its profile. A trip specification leg
+// names the carrier whose train it asks for, so a copy names its provider's.
+const carrierOf = (provider) => require(`../providers/${provider}.json`).carrier.ref;
+
+// `value` with every text equal to `from` replaced by `to`, at any depth.
+function withText(value, from, to) {
+  if (value === from) return to;
+  if (Array.isArray(value)) return value.map((v) => withText(v, from, to));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withText(v, from, to)]));
+}
+
+const namesText = (value, text) => JSON.stringify(withText(value, text, null)) !== JSON.stringify(value);
+
+// The ids of the trips that name gamma's carrier: those a copy cannot share.
+const carrierTripIds = (trips) => new Set((Array.isArray(trips) ? trips : [])
+  .filter((t) => namesText(t, carrierOf('gamma'))).map((t) => t.id));
+
+// The id of a trip's copy for `version`: the version's suffix, then the
+// trip's id on two digits (trip 4 is 3604 for 3.6, 31204 for 3.12). Gamma's
+// trips stay under 100, so no copy meets one of them or another copy.
+function tripIdFor(id, version) {
+  if (!Number.isInteger(id) || id < 1 || id > 99) throw new Error(`Trip ${id}: a trip naming gamma's carrier needs an id from 1 to 99 to be copied.`);
+  return Number(`${VERSIONS[version].suffix}${String(id).padStart(2, '0')}`);
+}
+
+/** The trip `trip` (one naming gamma's carrier) for the provider of `version`. */
+function tripCopyOf(trip, version) {
+  const { provider } = VERSIONS[version];
+  const adapted = withText(trip, carrierOf('gamma'), carrierOf(provider));
+  // "where gamma offers seat preferences": every provider does (#824).
+  const own = String(trip.description || '').trim().replaceAll(/\bgamma\b/g, provider);
+  const sentence = own === '' || own.endsWith('.') ? own : `${own}.`;
+  const description = `${sentence} On ${provider}'s carrier (a copy of trip ${trip.id}, #1022).`.trim();
+  return { ...adapted, id: tripIdFor(trip.id, version), description };
+}
+
+// The trip slots of a scenario: its own and its exchange's (#959).
+const TRIP_SLOTS = Object.freeze([
+  { get: (s) => s?.tripRequirementId, set: (s, v) => ({ ...s, tripRequirementId: v }) },
+  { get: (s) => s?.exchange?.tripRequirementId, set: (s, v) => ({ ...s, exchange: { ...s.exchange, tripRequirementId: v } }) },
+]);
+
 const NO_COMBINED_RETURN = 'OSDM 3.6 has no return in one offer (outboundTripIds and inboundDate come with 3.7).';
 const NO_PRODUCT_SELECTIONS = 'OSDM 3.6 has no OfferSearchCriteria.productSelections (3.7).';
 const NO_COMPARTMENT_SELECTION = 'OSDM before 3.8 has no PlaceSelection.compartments: a compartment cannot be named.';
@@ -93,17 +138,48 @@ const NOT_POSSIBLE = Object.freeze({
 // `_38` and `_310` (#920): the version's major and minor.
 const baseOf = (code) => String(code).replace(/_\d{2,3}$/, '');
 
-/** The scenario `source` (a `_38` one) for `version`, or null when not possible. */
-function copyOf(source, version) {
+/**
+ * The scenario `source` (a `_38` one) for `version`, or null when not
+ * possible. `trips` is the data file's `tripRequirements`: a copy goes on its
+ * provider's copy of a trip that names gamma's carrier (#1022).
+ */
+function copyOf(source, version, trips) {
   const target = VERSIONS[version];
   if (!target || source?.osdmVersion !== SOURCE_VERSION) return null;
+  if (!Array.isArray(trips)) throw new TypeError('copyOf() needs the data file\'s tripRequirements.');
   if (reasonNotPossible(source, version)) return null;
   const code = `${baseOf(source.code)}_${target.suffix}`;
   const tail = `OSDM ${version}, for ${target.provider} (a copy of ${source.code}, #914).`;
   const description = String(source.description || '');
   const replaced = description.replace(/OSDM 3\.8\.0, for gamma\.\s*$/, tail);
-  const adapted = withCurrencies(source, currenciesOf('gamma'), currenciesOf(target.provider));
+  const ownTrips = carrierTripIds(trips);
+  let adapted = withText(withCurrencies(source, currenciesOf('gamma'), currenciesOf(target.provider)), carrierOf('gamma'), carrierOf(target.provider));
+  for (const slot of TRIP_SLOTS) {
+    const id = slot.get(adapted);
+    if (ownTrips.has(id)) adapted = slot.set(adapted, tripIdFor(id, version));
+  }
   return { ...adapted, code, osdmVersion: version, description: replaced === description ? `${description} ${tail}`.trim() : replaced };
+}
+
+/**
+ * The trip copies the data file should hold, by id: each provider's copy of
+ * every trip naming gamma's carrier that one of its scenario copies goes on,
+ * in the order of the versions, then of the trips.
+ */
+function tripCopies(datafile) {
+  const scenarios = Array.isArray(datafile?.scenarios) ? datafile.scenarios : [];
+  const trips = Array.isArray(datafile?.tripRequirements) ? datafile.tripRequirements : [];
+  const ownTrips = carrierTripIds(trips);
+  const out = new Map();
+  for (const version of Object.keys(VERSIONS)) {
+    const named = new Set();
+    for (const source of scenarios) {
+      if (source?.osdmVersion !== SOURCE_VERSION || reasonNotPossible(source, version)) continue;
+      for (const slot of TRIP_SLOTS) if (ownTrips.has(slot.get(source))) named.add(slot.get(source));
+    }
+    for (const trip of trips) if (named.has(trip.id)) out.set(tripIdFor(trip.id, version), tripCopyOf(trip, version));
+  }
+  return out;
 }
 
 /** The copies the data file should hold and does not, in the order of their sources. */
@@ -113,7 +189,7 @@ function missingCopies(datafile) {
   const out = [];
   for (const version of Object.keys(VERSIONS)) {
     for (const source of scenarios) {
-      const copy = copyOf(source, version);
+      const copy = copyOf(source, version, datafile.tripRequirements);
       if (copy && !codes.has(copy.code)) out.push(copy);
     }
   }
@@ -139,17 +215,86 @@ function layout(value, indent) {
   return JSON.stringify(value);
 }
 
-/**
- * The data file's text with `copies` appended at the end of its scenarios,
- * the rest of the text untouched.
- */
-function appendScenarios(text, copies) {
-  if (copies.length === 0) return text;
-  const start = text.indexOf('\n  "scenarios": [');
-  const end = text.indexOf('\n  ],', start);
-  if (start < 0 || end < 0) throw new Error('The data file has no scenarios array where expected.');
-  const blocks = copies.map((c) => `    ${layout(c, 4)}`).join(',\n');
-  return `${text.slice(0, end)},\n${blocks}${text.slice(end)}`;
+// An entry of a root list as the data file writes it.
+const blockOf = (value) => `    ${layout(value, 4)}`;
+
+/** The text with `values` appended at the end of the root list `key`, the rest untouched. */
+function appendTo(text, key, values) {
+  if (values.length === 0) return text;
+  const start = text.indexOf(`\n  ${JSON.stringify(key)}: [`);
+  const end = start < 0 ? -1 : text.indexOf('\n  ]', start);
+  if (start < 0 || end < 0) throw new Error(`The data file has no ${key} list where expected.`);
+  return `${text.slice(0, end)},\n${values.map(blockOf).join(',\n')}${text.slice(end)}`;
 }
 
-module.exports = { SOURCE_VERSION, VERSIONS, NOT_POSSIBLE, reasonNotPossible, baseOf, copyOf, missingCopies, layout, appendScenarios };
+// Where the entry `value` is written in the text: once, laid out as the
+// script writes it, else the copy was edited by hand and is left to a person.
+function placeOf(text, value) {
+  const block = blockOf(value);
+  const at = text.indexOf(block);
+  if (at < 0 || text.indexOf(block, at + 1) >= 0) throw new Error(`Entry ${value.code || value.id} is not written once as the script writes it: change it by hand.`);
+  return { at, length: block.length };
+}
+
+function replaceEntry(text, before, after) {
+  const { at, length } = placeOf(text, before);
+  return `${text.slice(0, at)}${blockOf(after)}${text.slice(at + length)}`;
+}
+
+function removeEntry(text, value) {
+  const { at, length } = placeOf(text, value);
+  if (text.slice(at - 2, at) !== ',\n') throw new Error(`Entry ${value.code || value.id} is the first of its list: remove it by hand.`);
+  return `${text.slice(0, at - 2)}${text.slice(at + length)}`;
+}
+
+// A trip id tripIdFor() gives: a version's suffix, then two digits.
+const isTripCopyId = (id) => Number.isInteger(id) && id >= 100
+  && Object.values(VERSIONS).some(({ suffix }) => String(id).length === suffix.length + 2 && String(id).startsWith(suffix));
+
+/**
+ * The data file's text with its copies up to date (#914, #1022): trip copies
+ * added, changed or removed, scenario copies changed (each keeps its own
+ * description) or added. Only those entries are written; the rest of the text
+ * is left as it is. Returns the text and what changed.
+ */
+function syncedText(text) {
+  const done = { tripsAdded: 0, tripsChanged: 0, tripsRemoved: 0, added: 0, changed: 0 };
+  let out = text;
+  let datafile = JSON.parse(out);
+  const wanted = tripCopies(datafile);
+  for (const trip of datafile.tripRequirements) {
+    if (!isTripCopyId(trip?.id)) continue;
+    const want = wanted.get(trip.id);
+    if (!want) {
+      out = removeEntry(out, trip);
+      done.tripsRemoved += 1;
+    } else if (JSON.stringify(want) !== JSON.stringify(trip)) {
+      out = replaceEntry(out, trip, want);
+      done.tripsChanged += 1;
+    }
+  }
+  const held = new Set(datafile.tripRequirements.map((t) => t?.id));
+  const newTrips = [...wanted.values()].filter((t) => !held.has(t.id));
+  out = appendTo(out, 'tripRequirements', newTrips);
+  done.tripsAdded = newTrips.length;
+
+  datafile = JSON.parse(out);
+  const sources = new Map(datafile.scenarios.filter((s) => s?.osdmVersion === SOURCE_VERSION).map((s) => [baseOf(s.code), s]));
+  for (const scenario of datafile.scenarios) {
+    const source = scenario?.osdmVersion === SOURCE_VERSION ? null : sources.get(baseOf(scenario?.code));
+    const copy = source ? copyOf(source, scenario.osdmVersion, datafile.tripRequirements) : null;
+    if (!copy) continue;
+    const want = { ...copy, description: scenario.description };
+    if (JSON.stringify(want) !== JSON.stringify(scenario)) { out = replaceEntry(out, scenario, want); done.changed += 1; }
+  }
+  const missing = missingCopies(datafile);
+  out = appendTo(out, 'scenarios', missing);
+  done.added = missing.length;
+  JSON.parse(out);
+  return { text: out, done };
+}
+
+module.exports = {
+  SOURCE_VERSION, VERSIONS, NOT_POSSIBLE, reasonNotPossible, baseOf, copyOf, missingCopies, layout,
+  carrierOf, tripIdFor, tripCopyOf, tripCopies, isTripCopyId, syncedText,
+};

@@ -91,9 +91,23 @@ describe('#809 a trip specification names its carrier, or says why it cannot', (
       expect(carrierChecks(checks)).toEqual([]);
     });
 
-  test('every specification trip of the simulator names its carrier', () => {
-    for (const trip of simulatorFile().tripRequirements.filter((t) => t.tripType === 'SPECIFICATION')) {
-      for (const leg of trip.legs) expect(leg.operatorCode).toBe('urn:x_osdm_simulator:carrier:gamma');
+  test('every specification trip of the simulator names the carrier of the provider whose scenarios use it (#1022)', () => {
+    const file = simulatorFile();
+    const providers = fs.readdirSync(path.join(path.dirname(SIMULATOR_FILE), '..', '..', 'OSDM_Simulator', 'providers'))
+      .map((name) => JSON.parse(fs.readFileSync(path.join(path.dirname(SIMULATOR_FILE), '..', '..', 'OSDM_Simulator', 'providers', name), 'utf8')));
+    const carrierOf = new Map(providers.map((p) => [p.osdmVersion, p.carrier.ref]));
+    const usedBy = new Map();
+    for (const s of file.scenarios) {
+      for (const id of [s.tripRequirementId, s.exchange?.tripRequirementId]) {
+        if (id != null) usedBy.set(id, new Set([...(usedBy.get(id) || []), carrierOf.get(s.osdmVersion)]));
+      }
+    }
+    const trips = file.tripRequirements.filter((t) => t.tripType === 'SPECIFICATION');
+    expect(trips.length).toBeGreaterThan(17);
+    for (const trip of trips) {
+      expect(usedBy.get(trip.id)?.size).toBe(1);
+      const [own] = usedBy.get(trip.id);
+      for (const leg of trip.legs) expect(leg.operatorCode).toBe(own);
     }
   });
 

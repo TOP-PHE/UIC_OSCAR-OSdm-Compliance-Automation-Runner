@@ -249,6 +249,6 @@ All optional, read from the environment.
 | `src/osdm/bookings.js` | bookings, passengers, purchaser, tickets |
 | `providers/` | the provider profiles |
 | `deploy/` | compose file and reverse-proxy example |
-| `scripts/version-copies.js` | appends to the data file the `_36`, `_37`, `_39`, `_310` and `_312` copies of its `_38` scenarios (#914, #920, #925): run it after adding a scenario for gamma |
+| `scripts/version-copies.js` | brings the data file's `_36`, `_37`, `_39`, `_310` and `_312` copies of its `_38` scenarios up to date, each on its provider's copy of a trip naming a carrier (#914, #920, #925, #1022): run it after adding or changing a scenario or a trip for gamma |
 | `scripts/replay.js` | runs the data file's scenarios with `bru` on the provider of their version and records the checks (#611) |
 | `tests/` | `node --test` |

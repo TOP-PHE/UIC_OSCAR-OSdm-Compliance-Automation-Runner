@@ -116,12 +116,22 @@ describe('the Test Data', () => {
   test('a one-leg trip gives the train the page would make from it (trainFromTrip)', () => {
     const ctx = vm.createContext({});
     vm.runInContext(`${lift('trainFromTrip')}\nthis.trainFromTrip = trainFromTrip;`, ctx);
-    for (const [i, trip] of DATAFILE.tripRequirements.entries()) {
-      const legs = trip.tripType === 'SPECIFICATION' ? trip.legs : [trip.trip];
-      if (legs.length !== 1) continue;
-      const fromPage = ctx.trainFromTrip(trip, i).data;
-      expect(trains.some(t => JSON.stringify(t.data) === JSON.stringify(fromPage))).toBe(true);
+    // #1022: provider by provider, as a reference is made. Each provider has
+    // its copy of the trips naming a carrier, which differ from gamma's in the
+    // carrier only: one train of the whole file stands for all of them.
+    const checked = new Set();
+    for (const version of new Set(DATAFILE.scenarios.map(s => s.osdmVersion))) {
+      const part = R.providerPartOf(DATAFILE, version);
+      const own = R.testResourcesFromDatafile(part).filter(r => r.resource_type === 'TRAIN');
+      for (const [i, trip] of part.tripRequirements.entries()) {
+        checked.add(trip.id);
+        const legs = trip.tripType === 'SPECIFICATION' ? trip.legs : [trip.trip];
+        if (legs.length !== 1) continue;
+        const fromPage = ctx.trainFromTrip(trip, i).data;
+        expect(own.some(t => JSON.stringify(t.data) === JSON.stringify(fromPage))).toBe(true);
+      }
     }
+    expect(checked.size).toBe(DATAFILE.tripRequirements.length);
   });
 });
 

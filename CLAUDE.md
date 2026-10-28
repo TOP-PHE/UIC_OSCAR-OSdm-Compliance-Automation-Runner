@@ -2534,8 +2534,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   **A trip specification leg without an operator code is sent
   without `carriers`** (OSDM requires a `ref`; `[{}]` was refused as a whole
   request), with a failed check and an `[ERROR]` only then, so other runs
-  keep their check counts; the simulator's specification trips name gamma's
-  carrier. **One defect, one check** (#1019): the `[OSCAR request]`
+  keep their check counts; the simulator's specification trips name their
+  provider's carrier (#1022). **One defect, one check** (#1019): the `[OSCAR request]`
   conformance check leaves that missing carrier out (`isDataGap()` in
   `osdmRequestSchema.js`) and passes, named "but for what the scenario's
   data lacks", when nothing else is wrong: it was counted a second time, as
@@ -2879,7 +2879,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     WRONG / FAULT ones fail as their `_38` twins. `datafile.test.js` fails until a new `_38`
     scenario has its copies; its other tests read the file without the
     generated copies (`isGeneratedCopy`), and the scenarios document gives
-    them no row. An update from a reference now stores the provider's part
+    them no row. **A copy asks its own provider's carrier** (#1022,
+    OTST_V2.0.233): a trip naming gamma's carrier has one copy per provider
+    (`tripCopyOf()`, id = version suffix + the trip's two digits: trip 4 is
+    3604 … 31204, so gamma's trips stay under 100), and a scenario copy, its
+    exchange's trip included, goes on it. The script now *syncs*
+    (`syncedText()`): adds, rewrites or removes a copy's block of text, so a
+    change to a gamma trip reaches its copies. `isGeneratedTrip` keeps the
+    other tests on gamma's trips. `trainKey()` of `testResourcesFromDatafile()`
+    ignores the operator, so the whole file's Test Data has one train for a
+    trip and its copies: build Test Data per provider (`providerPartOf()`), as
+    the references do. An update from a reference now stores the provider's part
     only (`configurationOf()`), so a delta company holds delta's scenarios.
     Found on the way: below 3.8 the simulator lost the refund receipt (the
     booking's list went, no fulfilment names it); it is a `Document` of
