@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28-simulated-errors-apart",
+    "date": "October 28, 2026",
+    "tag": "Improved",
+    "title": "Simulated errors kept apart from the coverage",
+    "summary": "On a simulator company, the scenarios that fail on purpose no longer count against the provider: the coverage report lists them on their own, detected or missed.",
+    "content": "The simulator's SIM_WRONG_ and SIM_FAULT_ scenarios test whether OSCAR sees an error. Their failures used to become points of the provider in the coverage report. They are now left out of every view of the coverage and of published reports, and a Simulated errors section lists each one: detected (OSCAR failed a check, or reported every fault as expected), missed (OSCAR did not see it) or not run. The Markdown export and the workbook have it too."
+  },
+  {
     "id": "2026-10-28-choose-at-launch",
     "date": "October 28, 2026",
     "tag": "New",

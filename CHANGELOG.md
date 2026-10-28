@@ -93,6 +93,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.432] / [collection-OTST_V2.0.234] — 2026-10-28
+
+Issue #1029, PR 2 of 3, release 2026.468. Server only; collection unchanged.
+
+### Changed
+- **The simulator's deliberate errors are kept apart from the provider's coverage.** `SIM_WRONG_` and `SIM_FAULT_` scenarios (and any scenario naming `simulatorFaults`) fail on purpose: they say whether OSCAR sees an error, not whether the provider conforms.
+  - Run with the others, their failures became points of the provider. Left unrun, they filled the "set apart" list.
+  - The coverage report now leaves them out of every view (by capability, by flow and element, by function, set apart) before anything is read (`splitSimulated()`, `utils/simulatedErrors.js`, pure). A published report never holds them (`forPublication()`).
+
+### Added
+- **A *Simulated errors* section**, after the points to look at, lists each one (`byCapability.simulatedErrors`: summary and entries):
+  - **Detected**: a `SIM_WRONG_` scenario whose latest finished run failed a check, or a `SIM_FAULT_` scenario whose every fault OSCAR reported as the simulator's catalogue expects (`faultDetection.detect()`, the fault detection report's own rule).
+  - **Missed**: it ran without that; the row names the fault not reported.
+  - **Not run**.
+- The section is in the page, the Markdown and a workbook sheet of its own (*Simulated errors*, only when there are some). The page's words are pinned to the server's.
+- Tester User Guide, API description, CLAUDE.md.
+
+### Tests
+- `simulated-errors.test.js` (new):
+  - which scenarios leave the data file and the run list;
+  - wrong answers detected, missed and not run;
+  - every fault of `fault-replay.json` detected by the report's rule, and a fault not reported is missed and named;
+  - a published report without them; the workbook sheet only when there are some;
+  - the page's section and Markdown, escaped, a run linked by its UUID only.
+- `coverage-simulated-errors.test.js` (new), through `GET /v1/company/coverage` and its download:
+  - no point, form, set-apart entry, matrix scenario or function scenario from a simulated error;
+  - the four results, and the workbook sheet.
+- `ui-scripts.test.js`: the section follows the points in the capability view.
+- 11 deliberate breaks, one per change, each make a test fail.
+
+---
+
 ## [server-1.11.431] / [collection-OTST_V2.0.234] — 2026-10-28
 
 Issue #1029, PR 1 of 3, release 2026.466 → 2026.467. Server only; collection unchanged.

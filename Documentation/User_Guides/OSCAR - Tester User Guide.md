@@ -1572,7 +1572,22 @@ in the finding's thread on *Test Findings & Open Points*. A later position
 changes the same finding. The Test Manager can change the finding's
 category there to confirm or reopen it.
 
-Below the points, two folded lists:
+**Simulated errors.** On a simulator company, the `SIM_WRONG_` and
+`SIM_FAULT_` scenarios fail on purpose: they test whether OSCAR sees an error,
+not whether the provider conforms. They count in no view of the coverage, and
+a published report never holds them. A section of their own, after the points,
+lists each one:
+
+- **Detected**: a `SIM_WRONG_` scenario whose latest finished run failed a
+  check, or a `SIM_FAULT_` scenario whose every fault OSCAR reported as the
+  simulator's catalogue expects (the rule of the fault detection report);
+- **Missed**: it ran, and OSCAR did not see the error; the row says which
+  fault was not reported;
+- **Not run**: no finished run yet.
+
+A missed one is OSCAR's to fix, not the provider's.
+
+Below them, two folded lists:
 
 - the declared functions no scenario run tests;
 - the scenarios set apart: neither in the run list nor run, such as copies
@@ -1586,7 +1601,8 @@ the Test Framework declares, with their scenarios (folded).
 the same order: the capabilities, the expected refusals and the points to look
 at first, then the two detailed views. The workbook has seven sheets: Summary,
 Capabilities, Expected refusals, Points to look at, By flow and element, By
-scenario, By function.
+scenario, By function; *Offer request parameters* and *Simulated errors* are
+added when the report holds some.
 
 Each file's name starts with the company or provider it is about, for example
 `Provider-A-oscar-coverage-2026-10-27.xlsx`. Accents are dropped, and any
@@ -1791,7 +1807,8 @@ Three ways to ask for faults:
   `SIM_FAULT_BOOKING_PASSENGER_DROPPED_38`). They are not in the run list,
   because they fail on purpose: on **New Run**, tick **Simulated errors** only
   (§5) and start the batch. Keep them in the data file: updating from the
-  reference brings them.
+  reference brings them. The coverage report then lists each one as detected,
+  missed or not run, apart from the provider's coverage.
 - **On a scenario of your own**: in Test Config, open the scenario and fill in
   **Simulator faults** with one or more codes separated by commas, for
   example `offer.price-below-parts, booking.passenger-dropped`. Every request

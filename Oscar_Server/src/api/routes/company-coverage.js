@@ -36,6 +36,7 @@ const { frameworkConfigOf } = require('../helpers/configurationStore');
 const { viewForTester } = require('../../utils/datafileOwnership');
 const { getRunSelection } = require('../../utils/runSelections');
 const { currentCollectionVersion } = require('../../utils/versionInfo');
+const { splitSimulated, simulatedErrorsOf } = require('../../utils/simulatedErrors');
 const { coverageOf, latestRunsOf, failureOf } = require('../../utils/frameworkCoverage');
 const { coverageMatrixOf } = require('../../utils/coverageMatrix');
 const { capabilityCoverageOf } = require('../../utils/capabilityCoverage');
@@ -259,8 +260,11 @@ async function buildCoverage(companyId, days, user) {
     .map(({ id, title, category, status, scenario_code: code }) => ({ id, title, category, status, scenario_code: code }));
   const runs = latestRuns(companyId, days);
   const warnings = warningLinesOf(runs);
+  // #1029: the simulator's deliberate errors say how well OSCAR sees an error,
+  // not how the provider conforms: kept out of every view, listed apart.
+  const { datafile: provided, simulated } = splitSimulated(datafile || { scenarios: [] });
   const input = {
-    framework: framework || {}, datafile: datafile || { scenarios: [] }, runs, findings, collectionVersion: currentCollectionVersion(),
+    framework: framework || {}, datafile: provided, runs, findings, collectionVersion: currentCollectionVersion(),
     catalogue: catalogueEntries(),
   };
   const coverage = coverageOf(input);
@@ -270,6 +274,7 @@ async function buildCoverage(companyId, days, user) {
   }), offerOptionsOf(input.datafile, runs));
   // #994: what the reader may answer on a point (POST /coverage/positions).
   byCapability.positions = { choices: positionChoices(), alwaysRequired: [...ALWAYS_REQUIRED] };
+  byCapability.simulatedErrors = simulatedErrorsOf(simulated, runs, warnings);
   return { days, framework: Boolean(framework), datafile: Boolean(datafile), collectionVersion: input.collectionVersion, ...coverage, matrix, scenarios, byCapability };
 }
 

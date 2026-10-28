@@ -984,6 +984,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   are the server's, `run-selection-page.test.js` reads the drawing back)
   and sends the selection; the button is ready once a data file exists,
   whatever the run list holds.
+  **The simulated errors are kept apart from the coverage** (PR 2 =
+  1.11.432): `splitSimulated()` (`utils/simulatedErrors.js`, pure, the
+  `simulated` category of `runFilters`) takes them out of the data file
+  before `buildCoverage()` builds any view, so no point, form, matrix row or
+  set-apart entry comes from them; `byCapability.simulatedErrors` lists each
+  one detected (a SIM_WRONG_ failed a check; a SIM_FAULT_ had every fault
+  reported, `faultDetection.detect()`), missed or not run, on the page,
+  in the Markdown and a workbook sheet. `forPublication()` drops it. The
+  page's words are pinned to `RESULT_TEXT` / `KIND_TEXT`.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

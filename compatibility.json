@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.467",
+  "current_release": "2026.468",
   "releases": [
+    {
+      "release": "2026.468",
+      "date": "2026-10-28",
+      "server": "1.11.432",
+      "collection": "OTST_V2.0.234",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1029 PR 2: the simulator's deliberate errors (SIM_WRONG_, SIM_FAULT_) are kept out of every view of the coverage and of published reports, and listed apart as detected, missed or not run (page, Markdown, workbook sheet)."
+      ]
+    },
     {
       "release": "2026.467",
       "date": "2026-10-28",
