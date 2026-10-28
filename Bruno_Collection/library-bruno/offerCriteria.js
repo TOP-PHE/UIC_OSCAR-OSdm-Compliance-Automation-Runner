@@ -17,7 +17,9 @@ http://www.apache.org/licenses/LICENSE-2.0
  * on the other options either. No offer keeping to the option is a WARNING
  * (`level: 'warn'`); some offers not keeping to it is INFO (`level: 'info'`).
  * An option the provider says it ignored (PARAMETER_NOT_SUPPORTED) is a
- * warning saying so.
+ * warning saying so. Each check names its `parameter` and whether the answer
+ * `said` it was not taken: `unsaidCheck()` gives one more WARNING listing the
+ * parameters no offer kept to that the answer does not name (#1035).
  *
  * The offer mode is read on the admissions, the flexibility and classes on
  * the products of the admissions: a
@@ -119,8 +121,9 @@ function checkOfferCriteria(criteria, response, ignored = []) {
     const values = asked[option];
     if (!values.length) continue;
     const name = `Offer request: the offers keep to the ${LABEL[option]} asked (${values.join(', ')})`;
+    const parameter = `offerSearchCriteria.${option}`;
     if (ignored.includes(option.toLowerCase())) {
-      checks.push({ name, ok: false, level: 'warn', message: `the provider says it ignored offerSearchCriteria.${option} (PARAMETER_NOT_SUPPORTED): not supported` });
+      checks.push({ name, parameter, said: true, ok: false, level: 'warn', message: `the provider says it ignored offerSearchCriteria.${option} (PARAMETER_NOT_SUPPORTED): not supported` });
       continue;
     }
     const off = offers.map((offer, i) => ({ offer, i })).filter(({ offer }) => !keeps(option, offer, values));
@@ -131,7 +134,7 @@ function checkOfferCriteria(criteria, response, ignored = []) {
     // None keeps to it: the option made no difference (WARNING). Some do: the
     // answer holds other offers too, which OSDM does not forbid (INFO).
     checks.push({
-      name, ok: off.length === 0, level: off.length === offers.length ? 'warn' : 'info',
+      name, parameter, said: false, ok: off.length === 0, level: off.length === offers.length ? 'warn' : 'info',
       message: `${off.length} of ${offers.length} offer(s) do not (${shown}${off.length > 3 ? '; …' : ''})`,
     });
   }
@@ -161,12 +164,31 @@ function selectionChecks(criteria, offers, ignored) {
   const selections = list.map(selectionOf).filter(Boolean);
   return selections.map((sel) => {
     const name = `Offer request: an offer holds the product selected (${sel.text})`;
+    const parameter = 'offerSearchCriteria.productSelections';
     if (ignored.includes('productselections')) {
-      return { name, ok: false, level: 'warn', message: 'the provider says it ignored offerSearchCriteria.productSelections (PARAMETER_NOT_SUPPORTED): not supported' };
+      return { name, parameter, said: true, ok: false, level: 'warn', message: 'the provider says it ignored offerSearchCriteria.productSelections (PARAMETER_NOT_SUPPORTED): not supported' };
     }
     const ok = offers.some((offer) => holdsSelection(offer, sel));
-    return { name, ok, level: 'warn', message: ok ? '' : `none of the ${offers.length} offer(s) holds it` };
+    return { name, parameter, said: false, ok, level: 'warn', message: ok ? '' : `none of the ${offers.length} offer(s) holds it` };
   });
 }
 
-module.exports = { PART_LISTS, askedOptions, admissionProducts, checkOfferCriteria };
+/**
+ * #1035: the parameters no offer kept to that the answer does not name as not
+ * taken. A provider that does not take a parameter says so (OSDM: a
+ * PARAMETER_NOT_SUPPORTED warning naming it); one WARNING lists them all,
+ * besides the warning of each. Null when there are none.
+ */
+function unsaidCheck(checks) {
+  const unsaid = (Array.isArray(checks) ? checks : [])
+    .filter((c) => c && !c.ok && c.level === 'warn' && c.said === false && typeof c.parameter === 'string');
+  if (unsaid.length === 0) return null;
+  return {
+    name: 'Offer request: the answer names the parameters it did not take (PARAMETER_NOT_SUPPORTED)',
+    ok: false,
+    level: 'warn',
+    message: `kept by no offer or trip, and not named in the answer: ${[...new Set(unsaid.map((c) => c.parameter))].join(', ')}`,
+  };
+}
+
+module.exports = { PART_LISTS, askedOptions, admissionProducts, checkOfferCriteria, unsaidCheck };

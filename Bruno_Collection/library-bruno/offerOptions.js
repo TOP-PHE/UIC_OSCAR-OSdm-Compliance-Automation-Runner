@@ -626,17 +626,36 @@ function notTakenText(row) {
   return `${head ? `${head}: ` : ''}${detail}. Either the provider does not take it, and the Test Framework should not declare it, or the provider should.`;
 }
 
+// #1035 (maintainer, 2026-10-28): a declared flexibility answered with offers
+// in another flexibility, said or not, is a WARNING only. Asked for
+// non-flexible, a provider may have only full-flex left and offer it. A
+// refusal, an error or no offer still fails.
+const WARN_WHEN_IGNORED = new Set(['offerSearchCriteria.flexibilities']);
+const IGNORED_RESULTS = new Set(['ignored-said', 'ignored-silent']);
+const warnsOnly = (r) => WARN_WHEN_IGNORED.has(r.option) && IGNORED_RESULTS.has(r.result);
+
 /**
  * The rows the framework contradicts: `declared` options the provider does not
- * take (a FAIL each, so a finding draft, #735), and options it takes that the
- * framework says it does not (a suggestion to declare them).
+ * take (a FAIL each, so a finding draft, #735), those of them that only warn
+ * (`warned`, #1035), and options it takes that the framework says it does not
+ * (a suggestion to declare them).
  */
 function compareWithDeclarations(report) {
   const rows = Array.isArray(report?.options) ? report.options : [];
+  const notTaken = rows.filter((r) => r.declared === true && NOT_TAKEN.has(r.result));
   return {
-    contradicted: rows.filter((r) => r.declared === true && NOT_TAKEN.has(r.result)),
+    contradicted: notTaken.filter((r) => !warnsOnly(r)),
+    warned: notTaken.filter(warnsOnly),
     undeclared: rows.filter((r) => r.declared === false && isSupported(r)),
   };
+}
+
+/** The WARNING line of a declared option that only warns (#1035). */
+function warnedText(row) {
+  const words = NOT_TAKEN_WORDS[row.result] || String(row.result);
+  const status = row.status ? ` (HTTP ${row.status})` : '';
+  return `[WARNING] 🧭 Offer request option ${row.option} — declared in the Test Framework, ${words}${status}: ${row.message || 'no detail'}. `
+    + 'The offers are in another flexibility: a warning, not a failure (the provider offers what it has).';
 }
 
 /**
@@ -746,12 +765,15 @@ async function runOptionDiscovery(status, body) {
   });
   for (const line of reportLines(report)) validationLogger(line);
   // #227 part 2: what the Test Framework declares, held to the answers.
-  const { contradicted, undeclared } = compareWithDeclarations(report);
+  const { contradicted, warned, undeclared } = compareWithDeclarations(report);
   for (const row of contradicted) {
     test(`🧭 Offer request option ${row.option} — declared in the Test Framework, taken by the provider`, () => {
       throw new Error(notTakenText(row));
     });
   }
+  // #1035: the second WARNING, when the answer said nothing, is the report's
+  // "taken without a word" line, which lists every such parameter.
+  for (const row of warned) validationLogger(warnedText(row));
   // #995: options each taken alone, refused together.
   for (const c of refusedCombinations(report)) {
     test(c.title, () => { throw new Error(refusedCombinationText(c)); });
@@ -767,6 +789,8 @@ module.exports = {
   DEFAULT_MAX_REQUESTS,
   discover,
   compareWithDeclarations,
+  warnedText,
+  WARN_WHEN_IGNORED,
   notTakenText,
   NOT_TAKEN_WORDS,
   refusedCombinations,
