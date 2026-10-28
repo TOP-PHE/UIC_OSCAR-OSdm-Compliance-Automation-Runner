@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27-carrier-per-provider",
+    "date": "October 27, 2026",
+    "tag": "Fixed",
+    "title": "Simulator trains name their own carrier",
+    "summary": "Each simulator reference's trains name that provider's carrier, and a provider answering another carrier than the one asked is now warned.",
+    "content": "In the references of the OSDM simulator, most trains of alpha, beta, delta, epsilon and zeta named gamma's carrier, so a copied scenario asked one provider for a train of another. Every train of a reference now names its own provider's carrier: update your simulator companies from their reference, then copy the scenarios again.\n\nAfter the offer request of a trip specification, OSCAR now compares, leg by leg, the carrier asked with the one the provider's answer names. When they differ it gives a warning: the provider may be offering another train than the one asked."
+  },
+  {
     "id": "2026-10-27-copies-on-trains-that-run-them",
     "date": "October 27, 2026",
     "tag": "Fixed",

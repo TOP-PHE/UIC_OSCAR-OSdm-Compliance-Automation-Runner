@@ -967,6 +967,18 @@ function validateTripsAndLegs(jsonData) {
       });
     });
   });
+  warnOtherCarriers(trips);
+}
+
+// #1021: a provider answering another carrier than the trip specification
+// asked may be offering another train. A WARNING: OSDM does not say the
+// answer repeats the carrier.
+function warnOtherCarriers(trips) {
+  if (bru.getEnvVar('TripType') !== 'SPECIFICATION') return;
+  const { carrierDifferences, carrierWarning } = require('./specifiedCarriers.js');
+  for (const d of carrierDifferences(parseEnvJson('offerTripSpecifications'), trips, bru.getEnvVar('coveredTripId'))) {
+    validationLogger(`[WARNING] ${carrierWarning(d)}`);
+  }
 }
 
 // Offer Parts validation

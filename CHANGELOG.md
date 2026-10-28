@@ -93,6 +93,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.428] / [collection-OTST_V2.0.232] — 2026-10-27
+
+Issue #1021, release 2026.463. Each simulator reference's trains name their own provider's carrier; a provider answering another carrier than the one asked is warned.
+
+### Fixed
+- **The simulator references' carriers.** After #1019, about 20 of 32 trains in the references of alpha, beta, delta, epsilon and zeta still named gamma's carrier. They come from the data file's trip specifications, which name gamma's in every version, so a copy on such a train asked zeta, say, for a train of gamma's.
+  - Every train of a provider's reference now names that provider's carrier (`namedTrains()`); a train's own number is kept.
+  - The data file's own scenarios are corrected in a separate change.
+
+### Added
+- **A warning when the provider answers another carrier.** After step 01 of a trip specification, each leg's carrier asked is compared with the carriers of the trip the chosen offer covers (else the first with as many timed legs), compared without case (`library-bruno/specifiedCarriers.js`).
+  - One `[WARNING]` per leg where both sides name carriers and none is the same: the provider may be offering another train than the one asked.
+  - A WARNING, not a failure: OSDM requires the carrier of a specified leg, but does not say the answer repeats it. Nothing is said when either side names none.
+  - On the simulator, the non-gamma versions of its own scenarios warn until their data file is corrected: they still ask for gamma's carrier.
+- CLAUDE.md.
+
+### Upgrade
+Update the simulator companies from their reference (all but gamma's moved), then copy the catalogue scenarios again.
+
+### Tests
+- `reference-configuration.test.js`: every train names its provider's carrier.
+- `bruno-specified-carriers.test.js` (new): the trip answered, the legs that differ (case, several carriers, a transfer leg, none named), the text; and step 01 through the real `validateTripsAndLegs()`, specification and search.
+- Seven deliberate breaks each make a test fail.
+
+---
+
 ## [server-1.11.427] / [collection-OTST_V2.0.231] — 2026-10-27
 
 Issue #1019, release 2026.462. Catalogue copies go on trains that can run them; a leg without carrier is no longer counted again as OSCAR's.
