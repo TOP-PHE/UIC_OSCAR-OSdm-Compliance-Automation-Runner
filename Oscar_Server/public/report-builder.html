@@ -2899,14 +2899,14 @@ async function saveCoveragePosition(e) {
 
 async function exportCoverageExcel() {
   var msg = document.getElementById('coverage-xlsx-msg');
-  var url = coverageUrl('/download');
-  if (!url) {
+  var address = coverageUrl('/download');
+  if (!address) {
     msg.textContent = 'Choose a company or provider first.';
     return;
   }
   msg.textContent = 'Preparing the workbook...';
   try {
-    var res = await fetch(url, {});
+    var res = await fetch(address, {});
     if (!res.ok) {
       var err = await res.json().catch(function() { return null; });
       msg.textContent = 'The workbook could not be made: ' + ((err && err.detail) || ('HTTP ' + res.status)) + '.';

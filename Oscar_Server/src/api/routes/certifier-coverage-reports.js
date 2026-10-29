@@ -161,7 +161,8 @@ router.get('/coverage/:companyId/download', coverageLimiter, async (req, res) =>
     const title = company.distributor_name ? `${company.distributor_name} — ${company.name}` : company.name;
     const file = coverageWorkbook(built.report, { title: title || '', generatedAt: now.replace('T', ' ').slice(0, 19) + ' UTC' });
     res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.set('Content-Disposition', `attachment; filename="${fileNameFor(company.name, `oscar-coverage-${now.slice(0, 10)}.xlsx`)}"`);
+    const name = fileNameFor(company.name, `oscar-coverage-${now.slice(0, 10)}.xlsx`);
+    res.set('Content-Disposition', `attachment; filename="${name}"`);
     return res.send(file);
   } catch (err) {
     return failedCoverage(res, err, req.params.companyId);

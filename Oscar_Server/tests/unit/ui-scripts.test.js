@@ -1579,7 +1579,7 @@ describe('the Report Builder coverage section', () => {
     expect(source).toContain("if (!isPlatformUser || isCertifier) {\n  document.getElementById('coverage-card').style.display = 'block';");
     expect(source).toContain("if (!isCertifier) return '/v1/company/coverage' + suffix + days;");
     expect(source).toContain("var url = coverageUrl('');");
-    expect(source).toContain("var url = coverageUrl('/download');");
+    expect(source).toContain("var address = coverageUrl('/download');");
     expect(source).toContain("body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);");
     expect(source).toContain('<option value="capabilities" selected>By capability</option><option value="matrix">By flow and element</option>');
   });
