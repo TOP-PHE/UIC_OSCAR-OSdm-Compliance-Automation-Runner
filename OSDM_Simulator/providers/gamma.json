@@ -204,7 +204,13 @@
       "faresWithoutSection": "urn:uic:stn:0000086",
       "combiningFares": "urn:uic:stn:0000087",
       "bicycleReservationProductMode": "urn:uic:stn:0000088",
-      "alternativeRoutes": "urn:uic:stn:0000089"
+      "alternativeRoutes": "urn:uic:stn:0000089",
+      "realAnswerForm": "urn:uic:stn:0000060",
+      "cardNotHeld": "urn:uic:stn:0000061",
+      "agesOutside": "urn:uic:stn:0000062",
+      "otherClass": "urn:uic:stn:0000063",
+      "datesOffset": "urn:uic:stn:0000064",
+      "coveredLegUnknown": "urn:uic:stn:0000065"
     },
     "borderPoints": {
       "urn:uic:stn:0000004": "804",

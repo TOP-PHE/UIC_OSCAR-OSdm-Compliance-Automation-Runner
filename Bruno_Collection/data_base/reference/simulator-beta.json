@@ -1135,6 +1135,162 @@
     },
     {
       "id": 34,
+      "resource_type": "TRAIN",
+      "label": "Train 2260 0000060–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000060",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2260",
+            "departureTime": "10:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 35,
+      "resource_type": "TRAIN",
+      "label": "Train 2261 0000061–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000061",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2261",
+            "departureTime": "10:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 36,
+      "resource_type": "TRAIN",
+      "label": "Train 2262 0000062–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000062",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2262",
+            "departureTime": "10:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 37,
+      "resource_type": "TRAIN",
+      "label": "Train 2263 0000063–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000063",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2263",
+            "departureTime": "10:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 38,
+      "resource_type": "TRAIN",
+      "label": "Train 2264 0000064–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000064",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2264",
+            "departureTime": "10:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 39,
+      "resource_type": "TRAIN",
+      "label": "Train 2265 0000065–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000065",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+        "productCategoryName": "Regional",
+        "productCategoryShortName": "R",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "2265",
+            "departureTime": "10:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 40,
       "resource_type": "JOURNEY",
       "label": "Trip 3704: 0000001–0000002, 2 legs",
       "data": {
@@ -1151,7 +1307,7 @@
       }
     },
     {
-      "id": 35,
+      "id": 41,
       "resource_type": "JOURNEY",
       "label": "Trip 3705: 0000001–0000002, 2 legs",
       "data": {
@@ -1168,7 +1324,7 @@
       }
     },
     {
-      "id": 36,
+      "id": 42,
       "resource_type": "JOURNEY",
       "label": "Trip 3711: 0000095–0000002, 2 legs",
       "data": {
@@ -1185,7 +1341,7 @@
       }
     },
     {
-      "id": 37,
+      "id": 43,
       "resource_type": "JOURNEY",
       "label": "Trip 3724: 0000001–0000002, 2 legs",
       "data": {
@@ -1336,6 +1492,7 @@
     "SIM_FARE_GROUP_6ADT_37",
     "SIM_FARE_TRANSIT_1ADT_37",
     "SIM_FARE_ROUTES_1ADT_37",
-    "SIM_FARE_REFUND_NON_FLEX_1ADT_37"
+    "SIM_FARE_REFUND_NON_FLEX_1ADT_37",
+    "SIM_FARE_REAL_FORM_1ADT_37"
   ]
 }

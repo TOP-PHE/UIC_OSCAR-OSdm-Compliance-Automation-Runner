@@ -451,6 +451,42 @@ function applyCombiningVariant(fare, variant, day) {
   ];
 }
 
+// #1045: the variants of what a fare says of its passengers, cards, dates and
+// coverage. `realAnswerForm` is not wrong: it answers as a real provider does,
+// the coverage on the route and the offer only (no covered section, no
+// connection point).
+function applyDetailVariant(fare, variant, { day, provider, first }) {
+  if (variant === 'realAnswerForm') {
+    delete fare.coveredSection;
+    delete fare.regionalConstraint.entryConnectionPoint;
+    delete fare.regionalConstraint.exitConnectionPoint;
+  }
+  if (variant === 'cardNotHeld') {
+    fare.requiredCards = [{ type: 'REDUCTION_CARD', code: provider.reductionCards?.[0]?.code || 'SIM_CARD', issuer: provider.carrier.ref }];
+  }
+  if (variant === 'agesOutside' && first) fare.passengerConstraints = [{ number: 1, lowerAgeLimit: 6, upperAgeLimit: 14 }];
+  if (variant === 'datesOffset') {
+    const until = new Date(Date.parse(`${day}T00:00:00Z`) + 2 * 86400000).toISOString().slice(0, 10);
+    fare.travelValidityConstraint.validTravelDates = { from: `${day}T00:00:00+01:00`, until: `${until}T00:00:00+01:00`, utcOffset: 0 };
+  }
+}
+
+// #1045: the trip coverage of a fare offer, for the variants that give one:
+// the section's legs; `coveredLegUnknown` names a leg the trip does not have.
+function offerCoverageOf(variant, trip, section) {
+  if (variant !== 'realAnswerForm' && variant !== 'coveredLegUnknown') return {};
+  const legs = legsOfSection(trip, section);
+  const ids = legs.map((l) => l.id);
+  const endLeg = variant === 'coveredLegUnknown' ? 'no-such-leg' : ids.at(-1);
+  return {
+    tripCoverage: {
+      coveredTripId: trip.id,
+      coveredLegIds: ids,
+      coveredSections: [{ startPlace: { ...section.startPlace }, endPlace: { ...section.endPlace }, startLegId: ids[0], endLegId: endLeg }],
+    },
+  };
+}
+
 /**
  * The fare offers of a request: [] unless the provider sells fares, the
  * request asks for them and names a section (or the section starts at the
@@ -491,7 +527,8 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
   const priced = farePassengers.filter((p, i) => !(variant === 'passengerWithoutFare' && i === farePassengers.length - 1));
   const offers = [];
   templates.forEach((template, routeIndex) => {
-    for (const travelClass of fareClassesOf(criteria)) {
+    // #1045: the otherClass variant answers second class whatever is asked.
+    for (const travelClass of variant === 'otherClass' ? ['SECOND'] : fareClassesOf(criteria)) {
       const choices = priced.map((passenger) => ({ passenger, choice: fareChoiceOf(passenger, { template, family, travelClass, day, rules, cardOf }) }));
       for (const cluster of clusters) {
         const fares = choices.flatMap(({ passenger, choice }) => {
@@ -500,13 +537,14 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
             variant, cluster, clusters, day, provider, rules, trip: trips[0], choice, priceCents: clusterPrices(full)[cluster],
           });
         });
-        for (const fare of fares) {
+        fares.forEach((fare, k) => {
           applyClusterVariant(fare, variant);
           applyCombiningVariant(fare, variant, day);
-        }
+          applyDetailVariant(fare, variant, { day, provider, first: k === 0 });
+        });
         const reservations = bicycles.length > 0 ? { reservationOfferParts: places() } : {};
         const which = templates.length > 1 ? `, route ${routeIndex + 1} (${template.distance} km)` : '';
-        offers.push(offerOf(`${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fares, ${CLASS_WORDS[travelClass]}, ${route}${which}`, { fares, ...reservations }));
+        offers.push(offerOf(`${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fares, ${CLASS_WORDS[travelClass]}, ${route}${which}`, { fares, ...reservations, ...offerCoverageOf(variant, trips[0], section) }));
       }
     }
   });

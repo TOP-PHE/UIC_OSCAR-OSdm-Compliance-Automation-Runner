@@ -2194,6 +2194,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   29 `_38` fare scenarios gave the same checks before and after; the eight
   new `SIM_FARE_*` scenarios give the plain sale's 116 checks: OSCAR has
   no check of their particulars yet (#1045's next part).
+  **What a fare says, checked** (#1045 review, 1.11.440 / OTST_V2.0.238,
+  simulator 0.60.0). `library-bruno/fareDetails.js` (pure), turned into
+  checks by `detailChecks()` in `fares.js`, all WARNING (OSDM leaves the
+  reading open): O16 a `requiredCards` card no passenger of the fare holds
+  (code and issuer), or an empty list; O17 an age on `__travelDay` outside
+  the fare's `passengerConstraints`; O18 a class asked with no fare offer
+  (a bicycle's fare ignored); O19 `utcOffset` ≠ − the dates' offset
+  (OSDM: minutes *added* to get UTC; a real provider wrote 0 at +01:00);
+  O20 an offer's `coveredSections` naming a leg not a `timedLeg` of its
+  trip (a real provider named its transfer leg). **O8 reads a fare's
+  coverage from four places** (`coveredOf()`): `coveredSection`, the
+  connection points, the route's ends (`routeEndsOf()`: the top
+  `routeItem`'s indices, else the bare `routeItemList`, as a real provider
+  sends it), the offer's covered sections; a real fare answer had only the
+  last two, so O8 warned "cannot be checked" on every fare. Simulator
+  variants by the section's start: `realAnswerForm` 0000060 (not wrong:
+  that form, `SIM_FARE_REAL_FORM_1ADT_38` in the run list), `cardNotHeld`
+  61, `agesOutside` 62, `otherClass` 63, `datesOffset` 64,
+  `coveredLegUnknown` 65 (`applyDetailVariant()`, `offerCoverageOf()`);
+  their `SIM_WRONG_FARE_*` scenarios warn only (`WARNING_ONLY`). A
+  WARNING-level fare check is a log line, not a test (`record()`), so no
+  scenario's number of checks moved, nor the catalogue's `checks`.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

@@ -109,7 +109,7 @@ function checkProvider(key, raw) {
 // station of each variant (for `faresWithoutSection`, #905, the trip's
 // origin: that request names no section). Absent: no fare is offered.
 const FARE_CLUSTERS = new Set(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO']);
-const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares', 'bicycleReservationProductMode', 'alternativeRoutes']);
+const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares', 'bicycleReservationProductMode', 'alternativeRoutes', 'realAnswerForm', 'cardNotHeld', 'agesOutside', 'otherClass', 'datesOffset', 'coveredLegUnknown']);
 // #1048: the stations that are border points, each with the provider's code
 // for it: a fare to or from one is priced on a template with a border there.
 function checkBorderPoints(value, bad) {

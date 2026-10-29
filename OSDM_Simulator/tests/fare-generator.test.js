@@ -203,3 +203,48 @@ test('every new case is an OSDM answer in every provider\'s version', () => {
     }
   }
 });
+
+// #1045: the variants of what a fare says, each changing one thing.
+test('the detail variants: the real answer\'s form, a card not held, ages outside, another class, dates, an unknown leg', () => {
+  const gamma = providers.get('gamma');
+  const plain = offersOf(request());
+  assert.ok(plain.every((o) => !o.tripCoverage && o.fares.every((f) => f.coveredSection && f.regionalConstraint.entryConnectionPoint)));
+
+  const real = offersOf(request({ from: '0000060' }));
+  assert.ok(real.length > 0);
+  for (const offer of real) {
+    assert.ok(offer.fares.every((f) => !f.coveredSection && !f.regionalConstraint.entryConnectionPoint && !f.regionalConstraint.exitConnectionPoint));
+    const [section] = offer.tripCoverage.coveredSections;
+    assert.deepEqual([section.startPlace.stopPlaceRef, section.endPlace.stopPlaceRef], ['urn:uic:stn:0000060', 'urn:uic:stn:0000002']);
+    assert.equal(section.endLegId, offer.tripCoverage.coveredLegIds.at(-1));
+  }
+
+  const cards = offersOf(request({ from: '0000061' }));
+  assert.ok(cards.every((o) => o.fares.every((f) => f.requiredCards[0].code === gamma.reductionCards[0].code && f.requiredCards[0].issuer === gamma.carrier.ref)));
+
+  const ages = offersOf(request({ from: '0000062', passengers: [adult(1), adult(2)] }));
+  for (const offer of ages) {
+    assert.deepEqual(offer.fares[0].passengerConstraints, [{ number: 1, lowerAgeLimit: 6, upperAgeLimit: 14 }]);
+    assert.notDeepEqual(offer.fares[1].passengerConstraints, offer.fares[0].passengerConstraints);
+  }
+
+  const classes = offersOf(request({ from: '0000063', classes: ['FIRST'] }));
+  assert.ok(classes.length > 0 && classes.every((o) => o.fares.every((f) => f.travelClass === 'SECOND')));
+
+  const dates = offersOf(request({ from: '0000064' }));
+  assert.ok(dates.every((o) => o.fares.every((f) => f.travelValidityConstraint.validTravelDates.utcOffset === 0
+    && f.travelValidityConstraint.validTravelDates.from.endsWith('+01:00'))));
+
+  const legs = offersOf(request({ from: '0000065' }));
+  assert.ok(legs.every((o) => o.tripCoverage.coveredSections[0].endLegId === 'no-such-leg' && o.fares.every((f) => f.coveredSection)));
+});
+
+test('every detail variant is an OSDM answer in every provider\'s version', () => {
+  for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
+    const provider = providers.get(key);
+    for (const from of ['0000060', '0000061', '0000062', '0000063', '0000064', '0000065']) {
+      const response = shapeAnswer(buildOfferCollection(request({ from, classes: from === '0000063' ? ['FIRST'] : null }), provider, NOW).response, provider.osdmVersion);
+      checkConformance('POST', `/${key}/offers`, 200, response);
+    }
+  }
+});

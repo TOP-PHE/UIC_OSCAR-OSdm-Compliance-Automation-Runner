@@ -29,6 +29,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   O13 no negative price                                     FAIL
  *   O14 fares that were not asked                             FAIL
  *   O15 products and fares counted                            INFO
+ *   O16–O20 cards, ages, class, dates offset, offer coverage  WARNING
+ *       (`fareDetails.js`, #1045)
  *
  * A negative scenario (#905) sets `expectFares: false`: the answer must hold
  * no fare (N, FAIL), whether fares were asked or not; O1 to O13 are then not
@@ -50,6 +52,7 @@ http://www.apache.org/licenses/LICENSE-2.0
 
 const { sameStopPlace } = require('./returnJourney.js');
 const fareReservations = require('./fareReservations.js');
+const fareDetails = require('./fareDetails.js');
 
 // The clusters of OSDM's "constructing products from fares", most flexible first.
 const CLUSTERS = ['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO'];
@@ -133,9 +136,40 @@ function dayOutside(fare, travelDay) {
   return day < String(dates.from).slice(0, 10) || day > String(dates.until).slice(0, 10);
 }
 
+// The stations a route item stands for: its station, the stations of its
+// fare reference station, else those of the first or last item it names.
+function routeItemStations(item, items, which, depth = 0) {
+  if (!isObject(item) || depth > 20) return [];
+  if (isObject(item.station)) return [stationOf(item.station)].filter(Boolean);
+  if (isObject(item.fareReferenceStation)) return list(item.fareReferenceStation.stations).map(stationOf).filter(Boolean);
+  const indices = list(item.routeItemIndices).length ? list(item.routeItemIndices) : list(item.alternativeRouteItemIndices);
+  const pick = which === 'first' ? indices[0] : indices.at(-1);
+  if (indices.length > 1 && list(item.alternativeRouteItemIndices).length && !list(item.routeItemIndices).length) {
+    return indices.flatMap((i) => routeItemStations(items[i], items, which, depth + 1));
+  }
+  return pick === undefined ? [] : routeItemStations(items[pick], items, which, depth + 1);
+}
+
+/**
+ * #1045: the stations a fare's route runs from and to: the first and last
+ * items of its route item (OSDM 3.8 Route), else of its list as given. null
+ * when the route names no station at either end.
+ */
+function routeEndsOf(fare) {
+  const route = list(fare?.regionalConstraint?.regionalValidities).map((v) => v?.route).find(isObject);
+  if (!route) return null;
+  const items = list(route.routeItemList);
+  const top = list(route.routeItem?.routeItemIndices).length ? route.routeItem.routeItemIndices.map((i) => items[i]) : items;
+  const start = routeItemStations(top[0], items, 'first');
+  const end = routeItemStations(top.at(-1), items, 'last');
+  return top.length > 1 && start.length && end.length ? { start, end } : null;
+}
+
 // The [start, end] stations a fare covers: its coveredSection, else its entry
-// and exit connection points. null when neither says.
-function coveredOf(fare) {
+// and exit connection points, else its route's ends, else the covered
+// sections of its offer (#1045: a real provider gives the last two only).
+// null when none says.
+function coveredOf(fare, offer) {
   const section = fare?.coveredSection;
   if (isObject(section) && stationOf(section.startPlace) && stationOf(section.endPlace)) {
     return { start: [stationOf(section.startPlace)], end: [stationOf(section.endPlace)] };
@@ -143,7 +177,8 @@ function coveredOf(fare) {
   const points = (cp) => list(cp?.stationSets).flatMap((set) => list(set.stations).map(stationOf)).filter(Boolean);
   const start = points(fare?.regionalConstraint?.entryConnectionPoint);
   const end = points(fare?.regionalConstraint?.exitConnectionPoint);
-  return start.length && end.length ? { start, end } : null;
+  if (start.length && end.length) return { start, end };
+  return routeEndsOf(fare) || fareDetails.offerSectionEnds(offer);
 }
 
 const among = (station, stations) => stations.some((s) => sameStopPlace(s, station));
@@ -154,8 +189,8 @@ const among = (station, stations) => stations.some((s) => sameStopPlace(s, stati
  * what it covers). From the section's start, each step takes a fare starting
  * where the last one ended, one reaching the end first.
  */
-function coverageOfPassenger(fares, section) {
-  const spans = fares.map(coveredOf);
+function coverageOfPassenger(fares, section, spanOf = coveredOf) {
+  const spans = fares.map((fare) => spanOf(fare));
   if (spans.includes(null)) return 'unknown';
   const left = [...spans];
   let at = section.start;
@@ -196,7 +231,7 @@ function passengerChecks(response, request) {
       if (own.length === 0 && reserved.has(ref)) continue;
       if (own.length === 0) { withoutFare.push(`passenger ${ref} in offers[${i}]`); continue; }
       if (!section) continue;
-      const how = coverageOfPassenger(own, section);
+      const how = coverageOfPassenger(own, section, (fare) => coveredOf(fare, offer));
       if (how === 'gap') gaps.push(`passenger ${ref} in offers[${i}]`);
       if (how === 'overlap') overlaps.push(`passenger ${ref} in offers[${i}]`);
       if (how === 'unknown') unknown.push(`passenger ${ref} in offers[${i}]`);
@@ -276,7 +311,27 @@ function fareChecks(response, request, { travelDay } = {}) {
     check('O12', 'WARNING', 'Each fare names the TCOs involved (involvedTCOs)',
       all.filter(({ fare }) => list(fare?.involvedTCOs).length === 0).map(({ path }) => path), 'no involvedTCOs'),
     check('O13', 'FAIL', 'No fare price is negative', negativePrices(all), 'negative prices'),
+    ...detailChecks(response, request, all, travelDay),
     countCheck(response),
+  ];
+}
+
+// O16 to O20 (#1045): what a fare says of its passengers, cards, class,
+// dates and coverage, against the request (`fareDetails.js`).
+function detailChecks(response, request, all, travelDay) {
+  const cards = fareDetails.cardIssues(all, request);
+  return [
+    check('O16', 'WARNING', 'A fare requiring cards names one its passengers hold (requiredCards)', cards.notHeld,
+      'cards required that no passenger of the fare declared (OSDM: one of them is required at the time of travel)'),
+    check('O16', 'WARNING', 'A requiredCards list names at least one card', cards.empty, 'empty lists (OSDM: at least one item when the list is given)'),
+    check('O17', 'WARNING', "A fare's passenger constraints hold its passenger's age on the travel day", fareDetails.ageIssues(all, request, travelDay),
+      "ages outside the fare's passenger constraints"),
+    check('O18', 'WARNING', 'A fare offer is in each travel class asked (travelClasses)', fareDetails.classIssues(response, request),
+      'classes asked with no fare offer in them'),
+    check('O19', 'WARNING', 'Valid travel dates: utcOffset agrees with the offset of the dates', fareDetails.datesOffsetIssues(all),
+      'offsets that disagree (OSDM: utcOffset is the minutes added to get UTC)'),
+    check('O20', 'WARNING', "An offer's covered sections name train legs of its trip", fareDetails.offerCoverageIssues(response),
+      "covered sections naming a leg that is not one of the trip's trains"),
   ];
 }
 
@@ -287,7 +342,7 @@ function sectionChecks(pax) {
     check('O8', 'FAIL', 'Each passenger\'s fares cover the requested section without a gap', pax.gaps,
       `fares that leave part of the section ${pax.section.start} - ${pax.section.end} uncovered`),
     check('O8', 'WARNING', 'Each passenger\'s fares do not overlap', pax.overlaps, 'fares covering a part of the section twice'),
-    check('O8', 'WARNING', 'Each fare says what it covers (coveredSection, else entry and exit connection points)', pax.unknown,
+    check('O8', 'WARNING', "Each fare says what it covers (coveredSection, else entry and exit connection points, its route's ends or its offer's covered sections)", pax.unknown,
       'the coverage of the section cannot be checked'),
   ];
 }

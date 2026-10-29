@@ -319,6 +319,12 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     // #255: the fare reservation's variants, by the section's station and by a last name.
     SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38: [],
     SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38: ['fare-reservation-product-mode'],
+    // #1045: the wrong answers of O16 to O20, by the section's station.
+    SIM_WRONG_FARE_CARD_NOT_HELD_38: [],
+    SIM_WRONG_FARE_AGES_OUTSIDE_38: [],
+    SIM_WRONG_FARE_OTHER_CLASS_38: [],
+    SIM_WRONG_FARE_DATES_OFFSET_38: [],
+    SIM_WRONG_FARE_COVERED_LEG_38: [],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -752,6 +758,13 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_FARE_TRANSIT_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
     SIM_FARE_ROUTES_1ADT_38: [v.alternativeRoutes, 'SPECIFICATION', true, true, undefined],
     SIM_FARE_REFUND_NON_FLEX_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    // #1045: an answer as a real provider gives it, and the wrong answers of O16 to O20.
+    SIM_FARE_REAL_FORM_1ADT_38: [v.realAnswerForm, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_CARD_NOT_HELD_38: [v.cardNotHeld, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_AGES_OUTSIDE_38: [v.agesOutside, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_OTHER_CLASS_38: [v.otherClass, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_DATES_OFFSET_38: [v.datesOffset, 'SPECIFICATION', true, true, undefined],
+    SIM_WRONG_FARE_COVERED_LEG_38: [v.coveredLegUnknown, 'SPECIFICATION', true, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
@@ -775,12 +788,14 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
   // No other scenario starts a section at a variant station; the COMBINING
   // one (#907) is not wrong, and its two scenarios alone start there.
   const variantStations = new Set(Object.values(v));
-  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_') && startOf(x) !== v.combiningFares && startOf(x) !== v.alternativeRoutes)) {
+  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_') && startOf(x) !== v.combiningFares && startOf(x) !== v.alternativeRoutes && startOf(x) !== v.realAnswerForm)) {
     assert.ok(!variantStations.has(startOf(s)), s.code);
   }
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.combiningFares).map((s) => s.code), ['SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_WRONG_FARE_COMBINING_FEE_38']);
   // #1048: every route of a pair, not wrong either, and its one scenario alone starts there.
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.alternativeRoutes).map((s) => s.code), ['SIM_FARE_ROUTES_1ADT_38']);
+  // #1045: the answer of a real provider, not wrong either.
+  assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.realAnswerForm).map((s) => s.code), ['SIM_FARE_REAL_FORM_1ADT_38']);
   // #255: fare reservations are asked by the four bicycle scenarios only, each with a bicycle.
   const askReservations = datafile.scenarios.filter((s) => s.offerSearchCriteria?.requestedOfferParts?.includes('FARE_RESERVATION'));
   assert.deepEqual(askReservations.map((s) => s.code), ['SIM_FARE_BICYCLE_1ADT_38', 'SIM_FARE_BICYCLE_ONLY_38', 'SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38', 'SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38']);

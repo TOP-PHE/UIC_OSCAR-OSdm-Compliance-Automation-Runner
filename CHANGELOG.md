@@ -93,6 +93,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.440] / [collection-OTST_V2.0.238] — 2026-10-29
+
+Issue #1045 (OSCAR's fare checks reviewed, after the simulator's fares became realistic in #1048), release 2026.478. Simulator 0.60.0. The server changes are the five warning-only simulated errors and the welcome-page news entry.
+
+### Added
+- **What a fare says, checked against the request** (`library-bruno/fareDetails.js`, step 01). Each is a WARNING: the provider's data disagrees with the request or with itself, where OSDM leaves the reading open.
+  - **O16:** a fare whose `requiredCards` names no card a passenger of the fare holds (code, and issuer when both name one). OSDM: one of the listed cards is required at the time of travel. An empty `requiredCards` list is a WARNING of its own (OSDM: at least one item when the list is given).
+  - **O17:** a fare whose `passengerConstraints` do not hold its passenger's age on the day of travel (from the date of birth, else the age; an unknown age checks nothing).
+  - **O18:** a travel class asked (`travelClasses`) with no fare offer in it. A bicycle's fare does not count against the class.
+  - **O19:** valid travel dates whose `utcOffset` disagrees with their own offset. OSDM 3.8: the minutes *added* to get UTC, so `-60` for dates at `+01:00`.
+  - **O20:** an offer's `tripCoverage.coveredSections` naming a leg its trip does not have, or one that is not a train (a transfer leg).
+- **Six fare scenarios on gamma** (collection OTST_V2.0.238), each with its `_36`, `_37`, `_39`, `_310` and `_312` copies, chosen by the section's start station:
+  - `SIM_FARE_REAL_FORM_1ADT_38` (`0000060`, in the run list): the fares name no covered section and no connection point, the offer names its covered section, as a real provider answered. No warning.
+  - `SIM_WRONG_FARE_CARD_NOT_HELD_38` (`0000061`, O16), `SIM_WRONG_FARE_AGES_OUTSIDE_38` (`0000062`, O17), `SIM_WRONG_FARE_OTHER_CLASS_38` (`0000063`, first class asked, O18), `SIM_WRONG_FARE_DATES_OFFSET_38` (`0000064`, O19), `SIM_WRONG_FARE_COVERED_LEG_38` (`0000065`, O20). Deliberately wrong, not in the run list; each gives its warning and no failed check, so each is listed in the server's warning-only simulated errors (`simulatedErrors.js`).
+- The simulator reference configurations include `SIM_FARE_REAL_FORM_1ADT_38` and its copies in their run lists.
+- A welcome-page news entry: more of a fare checked against the request.
+
+### Changed
+- **O8 reads what a fare covers from where a real provider puts it.** In order: the fare's `coveredSection`, its entry and exit connection points, the ends of its route (the top `routeItem`'s indices, else the bare `routeItemList`), then its offer's covered sections. A real fare answer named only the last two, so O8 warned that the coverage could not be checked on every fare.
+
+### Simulator 0.60.0
+- Six fare variants by the section's start station (`fares.variants` in every profile): `realAnswerForm` (`0000060`, not wrong), `cardNotHeld` (`0000061`, the provider's first card required), `agesOutside` (`0000062`, the first fare's passenger constraints 6 to 14), `otherClass` (`0000063`, second class whatever is asked), `datesOffset` (`0000064`, dates at `+01:00` with `utcOffset` 0), `coveredLegUnknown` (`0000065`, a covered section ending on a leg the trip does not have). Every variant's answer passes the OSDM response schema of each provider's version, from 3.6 to 3.12.
+- Checked with the replay:
+  - The 37 `_38` fare scenarios, recorded on the old and the new collection and simulator, give the same checks, failures and warnings. The new checks are warnings, which are log lines, not tests: no scenario's number of checks moved, nor the catalogue's.
+  - Each new scenario and its 3.6 copy on alpha: no failed check; each wrong one gives its one warning, `SIM_FARE_REAL_FORM_1ADT_38` none (O8 reads its coverage from the route).
+  - A real provider's fare answer (private sample) now passes O8; it gives O12, O16 (an empty `requiredCards`), O19 (`utcOffset` 0 with dates at `+01:00`) and O20 (a covered section ending on a transfer leg).
+
+---
+
 ## [server-1.11.439] / [collection-OTST_V2.0.237] — 2026-10-29
 
 Issue #1048 (part C of #1045, realistic fares on the simulator), release 2026.477. Simulator 0.59.0. The server change is the welcome-page news entry.
