@@ -13,8 +13,10 @@ http://www.apache.org/licenses/LICENSE-2.0
  * One check per parameter the search carried that a trip shows: the transfer
  * limit (transfers of each trip), the vias (each trip passes them), the
  * not-vias (no trip changes or stops there) and the number of results (no
- * more trips than asked). An arrival-time basis, real-time data and the train
- * filter are not checked here (the train filter has its own check, #722).
+ * more trips than asked), and with an arrival-time basis the arrival (each
+ * trip arrives at or before the time asked, #1037). Real-time data and the
+ * train filter are not checked here (the train filter has its own check,
+ * #722; a test system has no real-time data to tell by).
  *
  * Graded as the offer search options (offerCriteria.js): no trip keeping to
  * it is a WARNING, some trips not keeping to it INFO, a member the provider
@@ -57,6 +59,33 @@ function placesPassed(trip) {
 
 const passes = (trip, place) => placesPassed(trip).some((p) => sameStopPlace(p, place));
 
+// A date-time with an offset or Z at its end, or none.
+const OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/;
+const LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/;
+
+/** Where a trip arrives: its endTime, else its last timed leg's arrival. */
+function arrivalOf(trip) {
+  const legs = timedLegs(trip);
+  const last = legs.at(-1)?.end?.serviceArrival;
+  const time = trip?.endTime || last?.estimatedTime || last?.timetabledTime;
+  return typeof time === 'string' ? time : null;
+}
+
+/**
+ * Does a trip arrive at or before the time asked? The time asked is the
+ * stop's local time (OSDM: no offset); it is read in the offset of the trip's
+ * own arrival, which is at the same stop. null when either cannot be read.
+ */
+function arrivesBy(trip, asked) {
+  const arrival = arrivalOf(trip);
+  if (!arrival || !OFFSET.test(arrival)) return null;
+  const at = Date.parse(arrival);
+  const offset = arrival.match(OFFSET)[0];
+  const by = Date.parse(OFFSET.test(asked) ? asked : `${asked}${offset}`);
+  if (!Number.isFinite(at) || !Number.isFinite(by)) return null;
+  return at <= by;
+}
+
 /** The parameters a TripSearchCriteria carried, in the form the checks read. */
 function askedParameters(criteria) {
   const c = isObj(criteria) ? criteria : {};
@@ -66,6 +95,7 @@ function askedParameters(criteria) {
     vias: list(c.vias).map((v) => refOf(v.viaPlace)).filter(Boolean),
     notVias: list(c.notVias).flatMap((n) => list(n.notViaPlace).map(refOf)).filter(Boolean),
     numberOfResults: count(params.numberOfResults),
+    arrivalTime: typeof c.arrivalTime === 'string' && (LOCAL.test(c.arrivalTime) || OFFSET.test(c.arrivalTime)) ? c.arrivalTime : null,
   };
 }
 
@@ -121,10 +151,16 @@ function checkTripParameters(criteria, response, ignored = []) {
       grade: () => ({ ok, level: 'warn', message: ok ? '' : `${trips.length} trips given` }),
     });
   }
+  if (asked.arrivalTime !== null) {
+    wanted.push({
+      name: `Trip search: the trips arrive by the time asked (${asked.arrivalTime})`, member: 'arrivalTime', key: 'arrivaltime',
+      grade: () => overTrips(trips, (t) => arrivesBy(t, asked.arrivalTime) !== false, (t) => `arrives ${arrivalOf(t)}`),
+    });
+  }
   // #1035: each check names its parameter, and whether the answer said it was not taken.
   return wanted.map(({ name, member, key, grade }) => (ignored.includes(key)
     ? { name, parameter: `tripSearchCriteria.${member}`, said: true, ok: false, level: 'warn', message: `the provider says it ignored tripSearchCriteria.${member} (PARAMETER_NOT_SUPPORTED): not supported` }
     : { name, parameter: `tripSearchCriteria.${member}`, said: false, ...grade() }));
 }
 
-module.exports = { askedParameters, transfersOf, placesPassed, checkTripParameters };
+module.exports = { askedParameters, transfersOf, placesPassed, arrivalOf, arrivesBy, checkTripParameters };

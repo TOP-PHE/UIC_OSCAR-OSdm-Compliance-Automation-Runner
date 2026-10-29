@@ -230,7 +230,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`library-bruno/tripParameters.js`, from `offerTripSearchCriteria`)
     checks transfers, vias, not-vias and the number of trips, graded like the
     options. Probe `OTST_TRIP_TRANSFER_LIMIT_0`. Simulator 0.40.0: a via makes
-    a two-leg trip. **The simulator alpha checklist sits just under the AI
+    a two-leg trip. **An arrival-time search is checked too** (#1037,
+    OTST_V2.0.236): the trips arrive at or before `arrivalTime`, the stop's
+    local time read in the offset of the trip's own arrival (`arrivesBy()`;
+    an arrival without offset is not counted against). Real-time data stays
+    unchecked and without a scenario (maintainer: a simulator has none).
+    **The simulator alpha checklist sits just under the AI
     context's 20k characters** (`contextOf()`, #827): a longer `fw.*`
     comment there cuts service sheets and fails `ai-checklist.test.js`
     (`cut`).
@@ -1907,7 +1912,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   listed code (`overruleCodeChoices()`), since the point is a code the
   framework does not declare. The simulator restricts codes per provider
   (`overruleCodes` in the profile, on all three since #824, so the refusal
-  test passes on each).
+  test passes on each). **An exchange with an overrule code carries no fee** (#1037,
+  `checkOverruledExchangeFee()` in `exchanges.js`, at 10/11/12; no
+  `appliedOverruleCode` is a WARNING). The four scenarios of #1037
+  (`SIM_EXCHANGE_OVERRULE_…`, `SIM_SALE_YOUNG_CHILD_38`,
+  `SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38`, `SIM_TRIP_PROBE_ARRIVAL_TIME_38`)
+  were added because the coverage report listed their functions as declared
+  without a run: a function the gamma reference declares should have a
+  simulator scenario.
 - **A reduction card is sent, and proved applied twice** (#597, 1.11.228 /
   OTST_V2.0.112). `library-bruno/reductionCards.js` (pure) turns a
   passenger's `reductionCards` into `{ type: REDUCTION_CARD, code, issuer }`;

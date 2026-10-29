@@ -93,6 +93,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.434] / [collection-OTST_V2.0.236] — 2026-10-29
+
+Issue #1037, release 2026.472. Collection only; server unchanged.
+
+### Added
+- **Simulator scenarios for four declared functions without a run.** On a company following a simulator reference, the coverage report listed them under *Declared functions without a scenario run*. Each `_38` scenario has its copies for the other versions (`version-copies.js`), and the references list them:
+  - `SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38`: a semi-flexible one-way ticket exchanged with overrule code `TECHNICAL_FAILURE` (exchange for irregular operations).
+  - `SIM_SALE_YOUNG_CHILD_38`: an adult and a child of 3 on gamma's age-priced stop place, the child priced as `YOUNG_CHILD` (passenger list 38).
+  - `SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38`: `productSelections` by `productCode` (`SIM_ALL_DAY`), the twin of the tag probe. No 3.6 copy: OSDM 3.6 has no `productSelections`.
+  - `SIM_TRIP_PROBE_ARRIVAL_TIME_38`: a search by arrival time (trip 35, `timeBasis` ARRIVAL).
+- **A search by arrival time is checked.** The collection already sent `arrivalTime` but checked nothing about it. After step 01, `checkTripParameters()` (`tripParameters.js`) checks that the trips arrive at or before the time asked (OJP's arrival basis), graded like the other trip search parameters: no trip keeping to it a WARNING, some INFO, a test in a probe. The time asked is the stop's local time; it is read in the offset of the trip's own arrival (`arrivesBy()`). A trip whose arrival names no offset is not counted against.
+- **A technical exchange carries no fee.** An exchange asked with an overrule code (not `null` or the refund's `CODE_DOES_NOT_EXIST` probe) must offer `exchangeFee` 0, as a refund with one gives everything back (#596): one check per exchange offer at 10, 11 and 12 (`checkOverruledExchangeFee()`, `exchanges.js`). An offer that does not name the code applied (`appliedOverruleCode`, optional in OSDM) is a WARNING.
+- *OSCAR - OSDM Simulator scenarios*: a row for each new scenario. CLAUDE.md.
+
+### Not done, on purpose
+- **Ignoring real-time data** (maintainer, 29/10/2026): a simulator has no real-time data, so its answer would look the same whether the parameter is taken or not. It stays listed as declared without a run.
+
+### Tests
+- `trip-search-parameters.test.js`: the arrival asked is read; a trip's arrival from `endTime`, else its last leg; on time, late, read in the arrival's offset (12:00 local = 11:00Z), an arrival without offset not counted; graded none / some / said.
+- `bruno-exchanges.test.js`: an overruled exchange offer without fee passes, with a fee or none fails, without `appliedOverruleCode` warns; no code, `null` and `CODE_DOES_NOT_EXIST` check nothing.
+- Simulator `datafile.test.js`: the exchanges, overrule and age scenarios name the new ones.
+- The four scenarios replayed on a local simulator 0.57.0: 470, 332, 106 and 118 checks, none failed. The arrival check made to compare the wrong way fails its test, as does the fee check made to accept a fee.
+
+---
+
 ## [server-1.11.434] / [collection-OTST_V2.0.235] — 2026-10-28
 
 Issue #1035, release 2026.471. Collection only; server unchanged.

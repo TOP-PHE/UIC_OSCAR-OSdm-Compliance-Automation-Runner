@@ -25,7 +25,7 @@ const { catalogueFor, catalogueDatafile, requirementsOf, missingFor } = require(
 
 const LIB = path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno');
 const DATA = path.join(LIB, '..', 'data_base');
-const { askedParameters, transfersOf, placesPassed, checkTripParameters } = require(path.join(LIB, 'tripParameters.js'));
+const { askedParameters, transfersOf, placesPassed, arrivalOf, arrivesBy, checkTripParameters } = require(path.join(LIB, 'tripParameters.js'));
 
 const stop = (ref) => ({ objectType: 'StopPlaceRef', stopPlaceRef: ref });
 // A trip through the given stops (A, …, B), one timed leg between each two.
@@ -120,8 +120,8 @@ describe('collection: the trips keep to the parameters sent', () => {
     expect(askedParameters({
       vias: [{ viaPlace: stop(V) }, {}], notVias: [{ notViaPlace: [stop('urn:x'), stop('urn:y')] }],
       parameters: { transferLimit: 0, numberOfResults: 2, numberOfResultsAfter: 5 },
-    })).toEqual({ transferLimit: 0, vias: [V], notVias: ['urn:x', 'urn:y'], numberOfResults: 2 });
-    expect(askedParameters(null)).toEqual({ transferLimit: null, vias: [], notVias: [], numberOfResults: null });
+    })).toEqual({ transferLimit: 0, vias: [V], notVias: ['urn:x', 'urn:y'], numberOfResults: 2, arrivalTime: null });
+    expect(askedParameters(null)).toEqual({ transferLimit: null, vias: [], notVias: [], numberOfResults: null, arrivalTime: null });
     expect(transfersOf(trip('t', [A, V, B]))).toBe(1);
     expect(transfersOf(trip('t', [A, V, B], { transfers: 0 }))).toBe(0);
     expect(transfersOf({})).toBe(0);
@@ -150,6 +150,37 @@ describe('collection: the trips keep to the parameters sent', () => {
     expect(mixed[3].message).toBe('2 trips given');
     expect(checkTripParameters(asked, { trips: [] })).toEqual([]);
     expect(checkTripParameters({}, direct)).toEqual([]);
+  });
+
+  test('#1037 an arrival-time basis: the trips arrive at or before the time asked, read in the arrival\'s offset', () => {
+    expect(askedParameters({ arrivalTime: '2026-11-02T12:00:00' }).arrivalTime).toBe('2026-11-02T12:00:00');
+    expect(askedParameters({ arrivalTime: '2026-11-02T12:00:00+01:00' }).arrivalTime).toBe('2026-11-02T12:00:00+01:00');
+    expect(askedParameters({ arrivalTime: 'noon' }).arrivalTime).toBeNull();
+    expect(askedParameters({ arrivalTime: 1200 }).arrivalTime).toBeNull();
+    const at = (id, time) => trip(id, [A, B], { endTime: time });
+    expect(arrivalOf(at('a', '2026-11-02T11:40:00+01:00'))).toBe('2026-11-02T11:40:00+01:00');
+    const byLeg = trip('l', [A, B]);
+    byLeg.legs[0].timedLeg.end.serviceArrival = { timetabledTime: '2026-11-02T11:00:00+01:00' };
+    expect(arrivalOf(byLeg)).toBe('2026-11-02T11:00:00+01:00');
+    expect(arrivalOf(trip('n', [A, B]))).toBeNull();
+    // The local time asked is the stop's: 12:00 there is 11:00 UTC.
+    expect(arrivesBy(at('a', '2026-11-02T12:00:00+01:00'), '2026-11-02T12:00:00')).toBe(true);
+    expect(arrivesBy(at('a', '2026-11-02T11:00:00Z'), '2026-11-02T12:00:00')).toBe(true);
+    expect(arrivesBy(at('a', '2026-11-02T12:01:00+01:00'), '2026-11-02T12:00:00')).toBe(false);
+    expect(arrivesBy(at('a', '2026-11-02T12:30:00+02:00'), '2026-11-02T12:00:00+01:00')).toBe(true);
+    // Nothing to tell by: not counted against the trip.
+    expect(arrivesBy(at('a', '2026-11-02T12:30:00'), '2026-11-02T12:00:00')).toBeNull();
+    expect(arrivesBy(trip('n', [A, B]), '2026-11-02T12:00:00')).toBeNull();
+    const asked = { arrivalTime: '2026-11-02T12:00:00' };
+    const name = 'Trip search: the trips arrive by the time asked (2026-11-02T12:00:00)';
+    expect(checkTripParameters(asked, { trips: [at('a', '2026-11-02T11:55:00+01:00')] })).toEqual([
+      { name, parameter: 'tripSearchCriteria.arrivalTime', said: false, ok: true, level: 'info', message: '0 of 1 trip(s) do not ()' },
+    ]);
+    const late = checkTripParameters(asked, { trips: [at('a', '2026-11-02T11:55:00+01:00'), at('b', '2026-11-02T12:20:00+01:00')] });
+    expect(late[0]).toMatchObject({ ok: false, level: 'info', message: '1 of 2 trip(s) do not (trip b: arrives 2026-11-02T12:20:00+01:00)' });
+    expect(checkTripParameters(asked, { trips: [at('b', '2026-11-02T12:20:00+01:00')] })[0]).toMatchObject({ ok: false, level: 'warn' });
+    expect(checkTripParameters(asked, { trips: [at('b', '2026-11-02T12:20:00+01:00')] }, ['arrivaltime'])[0]).toMatchObject({ said: true, ok: false, level: 'warn' });
+    expect(checkTripParameters({ departureTime: '2026-11-02T08:00:00' }, { trips: [at('b', '2026-11-02T12:20:00+01:00')] })).toEqual([]);
   });
 
   test('a member the provider says it ignored is a warning saying so', () => {
