@@ -801,6 +801,7 @@ function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
   // (alone when only fare parts are asked, #1046).
   const fareOffers = beyondHorizon ? [] : fareOffersOf({
     body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS, fulfillmentOptions,
+    cardOf: (p) => p[CARDS_APPLIED].applied,
   });
   const offers = options.noOffer ? [] : [...productOffers, ...fareOffers];
   // #906: a fare offer is booked like any other, so it is remembered too.

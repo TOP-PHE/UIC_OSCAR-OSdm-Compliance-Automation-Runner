@@ -51,12 +51,14 @@ const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { rank } = require('./versionShapes');
 const { FARE_PLACE } = require('./reservations');
+const { fareTemplates, onlineFare } = require('./fareTemplates');
 
 const MAX_SECTIONS = 4;
 const MAX_REF_LENGTH = 120;
 // The clusters OSDM names, most flexible first (constructing products from fares).
 const CLUSTERS = ['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO'];
-const CLUSTER_FACTOR = { BUSINESS: 2, FULL_FLEX: 1.6, SEMI_FLEX: 1.3, NON_FLEX: 1, PROMO: 0.8 };
+// #1048: a cluster's price against FULL_FLEX's, the template's own (F4, F9).
+const CLUSTER_SHARE = { BUSINESS: 1.25, FULL_FLEX: 1, SEMI_FLEX: 0.8, NON_FLEX: 0.6, PROMO: 0.5 };
 const AFTER_SALE = {
   BUSINESS: [{ condition: 'REFUND', fee: 0 }, { condition: 'EXCHANGE', fee: 0 }],
   FULL_FLEX: [{ condition: 'REFUND', fee: 0 }, { condition: 'EXCHANGE', fee: 0 }],
@@ -222,41 +224,195 @@ function wholeTripWithoutSection(trips, rules) {
   };
 }
 
-// One fare of one passenger for [from, to] of the section.
-function fareOf({ passenger, from, to, cluster, clusters, day, priceCents, provider }) {
-  const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
-  const amount = priceCents;
+/**
+ * #1048: the price of each cluster from FULL_FLEX's, in the provider's
+ * currency cents: BUSINESS above it, then each strictly cheaper than the one
+ * before (F9: NON_FLEX < SEMI_FLEX < FULL_FLEX), never below 0. A free fare
+ * is free in every cluster.
+ */
+function clusterPrices(full) {
+  if (full <= 0) return Object.fromEntries(CLUSTERS.map((c) => [c, 0]));
+  const below = (share, above) => Math.max(0, Math.min(Math.floor(full * share), above - 1));
+  const semi = below(CLUSTER_SHARE.SEMI_FLEX, full);
+  const non = below(CLUSTER_SHARE.NON_FLEX, semi);
   return {
-    id: `${provider.idPrefix}-FARE-${randomId()}`,
-    type: 'ADMISSION',
-    name: { id: `${provider.idPrefix}-FARE-NAME-${cluster}`, text: `${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fare` },
-    prices: [price(amount)],
-    regionalConstraint: {
-      entryConnectionPoint: {
-        objectType: 'FareConnectionPoint',
-        id: `urn:x_osdm_simulator:fcp:${from.stopPlaceRef.split(':').pop()}`,
-        name: stopName(from.stopPlaceRef),
-        stationSets: [{ stations: [{ ...from }] }],
-      },
-      regionalValidities: [{ seqNb: 1, route: { routeSummary: `${stopName(from.stopPlaceRef)} - ${stopName(to.stopPlaceRef)}` } }],
-    },
-    serviceClass: { type: 'STANDARD', name: 'Standard' },
-    travelClass: 'SECOND',
+    BUSINESS: Math.max(Math.ceil(full * CLUSTER_SHARE.BUSINESS), full + 1),
+    FULL_FLEX: full,
+    SEMI_FLEX: semi,
+    NON_FLEX: non,
+    PROMO: below(CLUSTER_SHARE.PROMO, non),
+  };
+}
+
+// #1048: the templates a section is priced on. A section starting or ending
+// at one of the provider's border points takes a template with a border
+// there; any other, one from station to station. The same section always
+// takes the same one; the `alternativeRoutes` variant takes every route of
+// that template's pair of ends, in its direction.
+function templatesFor(section, rules, variant) {
+  const file = fareTemplates();
+  const border = (place) => Boolean(rules.borderPoints?.[place.stopPlaceRef]);
+  const routesOf = (t) => file.templates.filter((x) => x.pair === t.pair && x.direction === t.direction);
+  let candidates = file.templates.filter((t) => t.entry.border === border(section.startPlace) && t.exit.border === border(section.endPlace));
+  if (variant === 'alternativeRoutes') candidates = candidates.filter((t) => routesOf(t).length > 1);
+  const seed = hashOf(`${section.startPlace.stopPlaceRef}|${section.endPlace.stopPlaceRef}`);
+  const chosen = candidates[seed.readUInt16BE(2) % candidates.length];
+  return variant === 'alternativeRoutes' ? routesOf(chosen) : [chosen];
+}
+
+// The places a template's route asks for, and how many its last place takes
+// (a station, or a station set).
+function routeCounts(node) {
+  if (node.place === 'station') return { total: 1, last: 1 };
+  if (node.place === 'stationSet') return { total: node.stations, last: node.stations };
+  const parts = (node.sequence || node.alternatives).map(routeCounts);
+  return { total: parts.reduce((n, p) => n + p.total, 0), last: parts.at(-1).last };
+}
+
+// The stops a trip makes strictly between a section's ends.
+function stopsBetween(trip, section) {
+  const legs = Array.isArray(trip?.legs) ? trip.legs : [];
+  const stops = legs.length > 0 ? [legs[0].timedLeg?.start?.stopPlaceRef?.stopPlaceRef, ...legs.map((l) => l.timedLeg?.end?.stopPlaceRef?.stopPlaceRef)] : [];
+  const from = stops.indexOf(section.startPlace.stopPlaceRef);
+  const to = stops.lastIndexOf(section.endPlace.stopPlaceRef);
+  return from >= 0 && to > from ? stops.slice(from + 1, to) : [];
+}
+
+const ROLE_DIGIT = { entry: 1, route: 2, exit: 3 };
+
+// Where each item of a route's top sequence starts among its places.
+function itemStarts(route) {
+  const starts = [];
+  let at = 0;
+  for (const item of route.sequence) {
+    starts.push(at);
+    at += routeCounts(item).total;
+  }
+  return starts;
+}
+
+/**
+ * #1048: where a template is laid on a section: the section's start opens
+ * the entry and the route, its end opens the exit and the route's last
+ * place, the trip's stops between them open the next items of the route,
+ * and every other place is a station of the simulator's own, the same for a
+ * template wherever it is laid (99, the template's number, the role, the
+ * place).
+ */
+function placesFor(template, section, trip) {
+  const route = template.regionalValidities[0].route;
+  const { total, last } = routeCounts(route);
+  const starts = itemStarts(route);
+  const between = stopsBetween(trip, section);
+  const known = (ref) => ({ stopPlaceRef: ref, name: stopName(ref) });
+  const own = (role, n) => known(`urn:uic:stn:99${template.id.slice(1)}${ROLE_DIGIT[role]}${String(n).padStart(2, '0')}`);
+  const endAt = total - last;
+  return (role, n) => {
+    if (role === 'entry') return n === 0 ? known(section.startPlace.stopPlaceRef) : own(role, n);
+    if (role === 'exit') return n === 0 ? known(section.endPlace.stopPlaceRef) : own(role, n);
+    if (n === 0) return known(section.startPlace.stopPlaceRef);
+    if (n === endAt) return known(section.endPlace.stopPlaceRef);
+    const item = starts.indexOf(n);
+    if (item >= 1 && item <= between.length && n < endAt) return known(between[item - 1]);
+    return own(role, n);
+  };
+}
+
+// The provider's carrier, then companies of the simulator's own: as many as
+// a template counts.
+const companiesOf = (provider) => (n) => Array.from({ length: n }, (_, i) => (i === 0 ? provider.carrier.ref : `urn:x_osdm_simulator:company:${String(i).padStart(3, '0')}`));
+
+// A border end of a fare is its connection point, named by the provider's code.
+function markBorders(regionalConstraint, section, rules) {
+  for (const [key, place] of [['entryConnectionPoint', section.startPlace], ['exitConnectionPoint', section.endPlace]]) {
+    const code = rules.borderPoints?.[place.stopPlaceRef];
+    if (code) Object.assign(regionalConstraint[key], { id: `urn:x_osdm_simulator:border:${code}`, name: `Border point ${code}` });
+  }
+}
+
+// One fare of one passenger for [from, to] of the section, from the
+// template fare `choice` gives (#1048).
+function fareOf({ passenger, from, to, cluster, clusters, day, priceCents, provider, rules, trip, choice }) {
+  const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
+  const section = { startPlace: from, endPlace: to };
+  const id = `${provider.idPrefix}-FARE-${randomId()}`;
+  const fare = onlineFare(fareTemplates(), choice.template, choice.fare, {
+    id,
+    passengerRefs: [passenger.externalRef],
+    day,
+    placeOf: placesFor(choice.template, section, trip),
+    companies: companiesOf(provider),
+    cardFor: () => ({ type: 'REDUCTION_CARD', code: choice.card.code, issuer: provider.carrier.ref }),
     afterSalesCondition: {
       conditions: AFTER_SALE[cluster].map((c) => ({
         condition: c.condition,
-        afterSaleFee: price(c.fee ?? Math.round(amount * c.share)),
+        afterSaleFee: price(c.fee ?? Math.round(priceCents * c.share)),
       })),
       isProviderFee: true,
     },
     combinationConstraint: [{ model: 'CLUSTERING', referenceCluster: cluster, allowedClusters: allowedOf(cluster, clusters) }],
-    travelValidityConstraint: {
-      validTravelDates: { from: `${day}T00:00:00Z`, until: `${day}T23:59:59Z` },
-      validityRange: { timeUnit: 'DAYS', value: 1 },
-    },
-    coveredSection: { startPlace: { ...from }, endPlace: { ...to } },
-    passengerRefs: [passenger.externalRef],
-    involvedTCOs: [provider.carrier.ref],
+  });
+  markBorders(fare.regionalConstraint, section, rules);
+  fare.name = { id: `${provider.idPrefix}-FARE-NAME-${cluster}`, text: `${choice.fare.name}, ${cluster.replace('_', ' ').toLowerCase()}` };
+  fare.description = { id: `${id}-DESCRIPTION`, text: choice.description };
+  fare.prices = [price(priceCents)];
+  fare.coveredSection = { startPlace: { ...from }, endPlace: { ...to } };
+  if (choice.free) fare.passengerConstraints = [{ number: 1, lowerAgeLimit: 0, upperAgeLimit: rules.freeUnderAge - 1 }];
+  return fare;
+}
+
+// #1048: the travel classes of a fare request: those asked, else second.
+function fareClassesOf(criteria) {
+  const asked = Array.isArray(criteria?.travelClasses) ? criteria.travelClasses.filter((c) => c === 'FIRST' || c === 'SECOND') : [];
+  return asked.length > 0 ? [...new Set(asked)] : ['SECOND'];
+}
+
+// #1048: the fare family of the passengers: a group fare from 6 weighted
+// passengers (a person who travels free, a bicycle or an animal weighs
+// nothing), a flexible fare below.
+function familyOf(passengers, day, rules) {
+  const weighted = passengers.filter((p) => p.type === 'PERSON' && !isFree(p, day, rules)).length;
+  return weighted >= 6 ? 'GROUP' : 'FLEXIBLE';
+}
+
+const CLASS_WORDS = { FIRST: 'first class', SECOND: 'second class' };
+
+/**
+ * #1048: the template fare of one passenger: the bicycle fare for a bicycle
+ * (second class only), the fare of the passenger constraint of its type, or
+ * of its age on the day of travel for a person (an adult without a date of
+ * birth); a person travelling free takes a child's fare priced 0. A card of
+ * the provider (F8) takes the fare of the template's card slot of the same
+ * reduction, when it has one.
+ */
+function fareChoiceOf(passenger, { template, family, travelClass, day, rules, cardOf }) {
+  const file = fareTemplates();
+  const typeOf = (f) => file.passengerConstraints[f.passenger];
+  if (isBicycle(passenger)) {
+    const fare = template.fares.find((f) => f.family === 'BICYCLE' && f.card === null);
+    return { template, fare, free: false, card: null, description: `${fare.name}, bicycle, second class` };
+  }
+  const plain = template.fares.filter((f) => f.family === family && f.travelClass === travelClass && f.card === null);
+  const free = isFree(passenger, day, rules);
+  const age = ageOn(passenger.dateOfBirth, day);
+  const fits = (f) => {
+    const c = typeOf(f);
+    if (passenger.type !== 'PERSON') return c.type === passenger.type;
+    if (free) return c.type === 'CHILD';
+    if (age === null) return c.type === 'ADULT';
+    return (c.type === 'ADULT' || c.type === 'CHILD') && c.lowerAgeLimit <= age && age <= c.upperAgeLimit;
+  };
+  const fare = plain.find(fits) || plain.find((f) => typeOf(f).type === 'ADULT');
+  const card = free ? null : cardOf(passenger);
+  const carded = card && template.fares.find((f) => f.family === family && f.travelClass === travelClass && f.passenger === fare.passenger
+    && f.card && file.cardSlots[f.card].family === `REDUCTION_${card.percent}`);
+  const who = free ? 'free child' : typeOf(fare).type.toLowerCase();
+  return {
+    template,
+    fare: carded || fare,
+    free,
+    card: carded ? card : null,
+    description: `${fare.name}, ${who}${carded ? `, ${card.name}` : ''}, ${CLASS_WORDS[travelClass]}`,
   };
 }
 
@@ -301,7 +457,7 @@ function applyCombiningVariant(fare, variant, day) {
  * "unrequested fares" variant station, or the trip leaves from the "fares
  * without section" one).
  */
-function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, lifetimeMs, fulfillmentOptions = [] }) {
+function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, lifetimeMs, fulfillmentOptions = [], cardOf = () => null }) {
   checkInternationalFlags(body);
   const rules = provider.fares;
   const sections = sectionsOf(body);
@@ -311,13 +467,12 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
   const variant = sections.length ? variantOf(section, rules) : null;
   const admissions = asksFares(criteria) || variant === 'unrequestedFares';
   // #255: bicycle places in fare mode, from OSDM 3.8.
-  const bicycles = asksFareReservations(criteria) && rank(provider.osdmVersion) >= FARE_RESERVATIONS_FROM ? passengers.filter(isBicycle) : [];
+  const placesInFareMode = asksFareReservations(criteria) && rank(provider.osdmVersion) >= FARE_RESERVATIONS_FROM;
+  const bicycles = placesInFareMode ? passengers.filter(isBicycle) : [];
   if (!admissions && bicycles.length === 0) return [];
-  const persons = passengers.filter((p) => !isBicycle(p));
-  if (persons.length === 0 && bicycles.length === 0) return [];
+  // F6 (#1048): a bicycle with no place in fare mode travels on a bicycle fare.
+  const farePassengers = passengers.filter((p) => !(isBicycle(p) && bicycles.includes(p)));
   const day = trips[0].startTime.slice(0, 10);
-  const seed = hashOf(`${section.startPlace.stopPlaceRef}|${section.endPlace.stopPlaceRef}`);
-  const baseCents = 800 + (seed.readUInt16BE(0) % 4200);
   const clusters = rules.clusters.filter((c) => CLUSTERS.includes(c));
   const createdOn = new Date(nowMs).toISOString();
   const places = () => bicyclePlacesOf({ trip: trips[0], section, bicycles, provider, createdOn, fulfillmentOptions, variant });
@@ -330,22 +485,32 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
     passengerRefs: passengers.map((p) => p.externalRef),
     ...members,
   });
-  if (!admissions || persons.length === 0) return [offerOf(`${provider.name} bicycle places, ${route}`, { reservationOfferParts: places() })];
-  return clusters.map((cluster) => {
-    const priceCents = Math.round(baseCents * CLUSTER_FACTOR[cluster] * provider.priceFactor);
-    const fares = persons
-      .filter((p, i) => !(variant === 'passengerWithoutFare' && i === persons.length - 1))
-      .flatMap((passenger) => faresOfPassenger(passenger, section, {
-        variant, cluster, clusters, day, provider,
-        priceCents: isFree(passenger, day, rules) ? 0 : priceCents,
-      }));
-    for (const fare of fares) {
-      applyClusterVariant(fare, variant);
-      applyCombiningVariant(fare, variant, day);
+  if (!admissions || farePassengers.length === 0) return [offerOf(`${provider.name} bicycle places, ${route}`, { reservationOfferParts: places() })];
+  const family = familyOf(farePassengers, day, rules);
+  const templates = templatesFor(section, rules, variant);
+  const priced = farePassengers.filter((p, i) => !(variant === 'passengerWithoutFare' && i === farePassengers.length - 1));
+  const offers = [];
+  templates.forEach((template, routeIndex) => {
+    for (const travelClass of fareClassesOf(criteria)) {
+      const choices = priced.map((passenger) => ({ passenger, choice: fareChoiceOf(passenger, { template, family, travelClass, day, rules, cardOf }) }));
+      for (const cluster of clusters) {
+        const fares = choices.flatMap(({ passenger, choice }) => {
+          const full = choice.free ? 0 : Math.round(choice.fare.price * provider.priceFactor);
+          return faresOfPassenger(passenger, section, {
+            variant, cluster, clusters, day, provider, rules, trip: trips[0], choice, priceCents: clusterPrices(full)[cluster],
+          });
+        });
+        for (const fare of fares) {
+          applyClusterVariant(fare, variant);
+          applyCombiningVariant(fare, variant, day);
+        }
+        const reservations = bicycles.length > 0 ? { reservationOfferParts: places() } : {};
+        const which = templates.length > 1 ? `, route ${routeIndex + 1} (${template.distance} km)` : '';
+        offers.push(offerOf(`${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fares, ${CLASS_WORDS[travelClass]}, ${route}${which}`, { fares, ...reservations }));
+      }
     }
-    const reservations = bicycles.length > 0 ? { reservationOfferParts: places() } : {};
-    return offerOf(`${provider.name} ${cluster.replace('_', ' ').toLowerCase()} fares, ${route}`, { fares, ...reservations });
   });
+  return offers;
 }
 
-module.exports = { fareOffersOf, sectionsOf, asksFares, asksFareReservations, asksOnlyFares, noFareOfferProblem, CLUSTERS };
+module.exports = { fareOffersOf, sectionsOf, asksFares, asksFareReservations, asksOnlyFares, noFareOfferProblem, clusterPrices, placesFor, CLUSTERS };
