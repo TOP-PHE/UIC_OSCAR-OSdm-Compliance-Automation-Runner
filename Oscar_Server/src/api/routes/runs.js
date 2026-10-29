@@ -1278,17 +1278,31 @@ router.post('/:id/share', (req, res) => {
       detail: `Run is ${runRow.status} — sharing is only allowed once a run reaches a terminal status.` });
   }
 
+  shareWithCertifier(req, runRow);
+  const updated = get('SELECT id, shared_with_certifier_at, shared_with_certifier_by FROM runs WHERE id = ?', [req.params.id]);
+  return res.json({ ok: true, run: updated });
+});
+
+// One run shared with certifiers, audited (the run page, a Dashboard row and a
+// batch, #1041). The caller checks the role, the run's visibility and status.
+function shareWithCertifier(req, runRow) {
   dbRun(
     `UPDATE runs
         SET shared_with_certifier_at = datetime('now'),
             shared_with_certifier_by = ?
       WHERE id = ?`,
-    [req.user.email, req.params.id]
+    [req.user.email, runRow.id]
   );
-  auditLog(req.user.id, runRow.company_id, req.user.email, `run_shared_with_certifier:${req.params.id}`);
-  const updated = get('SELECT id, shared_with_certifier_at, shared_with_certifier_by FROM runs WHERE id = ?', [req.params.id]);
-  return res.json({ ok: true, run: updated });
-});
+  auditLog(req.user.id, runRow.company_id, req.user.email, `run_shared_with_certifier:${runRow.id}`);
+}
+
+function unshareWithCertifier(req, runRow) {
+  dbRun(
+    `UPDATE runs SET shared_with_certifier_at = NULL, shared_with_certifier_by = NULL WHERE id = ?`,
+    [runRow.id]
+  );
+  auditLog(req.user.id, runRow.company_id, req.user.email, `run_unshared_with_certifier:${runRow.id}`);
+}
 
 // ── DELETE /v1/runs/:id/share — revoke certifier access to THIS run ──────────
 // Test manager unshare: certifiers immediately lose access. Audit-logged.
@@ -1301,11 +1315,7 @@ router.delete('/:id/share', (req, res) => {
   if (!runRow) {
     return res.status(404).json({ status: 404, title: 'Run not found.' });
   }
-  dbRun(
-    `UPDATE runs SET shared_with_certifier_at = NULL, shared_with_certifier_by = NULL WHERE id = ?`,
-    [req.params.id]
-  );
-  auditLog(req.user.id, runRow.company_id, req.user.email, `run_unshared_with_certifier:${req.params.id}`);
+  unshareWithCertifier(req, runRow);
   return res.json({ ok: true, run: { id: req.params.id, shared_with_certifier_at: null } });
 });
 
@@ -1398,6 +1408,36 @@ router.delete('/batch/:batchId/share-with-operator', (req, res) => {
   const runs = batchRunsOf(req);
   if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
   return res.json({ runs: unshareRuns(req, runs) });
+});
+
+// ── #1041: share a whole batch with certifiers ──────────────────────────────
+// Every run of the batch the Test Manager may see (batchRunsOf()); only the
+// finished ones are shared, the others come back with their reason. Already
+// shared runs keep who shared them and when. One audit event per run changed.
+router.post('/batch/:batchId/share', (req, res) => {
+  if (req.user.role !== 'test_manager') {
+    return res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only test_manager can share runs with certifiers.' });
+  }
+  const runs = batchRunsOf(req);
+  if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
+  const results = runs.map((runRow) => {
+    if (!TERMINAL.has(runRow.status)) return { id: runRow.id, shared: false, reason: `Run is ${runRow.status}.` };
+    if (!runRow.shared_with_certifier_at) shareWithCertifier(req, runRow);
+    return { id: runRow.id, shared: true };
+  });
+  return res.json({ shared: results.filter((r) => r.shared).length, runs: results });
+});
+
+router.delete('/batch/:batchId/share', (req, res) => {
+  if (req.user.role !== 'test_manager') {
+    return res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only test_manager can revoke certifier access.' });
+  }
+  const runs = batchRunsOf(req);
+  if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
+  for (const runRow of runs) if (runRow.shared_with_certifier_at) unshareWithCertifier(req, runRow);
+  return res.json({ runs: runs.map((r) => ({ id: r.id, shared: false })) });
 });
 
 // ── DELETE /v1/runs/:id/cancel ────────────────────────────────────────────────

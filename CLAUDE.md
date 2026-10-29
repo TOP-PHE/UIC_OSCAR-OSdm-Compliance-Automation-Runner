@@ -909,6 +909,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   with `shared_with_certifier_at` set (the company-wide
   `share_reports_with_certifier` toggle was removed in v1.11.15 and is dead
   schema); tester/test_manager → own company; unknown role → fail closed.
+  **A whole batch is shared with certifiers** (#1041, 1.11.436):
+  `POST`/`DELETE /v1/runs/batch/:batchId/share` over `batchRunsOf()` (each
+  run through `canUserSeeRun()`), finished runs only, an earlier share kept,
+  one audit event per run (`shareWithCertifier()`, shared with the per-run
+  route); the Dashboard's `batchCertifierAction()` asks first.
   **The failure mode to watch for is a second copy of the policy.** `reports.js`
   grew its own — five handlers branching on `isPlatformRole()` or on the literal
   string `'certification_user'` — and each one was a bypass: findings S1/S4 of

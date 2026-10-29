@@ -122,3 +122,38 @@ describe('providers page', () => {
     expect(f({ provider_id: 'p1', distributor_name: 'UIC', provider_name: 'CHAPS', status: 'refused' })).not.toContain('link-refuse');
   });
 });
+
+describe('dashboard: a whole batch shared with certifiers (#1041)', () => {
+  const f = (user) => loadFunction('dashboard.html', 'batchCertifierAction', { user, esc });
+  const done = (extra = {}) => ({ status: 'COMPLETED', ...extra });
+
+  test('offered while a finished run of the batch is not shared; undone once all are', () => {
+    expect(f(TM)([done({ shared_with_certifier_at: 'x' }), done()], 'b1')).toContain('data-action="share-batch-certifier"');
+    expect(f(TM)([done({ shared_with_certifier_at: 'x' }), { status: 'RUNNING' }], 'b1')).toContain('data-action="unshare-batch-certifier"');
+    expect(f(TM)([done({ shared_with_certifier_at: 'x' }), { status: 'RUNNING' }], 'b1')).toContain('✓ Shared with certifiers');
+  });
+
+  test('nothing for a batch with no finished run, nor for anyone but a Test Manager', () => {
+    expect(f(TM)([{ status: 'QUEUED' }, { status: 'RUNNING' }], 'b1')).toBe('');
+    expect(f({ role: 'company_user' })([done()], 'b1')).toBe('');
+    expect(f({ role: 'certification_user' })([done()], 'b1')).toBe('');
+  });
+
+  test('the batch id is escaped', () => {
+    const html = f(TM)([done()], 'b"><img src=x>');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('&quot;');
+  });
+
+  test('the click handler reads the actions, asks first, and calls the batch route', () => {
+    const src = read('dashboard.html');
+    expect(src).toContain('[data-action$="-batch-certifier"]');
+    expect(src).toContain('/v1/runs/batch/${encodeURIComponent(certEl.dataset.batchId)}/share`');
+    expect(src).toMatch(/if \(confirm\(batchCertifierQuestion\(share\)\)\)/);
+    // The certifier handler comes before the batch row's toggle, which would swallow the click.
+    expect(src.indexOf('-batch-certifier"]')).toBeLessThan(src.indexOf('[data-action="toggle-batch"]\')'));
+    const q = loadFunction('dashboard.html', 'batchCertifierQuestion');
+    expect(q(true)).toContain('every finished run');
+    expect(q(false)).toContain('Stop sharing');
+  });
+});

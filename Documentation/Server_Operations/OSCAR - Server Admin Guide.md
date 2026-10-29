@@ -892,8 +892,11 @@ Certifier visibility of a run requires exactly one thing:
 
 - **Per-run share** — `runs.shared_with_certifier_at` is set. The Test
   Manager flips this with the **Share with certifiers** button on the
-  run-detail page. Audit-logged. Default is unshared: a certifier sees
-  nothing until someone deliberately shares it.
+  run-detail page, on the run's Dashboard row, for a whole batch from the
+  batch's row (`POST`/`DELETE /v1/runs/batch/:batchId/share`, #1041: its
+  finished runs only), or by sharing a published coverage report.
+  Audit-logged per run. Default is unshared: a certifier sees nothing until
+  someone deliberately shares it.
 
 > **Corrected in v1.11.194.** This section previously described a second,
 > company-wide gate — `companies.share_reports_with_certifier`, the legacy
