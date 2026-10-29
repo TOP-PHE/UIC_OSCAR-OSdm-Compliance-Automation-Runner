@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-fare-overlap-combining-fee-fail",
+    "date": "October 29, 2026",
+    "tag": "Changed",
+    "title": "Overlapping fares and a wrong COMBINING refund fee now fail",
+    "summary": "Two fare checks about money count against the provider: fares covering part of the trip twice, and a refund fee the fares do not give.",
+    "content": "Until now both were warnings, which do not count in a coverage report. A passenger's fares covering part of the requested section twice now fail at the offer, and that offer is not booked. A refund offer whose fee is not the one the COMBINING fares' conditions give now fails at the refund. Fare scenarios count one more check, two for a COMBINING refund."
+  },
+  {
     "id": "2026-10-29-coverage-by-distribution-mode",
     "date": "October 29, 2026",
     "tag": "New",

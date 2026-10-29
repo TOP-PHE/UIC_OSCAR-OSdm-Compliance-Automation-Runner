@@ -2230,6 +2230,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   their `SIM_WRONG_FARE_*` scenarios warn only (`WARNING_ONLY`). A
   WARNING-level fare check is a log line, not a test (`record()`), so no
   scenario's number of checks moved, nor the catalogue's `checks`.
+  **Overlapping fares (O8) and a wrong COMBINING refund fee (R3) fail**
+  (#1055, 1.11.442 / OTST_V2.0.239, maintainer 2026-10-29: both are
+  money). As tests they add one check to every fare offer with a section and
+  one to a COMBINING refund: the catalogue's `checks` and *What is tested*
+  moved with them (`replay.js catalogue` on the fare `_38` scenarios). An
+  overlapping offer is no longer booked (`fareSaleDecision()`).
+  `SIM_WRONG_FARE_OVERLAP_*` and `SIM_WRONG_FARE_COMBINING_FEE_*` left
+  `WARNING_ONLY`.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,
