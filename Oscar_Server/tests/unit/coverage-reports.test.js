@@ -87,3 +87,22 @@ describe('what a report keeps beside its content', () => {
     expect(R.summaryOf({ byCapability: { summary: { tested: 'x<script>' } } }).tested).toBe(0);
   });
 });
+
+// #1053: two reports split by distribution mode are compared mode by mode.
+describe('the comparison of reports split by distribution mode (#1053)', () => {
+  const row = (id, result) => ({ id, label: id, group: 'G', result });
+  const report = (byMode, capabilities = []) => ({ byCapability: { capabilities, points: [], ...(byMode ? { byMode } : {}) } });
+  const previous = (r) => ({ id: 'p', number: 1, report: r });
+
+  test('a capability moved in one mode only is named with that mode', () => {
+    const before = report([{ mode: 'PRODUCT', capabilities: [row('sale', 'passed')] }, { mode: 'FARE', capabilities: [row('sale', 'passed')] }], [row('sale', 'passed')]);
+    const now = report([{ mode: 'PRODUCT', capabilities: [row('sale', 'passed')] }, { mode: 'FARE', capabilities: [row('sale', 'blocked')] }], [row('sale', 'blocked')]);
+    expect(R.comparisonOf(now, previous(before)).capabilities).toEqual([{ id: 'sale', label: 'sale', group: 'G', before: 'passed', now: 'blocked', mode: 'FARE' }]);
+  });
+
+  test('a report published before the split is compared on the whole report', () => {
+    const before = report(null, [row('sale', 'passed')]);
+    const now = report([{ mode: 'FARE', capabilities: [row('sale', 'blocked')] }], [row('sale', 'blocked')]);
+    expect(R.comparisonOf(now, previous(before)).capabilities).toEqual([{ id: 'sale', label: 'sale', group: 'G', before: 'passed', now: 'blocked' }]);
+  });
+});

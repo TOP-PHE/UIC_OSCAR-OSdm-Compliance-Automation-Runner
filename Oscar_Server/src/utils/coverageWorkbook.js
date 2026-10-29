@@ -63,6 +63,29 @@ function formLine(x) {
 }
 const testsText = (tests) => arr(tests).map((x) => `${x.entry || x.key}: ${capabilityText(x.result)}\n${arr(x.forms).map((y) => '  ' + formLine(y)).join('\n')}`).join('\n');
 const findingOf = (p) => p.finding || p.possibleFinding || null;
+const { DISTRIBUTION_MODE_TEXT } = require('./distributionModes');
+const modeText = (mode) => (DISTRIBUTION_MODE_TEXT[mode] ? `${DISTRIBUTION_MODE_TEXT[mode][0].toUpperCase()}${DISTRIBUTION_MODE_TEXT[mode].slice(1)}` : '');
+// #1053: the rows of a split report, each with its mode first, else the rows as they are.
+const splitOf = (report) => (Array.isArray(report.byCapability?.byMode) ? report.byCapability.byMode : null);
+function rowsByMode(report, key, toRow) {
+  const split = splitOf(report);
+  if (!split) return arr(report.byCapability?.[key]).map((x) => toRow(x));
+  return split.flatMap((m) => arr(m[key]).map((x) => [modeText(m.mode), ...toRow(x)]));
+}
+const modeColumn = (report) => (splitOf(report) ? [{ title: 'Distribution', width: 16 }] : []);
+// The summary lines of each mode of a split report.
+function modeSummaryRows(report) {
+  return arr(splitOf(report)).flatMap((m) => {
+    const s = m.summary || {};
+    return [
+      [`${modeText(m.mode)} distribution: capabilities tested`, s.tested ?? 0], ['  Passed', s.passed ?? 0],
+      ['  Passed with deviation', s.deviation ?? 0], ['  Passed with points', s.points ?? 0], ['  Blocked', s.blocked ?? 0],
+      ['  Not supported by the provider', s.notSupported ?? 0], ['  Declared and not tested', s.notTested ?? 0],
+      ['  Expected refusals refused', `${s.expectedRefusals?.refused ?? 0} of ${s.expectedRefusals?.total ?? 0}`],
+      ['  Points to look at', s.pointsToLookAt?.total ?? 0],
+    ];
+  });
+}
 
 function capabilitySummaryRows(report) {
   const s = report.byCapability?.summary || {};
@@ -78,6 +101,7 @@ function capabilitySummaryRows(report) {
     ['  Accepted deviations', p.accepted ?? 0], ['  Not supported by the provider', p.unsupported ?? 0],
     ['  Questions on the specification', p.questions ?? 0], ["  OSCAR's own", p.oscar ?? 0],
     ['Scenarios set apart (neither in the run list nor run)', s.apart ?? 0],
+    ...modeSummaryRows(report),
   ];
 }
 
@@ -98,11 +122,11 @@ function capabilitiesSheet(report) {
   return {
     name: 'Capabilities',
     columns: [
-      { title: 'Group', width: 18 }, { title: 'Capability', width: 44 }, { title: 'Optional', width: 10 }, { title: 'Test Framework', width: 20 },
+      ...modeColumn(report), { title: 'Group', width: 18 }, { title: 'Capability', width: 44 }, { title: 'Optional', width: 10 }, { title: 'Test Framework', width: 20 },
       { title: 'Result', width: 26 }, { title: 'Tests', width: 8 }, { title: 'Forms run', width: 10 }, { title: 'Proven on the way (runs)', width: 14 },
       { title: 'Points', width: 16 }, { title: 'Tests and forms', width: 80 }, { title: 'Problems on the way', width: 40 },
     ],
-    rows: arr(report.byCapability?.capabilities).map((c) => [
+    rows: rowsByMode(report, 'capabilities', (c) => [
       c.group, c.label, yesNo(Boolean(c.optional)), DECLARATION_TEXT[c.declaration] || c.declaration || '', capabilityText(c.result),
       arr(c.tests).length, formsRun(c.tests), c.provenBy?.count ?? 0, numbersText(c.points), testsText(c.tests),
       arr(c.sideProblems).map((x) => `${x.code}: ${capabilityText(x.result)}`).join('\n'),
@@ -114,10 +138,10 @@ function refusalsSheet(report) {
   return {
     name: 'Expected refusals',
     columns: [
-      { title: 'Expected refusal', width: 40 }, { title: 'Purpose', width: 60 }, { title: 'Capability probed', width: 36 },
+      ...modeColumn(report), { title: 'Expected refusal', width: 40 }, { title: 'Purpose', width: 60 }, { title: 'Capability probed', width: 36 },
       { title: 'Result', width: 22 }, { title: 'Forms', width: 70 }, { title: 'Points', width: 12 },
     ],
-    rows: arr(report.byCapability?.expectedRefusals).map((r) => [
+    rows: rowsByMode(report, 'expectedRefusals', (r) => [
       r.entry || r.key, r.purpose || '', r.capabilityLabel, capabilityText(r.result), arr(r.forms).map(formLine).join('\n'), numbersText(r.points),
     ]),
   };
@@ -127,7 +151,7 @@ function pointsSheet(report) {
   return {
     name: 'Points to look at',
     columns: [
-      { title: 'Point', width: 8 }, { title: 'Kind', width: 26 }, { title: 'Capability', width: 36 }, { title: 'Expected refusal', width: 10 },
+      { title: 'Point', width: 8 }, ...modeColumn(report), { title: 'Kind', width: 26 }, { title: 'Capability', width: 36 }, { title: 'Expected refusal', width: 10 },
       { title: 'Steps', width: 40 }, { title: 'Expected (the check)', width: 70 }, { title: 'Seen (latest run)', width: 70 },
       { title: 'HTTP status', width: 10 }, { title: 'Problem code', width: 24 },
       { title: 'Blocking', width: 10 }, { title: 'Times seen', width: 10 }, { title: 'Tests', width: 40 }, { title: 'Scenario codes', width: 50 },
@@ -140,7 +164,7 @@ function pointsSheet(report) {
       const finding = findingOf(p);
       const position = p.finding?.position || null;
       return [
-        p.number, KIND_TEXT[p.kind] || p.kind || '', p.capabilityLabel, yesNo(Boolean(p.expectedRefusal)),
+        p.number, ...(splitOf(report) ? [arr(p.modes).map(modeText).join(', ')] : []), KIND_TEXT[p.kind] || p.kind || '', p.capabilityLabel, yesNo(Boolean(p.expectedRefusal)),
         arr(p.steps).length ? arr(p.steps).join('\n') : (p.step || ''), p.check, p.observed?.text || '', p.status ?? null, p.problemCode || '',
         yesNo(Boolean(p.blocking)), p.occurrences ?? 0, arr(p.tests).map((x) => x.entry || x.key).join('\n'),
         arr(p.tests).flatMap((x) => arr(x.codes)).join('\n'), p.firstSeen || '', p.lastSeen || '',
@@ -275,7 +299,7 @@ function comparisonSheet(comparison) {
     arr(p.steps).join('\n'), p.check || '', '', '',
   ]));
   const capabilityRows = arr(comparison.capabilities).map((c) => [
-    'Capability result', null, null, c.label || c.id, '', '', capabilityText(c.before), capabilityText(c.now),
+    'Capability result', null, null, (c.label || c.id) + (c.mode ? ` (${DISTRIBUTION_MODE_TEXT[c.mode] || c.mode})` : ''), '', '', capabilityText(c.before), capabilityText(c.now),
   ]);
   return {
     name: `Since report ${comparison.previous?.number ?? ''}`.trim(),

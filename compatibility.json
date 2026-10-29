@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.478",
+  "current_release": "2026.479",
   "releases": [
+    {
+      "release": "2026.479",
+      "date": "2026-10-29",
+      "server": "1.11.441",
+      "collection": "OTST_V2.0.238",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1053: the coverage by capability has one section per distribution mode (product-based, fare-based) when fares are declared or a fare scenario ran; the points stay one numbered list, each naming its mode; exports, published reports and their comparison follow."
+      ]
+    },
     {
       "release": "2026.478",
       "date": "2026-10-29",

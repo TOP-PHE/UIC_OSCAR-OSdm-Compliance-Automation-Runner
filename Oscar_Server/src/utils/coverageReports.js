@@ -88,16 +88,26 @@ function pointChanges(now, before) {
   return out;
 }
 
+// The capability rows of a report, by key: `id`, or `mode:id` when both
+// reports are split by distribution mode (#1053).
+function rowsByKey(byCapability, split) {
+  if (!split) return new Map(arr(byCapability.capabilities).map((c) => [c.id, c]));
+  return new Map(arr(byCapability.byMode).flatMap((m) => arr(m.capabilities).map((c) => [`${m.mode}:${c.id}`, { ...c, mode: m.mode }])));
+}
+
 function capabilityChanges(now, before) {
-  const was = new Map(arr(before.capabilities).map((c) => [c.id, c]));
-  const is = new Map(arr(now.capabilities).map((c) => [c.id, c]));
+  const split = Array.isArray(now.byMode) && Array.isArray(before.byMode);
+  const was = rowsByKey(before, split);
+  const is = rowsByKey(now, split);
   const changes = [];
-  for (const id of new Set([...was.keys(), ...is.keys()])) {
-    const b = was.get(id);
-    const n = is.get(id);
+  for (const key of new Set([...was.keys(), ...is.keys()])) {
+    const b = was.get(key);
+    const n = is.get(key);
     const from = b ? b.result : null;
     const to = n ? n.result : null;
-    if (from !== to) changes.push({ id, label: (n || b).label, group: (n || b).group, before: from, now: to });
+    if (from === to) continue;
+    const row = n || b;
+    changes.push({ id: row.id, label: row.label, group: row.group, before: from, now: to, ...(split ? { mode: row.mode } : {}) });
   }
   return changes;
 }

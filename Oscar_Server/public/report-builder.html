@@ -2376,7 +2376,42 @@ function capabilityTestCodes(t) {
 
 function capabilityWhereText(p) {
   var tests = (p.tests || []).map(capabilityTestCodes).join('; ');
-  return 'Found in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '');
+  var modes = (p.modes || []).map(capabilityModeText).join(' and ');
+  return 'Found in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '')
+    + (modes ? ' (' + modes.toLowerCase() + ')' : '');
+}
+
+// #1053: the name of a distribution mode.
+function capabilityModeText(mode) {
+  var MODE_TEXT = { PRODUCT: 'Product-based distribution', FARE: 'Fare-based distribution' };
+  return Object.hasOwn(MODE_TEXT, mode) ? MODE_TEXT[mode] : String(mode || '');
+}
+
+// #1053: one mode's summary: its capabilities, refusals and points.
+function capabilityModeSummaryText(m) {
+  var s = (m && m.summary) || {};
+  var r = s.expectedRefusals || {};
+  var p = s.pointsToLookAt || {};
+  return (m && m.scenarios || 0) + ' scenario(s) · ' + (s.tested || 0) + ' capability(ies) tested: ' + (s.passed || 0) + ' passed, '
+    + (s.deviation || 0) + ' passed with deviation, ' + (s.points || 0) + ' passed with points, ' + (s.blocked || 0) + ' blocked, '
+    + (s.notSupported || 0) + ' not supported by the provider · ' + (s.notTested || 0) + ' declared and not tested · expected refusals: '
+    + (r.refused || 0) + ' of ' + (r.total || 0) + ' refused · ' + (p.total || 0) + ' point(s) to look at';
+}
+
+// The capability tables: one, or one per distribution mode (#1053), each
+// with its expected refusals. The points stay one list for the report.
+function capabilityTablesHtml(data) {
+  var table = function(rows, refusals) {
+    if (!Array.isArray(rows) || rows.length === 0) return '<div class="cov-note">No capability: no scenario of this distribution mode is read.</div>';
+    return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
+      + capabilityRowsHtml(rows, data.points, data.positions) + '</tbody></table>';
+  };
+  if (!Array.isArray(data.byMode)) return table(data.capabilities) + capabilityRefusalsHtml(data.expectedRefusals, data.points, data.positions);
+  return data.byMode.map(function(m) {
+    return '<h3 class="cov-heading">' + escHtml(capabilityModeText(m.mode)) + '</h3>'
+      + '<div class="cov-summary">' + escHtml(capabilityModeSummaryText(m)) + '</div>'
+      + table(m.capabilities) + capabilityRefusalsHtml(m.expectedRefusals, data.points, data.positions);
+  }).join('');
 }
 
 // The provider's position on a point (#994), on one line: what, who and
@@ -2528,9 +2563,7 @@ function simulatedErrorsMarkdown(se) {
 
 function capabilityHtml(c) {
   var data = c || {};
-  return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
-    + capabilityRowsHtml(data.capabilities, data.points, data.positions) + '</tbody></table>'
-    + capabilityRefusalsHtml(data.expectedRefusals, data.points, data.positions) + capabilityOptionsHtml(data.offerOptions)
+  return capabilityTablesHtml(data) + capabilityOptionsHtml(data.offerOptions)
     + capabilityPointsHtml(data.points, data.positions) + simulatedErrorsHtml(data.simulatedErrors) + capabilityAsideHtml(data);
 }
 
@@ -2618,10 +2651,22 @@ function capabilityAsideMarkdown(c) {
   return lines;
 }
 
+// The capability tables in Markdown: one, or one per distribution mode (#1053).
+function capabilityTablesMarkdown(data) {
+  if (!Array.isArray(data.byMode)) return capabilityRowsMarkdown(data.capabilities).concat(capabilityRefusalsMarkdown(data.expectedRefusals));
+  var lines = [];
+  for (const m of data.byMode) {
+    lines.push('', '### ' + mdCell(capabilityModeText(m.mode)), '', mdCell(capabilityModeSummaryText(m)));
+    lines = lines.concat(capabilityRowsMarkdown(m.capabilities).map(function(l) { return l.startsWith('### ') ? '#' + l : l; }),
+      capabilityRefusalsMarkdown(m.expectedRefusals).map(function(l) { return l.startsWith('## ') ? '#' + l : l; }));
+  }
+  return lines;
+}
+
 function capabilityMarkdown(c, days) {
   var data = c || {};
   return ['## By capability', '', mdCell(capabilitySummaryText(data.summary, days))]
-    .concat(capabilityRowsMarkdown(data.capabilities), capabilityRefusalsMarkdown(data.expectedRefusals),
+    .concat(capabilityTablesMarkdown(data),
       capabilityOptionsMarkdown(data.offerOptions), capabilityPointsMarkdown(data.points), simulatedErrorsMarkdown(data.simulatedErrors),
       capabilityAsideMarkdown(data));
 }
@@ -2734,7 +2779,8 @@ function comparisonHtml(c) {
   var head = 'Since published report #' + (previous.number || '?') + ' (shared ' + (previous.sharedAt || '?') + '): ' + (counts.fixed || 0) + ' fixed, '
     + (counts.still || 0) + ' still open, ' + (counts.new || 0) + ' new, ' + (counts.notRetested || 0) + ' not run again.';
   var changed = (c.capabilities || []).map(function(x) {
-    return '<li>' + escHtml((x.label || x.id) + ': ' + comparisonResultText(x.before) + ' → ' + comparisonResultText(x.now)) + '</li>';
+    var mode = x.mode ? ' (' + capabilityModeText(x.mode).toLowerCase() + ')' : '';
+    return '<li>' + escHtml((x.label || x.id) + mode + ': ' + comparisonResultText(x.before) + ' → ' + comparisonResultText(x.now)) + '</li>';
   }).join('');
   var lists = Object.keys(CHANGE_LABELS).map(function(k) {
     var of = (c.points && c.points[k]) || [];

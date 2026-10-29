@@ -53,6 +53,9 @@ const { declarationOf } = require('./coverageMatrix');
 const {
   declaredFunctions, frameworkOf, isBlockingCheck: isBlocking, scenarioHash, toRunAgain,
 } = require('./frameworkCoverage');
+const {
+  DISTRIBUTION_MODES, DISTRIBUTION_MODE_TEXT, declaredDistributionModes, distributionModesOf,
+} = require('./distributionModes');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -363,6 +366,12 @@ function formOf(item, { collectionVersion, pointOf }) {
   return form;
 }
 
+// #1053: the distribution modes a scenario counts in, product when none is read.
+function modesOfScenario(scenario, datafile) {
+  const modes = distributionModesOf(scenario, datafile);
+  return modes.length > 0 ? modes : ['PRODUCT'];
+}
+
 // Each scenario of the report: its test, main capability, traits and run.
 function scenarioItems({ datafile, catalogue, runs, runList }) {
   const items = [];
@@ -378,6 +387,7 @@ function scenarioItems({ datafile, catalogue, runs, runList }) {
       scenario, entry, testKey: entry?.code || scenario.code, run: runs[scenario.code] || null,
       main: K.CAPABILITY.has(entry?.capability) ? entry.capability : K.derivedCapability(scenario, datafile),
       refusal: K.isRefusalTest(scenario), traits: K.traitsOf(scenario, datafile),
+      modes: modesOfScenario(scenario, datafile),
     });
   }
   return { items, apart };
@@ -487,6 +497,76 @@ function capabilityRow(def, tests, side, { declaration, points }) {
   };
 }
 
+// The capability rows of some tests: a row for each capability a test or a
+// run proves, or that the framework declares (#1053: `shown` says which of
+// those declared rows belong to the mode read).
+function capabilityRowsOf(tests, side, { fw, declaredIds, points, shown = () => true, belongs = () => true }) {
+  const rows = [];
+  for (const def of K.CAPABILITIES) {
+    if (!belongs(def)) continue;
+    const own = tests.filter((t) => !t.refusal && t.capability === def.id);
+    const evidence = side.get(def.id) || [];
+    const declaration = capabilityDeclaration(def.id, fw, declaredIds);
+    if (own.length === 0 && evidence.length === 0 && (declaration !== 'declared' || !shown(def))) continue;
+    const rowPoints = numbersOf(points.filter((p) => p.capability === def.id && !p.expectedRefusal));
+    rows.push(capabilityRow(def, own, evidence, { declaration, points: rowPoints }));
+  }
+  return rows;
+}
+
+function refusalsOf(tests, points) {
+  return tests.filter((t) => t.refusal).map(({ key, entry, purpose, capability, result, forms }) => ({
+    key, entry, purpose, capability, capabilityLabel: K.CAPABILITY.get(capability)?.label || capability, result, forms,
+    points: numbersOf(points.filter((p) => p.expectedRefusal && p.tests.some((t) => t.key === key))),
+  }));
+}
+
+// #1053: a declared capability not tested is listed under its own mode only:
+// the fares group under fare-based distribution, the others under product.
+// The fares group is never a row of product-based distribution, even for a
+// scenario that asks fares and books the product (it counts in both modes):
+// what it proves of the product sale is read on the other rows.
+const ownMode = (def) => (def.group === 'Fares' ? 'FARE' : 'PRODUCT');
+const belongsTo = (mode, capability) => mode === 'FARE' || K.CAPABILITY.get(capability)?.group !== 'Fares';
+
+// The scenario codes a point was met in.
+const pointCodes = (p) => arr(p.tests).flatMap((t) => arr(t.codes));
+
+/**
+ * #1053: one section per distribution mode, when the framework declares
+ * fare-based distribution or a fare scenario is read; else null (a product
+ * provider's report is as before). The points keep the report's numbers.
+ */
+function modesSplit(items, { fw, declaredIds, points, truncated }) {
+  const fare = declaredDistributionModes(fw).includes('FARE') || items.some((i) => i.modes.includes('FARE'));
+  if (!fare) return null;
+  return DISTRIBUTION_MODES.map((mode) => {
+    const of = items.filter((i) => i.modes.includes(mode));
+    const codes = new Set(of.map((i) => i.scenario.code));
+    const modePoints = points.filter((p) => belongsTo(mode, p.capability) && pointCodes(p).some((c) => codes.has(c)));
+    const tests = testsOf(of).filter((t) => belongsTo(mode, t.capability));
+    const capabilities = capabilityRowsOf(tests, sideEvidenceOf(of), {
+      fw, declaredIds, points: modePoints, shown: (def) => ownMode(def) === mode, belongs: (def) => belongsTo(mode, def.id),
+    });
+    const expectedRefusals = refusalsOf(tests, modePoints);
+    return {
+      mode, label: DISTRIBUTION_MODE_TEXT[mode], scenarios: of.length, capabilities, expectedRefusals,
+      summary: summaryOf({ capabilities, expectedRefusals, notTested: [], apart: [], points: modePoints, truncated }),
+    };
+  });
+}
+
+// #1053: each point names the modes of the scenarios it was met in, when the
+// report is split.
+function withPointModes(points, items, byMode) {
+  if (!byMode) return points;
+  const modesOf = new Map(items.map((i) => [i.scenario.code, i.modes]));
+  return points.map((p) => {
+    const modes = new Set(pointCodes(p).flatMap((c) => modesOf.get(c) || []));
+    return { ...p, modes: DISTRIBUTION_MODES.filter((m) => modes.has(m)) };
+  });
+}
+
 const COUNTED = new Set(['passed', 'deviation', 'points', 'blocked', 'not-supported']);
 const numbersOf = (points) => points.map((p) => p.number);
 
@@ -543,25 +623,15 @@ function capabilityCoverageOf({
   });
   withEvidence(items, { accepted, unsupported, oscar, pointOf, collectionVersion });
   const tests = testsOf(items);
-  const side = sideEvidenceOf(items);
-  const capabilities = [];
-  for (const def of K.CAPABILITIES) {
-    const own = tests.filter((t) => !t.refusal && t.capability === def.id);
-    const evidence = side.get(def.id) || [];
-    const declaration = capabilityDeclaration(def.id, fw, declaredIds);
-    if (own.length === 0 && evidence.length === 0 && declaration !== 'declared') continue;
-    const rowPoints = numbersOf(points.filter((p) => p.capability === def.id && !p.expectedRefusal));
-    capabilities.push(capabilityRow(def, own, evidence, { declaration, points: rowPoints }));
-  }
-  const expectedRefusals = tests.filter((t) => t.refusal).map(({ key, entry, purpose, capability, result, forms }) => ({
-    key, entry, purpose, capability, capabilityLabel: K.CAPABILITY.get(capability)?.label || capability, result, forms,
-    points: numbersOf(points.filter((p) => p.expectedRefusal && p.tests.some((t) => t.key === key))),
-  }));
+  const capabilities = capabilityRowsOf(tests, sideEvidenceOf(items), { fw, declaredIds, points });
+  const expectedRefusals = refusalsOf(tests, points);
   const notTested = arr(functions).filter((f) => f.state === 'not-covered' || f.state === 'never-run')
     .map((f) => ({ id: f.id, group: f.group, label: f.label, state: f.state }));
+  const byMode = modesSplit(items, { fw, declaredIds, points, truncated });
   return {
-    capabilities, expectedRefusals, points, apart, notTested,
+    capabilities, expectedRefusals, points: withPointModes(points, items, byMode), apart, notTested,
     summary: summaryOf({ capabilities, expectedRefusals, notTested, apart, points, truncated }),
+    ...(byMode ? { byMode } : {}),
   };
 }
 
