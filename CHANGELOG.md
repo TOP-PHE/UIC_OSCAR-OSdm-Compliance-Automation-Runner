@@ -93,6 +93,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.435] / [collection-OTST_V2.0.236] — 2026-10-29
+
+Issue #1039, release 2026.473. Server only; collection unchanged.
+
+### Added
+- **New Run chooses by distribution mode.** A *Distribution* filter, *Product based* and *Fare based*, between Category and Capability, so a batch can run only the fare-based tests, or only the product-based ones.
+  - Each scenario's modes are those the Test Framework's distribution check reads (`distributionModesOf()`, #936): fare when it asks a `FARE_*` part or expects no fare, product when it asks no fare or books the product (`modesOf()`, `runFilters.js`).
+  - A scenario of both modes (fares asked, then a product sold) runs with either box.
+  - Both are ticked by default, so a batch launched as before runs the same scenarios. The batch label names the mode when one box only is ticked ("Fare based").
+  - On gamma's OSDM 3.8 scenarios: 28 fare based (the *Fares* capability group), 143 product based, one of both.
+- `selection.modes` in `POST /v1/runs` and `/v1/runs/preview` (`PRODUCT`, `FARE`); an unknown mode is a 400.
+- Tester User Guide, API description, CLAUDE.md.
+
+### Tests
+- `run-filters.test.js`: the modes of a scenario, the filter (one mode, the other, both), the counts and labels, the checks, the label; on the simulator's data file, the fare scenarios are fare based and a product request checking no fare is product based.
+- `run-selection-page.test.js`: the Distribution fieldset drawn between Category and Capability, and read back.
+- `runs-selection.test.js`: the route counts the modes, a fare-only batch with no fare scenario is refused, an unknown mode is a 400 naming it.
+- 9 deliberate breaks, one per change, each make a test fail.
+
+---
+
 ## [server-1.11.434] / [collection-OTST_V2.0.236] — 2026-10-29
 
 Issue #1037, release 2026.472. Collection only; server unchanged.

@@ -19,20 +19,24 @@
  *  - group: the group of its main capability, as the coverage report reads
  *    it (the catalogue entry's capability, else `derivedCapability()`);
  *  - form: the form of its offer request (`offerRequestFormOf()`);
+ *  - modes: its distribution modes, product based and / or fare based, as
+ *    the Test Framework's distribution check reads them
+ *    (`distributionModesOf()`, #936; #1039);
  *  - its latest finished run: `never`, `failed` (a check failed, or the run
  *    ended FAILED) or `passed`, and whether it is to run again (never run, or
  *    older than the collection or the scenario, or not known).
  *
- * A selection { base, categories, groups, forms, lastRun } keeps the
+ * A selection { base, categories, modes, groups, forms, lastRun } keeps the
  * scenarios whose facets are all ticked: AND between the filters, OR within
- * one. `base` is `all` (every scenario the person sees) or `list` (their run
- * list); the route reads it.
+ * one (a scenario of both modes is kept by either). `base` is `all` (every
+ * scenario the person sees) or `list` (their run list); the route reads it.
  */
 
 const K = require('./capabilities');
 const { offerRequestFormOf } = require('./frameworkGating');
 const { catalogueEntryForScenario } = require('./scenarioCatalogue');
 const { scenarioHash, toRunAgain } = require('./frameworkCoverage');
+const { DISTRIBUTION_MODES, distributionModesOf } = require('./distributionModes');
 
 const CATEGORIES = Object.freeze(['happy', 'refusal', 'simulated']);
 const CATEGORY_TEXT = Object.freeze({ happy: 'Happy flows', refusal: 'Expected refusals', simulated: 'Simulated errors' });
@@ -41,11 +45,13 @@ const FORM_TEXT = Object.freeze({ SEARCH: 'Search', SPECIFICATION: 'Specificatio
 const BASES = Object.freeze(['all', 'list']);
 const LAST_RUNS = Object.freeze(['all', 'toRunAgain', 'failed']);
 const LAST_RUN_TEXT = Object.freeze({ all: 'All', toRunAgain: 'To run again', failed: 'Failed at the last run' });
-const SELECTION_KEYS = Object.freeze(['base', 'categories', 'groups', 'forms', 'lastRun']);
+const MODES = DISTRIBUTION_MODES;
+const MODE_TEXT = Object.freeze({ PRODUCT: 'Product based', FARE: 'Fare based' });
+const SELECTION_KEYS = Object.freeze(['base', 'categories', 'modes', 'groups', 'forms', 'lastRun']);
 
 /** What the page starts with: happy flows and expected refusals, everything else. */
 const DEFAULT_SELECTION = Object.freeze({
-  base: 'all', categories: ['happy', 'refusal'], groups: [...K.GROUPS], forms: [...FORMS], lastRun: 'all',
+  base: 'all', categories: ['happy', 'refusal'], modes: [...MODES], groups: [...K.GROUPS], forms: [...FORMS], lastRun: 'all',
 });
 
 const SIMULATED_CODE = /^SIM_(?:WRONG|FAULT)_/;
@@ -79,6 +85,15 @@ function formOf(scenario, datafile) {
   return FORMS.includes(form) ? form : 'SEARCH';
 }
 
+// A facet's modes; one that names none is a product sale, as modesOf() reads it.
+const facetModes = (facet) => (arr(facet?.modes).length > 0 ? facet.modes : ['PRODUCT']);
+
+/** #1039: PRODUCT and / or FARE; a scenario that names neither is a product sale. */
+function modesOf(scenario, datafile) {
+  const modes = distributionModesOf(scenario, datafile).filter((m) => MODES.includes(m));
+  return modes.length > 0 ? modes : ['PRODUCT'];
+}
+
 /**
  * What the latest finished run says ({ status, failed, collection_version,
  * scenario_hash } or nothing): { lastRun, toRunAgain }.
@@ -93,7 +108,7 @@ function lastRunOf(run, scenario, collectionVersion) {
 
 /**
  * The facets of each scenario named in `codes`, in that order:
- * [{ code, category, group, form, lastRun, toRunAgain }]. `runs` maps a code
+ * [{ code, category, modes, group, form, lastRun, toRunAgain }]. `runs` maps a code
  * to its latest finished run.
  */
 function facetsOf(codes, { datafile, entries = [], runs = {}, collectionVersion = null } = {}) {
@@ -101,7 +116,8 @@ function facetsOf(codes, { datafile, entries = [], runs = {}, collectionVersion 
   return arr(codes).filter((code) => byCode.has(code)).map((code) => {
     const scenario = byCode.get(code);
     return {
-      code, category: categoryOf(scenario), group: groupOf(scenario, datafile, entries), form: formOf(scenario, datafile),
+      code, category: categoryOf(scenario), modes: modesOf(scenario, datafile), group: groupOf(scenario, datafile, entries),
+      form: formOf(scenario, datafile),
       ...lastRunOf(runs?.[code], scenario, collectionVersion),
     };
   });
@@ -124,6 +140,7 @@ function selectionProblem(selection) {
   if (selection.base !== undefined && !BASES.includes(selection.base)) return `selection.base must be one of ${BASES.join(', ')}`;
   if (selection.lastRun !== undefined && !LAST_RUNS.includes(selection.lastRun)) return `selection.lastRun must be one of ${LAST_RUNS.join(', ')}`;
   return listProblem(selection.categories, CATEGORIES, 'categories')
+    || listProblem(selection.modes, MODES, 'modes')
     || listProblem(selection.groups, K.GROUPS, 'groups')
     || listProblem(selection.forms, FORMS, 'forms');
 }
@@ -134,6 +151,7 @@ function withDefaults(selection) {
   return {
     base: s.base ?? DEFAULT_SELECTION.base,
     categories: s.categories ?? [...DEFAULT_SELECTION.categories],
+    modes: s.modes ?? [...DEFAULT_SELECTION.modes],
     groups: s.groups ?? [...DEFAULT_SELECTION.groups],
     forms: s.forms ?? [...DEFAULT_SELECTION.forms],
     lastRun: s.lastRun ?? DEFAULT_SELECTION.lastRun,
@@ -143,6 +161,8 @@ function withDefaults(selection) {
 /** Whether a scenario's facets are all ticked. */
 function keeps(facet, selection) {
   if (!selection.categories.includes(facet.category)) return false;
+  // A scenario of both modes is kept by either box.
+  if (!facetModes(facet).some((m) => selection.modes.includes(m))) return false;
   if (!selection.groups.includes(facet.group) || !selection.forms.includes(facet.form)) return false;
   if (selection.lastRun === 'toRunAgain') return facet.toRunAgain;
   if (selection.lastRun === 'failed') return facet.lastRun === 'failed';
@@ -168,11 +188,12 @@ function previewOf(facets, selection) {
     selected: selectCodes(list, selection).length,
     counts: {
       categories: tally(CATEGORIES, 'category'),
+      modes: Object.fromEntries(MODES.map((m) => [m, list.filter((f) => facetModes(f).includes(m)).length])),
       groups: tally(K.GROUPS, 'group'),
       forms: tally(FORMS, 'form'),
       lastRun: { all: list.length, toRunAgain: list.filter((f) => f.toRunAgain).length, failed: list.filter((f) => f.lastRun === 'failed').length },
     },
-    labels: { categories: CATEGORY_TEXT, groups: Object.fromEntries(K.GROUPS.map((g) => [g, g])), forms: FORM_TEXT, lastRun: LAST_RUN_TEXT },
+    labels: { categories: CATEGORY_TEXT, modes: MODE_TEXT, groups: Object.fromEntries(K.GROUPS.map((g) => [g, g])), forms: FORM_TEXT, lastRun: LAST_RUN_TEXT },
   };
 }
 
@@ -202,13 +223,14 @@ function selectionLabel(selection) {
   const categories = s.categories.length === CATEGORIES.length
     ? 'Every category'
     : s.categories.map((c) => CATEGORY_TEXT[c] || c).join(' + ');
-  parts.push(categories, valuesText(s.groups, K.GROUPS, {}, 'capabilities'), valuesText(s.forms, FORMS, FORM_TEXT, 'forms'));
+  parts.push(categories, valuesText(s.modes, MODES, MODE_TEXT, 'modes'), valuesText(s.groups, K.GROUPS, {}, 'capabilities'),
+    valuesText(s.forms, FORMS, FORM_TEXT, 'forms'));
   if (s.lastRun !== 'all') parts.push(LAST_RUN_TEXT[s.lastRun]);
   return parts.filter(Boolean).join(' · ');
 }
 
 module.exports = {
   selectionLabel,
-  CATEGORIES, CATEGORY_TEXT, FORMS, FORM_TEXT, BASES, LAST_RUNS, LAST_RUN_TEXT, DEFAULT_SELECTION,
-  categoryOf, groupOf, formOf, lastRunOf, facetsOf, selectionProblem, withDefaults, selectCodes, previewOf,
+  CATEGORIES, CATEGORY_TEXT, MODES, MODE_TEXT, FORMS, FORM_TEXT, BASES, LAST_RUNS, LAST_RUN_TEXT, DEFAULT_SELECTION,
+  categoryOf, modesOf, groupOf, formOf, lastRunOf, facetsOf, selectionProblem, withDefaults, selectCodes, previewOf,
 };

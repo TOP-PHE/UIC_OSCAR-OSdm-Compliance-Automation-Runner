@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.472",
+  "current_release": "2026.473",
   "releases": [
+    {
+      "release": "2026.473",
+      "date": "2026-10-29",
+      "server": "1.11.435",
+      "collection": "OTST_V2.0.236",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1039: New Run chooses by distribution mode: a Distribution filter, product based and fare based, read as the Test Framework's distribution check reads a scenario; a scenario of both modes runs with either box."
+      ]
+    },
     {
       "release": "2026.472",
       "date": "2026-10-29",
