@@ -633,7 +633,7 @@ module.exports = {
     },
     '/v1/certifier/coverage-reports': {
       get: { tags: ['Certifier'], summary: 'The coverage reports shared with certifiers and not withdrawn, every company (#972 part 4; certifiers only)', security: [{ bearerAuth: [] }],
-        responses: { 200: { description: '{ reports: [{ id, number, days, company, distributor, createdAt, sharedAt, summary }] }; no e-mail' }, 403: { description: 'Not a certifier' } } },
+        responses: { 200: { description: '{ reports: [{ id, number, days, companyId, company, distributor, createdAt, sharedAt, summary }] }; no e-mail' }, 403: { description: 'Not a certifier' } } },
     },
     '/v1/certifier/coverage-reports/{id}': {
       get: { tags: ['Certifier'], summary: 'One shared report, as it was frozen, and its comparison (certifiers only)', security: [{ bearerAuth: [] }],
@@ -644,6 +644,22 @@ module.exports = {
       get: { tags: ['Certifier'], summary: 'One shared report as an .xlsx workbook (certifiers only)', security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         responses: { 200: { description: 'The workbook' }, 403: { description: 'Not a certifier' }, 404: { description: 'Not shared, withdrawn or unknown' } } },
+    },
+    '/v1/certifier/coverage': {
+      get: { tags: ['Certifier'], summary: 'The companies or providers that shared a coverage report not withdrawn (#1043; certifiers only)', security: [{ bearerAuth: [] }],
+        responses: { 200: { description: '{ companies: [{ id, company, distributor }] }' }, 403: { description: 'Not a certifier' } } },
+    },
+    '/v1/certifier/coverage/{companyId}': {
+      get: { tags: ['Certifier'], summary: 'The coverage of one of them, built now from the runs it shared with certifiers (#1043; certifiers only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'companyId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                     { name: 'days', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 3650 } }],
+        responses: { 200: { description: 'The coverage, as a published report holds it (no positions, no simulated errors)' }, 400: { description: 'days not 1–3650' }, 403: { description: 'Not a certifier' }, 404: { description: 'No report of it is shared' } } },
+    },
+    '/v1/certifier/coverage/{companyId}/download': {
+      get: { tags: ['Certifier'], summary: 'The same coverage as an .xlsx workbook (#1043; certifiers only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'companyId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                     { name: 'days', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 3650 } }],
+        responses: { 200: { description: 'The workbook' }, 400: { description: 'days not 1–3650' }, 403: { description: 'Not a certifier' }, 404: { description: 'No report of it is shared' } } },
     },
     '/v1/company/providers': {
       get: { tags: ['Company'], summary: 'List the providers of the caller\'s company (Test Manager: all; tester: those granted)', security: [{ bearerAuth: [] }],

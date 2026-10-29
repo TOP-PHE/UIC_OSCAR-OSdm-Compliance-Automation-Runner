@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.474",
+  "current_release": "2026.475",
   "releases": [
+    {
+      "release": "2026.475",
+      "date": "2026-10-29",
+      "server": "1.11.437",
+      "collection": "OTST_V2.0.236",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1043: a certifier builds the Test Framework coverage (by capability, flow and element, function) of a company or provider that shared a coverage report with them, from the runs it shared with certifiers only; same views and exports, no publishing, no positions."
+      ]
+    },
     {
       "release": "2026.474",
       "date": "2026-10-29",

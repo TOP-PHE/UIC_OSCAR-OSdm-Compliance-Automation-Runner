@@ -1574,11 +1574,12 @@ describe('the Report Builder coverage section', () => {
     expect(coverageMarkdown(report, 'P')).toContain('### Sales flows');
   });
 
-  test('the card is shown to members only, asks the coverage routes, and draws the view chosen', () => {
+  test('the card is shown to members (and certifiers, #1043), asks the coverage routes, and draws the view chosen', () => {
     const source = read(page);
-    expect(source).toContain("if (!isPlatformUser) {\n  document.getElementById('coverage-card').style.display = 'block';");
-    expect(source).toContain("fetch('/v1/company/coverage?days=' + encodeURIComponent(");
-    expect(source).toContain("fetch('/v1/company/coverage/download?days=' + encodeURIComponent(");
+    expect(source).toContain("if (!isPlatformUser || isCertifier) {\n  document.getElementById('coverage-card').style.display = 'block';");
+    expect(source).toContain("if (!isCertifier) return '/v1/company/coverage' + suffix + days;");
+    expect(source).toContain("var url = coverageUrl('');");
+    expect(source).toContain("var address = coverageUrl('/download');");
     expect(source).toContain("body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);");
     expect(source).toContain('<option value="capabilities" selected>By capability</option><option value="matrix">By flow and element</option>');
   });
@@ -2155,5 +2156,43 @@ describe('scenarios.js — what an exchange is for (#959)', () => {
     expect(source).toContain('|| changeExchange(action, el)) return;');
     expect(source).toContain('scenarioTripIds(sc).includes(trip.id) && isReadOnlyForMe(sc)');
     expect(source).toContain('...scenarioTripIds(s), s.passengersListId');
+  });
+});
+
+// #1043: a certifier builds the coverage of a company that shared a report.
+describe('the Report Builder: a certifier\'s live coverage (#1043)', () => {
+  const page = 'report-builder.html';
+  const coverageRunIdOf = loadFunction(page, 'coverageRunIdOf');
+  const ID = '0b6a1f3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b';
+  const doc = (company, days = '365') => ({
+    getElementById: (id) => ({ 'coverage-days': { value: days }, 'coverage-company': { value: company } })[id],
+  });
+
+  test('a certifier asks the certifier route of the company chosen, a member their own', () => {
+    const cert = loadFunction(page, 'coverageUrl', { isCertifier: true, coverageRunIdOf, document: doc(ID), encodeURIComponent });
+    expect(cert('')).toBe(`/v1/certifier/coverage/${ID}?days=365`);
+    expect(cert('/download')).toBe(`/v1/certifier/coverage/${ID}/download?days=365`);
+    // A value that is not an id never reaches an address.
+    const bad = loadFunction(page, 'coverageUrl', { isCertifier: true, coverageRunIdOf, document: doc('../x'), encodeURIComponent });
+    expect(bad('')).toBeNull();
+    const member = loadFunction(page, 'coverageUrl', { isCertifier: false, coverageRunIdOf, document: doc(''), encodeURIComponent });
+    expect(member('/download')).toBe('/v1/company/coverage/download?days=365');
+  });
+
+  test('the companies are listed by name, escaped, with their distributor', () => {
+    const esc = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+    const f = loadFunction(page, 'coverageCompaniesHtml', { coverageRunIdOf, escHtml: esc });
+    const html = f([{ id: ID, company: 'Prov <P1>', distributor: 'Dist' }, { id: 'x', company: 'Bad' }]);
+    expect(html).toBe(`<option value="${ID}">Dist — Prov &#60;P1&#62;</option>`);
+    expect(f(null)).toBe('');
+  });
+
+  test('the card is shown to certifiers, without the publish button or positions', () => {
+    const src = read(page);
+    expect(src).toContain('if (!isPlatformUser || isCertifier) {');
+    expect(src).toContain("const isCertifier = userRole === 'certification_user';");
+    expect(src.indexOf("const isCertifier = userRole")).toBeLessThan(src.indexOf('if (!isPlatformUser || isCertifier) {'));
+    expect(src).toContain("var res = await fetch('/v1/certifier/coverage', {});");
+    expect(src).toContain("if (isCertifier) {\n  // A .btn rule sets display, so `hidden` alone does not hide it.\n  document.getElementById('coverage-publish-btn').style.display = 'none';");
   });
 });
