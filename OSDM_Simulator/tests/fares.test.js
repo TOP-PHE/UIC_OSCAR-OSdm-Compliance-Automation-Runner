@@ -62,7 +62,8 @@ test('FARE_ADMISSION with a section: one fare offer per cluster and no product o
     assert.equal(fare.regionalConstraint.entryConnectionPoint.stationSets[0].stations[0].stopPlaceRef, 'urn:uic:stn:0000001');
     assert.ok(fare.afterSalesCondition.conditions.length > 0);
     assert.equal(fare.travelValidityConstraint.validTravelDates.from.slice(0, 10), '2026-11-20');
-    assert.deepEqual(fare.involvedTCOs, [providers.get('gamma').carrier.ref]);
+    assert.equal(fare.involvedTCOs[0], providers.get('gamma').carrier.ref, 'the provider first, then the companies the template counts (#1048)');
+    assert.ok(fare.involvedTCOs.length > 1);
   }
   const amounts = fares.map((o) => o.fares[0].prices[0].amount);
   assert.ok(amounts[0] > amounts[1] && amounts[1] > amounts[2], 'flexible fares cost more');
@@ -416,9 +417,11 @@ test('FARE_RESERVATION: each bicycle gets a place in fare mode on each leg of th
   assert.equal(only.length, 1);
   assert.equal(only[0].fares, undefined);
   assert.equal(alone.offers.length, 1, 'no product offer next to it (#1046)');
-  // Not asked: no fare reservation; a bicycle alone with fare admissions gets nothing.
-  assert.ok(!fareOffers(build(fareRequest({ passengers: [ADULT, BICYCLE] }))).some((o) => o.reservationOfferParts));
-  assert.equal(fareOffers(build(fareRequest({ passengers: [BICYCLE] }))).length, 0);
+  // Not asked: no fare reservation; a bicycle with fare admissions only travels on a bicycle fare (F6, #1048).
+  const admissions = fareOffers(build(fareRequest({ passengers: [ADULT, BICYCLE] })));
+  assert.ok(!admissions.some((o) => o.reservationOfferParts));
+  for (const offer of admissions) assert.deepEqual(offer.fares.map((f) => f.passengerRefs[0]), ['00001', '00002']);
+  assert.equal(fareOffers(build(fareRequest({ passengers: [BICYCLE] }))).length, 3);
 });
 
 test('FARE_RESERVATION below OSDM 3.8 gives no fare reservation: 3.6 and 3.7 have no distributionMode', () => {

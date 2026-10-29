@@ -407,6 +407,10 @@ test('the reduction card scenarios: each card gamma lists, on a passenger of its
   const wrongCards = datafile.passengersList.find((l) => l.id === wrong.passengersListId).passengers.flatMap((p) => p.reductionCards || []);
   assert.deepEqual(wrongCards, [{ code: 'SIM_CARD_25', percent: 30 }]);
   carded.push(wrong);
+  // #1048: the fare sale with a card holds the 25 % card scenario's passenger.
+  const fareCard = datafile.scenarios.find((s) => s.code === 'SIM_FARE_CARD_1ADT_38');
+  assert.equal(fareCard.passengersListId, carded[0].passengersListId);
+  carded.push(fareCard);
   for (const scenario of datafile.scenarios.filter((s) => !carded.includes(s))) {
     const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
     assert.ok(list.passengers.every((p) => !p.reductionCards), `${scenario.code} holds no card`);
@@ -607,8 +611,10 @@ test('the age scenarios: the only ones on gamma\'s age-tariff stop place, three 
   assert.deepEqual(datafile.tripRequirements.filter((t) => origins(t).includes(from)).map((t) => t.id), [13]);
   assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === 13).map((s) => [s.code, s.passengersListId]), [['SIM_SALE_AGE_LIMITS_38', 22], ['SIM_SALE_YOUNG_CHILD_38', 38]]);
   const aged = datafile.passengersList.filter((l) => l.passengers.some((p) => p.bornYearsBeforeTravel !== undefined)).map((l) => l.id);
-  // #903: the free child of the fare scenario is aged too (3 on the day of travel).
-  assert.deepEqual(aged, [22, 29, 38]);
+  // #903: the free child of the fare scenario is aged too (3 on the day of travel);
+  // #1048: the family of the fare scenario, an adult, a child and a young child.
+  assert.deepEqual(aged, [22, 29, 38, 39]);
+  assert.deepEqual(datafile.passengersList.find((l) => l.id === 39).passengers.map((p) => [p.bornYearsBeforeTravel, p.expectedPassengerType]), [[35, 'ADULT'], [8, 'CHILD'], [3, 'YOUNG_CHILD']]);
   const child = bands.find((b) => b.type === 'CHILD');
   const youth = bands.find((b) => b.type === 'YOUTH');
   const list = datafile.passengersList.find((l) => l.id === 22).passengers;
@@ -736,6 +742,16 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_FARE_BICYCLE_ONLY_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, false, undefined],
     SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38: [v.bicycleReservationProductMode, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    // #1048: fares from DB's templates: first class, a card, a family, a bicycle
+    // fare, a group, border to border, every route of a pair, a NON_FLEX refund.
+    SIM_FARE_FIRST_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_CARD_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_FAMILY_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_BICYCLE_ADMISSION_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_GROUP_6ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_TRANSIT_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_ROUTES_1ADT_38: [v.alternativeRoutes, 'SPECIFICATION', true, true, undefined],
+    SIM_FARE_REFUND_NON_FLEX_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
@@ -759,10 +775,12 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
   // No other scenario starts a section at a variant station; the COMBINING
   // one (#907) is not wrong, and its two scenarios alone start there.
   const variantStations = new Set(Object.values(v));
-  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_') && startOf(x) !== v.combiningFares)) {
+  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_') && startOf(x) !== v.combiningFares && startOf(x) !== v.alternativeRoutes)) {
     assert.ok(!variantStations.has(startOf(s)), s.code);
   }
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.combiningFares).map((s) => s.code), ['SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_WRONG_FARE_COMBINING_FEE_38']);
+  // #1048: every route of a pair, not wrong either, and its one scenario alone starts there.
+  assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.alternativeRoutes).map((s) => s.code), ['SIM_FARE_ROUTES_1ADT_38']);
   // #255: fare reservations are asked by the four bicycle scenarios only, each with a bicycle.
   const askReservations = datafile.scenarios.filter((s) => s.offerSearchCriteria?.requestedOfferParts?.includes('FARE_RESERVATION'));
   assert.deepEqual(askReservations.map((s) => s.code), ['SIM_FARE_BICYCLE_1ADT_38', 'SIM_FARE_BICYCLE_ONLY_38', 'SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38', 'SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38']);

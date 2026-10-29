@@ -1112,6 +1112,58 @@
     },
     {
       "id": 33,
+      "resource_type": "TRAIN",
+      "label": "Train 154 0000004–0000070",
+      "data": {
+        "originURN": "urn:uic:stn:0000004",
+        "destinationURN": "urn:uic:stn:0000070",
+        "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+        "productCategoryName": "InterCity",
+        "productCategoryShortName": "IC",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "154",
+            "departureTime": "09:00:00+01:00",
+            "arrivalTime": "11:30:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 34,
+      "resource_type": "TRAIN",
+      "label": "Train 168 0000089–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000089",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+        "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+        "productCategoryName": "InterCity",
+        "productCategoryShortName": "IC",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "168",
+            "departureTime": "07:00:00+01:00",
+            "arrivalTime": "13:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 35,
       "resource_type": "JOURNEY",
       "label": "Trip 31204: 0000001–0000002, 2 legs",
       "data": {
@@ -1128,7 +1180,7 @@
       }
     },
     {
-      "id": 34,
+      "id": 36,
       "resource_type": "JOURNEY",
       "label": "Trip 31205: 0000001–0000002, 2 legs",
       "data": {
@@ -1145,7 +1197,7 @@
       }
     },
     {
-      "id": 35,
+      "id": 37,
       "resource_type": "JOURNEY",
       "label": "Trip 31211: 0000095–0000002, 2 legs",
       "data": {
@@ -1162,7 +1214,7 @@
       }
     },
     {
-      "id": 36,
+      "id": 38,
       "resource_type": "JOURNEY",
       "label": "Trip 31224: 0000001–0000002, 2 legs",
       "data": {
@@ -1309,6 +1361,14 @@
     "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_312",
     "SIM_SALE_YOUNG_CHILD_312",
     "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_312",
-    "SIM_TRIP_PROBE_ARRIVAL_TIME_312"
+    "SIM_TRIP_PROBE_ARRIVAL_TIME_312",
+    "SIM_FARE_FIRST_1ADT_312",
+    "SIM_FARE_CARD_1ADT_312",
+    "SIM_FARE_FAMILY_312",
+    "SIM_FARE_BICYCLE_ADMISSION_312",
+    "SIM_FARE_GROUP_6ADT_312",
+    "SIM_FARE_TRANSIT_1ADT_312",
+    "SIM_FARE_ROUTES_1ADT_312",
+    "SIM_FARE_REFUND_NON_FLEX_1ADT_312"
   ]
 }

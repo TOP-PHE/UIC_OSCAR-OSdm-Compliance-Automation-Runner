@@ -203,7 +203,13 @@
       "unrequestedFares": "urn:uic:stn:0000085",
       "faresWithoutSection": "urn:uic:stn:0000086",
       "combiningFares": "urn:uic:stn:0000087",
-      "bicycleReservationProductMode": "urn:uic:stn:0000088"
+      "bicycleReservationProductMode": "urn:uic:stn:0000088",
+      "alternativeRoutes": "urn:uic:stn:0000089"
+    },
+    "borderPoints": {
+      "urn:uic:stn:0000004": "804",
+      "urn:uic:stn:0000070": "870",
+      "urn:uic:stn:0000089": "889"
     }
   }
 }

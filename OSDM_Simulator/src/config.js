@@ -109,7 +109,17 @@ function checkProvider(key, raw) {
 // station of each variant (for `faresWithoutSection`, #905, the trip's
 // origin: that request names no section). Absent: no fare is offered.
 const FARE_CLUSTERS = new Set(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX', 'PROMO']);
-const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares', 'bicycleReservationProductMode']);
+const FARE_VARIANTS = new Set(['passengerWithoutFare', 'unknownCluster', 'widerClusters', 'sectionGap', 'overlappingFares', 'unrequestedFares', 'faresWithoutSection', 'combiningFares', 'bicycleReservationProductMode', 'alternativeRoutes']);
+// #1048: the stations that are border points, each with the provider's code
+// for it: a fare to or from one is priced on a template with a border there.
+function checkBorderPoints(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 20) throw bad('fares');
+  for (const [station, code] of Object.entries(value)) {
+    if (!isText(station, 1, 120) || typeof code !== 'string' || !/^\d{1,6}$/.test(code)) throw bad('fares');
+  }
+  return { borderPoints: { ...value } };
+}
 function checkFares(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object') throw bad('fares');
@@ -122,7 +132,7 @@ function checkFares(value, bad) {
     if (!FARE_VARIANTS.has(name) || !isText(station, 1, 120)) throw bad('fares');
   }
   if (new Set(Object.values(variants)).size !== Object.keys(variants).length) throw bad('fares');
-  return { fares: { clusters: [...clusters], freeUnderAge, variants: { ...variants } } };
+  return { fares: { clusters: [...clusters], freeUnderAge, variants: { ...variants }, ...checkBorderPoints(value.borderPoints, bad) } };
 }
 
 // #781: the other currencies a provider sells in, each with its own price
