@@ -67,6 +67,12 @@ const WARNING_ONLY = Object.freeze({
   SIM_WRONG_FARE_OVERLAP: '[fares O8]',
   SIM_WRONG_FARE_FULFILLMENT_DOCUMENT: '[fares F2]',
   SIM_WRONG_FARE_COMBINING_FEE: '[fares R3]',
+  // #1045: what a fare says against the request.
+  SIM_WRONG_FARE_CARD_NOT_HELD: '[fares O16]',
+  SIM_WRONG_FARE_AGES_OUTSIDE: '[fares O17]',
+  SIM_WRONG_FARE_OTHER_CLASS: '[fares O18]',
+  SIM_WRONG_FARE_DATES_OFFSET: '[fares O19]',
+  SIM_WRONG_FARE_COVERED_LEG: '[fares O20]',
 });
 const baseCode = (code) => String(code).replace(/_\d{2,3}$/, '');
 

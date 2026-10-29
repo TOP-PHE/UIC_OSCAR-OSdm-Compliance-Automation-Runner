@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.477",
+  "current_release": "2026.478",
   "releases": [
+    {
+      "release": "2026.478",
+      "date": "2026-10-29",
+      "server": "1.11.440",
+      "collection": "OTST_V2.0.238",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Part of #1045 (OSCAR's fare checks reviewed), collection OTST_V2.0.238, simulator 0.60.0: new WARNING checks O16 (a required card no passenger holds, an empty requiredCards), O17 (an age outside the fare's passenger constraints), O18 (a travel class asked with no fare offer), O19 (utcOffset disagreeing with the dates' offset), O20 (a covered section naming a leg not a train of its trip); O8 reads a fare's coverage from its route's ends, else its offer's covered sections, as a real provider writes it. Six fare scenarios on gamma with their version copies (one real-answer form, five wrong variants that warn only); the reference configurations follow. Server: the five warning-only simulated errors and the welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.477",
       "date": "2026-10-29",

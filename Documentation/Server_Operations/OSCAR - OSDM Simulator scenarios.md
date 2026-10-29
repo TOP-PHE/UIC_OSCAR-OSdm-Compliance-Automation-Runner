@@ -455,6 +455,17 @@ Fare offers for a requested section (fares phase 1a). The trip is trip 24, a spe
 | `SIM_FARE_ROUTES_1ADT_38` | One adult on trip 37, the section from 0000089 (`fares.variants.alternativeRoutes`, not a wrong variant). | Every route of the template's pair of ends: three routes, each in three clusters, nine offers. | No failed check and no fare warning; the fare offer chosen is booked and confirmed (116 checks on the simulator). |
 | `SIM_FARE_REFUND_NON_FLEX_1ADT_38` | The fare sale of `SIM_FARE_SPEC_1ADT_38` in the non-flexible cluster, refunded in full. | One refund offer that gives nothing back: a NON_FLEX fare's REFUND condition keeps the whole price. | No failed check and no fare warning; the refund steps pass (180 checks on the simulator). |
 
+**What a fare says, checked against the request (#1045).** Step 01 reads more of each fare: its coverage from its route's ends or its offer's covered sections when it names no covered section or connection point (O8), and the checks O16 to O20 of `fareDetails.js`, all WARNINGs: a card required that no passenger holds, or an empty `requiredCards`; a passenger's age outside the fare's passenger constraints; no fare offer in a travel class asked; valid travel dates whose `utcOffset` disagrees with their offset; an offer's covered section on a leg that is not one of its trip's trains. One scenario answers as a real provider does, and one wrong answer shows each warning.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_FARE_REAL_FORM_1ADT_38` | One adult on trip 38, the section from 0000060 (`fares.variants.realAnswerForm`, not a wrong variant). | Fares naming no covered section and no connection point; the offer covers the section in `tripCoverage.coveredSections`. | No failed check and no fare warning: O8 reads the coverage from the route's ends; the fare offer is booked and confirmed. |
+| `SIM_WRONG_FARE_CARD_NOT_HELD_38` | One adult without a card on trip 39, the section from 0000061. Deliberately wrong. | Every fare requires gamma's first card. | A WARNING of check O16 at 01; no failed check: only warnings, so the fare is booked and confirmed. |
+| `SIM_WRONG_FARE_AGES_OUTSIDE_38` | One adult on trip 40, the section from 0000062. Deliberately wrong. | The adult's fares carry a child's passenger constraints (6 to 14). | A WARNING of check O17 at 01; no failed check: only warnings, so the fare is booked and confirmed. |
+| `SIM_WRONG_FARE_OTHER_CLASS_38` | One adult asking first class on trip 41, the section from 0000063. Deliberately wrong. | Second-class fares only. | A WARNING of check O18 at 01; no failed check: only warnings, so the fare is booked and confirmed. |
+| `SIM_WRONG_FARE_DATES_OFFSET_38` | One adult on trip 42, the section from 0000064. Deliberately wrong. | Valid travel dates at +01:00 with `utcOffset` 0. | A WARNING of check O19 at 01; no failed check: only warnings, so the fare is booked and confirmed. |
+| `SIM_WRONG_FARE_COVERED_LEG_38` | One adult on trip 43, the section from 0000065. Deliberately wrong. | The offer's covered section ends on a leg the trip does not have. | A WARNING of check O20 at 01; no failed check: only warnings, so the fare is booked and confirmed. |
+
 ### Deliberately wrong answers (#611)
 
 Each of these makes one validator family fail on purpose, so that its FAIL path runs. They are not in the data file's run list. The offer one uses the trip from station `0000098` (`variants.wrongOffersFrom`); the others a passenger list naming the variant.

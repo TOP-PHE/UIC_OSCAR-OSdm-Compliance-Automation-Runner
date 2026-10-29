@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38", "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38", "SIM_SALE_YOUNG_CHILD_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38", "SIM_TRIP_PROBE_ARRIVAL_TIME_38", "SIM_FARE_FIRST_1ADT_38", "SIM_FARE_CARD_1ADT_38", "SIM_FARE_FAMILY_38", "SIM_FARE_BICYCLE_ADMISSION_38", "SIM_FARE_GROUP_6ADT_38", "SIM_FARE_TRANSIT_1ADT_38", "SIM_FARE_ROUTES_1ADT_38", "SIM_FARE_REFUND_NON_FLEX_1ADT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38", "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38", "SIM_SALE_YOUNG_CHILD_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38", "SIM_TRIP_PROBE_ARRIVAL_TIME_38", "SIM_FARE_FIRST_1ADT_38", "SIM_FARE_CARD_1ADT_38", "SIM_FARE_FAMILY_38", "SIM_FARE_BICYCLE_ADMISSION_38", "SIM_FARE_GROUP_6ADT_38", "SIM_FARE_TRANSIT_1ADT_38", "SIM_FARE_ROUTES_1ADT_38", "SIM_FARE_REFUND_NON_FLEX_1ADT_38", "SIM_FARE_REAL_FORM_1ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -37468,6 +37468,1460 @@
         "offerMode": null,
         "requestedOfferParts": ["FARE_ADMISSION"]
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REAL_FORM_1ADT_38",
+      "description": "Simulated provider, fares answered as a real provider does (#1045): one adult on trip 38, the section from 0000060 (fares.variants.realAnswerForm, not a wrong variant). The fares name no covered section and no connection point: their coverage is in their route and in the offer's tripCoverage.coveredSections, which O8 reads. The fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 38,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000060",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_CARD_NOT_HELD_38",
+      "description": "Deliberately wrong (#1045): one adult without a card on trip 39, the section from 0000061 (fares.variants.cardNotHeld). Every fare requires gamma's first card. Expected: a WARNING of check O16 at 01; no failed check. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 39,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000061",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_AGES_OUTSIDE_38",
+      "description": "Deliberately wrong (#1045): one adult on trip 40, the section from 0000062 (fares.variants.agesOutside). The adult's fares carry a child's passenger constraints, ages 6 to 14. Expected: a WARNING of check O17 at 01; no failed check. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 40,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000062",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_OTHER_CLASS_38",
+      "description": "Deliberately wrong (#1045): one adult asking first class on trip 41, the section from 0000063 (fares.variants.otherClass). Gamma answers second-class fares only. Expected: a WARNING of check O18 at 01; no failed check. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 41,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000063",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [
+          "FIRST"
+        ],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_DATES_OFFSET_38",
+      "description": "Deliberately wrong (#1045): one adult on trip 42, the section from 0000064 (fares.variants.datesOffset). The valid travel dates are written at +01:00 with utcOffset 0. Expected: a WARNING of check O19 at 01; no failed check. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 42,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000064",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_COVERED_LEG_38",
+      "description": "Deliberately wrong (#1045): one adult on trip 43, the section from 0000065 (fares.variants.coveredLegUnknown). The offer's covered section ends on a leg the trip does not have. Expected: a WARNING of check O20 at 01; no failed check. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 43,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000065",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REAL_FORM_1ADT_36",
+      "description": "Simulated provider, fares answered as a real provider does (#1045): one adult on trip 38, the section from 0000060 (fares.variants.realAnswerForm, not a wrong variant). The fares name no covered section and no connection point: their coverage is in their route and in the offer's tripCoverage.coveredSections, which O8 reads. The fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_REAL_FORM_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3638,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000060",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_CARD_NOT_HELD_36",
+      "description": "Deliberately wrong (#1045): one adult without a card on trip 39, the section from 0000061 (fares.variants.cardNotHeld). Every fare requires gamma's first card. Expected: a WARNING of check O16 at 01; no failed check. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_FARE_CARD_NOT_HELD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3639,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000061",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_AGES_OUTSIDE_36",
+      "description": "Deliberately wrong (#1045): one adult on trip 40, the section from 0000062 (fares.variants.agesOutside). The adult's fares carry a child's passenger constraints, ages 6 to 14. Expected: a WARNING of check O17 at 01; no failed check. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_FARE_AGES_OUTSIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3640,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000062",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_OTHER_CLASS_36",
+      "description": "Deliberately wrong (#1045): one adult asking first class on trip 41, the section from 0000063 (fares.variants.otherClass). Gamma answers second-class fares only. Expected: a WARNING of check O18 at 01; no failed check. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_FARE_OTHER_CLASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3641,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000063",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_DATES_OFFSET_36",
+      "description": "Deliberately wrong (#1045): one adult on trip 42, the section from 0000064 (fares.variants.datesOffset). The valid travel dates are written at +01:00 with utcOffset 0. Expected: a WARNING of check O19 at 01; no failed check. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_FARE_DATES_OFFSET_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3642,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000064",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_COVERED_LEG_36",
+      "description": "Deliberately wrong (#1045): one adult on trip 43, the section from 0000065 (fares.variants.coveredLegUnknown). The offer's covered section ends on a leg the trip does not have. Expected: a WARNING of check O20 at 01; no failed check. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_FARE_COVERED_LEG_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3643,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000065",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REAL_FORM_1ADT_37",
+      "description": "Simulated provider, fares answered as a real provider does (#1045): one adult on trip 38, the section from 0000060 (fares.variants.realAnswerForm, not a wrong variant). The fares name no covered section and no connection point: their coverage is in their route and in the offer's tripCoverage.coveredSections, which O8 reads. The fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_REAL_FORM_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3738,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000060",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_CARD_NOT_HELD_37",
+      "description": "Deliberately wrong (#1045): one adult without a card on trip 39, the section from 0000061 (fares.variants.cardNotHeld). Every fare requires gamma's first card. Expected: a WARNING of check O16 at 01; no failed check. OSDM 3.7.0, for beta (a copy of SIM_WRONG_FARE_CARD_NOT_HELD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3739,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000061",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_AGES_OUTSIDE_37",
+      "description": "Deliberately wrong (#1045): one adult on trip 40, the section from 0000062 (fares.variants.agesOutside). The adult's fares carry a child's passenger constraints, ages 6 to 14. Expected: a WARNING of check O17 at 01; no failed check. OSDM 3.7.0, for beta (a copy of SIM_WRONG_FARE_AGES_OUTSIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3740,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000062",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_OTHER_CLASS_37",
+      "description": "Deliberately wrong (#1045): one adult asking first class on trip 41, the section from 0000063 (fares.variants.otherClass). Gamma answers second-class fares only. Expected: a WARNING of check O18 at 01; no failed check. OSDM 3.7.0, for beta (a copy of SIM_WRONG_FARE_OTHER_CLASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3741,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000063",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_DATES_OFFSET_37",
+      "description": "Deliberately wrong (#1045): one adult on trip 42, the section from 0000064 (fares.variants.datesOffset). The valid travel dates are written at +01:00 with utcOffset 0. Expected: a WARNING of check O19 at 01; no failed check. OSDM 3.7.0, for beta (a copy of SIM_WRONG_FARE_DATES_OFFSET_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3742,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000064",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_COVERED_LEG_37",
+      "description": "Deliberately wrong (#1045): one adult on trip 43, the section from 0000065 (fares.variants.coveredLegUnknown). The offer's covered section ends on a leg the trip does not have. Expected: a WARNING of check O20 at 01; no failed check. OSDM 3.7.0, for beta (a copy of SIM_WRONG_FARE_COVERED_LEG_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3743,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000065",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REAL_FORM_1ADT_39",
+      "description": "Simulated provider, fares answered as a real provider does (#1045): one adult on trip 38, the section from 0000060 (fares.variants.realAnswerForm, not a wrong variant). The fares name no covered section and no connection point: their coverage is in their route and in the offer's tripCoverage.coveredSections, which O8 reads. The fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_REAL_FORM_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3938,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000060",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_CARD_NOT_HELD_39",
+      "description": "Deliberately wrong (#1045): one adult without a card on trip 39, the section from 0000061 (fares.variants.cardNotHeld). Every fare requires gamma's first card. Expected: a WARNING of check O16 at 01; no failed check. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_CARD_NOT_HELD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3939,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000061",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_AGES_OUTSIDE_39",
+      "description": "Deliberately wrong (#1045): one adult on trip 40, the section from 0000062 (fares.variants.agesOutside). The adult's fares carry a child's passenger constraints, ages 6 to 14. Expected: a WARNING of check O17 at 01; no failed check. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_AGES_OUTSIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3940,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000062",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_OTHER_CLASS_39",
+      "description": "Deliberately wrong (#1045): one adult asking first class on trip 41, the section from 0000063 (fares.variants.otherClass). Gamma answers second-class fares only. Expected: a WARNING of check O18 at 01; no failed check. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_OTHER_CLASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3941,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000063",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_DATES_OFFSET_39",
+      "description": "Deliberately wrong (#1045): one adult on trip 42, the section from 0000064 (fares.variants.datesOffset). The valid travel dates are written at +01:00 with utcOffset 0. Expected: a WARNING of check O19 at 01; no failed check. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_DATES_OFFSET_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3942,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000064",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_COVERED_LEG_39",
+      "description": "Deliberately wrong (#1045): one adult on trip 43, the section from 0000065 (fares.variants.coveredLegUnknown). The offer's covered section ends on a leg the trip does not have. Expected: a WARNING of check O20 at 01; no failed check. OSDM 3.9.0, for delta (a copy of SIM_WRONG_FARE_COVERED_LEG_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3943,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000065",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REAL_FORM_1ADT_310",
+      "description": "Simulated provider, fares answered as a real provider does (#1045): one adult on trip 38, the section from 0000060 (fares.variants.realAnswerForm, not a wrong variant). The fares name no covered section and no connection point: their coverage is in their route and in the offer's tripCoverage.coveredSections, which O8 reads. The fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_REAL_FORM_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31038,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000060",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_CARD_NOT_HELD_310",
+      "description": "Deliberately wrong (#1045): one adult without a card on trip 39, the section from 0000061 (fares.variants.cardNotHeld). Every fare requires gamma's first card. Expected: a WARNING of check O16 at 01; no failed check. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_FARE_CARD_NOT_HELD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31039,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000061",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_AGES_OUTSIDE_310",
+      "description": "Deliberately wrong (#1045): one adult on trip 40, the section from 0000062 (fares.variants.agesOutside). The adult's fares carry a child's passenger constraints, ages 6 to 14. Expected: a WARNING of check O17 at 01; no failed check. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_FARE_AGES_OUTSIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31040,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000062",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_OTHER_CLASS_310",
+      "description": "Deliberately wrong (#1045): one adult asking first class on trip 41, the section from 0000063 (fares.variants.otherClass). Gamma answers second-class fares only. Expected: a WARNING of check O18 at 01; no failed check. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_FARE_OTHER_CLASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31041,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000063",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_DATES_OFFSET_310",
+      "description": "Deliberately wrong (#1045): one adult on trip 42, the section from 0000064 (fares.variants.datesOffset). The valid travel dates are written at +01:00 with utcOffset 0. Expected: a WARNING of check O19 at 01; no failed check. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_FARE_DATES_OFFSET_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31042,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000064",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_COVERED_LEG_310",
+      "description": "Deliberately wrong (#1045): one adult on trip 43, the section from 0000065 (fares.variants.coveredLegUnknown). The offer's covered section ends on a leg the trip does not have. Expected: a WARNING of check O20 at 01; no failed check. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_FARE_COVERED_LEG_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31043,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000065",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REAL_FORM_1ADT_312",
+      "description": "Simulated provider, fares answered as a real provider does (#1045): one adult on trip 38, the section from 0000060 (fares.variants.realAnswerForm, not a wrong variant). The fares name no covered section and no connection point: their coverage is in their route and in the offer's tripCoverage.coveredSections, which O8 reads. The fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_REAL_FORM_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31238,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000060",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_CARD_NOT_HELD_312",
+      "description": "Deliberately wrong (#1045): one adult without a card on trip 39, the section from 0000061 (fares.variants.cardNotHeld). Every fare requires gamma's first card. Expected: a WARNING of check O16 at 01; no failed check. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_FARE_CARD_NOT_HELD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31239,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000061",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_AGES_OUTSIDE_312",
+      "description": "Deliberately wrong (#1045): one adult on trip 40, the section from 0000062 (fares.variants.agesOutside). The adult's fares carry a child's passenger constraints, ages 6 to 14. Expected: a WARNING of check O17 at 01; no failed check. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_FARE_AGES_OUTSIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31240,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000062",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_OTHER_CLASS_312",
+      "description": "Deliberately wrong (#1045): one adult asking first class on trip 41, the section from 0000063 (fares.variants.otherClass). Gamma answers second-class fares only. Expected: a WARNING of check O18 at 01; no failed check. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_FARE_OTHER_CLASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31241,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000063",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_DATES_OFFSET_312",
+      "description": "Deliberately wrong (#1045): one adult on trip 42, the section from 0000064 (fares.variants.datesOffset). The valid travel dates are written at +01:00 with utcOffset 0. Expected: a WARNING of check O19 at 01; no failed check. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_FARE_DATES_OFFSET_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31242,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000064",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FARE_COVERED_LEG_312",
+      "description": "Deliberately wrong (#1045): one adult on trip 43, the section from 0000065 (fares.variants.coveredLegUnknown). The offer's covered section ends on a leg the trip does not have. Expected: a WARNING of check O20 at 01; no failed check. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_FARE_COVERED_LEG_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31243,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000065",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -40090,6 +41544,654 @@
         }
       ],
       "description": "Simulated trip for fares on several routes (#1048): InterCity 168 from station 0000089, where zeta answers every route of a pair of ends, to station 0000002. On zeta's carrier (a copy of trip 37, #1022)."
+    },
+    {
+      "id": 38,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000060",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2260",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares answered as a real provider does (#1045): regional 2260 from station 0000060, where gamma answers so, to station 0000002; the section asked is the whole trip"
+    },
+    {
+      "id": 39,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000061",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2261",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare requiring a card no passenger holds (#1045): regional 2261 from station 0000061, where gamma answers so, to station 0000002; the section asked is the whole trip"
+    },
+    {
+      "id": 40,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000062",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2262",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare outside its passenger's age (#1045): regional 2262 from station 0000062, where gamma answers so, to station 0000002; the section asked is the whole trip"
+    },
+    {
+      "id": 41,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000063",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2263",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares in another class than asked (#1045): regional 2263 from station 0000063, where gamma answers so, to station 0000002; the section asked is the whole trip"
+    },
+    {
+      "id": 42,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000064",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2264",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for valid travel dates whose utcOffset disagrees (#1045): regional 2264 from station 0000064, where gamma answers so, to station 0000002; the section asked is the whole trip"
+    },
+    {
+      "id": 43,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000065",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2265",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a covered section on a leg the trip does not have (#1045): regional 2265 from station 0000065, where gamma answers so, to station 0000002; the section asked is the whole trip"
+    },
+    {
+      "id": 3638,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000060",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2260",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares answered as a real provider does (#1045): regional 2260 from station 0000060, where alpha answers so, to station 0000002; the section asked is the whole trip. On alpha's carrier (a copy of trip 38, #1022)."
+    },
+    {
+      "id": 3639,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000061",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2261",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare requiring a card no passenger holds (#1045): regional 2261 from station 0000061, where alpha answers so, to station 0000002; the section asked is the whole trip. On alpha's carrier (a copy of trip 39, #1022)."
+    },
+    {
+      "id": 3640,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000062",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2262",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare outside its passenger's age (#1045): regional 2262 from station 0000062, where alpha answers so, to station 0000002; the section asked is the whole trip. On alpha's carrier (a copy of trip 40, #1022)."
+    },
+    {
+      "id": 3641,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000063",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2263",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares in another class than asked (#1045): regional 2263 from station 0000063, where alpha answers so, to station 0000002; the section asked is the whole trip. On alpha's carrier (a copy of trip 41, #1022)."
+    },
+    {
+      "id": 3642,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000064",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2264",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for valid travel dates whose utcOffset disagrees (#1045): regional 2264 from station 0000064, where alpha answers so, to station 0000002; the section asked is the whole trip. On alpha's carrier (a copy of trip 42, #1022)."
+    },
+    {
+      "id": 3643,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000065",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2265",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a covered section on a leg the trip does not have (#1045): regional 2265 from station 0000065, where alpha answers so, to station 0000002; the section asked is the whole trip. On alpha's carrier (a copy of trip 43, #1022)."
+    },
+    {
+      "id": 3738,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000060",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2260",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares answered as a real provider does (#1045): regional 2260 from station 0000060, where beta answers so, to station 0000002; the section asked is the whole trip. On beta's carrier (a copy of trip 38, #1022)."
+    },
+    {
+      "id": 3739,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000061",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2261",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare requiring a card no passenger holds (#1045): regional 2261 from station 0000061, where beta answers so, to station 0000002; the section asked is the whole trip. On beta's carrier (a copy of trip 39, #1022)."
+    },
+    {
+      "id": 3740,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000062",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2262",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare outside its passenger's age (#1045): regional 2262 from station 0000062, where beta answers so, to station 0000002; the section asked is the whole trip. On beta's carrier (a copy of trip 40, #1022)."
+    },
+    {
+      "id": 3741,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000063",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2263",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares in another class than asked (#1045): regional 2263 from station 0000063, where beta answers so, to station 0000002; the section asked is the whole trip. On beta's carrier (a copy of trip 41, #1022)."
+    },
+    {
+      "id": 3742,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000064",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2264",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for valid travel dates whose utcOffset disagrees (#1045): regional 2264 from station 0000064, where beta answers so, to station 0000002; the section asked is the whole trip. On beta's carrier (a copy of trip 42, #1022)."
+    },
+    {
+      "id": 3743,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000065",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2265",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a covered section on a leg the trip does not have (#1045): regional 2265 from station 0000065, where beta answers so, to station 0000002; the section asked is the whole trip. On beta's carrier (a copy of trip 43, #1022)."
+    },
+    {
+      "id": 3938,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000060",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2260",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares answered as a real provider does (#1045): regional 2260 from station 0000060, where delta answers so, to station 0000002; the section asked is the whole trip. On delta's carrier (a copy of trip 38, #1022)."
+    },
+    {
+      "id": 3939,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000061",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2261",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare requiring a card no passenger holds (#1045): regional 2261 from station 0000061, where delta answers so, to station 0000002; the section asked is the whole trip. On delta's carrier (a copy of trip 39, #1022)."
+    },
+    {
+      "id": 3940,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000062",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2262",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare outside its passenger's age (#1045): regional 2262 from station 0000062, where delta answers so, to station 0000002; the section asked is the whole trip. On delta's carrier (a copy of trip 40, #1022)."
+    },
+    {
+      "id": 3941,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000063",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2263",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares in another class than asked (#1045): regional 2263 from station 0000063, where delta answers so, to station 0000002; the section asked is the whole trip. On delta's carrier (a copy of trip 41, #1022)."
+    },
+    {
+      "id": 3942,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000064",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2264",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for valid travel dates whose utcOffset disagrees (#1045): regional 2264 from station 0000064, where delta answers so, to station 0000002; the section asked is the whole trip. On delta's carrier (a copy of trip 42, #1022)."
+    },
+    {
+      "id": 3943,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000065",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2265",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a covered section on a leg the trip does not have (#1045): regional 2265 from station 0000065, where delta answers so, to station 0000002; the section asked is the whole trip. On delta's carrier (a copy of trip 43, #1022)."
+    },
+    {
+      "id": 31038,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000060",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2260",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares answered as a real provider does (#1045): regional 2260 from station 0000060, where epsilon answers so, to station 0000002; the section asked is the whole trip. On epsilon's carrier (a copy of trip 38, #1022)."
+    },
+    {
+      "id": 31039,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000061",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2261",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare requiring a card no passenger holds (#1045): regional 2261 from station 0000061, where epsilon answers so, to station 0000002; the section asked is the whole trip. On epsilon's carrier (a copy of trip 39, #1022)."
+    },
+    {
+      "id": 31040,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000062",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2262",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare outside its passenger's age (#1045): regional 2262 from station 0000062, where epsilon answers so, to station 0000002; the section asked is the whole trip. On epsilon's carrier (a copy of trip 40, #1022)."
+    },
+    {
+      "id": 31041,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000063",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2263",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares in another class than asked (#1045): regional 2263 from station 0000063, where epsilon answers so, to station 0000002; the section asked is the whole trip. On epsilon's carrier (a copy of trip 41, #1022)."
+    },
+    {
+      "id": 31042,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000064",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2264",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for valid travel dates whose utcOffset disagrees (#1045): regional 2264 from station 0000064, where epsilon answers so, to station 0000002; the section asked is the whole trip. On epsilon's carrier (a copy of trip 42, #1022)."
+    },
+    {
+      "id": 31043,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000065",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2265",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a covered section on a leg the trip does not have (#1045): regional 2265 from station 0000065, where epsilon answers so, to station 0000002; the section asked is the whole trip. On epsilon's carrier (a copy of trip 43, #1022)."
+    },
+    {
+      "id": 31238,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000060",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2260",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares answered as a real provider does (#1045): regional 2260 from station 0000060, where zeta answers so, to station 0000002; the section asked is the whole trip. On zeta's carrier (a copy of trip 38, #1022)."
+    },
+    {
+      "id": 31239,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000061",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2261",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare requiring a card no passenger holds (#1045): regional 2261 from station 0000061, where zeta answers so, to station 0000002; the section asked is the whole trip. On zeta's carrier (a copy of trip 39, #1022)."
+    },
+    {
+      "id": 31240,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000062",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2262",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a fare outside its passenger's age (#1045): regional 2262 from station 0000062, where zeta answers so, to station 0000002; the section asked is the whole trip. On zeta's carrier (a copy of trip 40, #1022)."
+    },
+    {
+      "id": 31241,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000063",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2263",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for fares in another class than asked (#1045): regional 2263 from station 0000063, where zeta answers so, to station 0000002; the section asked is the whole trip. On zeta's carrier (a copy of trip 41, #1022)."
+    },
+    {
+      "id": 31242,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000064",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2264",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for valid travel dates whose utcOffset disagrees (#1045): regional 2264 from station 0000064, where zeta answers so, to station 0000002; the section asked is the whole trip. On zeta's carrier (a copy of trip 42, #1022)."
+    },
+    {
+      "id": 31243,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000065",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+          "vehicleNumber": "2265",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip for a covered section on a leg the trip does not have (#1045): regional 2265 from station 0000065, where zeta answers so, to station 0000002; the section asked is the whole trip. On zeta's carrier (a copy of trip 43, #1022)."
     }
   ],
   "purchaserList": [

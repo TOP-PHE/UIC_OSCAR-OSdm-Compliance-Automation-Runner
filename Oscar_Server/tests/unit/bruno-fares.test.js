@@ -100,8 +100,13 @@ describe('fare checks on hand-made answers', () => {
       [(f) => { f.travelValidityConstraint.validTravelDates = { from: '2026-12-01T00:00:00Z', until: '2026-12-02T00:00:00Z' }; }, 'O6 WARNING'],
       [(f) => { delete f.involvedTCOs; }, 'O12 WARNING'],
       [(f) => { f.combinationConstraint[0].model = 'CLUSTER'; }, 'O9 WARNING'],
-      // The simulator's fares name both connection points since #1048: without them too, coverage is unknown.
-      [(f) => { delete f.coveredSection; delete f.regionalConstraint.exitConnectionPoint; }, 'O8 WARNING'],
+      // The simulator's fares name both connection points and a route since #1048: without
+      // them, and with no covered sections on the offer, coverage is unknown (#1045).
+      [(f) => {
+        delete f.coveredSection;
+        delete f.regionalConstraint.exitConnectionPoint;
+        f.regionalConstraint.regionalValidities = [{ seqNb: 1, route: { routeSummary: 'A - B' } }];
+      }, 'O8 WARNING'],
     ];
     for (const [change, expected] of cases) {
       const body = base();

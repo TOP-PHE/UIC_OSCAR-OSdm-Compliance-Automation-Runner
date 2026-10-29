@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-fare-details-checked",
+    "date": "October 29, 2026",
+    "tag": "Improved",
+    "title": "More of a fare checked against the request",
+    "summary": "OSCAR now checks the cards, ages, travel class, date offsets and covered legs a fare offer states, and reads what a fare covers from its route as real providers write it.",
+    "content": "A fare offer says more than its price: the reduction card it requires, the ages it is for, its travel class, the dates it is valid on and the legs it covers. OSCAR now checks each of these against the request. A fare requiring a card that none of its passengers holds, or an empty list of required cards, is a warning. So is a fare whose passenger constraints do not hold its passenger's age on the day of travel, a travel class asked with no fare offer in it, valid travel dates whose utcOffset disagrees with their own offset, and an offer naming a covered leg that is not one of its trip's trains.\n\nThese are warnings, not failures: OSDM leaves room in each case (a card may be shown on board, classes may differ). The coverage of the requested section is also read from where real providers put it: when a fare names no covered section and no connection point, OSCAR reads the ends of its route, then the covered sections of its offer, before saying it cannot check the coverage.\n\nSix new fare scenarios on the OSDM simulator show each case, one of them answering in the form of a real provider. Nothing to do on your side: the new warnings appear in your next fare runs where they apply."
+  },
+  {
     "id": "2026-10-29-simulator-realistic-fares",
     "date": "October 29, 2026",
     "tag": "Improved",
