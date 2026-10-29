@@ -86,7 +86,7 @@ identifiers and their token lifetime:
 | Expiry after 60 s for trips from station 0000099 | yes | yes | yes | yes | yes | yes |
 | Response variants, deliberately wrong answers | yes | yes | yes | yes | yes | yes |
 | Requested information and passenger data checks, sales horizon, age tariffs | yes | yes | yes | yes | yes | yes |
-| Fare offers for a requested section (`FARE_ADMISSION`, five clusters, a free child), seven wrong variants (one priced without a section, #905); booking and fulfilment of a fare, two wrong fare fulfilments (#906); the refund of a fare, COMBINING fares, two wrong fare refunds (#907) | yes | yes | yes | yes | yes | yes |
+| Fare offers for a requested section (`FARE_ADMISSION`, five clusters, a free child), alone when only fare parts are asked (#1046), seven wrong variants (one priced without a section, #905); booking and fulfilment of a fare, two wrong fare fulfilments (#906); the refund of a fare, COMBINING fares, two wrong fare refunds (#907) | yes | yes | yes | yes | yes | yes |
 | Fare reservations: a bicycle place in fare mode, two wrong answers (#255; OSDM 3.8 and later, so not on alpha and beta) | — | — | yes | yes | yes | yes |
 
 Every new function goes to every provider: a test of the simulator

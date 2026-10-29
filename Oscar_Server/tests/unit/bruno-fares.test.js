@@ -151,7 +151,9 @@ describe('the pure helpers', () => {
   });
 
   test('productOffersOf leaves fare-only offers out', () => {
-    const body = answer(request());
+    // Products and fares both asked: a request for fare parts only gets no product offer (#1046).
+    const body = answer(request({ parts: ['ADMISSION', 'FARE_ADMISSION'] }));
+    expect(body.offers.some((o) => o.fares)).toBe(true);
     expect(fares.productOffersOf(body).every((o) => !o.fares)).toBe(true);
     expect(fares.productOffersOf(body).length).toBeGreaterThan(0);
   });
@@ -271,7 +273,8 @@ describe('the negative fare requests (#905)', () => {
     });
 
     realTest('with bookMode PRODUCT the sale goes on, with the product offers only', () => {
-      const { ended, body } = runStep(fromStation(withoutSection(request()), '0000086'), { expectFares: 'false', bookMode: 'PRODUCT' });
+      // As SIM_NHF_FARE_NO_SECTION_SRCH: products asked too, or no product offer comes (#1046).
+      const { ended, body } = runStep(fromStation(withoutSection(request({ parts: ['ADMISSION', 'FARE_ADMISSION'] })), '0000086'), { expectFares: 'false', bookMode: 'PRODUCT' });
       expect(ended).toBe(false);
       expect(recorded[0]).toMatch(/^\[fares N\] .*: 6 fare\(s\) in 3 offer\(s\)/);
       expect(body.offers.length).toBeGreaterThan(0);

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-simulator-fare-only-offers",
+    "date": "October 29, 2026",
+    "tag": "Improved",
+    "title": "Simulator fare requests get fare offers only",
+    "summary": "Asked for fare parts only, the OSDM simulator now answers fare offers alone, without its product offers, as a provider in fare mode does.",
+    "content": "When a scenario asks the OSDM simulator for fare parts only (FARE_ADMISSION, FARE_RESERVATION), the answer now holds the fare offers and nothing else. Until now the simulator added its product offers to every answer, which made a fare answer look product based. A request that also asks for product parts (ADMISSION, RESERVATION, ANCILLARY or ALL) still gets both.\n\nWhen only fare parts are asked and no fare can be given, for example without a requested section, the answer holds no offer and one OFFER_NO_RESULTS warning that says why.\n\nThe checks OSCAR runs on the simulator's fare scenarios give the same results as before. Nothing to do on your side. This is the first step of more realistic fare answers on the simulator (#1045)."
+  },
+  {
     "id": "2026-10-29-certifier-coverage",
     "date": "October 29, 2026",
     "tag": "New",
