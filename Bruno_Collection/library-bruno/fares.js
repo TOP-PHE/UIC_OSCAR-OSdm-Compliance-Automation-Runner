@@ -21,7 +21,7 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   O5  after-sales conditions; isProviderFee logged          FAIL / INFO
  *   O6  a validity range; the travel day within the dates     FAIL / WARNING
  *   O7  every passenger in a fare of each offer               FAIL
- *   O8  each passenger's fares cover the section: gap, overlap FAIL / WARNING
+ *   O8  each passenger's fares cover the section: gap and overlap FAIL, unknown coverage WARNING
  *   O9  combination model of the YAML list                    WARNING
  *   O10 CLUSTERING: reference and allowed clusters listed     WARNING
  *   O11 CLUSTERING: none allowed more flexible                WARNING
@@ -341,7 +341,8 @@ function sectionChecks(pax) {
   return [
     check('O8', 'FAIL', 'Each passenger\'s fares cover the requested section without a gap', pax.gaps,
       `fares that leave part of the section ${pax.section.start} - ${pax.section.end} uncovered`),
-    check('O8', 'WARNING', 'Each passenger\'s fares do not overlap', pax.overlaps, 'fares covering a part of the section twice'),
+    // #1055: a part covered twice is paid twice, a failed check (maintainer, 2026-10-29).
+    check('O8', 'FAIL', 'Each passenger\'s fares do not overlap', pax.overlaps, 'fares covering a part of the section twice'),
     check('O8', 'WARNING', "Each fare says what it covers (coveredSection, else entry and exit connection points, its route's ends or its offer's covered sections)", pax.unknown,
       'the coverage of the section cannot be checked'),
   ];

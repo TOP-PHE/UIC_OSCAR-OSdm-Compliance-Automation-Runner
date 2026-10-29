@@ -93,6 +93,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.442] / [collection-OTST_V2.0.239] — 2026-10-29
+
+Issue #1055, release 2026.480.
+
+### Changed
+- **Two fare checks about money fail instead of warning.** Reading the fare results on gamma, 10 of the 17 injected fare errors only raised a warning, which is not a point in a certification report. Two of them cost the traveller or the distributor money, so they are failed checks now (maintainer decision):
+  - **O8, overlapping fares** (`fares.js` `sectionChecks()`): a passenger's fares covering part of the requested section twice. The fare offer is then not booked, as for any failed fare check. "The coverage cannot be checked" stays a warning.
+  - **R3, COMBINING refund fee** (`fareRefund.js` `refundOfferChecks()`): a refund offer's fee that is not the one the fares' after-sales conditions give (osdm.io: the distributor must obey the fares' fees).
+  - As tests, they count: every fare scenario with a section gains one check, a COMBINING refund two. The catalogue's `checks` of nine fare entries and *OSCAR - What is tested* follow, from a replay of the 43 fare `_38` scenarios. `NHF_FARE_PRODUCT_ONLY` read 235 though `main` already gave 237: corrected too.
+  - `SIM_WRONG_FARE_OVERLAP_*` and `SIM_WRONG_FARE_COMBINING_FEE_*` leave `WARNING_ONLY`: their failed check now detects them, as *OSCAR - OSDM Simulator scenarios* says.
+
+---
+
 ## [server-1.11.441] / [collection-OTST_V2.0.238] — 2026-10-29
 
 Issue #1053, release 2026.479.

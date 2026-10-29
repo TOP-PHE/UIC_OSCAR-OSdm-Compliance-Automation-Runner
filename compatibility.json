@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.479",
+  "current_release": "2026.480",
   "releases": [
+    {
+      "release": "2026.480",
+      "date": "2026-10-29",
+      "server": "1.11.442",
+      "collection": "OTST_V2.0.239",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1055: overlapping fares (O8) and a COMBINING refund fee that is not the fares' own (R3) are failed checks instead of warnings; an overlapping fare offer is no longer booked; the fare catalogue entries count one more check (two for a COMBINING refund)."
+      ]
+    },
     {
       "release": "2026.479",
       "date": "2026-10-29",

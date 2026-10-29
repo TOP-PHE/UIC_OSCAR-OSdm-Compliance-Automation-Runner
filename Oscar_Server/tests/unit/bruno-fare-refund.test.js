@@ -82,15 +82,15 @@ describe('the fare refund on the simulator\'s answers', () => {
     expect(failing(ignored.checks)).toEqual(['R4 FAIL']);
   });
 
-  test('COMBINING fares give their fee by date (R3); the variant taking the other window gives an R3 warning only', () => {
+  test('COMBINING fares give their fee by date (R3); the variant taking the other window fails R3 (#1055)', () => {
     const s = sale({ start: '0000087' });
     expect(fareRefund.feeRuleOf(s.kept[0].fares)).toBe('COMBINING');
     const right = refund(s);
     expect(right.offers[0].refundFee.amount).toBe(Math.round(s.offer.fares[0].prices[0].amount / 10));
-    expect(ids(right.checks)).toEqual(['R1 FAIL', 'R2 FAIL', 'R3 WARNING']);
+    expect(ids(right.checks)).toEqual(['R1 FAIL', 'R2 FAIL', 'R3 FAIL']);
     expect(failing(right.checks)).toEqual([]);
     const wrong = refund(sale({ start: '0000087', lastName: 'Simvariant-Fare-Wrong-Combining-Fee' }));
-    expect(failing(wrong.checks)).toEqual(['R3 WARNING']);
+    expect(failing(wrong.checks)).toEqual(['R3 FAIL']);
     // A fee stated for COMBINING fares is not sent.
     const { specs, notes } = fareRefund.feeSpecsFor(s.kept, { fee: 250, osdmVersion: '3.8.0' });
     expect(specs).toEqual([]);
@@ -193,9 +193,9 @@ describe('the refund offers on hand-made answers', () => {
     expect(failing(fareRefund.refundOfferChecks([offer('O1', ['F1', 'F2'], 1540, 60)], kept, { asked: ['F1', 'F2'] }))).toEqual([]);
   });
 
-  test('R3: a COMBINING fee other than the fares\' warns; a fee that cannot be worked out is an INFO line', () => {
+  test('R3: a COMBINING fee other than the fares\' fails (#1055); a fee that cannot be worked out is an INFO line', () => {
     expect(failing(fareRefund.refundOfferChecks([offer('O2', ['F2'], 540, 60)], kept, { asked: ['F2'] }))).toEqual([]);
-    expect(failing(fareRefund.refundOfferChecks([offer('O2', ['F2'], 600, 0)], kept, { asked: ['F2'] }))).toEqual(['R3 WARNING']);
+    expect(failing(fareRefund.refundOfferChecks([offer('O2', ['F2'], 600, 0)], kept, { asked: ['F2'] }))).toEqual(['R3 FAIL']);
     const noConditions = [{ ...kept[1], fares: [{ ...kept[1].fares[0], conditions: [] }] }];
     const checks = fareRefund.refundOfferChecks([offer('O2', ['F2'], 540, 60)], noConditions, { asked: ['F2'] });
     expect(checks.filter((c) => c.level === 'INFO').map((c) => c.id)).toEqual(['R3']);

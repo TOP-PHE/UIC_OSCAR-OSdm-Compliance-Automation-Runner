@@ -992,7 +992,7 @@
     {
       "code": "OTST_FARE_SPEC_1ADT",
       "source": "SIM_FARE_SPEC_1ADT_38",
-      "checks": 117,
+      "checks": 118,
       "purpose": "Fare sale for one adult by trip specification: fares asked for the last leg's section, one fare offer per cluster checked (fares, passengers, section coverage, conditions), the fare offer of the chosen cluster booked and fulfilled as fares.",
       "capability": "fares.sale",
       "needs": {
@@ -1004,7 +1004,7 @@
     {
       "code": "OTST_FARE_SRCH_1ADT",
       "source": "SIM_FARE_SRCH_1ADT_38",
-      "checks": 117,
+      "checks": 118,
       "purpose": "Fare sale for one adult by search criteria: fares asked for the whole trip, the fare offers checked, the fare offer of the chosen cluster booked and fulfilled as fares.",
       "capability": "fares.sale",
       "needs": {
@@ -1015,7 +1015,7 @@
     {
       "code": "OTST_FARE_TRIPIDS_1ADT",
       "source": "SIM_FARE_TRIPIDS_1ADT_38",
-      "checks": 124,
+      "checks": 125,
       "purpose": "Fare sale for one adult by trip id: POST /trips-collection, then the fares of the trip chosen, by its id, for the whole trip; the fare offer of the chosen cluster booked and fulfilled as fares.",
       "capability": "fares.sale",
       "needs": {
@@ -1026,7 +1026,7 @@
     {
       "code": "OTST_FARE_FREE_CHILD",
       "source": "SIM_FARE_SPEC_FREE_CHILD_38",
-      "checks": 116,
+      "checks": 117,
       "limit": "FREE_CHILD",
       "purpose": "Fare sale for an adult and a child one year under the age the Test Framework declares free: every passenger has a fare, the child's priced 0.",
       "capability": "fares.sale",
@@ -1075,7 +1075,7 @@
     {
       "code": "NHF_FARE_PRODUCT_ONLY",
       "source": "SIM_NHF_FARE_NO_SECTION_SRCH_38",
-      "checks": 235,
+      "checks": 237,
       "purpose": "Negative fare request, then a product sale: a search asking ADMISSION and FARE_ADMISSION without a section; a fare in the answer fails, and the sale goes on with a product offer, booked and fulfilled.",
       "capability": "fares.offers",
       "needs": {
@@ -1119,7 +1119,7 @@
     {
       "code": "OTST_FARE_REFUND_1ADT",
       "source": "SIM_FARE_REFUND_1ADT_38",
-      "checks": 180,
+      "checks": 181,
       "purpose": "Fare sale refunded in full, no fee stated: the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
       "capability": "fares.refund",
       "needs": {
@@ -1132,7 +1132,7 @@
     {
       "code": "OTST_FARE_REFUND_FEE_1ADT",
       "source": "SIM_FARE_REFUND_FEE_1ADT_38",
-      "checks": 181,
+      "checks": 182,
       "purpose": "Fare sale refunded in full with a refund fee stated by OSCAR (RefundSpecification.refundFee, OSDM 3.8): the refund offer keeps the fee stated, CLUSTERING fares.",
       "capability": "fares.refund",
       "needs": {
@@ -1145,7 +1145,7 @@
     {
       "code": "OTST_FARE_REFUND_COMBINING_1ADT",
       "source": "SIM_FARE_REFUND_COMBINING_1ADT_38",
-      "checks": 179,
+      "checks": 181,
       "combinationModel": "COMBINING",
       "purpose": "Fare sale of fares combined by COMBINING, refunded in full: the fee is the fare's own, from its refund conditions at the time of the refund offer.",
       "capability": "fares.refund",
@@ -1158,7 +1158,7 @@
     {
       "code": "OTST_FARE_BICYCLE_1ADT",
       "source": "SIM_FARE_BICYCLE_1ADT_38",
-      "checks": 130,
+      "checks": 131,
       "purpose": "Fare sale for an adult and a bicycle (OSDM 3.8): the adult's fare and the bicycle's fare reservation in fare mode, selected, booked and fulfilled with the fare.",
       "capability": "fares.reservation",
       "needs": {

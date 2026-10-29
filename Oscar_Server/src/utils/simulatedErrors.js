@@ -64,9 +64,7 @@ const firstFailure = (run) => {
 const WARNING_ONLY = Object.freeze({
   SIM_WRONG_FARE_UNKNOWN_CLUSTER: '[fares O10]',
   SIM_WRONG_FARE_WIDER_CLUSTERS: '[fares O11]',
-  SIM_WRONG_FARE_OVERLAP: '[fares O8]',
   SIM_WRONG_FARE_FULFILLMENT_DOCUMENT: '[fares F2]',
-  SIM_WRONG_FARE_COMBINING_FEE: '[fares R3]',
   // #1045: what a fare says against the request.
   SIM_WRONG_FARE_CARD_NOT_HELD: '[fares O16]',
   SIM_WRONG_FARE_AGES_OUTSIDE: '[fares O17]',

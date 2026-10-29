@@ -52,7 +52,7 @@ describe('fare checks on the simulator\'s answers', () => {
     ['0000081', 'a cluster outside the list', ['O10 WARNING']],
     ['0000082', 'allowed clusters wider than the reference', ['O11 WARNING']],
     ['0000083', 'a gap in the section', ['O8 FAIL']],
-    ['0000084', 'overlapping fares', ['O8 WARNING']],
+    ['0000084', 'overlapping fares', ['O8 FAIL']],
   ])('variant %s (%s) fails exactly %j', (start, _what, expected) => {
     expect(run(request({ start }))).toEqual(expected);
   });

@@ -234,7 +234,8 @@ function refundOfferChecks(refundOffers, fulfillments, { asked = [], sent = {}, 
   ];
   const combiningAsked = offers.some((o) => fulfillmentIdsOf(o).some((id) => byId.has(id) && feeRuleOf(byId.get(id).fares) === 'COMBINING'));
   if (combiningAsked) {
-    checks.push(check('R3', 'WARNING', 'COMBINING: each refund offer\'s fee is the one its fares\' after-sales conditions give (osdm.io: the distributor must obey the fares\' fees)', of('combining'), 'fees that are not the fares\''));
+    // #1055: a fee the fares do not give is money, a failed check (maintainer, 2026-10-29).
+    checks.push(check('R3', 'FAIL', 'COMBINING: each refund offer\'s fee is the one its fares\' after-sales conditions give (osdm.io: the distributor must obey the fares\' fees)', of('combining'), 'fees that are not the fares\''));
   }
   if (Object.keys(sent).length > 0) {
     checks.push(check('R4', 'FAIL', 'CLUSTERING: each refund offer\'s fee is the refundFee OSCAR sent (osdm.io: the provider uses the amount the client states)', of('fee'), 'fees other than the one sent'));

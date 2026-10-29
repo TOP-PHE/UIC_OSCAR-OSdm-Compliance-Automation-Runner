@@ -43,7 +43,7 @@ const SCENARIOS = [
   { code: 'OTST_SALE_ONE_WAY', ...base },
   { code: 'SIM_WRONG_BOOKING_PRICE_38', ...base },
   { code: 'SIM_WRONG_SILENT_38', ...base },
-  { code: 'SIM_WRONG_FARE_OVERLAP_38', ...base },
+  { code: 'SIM_WRONG_FARE_UNKNOWN_CLUSTER_38', ...base },
   { code: 'SIM_WRONG_FARE_WIDER_CLUSTERS_38', ...base },
   { ...simulator.scenarios.find((s) => s.code === FAULT), tripRequirementId: 1, passengersListId: 1 },
   { code: 'SIM_FAULT_NEVER_RUN_38', ...base, simulatorFaults: 'offer.price-below-parts' },
@@ -79,7 +79,7 @@ beforeAll(async () => {
   addRun('SIM_WRONG_BOOKING_PRICE_38', [['02. POST Create Booking', 'provisionalPrice is the sum of the pre-booked parts']]);
   addRun('SIM_WRONG_SILENT_38');
   // Meant to warn only (#1029 follow-up): one gives its warning, the other only another one.
-  addRun('SIM_WRONG_FARE_OVERLAP_38', [], ['[INFO] offers read', '[WARNING] [fares O8] Each passenger\'s fares do not overlap — fares covering a part of the section twice']);
+  addRun('SIM_WRONG_FARE_UNKNOWN_CLUSTER_38', [], ['[INFO] offers read', '[WARNING] [fares O10] CLUSTERING: the reference cluster is one of BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO — reference clusters outside the list']);
   addRun('SIM_WRONG_FARE_WIDER_CLUSTERS_38', [], ['[WARNING] [fares O10] CLUSTERING: the reference cluster is one of the five']);
   addRun(FAULT, replay[FAULT].failures, replay[FAULT].warnings);
 });
@@ -112,9 +112,9 @@ test('they are listed apart: detected, missed, not run', async () => {
   const byCode = Object.fromEntries(se.entries.map((e) => [e.code, e]));
   expect(byCode.SIM_WRONG_BOOKING_PRICE_38).toMatchObject({ kind: 'wrong', result: 'detected', step: '02. POST Create Booking', check: 'provisionalPrice is the sum of the pre-booked parts' });
   expect(byCode.SIM_WRONG_SILENT_38).toMatchObject({ kind: 'wrong', result: 'missed' });
-  expect(byCode.SIM_WRONG_FARE_OVERLAP_38).toMatchObject({
+  expect(byCode.SIM_WRONG_FARE_UNKNOWN_CLUSTER_38).toMatchObject({
     kind: 'wrong', result: 'detected', step: null,
-    check: '[WARNING] [fares O8] Each passenger\'s fares do not overlap — fares covering a part of the section twice',
+    check: '[WARNING] [fares O10] CLUSTERING: the reference cluster is one of BUSINESS, FULL_FLEX, SEMI_FLEX, NON_FLEX, PROMO — reference clusters outside the list',
   });
   expect(byCode.SIM_WRONG_FARE_WIDER_CLUSTERS_38).toMatchObject({
     kind: 'wrong', result: 'missed', check: 'The run passed every check and gave no [fares O11] warning: OSCAR did not see the error.',
