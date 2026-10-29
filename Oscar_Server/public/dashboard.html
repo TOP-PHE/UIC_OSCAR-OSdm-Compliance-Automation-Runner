@@ -713,6 +713,28 @@ document.getElementById('delete-modal').addEventListener('click', function(e) {
   if (e.target === this) closeDeleteModal();
 });
 
+// #1041: a whole batch with certifiers (asked first); #901: share with the
+// company that operates the provider, run or batch. True when it was one.
+function handleBatchShareClick(e) {
+  const certEl = e.target.closest('[data-action$="-batch-certifier"]');
+  const opEl = certEl ? null : e.target.closest('[data-action$="-operator"]');
+  const el = certEl || opEl;
+  if (!el) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  const share = el.dataset.action.startsWith('share');
+  if (certEl) {
+    if (confirm(batchCertifierQuestion(share))) {
+      toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(certEl.dataset.batchId)}/share`, share);
+    }
+  } else if (opEl.dataset.batchId) {
+    toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share);
+  } else {
+    toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share);
+  }
+  return true;
+}
+
 // Delegated handlers for dynamically rendered run rows
 document.getElementById('runs-list').addEventListener('click', function(e) {
   if (e.target.type === 'checkbox') return; // let change handler deal with it
@@ -727,28 +749,8 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
     return;
   }
 
-  // #1041: a whole batch with certifiers (asked first).
-  const certEl = e.target.closest('[data-action$="-batch-certifier"]');
-  if (certEl) {
-    e.preventDefault();
-    e.stopPropagation();
-    const share = certEl.dataset.action.startsWith('share');
-    if (confirm(batchCertifierQuestion(share))) {
-      toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(certEl.dataset.batchId)}/share`, share);
-    }
-    return;
-  }
-
-  // #901: share with the company that operates the provider, run or batch.
-  const opEl = e.target.closest('[data-action$="-operator"]');
-  if (opEl) {
-    e.preventDefault();
-    e.stopPropagation();
-    const share = opEl.dataset.action.startsWith('share');
-    if (opEl.dataset.batchId) toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share);
-    else toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share);
-    return;
-  }
+  // #1041 / #901: batch with certifiers, run or batch with the operator.
+  if (handleBatchShareClick(e)) return;
 
   // Bulk download — all reports in a batch as a ZIP (#405). Must run BEFORE the
   // batch-header toggle below, since the button lives inside the toggle row.
