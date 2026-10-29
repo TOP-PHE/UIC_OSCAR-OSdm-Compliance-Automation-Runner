@@ -78,9 +78,10 @@ function arrivalOf(trip) {
  */
 function arrivesBy(trip, asked) {
   const arrival = arrivalOf(trip);
-  if (!arrival || !OFFSET.test(arrival)) return null;
+  const found = arrival ? OFFSET.exec(arrival) : null;
+  if (!found) return null;
   const at = Date.parse(arrival);
-  const offset = arrival.match(OFFSET)[0];
+  const offset = found[0];
   const by = Date.parse(OFFSET.test(asked) ? asked : `${asked}${offset}`);
   if (!Number.isFinite(at) || !Number.isFinite(by)) return null;
   return at <= by;
