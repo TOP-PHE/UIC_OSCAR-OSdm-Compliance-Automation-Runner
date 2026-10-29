@@ -2163,8 +2163,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `validationLogger` on the global object when loaded: a unit test that
   watches the global logger sets it again after requiring a module that
   loads `displays.js`.
-  **Fare templates from DB's real fares** (#1047, part B of #1045; no
-  version: nothing reads them until #1048). `OSDM_Simulator/fares/
+  **Fare templates from DB's real fares** (#1047, part B of #1045,
+  released with #1048). `OSDM_Simulator/fares/
   templates.json` is **generated** by `scripts/fare-templates.js` from DB's
   offline delivery (`OSCAR_Test_Infos/FARE Examples/1080_2024.02.gtm.json`,
   private repository; public CEN data of 2024). The delivery is read from
@@ -2179,6 +2179,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `src/osdm/fareTemplates.js` `onlineFare()` lays a template fare on
   `placeOf(role, n)` (entry, then route in reading order, then exit) as an
   online Fare, valid in every version from 3.6 to 3.12.
+  **The generator uses them** (#1048, 1.11.439 / OTST_V2.0.237, simulator
+  0.59.0). `templatesFor()` (`fares.js`) chooses a border template where
+  the section starts or ends at a `fares.borderPoints` station (0000004,
+  0000070, 0000089 in every profile), else one from station to station,
+  by a hash of the section. `placesFor()` lays it: the section's ends,
+  the trip's stops opening the next route items, else `99…` stations of
+  the simulator's own. `clusterPrices()` keeps NON_FLEX < SEMI_FLEX <
+  FULL_FLEX (80 %, 60 %; F9). `fareChoiceOf()` picks each passenger's
+  template fare: the constraint of its age, a child's fare at 0 under
+  `freeUnderAge`, the card slot of the card's reduction, the GROUP family
+  from six weighted passengers, a bicycle fare without fare-mode places.
+  Variant `alternativeRoutes` (0000089) gives every route of a pair. The
+  29 `_38` fare scenarios gave the same checks before and after; the eight
+  new `SIM_FARE_*` scenarios give the plain sale's 116 checks: OSCAR has
+  no check of their particulars yet (#1045's next part).
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

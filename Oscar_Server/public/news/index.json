@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-simulator-realistic-fares",
+    "date": "October 29, 2026",
+    "tag": "Improved",
+    "title": "Realistic fares on the OSDM simulator",
+    "summary": "The simulator now builds its fare answers from real fares: the shape and prices of DB's 2024 fares, laid on the simulator's own stations.",
+    "content": "The OSDM simulator's fare answers are now built from templates made from DB's 2024 international fare delivery, shared publicly by a CEN project. A fare carries what a real one does: both connection points, a route of stations and station sets, first or second class, the passenger constraint of each passenger's age, the reduction card it requires, the carriers and companies involved and an accounting identifier. No station, company or card of DB's appears: the simulator lays each template on its own stations.\n\nThe three clusters keep a commercial order: the non-flexible fare is always the cheapest, then the semi-flexible one, then the fully flexible one. A young child travels free, six people or more travel on a group fare, a bicycle has a fare of its own when no bicycle place is asked, and a section from a border point is priced on a fare with a border there.\n\nEight new fare scenarios show these cases: first class, a card holder, a family, a bicycle fare, a group, border to border, several routes and the refund of a non-flexible fare. The simulator reference configurations include them, so a company following a reference is told it is not up to date. The checks OSCAR runs on the earlier fare scenarios give the same results. Nothing else to do on your side."
+  },
+  {
     "id": "2026-10-29-simulator-fare-only-offers",
     "date": "October 29, 2026",
     "tag": "Improved",

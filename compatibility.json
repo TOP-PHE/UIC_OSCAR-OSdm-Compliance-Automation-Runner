@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.476",
+  "current_release": "2026.477",
   "releases": [
+    {
+      "release": "2026.477",
+      "date": "2026-10-29",
+      "server": "1.11.439",
+      "collection": "OTST_V2.0.237",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1048 (simulator fares C), simulator 0.59.0, collection OTST_V2.0.237: the simulator builds its fares from DB's templates (#1047), laid on its own stations: border points, both connection points and a route of stations and station sets, clusters priced NON_FLEX < SEMI_FLEX < FULL_FLEX, a fare per passenger constraint (a young child free), the provider's cards, group fares from six people, a bicycle fare, first class, every route of a pair. Eight new fare scenarios with their version copies; the reference configurations follow. Server change: the welcome-page news entry only."
+      ]
+    },
     {
       "release": "2026.476",
       "date": "2026-10-29",

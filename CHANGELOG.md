@@ -67,9 +67,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OSDM provider simulator** (#575), in the new `OSDM_Simulator/` folder: a
+  stub OSDM provider for testing OSCAR itself, written for the security test.
+  It is not part of the server or of the collection, changes neither, and is
+  not deployed with them: it runs on a host of its own.
+  - It issues its own access tokens (`client_credentials`, client id and
+    secret in a Basic header or in the body, so both standard OSCAR profiles
+    work) and answers a basic sale: version check, offers, booking, passenger
+    and purchaser, tickets. Every other OSDM resource answers 501, which the
+    collection reports as "not implemented by this provider".
+  - Three simulated providers, `alpha`, `beta`, `gamma`, named by the first
+    part of the path. Each has its own carrier, currency, prices, OSDM version,
+    token lifetime and id prefix. A token of one is refused by the others, and
+    a booking is visible only to the client that made it.
+  - No dependency, no data on disk, no outbound request. Client secrets are
+    read from a file that is not in the repository; without it the simulator
+    does not start.
+  - `OSDM_Simulator/oscar/datafile.json`: a ready-made data file with two sale
+    scenarios. Run through OSCAR against the three providers, with both OAuth
+    profiles, each scenario completes with no failed check (173 and 234
+    checks).
+  - Installation and use: `Documentation/Server_Operations/OSCAR - OSDM
+    Simulator.md`. Linted and tested in the required CI job, analysed by Sonar
+    with its own coverage report.
+
+---
+
+## [server-1.11.439] / [collection-OTST_V2.0.237] — 2026-10-29
+
+Issue #1048 (part C of #1045, realistic fares on the simulator), release 2026.477. Simulator 0.59.0. The server change is the welcome-page news entry.
+
+### Simulator 0.59.0
+- **The fare generator builds its fares from DB's templates** (#1047) instead of a handful of fixed fields. The stations are always the simulator's own (F2).
+  - **The template:** a section starting or ending at one of the provider's border points (`fares.borderPoints`: `0000004`, `0000070`, `0000089`, each with a code of the provider) takes a template with a border there; any other section takes one from station to station. The same section always takes the same template.
+  - **The region laid on the section:** the section's start opens the entry connection point and the route, its end the exit and the route's last place, and the trip's stops between them open the next items of the route. Every other place is a station of the simulator's own (`urn:uic:stn:99…`), the same for a template wherever it is laid. A border end is a connection point named by the provider's code (`urn:x_osdm_simulator:border:<code>`). The route is OSDM's flat `routeItemList` with its alternatives.
+  - **Clusters and prices (F4, F9):** FULL_FLEX takes the template's price in EUR, in the provider's currency (gamma: × 24 in CZK, or EUR when asked). SEMI_FLEX and NON_FLEX are 80 % and 60 % of it, rounded down and always strictly cheaper. BUSINESS is 125 %, PROMO 50 %. A free fare is free in every cluster. The after-sales conditions of each cluster are unchanged.
+  - **One fare per passenger:** the passenger constraint of its age on the day of travel; a passenger under `freeUnderAge` gets a child's fare priced 0 with ages 0 to 5 (F7). A card of the provider takes the template's fare for the card slot of the same reduction, naming the card in `requiredCards` (F8). From six weighted passengers, everyone gets group saver fares. A bicycle travels on a bicycle fare when no bicycle place is asked in fare mode (F6). Fares come in each travel class asked, else second class.
+  - **Every route of a pair:** a section from `fares.variants.alternativeRoutes` (`0000089`, not a wrong variant) gets one offer per route of the template's pair of ends and per cluster.
+  - Every template attribute is kept: carrier constraint, CIV, fulfilment constraint, travel validity (2 days), passenger constraints, TCOs (the provider's carrier, then companies of the simulator's own), the accounting identifier, a description. The covered section stays.
+  - The deliberately wrong variants, the COMBINING section, the fare reservations of #255 and the section rules of #903–#905 are unchanged.
+- Checked with the replay:
+  - The 29 `_38` fare scenarios, recorded on the old and the new simulator, give the same checks, failures and warnings. Only the amounts in the texts of six checks and one warning change.
+  - Every fare answer of the simulator's tests passes the response schema of its provider's version, from 3.6 to 3.12.
 - **Fare templates made from DB's real fares, without their places** (#1047,
-  part B of #1045). Simulator files only, read by nothing yet: they are
-  released with the fare generator that uses them (#1048), so no version moves.
+  part B of #1045). Merged without a release; released with this generator.
   - `OSDM_Simulator/fares/templates.json`: 26 templates, one per region of
     DB's 2024 offline fare delivery (fare provider 1080, delivery 2024.02,
     shared publicly by a CEN project, no longer commercially valid). Each holds
@@ -96,29 +137,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     whose items name each other by index. All 702 fares, laid on test places,
     pass the OSDM response schema of every version from 3.6 to 3.12.
 
-- **OSDM provider simulator** (#575), in the new `OSDM_Simulator/` folder: a
-  stub OSDM provider for testing OSCAR itself, written for the security test.
-  It is not part of the server or of the collection, changes neither, and is
-  not deployed with them: it runs on a host of its own.
-  - It issues its own access tokens (`client_credentials`, client id and
-    secret in a Basic header or in the body, so both standard OSCAR profiles
-    work) and answers a basic sale: version check, offers, booking, passenger
-    and purchaser, tickets. Every other OSDM resource answers 501, which the
-    collection reports as "not implemented by this provider".
-  - Three simulated providers, `alpha`, `beta`, `gamma`, named by the first
-    part of the path. Each has its own carrier, currency, prices, OSDM version,
-    token lifetime and id prefix. A token of one is refused by the others, and
-    a booking is visible only to the client that made it.
-  - No dependency, no data on disk, no outbound request. Client secrets are
-    read from a file that is not in the repository; without it the simulator
-    does not start.
-  - `OSDM_Simulator/oscar/datafile.json`: a ready-made data file with two sale
-    scenarios. Run through OSCAR against the three providers, with both OAuth
-    profiles, each scenario completes with no failed check (173 and 234
-    checks).
-  - Installation and use: `Documentation/Server_Operations/OSCAR - OSDM
-    Simulator.md`. Linted and tested in the required CI job, analysed by Sonar
-    with its own coverage report.
+### Added
+- **Eight fare scenarios on gamma** (collection OTST_V2.0.237), each with its `_36`, `_37`, `_39`, `_310` and `_312` copies:
+  - `SIM_FARE_FIRST_1ADT_38` (first class), `SIM_FARE_CARD_1ADT_38` (the 25 % card), `SIM_FARE_FAMILY_38` (an adult, a child, a young child free);
+  - `SIM_FARE_BICYCLE_ADMISSION_38` (a bicycle fare), `SIM_FARE_GROUP_6ADT_38` (group saver fares);
+  - `SIM_FARE_TRANSIT_1ADT_38` (border to border, trip 36), `SIM_FARE_ROUTES_1ADT_38` (three routes, nine offers, trip 37);
+  - `SIM_FARE_REFUND_NON_FLEX_1ADT_38` (a NON_FLEX fare refunded: nothing back).
+  - Recorded on the simulator, with their 3.6 copies: no failed check and no warning. Each gives the same 116 checks as a one-adult fare sale (180 for the refund): OSCAR checks nothing yet of what is particular to each, the next part of #1045.
+- The simulator reference configurations include them in their run lists.
+- A welcome-page news entry: realistic fares on the OSDM simulator.
+
+### Changed
+- `Oscar_Server/tests/unit/bruno-fares.test.js`: a fare without `coveredSection` needs no exit connection point either for O8 to warn, since the simulator's fares name both.
 
 ---
 

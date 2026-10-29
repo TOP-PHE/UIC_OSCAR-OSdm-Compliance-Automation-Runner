@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38", "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38", "SIM_SALE_YOUNG_CHILD_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38", "SIM_TRIP_PROBE_ARRIVAL_TIME_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38", "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38", "SIM_SALE_YOUNG_CHILD_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38", "SIM_TRIP_PROBE_ARRIVAL_TIME_38", "SIM_FARE_FIRST_1ADT_38", "SIM_FARE_CARD_1ADT_38", "SIM_FARE_FAMILY_38", "SIM_FARE_BICYCLE_ADMISSION_38", "SIM_FARE_GROUP_6ADT_38", "SIM_FARE_TRANSIT_1ADT_38", "SIM_FARE_ROUTES_1ADT_38", "SIM_FARE_REFUND_NON_FLEX_1ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -35524,6 +35524,1950 @@
         "requestedOfferParts": []
       },
       "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FIRST_1ADT_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fares of SIM_FARE_SPEC_1ADT_38 in first class (travelClass FIRST). Gamma answers first-class fares of the template, dearer than second class in each cluster; the fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [
+          "FIRST"
+        ],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_CARD_1ADT_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult holding gamma's 25 % card (passenger list 3). Gamma answers the template's card fare, three quarters of the price, naming the card in requiredCards; the fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 3,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FAMILY_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult, a child aged 8 and a young child aged 3 on the day of travel (passenger list 39). One fare each, of the passenger constraint of each age; the young child travels free, priced 0 with ages 0 to 5. The fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 39,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ADMISSION_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_GROUP_6ADT_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): six adults (passenger list 7). From six weighted passengers gamma answers group saver fares, one per passenger, cheaper than the flexible fare; the fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 7,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_TRANSIT_1ADT_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 36, from the border point 0000004 to the border point 0000070. Gamma prices it on a template from border to border; both connection points name gamma's border codes. The fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 36,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000070"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_ROUTES_1ADT_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 37, the section from 0000089 (fares.variants.alternativeRoutes, not a wrong variant). Gamma answers every route of the template's pair of ends: three routes, each in three clusters, nine offers; the first is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 37,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000089",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REFUND_NON_FLEX_1ADT_38",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fare sale of SIM_FARE_SPEC_1ADT_38 in the non-flexible cluster, refunded in full. A NON_FLEX fare is neither refundable nor exchangeable: its REFUND condition keeps the whole price, so the refund offer gives nothing back. OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 24,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [
+          "FARE_ADMISSION"
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FIRST_1ADT_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fares of SIM_FARE_SPEC_1ADT_38 in first class (travelClass FIRST). Gamma answers first-class fares of the template, dearer than second class in each cluster; the fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_FIRST_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3624,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_CARD_1ADT_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult holding gamma's 25 % card (passenger list 3). Gamma answers the template's card fare, three quarters of the price, naming the card in requiredCards; the fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_CARD_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3624,
+      "passengersListId": 3,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FAMILY_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult, a child aged 8 and a young child aged 3 on the day of travel (passenger list 39). One fare each, of the passenger constraint of each age; the young child travels free, priced 0 with ages 0 to 5. The fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_FAMILY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3624,
+      "passengersListId": 39,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ADMISSION_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3624,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_GROUP_6ADT_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): six adults (passenger list 7). From six weighted passengers gamma answers group saver fares, one per passenger, cheaper than the flexible fare; the fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_GROUP_6ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3624,
+      "passengersListId": 7,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_TRANSIT_1ADT_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 36, from the border point 0000004 to the border point 0000070. Gamma prices it on a template from border to border; both connection points name gamma's border codes. The fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_TRANSIT_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3636,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000070"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_ROUTES_1ADT_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 37, the section from 0000089 (fares.variants.alternativeRoutes, not a wrong variant). Gamma answers every route of the template's pair of ends: three routes, each in three clusters, nine offers; the first is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_ROUTES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3637,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000089",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REFUND_NON_FLEX_1ADT_36",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fare sale of SIM_FARE_SPEC_1ADT_38 in the non-flexible cluster, refunded in full. A NON_FLEX fare is neither refundable nor exchangeable: its REFUND condition keeps the whole price, so the refund offer gives nothing back. OSDM 3.6.0, for alpha (a copy of SIM_FARE_REFUND_NON_FLEX_1ADT_38, #914).",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3624,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FIRST_1ADT_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fares of SIM_FARE_SPEC_1ADT_38 in first class (travelClass FIRST). Gamma answers first-class fares of the template, dearer than second class in each cluster; the fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_FIRST_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3724,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_CARD_1ADT_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult holding gamma's 25 % card (passenger list 3). Gamma answers the template's card fare, three quarters of the price, naming the card in requiredCards; the fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_CARD_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3724,
+      "passengersListId": 3,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FAMILY_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult, a child aged 8 and a young child aged 3 on the day of travel (passenger list 39). One fare each, of the passenger constraint of each age; the young child travels free, priced 0 with ages 0 to 5. The fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_FAMILY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3724,
+      "passengersListId": 39,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ADMISSION_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3724,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_GROUP_6ADT_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): six adults (passenger list 7). From six weighted passengers gamma answers group saver fares, one per passenger, cheaper than the flexible fare; the fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_GROUP_6ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3724,
+      "passengersListId": 7,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_TRANSIT_1ADT_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 36, from the border point 0000004 to the border point 0000070. Gamma prices it on a template from border to border; both connection points name gamma's border codes. The fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_TRANSIT_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3736,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000070"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_ROUTES_1ADT_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 37, the section from 0000089 (fares.variants.alternativeRoutes, not a wrong variant). Gamma answers every route of the template's pair of ends: three routes, each in three clusters, nine offers; the first is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_ROUTES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3737,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000089",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REFUND_NON_FLEX_1ADT_37",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fare sale of SIM_FARE_SPEC_1ADT_38 in the non-flexible cluster, refunded in full. A NON_FLEX fare is neither refundable nor exchangeable: its REFUND condition keeps the whole price, so the refund offer gives nothing back. OSDM 3.7.0, for beta (a copy of SIM_FARE_REFUND_NON_FLEX_1ADT_38, #914).",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3724,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FIRST_1ADT_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fares of SIM_FARE_SPEC_1ADT_38 in first class (travelClass FIRST). Gamma answers first-class fares of the template, dearer than second class in each cluster; the fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_FIRST_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3924,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_CARD_1ADT_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult holding gamma's 25 % card (passenger list 3). Gamma answers the template's card fare, three quarters of the price, naming the card in requiredCards; the fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_CARD_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3924,
+      "passengersListId": 3,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FAMILY_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult, a child aged 8 and a young child aged 3 on the day of travel (passenger list 39). One fare each, of the passenger constraint of each age; the young child travels free, priced 0 with ages 0 to 5. The fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_FAMILY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3924,
+      "passengersListId": 39,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ADMISSION_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3924,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_GROUP_6ADT_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): six adults (passenger list 7). From six weighted passengers gamma answers group saver fares, one per passenger, cheaper than the flexible fare; the fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_GROUP_6ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3924,
+      "passengersListId": 7,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_TRANSIT_1ADT_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 36, from the border point 0000004 to the border point 0000070. Gamma prices it on a template from border to border; both connection points name gamma's border codes. The fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_TRANSIT_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3936,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000070"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_ROUTES_1ADT_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 37, the section from 0000089 (fares.variants.alternativeRoutes, not a wrong variant). Gamma answers every route of the template's pair of ends: three routes, each in three clusters, nine offers; the first is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_ROUTES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3937,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000089",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REFUND_NON_FLEX_1ADT_39",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fare sale of SIM_FARE_SPEC_1ADT_38 in the non-flexible cluster, refunded in full. A NON_FLEX fare is neither refundable nor exchangeable: its REFUND condition keeps the whole price, so the refund offer gives nothing back. OSDM 3.9.0, for delta (a copy of SIM_FARE_REFUND_NON_FLEX_1ADT_38, #914).",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3924,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FIRST_1ADT_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fares of SIM_FARE_SPEC_1ADT_38 in first class (travelClass FIRST). Gamma answers first-class fares of the template, dearer than second class in each cluster; the fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_FIRST_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31024,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_CARD_1ADT_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult holding gamma's 25 % card (passenger list 3). Gamma answers the template's card fare, three quarters of the price, naming the card in requiredCards; the fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_CARD_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31024,
+      "passengersListId": 3,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FAMILY_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult, a child aged 8 and a young child aged 3 on the day of travel (passenger list 39). One fare each, of the passenger constraint of each age; the young child travels free, priced 0 with ages 0 to 5. The fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_FAMILY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31024,
+      "passengersListId": 39,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ADMISSION_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31024,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_GROUP_6ADT_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): six adults (passenger list 7). From six weighted passengers gamma answers group saver fares, one per passenger, cheaper than the flexible fare; the fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_GROUP_6ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31024,
+      "passengersListId": 7,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_TRANSIT_1ADT_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 36, from the border point 0000004 to the border point 0000070. Gamma prices it on a template from border to border; both connection points name gamma's border codes. The fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_TRANSIT_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31036,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000070"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_ROUTES_1ADT_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 37, the section from 0000089 (fares.variants.alternativeRoutes, not a wrong variant). Gamma answers every route of the template's pair of ends: three routes, each in three clusters, nine offers; the first is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_ROUTES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31037,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000089",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REFUND_NON_FLEX_1ADT_310",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fare sale of SIM_FARE_SPEC_1ADT_38 in the non-flexible cluster, refunded in full. A NON_FLEX fare is neither refundable nor exchangeable: its REFUND condition keeps the whole price, so the refund offer gives nothing back. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_REFUND_NON_FLEX_1ADT_38, #914).",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31024,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FIRST_1ADT_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fares of SIM_FARE_SPEC_1ADT_38 in first class (travelClass FIRST). Gamma answers first-class fares of the template, dearer than second class in each cluster; the fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_FIRST_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31224,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": ["FIRST"],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_CARD_1ADT_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult holding gamma's 25 % card (passenger list 3). Gamma answers the template's card fare, three quarters of the price, naming the card in requiredCards; the fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_CARD_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31224,
+      "passengersListId": 3,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_FAMILY_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult, a child aged 8 and a young child aged 3 on the day of travel (passenger list 39). One fare each, of the passenger constraint of each age; the young child travels free, priced 0 with ages 0 to 5. The fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_FAMILY_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31224,
+      "passengersListId": 39,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_BICYCLE_ADMISSION_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31224,
+      "passengersListId": 34,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_GROUP_6ADT_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): six adults (passenger list 7). From six weighted passengers gamma answers group saver fares, one per passenger, cheaper than the flexible fare; the fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_GROUP_6ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31224,
+      "passengersListId": 7,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_TRANSIT_1ADT_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 36, from the border point 0000004 to the border point 0000070. Gamma prices it on a template from border to border; both connection points name gamma's border codes. The fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_TRANSIT_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31236,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000070"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_ROUTES_1ADT_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): one adult on trip 37, the section from 0000089 (fares.variants.alternativeRoutes, not a wrong variant). Gamma answers every route of the template's pair of ends: three routes, each in three clusters, nine offers; the first is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_ROUTES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31237,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000089",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_FARE_REFUND_NON_FLEX_1ADT_312",
+      "description": "Simulated provider, fares from DB's templates (#1048): the fare sale of SIM_FARE_SPEC_1ADT_38 in the non-flexible cluster, refunded in full. A NON_FLEX fare is neither refundable nor exchangeable: its REFUND condition keeps the whole price, so the refund offer gives nothing back. OSDM 3.12.0, for zeta (a copy of SIM_FARE_REFUND_NON_FLEX_1ADT_38, #914).",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31224,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "requestedSections": [
+        {
+          "startPlace": "urn:uic:stn:0000004",
+          "endPlace": "urn:uic:stn:0000002"
+        }
+      ],
+      "isPartOfInternationalTrip": true,
+      "desiredFareCluster": "NON_FLEX",
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": ["FARE_ADMISSION"]
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -37930,6 +39874,222 @@
         }
       ],
       "description": "Simulated trip for a wrong fare reservation (#255): regional 2218 from station 0000088, where zeta's bicycle places come in product mode, to station 0000002; the section asked lies inside it. On zeta's carrier (a copy of trip 33, #1022)."
+    },
+    {
+      "id": 36,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000070",
+          "startDatetime": "%TRIP_DATE%T09:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:30:00+01:00",
+          "vehicleNumber": "154",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares from border to border (#1048): InterCity 154 from the border point 0000004 to the border point 0000070; the section asked is the whole trip"
+    },
+    {
+      "id": 37,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000089",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T13:00:00+01:00",
+          "vehicleNumber": "168",
+          "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares on several routes (#1048): InterCity 168 from station 0000089, where gamma answers every route of a pair of ends, to station 0000002"
+    },
+    {
+      "id": 3636,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000070",
+          "startDatetime": "%TRIP_DATE%T09:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:30:00+01:00",
+          "vehicleNumber": "154",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares from border to border (#1048): InterCity 154 from the border point 0000004 to the border point 0000070; the section asked is the whole trip. On alpha's carrier (a copy of trip 36, #1022)."
+    },
+    {
+      "id": 3637,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000089",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T13:00:00+01:00",
+          "vehicleNumber": "168",
+          "operatorCode": "urn:x_osdm_simulator:carrier:alpha",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares on several routes (#1048): InterCity 168 from station 0000089, where alpha answers every route of a pair of ends, to station 0000002. On alpha's carrier (a copy of trip 37, #1022)."
+    },
+    {
+      "id": 3736,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000070",
+          "startDatetime": "%TRIP_DATE%T09:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:30:00+01:00",
+          "vehicleNumber": "154",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares from border to border (#1048): InterCity 154 from the border point 0000004 to the border point 0000070; the section asked is the whole trip. On beta's carrier (a copy of trip 36, #1022)."
+    },
+    {
+      "id": 3737,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000089",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T13:00:00+01:00",
+          "vehicleNumber": "168",
+          "operatorCode": "urn:x_osdm_simulator:carrier:beta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares on several routes (#1048): InterCity 168 from station 0000089, where beta answers every route of a pair of ends, to station 0000002. On beta's carrier (a copy of trip 37, #1022)."
+    },
+    {
+      "id": 3936,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000070",
+          "startDatetime": "%TRIP_DATE%T09:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:30:00+01:00",
+          "vehicleNumber": "154",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares from border to border (#1048): InterCity 154 from the border point 0000004 to the border point 0000070; the section asked is the whole trip. On delta's carrier (a copy of trip 36, #1022)."
+    },
+    {
+      "id": 3937,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000089",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T13:00:00+01:00",
+          "vehicleNumber": "168",
+          "operatorCode": "urn:x_osdm_simulator:carrier:delta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares on several routes (#1048): InterCity 168 from station 0000089, where delta answers every route of a pair of ends, to station 0000002. On delta's carrier (a copy of trip 37, #1022)."
+    },
+    {
+      "id": 31036,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000070",
+          "startDatetime": "%TRIP_DATE%T09:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:30:00+01:00",
+          "vehicleNumber": "154",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares from border to border (#1048): InterCity 154 from the border point 0000004 to the border point 0000070; the section asked is the whole trip. On epsilon's carrier (a copy of trip 36, #1022)."
+    },
+    {
+      "id": 31037,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000089",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T13:00:00+01:00",
+          "vehicleNumber": "168",
+          "operatorCode": "urn:x_osdm_simulator:carrier:epsilon",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares on several routes (#1048): InterCity 168 from station 0000089, where epsilon answers every route of a pair of ends, to station 0000002. On epsilon's carrier (a copy of trip 37, #1022)."
+    },
+    {
+      "id": 31236,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000070",
+          "startDatetime": "%TRIP_DATE%T09:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:30:00+01:00",
+          "vehicleNumber": "154",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares from border to border (#1048): InterCity 154 from the border point 0000004 to the border point 0000070; the section asked is the whole trip. On zeta's carrier (a copy of trip 36, #1022)."
+    },
+    {
+      "id": 31237,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000089",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T13:00:00+01:00",
+          "vehicleNumber": "168",
+          "operatorCode": "urn:x_osdm_simulator:carrier:zeta",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        }
+      ],
+      "description": "Simulated trip for fares on several routes (#1048): InterCity 168 from station 0000089, where zeta answers every route of a pair of ends, to station 0000002. On zeta's carrier (a copy of trip 37, #1022)."
     }
   ],
   "purchaserList": [
@@ -39751,6 +41911,53 @@
           "gender": "X",
           "updateFirstName": "Tomas",
           "updatePhoneNumber": "+420601000020",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 35,
+          "expectedPassengerType": "ADULT",
+          "firstName": "Fran",
+          "lastName": "Family",
+          "phoneNumber": "+420601000021",
+          "email": "fran.family@example.org",
+          "gender": "X",
+          "updateFirstName": "Frana",
+          "updatePhoneNumber": "+420601000022",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 8,
+          "expectedPassengerType": "CHILD",
+          "firstName": "Cleo",
+          "lastName": "Family",
+          "phoneNumber": "+420601000023",
+          "email": "cleo.family@example.org",
+          "gender": "X",
+          "updateFirstName": "Cleoa",
+          "updatePhoneNumber": "+420601000024",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00003",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 3,
+          "expectedPassengerType": "YOUNG_CHILD",
+          "firstName": "Yan",
+          "lastName": "Family",
+          "phoneNumber": "+420601000025",
+          "email": "yan.family@example.org",
+          "gender": "X",
+          "updateFirstName": "Yana",
+          "updatePhoneNumber": "+420601000026",
           "type": "PERSON"
         }
       ]
