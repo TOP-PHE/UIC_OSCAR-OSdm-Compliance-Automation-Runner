@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-batch-share-certifiers",
+    "date": "October 29, 2026",
+    "tag": "Added",
+    "title": "Share a whole batch with certifiers",
+    "summary": "A Test Manager now shares every finished run of a batch with certifiers from the batch's row on the Dashboard, instead of one run at a time.",
+    "content": "On the Dashboard, a batch's row offers 'Share batch with certifiers'. After a confirmation, every finished run of the batch becomes visible to certifiers; runs still queued or running are left out. Once they all are shared, the row says so and offers 'Unshare'. Sharing one run, and sharing a published coverage report (which shares its runs), work as before."
+  },
+  {
     "id": "2026-10-29-run-by-distribution",
     "date": "October 29, 2026",
     "tag": "New",

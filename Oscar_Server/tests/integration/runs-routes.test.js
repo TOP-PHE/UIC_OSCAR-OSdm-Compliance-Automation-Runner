@@ -944,6 +944,85 @@ describe('POST /v1/runs/:id/share and DELETE /v1/runs/:id/share', () => {
   });
 });
 
+describe('POST/DELETE /v1/runs/batch/:batchId/share — a whole batch with certifiers (#1041)', () => {
+  const batchId = uuidv4();
+  const done1 = uuidv4();
+  const done2 = uuidv4();
+  const queued = uuidv4();
+  const foreign = uuidv4();
+  const earlier = 'earlier@' + EMAIL_DOMAIN;
+  const tm = () => covToken('test_manager', covTmId);
+  const sharedRow = (id) => get('SELECT shared_with_certifier_at, shared_with_certifier_by FROM runs WHERE id = ?', [id]);
+  const auditCount = (event) => get('SELECT COUNT(*) AS n FROM auth_events WHERE event_type = ?', [event]).n;
+
+  beforeAll(() => {
+    const add = (id, company, status) => run(
+      `INSERT INTO runs (id, company_id, user_id, status, batch_id, queued_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+      [id, company, company === covCompanyId ? covUserId : covOtherUserId, status, batchId]);
+    add(done1, covCompanyId, 'COMPLETED');
+    add(done2, covCompanyId, 'FAILED');
+    add(queued, covCompanyId, 'QUEUED');
+    // Another tenant's run under the same batch id: never touched.
+    add(foreign, covOtherCompanyId, 'COMPLETED');
+    // Already shared by someone else: who and when are kept.
+    run(`UPDATE runs SET shared_with_certifier_at = '2026-10-01 10:00:00', shared_with_certifier_by = ? WHERE id = ?`, [earlier, done2]);
+  });
+  afterAll(() => { for (const id of [done1, done2, queued, foreign]) run('DELETE FROM runs WHERE id = ?', [id]); });
+
+  test('403 for anyone but a Test Manager', async () => {
+    for (const [role, uid] of [['company_user', covUserId], ['certification_user', covCertifierId]]) {
+      const post = await request(app).post(`/v1/runs/batch/${batchId}/share`).set('Authorization', `Bearer ${covToken(role, uid)}`);
+      const del = await request(app).delete(`/v1/runs/batch/${batchId}/share`).set('Authorization', `Bearer ${covToken(role, uid)}`);
+      expect([post.status, del.status]).toEqual([403, 403]);
+    }
+    expect(sharedRow(done1).shared_with_certifier_at).toBeNull();
+  });
+
+  test('404 for a batch the Test Manager sees no run of', async () => {
+    const res = await request(app).post(`/v1/runs/batch/${uuidv4()}/share`).set('Authorization', `Bearer ${tm()}`);
+    expect(res.status).toBe(404);
+    const del = await request(app).delete(`/v1/runs/batch/${uuidv4()}/share`).set('Authorization', `Bearer ${tm()}`);
+    expect(del.status).toBe(404);
+  });
+
+  test('shares the finished runs, names the one not finished, keeps an earlier share, leaves another tenant alone', async () => {
+    const before = auditCount(`run_shared_with_certifier:${done1}`);
+    const res = await request(app).post(`/v1/runs/batch/${batchId}/share`).set('Authorization', `Bearer ${tm()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.shared).toBe(2);
+    const byId = Object.fromEntries(res.body.runs.map((r) => [r.id, r]));
+    expect(Object.keys(byId).sort()).toEqual([done1, done2, queued].sort());
+    expect(byId[queued]).toEqual({ id: queued, shared: false, reason: 'Run is QUEUED.' });
+    expect(sharedRow(done1).shared_with_certifier_at).toBeTruthy();
+    expect(sharedRow(done1).shared_with_certifier_by).toContain(EMAIL_DOMAIN);
+    expect(sharedRow(done2)).toEqual({ shared_with_certifier_at: '2026-10-01 10:00:00', shared_with_certifier_by: earlier });
+    expect(sharedRow(queued).shared_with_certifier_at).toBeNull();
+    expect(sharedRow(foreign).shared_with_certifier_at).toBeNull();
+    expect(auditCount(`run_shared_with_certifier:${done1}`)).toBe(before + 1);
+    expect(auditCount(`run_shared_with_certifier:${done2}`)).toBe(0);
+  });
+
+  test('the certifier then sees the shared runs, and only those', async () => {
+    const res = await request(app).get('/v1/runs').set('Authorization', `Bearer ${covToken('certification_user', covCertifierId)}`);
+    const ids = res.body.runs.map((r) => r.id);
+    expect(ids).toEqual(expect.arrayContaining([done1, done2]));
+    expect(ids).not.toContain(queued);
+    expect(ids).not.toContain(foreign);
+  });
+
+  test('DELETE unshares every run of the batch the Test Manager sees', async () => {
+    run(`UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?`, [foreign]);
+    const res = await request(app).delete(`/v1/runs/batch/${batchId}/share`).set('Authorization', `Bearer ${tm()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.runs.every((r) => r.shared === false)).toBe(true);
+    for (const id of [done1, done2]) expect(sharedRow(id).shared_with_certifier_at).toBeNull();
+    expect(auditCount(`run_unshared_with_certifier:${done2}`)).toBe(1);
+    expect(auditCount(`run_unshared_with_certifier:${queued}`)).toBe(0);
+    // Another tenant's run is not the Test Manager's to change.
+    expect(sharedRow(foreign).shared_with_certifier_at).toBeTruthy();
+  });
+});
+
 describe('DELETE /v1/runs/:id/cancel', () => {
   test('403 certification_user cannot cancel', async () => {
     const token = covToken('certification_user', covCertifierId);

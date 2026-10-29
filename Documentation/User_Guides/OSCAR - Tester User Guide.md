@@ -1632,6 +1632,22 @@ Each file's name starts with the company or provider it is about, for example
 `Provider-A-oscar-coverage-2026-10-27.xlsx`. Accents are dropped, and any
 character other than a letter or a digit becomes a dash.
 
+### Sharing runs with a certifier (Test Managers)
+
+A certifier sees nothing until a Test Manager shares it. There are three ways,
+all on finished runs only (completed, failed or cancelled):
+
+- **One run**: `↗ Share with certifiers` under the run on the Dashboard, or
+  **🤝 Share this report with certifiers** on the run's page.
+- **A whole batch**: `↗ Share batch with certifiers` on the batch's row of the
+  Dashboard. Every finished run of the batch is shared after a confirmation;
+  runs still queued or running are left out and named. Once they all are, the
+  row reads **✓ Shared with certifiers**, with **Unshare** next to it.
+- **A coverage report**: sharing a published report (below) also shares every
+  run it was made from.
+
+Each share and unshare is written to the audit log, run by run.
+
 ### Published coverage reports (Test Managers and certifiers)
 
 A Test Manager can **publish** the coverage shown, with *Publish this

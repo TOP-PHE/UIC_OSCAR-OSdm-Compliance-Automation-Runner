@@ -93,6 +93,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.436] / [collection-OTST_V2.0.236] — 2026-10-29
+
+Issue #1041, release 2026.474. Server only; collection unchanged.
+
+### Added
+- **A whole batch is shared with certifiers in one click.** Until now a Test Manager shared runs one Dashboard row at a time: a batch of 337 scenarios meant 337 clicks. The batch's row now offers `↗ Share batch with certifiers`, after a confirmation. Once every finished run of it is shared, the row reads `✓ Shared with certifiers`, with `Unshare` next to it (`batchCertifierAction()`, `dashboard.html`).
+- `POST` / `DELETE /v1/runs/batch/:batchId/share` (`runs.js`), Test Managers only. Both act on every run of the batch the Test Manager may see (`batchRunsOf()`, the run-visibility rule, as the operator share of #901 does).
+  - Only finished runs are shared (COMPLETED, FAILED or CANCELLED). The others come back as not shared, with their status.
+  - A run already shared keeps who shared it and when.
+  - One audit event is written per run changed, the same events as the per-run share (`shareWithCertifier()` / `unshareWithCertifier()`, now shared by both).
+- Tester User Guide: *Sharing runs with a certifier*, the three ways (one run, a batch, a coverage report). Server Admin Guide §15.2. CLAUDE.md.
+
+### Tests
+- `runs-routes.test.js`:
+  - A tester and a certifier get 403, and a batch the Test Manager sees no run of gets 404.
+  - The two finished runs are shared, the queued one is named, and an earlier share keeps its author and date.
+  - Another tenant's run under the same batch id is left alone, whether shared or unshared.
+  - The certifier then lists the shared runs only, and the audit events are counted.
+- `run-share-pages.test.js`: the batch row's link (offered, undone, none for other roles or a batch with nothing finished), the batch id escaped, and the click handler placed before the batch toggle that would swallow the click.
+- 3 deliberate breaks (not-finished runs shared, an earlier share overwritten, unshare doing nothing) each make a test fail.
+
+---
+
 ## [server-1.11.435] / [collection-OTST_V2.0.236] — 2026-10-29
 
 Issue #1039, release 2026.473. Server only; collection unchanged.

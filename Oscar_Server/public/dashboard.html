@@ -288,6 +288,26 @@ function batchOperatorAction(batchRuns, batchId) {
   return `<div style="margin-top:2px"><a href="#" data-action="${action}" data-batch-id="${batchId}" style="color:#4527a0;font-size:11px;font-weight:400;text-decoration:none">${label}</a></div>`;
 }
 
+// #1041: the batch's certifier share: every finished run of it, or undo once
+// they all are. Test Managers only, as the per-run line.
+function batchCertifierAction(batchRuns, batchId) {
+  if (user.role !== 'test_manager') return '';
+  const finished = batchRuns.filter(r => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status));
+  if (!finished.length) return '';
+  if (finished.every(r => r.shared_with_certifier_at)) {
+    return `<div style="margin-top:2px;font-size:11px;font-weight:400"><span style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
+      + ` <a href="#" data-action="unshare-batch-certifier" data-batch-id="${esc(batchId)}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a></div>`;
+  }
+  return `<div style="margin-top:2px"><a href="#" data-action="share-batch-certifier" data-batch-id="${esc(batchId)}" style="color:#0090D4;font-size:11px;font-weight:400;text-decoration:none">↗ Share batch with certifiers</a></div>`;
+}
+
+// The question asked before a batch is shared with certifiers, or unshared.
+function batchCertifierQuestion(share) {
+  return share
+    ? 'Share every finished run of this batch with certifiers?\n\nCertifiers will be able to view each run\'s structured results, HTTP traffic and downloadable artifacts.'
+    : 'Stop sharing every run of this batch with certifiers?';
+}
+
 // ── Render a single run row (used for both unbatched and batch-child rows) ───
 function renderRunRow(r, opts) {
   const isBatchChild = opts && opts.batchChild;
@@ -457,7 +477,7 @@ function renderRuns(runs) {
     <div class="run-row batch-header" data-batch-id="${batchId}" data-action="toggle-batch">
       <div class="cb-cell" data-action="batch-cb-cell">${batchCheckboxCell}</div>
       <div style="font-weight:700;color:#0090D4">
-        <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)${batchOperatorAction(batchRuns, batchId)}
+        <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)${batchCertifierAction(batchRuns, batchId)}${batchOperatorAction(batchRuns, batchId)}
         ${batchLabelHtml(batchRuns[0].batch_label)}
         ${batchRuns[0].submitted_by
           ? `<div style="color:#78909c;font-size:11px;font-weight:400;margin-top:2px">👤 ${esc(batchRuns[0].submitted_by)}${batchSubmitterSuffix}</div>`
@@ -693,6 +713,28 @@ document.getElementById('delete-modal').addEventListener('click', function(e) {
   if (e.target === this) closeDeleteModal();
 });
 
+// #1041: a whole batch with certifiers (asked first); #901: share with the
+// company that operates the provider, run or batch. True when it was one.
+function handleBatchShareClick(e) {
+  const certEl = e.target.closest('[data-action$="-batch-certifier"]');
+  const opEl = certEl ? null : e.target.closest('[data-action$="-operator"]');
+  const el = certEl || opEl;
+  if (!el) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  const share = el.dataset.action.startsWith('share');
+  if (certEl) {
+    if (confirm(batchCertifierQuestion(share))) {
+      toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(certEl.dataset.batchId)}/share`, share);
+    }
+  } else if (opEl.dataset.batchId) {
+    toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share);
+  } else {
+    toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share);
+  }
+  return true;
+}
+
 // Delegated handlers for dynamically rendered run rows
 document.getElementById('runs-list').addEventListener('click', function(e) {
   if (e.target.type === 'checkbox') return; // let change handler deal with it
@@ -707,16 +749,8 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
     return;
   }
 
-  // #901: share with the company that operates the provider, run or batch.
-  const opEl = e.target.closest('[data-action$="-operator"]');
-  if (opEl) {
-    e.preventDefault();
-    e.stopPropagation();
-    const share = opEl.dataset.action.startsWith('share');
-    if (opEl.dataset.batchId) toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share);
-    else toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share);
-    return;
-  }
+  // #1041 / #901: batch with certifiers, run or batch with the operator.
+  if (handleBatchShareClick(e)) return;
 
   // Bulk download — all reports in a batch as a ZIP (#405). Must run BEFORE the
   // batch-header toggle below, since the button lives inside the toggle row.
@@ -811,7 +845,8 @@ async function toggleShare(runId, share) {
   }
 }
 // #901: share or unshare with the operating company, then redraw the list
-// (a batch changes several rows and its header).
+// (a batch changes several rows and its header). A batch shared with
+// certifiers (#1041) goes the same way: its answer has the same shape.
 async function toggleOperatorShare(url, share) {
   try {
     const res = await fetch(url, { method: share ? 'POST' : 'DELETE' });
