@@ -70,7 +70,7 @@ test('DB\'s doubled card fare is the child\'s in every region', () => {
   assert.match(file.about.corrected, /\(26 fares\)/);
   for (const t of file.templates) {
     const quarter = t.fares.filter((f) => f.family === 'FLEXIBLE' && f.travelClass === 'SECOND' && f.card === 'R3');
-    assert.deepEqual(quarter.map((f) => f.passenger).sort(), ['G1', 'G3'], t.id);
+    assert.deepEqual(quarter.map((f) => f.passenger).sort((a, b) => a.localeCompare(b, 'en')), ['G1', 'G3'], t.id);
     const [adult, child] = ['G1', 'G3'].map((g) => quarter.find((f) => f.passenger === g));
     assert.ok(child.price < adult.price, t.id);
   }

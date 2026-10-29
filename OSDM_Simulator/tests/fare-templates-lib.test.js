@@ -132,7 +132,7 @@ test('a template\'s fares keep everything but places, companies and cards', () =
 test('DB\'s doubled card fare goes to the child it is priced for, not the dog priced like the child', () => {
   const { templates, corrections } = lib.templatesOf(collected(), REGIONS);
   const card = templates.templates[0].fares.filter((f) => f.card === 'R3');
-  assert.deepEqual(card.map((f) => [f.passenger, f.price]).sort(), [['G1', 750], ['G3', 375]]);
+  assert.deepEqual(card.map((f) => [f.passenger, f.price]).sort((a, b) => a[0].localeCompare(b[0], 'en')), [['G1', 750], ['G3', 375]]);
   assert.deepEqual(corrections, ['T01: FLEXIBLE|SECOND|G1|R3 at 375 given to G3']);
   assert.match(templates.about.corrected, /given back to the child \(1 fares\)/);
 });

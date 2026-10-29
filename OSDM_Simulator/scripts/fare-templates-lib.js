@@ -82,7 +82,10 @@ const keyOf = (id) => {
 function createCollector(numbers = REGION_NUMBERS) {
   const wanted = new Set(numbers.map(String));
   const kept = { delivery: null, lists: {} };
-  const keep = (list, value) => { (kept.lists[list] ||= []).push(value); };
+  const keep = (list, value) => {
+    if (!kept.lists[list]) kept.lists[list] = [];
+    kept.lists[list].push(value);
+  };
   return {
     kept,
     onDelivery(text) { kept.delivery = JSON.parse(text); },
@@ -157,7 +160,7 @@ function validityShape(validity, ctx) {
 
 function priceOf(price, id) {
   const p = Array.isArray(price?.price) ? price.price[0] : null;
-  if (!p || p.currency !== 'EUR' || (p.scale ?? 2) !== 2) throw new Error(`a price not in EUR cents: ${id}`);
+  if (p?.currency !== 'EUR' || (p.scale ?? 2) !== 2) throw new Error(`a price not in EUR cents: ${id}`);
   return p.amount;
 }
 
@@ -413,34 +416,65 @@ function templatesOf(kept, regions = REGIONS) {
  * codes and names, carrier and TCO codes, card codes and names. Strings only
  * (numbers are counts, prices and accounting identifiers).
  */
-function leaksIn(templates, kept) {
-  const tokens = new Set();
-  const add = (v) => { if (typeof v === 'string' && v.length >= 4) tokens.add(v); };
-  const { lists } = kept;
-  for (const p of lists.connectionPoints || []) for (const set of p.stationSets || []) for (const s of set) add(s.code);
-  for (const d of lists.fareReferenceStationSetDefinitions || []) {
-    add(d.code); add(d.name); add(d.nameUtf8);
-    for (const s of d.stations || []) add(s.code);
+// The station codes and station sets a route item names, deep.
+function routeTokens(item, out) {
+  if (!item) return out;
+  if (item.station) out.push(item.station.code);
+  if (item.fareReferenceStationSet) out.push(item.fareReferenceStationSet.code, item.fareReferenceStationSet.name);
+  for (const x of [...(item.route || []), ...(item.alternativeRoute || [])]) routeTokens(x, out);
+  return out;
+}
+
+// The places, companies and cards of what was kept, as text to look for.
+function deliveryTokens({ lists }) {
+  const values = [];
+  for (const p of lists.connectionPoints || []) {
+    for (const set of p.stationSets || []) values.push(...set.map((s) => s.code));
   }
-  const walkRoute = (item) => {
-    if (!item) return;
-    if (item.station) add(item.station.code);
-    if (item.fareReferenceStationSet) { add(item.fareReferenceStationSet.code); add(item.fareReferenceStationSet.name); }
-    for (const x of [...(item.route || []), ...(item.alternativeRoute || [])]) walkRoute(x);
-  };
-  for (const rc of lists.regionalConstraints || []) for (const v of rc.regionalValidity || []) walkRoute(v.viaStations);
-  for (const c of lists.carrierConstraints || []) for (const code of [...(c.includedCarrier || []), ...(c.excludedCarrier || [])]) add(code);
-  for (const f of lists.fares || []) for (const code of f.involvedTCOs || []) add(code);
-  for (const r of lists.reductionConstraints || []) for (const card of r.requiredCards || []) { add(card.cardValue); add(card.cardName); }
+  for (const d of lists.fareReferenceStationSetDefinitions || []) {
+    values.push(d.code, d.name, d.nameUtf8, ...(d.stations || []).map((s) => s.code));
+  }
+  for (const rc of lists.regionalConstraints || []) {
+    for (const v of rc.regionalValidity || []) routeTokens(v.viaStations, values);
+  }
+  for (const c of lists.carrierConstraints || []) values.push(...(c.includedCarrier || []), ...(c.excludedCarrier || []));
+  for (const f of lists.fares || []) values.push(...(f.involvedTCOs || []));
+  for (const r of lists.reductionConstraints || []) {
+    for (const card of r.requiredCards || []) values.push(card.cardValue, card.cardName);
+  }
+  return new Set(values.filter((v) => typeof v === 'string' && v.length >= 4));
+}
+
+// Every string of a value, keys included.
+function stringsOf(value, out = []) {
+  if (typeof value === 'string') {
+    out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const v of value) stringsOf(v, out);
+  } else if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      out.push(k);
+      stringsOf(v, out);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every place, company or card of the delivery that appears in the templates
+ * outside `about`: station codes and names of the regions read, station set
+ * codes and names, carrier and TCO codes, card codes and names. Strings only
+ * (numbers are counts, prices and accounting identifiers).
+ */
+function leaksIn(templates, kept) {
+  const tokens = deliveryTokens(kept);
+  const rest = { ...templates };
+  delete rest.about;
   const found = new Set();
-  const walk = (v) => {
-    if (typeof v === 'string') { for (const t of tokens) if (v.includes(t)) found.add(t); return; }
-    if (Array.isArray(v)) { v.forEach(walk); return; }
-    if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { walk(k); walk(x); }
-  };
-  const { about: _about, ...rest } = templates;
-  walk(rest);
-  return [...found].sort();
+  for (const s of stringsOf(rest)) {
+    for (const t of tokens) if (s.includes(t)) found.add(t);
+  }
+  return [...found].sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 /**
