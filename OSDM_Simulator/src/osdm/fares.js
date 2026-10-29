@@ -117,7 +117,7 @@ function asksFareReservations(criteria) {
 }
 
 // OSDM's OfferPartType values; any other is not read.
-const OFFER_PART_TYPES = ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL'];
+const OFFER_PART_TYPES = new Set(['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL']);
 
 /**
  * #1046: does the request ask for fare parts and nothing else? OSDM:
@@ -125,7 +125,7 @@ const OFFER_PART_TYPES = ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSI
  * such a request gets no product offer.
  */
 function asksOnlyFares(criteria) {
-  const parts = partsAsked(criteria).filter((p) => OFFER_PART_TYPES.includes(p));
+  const parts = partsAsked(criteria).filter((p) => OFFER_PART_TYPES.has(p));
   return parts.length > 0 && parts.every((p) => p.startsWith('FARE_'));
 }
 
@@ -134,7 +134,7 @@ function asksOnlyFares(criteria) {
  * when no fare can be given: no offer at all, and why.
  */
 function noFareOfferProblem(body, criteria, provider) {
-  const asked = partsAsked(criteria).filter((p) => OFFER_PART_TYPES.includes(p)).join(', ');
+  const asked = partsAsked(criteria).filter((p) => OFFER_PART_TYPES.has(p)).join(', ');
   let reason = 'none of the fare parts asked is sold for this section';
   if (!provider.fares) reason = 'this provider sells no fares';
   else if (sectionsOf(body).length === 0) reason = 'a fare is offered for a requested section, and none was given (requestedSections)';
