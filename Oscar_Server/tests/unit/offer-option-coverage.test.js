@@ -113,3 +113,15 @@ describe('the offer request options in the coverage (#995)', () => {
     expect(e.summary.parameters).toBe(450);
   });
 });
+
+// #1053: the row of each distribution mode carries the same line.
+describe('withOfferOptions on a report split by distribution mode (#1053)', () => {
+  const { withOfferOptions: withOptions } = require('../../src/utils/offerOptionCoverage');
+  test('every requestOptions row gets the line; a report without the split gets no byMode', () => {
+    const row = { id: 'offers.requestOptions' };
+    const out = withOptions({ capabilities: [row], byMode: [{ mode: 'PRODUCT', capabilities: [row, { id: 'sale' }] }, { mode: 'FARE', capabilities: [] }] }, [{ text: 'line' }]);
+    expect(out.byMode[0].capabilities).toEqual([{ id: 'offers.requestOptions', parameters: 'line' }, { id: 'sale' }]);
+    expect(out.capabilities[0].parameters).toBe('line');
+    expect(withOptions({ capabilities: [row] }, [{ text: 'line' }]).byMode).toBeUndefined();
+  });
+});

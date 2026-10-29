@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-coverage-by-distribution-mode",
+    "date": "October 29, 2026",
+    "tag": "New",
+    "title": "Coverage by capability, per distribution mode",
+    "summary": "When a provider sells fares, the coverage by capability shows product-based and fare-based distribution in sections of their own.",
+    "content": "A capability can pass in product mode and fail in fare mode. When the Test Framework declares fare-based distribution, or a fare scenario has run, the view By capability now has one section per mode, each with its own summary, capabilities and expected refusals. The points to look at stay one list, each point saying which mode it was met in. The Markdown and Excel exports and the published reports follow. A provider that sells products only sees no change."
+  },
+  {
     "id": "2026-10-29-fare-details-checked",
     "date": "October 29, 2026",
     "tag": "Improved",

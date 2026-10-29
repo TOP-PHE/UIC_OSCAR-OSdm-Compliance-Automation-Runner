@@ -217,3 +217,35 @@ describe('the Excel workbook', () => {
     expect(names(coverageWorkbook({ days: 30, summary: {}, byCapability: { capabilities: [] } }, {}))).not.toContain('Offer request parameters');
   });
 });
+
+// #1053: a report split by distribution mode names the mode of each row.
+describe('the workbook of a report split by distribution mode (#1053)', () => {
+  const sheet = (buf, n) => readZipEntry(buf, `xl/worksheets/sheet${n}.xml`).toString('utf8');
+  const cap = (id, result) => ({ id, group: 'Sale', label: id, result, declaration: 'declared', tests: [], points: [] });
+  const report = (byMode) => ({
+    days: 30, summary: {}, functions: [], matrix: [], scenarios: [],
+    byCapability: {
+      summary: {}, capabilities: [cap('sale', 'blocked')], expectedRefusals: [], points: [{ number: 1, kind: 'provider', capabilityLabel: 'Sale', modes: ['FARE'], tests: [] }],
+      ...(byMode ? { byMode } : {}),
+    },
+  });
+
+  test('Capabilities and Points to look at take a Distribution column; the summary a block per mode', () => {
+    const buf = coverageWorkbook(report([
+      { mode: 'PRODUCT', summary: { tested: 1, passed: 1 }, capabilities: [cap('sale', 'passed')], expectedRefusals: [] },
+      { mode: 'FARE', summary: { tested: 1, blocked: 1 }, capabilities: [cap('sale', 'blocked')], expectedRefusals: [] },
+    ]));
+    expect(sheet(buf, 1)).toContain('Product-based distribution: capabilities tested');
+    const capabilities = sheet(buf, 2);
+    expect(capabilities).toContain('>Distribution<');
+    expect(capabilities).toContain('>Product-based<');
+    expect(capabilities).toContain('>Fare-based<');
+    expect(sheet(buf, 4)).toContain('>Fare-based<');
+  });
+
+  test('a report without the split has no such column', () => {
+    const buf = coverageWorkbook(report(null));
+    expect(sheet(buf, 2)).not.toContain('>Distribution<');
+    expect(sheet(buf, 1)).not.toContain('distribution: capabilities tested');
+  });
+});

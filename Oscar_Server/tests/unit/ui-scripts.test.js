@@ -1656,6 +1656,42 @@ describe('the Report Builder coverage section', () => {
     expect(capabilityHtml({ points: [] })).not.toContain('Simulated errors');
   });
 
+  // #1053: the server's own split answer, drawn and written.
+  test('a report split by distribution mode has one section per mode, the points one list', () => {
+    const { capabilityCoverageOf } = require('../../src/utils/capabilityCoverage');
+    const SALE = ['01. POST Get Offer', '02. POST Create Booking', '05. GET Booking before Fulfillments',
+      '06. POST Obtaining Fulfillments from Booking', '07. GET Booking after Fulfillments'];
+    const runOf = (n, checks = []) => ({ id: `00000000-0000-4000-8000-00000000000${n}`, status: checks.length ? 'FAILED' : 'COMPLETED',
+      completed_at: '2026-10-29 08:00:00', steps: SALE.map((name) => ({ request_name: name, http_status: 200 })), checks });
+    const scenarios = [
+      { code: 'P_1', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1 },
+      { code: 'F_1', scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1, offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } },
+    ];
+    const split = capabilityCoverageOf({
+      framework: { distributionModes: ['PRODUCT', 'FARE'] },
+      datafile: { scenarios, tripRequirements: [{ id: 1, tripType: 'SEARCH' }], passengersList: [{ id: 1, passengers: [{ type: 'PERSON' }] }] },
+      runs: { P_1: runOf(1), F_1: runOf(2, [{ request_name: '07. GET Booking after Fulfillments', http_status: 200, assertion_name: 'Fares <booked>', category: 'business_logic', severity: 'major' }]) },
+    });
+    const out = capabilityHtml(split);
+    const product = out.indexOf('<h3 class="cov-heading">Product-based distribution</h3>');
+    const fare = out.indexOf('<h3 class="cov-heading">Fare-based distribution</h3>');
+    expect(product).toBeGreaterThan(-1);
+    expect(fare).toBeGreaterThan(product);
+    expect(out).toContain('1 scenario(s) · ');
+    // One list of points, after both sections, the point naming its mode.
+    expect(out.indexOf('Points to look at (1)')).toBeGreaterThan(fare);
+    expect(out).toContain('(fare-based distribution)</small>');
+    const md = coverageMarkdown({ days: 30, framework: true, datafile: true, summary: {}, functions: [], matrix: [], byCapability: split }, 'P');
+    expect(md).toContain('### Product-based distribution');
+    expect(md).toContain('### Fare-based distribution');
+    expect(md.indexOf('### Fare-based distribution')).toBeGreaterThan(md.indexOf('### Product-based distribution'));
+    // A report without the split draws as before.
+    expect(capabilityHtml({ capabilities: split.capabilities, points: [] })).not.toContain('distribution</h3>');
+    // A comparison names the mode of a capability whose result moved.
+    expect(comparisonHtml({ previous: { number: 1 }, points: {}, counts: {}, capabilities: [{ id: 'sale', label: 'Sale', mode: 'FARE', before: 'passed', now: 'blocked' }] }))
+      .toContain('Sale (fare-based distribution): ');
+  });
+
   test('a point number opens that point under its row, and closes it (#984)', () => {
     const out = coverageHtml({ ...answer, byCapability }, 'capabilities');
     // Under the row naming it, hidden, without the id the list at the end keeps.

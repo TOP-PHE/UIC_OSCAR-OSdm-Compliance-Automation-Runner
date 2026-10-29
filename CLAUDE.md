@@ -818,6 +818,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     FAILED one, `not-run`. A refusal's failure at the steps of the capability
     it probes never gives that capability "points". A drawn-runs test in
     `capability-coverage.test.js` holds both promises.
+    **Split by distribution mode** (#1053, 1.11.441): when the framework
+    declares FARE or a fare scenario is read, `capabilityCoverageOf()` adds
+    `byMode` [{ mode, label, scenarios, capabilities, expectedRefusals,
+    summary }] (`modesSplit()`): each item's `modes` are
+    `distributionModesOf()` (none = PRODUCT), a scenario of both counts in
+    both, the *Fares* group is never a row of PRODUCT (`belongsTo()`), a
+    declared row without evidence only in its own mode (`ownMode()`). The
+    points stay one numbered list, each with `modes` (`withPointModes()`);
+    a mode's points are those met in its scenarios. Without the split the
+    answer is unchanged (no `byMode`, no point `modes`). `withOfferOptions()`
+    writes its line on each mode's row; `comparisonOf()` compares
+    `mode:id` when both reports are split; the workbook adds a
+    *Distribution* column (`rowsByMode()`), the page and the Markdown one
+    section per mode (`capabilityTablesHtml()`, `capabilityTablesMarkdown()`).
     **A refusal stopped before it asked is blocked** (#1027, 1.11.430): a
     form whose failed checks are all prerequisites (the classifier's
     category: no trip, no offer) reads `blocked` with its point

@@ -93,6 +93,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.441] / [collection-OTST_V2.0.238] — 2026-10-29
+
+Issue #1053, release 2026.479.
+
+### Added
+- **The coverage by capability, split by distribution mode.** What works in product mode can fail in fare mode, or the reverse, and the report read every scenario together. When the Test Framework declares fare-based distribution, or a fare scenario is read, *By capability* now has one section per mode: *Product-based distribution*, then *Fare-based distribution*.
+  - Each section has its own summary line, capabilities and expected refusals. A scenario counts in the mode(s) `distributionModesOf()` gives it, the rule of the Run page's *Distribution* filter; one asking fares and booking the product counts in both.
+  - A capability tested in both modes has a row in each. The *Fares* group is never a row of the product section; a capability declared and not tested is listed in its own mode only.
+  - *Points to look at* stays one numbered list: a point keeps its number and names its mode(s).
+  - The Markdown has the same sections; the workbook adds a *Distribution* column to *Capabilities*, *Expected refusals* and *Points to look at*, and a block per mode to *Summary*.
+  - A published report holds the sections; when two shared reports both have them, the comparison is made per mode and capability. Reports published before are unchanged.
+  - A provider that sells products only gets the report as before.
+
+---
+
 ## [server-1.11.440] / [collection-OTST_V2.0.238] — 2026-10-29
 
 Issue #1045 (OSCAR's fare checks reviewed, after the simulator's fares became realistic in #1048), release 2026.478. Simulator 0.60.0. The server changes are the five warning-only simulated errors and the welcome-page news entry.

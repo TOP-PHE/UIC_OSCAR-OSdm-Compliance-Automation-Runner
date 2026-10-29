@@ -827,3 +827,61 @@ describe('over drawn runs, "Blocked" and "Passed with points" always say why (#1
     }
   });
 });
+
+// #1053: one section per distribution mode.
+describe('the coverage by capability split by distribution mode (#1053)', () => {
+  const FARES = { offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } };
+  const fareSale = oneWay('FARE_SALE_1', FARES);
+  const both = oneWay('FARE_AND_PRODUCT_1', { ...FARES, bookMode: 'PRODUCT' });
+  const product = oneWay('OTST_SALE_ONE_WAY_1ADT');
+  const runs = {
+    OTST_SALE_ONE_WAY_1ADT: run(SALE),
+    FARE_SALE_1: run(SALE, { failures: { '07. GET Booking after Fulfillments': fail('The booked fares are the fares offered') } }),
+    FARE_AND_PRODUCT_1: run(SALE),
+  };
+  const mode = (r, m) => r.byMode.find((x) => x.mode === m);
+  const BOTH = { ...FRAMEWORK, distributionModes: ['PRODUCT', 'FARE'] };
+  const split = (scenarios) => capabilityCoverageOf({ framework: BOTH, datafile: datafile(scenarios), catalogue: ENTRIES, runs });
+
+  test('a product provider keeps its report as it was: no split', () => {
+    const r = report([product], { OTST_SALE_ONE_WAY_1ADT: runs.OTST_SALE_ONE_WAY_1ADT });
+    expect(r.byMode).toBeUndefined();
+    expect(r.points.every((p) => p.modes === undefined)).toBe(true);
+  });
+
+  test('a fare scenario splits the report; each capability is read within its mode', () => {
+    const r = split([product, fareSale]);
+    expect(r.byMode.map((m) => [m.mode, m.label, m.scenarios])).toEqual([['PRODUCT', 'product-based', 1], ['FARE', 'fare-based', 1]]);
+    // The sale passes in product mode and has a point in fare mode.
+    expect(row(mode(r, 'PRODUCT'), 'sale').result).toBe('passed');
+    const fareRow = row(mode(r, 'FARE'), K.derivedCapability(fareSale, datafile([fareSale])));
+    expect(fareRow.result).toBe('points');
+    expect(mode(r, 'PRODUCT').capabilities.some((c) => c.group === 'Fares')).toBe(false);
+    // One list of points for the report, each naming its modes; each mode counts its own.
+    expect(r.points.map((p) => [p.number, p.modes])).toEqual([[1, ['FARE']]]);
+    expect(fareRow.points).toEqual([1]);
+    expect([mode(r, 'PRODUCT').summary.pointsToLookAt.total, mode(r, 'FARE').summary.pointsToLookAt.total]).toEqual([0, 1]);
+    // The whole report is unchanged by the split.
+    expect(r.summary.pointsToLookAt.total).toBe(1);
+  });
+
+  test('a scenario of both modes counts in both; its fare rows stay under fare-based distribution', () => {
+    const r = split([product, both]);
+    expect(r.byMode.map((m) => m.scenarios)).toEqual([2, 1]);
+    expect(mode(r, 'FARE').capabilities.some((c) => c.group === 'Fares')).toBe(true);
+    expect(mode(r, 'PRODUCT').capabilities.some((c) => c.group === 'Fares')).toBe(false);
+    // What it proves of the product sale is still read under product-based distribution.
+    expect(row(mode(r, 'PRODUCT'), 'sale').provenBy.count).toBeGreaterThan(0);
+  });
+
+  test('a framework declaring fares splits the report before any fare scenario runs; the fare rows wait under fares', () => {
+    const r = capabilityCoverageOf({
+      framework: { ...FRAMEWORK, distributionModes: ['PRODUCT', 'FARE'], fares: { salesFlows: ['SALE'] } },
+      datafile: datafile([product]), catalogue: ENTRIES, runs: { OTST_SALE_ONE_WAY_1ADT: runs.OTST_SALE_ONE_WAY_1ADT },
+    });
+    expect(r.byMode.map((m) => m.mode)).toEqual(['PRODUCT', 'FARE']);
+    expect(mode(r, 'PRODUCT').capabilities.some((c) => c.group === 'Fares')).toBe(false);
+    expect(mode(r, 'FARE').capabilities.every((c) => c.group === 'Fares')).toBe(true);
+    expect(mode(r, 'FARE').scenarios).toBe(0);
+  });
+});

@@ -164,8 +164,11 @@ function offerOptionCoverageOf(items) {
  */
 function withOfferOptions(byCapability, entries) {
   if (!isObj(byCapability) || arr(entries).length === 0) return byCapability;
-  const capabilities = arr(byCapability.capabilities).map((c) => (c?.id === 'offers.requestOptions' ? { ...c, parameters: entries[0].text } : c));
-  return { ...byCapability, capabilities, offerOptions: entries };
+  const withText = (rows) => arr(rows).map((c) => (c?.id === 'offers.requestOptions' ? { ...c, parameters: entries[0].text } : c));
+  const out = { ...byCapability, capabilities: withText(byCapability.capabilities), offerOptions: entries };
+  // #1053: the same line on the row of each distribution mode.
+  if (Array.isArray(byCapability.byMode)) out.byMode = byCapability.byMode.map((m) => ({ ...m, capabilities: withText(m.capabilities) }));
+  return out;
 }
 
 module.exports = { RESULT_TEXT, GROUPS, COMBINATION_TEXT, combinationState, summaryOf, summaryText, offerOptionCoverageOf, withOfferOptions };

@@ -1472,6 +1472,30 @@ refund, a seat near a given place… Each row shows:
 - its result;
 - the numbers of its points to look at.
 
+**Product-based and fare-based distribution.** When the Test Framework
+declares fare-based distribution, or a scenario asking fares has run, the view
+has one section per mode: *Product-based distribution*, then *Fare-based
+distribution*. What works in one mode may fail in the other, and each section
+says so on its own:
+
+- each section has its summary line, its capabilities and its expected
+  refusals;
+- a scenario counts in its mode: one asking a fare part (`FARE_*`) or
+  expecting no fare is fare-based, any other is product-based, and one asking
+  fares but booking the product counts in both;
+- a capability tested in both modes (an offer search, a sale, a refund) has a
+  row in each, with its own result;
+- the *Fares* rows are only under fare-based distribution; a capability
+  declared and not tested is listed in its own mode only;
+- *Points to look at* stays one list for the report: a point keeps its number,
+  and says which mode it was met in.
+
+The Markdown export has the same sections; the workbook adds a *Distribution*
+column to *Capabilities*, *Expected refusals* and *Points to look at*, and a
+block per mode to the summary. When two published reports both have the
+sections, *Since report N* compares each capability within its mode. A
+provider that sells products only keeps the report without sections.
+
 A failed check counts only against the capability its scenario is for. A
 failure at an optional operation (a reference data read, the fulfilment read,
 a withdrawal, the refund receipt) counts only against that operation. The
