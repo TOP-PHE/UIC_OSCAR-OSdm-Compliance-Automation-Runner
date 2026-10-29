@@ -2163,6 +2163,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `validationLogger` on the global object when loaded: a unit test that
   watches the global logger sets it again after requiring a module that
   loads `displays.js`.
+  **Fare templates from DB's real fares** (#1047, part B of #1045; no
+  version: nothing reads them until #1048). `OSDM_Simulator/fares/
+  templates.json` is **generated** by `scripts/fare-templates.js` from DB's
+  offline delivery (`OSCAR_Test_Infos/FARE Examples/1080_2024.02.gtm.json`,
+  private repository; public CEN data of 2024). The delivery is read from
+  stdin: a path from the command line is Sonar's S8707. It holds 26 regions
+  (`REGIONS` in `fare-templates-lib.js`), each a shape (ends, route tree,
+  distance, `pair` / `direction`) and its 27 fares. No station, company or
+  card of DB's is written outside `about`: `leaksIn()` checks it, and a
+  test refuses four-digit strings. `gtm-reader-lib.js` scans the delivery
+  in pieces, since one string cannot hold 1.3 GB. DB labels a child's
+  second-class 25 % card fare as the adult's in every region;
+  `correctDuplicates()` gives it back (DB rounds to 10 cents).
+  `src/osdm/fareTemplates.js` `onlineFare()` lays a template fare on
+  `placeOf(role, n)` (entry, then route in reading order, then exit) as an
+  online Fare, valid in every version from 3.6 to 3.12.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,
