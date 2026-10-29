@@ -92,6 +92,7 @@ module.exports = {
         properties: {
           base: { type: 'string', enum: ['all', 'list'], default: 'all', description: 'all = every scenario the caller sees; list = the run list' },
           categories: { type: 'array', items: { type: 'string', enum: ['happy', 'refusal', 'simulated'] }, default: ['happy', 'refusal'], description: 'simulated = the simulator\'s deliberate errors (SIM_WRONG_, SIM_FAULT_); refusal = the expected refusals (NHF_ and refusal probes)' },
+          modes: { type: 'array', items: { type: 'string', enum: ['PRODUCT', 'FARE'] }, default: ['PRODUCT', 'FARE'], description: 'distribution modes (#1039): PRODUCT = product based, FARE = fare based, read as the Test Framework\'s distribution check does; a scenario of both modes runs with either' },
           groups: { type: 'array', items: { type: 'string' }, description: 'groups of the main capability; default every group' },
           forms: { type: 'array', items: { type: 'string', enum: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'] }, description: 'forms of the offer request; default every form' },
           lastRun: { type: 'string', enum: ['all', 'toRunAgain', 'failed'], default: 'all', description: 'toRunAgain = never run, or older than the collection or the scenario; failed = the latest finished run failed a check' },

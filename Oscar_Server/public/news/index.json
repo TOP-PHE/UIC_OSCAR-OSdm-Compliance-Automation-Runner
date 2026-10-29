@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-run-by-distribution",
+    "date": "October 29, 2026",
+    "tag": "New",
+    "title": "New Run chooses product-based or fare-based tests",
+    "summary": "A Distribution filter on New Run runs only the fare-based tests, or only the product-based ones.",
+    "content": "Between Category and Capability, the Distribution filter offers Product based and Fare based. A scenario is fare based when it asks for fares or expects none, product based when it asks for no fare or books the product, as the Test Framework reads it; one that asks for fares and then sells a product runs with either box. Both are ticked by default, and the batch label on the dashboard names the mode when only one is."
+  },
+  {
     "id": "2026-10-29-declared-functions-scenarios",
     "date": "October 29, 2026",
     "tag": "Added",

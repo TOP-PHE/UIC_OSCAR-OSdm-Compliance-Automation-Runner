@@ -271,7 +271,7 @@ async function loadProfile() {
  * The filters, their values, labels and counts come from the server's preview
  * (POST /v1/runs/preview, utils/runFilters.js): the page only draws them and
  * sends back what is ticked. */
-const SELECT_FILTERS = [['categories', 'Category'], ['groups', 'Capability'], ['forms', 'Offer request']];
+const SELECT_FILTERS = [['categories', 'Category'], ['modes', 'Distribution'], ['groups', 'Capability'], ['forms', 'Offer request']];
 let launchReady = false;
 let runSelection = null;
 let selectedCount = 0;

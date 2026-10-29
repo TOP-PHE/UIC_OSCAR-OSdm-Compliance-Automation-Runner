@@ -1018,6 +1018,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   warning. `simulated-errors.test.js` holds the table to the rows of *OSCAR -
   OSDM Simulator scenarios* that say "no failed check": a new such scenario
   goes in both.
+  **A batch can be chosen by distribution mode** (#1039, 1.11.435): facet
+  `modes` (`modesOf()`, the Test Framework's `distributionModesOf()`, none =
+  PRODUCT), selection `modes` (`PRODUCT` / `FARE`, both by default), the
+  page's *Distribution* fieldset (`SELECT_FILTERS`). A scenario of both
+  modes is kept by either box (`facetModes()`); the label names one mode.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

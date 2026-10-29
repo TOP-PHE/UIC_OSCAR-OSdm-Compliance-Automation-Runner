@@ -137,11 +137,53 @@ describe('a selection', () => {
     expect(p.labels.categories).toEqual(RF.CATEGORY_TEXT);
   });
 
+  test('#1039: the distribution modes, as the Test Framework reads them', () => {
+    const df = { scenarios: [], offerSearchCriteriaList: [] };
+    expect(RF.modesOf({ code: 'P' }, df)).toEqual(['PRODUCT']);
+    expect(RF.modesOf({ code: 'F', offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } }, df)).toEqual(['FARE']);
+    expect(RF.modesOf({ code: 'B', offerSearchCriteria: { requestedOfferParts: ['ADMISSION', 'FARE_ADMISSION'] }, bookMode: 'PRODUCT' }, df)).toEqual(['PRODUCT', 'FARE']);
+    expect(RF.modesOf({ code: 'N', expectFares: false }, df)).toEqual(['FARE']);
+    expect(RF.modesOf(null, df)).toEqual(['PRODUCT']);
+  });
+
+  test('#1039: product based, fare based, or both; a scenario of both modes runs with either', () => {
+    const modal = [
+      { code: 'P1', category: 'happy', modes: ['PRODUCT'], group: 'Sale', form: 'SEARCH', lastRun: 'never', toRunAgain: true },
+      { code: 'F1', category: 'happy', modes: ['FARE'], group: 'Fares', form: 'SEARCH', lastRun: 'never', toRunAgain: true },
+      { code: 'B1', category: 'refusal', modes: ['PRODUCT', 'FARE'], group: 'Fares', form: 'SEARCH', lastRun: 'never', toRunAgain: true },
+      { code: 'X1', category: 'happy', group: 'Sale', form: 'SEARCH', lastRun: 'never', toRunAgain: true },
+    ];
+    expect(RF.selectCodes(modal, { modes: ['FARE'] })).toEqual(['F1', 'B1']);
+    expect(RF.selectCodes(modal, { modes: ['PRODUCT'] })).toEqual(['P1', 'B1', 'X1']);
+    expect(RF.selectCodes(modal, {})).toEqual(['P1', 'F1', 'B1', 'X1']);
+    expect(RF.selectCodes(modal, { modes: [] })).toEqual([]);
+    const p = RF.previewOf(modal, { modes: ['FARE'] });
+    expect(p.counts.modes).toEqual({ PRODUCT: 3, FARE: 2 });
+    expect(p.selected).toBe(2);
+    expect(p.labels.modes).toEqual({ PRODUCT: 'Product based', FARE: 'Fare based' });
+    expect(RF.DEFAULT_SELECTION.modes).toEqual(['PRODUCT', 'FARE']);
+    expect(RF.withDefaults({}).modes).toEqual(['PRODUCT', 'FARE']);
+    expect(RF.selectionProblem({ modes: ['FARE', 'BOTH'] })).toMatch(/selection\.modes: unknown value "BOTH"/);
+    expect(RF.selectionProblem({ modes: 'FARE' })).toMatch(/selection\.modes must be a list/);
+    expect(RF.selectionProblem({ modes: ['PRODUCT'] })).toBeNull();
+  });
+
+  test('#1039: on the simulator, the fare scenarios are fare based and a product request checking no fare is product based', () => {
+    const codes = simulator.scenarios.filter((s) => /_38$/.test(s.code)).map((s) => s.code);
+    const f = RF.facetsOf(codes, { datafile: simulator, entries: catalogue });
+    const fare = f.filter((x) => x.modes.includes('FARE')).map((x) => x.code);
+    expect(fare.length).toBeGreaterThan(10);
+    expect(fare.every((c) => /FARE/.test(c))).toBe(true);
+    expect(f.filter((x) => /^SIM_(FARE|NHF_FARE)_/.test(x.code)).every((x) => x.modes.includes('FARE'))).toBe(true);
+    expect(f.find((x) => x.code === 'SIM_WRONG_FARE_UNREQUESTED_38').modes).toEqual(['PRODUCT']);
+    expect(f.find((x) => x.code === 'SIM_SALE_SEARCH_1ADT_38').modes).toEqual(['PRODUCT']);
+  });
+
   test('the facets follow the data file, in the order of the codes asked', () => {
     const codes = ['SIM_WRONG_BOOKING_PRICE_38', 'NOT_IN_THE_FILE', 'SIM_SALE_SEARCH_1ADT_38'];
     const f = RF.facetsOf(codes, { datafile: simulator, entries: catalogue });
     expect(f.map((x) => [x.code, x.category])).toEqual([['SIM_WRONG_BOOKING_PRICE_38', 'simulated'], ['SIM_SALE_SEARCH_1ADT_38', 'happy']]);
-    expect(f[1]).toMatchObject({ group: 'Sale', form: 'SEARCH', lastRun: 'never', toRunAgain: true });
+    expect(f[1]).toMatchObject({ group: 'Sale', form: 'SEARCH', modes: ['PRODUCT'], lastRun: 'never', toRunAgain: true });
   });
 });
 
@@ -159,6 +201,9 @@ describe('what a batch ran, in words (#1029 PR 3)', () => {
       base: 'list', categories: ['simulated'], groups: ['Sale', 'Refund', 'Exchange', 'Fares'], forms: ['TRIP_IDS', 'SEARCH'], lastRun: 'failed',
     })).toBe('Run list · Simulated errors · 4 capabilities · Trip id + Search · Failed at the last run');
     expect(RF.selectionLabel({ lastRun: 'toRunAgain', forms: ['SPECIFICATION'] })).toBe('Happy flows + Expected refusals · Specification · To run again');
+    // #1039: one mode is named, both are not.
+    expect(RF.selectionLabel({ modes: ['FARE'], groups: ['Fares'] })).toBe('Happy flows + Expected refusals · Fare based · Fares');
+    expect(RF.selectionLabel({ modes: ['FARE', 'PRODUCT'] })).toBe('Happy flows + Expected refusals');
   });
 
   test('every value of a filter in another order is still every value', () => {

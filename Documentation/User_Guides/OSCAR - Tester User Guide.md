@@ -1366,13 +1366,18 @@ log volume only — never assertion outcomes.
   you tick anything, you start from your Test Manager's selection.
 - **Choose what a batch runs on New Run, without ticking scenarios one by
   one.** The **Launch** card starts from **Every scenario of the data file**
-  you see, or from **My run list**, and narrows it with four filters. Within a
+  you see, or from **My run list**, and narrows it with five filters. Within a
   filter, every box you tick adds to the batch; the filters then add up (a
   scenario runs only if each filter keeps it):
   - **Category**: *Happy flows*, *Expected refusals* (the `NHF_` scenarios and
     the refusal probes) and, when the data file holds some, *Simulated errors*
     (the simulator's `SIM_WRONG_` and `SIM_FAULT_` scenarios, which fail on
     purpose);
+  - **Distribution**: *Product based* and *Fare based*, read as the Test
+    Framework's distribution check reads them: a scenario is fare based when
+    it asks for fares or expects none, product based when it asks for no
+    fare or books the product. A scenario of both (fares asked, then a
+    product sold) runs with either box;
   - **Capability**: the group of what each scenario tests (Offers, Sale,
     Refund, Exchange, Fares…), as the coverage report reads it;
   - **Offer request**: by search, by specification or by trip id;

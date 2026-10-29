@@ -50,14 +50,14 @@ function rootOf(html) {
 const facets = [
   { code: 'H1', category: 'happy', group: 'Sale', form: 'SEARCH', lastRun: 'passed', toRunAgain: false },
   { code: 'R1', category: 'refusal', group: 'Refund', form: 'TRIP_IDS', lastRun: 'failed', toRunAgain: true },
-  { code: 'S1', category: 'simulated', group: 'Sale', form: 'SPECIFICATION', lastRun: 'never', toRunAgain: true },
+  { code: 'S1', category: 'simulated', modes: ['FARE'], group: 'Sale', form: 'SPECIFICATION', lastRun: 'never', toRunAgain: true },
 ];
 const answer = (list, selection) => ({ ...RF.previewOf(list, selection), selection: RF.withDefaults(selection), seen: list.length, runList: 1 });
 
 test('the panel draws every filter and value of the server\'s preview, and reads back the same selection', () => {
-  for (const selection of [{}, { base: 'list', categories: ['simulated'], groups: ['Sale', 'Refund'], forms: ['TRIP_IDS'], lastRun: 'failed' }]) {
+  for (const selection of [{}, { base: 'list', categories: ['simulated'], modes: ['FARE'], groups: ['Sale', 'Refund'], forms: ['TRIP_IDS'], lastRun: 'failed' }]) {
     const html = selectionPanelHtml(answer(facets, selection));
-    for (const key of ['categories', 'groups', 'forms']) {
+    for (const key of ['categories', 'modes', 'groups', 'forms']) {
       const drawn = rootOf(html).querySelectorAll(`input[data-select="${key}"]`).map((i) => i.value);
       expect([key, drawn]).toEqual([key, Object.keys(RF.previewOf(facets, selection).counts[key])]);
     }
@@ -70,6 +70,12 @@ test('the labels are the server\'s, the counts shown, the simulated errors only 
   expect(html).toContain(`> ${RF.CATEGORY_TEXT.simulated} <span class="sel-count">(1)</span>`);
   expect(html).toContain(`> ${RF.LAST_RUN_TEXT.toRunAgain} <span class="sel-count">(2)</span>`);
   expect(html).toContain('> Every scenario of the data file <span class="sel-count">(3)</span>');
+  // #1039: the Distribution filter, between Category and Capability.
+  expect(html).toContain('<legend>Distribution</legend>');
+  expect(html).toContain('> Fare based <span class="sel-count">(1)</span>');
+  expect(html).toContain('> Product based <span class="sel-count">(2)</span>');
+  expect(html.indexOf('<legend>Category</legend>')).toBeLessThan(html.indexOf('<legend>Distribution</legend>'));
+  expect(html.indexOf('<legend>Distribution</legend>')).toBeLessThan(html.indexOf('<legend>Capability</legend>'));
   const without = selectionPanelHtml(answer(facets.filter((f) => f.category !== 'simulated'), { categories: ['happy', 'refusal', 'simulated'] }));
   expect(without).not.toContain('value="simulated"');
   expect(selectionFromPanel(rootOf(without)).categories).toEqual(['happy', 'refusal']);
