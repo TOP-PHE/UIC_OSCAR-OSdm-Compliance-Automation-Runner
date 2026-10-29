@@ -728,7 +728,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     it listed and its runs shared; a withdrawn report is not shared again.
     `certifier-coverage-reports.js` (`/v1/certifier`, certifiers only):
     shared and not withdrawn, every company, names and dates, never an
-    e-mail; 404 otherwise. The workbook takes the comparison as its second
+    e-mail; 404 otherwise.
+    **A certifier builds a live coverage too** (#1043, 1.11.437): `GET
+    /v1/certifier/coverage` lists the companies or providers with a report
+    shared and not withdrawn, `/coverage/:companyId` (and `/download`) is
+    `buildCoverage()` for a `certification_user`: `latestRuns(…, true)`
+    (runs with `shared_with_certifier_at` only) and a data file cut to the
+    scenarios those runs ran (`sharedScenariosOnly()`, no `viewForTester`),
+    then `forPublication()`. Any other company is a 404. The page's
+    coverage card shows a company list to certifiers (`coverageUrl()`,
+    `coverageCompaniesHtml()`); `isCertifier` is declared beside
+    `isPlatformUser`, since the card's set-up reads it before the
+    published card's. The workbook takes the comparison as its second
     sheet, *Since report N*. Page: *Publish this report* after Show coverage,
     the *Published Coverage Reports* card for Test Managers and certifiers
     (`publishedListHtml()`, `comparisonHtml()`, `publishedHtml()`; a report id

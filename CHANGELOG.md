@@ -93,6 +93,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.437] / [collection-OTST_V2.0.236] — 2026-10-29
+
+Issue #1043, release 2026.475.
+
+### Added
+- **A certifier's own coverage.** Until now a certifier read the coverage only as each report was frozen when published. Once a company or provider has shared a report with them (not withdrawn), the certifier now has the Report Builder's *Test Framework Coverage* card too, with a list of those companies and providers.
+  - `GET /v1/certifier/coverage` lists them; `GET /v1/certifier/coverage/:companyId?days=` and `/download` build the coverage at that moment, certifiers only, 404 for any other company.
+  - It reads only the runs shared with certifiers (a shared report's runs, a batch, a run on its own), and only the scenarios those runs ran: a scenario never shared is not named.
+  - It is frozen as a published report is (`forPublication()`): no position to take, no simulated errors, no e-mail of the company's users.
+  - The published reports list now names the company each report is about (`companyId`).
+
+---
+
 ## [server-1.11.436] / [collection-OTST_V2.0.236] — 2026-10-29
 
 Issue #1041, release 2026.474. Server only; collection unchanged.

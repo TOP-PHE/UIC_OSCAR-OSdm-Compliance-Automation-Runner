@@ -130,12 +130,14 @@ function stepsOfRuns(ids) {
 }
 
 // The latest finished run of each scenario of the company within the window,
-// with its check counts, its steps and its failed checks.
-function latestRuns(companyId, days) {
+// with its check counts, its steps and its failed checks. `sharedOnly`: the
+// runs shared with certifiers only (#1043).
+function latestRuns(companyId, days, sharedOnly = false) {
+  const shared = sharedOnly ? 'AND shared_with_certifier_at IS NOT NULL' : '';
   const rows = all(
     `SELECT id, scenario_code, status, queued_at, completed_at, server_version, collection_version, scenario_hash
        FROM runs
-      WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED')
+      WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED') ${shared}
         AND queued_at >= datetime('now', ?)
       ORDER BY queued_at DESC, id DESC
       LIMIT ${MAX_RUNS}`,
@@ -243,14 +245,25 @@ async function reportOf(req, res) {
   return { companyId, report: await buildCoverage(companyId, days, req.user) };
 }
 
+// #1043: a certifier's data file holds the scenarios a shared run ran, nothing
+// else, so a scenario never shared is not even named.
+function sharedScenariosOnly(datafile, runs) {
+  const scenarios = Array.isArray(datafile.scenarios) ? datafile.scenarios : [];
+  return { ...datafile, scenarios: scenarios.filter((s) => s && typeof s.code === 'string' && Object.hasOwn(runs, s.code)) };
+}
+
 /**
  * The coverage report of a company or provider over the last `days` days, as
  * `user` reads it: a tester sees the scenarios of their view only. Shared with
- * the published reports (#972 part 4), which a Test Manager makes.
+ * the published reports (#972 part 4), which a Test Manager makes. A
+ * certifier (#1043) reads the runs shared with certifiers and their scenarios.
  */
 async function buildCoverage(companyId, days, user) {
+  const certifier = user.role === 'certification_user';
+  const runs = latestRuns(companyId, days, certifier);
   let datafile = await readDatafile(companyId);
-  if (datafile && user.role !== 'test_manager') {
+  if (datafile && certifier) datafile = sharedScenariosOnly(datafile, runs);
+  else if (datafile && user.role !== 'test_manager') {
     datafile = viewForTester(datafile, user.email, getRunSelection(companyId, user.id));
   }
   const framework = frameworkConfigOf(companyId);
@@ -258,7 +271,6 @@ async function buildCoverage(companyId, days, user) {
   // The function and matrix views list open findings by these fields only.
   const findings = allFindings.filter((f) => f.status !== 'resolved')
     .map(({ id, title, category, status, scenario_code: code }) => ({ id, title, category, status, scenario_code: code }));
-  const runs = latestRuns(companyId, days);
   const warnings = warningLinesOf(runs);
   // #1029: the simulator's deliberate errors say how well OSCAR sees an error,
   // not how the provider conforms: kept out of every view, listed apart.

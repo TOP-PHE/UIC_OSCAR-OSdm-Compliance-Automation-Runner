@@ -27,6 +27,7 @@ const { readZipEntry } = require('../../src/utils/zip');
 const app = express();
 app.use(express.json());
 app.use('/v1/company', require('../../src/api/routes/company-coverage-reports'));
+app.use('/v1/company', require('../../src/api/routes/company-coverage'));
 app.use('/v1/certifier', require('../../src/api/routes/certifier-coverage-reports'));
 
 const tag = uuidv4().slice(0, 8);
@@ -209,5 +210,65 @@ describe('published coverage reports (#972 part 4)', () => {
     expect(xlsx.headers['content-disposition']).toBe('attachment; filename="Prov-P1-oscar-coverage-report-1.xlsx"');
     const tm = await binary(request(app).get(`/v1/company/coverage/reports/${res.body.id}/download`).set(as('TM', 'P1')));
     expect(tm.headers['content-disposition']).toBe('attachment; filename="Prov-P1-oscar-coverage-report-1.xlsx"');
+  });
+});
+
+describe('a certifier\'s live coverage of a company that shared a report (#1043)', () => {
+  test('lists the companies or providers whose shared report is not withdrawn', async () => {
+    const res = await request(app).get('/v1/certifier/coverage').set(as('CERT'));
+    expect(res.status).toBe(200);
+    const mine = res.body.companies.filter((c) => [ids.D, ids.P1].includes(c.id));
+    // The distributor's only shared report was withdrawn.
+    expect(mine).toEqual([{ id: ids.P1, company: 'Prov P1', distributor: 'Dist <D>' }]);
+    for (const who of ['TM', 'ANA', 'ADM']) expect((await request(app).get('/v1/certifier/coverage').set(as(who))).status).toBe(403);
+    // The list of reports names the company each is about.
+    const reports = await request(app).get('/v1/certifier/coverage-reports').set(as('CERT'));
+    expect(reports.body.reports.find((r) => r.company === 'Prov P1').companyId).toBe(ids.P1);
+  });
+
+  test('is built from the runs shared with certifiers and their scenarios only', async () => {
+    await writeDatafile({ id: ids.P1, slug: `rep-d-${tag}--p1` },
+      { ...DATAFILE(), scenarios: [...SCENARIOS, { ...SCENARIOS[0], code: 'SALE_HIDDEN' }] });
+    const hidden = uuidv4();
+    run(`INSERT INTO runs (id, company_id, user_id, status, scenario_code, queued_at, completed_at)
+         VALUES (?, ?, ?, 'COMPLETED', 'SALE_HIDDEN', '2026-10-22 10:00:00', '2026-10-22 10:00:00')`, [hidden, ids.P1, ids.TM]);
+    const tm = await request(app).get('/v1/company/coverage?days=3650').set(as('TM', 'P1'));
+    expect(JSON.stringify(tm.body)).toContain('SALE_HIDDEN');
+
+    const res = await request(app).get(`/v1/certifier/coverage/${ids.P1}?days=3650`).set(as('CERT'));
+    expect(res.status).toBe(200);
+    const text = JSON.stringify(res.body);
+    expect(text).toContain('SALE_A');
+    expect(text).not.toContain('SALE_HIDDEN');
+    expect(text).not.toContain(hidden);
+    expect(text).not.toContain('@rep.example');
+    // Frozen as a published report is: no position to take, no simulated errors.
+    expect(res.body.byCapability.positions).toBeUndefined();
+    expect(res.body.byCapability.simulatedErrors).toBeUndefined();
+    expect(res.body.byCapability.capabilities.find((c) => c.id === 'sale').tests[0].forms[0].runId)
+      .toBe(get("SELECT id FROM runs WHERE company_id = ? AND scenario_code = 'SALE_A'", [ids.P1]).id);
+
+    // Shared afterwards, the run counts.
+    run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [hidden]);
+    expect(JSON.stringify((await request(app).get(`/v1/certifier/coverage/${ids.P1}?days=3650`).set(as('CERT'))).body)).toContain('SALE_HIDDEN');
+  });
+
+  test('answers 404 for a company that shared nothing, 400 for a bad window, 403 to anyone else', async () => {
+    expect((await request(app).get(`/v1/certifier/coverage/${ids.D}`).set(as('CERT'))).status).toBe(404);
+    expect((await request(app).get(`/v1/certifier/coverage/${ids.O}`).set(as('CERT'))).status).toBe(404);
+    expect((await request(app).get('/v1/certifier/coverage/not-an-id').set(as('CERT'))).status).toBe(404);
+    expect((await request(app).get(`/v1/certifier/coverage/${ids.P1}?days=0`).set(as('CERT'))).status).toBe(400);
+    for (const who of ['TM', 'ANA', 'ADM']) {
+      expect((await request(app).get(`/v1/certifier/coverage/${ids.P1}`).set(as(who))).status).toBe(403);
+      expect((await request(app).get(`/v1/certifier/coverage/${ids.P1}/download`).set(as(who))).status).toBe(403);
+    }
+    expect((await request(app).get(`/v1/certifier/coverage/${ids.D}/download`).set(as('CERT'))).status).toBe(404);
+  });
+
+  test('downloads as a workbook named after the provider', async () => {
+    const xlsx = await binary(request(app).get(`/v1/certifier/coverage/${ids.P1}/download?days=3650`).set(as('CERT')));
+    expect(xlsx.status).toBe(200);
+    expect(xlsx.headers['content-disposition']).toMatch(/^attachment; filename="Prov-P1-oscar-coverage-\d{4}-\d{2}-\d{2}\.xlsx"$/);
+    expect(readZipEntry(xlsx.body, 'xl/worksheets/sheet1.xml').toString()).toContain('Dist &lt;D&gt; — Prov P1');
   });
 });

@@ -416,7 +416,10 @@ a[data-cov-point][aria-expanded="true"]{font-weight:700}
   <div class="card" id="coverage-card" style="display:none">
     <div class="card-title">Test Framework Coverage</div>
     <div class="card-body">
+      <div class="cov-note" id="coverage-intro" hidden></div>
       <div class="actions-row">
+        <label for="coverage-company" style="font-size:13px" hidden>Company or provider</label>
+        <select id="coverage-company" hidden></select>
         <label for="coverage-days" style="font-size:13px">Runs of the last</label>
         <select id="coverage-days">
           <option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option>
@@ -550,6 +553,7 @@ const STATUS_OPTIONS = [
 const FINISHED_STATUSES = new Set(['COMPLETED', 'FAILED', 'CANCELLED', 'DELETED_BY_ADMIN']);
 const userRole = (user && user.role) || 'company_user';
 const isPlatformUser = userRole === 'administrator' || userRole === 'certification_user';
+const isCertifier = userRole === 'certification_user';
 const canPickAnyUser = isPlatformUser || userRole === 'test_manager';
 
 let allRuns = [];
@@ -2774,8 +2778,22 @@ function downloadFileName(res, fallback) {
 }
 
 function coverageTitle() {
+  if (isCertifier) {
+    var select = document.getElementById('coverage-company');
+    var chosen = select.options[select.selectedIndex];
+    return (chosen && chosen.textContent) || 'company';
+  }
   var provider = typeof window.oscarSelectedProvider === 'function' ? window.oscarSelectedProvider() : null;
   return (provider && provider.name) || company.name || 'company';
+}
+
+// #1043: a certifier reads the coverage of the company or provider chosen,
+// from the runs shared with certifiers; everyone else their own.
+function coverageUrl(suffix) {
+  var days = '?days=' + encodeURIComponent(document.getElementById('coverage-days').value);
+  if (!isCertifier) return '/v1/company/coverage' + suffix + days;
+  var id = coverageRunIdOf(document.getElementById('coverage-company').value);
+  return id ? '/v1/certifier/coverage/' + encodeURIComponent(id) + suffix + days : null;
 }
 
 async function loadCoverage() {
@@ -2783,9 +2801,14 @@ async function loadCoverage() {
   var mdBtn = document.getElementById('coverage-md-btn');
   coverageData = null;
   mdBtn.disabled = true;
+  var url = coverageUrl('');
+  if (!url) {
+    body.textContent = 'Choose a company or provider first.';
+    return;
+  }
   body.textContent = 'Loading coverage...';
   try {
-    var res = await fetch('/v1/company/coverage?days=' + encodeURIComponent(document.getElementById('coverage-days').value), {});
+    var res = await fetch(url, {});
     var data = await res.json().catch(function() { return null; });
     if (!res.ok || !data) {
       body.textContent = 'The coverage could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
@@ -2876,9 +2899,14 @@ async function saveCoveragePosition(e) {
 
 async function exportCoverageExcel() {
   var msg = document.getElementById('coverage-xlsx-msg');
+  var url = coverageUrl('/download');
+  if (!url) {
+    msg.textContent = 'Choose a company or provider first.';
+    return;
+  }
   msg.textContent = 'Preparing the workbook...';
   try {
-    var res = await fetch('/v1/company/coverage/download?days=' + encodeURIComponent(document.getElementById('coverage-days').value), {});
+    var res = await fetch(url, {});
     if (!res.ok) {
       var err = await res.json().catch(function() { return null; });
       msg.textContent = 'The workbook could not be made: ' + ((err && err.detail) || ('HTTP ' + res.status)) + '.';
@@ -2908,7 +2936,33 @@ function exportCoverageMarkdown() {
   setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
 }
 
-if (!isPlatformUser) {
+// #1043: the companies or providers that shared a report with the certifier.
+function coverageCompaniesHtml(companies) {
+  return (Array.isArray(companies) ? companies : []).filter(function(c) { return coverageRunIdOf(c.id); }).map(function(c) {
+    var name = c.distributor ? c.distributor + ' — ' + c.company : c.company;
+    return '<option value="' + escHtml(c.id) + '">' + escHtml(name || '') + '</option>';
+  }).join('');
+}
+
+async function loadCoverageCompanies() {
+  var intro = document.getElementById('coverage-intro');
+  var select = document.getElementById('coverage-company');
+  var res = await fetch('/v1/certifier/coverage', {});
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    intro.textContent = 'The companies could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  select.innerHTML = coverageCompaniesHtml(data.companies);
+  var none = select.options.length === 0;
+  document.getElementById('coverage-btn').disabled = none;
+  document.getElementById('coverage-xlsx-btn').disabled = none;
+  intro.textContent = none
+    ? 'No company or provider has shared a coverage report with you yet.'
+    : 'The coverage of a company or provider that shared a report with you, built now from the runs it shared with certifiers.';
+}
+
+if (!isPlatformUser || isCertifier) {
   document.getElementById('coverage-card').style.display = 'block';
   document.getElementById('coverage-btn').addEventListener('click', function() { loadCoverage().catch(function() {}); });
   document.getElementById('coverage-md-btn').addEventListener('click', exportCoverageMarkdown);
@@ -2920,9 +2974,21 @@ if (!isPlatformUser) {
     if (coverageData) document.getElementById('coverage-body').innerHTML = coverageHtml(coverageData, this.value);
   });
 }
+if (isCertifier) {
+  // A .btn rule sets display, so `hidden` alone does not hide it.
+  document.getElementById('coverage-publish-btn').style.display = 'none';
+  document.getElementById('coverage-intro').hidden = false;
+  document.getElementById('coverage-company').hidden = false;
+  document.querySelector('label[for="coverage-company"]').hidden = false;
+  document.getElementById('coverage-company').addEventListener('change', function() {
+    coverageData = null;
+    document.getElementById('coverage-body').textContent = '';
+    document.getElementById('coverage-md-btn').disabled = true;
+  });
+  loadCoverageCompanies().catch(function(e) { document.getElementById('coverage-intro').textContent = 'The companies could not be read: ' + e.message + '.'; });
+}
 
 const canPublish = userRole === 'test_manager';
-const isCertifier = userRole === 'certification_user';
 let publishedShown = null;
 
 function publishedBase() {
@@ -2955,7 +3021,7 @@ async function showPublished(id) {
   }
   publishedShown = data;
   // One set of point anchors at a time: the live coverage is cleared.
-  if (!isCertifier) document.getElementById('coverage-body').textContent = '';
+  document.getElementById('coverage-body').textContent = '';
   document.getElementById('published-actions').hidden = false;
   body.innerHTML = publishedHtml(data, document.getElementById('published-view').value);
 }

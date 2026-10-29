@@ -1689,6 +1689,16 @@ them: whose they are, when they were published and shared, the report, what
 changed, and the workbook. They also read the runs of a shared report. They
 see no e-mail address of the company's users.
 
+**A certifier's own coverage.** Once a company or provider has shared a
+report with the certifier (and not withdrawn it), the certifier also has the
+**Test Framework Coverage** card. They choose the company or provider in its
+list, then *Show coverage*: the coverage is built at that moment from the
+runs that company shared with certifiers (a shared report's runs, a batch or
+a run shared on its own) and from the scenarios those runs ran, nothing else.
+The three views and the two exports are the same as a Test Manager's. There
+is no *Publish* button and no position to take; the simulated errors are not
+shown. A company whose shared reports were all withdrawn leaves the list.
+
 ---
 
 ## 7. Reference tables

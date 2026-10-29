@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-certifier-coverage",
+    "date": "October 29, 2026",
+    "tag": "New",
+    "title": "Certifiers can build the coverage themselves",
+    "summary": "A certifier can show the coverage by capability of a company or provider that shared a report with them, from the runs it shared.",
+    "content": "Once a company or provider has shared a coverage report with a certifier, the certifier sees the Test Framework Coverage card in the Report Builder. They choose the company or provider and show its coverage, built at that moment from the runs it shared with certifiers and the scenarios those runs ran. The views and the Markdown and Excel exports are the same as a Test Manager's; nothing can be published or answered from there."
+  },
+  {
     "id": "2026-10-29-batch-share-certifiers",
     "date": "October 29, 2026",
     "tag": "Added",
