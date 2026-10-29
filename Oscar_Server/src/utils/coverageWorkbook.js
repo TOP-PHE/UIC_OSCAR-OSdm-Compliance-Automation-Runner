@@ -69,7 +69,7 @@ const modeText = (mode) => (DISTRIBUTION_MODE_TEXT[mode] ? `${DISTRIBUTION_MODE_
 const splitOf = (report) => (Array.isArray(report.byCapability?.byMode) ? report.byCapability.byMode : null);
 function rowsByMode(report, key, toRow) {
   const split = splitOf(report);
-  if (!split) return arr(report.byCapability?.[key]).map(toRow);
+  if (!split) return arr(report.byCapability?.[key]).map((x) => toRow(x));
   return split.flatMap((m) => arr(m[key]).map((x) => [modeText(m.mode), ...toRow(x)]));
 }
 const modeColumn = (report) => (splitOf(report) ? [{ title: 'Distribution', width: 16 }] : []);
