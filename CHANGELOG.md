@@ -93,6 +93,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.438] / [collection-OTST_V2.0.236] — 2026-10-29
+
+Issue #1046 (part A of #1045, simulator fares), release 2026.476. Simulator 0.58.0. Collection unchanged; the server change is the welcome-page news entry.
+
+### Simulator 0.58.0
+- **Only fare offers when only fare parts are asked.** A request whose `requestedOfferParts` names only `FARE_*` parts (`FARE_ADMISSION`, `FARE_RESERVATION`, `FARE_ANCILLARY`) gets the fare offers alone. Until now the product offers came with every answer, so a fare answer looked product based. OSDM: `OfferPartType` "allows to request offer-parts of a certain type"; osdm.io's processes give fares only when a fare part type is asked.
+  - Parts absent, empty, or with unknown values only: product offers, no fare, as before.
+  - `FARE_*` with `ADMISSION`, `RESERVATION`, `ANCILLARY` or `ALL`: both, as before.
+  - No `FARE_*` part: product offers only, as before.
+- **Only fare parts asked and no fare to give:** no offer, and one `OFFER_NO_RESULTS` warning (OSDM's functional warning "trip search returned no offers") saying why: no requested section, a provider selling no fares, or none of the fare parts asked sold for the section. Before, the answer held the product offers and a `PARAMETER_NOT_SUPPORTED` warning on `requestedOfferParts`.
+  - Such a request gets no `COLLECTIVE_OFFER_NOT_AVAILABLE` problem either, since no product was asked.
+- Only the offers given are kept for a booking (`fares.js` `asksOnlyFares()`, `noFareOfferProblem()`; `offers.js` `partsProblemOf()`).
+- Checked with the replay:
+  - The 29 `_38` fare scenarios, plus the 6 other `_38` scenarios that send offer parts or discover offer options, recorded before and after: the same checks, failures and warnings, except the position of the fare offers named in three warnings (`offers[0..2]` instead of `offers[4..6]`).
+  - Four copies on other versions (3.6, 3.7, 3.9, 3.12) give their `_38` twins' checks.
+- *OSCAR - OSDM Simulator scenarios* and *What is tested* say what the simulator now answers.
+
+### Added
+- A welcome-page news entry: simulator fare requests get fare offers only.
+
+---
+
 ## [server-1.11.437] / [collection-OTST_V2.0.236] — 2026-10-29
 
 Issue #1043, release 2026.475.

@@ -11,8 +11,11 @@
  * fares.js — fare offers for a requested section (#903, fares phase 1a).
  *
  * Asked for `FARE_ADMISSION` (or `ALL`) with a requested section, a provider
- * whose profile has `fares` answers, besides its product offers, one offer
- * per fare cluster of its profile. Each offer holds `fares[]` only: one fare
+ * whose profile has `fares` answers one offer per fare cluster of its
+ * profile. Its product offers come too, unless the request asks for fare
+ * parts only (#1046, `asksOnlyFares()`): then the answer holds fare offers
+ * alone, or no offer and a warning when no fare can be given
+ * (`noFareOfferProblem()`). Each offer holds `fares[]` only: one fare
  * per passenger for the section, combined by CLUSTERING, with a regional
  * constraint (an entry connection point and a route), a validity, after-sales
  * conditions, the TCOs involved and the section covered. A passenger younger
@@ -111,6 +114,35 @@ function asksFares(criteria) {
 function asksFareReservations(criteria) {
   const parts = partsAsked(criteria);
   return parts.includes('FARE_RESERVATION') || parts.includes('ALL');
+}
+
+// OSDM's OfferPartType values; any other is not read.
+const OFFER_PART_TYPES = ['ADMISSION', 'RESERVATION', 'ANCILLARY', 'FARE_ADMISSION', 'FARE_RESERVATION', 'FARE_ANCILLARY', 'CONTINUOUS_SERVICE', 'ALL'];
+
+/**
+ * #1046: does the request ask for fare parts and nothing else? OSDM:
+ * requestedOfferParts "allows to request offer-parts of a certain type", so
+ * such a request gets no product offer.
+ */
+function asksOnlyFares(criteria) {
+  const parts = partsAsked(criteria).filter((p) => OFFER_PART_TYPES.includes(p));
+  return parts.length > 0 && parts.every((p) => p.startsWith('FARE_'));
+}
+
+/**
+ * #1046: the warning of an answer to a request asking for fare parts only,
+ * when no fare can be given: no offer at all, and why.
+ */
+function noFareOfferProblem(body, criteria, provider) {
+  const asked = partsAsked(criteria).filter((p) => OFFER_PART_TYPES.includes(p)).join(', ');
+  let reason = 'none of the fare parts asked is sold for this section';
+  if (!provider.fares) reason = 'this provider sells no fares';
+  else if (sectionsOf(body).length === 0) reason = 'a fare is offered for a requested section, and none was given (requestedSections)';
+  return {
+    code: 'OFFER_NO_RESULTS',
+    title: 'No offer found',
+    detail: `Only fare parts were asked (${asked}), so no product is offered; and no fare: ${reason}.`,
+  };
 }
 
 // #255: a bicycle travels on a place of its own, its fare reservation.
@@ -316,4 +348,4 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
   });
 }
 
-module.exports = { fareOffersOf, sectionsOf, asksFares, asksFareReservations, CLUSTERS };
+module.exports = { fareOffersOf, sectionsOf, asksFares, asksFareReservations, asksOnlyFares, noFareOfferProblem, CLUSTERS };

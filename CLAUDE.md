@@ -2049,7 +2049,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `desiredFareCluster` chooses the fare offer (`fareOfferId`); `bookMode`
   is read but booking fares is #906, so a fare scenario ends after 01. The
   five variables are in both reset lists. Simulator: `fares` in every
-  profile (#824 rule), offers per cluster next to the product offers, wrong
+  profile (#824 rule), offers per cluster next to the product offers (alone
+  when only `FARE_*` parts are asked; none to give: no offer and an
+  `OFFER_NO_RESULTS` warning; #1046, simulator 0.58.0), wrong
   variants by the section's start station (`0000080`–`0000085`); the
   data-file scenarios are gamma's only (`SIM_FARE_`, `SIM_WRONG_FARE_`).
   `routeSummary` (3.7) and `isProviderFee` (3.8) are in `ABSENT_BELOW`. Test

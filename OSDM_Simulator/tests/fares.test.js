@@ -44,11 +44,11 @@ function fareRequest({ start = '0000001', parts = ['FARE_ADMISSION'], passengers
 const build = (request, provider = 'gamma') => buildOfferCollection(request, providers.get(provider), NOW).response;
 const fareOffers = (response) => response.offers.filter((o) => Array.isArray(o.fares));
 
-test('FARE_ADMISSION with a section: one fare offer per cluster, next to the product offers, in OSDM 3.8 shapes', () => {
+test('FARE_ADMISSION with a section: one fare offer per cluster and no product offer, in OSDM 3.8 shapes', () => {
   const response = build(fareRequest());
   const fares = fareOffers(response);
   assert.equal(fares.length, 3);
-  assert.ok(response.offers.length > fares.length, 'the product offers stay');
+  assert.equal(response.offers.length, fares.length, 'only fare parts were asked: no product offer (#1046)');
   assert.deepEqual(fares.map((o) => o.fares[0].combinationConstraint[0].referenceCluster), ['FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX']);
   for (const offer of fares) {
     assert.equal(offer.offerSummary, undefined, 'no offer summary for fares');
@@ -88,9 +88,70 @@ test('no fare without FARE_* asked, or without a section; ALL asks for them', ()
   assert.equal(fareOffers(build(fareRequest({ parts: null }))).length, 0);
   assert.equal(fareOffers(build(fareRequest({ sections: [] }))).length, 0);
   assert.equal(fareOffers(build(fareRequest({ parts: ['ALL'] }))).length, 3);
-  // Without fares, FARE_ADMISSION alone is still reported as ignored.
+  // #1046: FARE_ADMISSION alone without a section: no offer at all, and why.
   const none = build(fareRequest({ sections: [] }));
-  assert.ok(none.problems.some((p) => p.code === 'PARAMETER_NOT_SUPPORTED'));
+  assert.deepEqual(none.offers, []);
+  assert.deepEqual(none.problems.map((p) => p.code), ['OFFER_NO_RESULTS']);
+  assert.match(none.problems[0].detail, /requestedSections/);
+  checkConformance('POST', '/gamma/offers', 200, none);
+});
+
+// #1046: OSDM's requestedOfferParts "allows to request offer-parts of a
+// certain type": product offers come unless only fare parts are asked.
+const productOffers = (response) => response.offers.filter((o) => Array.isArray(o.admissionOfferParts));
+
+test('product offers come unless only fare parts are asked (#1046)', () => {
+  const answer = (parts, options = {}) => build(fareRequest({ parts, ...options }), options.provider);
+  const both = (parts) => {
+    const response = answer(parts);
+    assert.ok(productOffers(response).length > 0, `${parts}: product offers`);
+    assert.equal(fareOffers(response).length, 3, `${parts}: fare offers`);
+  };
+  // Absent, empty or unknown values only: products, no fare (fares are asked by part type).
+  for (const parts of [null, [], ['NOT_A_PART']]) {
+    const response = answer(parts);
+    assert.ok(productOffers(response).length > 0, `${JSON.stringify(parts)}: product offers`);
+    assert.equal(fareOffers(response).length, 0, `${JSON.stringify(parts)}: no fare`);
+  }
+  // Only fare parts: fares, no product.
+  for (const parts of [['FARE_ADMISSION'], ['FARE_ADMISSION', 'FARE_RESERVATION'], ['FARE_ADMISSION', 'NOT_A_PART']]) {
+    const response = answer(parts);
+    assert.equal(productOffers(response).length, 0, `${parts}: no product offer`);
+    assert.equal(fareOffers(response).length, 3, `${parts}: fare offers`);
+  }
+  // Fare parts and product parts: both.
+  for (const parts of [['FARE_ADMISSION', 'ADMISSION'], ['FARE_ADMISSION', 'RESERVATION'], ['FARE_ADMISSION', 'ANCILLARY'], ['ALL'], ['FARE_ADMISSION', 'ALL']]) both(parts);
+  // No fare part: products only.
+  const products = answer(['ADMISSION']);
+  assert.ok(productOffers(products).length > 0);
+  assert.equal(fareOffers(products).length, 0);
+});
+
+test('only fare parts asked and no fare to give: no offer, one OFFER_NO_RESULTS warning that says why (#1046)', () => {
+  const empty = (request, provider, reason) => {
+    const response = build(request, provider);
+    assert.deepEqual(response.offers, [], reason.source);
+    assert.deepEqual(response.problems.map((p) => p.code), ['OFFER_NO_RESULTS'], reason.source);
+    assert.match(response.problems[0].detail, reason);
+    checkConformance('POST', `/${provider}/offers`, 200, response);
+  };
+  empty(fareRequest({ parts: ['FARE_ANCILLARY'] }), 'gamma', /none of the fare parts asked is sold/);
+  empty(fareRequest({ parts: ['FARE_RESERVATION'] }), 'gamma', /none of the fare parts asked is sold/);
+  empty(fareRequest(), 'plain', /sells no fares/);
+  const noSection = fareRequest();
+  delete noSection.requestedSections;
+  empty(noSection, 'gamma', /none was given \(requestedSections\)/);
+  // A COLLECTIVE fare request is not told that no collective product was found.
+  const collective = fareRequest();
+  collective.offerSearchCriteria.offerMode = 'COLLECTIVE';
+  assert.ok(!(build(collective).problems || []).some((p) => p.code === 'COLLECTIVE_OFFER_NOT_AVAILABLE'));
+});
+
+test('the offers kept for a booking are the ones given: fares only when only fares are asked (#1046)', () => {
+  const { response, remembered } = buildOfferCollection(fareRequest(), providers.get('gamma'), NOW);
+  assert.deepEqual(remembered.map((r) => r.offer.offerId), response.offers.map((o) => o.offerId));
+  assert.equal(remembered.length, 3);
+  assert.ok(remembered.every((r) => Array.isArray(r.offer.fares)), 'no product offer is kept');
 });
 
 test('a provider without fares in its profile offers none', () => {
@@ -354,6 +415,7 @@ test('FARE_RESERVATION: each bicycle gets a place in fare mode on each leg of th
   const only = alone.offers.filter((o) => Array.isArray(o.reservationOfferParts) && o.reservationOfferParts.some((p) => p.distributionMode === 'FARE_MODE'));
   assert.equal(only.length, 1);
   assert.equal(only[0].fares, undefined);
+  assert.equal(alone.offers.length, 1, 'no product offer next to it (#1046)');
   // Not asked: no fare reservation; a bicycle alone with fare admissions gets nothing.
   assert.ok(!fareOffers(build(fareRequest({ passengers: [ADULT, BICYCLE] }))).some((o) => o.reservationOfferParts));
   assert.equal(fareOffers(build(fareRequest({ passengers: [BICYCLE] }))).length, 0);

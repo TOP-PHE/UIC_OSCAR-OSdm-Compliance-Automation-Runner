@@ -48,7 +48,7 @@ const persons = require('./persons');
 const ticketing = require('./ticketing');
 const { horizonProblem } = require('./salesHorizon');
 const ageTariffs = require('./ageTariffs');
-const { fareOffersOf } = require('./fares');
+const { fareOffersOf, asksOnlyFares, noFareOfferProblem } = require('./fares');
 const { withOfferConditions } = require('./afterSales');
 
 const MAX_PASSENGERS = 19;
@@ -365,6 +365,15 @@ function offerPartsIgnored(criteria) {
     detail: `No offer without an admission is sold (asked: ${parts.join(', ')}); offers with admissions are given.`,
     pointers: [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }],
   };
+}
+
+// The warning about the offer parts asked, when no fare is given: fare parts
+// only and no fare to give (#1046), else product parts without an admission
+// (#780). None when the answer is empty for another reason already said.
+function partsProblemOf({ productsAsked, fareOffers, unanswered, body, criteria, provider }) {
+  if (fareOffers.length > 0) return null;
+  if (productsAsked) return offerPartsIgnored(criteria);
+  return unanswered ? null : noFareOfferProblem(body, criteria, provider);
 }
 
 function fulfillmentOptionsOf(body) {
@@ -779,14 +788,17 @@ function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
   const pairs = outboundTrips.length > 0
     ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
     : trips.map((trip) => ({ trip }));
-  const built = offersOfPairs(beyondHorizon ? [] : pairs, {
+  // #1046: a request asking for fare parts only gets no product offer.
+  const productsAsked = !asksOnlyFares(criteria);
+  const built = offersOfPairs(beyondHorizon || !productsAsked ? [] : pairs, {
     classes, flexibilities, collective, passengers, refusals, fulfillmentOptions, provider, nowMs, shortLivedMs,
   });
   const { remembered } = built;
   applyStopPlaceVariants(trips, provider, built.offers, remembered);
   // #780: offers asked by product tag or product code.
-  const { offers: productOffers, problems: productProblems } = selectProducts(criteria, built.offers);
-  // #903: fare offers for a requested section, next to the product offers.
+  const { offers: productOffers, problems: productProblems } = productsAsked ? selectProducts(criteria, built.offers) : { offers: [], problems: [] };
+  // #903: fare offers for a requested section, next to the product offers
+  // (alone when only fare parts are asked, #1046).
   const fareOffers = beyondHorizon ? [] : fareOffersOf({
     body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS, fulfillmentOptions,
   });
@@ -794,9 +806,9 @@ function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
   // #906: a fare offer is booked like any other, so it is remembered too.
   for (const offer of fareOffers) remembered.push({ offer, trips, passengers, oneFulfillment: true, shortLivedMs });
   const allTrips = [...outboundTrips, ...trips];
-  const problems = [...problemsOf(passengers, built.offers, collective, refusals), ...productProblems, ...options.problems];
-  const partsIgnored = fareOffers.length > 0 ? null : offerPartsIgnored(criteria);
-  if (partsIgnored) problems.push(partsIgnored);
+  const problems = [...problemsOf(passengers, built.offers, collective && productsAsked, refusals), ...productProblems, ...options.problems];
+  const partsProblem = partsProblemOf({ productsAsked, fareOffers, unanswered: beyondHorizon || options.noOffer, body, criteria, provider });
+  if (partsProblem) problems.push(partsProblem);
   if (beyondHorizon) problems.push(beyondHorizon);
   const response = { anonymousPassengerSpecifications: passengers, trips: allTrips, offers };
   if (problems.length > 0) response.problems = problems;
