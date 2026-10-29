@@ -195,13 +195,17 @@ test('every new case is an OSDM answer in every provider\'s version', () => {
     request({ from: '0000089' }),
     request({ from: '0000001', via: '0000003' }),
   ];
+  let checked = 0;
   for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
     const provider = providers.get(key);
     for (const req of cases) {
       const response = shapeAnswer(buildOfferCollection(req, provider, NOW).response, provider.osdmVersion);
+      assert.ok(response.offers.some((o) => o.fares), `${key}: a fare offer`);
       checkConformance('POST', `/${key}/offers`, 200, response);
+      checked += 1;
     }
   }
+  assert.equal(checked, 6 * cases.length);
 });
 
 // #1045: the variants of what a fare says, each changing one thing.
@@ -240,11 +244,15 @@ test('the detail variants: the real answer\'s form, a card not held, ages outsid
 });
 
 test('every detail variant is an OSDM answer in every provider\'s version', () => {
+  let checked = 0;
   for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
     const provider = providers.get(key);
     for (const from of ['0000060', '0000061', '0000062', '0000063', '0000064', '0000065']) {
       const response = shapeAnswer(buildOfferCollection(request({ from, classes: from === '0000063' ? ['FIRST'] : null }), provider, NOW).response, provider.osdmVersion);
+      assert.ok(response.offers.some((o) => o.fares), `${key} ${from}: a fare offer`);
       checkConformance('POST', `/${key}/offers`, 200, response);
+      checked += 1;
     }
   }
+  assert.equal(checked, 36);
 });

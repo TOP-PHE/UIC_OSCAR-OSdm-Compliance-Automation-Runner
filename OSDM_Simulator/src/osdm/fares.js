@@ -407,12 +407,13 @@ function fareChoiceOf(passenger, { template, family, travelClass, day, rules, ca
   const carded = card && template.fares.find((f) => f.family === family && f.travelClass === travelClass && f.passenger === fare.passenger
     && f.card && file.cardSlots[f.card].family === `REDUCTION_${card.percent}`);
   const who = free ? 'free child' : typeOf(fare).type.toLowerCase();
+  const cardWords = carded ? `, ${card.name}` : '';
   return {
     template,
     fare: carded || fare,
     free,
     card: carded ? card : null,
-    description: `${fare.name}, ${who}${carded ? `, ${card.name}` : ''}, ${CLASS_WORDS[travelClass]}`,
+    description: `${fare.name}, ${who}${cardWords}, ${CLASS_WORDS[travelClass]}`,
   };
 }
 

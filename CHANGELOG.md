@@ -112,6 +112,7 @@ Issue #1045 (OSCAR's fare checks reviewed, after the simulator's fares became re
 
 ### Changed
 - **O8 reads what a fare covers from where a real provider puts it.** In order: the fare's `coveredSection`, its entry and exit connection points, the ends of its route (the top `routeItem`'s indices, else the bare `routeItemList`), then its offer's covered sections. A real fare answer named only the last two, so O8 warned that the coverage could not be checked on every fare.
+- The two Sonar findings #1051 left (both smells): a nested template literal in the simulator's `fareChoiceOf()`, and a conformance test of `fare-generator.test.js` with no assertion of its own.
 
 ### Simulator 0.60.0
 - Six fare variants by the section's start station (`fares.variants` in every profile): `realAnswerForm` (`0000060`, not wrong), `cardNotHeld` (`0000061`, the provider's first card required), `agesOutside` (`0000062`, the first fare's passenger constraints 6 to 14), `otherClass` (`0000063`, second class whatever is asked), `datesOffset` (`0000064`, dates at `+01:00` with `utcOffset` 0), `coveredLegUnknown` (`0000065`, a covered section ending on a leg the trip does not have). Every variant's answer passes the OSDM response schema of each provider's version, from 3.6 to 3.12.
