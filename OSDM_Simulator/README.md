@@ -247,8 +247,11 @@ All optional, read from the environment.
 | `src/store.js` | the bounded, per-client memory |
 | `src/osdm/offers.js` | the answer to `POST /offers` |
 | `src/osdm/bookings.js` | bookings, passengers, purchaser, tickets |
+| `src/osdm/fareTemplates.js` | lays a fare template on given places, as OSDM's online `Fare` (#1047); the fare generator uses it from #1048 |
+| `fares/templates.json` | 26 fare templates made from DB's 2024 offline fare delivery (shared publicly by a CEN project, no longer commercially valid): each a region's shape and its 27 fares, without any station, company or card of DB's. Generated: never edit it by hand |
 | `providers/` | the provider profiles |
 | `deploy/` | compose file and reverse-proxy example |
 | `scripts/version-copies.js` | brings the data file's `_36`, `_37`, `_39`, `_310` and `_312` copies of its `_38` scenarios up to date, each on its provider's copy of a trip naming a carrier (#914, #920, #925, #1022): run it after adding or changing a scenario or a trip for gamma |
 | `scripts/replay.js` | runs the data file's scenarios with `bru` on the provider of their version and records the checks (#611) |
+| `scripts/fare-templates.js` | writes `fares/templates.json` from DB's delivery, read from standard input as a stream (`node scripts/fare-templates.js < 1080_2024.02.gtm.json`, about 35 s for 1.3 GB); it stops, writing nothing, when the templates would name a place, company or card of DB's (#1047) |
 | `tests/` | `node --test` |

@@ -67,6 +67,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fare templates made from DB's real fares, without their places** (#1047,
+  part B of #1045). Simulator files only, read by nothing yet: they are
+  released with the fare generator that uses them (#1048), so no version moves.
+  - `OSDM_Simulator/fares/templates.json`: 26 templates, one per region of
+    DB's 2024 offline fare delivery (fare provider 1080, delivery 2024.02,
+    shared publicly by a CEN project, no longer commercially valid). Each holds
+    the shape of its region and its 27 fares:
+    - the shape: each end a station or a border point and the size of its
+      station sets; the route as a tree of stations, station sets,
+      sequences and alternatives; the distance; and the pair of ends it
+      shares with the other routes of that pair;
+    - the fares: family (flexible, group, bicycle), class, passenger
+      constraint, card slot, price in EUR cents, regulatory conditions,
+      accounting identifier and the number of carriers and TCOs, with the
+      bundles they name (clusters in OSDM's spelling, `FULL_FLEX`).
+  - No station, station name, station set, company code or card code of DB's
+    is written outside the file's `about`. The script stops before writing
+    when one would be, and a test refuses any string of four digits or more.
+  - DB's delivery labels, in every region, a child's second-class card fare
+    with the adult's passenger constraint. The script gives the 26 fares back
+    to the child, matching their price within DB's 10-cent rounding.
+  - `OSDM_Simulator/scripts/fare-templates.js` writes the file. It reads the
+    1.3 GB delivery from standard input through a stream scanner
+    (`gtm-reader-lib.js`), in about 35 seconds.
+  - `OSDM_Simulator/src/osdm/fareTemplates.js` lays a template fare on given
+    places as OSDM's online `Fare`. The route becomes a flat `routeItemList`
+    whose items name each other by index. All 702 fares, laid on test places,
+    pass the OSDM response schema of every version from 3.6 to 3.12.
+
 - **OSDM provider simulator** (#575), in the new `OSDM_Simulator/` folder: a
   stub OSDM provider for testing OSCAR itself, written for the security test.
   It is not part of the server or of the collection, changes neither, and is
