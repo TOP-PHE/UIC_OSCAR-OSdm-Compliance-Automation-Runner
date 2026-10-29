@@ -330,4 +330,22 @@ describe('checkBookingAroundExchange (#649)', () => {
     const clean = run(() => exchanges.checkBookingAroundExchange(booking([{ id: 'old1', status: 'FULFILLED' }]), 'withdrawn'));
     expect(clean.logs.some((l) => l.includes('still in the booking'))).toBe(false);
   });
+
+  test('#1037 an exchange asked with an overrule code has no fee; an offer not naming the code is a warning', () => {
+    envStore = { overruleCode: 'TECHNICAL_FAILURE' };
+    expect(exchanges.overruleCodeSent()).toBe('TECHNICAL_FAILURE');
+    const free = run(() => exchanges.checkOverruledExchangeFee({ exchangeFee: price(0), appliedOverruleCode: 'TECHNICAL_FAILURE' }, 0, 'TECHNICAL_FAILURE'));
+    expect(free.results).toEqual([{ name: 'Exchange offer[0] asked with overrule code TECHNICAL_FAILURE has no exchange fee (technical exchange)', ok: true }]);
+    expect(free.logs).toEqual([]);
+    const charged = run(() => exchanges.checkOverruledExchangeFee({ exchangeFee: price(1250) }, 1, 'TECHNICAL_FAILURE'));
+    expect(failed(charged)).toHaveLength(1);
+    expect(failed(charged)[0].message).toContain('exchangeFee is 1250 EUR');
+    expect(logged(charged, 'WARNING', 'does not name the overrule code applied')).toBe(true);
+    expect(failed(run(() => exchanges.checkOverruledExchangeFee({}, 0, 'TECHNICAL_FAILURE')))).toHaveLength(1);
+    expect(run(() => exchanges.checkOverruledExchangeFee({ exchangeFee: price(1250) }, 0, null)).results).toEqual([]);
+    for (const none of ['null', 'CODE_DOES_NOT_EXIST', '', undefined]) {
+      envStore = { overruleCode: none };
+      expect(exchanges.overruleCodeSent()).toBeNull();
+    }
+  });
 });

@@ -218,6 +218,7 @@ their prices.
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
 | `SIM_SALE_AGE_LIMITS_38` | Three passengers whose dates of birth are worked out from the day of travel (passenger list 22): 14 with the birthday tomorrow (`CHILD`), 15 today (`YOUTH`), 26 today (`ADULT`). The chosen offer must apply each expected type. | Each admission priced and typed by age. | No failed check. |
+| `SIM_SALE_YOUNG_CHILD_38` | An adult (30) and a child of 3 on the day of travel (passenger list 38, trip 13, #1037); the child must be priced as `YOUNG_CHILD`. | The child's admission typed `YOUNG_CHILD` and free (gamma's band up to 5). | No failed check. |
 
 ### Technical cancellation (overrule codes, #596)
 
@@ -295,9 +296,11 @@ Each asks for offers with one option of the offer search criteria alone (`offerS
 | `SIM_OFFER_PROBE_COMBINATION_38` | Three options together (#780 part 3): `travelClasses` `FIRST`, `offerMode` `INDIVIDUAL`, `requestedOfferParts` `ADMISSION`; the source of the catalogue's random combinations. | First-class individual offers. | No failed check. |
 | `SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38` | `productTags` `ADMISSION_POINT2POINT` (#780 PR A). | The usual offers, each product tagged by its type (`productTags`). | No failed check. |
 | `SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38` | `productSelections` with `productTag` `ADMISSION_POINT2POINT`. | The offers holding a product of that tag: all of them. | No failed check. |
+| `SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38` | `productSelections` with `productCode` `SIM_ALL_DAY` (#1037). Not on 3.6: OSDM 3.6 has no `productSelections`. | The offers holding that product only. | No failed check. |
 | `SIM_TRIP_PROBE_VIA_38` | Trip search probe (#780 PR B): a via, station `0000050`, 15 minutes (trip 20). | One trip in two legs, changing at `0000050` 15 minutes after arriving. | No failed check. |
 | `SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38` | `transferLimit` 0 and `numberOfResults` 1 (trip 21). | One direct trip. | No failed check. |
 | `SIM_TRIP_PROBE_NOT_VIA_38` | `notVias` station `0000050` (trip 22). | One direct trip, which does not pass it. | No failed check. |
+| `SIM_TRIP_PROBE_ARRIVAL_TIME_38` | Trip search by arrival time (#1037): `timeBasis` ARRIVAL, the trip's arrival 12:00 sent as `arrivalTime` (trip 35). | One direct trip arriving at 12:00. | No failed check: "Trip search: the trips arrive by the time asked" at 01. |
 | `SIM_OFFER_PROBE_NOT_DECLARED_38` | Undeclared option probe (#780 PR C): `serviceClassTypes` `BEST`, `offerOptionExpectRejection` on. | No offer: gamma sells no BEST class. | No failed check. |
 | `SIM_OFFER_OPTION_DISCOVERY_38` | Offer request options (#227), `offerOptionDiscovery` on, trip 34 from station `0000078`: the request with the mandatory parameters only, then each optional parameter alone, three combinations and all of them (30 requests). | Offers to the mandatory request. From `0000078` every provider ignores `flexibilities` silently, ignores `residency` and says so, answers 501 to `prmNeeds`, 500 to `embed`, no offer to a `transportable` (said) and to `tripResponseParameters` (not said), and refuses an unknown promotion code (400); a made-up corporate code is taken without a word. | No failed check; one WARNING naming `offerSearchCriteria.flexibilities`, `corporateCodes` and `tripResponseParameters` (taken without a word). Through OSCAR, with a reference that declares the flexibilities, one more WARNING: the declared flexibility answered in another flexibility (#1035), never a failure. |
 
@@ -358,6 +361,7 @@ optional. Each is one reservation for all the passengers, on one leg.
 | `SIM_EXCHANGE_DELETE_1ADT_38` | The same exchange, withdrawn before its confirmation (`scenarioAction` DELETE: 16. DEL, then 17). | `DELETE` of the pre-booked operation answers 204 and the parts go back to `FULFILLED`. A confirmed exchange cannot be withdrawn (409). | No failed check. |
 | `SIM_EXCHANGE_OTHER_ROUTE_1ADT_38` | The one-way ticket from 0000001 to 0000002 exchanged for another route (#959): `exchange.tripRequirementId` 2, station 0000003 to 0000001, on the sale's day. | The exchange offers are built from the trip asked and the answer names their `trips`; once confirmed, the booking holds the new trip and its booked offer covers it. | No failed check: "The exchange offers cover the trip asked" at 10, "The booked offer of the exchange covers the trip asked" at 15. |
 | `SIM_EXCHANGE_OTHER_DAY_1ADT_38` | The same route exchanged for the next day at 12:00 in first class (#959): `exchange.dateOffsetDays` 1, `time` "12:00", `offerSearchCriteria.travelClasses` FIRST, sent over the sale's criteria. | Offers for that day and time, first class only. | No failed check: the same two trip checks as above. |
+| `SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38` | A technical exchange (#1037): a semi-flexible one-way ticket exchanged with overrule code `TECHNICAL_FAILURE`. | Exchange offers with `exchangeFee` 0 (without the code, a quarter of the price) and `appliedOverruleCode` TECHNICAL_FAILURE. | No failed check: "Exchange offer[n] asked with overrule code TECHNICAL_FAILURE has no exchange fee (technical exchange)" at 10, 11 and 12. |
 
 ### Expiry probes (#611)
 

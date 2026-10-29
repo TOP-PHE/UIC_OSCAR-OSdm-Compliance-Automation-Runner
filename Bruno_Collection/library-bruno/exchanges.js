@@ -16,7 +16,9 @@ module.exports = {
   validateExchangeFeesConsistentWithAfterSalesConditions,
   validateExchangeAppliedOverruleCode,
   checkBookingAroundExchange,
-  checkExchangeTripOffers
+  checkExchangeTripOffers,
+  checkOverruledExchangeFee,
+  overruleCodeSent
 };
 
 // Function to validate exchange offers response
@@ -190,6 +192,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   if (exchangeOffer.appliedOverruleCode) {
     validateExchangeAppliedOverruleCode(exchangeOffer.appliedOverruleCode, expectedOverruleCode);
   }
+  checkOverruledExchangeFee(exchangeOffer, index, overruleCodeSent());
 
   // #396: exchange-fee schedule consistency runs in the NORMAL flow now. The old
   // code ran it ONLY inside `if (appliedOverruleCode)` — but an overrule
@@ -321,6 +324,29 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
     }
   });
   validationLogger(`[INFO] Exchange fee schedule decode OK \u2014 exchangeFee ${exchangeFee.amount} matches the active EXCHANGE schedule (active-window fee ${r.expectedFee}).`);
+}
+
+// The overrule code the exchange request sent, else null ("null" and the
+// refund's CODE_DOES_NOT_EXIST probe are no code).
+function overruleCodeSent() {
+  const code = bru.getEnvVar("overruleCode");
+  return code && code !== "null" && code !== "CODE_DOES_NOT_EXIST" ? String(code) : null;
+}
+
+// #1037: an exchange asked with an overrule code is a technical exchange, as a
+// refund with one is a technical cancellation (#596): no fee. An offer that
+// does not say it applied the code is a WARNING (appliedOverruleCode is
+// optional in OSDM).
+function checkOverruledExchangeFee(exchangeOffer, index, code) {
+  if (!code) return;
+  if (!exchangeOffer.appliedOverruleCode) {
+    validationLogger(`[WARNING] Exchange offer[${index}] does not name the overrule code applied (appliedOverruleCode; ${code} was sent)`);
+  }
+  const fee = exchangeOffer.exchangeFee?.amount;
+  test(`Exchange offer[${index}] asked with overrule code ${code} has no exchange fee (technical exchange)`, () => {
+    expect(fee, 'exchangeFee.amount is required').to.be.a('number');
+    expect(fee).to.equal(0, `exchangeFee is ${fee} ${exchangeOffer.exchangeFee?.currency || ''}`.trim());
+  });
 }
 
 // Function to validate applied overrule code

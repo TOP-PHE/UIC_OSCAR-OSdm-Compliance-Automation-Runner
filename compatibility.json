@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.471",
+  "current_release": "2026.472",
   "releases": [
+    {
+      "release": "2026.472",
+      "date": "2026-10-29",
+      "server": "1.11.434",
+      "collection": "OTST_V2.0.236",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Collection OTST_V2.0.236: simulator scenarios for four declared functions that had none (technical exchange with an overrule code, young child, product selection by code, trip search by arrival time); a search by arrival time is checked, and a technical exchange carries no fee (#1037)."
+      ]
+    },
     {
       "release": "2026.471",
       "date": "2026-10-28",

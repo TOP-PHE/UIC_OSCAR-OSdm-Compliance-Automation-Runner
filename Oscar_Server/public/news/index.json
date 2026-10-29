@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-29-declared-functions-scenarios",
+    "date": "October 29, 2026",
+    "tag": "Added",
+    "title": "Simulator scenarios for four more declared functions",
+    "summary": "The simulator now has a scenario for a technical exchange, a young child, a product selected by code and a search by arrival time; a search by arrival time is checked, and a technical exchange must carry no fee.",
+    "content": "On a company following a simulator reference, the coverage report listed four declared functions that no scenario exercised. Each now has one: an exchange with an overrule code (exchange for irregular operations), a child of 3 priced as a young child, a product selected by its code, and a trip searched by its arrival time. After the offer step, the trips of a search by arrival time must arrive at or before the time asked (a warning otherwise), and an exchange asked with an overrule code must carry no exchange fee (a failed check otherwise). Ignoring real-time data stays without a scenario: a simulator has no real-time data to tell by."
+  },
+  {
     "id": "2026-10-28-flexibility-warning",
     "date": "October 28, 2026",
     "tag": "Changed",

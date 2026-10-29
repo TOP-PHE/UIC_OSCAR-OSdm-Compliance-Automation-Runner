@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38", "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38", "SIM_SALE_YOUNG_CHILD_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38", "SIM_TRIP_PROBE_ARRIVAL_TIME_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -34528,6 +34528,146 @@
     {
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38",
+      "description": "Simulated provider: technical exchange of a semi-flexible one-way ticket with overrule code TECHNICAL_FAILURE (#1037): the exchange offers carry no exchange fee and name the code applied; one taken, confirmed. OSDM 3.8.0, for gamma.",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": "TECHNICAL_FAILURE",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_YOUNG_CHILD_38",
+      "description": "Simulated provider: sale for an adult and a child of 3 (trip from station 0000093, priced by age, #1037): the child is priced as a young child (YOUNG_CHILD, free on gamma). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 13,
+      "passengersListId": 38,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38",
+      "description": "Simulated provider: offer search probe, a product selected by code (offerSearchCriteria.productSelections, productCode SIM_ALL_DAY, #1037); an offer holds it. The scenario ends after the offer. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_ALL_DAY",
+            "numberOfItems": 1
+          }
+        ]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_TRIP_PROBE_ARRIVAL_TIME_38",
+      "description": "Simulated provider: trip search probe, by arrival time (tripSearchCriteria.arrivalTime 12:00, #1037); gamma gives a trip arriving at 12:00. The scenario ends after the offer. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 35,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
       "code": "SIM_WRONG_OFFER_OPTION_DECLARED_IGNORED_36",
       "description": "Simulated provider, deliberately wrong: the offer request options of SIM_OFFER_OPTION_DISCOVERY_38, with the scenario declaring as supported four options that the simulator does not take from station 0000078 (flexibilities ignored silently, residency ignored and said, prmNeeds 501, embed 500). Each fails \"Offer request option <key> — declared in the Test Framework, taken by the provider\" at 01 (#991). OSDM 3.6.0, for alpha (a copy of SIM_WRONG_OFFER_OPTION_DECLARED_IGNORED_38, #914).",
       "scenarioType": "SALE",
@@ -34724,6 +34864,666 @@
         "passenger.prmNeeds": true,
         "embed": true
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_36",
+      "description": "Simulated provider: technical exchange of a semi-flexible one-way ticket with overrule code TECHNICAL_FAILURE (#1037): the exchange offers carry no exchange fee and name the code applied; one taken, confirmed. OSDM 3.6.0, for alpha (a copy of SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38, #914).",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": "TECHNICAL_FAILURE",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_YOUNG_CHILD_36",
+      "description": "Simulated provider: sale for an adult and a child of 3 (trip from station 0000093, priced by age, #1037): the child is priced as a young child (YOUNG_CHILD, free on gamma). OSDM 3.6.0, for alpha (a copy of SIM_SALE_YOUNG_CHILD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 13,
+      "passengersListId": 38,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_TRIP_PROBE_ARRIVAL_TIME_36",
+      "description": "Simulated provider: trip search probe, by arrival time (tripSearchCriteria.arrivalTime 12:00, #1037); gamma gives a trip arriving at 12:00. The scenario ends after the offer. OSDM 3.6.0, for alpha (a copy of SIM_TRIP_PROBE_ARRIVAL_TIME_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 35,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_37",
+      "description": "Simulated provider: technical exchange of a semi-flexible one-way ticket with overrule code TECHNICAL_FAILURE (#1037): the exchange offers carry no exchange fee and name the code applied; one taken, confirmed. OSDM 3.7.0, for beta (a copy of SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38, #914).",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": "TECHNICAL_FAILURE",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_YOUNG_CHILD_37",
+      "description": "Simulated provider: sale for an adult and a child of 3 (trip from station 0000093, priced by age, #1037): the child is priced as a young child (YOUNG_CHILD, free on gamma). OSDM 3.7.0, for beta (a copy of SIM_SALE_YOUNG_CHILD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 13,
+      "passengersListId": 38,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_37",
+      "description": "Simulated provider: offer search probe, a product selected by code (offerSearchCriteria.productSelections, productCode SIM_ALL_DAY, #1037); an offer holds it. The scenario ends after the offer. OSDM 3.7.0, for beta (a copy of SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_ALL_DAY",
+            "numberOfItems": 1
+          }
+        ]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_TRIP_PROBE_ARRIVAL_TIME_37",
+      "description": "Simulated provider: trip search probe, by arrival time (tripSearchCriteria.arrivalTime 12:00, #1037); gamma gives a trip arriving at 12:00. The scenario ends after the offer. OSDM 3.7.0, for beta (a copy of SIM_TRIP_PROBE_ARRIVAL_TIME_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 35,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_39",
+      "description": "Simulated provider: technical exchange of a semi-flexible one-way ticket with overrule code TECHNICAL_FAILURE (#1037): the exchange offers carry no exchange fee and name the code applied; one taken, confirmed. OSDM 3.9.0, for delta (a copy of SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38, #914).",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": "TECHNICAL_FAILURE",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_YOUNG_CHILD_39",
+      "description": "Simulated provider: sale for an adult and a child of 3 (trip from station 0000093, priced by age, #1037): the child is priced as a young child (YOUNG_CHILD, free on gamma). OSDM 3.9.0, for delta (a copy of SIM_SALE_YOUNG_CHILD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 13,
+      "passengersListId": 38,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_39",
+      "description": "Simulated provider: offer search probe, a product selected by code (offerSearchCriteria.productSelections, productCode SIM_ALL_DAY, #1037); an offer holds it. The scenario ends after the offer. OSDM 3.9.0, for delta (a copy of SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_ALL_DAY",
+            "numberOfItems": 1
+          }
+        ]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_TRIP_PROBE_ARRIVAL_TIME_39",
+      "description": "Simulated provider: trip search probe, by arrival time (tripSearchCriteria.arrivalTime 12:00, #1037); gamma gives a trip arriving at 12:00. The scenario ends after the offer. OSDM 3.9.0, for delta (a copy of SIM_TRIP_PROBE_ARRIVAL_TIME_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 35,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_310",
+      "description": "Simulated provider: technical exchange of a semi-flexible one-way ticket with overrule code TECHNICAL_FAILURE (#1037): the exchange offers carry no exchange fee and name the code applied; one taken, confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38, #914).",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": "TECHNICAL_FAILURE",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_YOUNG_CHILD_310",
+      "description": "Simulated provider: sale for an adult and a child of 3 (trip from station 0000093, priced by age, #1037): the child is priced as a young child (YOUNG_CHILD, free on gamma). OSDM 3.10.0, for epsilon (a copy of SIM_SALE_YOUNG_CHILD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 13,
+      "passengersListId": 38,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_310",
+      "description": "Simulated provider: offer search probe, a product selected by code (offerSearchCriteria.productSelections, productCode SIM_ALL_DAY, #1037); an offer holds it. The scenario ends after the offer. OSDM 3.10.0, for epsilon (a copy of SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_ALL_DAY",
+            "numberOfItems": 1
+          }
+        ]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_TRIP_PROBE_ARRIVAL_TIME_310",
+      "description": "Simulated provider: trip search probe, by arrival time (tripSearchCriteria.arrivalTime 12:00, #1037); gamma gives a trip arriving at 12:00. The scenario ends after the offer. OSDM 3.10.0, for epsilon (a copy of SIM_TRIP_PROBE_ARRIVAL_TIME_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 35,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_312",
+      "description": "Simulated provider: technical exchange of a semi-flexible one-way ticket with overrule code TECHNICAL_FAILURE (#1037): the exchange offers carry no exchange fee and name the code applied; one taken, confirmed. OSDM 3.12.0, for zeta (a copy of SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38, #914).",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": "TECHNICAL_FAILURE",
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_YOUNG_CHILD_312",
+      "description": "Simulated provider: sale for an adult and a child of 3 (trip from station 0000093, priced by age, #1037): the child is priced as a young child (YOUNG_CHILD, free on gamma). OSDM 3.12.0, for zeta (a copy of SIM_SALE_YOUNG_CHILD_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 13,
+      "passengersListId": 38,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_312",
+      "description": "Simulated provider: offer search probe, a product selected by code (offerSearchCriteria.productSelections, productCode SIM_ALL_DAY, #1037); an offer holds it. The scenario ends after the offer. OSDM 3.12.0, for zeta (a copy of SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_ALL_DAY",
+            "numberOfItems": 1
+          }
+        ]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_TRIP_PROBE_ARRIVAL_TIME_312",
+      "description": "Simulated provider: trip search probe, by arrival time (tripSearchCriteria.arrivalTime 12:00, #1037); gamma gives a trip arriving at 12:00. The scenario ends after the offer. OSDM 3.12.0, for zeta (a copy of SIM_TRIP_PROBE_ARRIVAL_TIME_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 35,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "offerSearchProbe": "on"
     }
   ],
   "offerSearchCriteriaList": [
@@ -35396,6 +36196,25 @@
         "productCategoryName": "",
         "productCategoryShortName": "",
         "description": "Simulated trip, station 0000078 (where each provider ignores, refuses or answers without offers some optional members of the offer request, #227) to station 0000002"
+      }
+    },
+    {
+      "id": 35,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000001",
+        "destination": "urn:uic:stn:0000002",
+        "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+        "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000001 to station 0000002, searched by its arrival time (12:00)",
+        "searchCriteria": {
+          "timeBasis": "ARRIVAL"
+        }
       }
     },
     {
@@ -38899,6 +39718,39 @@
           "updateDateOfBirth": "1985-06-02",
           "updatePhoneNumber": "+33199000004",
           "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 30,
+          "expectedPassengerType": "ADULT",
+          "firstName": "Petra",
+          "lastName": "Parent",
+          "phoneNumber": "+420601000017",
+          "email": "petra.parent@example.org",
+          "gender": "X",
+          "updateFirstName": "Petraa",
+          "updatePhoneNumber": "+420601000018",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 3,
+          "expectedPassengerType": "YOUNG_CHILD",
+          "firstName": "Tom",
+          "lastName": "Toddler",
+          "phoneNumber": "+420601000019",
+          "email": "tom.toddler@example.org",
+          "gender": "X",
+          "updateFirstName": "Tomas",
+          "updatePhoneNumber": "+420601000020",
           "type": "PERSON"
         }
       ]

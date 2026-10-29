@@ -228,6 +228,8 @@ test('the refund offers not confirmed, and the exchanges: one-way, on gamma, the
     // #959: exchanged for another route, and for another day, time and class.
     SIM_EXCHANGE_OTHER_ROUTE_1ADT_38: 'EXCHANGE null',
     SIM_EXCHANGE_OTHER_DAY_1ADT_38: 'EXCHANGE null',
+    // #1037: a technical exchange, with an overrule code.
+    SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38: 'EXCHANGE null',
     SIM_REFUND_DELETE_1ADT_38: 'REFUND DELETE',
     SIM_REFUND_ONLY_OFFER_1ADT_38: 'REFUND null',
   });
@@ -235,7 +237,8 @@ test('the refund offers not confirmed, and the exchanges: one-way, on gamma, the
     const scenario = datafile.scenarios.find((s) => s.code === code);
     assert.equal(scenario.offerSearchCriteria.returnOffsetDays, undefined, `${code} is one-way`);
     assert.equal(scenario.osdmVersion, gamma.osdmVersion);
-    assert.equal(scenario.desiredFlexibility, 'FULL_FLEXIBLE', code);
+    // The technical exchange on a semi-flexible ticket: a fee without the code, so that waiving it shows.
+    assert.equal(scenario.desiredFlexibility, scenario.overruleCode ? 'SEMI_FLEXIBLE' : 'FULL_FLEXIBLE', code);
   }
 });
 
@@ -373,7 +376,11 @@ test('the overrule scenarios: each code gamma accepts, and one it refuses (#596)
   // The same technical cancellation on a return sold as one offer.
   const combined = datafile.scenarios.filter((s) => s.code.startsWith('SIM_REFUND_COMBINED_OVERRULE_'));
   assert.deepEqual(combined.map((s) => [s.code, s.overruleCode]), [['SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38', 'TECHNICAL_FAILURE']]);
-  for (const scenario of datafile.scenarios.filter((s) => !overruled.includes(s) && !combined.includes(s))) assert.equal(scenario.overruleCode, null, scenario.code);
+  // #1037: and an exchange, with a code gamma accepts.
+  const exchanged = datafile.scenarios.filter((s) => s.scenarioType === 'EXCHANGE' && s.overruleCode !== null);
+  assert.deepEqual(exchanged.map((s) => [s.code, s.overruleCode]), [['SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38', 'TECHNICAL_FAILURE']]);
+  assert.ok(gamma.overruleCodes.includes(exchanged[0].overruleCode));
+  for (const scenario of datafile.scenarios.filter((s) => !overruled.includes(s) && !combined.includes(s) && !exchanged.includes(s))) assert.equal(scenario.overruleCode, null, scenario.code);
 });
 
 test('the reduction card scenarios: each card gamma lists, on a passenger of its own (#597)', () => {
@@ -593,15 +600,15 @@ test('the sales-horizon scenarios: the only ones on gamma\'s horizon stop place,
   assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === 12).map((s) => s.code), dated.map((s) => s.code));
 });
 
-test('the age scenario: the only one on gamma\'s age-tariff stop place, three passengers on the edges of its bands (#705)', () => {
+test('the age scenarios: the only ones on gamma\'s age-tariff stop place, three passengers on the edges of its bands (#705), and a young child (#1037)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const { from, bands } = gamma.ageTariffs;
   const origins = (t) => (t.trip ? [t.trip.origin] : (t.legs || []).map((l) => l.origin));
   assert.deepEqual(datafile.tripRequirements.filter((t) => origins(t).includes(from)).map((t) => t.id), [13]);
-  assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === 13).map((s) => [s.code, s.passengersListId]), [['SIM_SALE_AGE_LIMITS_38', 22]]);
+  assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === 13).map((s) => [s.code, s.passengersListId]), [['SIM_SALE_AGE_LIMITS_38', 22], ['SIM_SALE_YOUNG_CHILD_38', 38]]);
   const aged = datafile.passengersList.filter((l) => l.passengers.some((p) => p.bornYearsBeforeTravel !== undefined)).map((l) => l.id);
   // #903: the free child of the fare scenario is aged too (3 on the day of travel).
-  assert.deepEqual(aged, [22, 29]);
+  assert.deepEqual(aged, [22, 29, 38]);
   const child = bands.find((b) => b.type === 'CHILD');
   const youth = bands.find((b) => b.type === 'YOUTH');
   const list = datafile.passengersList.find((l) => l.id === 22).passengers;
@@ -612,6 +619,13 @@ test('the age scenario: the only one on gamma\'s age-tariff stop place, three pa
   ]);
   // Not updated: the date of birth worked out at the run stays the one booked.
   for (const p of list) assert.equal(p.updateDateOfBirth, undefined);
+  // #1037: an adult and a child within the young-child band.
+  const young = bands.find((b) => b.type === 'YOUNG_CHILD');
+  const family = datafile.passengersList.find((l) => l.id === 38).passengers;
+  assert.deepEqual(family.map((p) => p.expectedPassengerType), ['ADULT', 'YOUNG_CHILD']);
+  assert.ok(family[1].bornYearsBeforeTravel <= young.maxAge);
+  assert.ok(family[0].bornYearsBeforeTravel > youth.maxAge);
+  for (const p of family) assert.equal(p.updateDateOfBirth, undefined);
 });
 
 test('the seat preference scenarios: the only ones on gamma\'s preference stop place, on a train with a mandatory reservation, or an optional one added later (#766)', () => {
