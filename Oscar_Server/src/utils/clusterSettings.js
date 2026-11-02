@@ -34,7 +34,7 @@ function trustProxyHops(raw) {
   if (raw === undefined || raw === null || String(raw).trim() === '') return 1;
   const text = String(raw).trim();
   const hops = /^\d$/.test(text) ? Number(text) : Number.NaN;
-  if (!(hops <= MAX_PROXY_HOPS)) {
+  if (Number.isNaN(hops) || hops > MAX_PROXY_HOPS) {
     throw new Error(`TRUST_PROXY_HOPS must be a whole number from 0 to ${MAX_PROXY_HOPS}, not "${text.slice(0, 20)}".`);
   }
   return hops;

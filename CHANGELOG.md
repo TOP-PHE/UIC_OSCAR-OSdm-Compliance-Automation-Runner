@@ -109,6 +109,9 @@ Issue #1059, release 2026.481. The collection is unchanged (OTST_V2.0.239).
 ### Changed
 - **The image's user is uid 1000 by number, and `/app/data` is writable by group 0.** OpenShift runs a container under an arbitrary uid in group 0, and Kubernetes checks `runAsNonRoot` only against a numeric `USER`. Same user as before (`node`), so Docker and the VPS see no difference.
 
+### Security
+- **`follow-redirects` 1.16.2 in the Bruno CLI's tree** (CVE-2026-116689, HIGH: information sent on across a cross-origin redirect). A new advisory against Bruno 4.3.0's copy (1.16.1), which fails the required Trivy scan of any PR. A `^1.16.2` floor in `Oscar_Server/bruno-cli/package.json` `overrides`, as for Bruno's other bundled copies; the lockfile resolves 1.16.2 and nothing else changes in it.
+
 ---
 
 ## [server-1.11.442] / [collection-OTST_V2.0.239] — 2026-10-29

@@ -12,7 +12,8 @@
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "#1059: OSCAR on Kubernetes and OpenShift, one pod: OSCAR_Deploy/kubernetes/ (bundle image of server + collection + compatibility.json, Kustomize base and overlays for an Ingress or a Route), deployed on kind under an OpenShift-style uid by .github/workflows/ci-kubernetes.yml.",
-        "Server: METRICS_TOKEN (when set, /metrics answers only that bearer token, else 404) and TRUST_PROXY_HOPS (default 1, as before). The image runs as USER 1000 by number and its data directory is writable by group 0; Docker and the VPS see no difference. The collection is unchanged (OTST_V2.0.239)."
+        "Server: METRICS_TOKEN (when set, /metrics answers only that bearer token, else 404) and TRUST_PROXY_HOPS (default 1, as before). The image runs as USER 1000 by number and its data directory is writable by group 0; Docker and the VPS see no difference. The collection is unchanged (OTST_V2.0.239).",
+        "Bruno CLI: follow-redirects 1.16.2 (CVE-2026-116689, HIGH) through an overrides floor in Oscar_Server/bruno-cli/package.json."
       ]
     },
     {
