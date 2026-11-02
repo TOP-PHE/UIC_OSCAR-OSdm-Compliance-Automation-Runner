@@ -173,7 +173,8 @@ describe('step 10 asks again, one fulfillment at a time', () => {
     const ask = step.indexOf('refundPerFulfillment.js").askOnePerFulfillment(_status, _answer)');
     expect(ask).toBeGreaterThan(step.indexOf('overruleRejectionArmed()'));
     expect(ask).toBeLessThan(step.indexOf('// Validate HTTP response status'));
-    expect(step).toContain('jsonData = _perFulfillment ? _perFulfillment.body : res.getBody();');
+    // #1045: the provider's own answer is read through a copy.
+    expect(step).toContain('jsonData = _perFulfillment ? _perFulfillment.body : require(bru.getEnvVar("library_base") + "envUtils.js").workingCopy(res.getBody());');
     expect(step).not.toMatch(/if \(res\.getStatus\(\) !== 200\)/);
   });
 });

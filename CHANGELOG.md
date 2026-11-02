@@ -105,6 +105,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.445] / [collection-OTST_V2.0.241] — 2026-11-02
+
+Issue #1045 (from the AI analysis of gamma's fare runs), release 2026.483. The server change is the welcome-page news entry.
+
+### Fixed
+- **The answer OSCAR keeps is the provider's, as sent.** Bruno stores a response object after the request's scripts have run. The report, its HTTP traffic and the run's stored requests (which the AI analysis and its download read) keep that object. Two checks set members on it:
+  - Step 01's fare checks set `offers` to the product offers only. For `SIM_WRONG_FARE_WITHOUT_SECTION_38` the stored answer read `"offers": []`, though gamma had sent fares and check N had failed on them. The analysis could not tell why.
+  - The refund checks set `refundOffers` on a step 11 answer holding a single `refundOffer`. Step 10 wrapped a `refundOffers` that was not a list.
+  - Steps 01 and 10 now give their checks a copy (`workingCopy()`, `envUtils.js`), and `postPatchRefundOfferResponse()` reads a single refund offer as a local list. No check's result changes.
+- **The two deliberately wrong scenarios whose check #1055 made a failure say so.** `SIM_WRONG_FARE_OVERLAP_*` now reads "check O8 fails at 01; the fare offer is not booked", and `SIM_WRONG_FARE_COMBINING_FEE_*` "check R3 fails at 10; the refund goes on". They still said "a WARNING", and the analysis took the failure for OSCAR's mistake. The scenarios document already said so.
+
+### Changed
+- A welcome-page news entry.
+
+### Checked
+- Replay of every `_38` fare and refund scenario (69) and two product sales (search, exchange), on #1063's head and on this branch: the same checks, failures and warnings in all 71.
+- In the runs, the stored answer at step 01 of `SIM_WRONG_FARE_WITHOUT_SECTION_38` holds the three fare offers gamma sent; before, it held none. Check N fails as before.
+- One run in the first branch recording wrote no result file, and the replay read a stale file of another scenario. Run again on its own, it matches `main`.
+
+---
+
 ## [server-1.11.444] / [collection-OTST_V2.0.240] — 2026-11-02
 
 Issue #1045 (a fare expert's review of the simulator's bicycle fare scenario), release 2026.482. Simulator 0.61.0. The server change is the welcome-page news entry.
