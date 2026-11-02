@@ -78,6 +78,16 @@ function asksFares(request) {
   return partsOf(request).some((p) => p === 'ALL' || String(p).startsWith('FARE_'));
 }
 
+/**
+ * #1045: does an offer request ask for fare parts and nothing else (the
+ * simulator's #1046 rule)? Its answer is fares only, whose fulfilment holds
+ * no document, so it asks no fulfilment option.
+ */
+function asksFaresOnly(offerSearchCriteria) {
+  const parts = list(offerSearchCriteria?.requestedOfferParts);
+  return parts.length > 0 && parts.every((p) => String(p).startsWith('FARE_'));
+}
+
 /** #255: does the request ask for fares other than reservations (admissions, ancillaries, ALL)? */
 function asksFareProducts(request) {
   return typesAsked(request).some((type) => type !== 'RESERVATION');
@@ -695,7 +705,7 @@ function stopOnSectionsOutside() {
 }
 
 module.exports = {
-  CLUSTERS, COMBINATION_MODELS, missingFareMembers, fareSaleDecision, isFareSale, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, asksFareProducts, typesAsked, fareChecks, unaskedFaresCheck, fareOffersOf,
+  CLUSTERS, COMBINATION_MODELS, missingFareMembers, fareSaleDecision, isFareSale, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, asksFaresOnly, asksFareProducts, typesAsked, fareChecks, unaskedFaresCheck, fareOffersOf,
   noFareChecks, chooseFareOffer, coverageOfPassenger, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip,
   prepareSectionCheck, stopOnSectionsOutside,
 };

@@ -18,8 +18,34 @@ const { birthDateFor, expectedTypesOf } = require('./passengerAges.js');
 const {
   normaliseReturnModel, normaliseReturnFulfillments, returnUsesInboundDate, combinedReturnDefined,
 } = require('./returnJourney.js');
+const { isTransportable, personalFieldsOf, transportableSpec } = require('./transportables.js');
 
 // scenarioParser-bruno.js
+
+// One passenger of the data file as the offer request's and the booking
+// request's specification. #1045: a transportable (a bicycle, a dog…) goes
+// with its reference, type and cards only; what the data file gives it of a
+// person's (the schema asks every passenger for it) is not sent.
+function passengerSpecsOf(passenger, cards, osdmVersion) {
+  if (isTransportable(passenger.type)) {
+    const left = personalFieldsOf(passenger);
+    if (left.length > 0) {
+      validationLogger(`[INFO] 🚲 Passenger ${passenger.reference} is a ${passenger.type}, not a person: its ${left.join(', ')} from the data file are not sent.`);
+    }
+    return {
+      offer: transportableSpec(passenger.reference, passenger.type, cards),
+      booking: transportableSpec(passenger.reference, passenger.type, cards),
+    };
+  }
+  const offer = new AnonymousPassengerSpec(passenger.reference, passenger.type, passenger.dateOfBirth, passenger.gender || null);
+  if (cards.length > 0) offer.cards = cards;
+  const detail = require("./personContact.js").usesContactDetail(osdmVersion)
+    ? new DetailContact(passenger.firstName, passenger.lastName, new Contact(passenger.email || null, passenger.phoneNumber || null))
+    : new Detail(passenger.firstName, passenger.lastName, passenger.email || null, passenger.phoneNumber || null);
+  const booking = new PassengerSpec(passenger.reference, passenger.type, passenger.dateOfBirth, passenger.gender || null, detail);
+  if (cards.length > 0) booking.cards = cards;
+  return { offer, booking };
+}
 
 // A UUID v4 for a request's externalRef. Bruno's sandbox gives scripts
 // `crypto` in developer mode; without it, a time-and-counter value, unique
@@ -59,6 +85,7 @@ function randomUUID() {
 
 module.exports = {
   getScenarioData,
+  passengerSpecsOf,
   randomUUID,
   parseScenarioData,
   resetScenarioEnvVars,
@@ -1265,49 +1292,11 @@ function parseScenarioData(jsonData) {
               validationLogger('[INFO] 🎂 Passenger ' + passenger.reference + ': born ' + _born + ', ' + passenger.bornYearsBeforeTravel + ' years before the day of travel' + (passenger.bornDaysAfter ? ' plus ' + passenger.bornDaysAfter + ' day(s)' : '') + (passenger.expectedPassengerType ? '; expected to be priced as ' + passenger.expectedPassengerType : ''));
             }
             // #597: the passenger's reduction cards, sent with the offer and
-            // the booking requests.
+            // the booking requests. #1045: a transportable without a person's data.
             const cards = cardsOfPassenger(passenger);
-            const offerSpec = new AnonymousPassengerSpec(
-              passenger.reference,
-              passenger.type,
-              passenger.dateOfBirth,
-              passenger.gender || null,
-            );
-            if (cards.length > 0) offerSpec.cards = cards;
-            offerPassengerSpecs.push(offerSpec);
-
-            const osdmVersion = bru.getEnvVar("osdmVersion");
-            if (require("./personContact.js").usesContactDetail(osdmVersion)) {
-              passengerSpecs.push(new PassengerSpec(
-                passenger.reference,
-                passenger.type,
-                passenger.dateOfBirth,
-                passenger.gender || null,
-                new DetailContact(
-                  passenger.firstName,
-                  passenger.lastName,
-                  new Contact(
-                    passenger.email || null,
-                    passenger.phoneNumber || null
-                  )
-                )
-              ));
-            } else {
-              passengerSpecs.push(new PassengerSpec(
-                passenger.reference,
-                passenger.type,
-                passenger.dateOfBirth,
-                passenger.gender || null,
-                new Detail(
-                  passenger.firstName,
-                  passenger.lastName,
-                  passenger.email || null,
-                  passenger.phoneNumber || null
-                )
-              ));
-            }
-
-            if (cards.length > 0) passengerSpecs.at(-1).cards = cards;
+            const specs = passengerSpecsOf(passenger, cards, bru.getEnvVar("osdmVersion"));
+            offerPassengerSpecs.push(specs.offer);
+            passengerSpecs.push(specs.booking);
             passengerReferences.push(passenger.reference);
 
             const passengerDataStruct = {
