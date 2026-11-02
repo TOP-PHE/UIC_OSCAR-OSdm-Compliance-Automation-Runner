@@ -70,7 +70,7 @@ function checkProvider(key, raw) {
   const products = checkProducts(raw.products, bad);
   const secondClassOnlyCategories = checkCategories(raw.secondClassOnlyCategories, bad);
   const reservations = checkReservations(raw.reservations, bad);
-  return {
+  const profile = {
     key,
     name: raw.name,
     carrier: { ref: raw.carrier.ref, name: raw.carrier.name },
@@ -80,28 +80,37 @@ function checkProvider(key, raw) {
     idPrefix: raw.idPrefix,
     utcOffset: raw.utcOffset,
     tokenLifetimeSeconds: raw.tokenLifetimeSeconds,
-    ...(overruleCodes ? { overruleCodes } : {}),
-    ...(reductionCards ? { reductionCards } : {}),
-    ...(products ? { products } : {}),
-    ...(secondClassOnlyCategories ? { secondClassOnlyCategories } : {}),
-    ...(reservations ? { reservations } : {}),
-    ...checkTripsCollection(raw.tripsCollection, bad),
-    ...checkDocuments(raw, bad),
-    ...checkIdempotency(raw.idempotency, bad),
-    ...checkExchange(raw.exchange, bad),
-    ...checkShortDeadlines(raw.shortDeadlines, bad),
-    ...checkVariants(raw.variants, bad),
-    ...checkPersonChecks(raw.personChecks, bad),
-    ...checkTicketing(raw.ticketing, bad),
-    ...checkSalesHorizon(raw.salesHorizon, bad),
-    ...checkAgeTariffs(raw.ageTariffs, bad),
-    ...checkRequestOptions(raw.requestOptions, bad),
-    ...checkPlacePreferences(raw.placePreferences, bad),
-    ...checkPlaceMap(raw.placeMap, bad),
-    ...checkOtherCurrencies(raw.otherCurrencies, raw.currency, bad),
-    ...checkOsdmDevelopment(raw.osdmDevelopment, bad),
-    ...checkFares(raw.fares, bad),
   };
+  // The optional parts are merged one after the other, not spread into one
+  // object literal. TypeScript types a spread of N values that are each `{}`
+  // or `{ key }` as every combination of them (2^N), and SonarCloud's analysis
+  // builds a TypeScript program over this code: at 21 such spreads it spent
+  // 20 minutes on this one expression (#1064). Same keys, same order,
+  // same values; a part that throws still throws first.
+  const parts = [
+    overruleCodes ? { overruleCodes } : {},
+    reductionCards ? { reductionCards } : {},
+    products ? { products } : {},
+    secondClassOnlyCategories ? { secondClassOnlyCategories } : {},
+    reservations ? { reservations } : {},
+    checkTripsCollection(raw.tripsCollection, bad),
+    checkDocuments(raw, bad),
+    checkIdempotency(raw.idempotency, bad),
+    checkExchange(raw.exchange, bad),
+    checkShortDeadlines(raw.shortDeadlines, bad),
+    checkVariants(raw.variants, bad),
+    checkPersonChecks(raw.personChecks, bad),
+    checkTicketing(raw.ticketing, bad),
+    checkSalesHorizon(raw.salesHorizon, bad),
+    checkAgeTariffs(raw.ageTariffs, bad),
+    checkRequestOptions(raw.requestOptions, bad),
+    checkPlacePreferences(raw.placePreferences, bad),
+    checkPlaceMap(raw.placeMap, bad),
+    checkOtherCurrencies(raw.otherCurrencies, raw.currency, bad),
+    checkOsdmDevelopment(raw.osdmDevelopment, bad),
+    checkFares(raw.fares, bad),
+  ];
+  return Object.assign(profile, ...parts);
 }
 
 // #903: fare offers for a requested section. `clusters` in OSDM's spelling,
