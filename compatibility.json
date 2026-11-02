@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.480",
+  "current_release": "2026.481",
   "releases": [
+    {
+      "release": "2026.481",
+      "date": "2026-11-02",
+      "server": "1.11.443",
+      "collection": "OTST_V2.0.239",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1059: OSCAR on Kubernetes and OpenShift, one pod: OSCAR_Deploy/kubernetes/ (bundle image of server + collection + compatibility.json, Kustomize base and overlays for an Ingress or a Route), deployed on kind under an OpenShift-style uid by .github/workflows/ci-kubernetes.yml.",
+        "Server: METRICS_TOKEN (when set, /metrics answers only that bearer token, else 404) and TRUST_PROXY_HOPS (default 1, as before). The image runs as USER 1000 by number and its data directory is writable by group 0; Docker and the VPS see no difference. The collection is unchanged (OTST_V2.0.239)."
+      ]
+    },
     {
       "release": "2026.480",
       "date": "2026-10-29",

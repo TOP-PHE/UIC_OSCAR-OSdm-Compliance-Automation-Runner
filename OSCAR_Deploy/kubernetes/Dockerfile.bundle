@@ -1,0 +1,25 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# The image a cluster runs (#1059): the server image of a release plus the
+# Bruno collection and compatibility.json of the same release. On the VPS the
+# collection is a folder mounted beside the container and pulled from git; on
+# a cluster it travels in the image, so that the server and the collection
+# always move together and /health names the release that runs.
+#
+# Build it with build-images.sh, from the root of a checkout of the release:
+# the build context is the repository root. Dockerfile.bundle.dockerignore
+# keeps everything else out of the context (BuildKit reads it; with another
+# builder, build from a fresh clone, which holds no local run reports).
+
+ARG OSCAR_SERVER_IMAGE=oscar-server:local
+FROM ${OSCAR_SERVER_IMAGE}
+
+# Read only for the server's user: owned by root, world-readable. Each run
+# copies what it needs into its workspace on the data volume.
+COPY --chown=0:0 Bruno_Collection/ /collection/
+COPY --chown=0:0 compatibility.json /app/compatibility.json

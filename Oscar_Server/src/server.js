@@ -40,6 +40,18 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+// #1059: the proxies in front of OSCAR, and the token /metrics may ask for.
+// A wrong hop count stops the start, like a missing variable: guessing would
+// either share one rate-limit bucket among all clients or let them pick theirs.
+const { trustProxyHops, metricsAllowed } = require('./utils/clusterSettings');
+let TRUST_PROXY_HOPS;
+try {
+  TRUST_PROXY_HOPS = trustProxyHops(process.env.TRUST_PROXY_HOPS);
+} catch (e) {
+  console.error(`[server] FATAL: ${e.message}`);
+  process.exit(1);
+}
+
 // ── Initialise structured logger ─────────────────────────────────────────────
 const log = require('./utils/logger');
 
@@ -128,7 +140,8 @@ setInterval(() => {
 // ── Prometheus metrics ────────────────────────────────────────────────────────
 // Registry + custom counters/gauges/histograms used by the rest of the codebase.
 // Endpoint is exposed below; nginx blocks /metrics externally so only the
-// Prometheus container in the same Docker network can scrape it.
+// Prometheus container in the same Docker network can scrape it. On a cluster
+// (no nginx), METRICS_TOKEN makes the endpoint ask for a bearer token (#1059).
 const metrics = require('./utils/metrics');
 const hostMetrics = require('./utils/hostMetrics');
 const simulatorMetrics = require('./services/simulatorMetrics');
@@ -138,7 +151,9 @@ const app = express();
 
 // Trust the first proxy (nginx/Apache on VPS) so express-rate-limit reads
 // the real client IP from X-Forwarded-For instead of always seeing 127.0.0.1.
-app.set('trust proxy', 1);
+// TRUST_PROXY_HOPS changes the count (#1059): a load balancer that adds its
+// own entry in front of a cluster's router makes two.
+app.set('trust proxy', TRUST_PROXY_HOPS);
 
 // Record HTTP request duration on every response (Histogram). Mounted as
 // early as possible so the timing covers any subsequent middleware too.
@@ -591,11 +606,17 @@ app.get('/artifacts/:runId/:filename', fileDownloadLimiter, (req, res) => {
 
 // ── Prometheus scrape endpoint ────────────────────────────────────────────────
 // Returns the entire metrics registry in Prometheus exposition format.
-// No auth on the route itself; nginx is configured to return 404 on /metrics
-// for external requests, so only the Prometheus container in the same Docker
-// network (which reaches OSCAR via the internal hostname `oscar:3001`) can
-// actually scrape this. See Documentation/Server_Operations/metrics-and-monitoring.md.
+// Without METRICS_TOKEN, no auth on the route itself; nginx is configured to
+// return 404 on /metrics for external requests, so only the Prometheus
+// container in the same Docker network (which reaches OSCAR via the internal
+// hostname `oscar:3001`) can actually scrape this. See
+// Documentation/Server_Operations/metrics-and-monitoring.md.
+// With METRICS_TOKEN (a cluster, where the Route or Ingress has no such rule,
+// #1059), a request without that bearer token gets the same 404 as from nginx.
 app.get('/metrics', async (req, res) => {
+  if (!metricsAllowed(req.headers.authorization, process.env.METRICS_TOKEN)) {
+    return res.status(404).end();
+  }
   try {
     // #1005: the simulator's metrics, read through Admin → OSDM Simulator's
     // address and key. The same path, so nginx's `location = /metrics` 404

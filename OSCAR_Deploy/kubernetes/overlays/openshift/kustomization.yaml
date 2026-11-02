@@ -1,0 +1,32 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# OSCAR on OpenShift (#1059). It runs under the default restricted-v2 SCC:
+# no SCC to grant, the cluster chooses the uid and the volume's group.
+#   oc new-project oscar
+#   oc create secret generic oscar-secrets --from-env-file=secrets.env
+#   oc apply -k OSCAR_Deploy/kubernetes/overlays/openshift
+# Before that, change below: the image you built (build-images.sh), and the
+# host oscar.example.org here and in route.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - route.yaml
+
+images:
+  - name: oscar-bundle
+    newName: registry.example.org/oscar/oscar
+    newTag: release-2026.481
+
+configMapGenerator:
+  - name: oscar-settings
+    behavior: merge
+    literals:
+      - APP_URL=https://oscar.example.org
+      - ALLOWED_REDIRECT_HOSTS=oscar.example.org

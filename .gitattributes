@@ -27,3 +27,6 @@
 *.html text eol=lf
 *.css  text eol=lf
 *.sh   text eol=lf
+# Read by Linux tools (kustomize, kubectl, docker), from any checkout: a CR at
+# the end of a settings.env line would end up in the value (#1059).
+OSCAR_Deploy/kubernetes/** text eol=lf

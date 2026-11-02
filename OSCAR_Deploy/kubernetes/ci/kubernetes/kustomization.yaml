@@ -1,0 +1,42 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# CI only (.github/workflows/ci-kubernetes.yml): overlays/kubernetes as it is
+# (uid 1000 from the image, fsGroup 1000, the Ingress), with the image built
+# by the workflow. The workflow checks that the pod starts healthy.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../overlays/kubernetes
+
+images:
+  # build-images.sh local ci
+  - name: registry.example.org/oscar/oscar
+    newName: local/oscar
+    newTag: ci
+
+patches:
+  - target:
+      kind: Deployment
+      name: oscar
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests
+        value:
+          cpu: 250m
+          memory: 512Mi
+  - target:
+      kind: PersistentVolumeClaim
+      name: oscar-data
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 2Gi

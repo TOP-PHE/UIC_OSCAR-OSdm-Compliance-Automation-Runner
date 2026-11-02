@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-02-kubernetes-openshift",
+    "date": "November 2, 2026",
+    "tag": "Operations",
+    "title": "OSCAR can run on Kubernetes and OpenShift",
+    "summary": "An organisation that hosts its own OSCAR can now run it on its own Kubernetes or OpenShift cluster, with ready-made deployment files and a guide.",
+    "content": "Until now OSCAR was installed with Docker on a single server. The repository now holds what a cluster needs: an image that carries the server and the test collection of one release together, the deployment files for Kubernetes (with an Ingress) and for OpenShift (with a Route), and the OSCAR - Kubernetes and OpenShift Deployment Guide. OSCAR still runs as a single instance.\n\nNothing changes for users of the UIC OSCAR, and no action is required."
+  },
+  {
     "id": "2026-10-29-fare-overlap-combining-fee-fail",
     "date": "October 29, 2026",
     "tag": "Changed",

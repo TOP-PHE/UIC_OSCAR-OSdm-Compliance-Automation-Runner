@@ -1,0 +1,6 @@
+# The bundle's build context is the repository root: only the collection and
+# the compatibility matrix are needed. Local run reports stay out.
+*
+!Bruno_Collection
+!compatibility.json
+Bruno_Collection/Validation_Reports
