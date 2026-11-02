@@ -8,6 +8,9 @@ For the legacy single-folder deployment guide, see
 [OSCAR - VPS Deployment Guide.md](./OSCAR%20-%20VPS%20Deployment%20Guide.md).
 The procedure below supersedes it for the monorepo layout.
 
+To run OSCAR on a **Kubernetes cluster or on OpenShift** instead of a VPS,
+see [section 10](#10-kubernetes-or-openshift-instead-of-docker-compose).
+
 ---
 
 ## 1. Prerequisites
@@ -32,7 +35,7 @@ service. The image itself is ~250 MB and the SQLite DB grows roughly
 ```bash
 sudo mkdir -p /opt
 cd /opt
-sudo git clone https://github.com/UICrail/OSCAR-OSdm-Compliance-Automation-Runner.git OSCAR
+sudo git clone https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner.git OSCAR
 sudo chown -R "$USER:$USER" /opt/OSCAR
 cd /opt/OSCAR
 ```
@@ -42,7 +45,7 @@ list of tested combinations):
 
 ```bash
 git fetch --tags
-git checkout release-2026.04   # or whichever release you intend to deploy
+git checkout release-2026.481   # or whichever release you intend to deploy
 ```
 
 ---
@@ -307,3 +310,73 @@ you created in step 5, and start onboarding companies.
 For deeper issues, see `Documentation/Server_Operations/SECURITY_FIXES.md`
 for known security-related notes, and the structured logs (Pino JSON) for
 contextual error details.
+
+---
+
+## 10. Kubernetes or OpenShift instead of Docker Compose
+
+Since server 1.11.443 (release 2026.481) OSCAR also runs on a Kubernetes
+cluster or on OpenShift, from the files in
+[`OSCAR_Deploy/kubernetes/`](../../OSCAR_Deploy/kubernetes/). This section
+says what changes and gives the outline; the full procedure is the
+[OSCAR - Kubernetes and OpenShift Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md).
+
+**When to choose it.** Your organisation runs its services on a cluster
+rather than on servers of their own, or the OSDM test systems you need to
+reach are reachable from the cluster's network.
+
+**What stays the same.** The server, its settings (the variables of
+section 3) and everything done in OSCAR's pages afterwards.
+
+**What differs.**
+
+| | Docker Compose (sections 1–9) | Kubernetes or OpenShift |
+|---|---|---|
+| Instances | one container | one pod, never more: the database (SQLite) and the run queue belong to one process |
+| Test collection | a folder beside the container, updated with `git pull` | inside the image, built from the release you deploy |
+| HTTPS | nginx on the host (section 6) | the cluster's Ingress or Route |
+| `/metrics` | nginx hides it from outside | OSCAR asks for `METRICS_TOKEN` |
+| Updates | Watchtower follows `:stable` | you change the image tag and apply |
+| Restarts | the autoheal sidecar | Kubernetes, from the liveness probe |
+| Backups | `oscar-backup.sh` on the host | volume snapshots of `oscar-data` |
+
+**Outline**, from a checkout of the release to deploy:
+
+1. Build and push the image:
+
+   ```bash
+   OSCAR_Deploy/kubernetes/build-images.sh registry.example.org/oscar release-2026.481
+   docker push registry.example.org/oscar/oscar:release-2026.481
+   ```
+
+2. Create the Secret `oscar-secrets` from
+   [`base/secrets.env.example`](../../OSCAR_Deploy/kubernetes/base/secrets.env.example)
+   (the secrets of section 3, plus `METRICS_TOKEN`), filled in outside the
+   repository:
+
+   ```bash
+   kubectl create namespace oscar
+   kubectl -n oscar create secret generic oscar-secrets --from-env-file=secrets.env
+   ```
+
+3. In `overlays/kubernetes` (Ingress) or `overlays/openshift` (Route), set
+   your image and your host.
+4. Apply it:
+
+   ```bash
+   kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/kubernetes
+   # OpenShift: oc apply -k OSCAR_Deploy/kubernetes/overlays/openshift
+   ```
+
+5. Create the first platform admin as in section 5, at your host's address.
+
+**Providers behind a VPN.** If the OSDM test systems are reached through a
+VPN or a private network, the cluster needs its own route to them, and OSCAR
+refuses private addresses unless `ALLOW_PRIVATE_TARGETS=1`, which turns that
+check off entirely. The guide's section 7 says how to put the limit back in
+the network.
+
+**Tested how.** Every change to these files, and every week, a CI workflow
+deploys them on a throw-away Kubernetes cluster under an OpenShift-style user
+id and runs a scenario against the OSDM simulator. They have not yet been run
+on a real OpenShift cluster.

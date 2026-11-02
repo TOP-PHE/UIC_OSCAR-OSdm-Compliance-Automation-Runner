@@ -10,6 +10,11 @@ canonical UIC deployment, this isn't your guide — see
 `OSCAR - VPS Deployment Guide.md` (legacy host install) and
 `auto-deploy-setup.md` (CI integration).
 
+Running on **Kubernetes or OpenShift** rather than on a VPS? The same OSCAR
+runs there as one pod: see `OSCAR - Kubernetes and OpenShift Deployment
+Guide.md` (same folder), or section 10 of `installation-guide.md` for what
+differs from this guide.
+
 ---
 
 ## What you'll have running, end-to-end
