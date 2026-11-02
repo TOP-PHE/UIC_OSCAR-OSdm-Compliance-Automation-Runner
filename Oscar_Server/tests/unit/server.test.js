@@ -850,6 +850,67 @@ describe('HTTPS-redirect middleware (NODE_ENV=production only)', () => {
   });
 });
 
+// ── #1059: behind a cluster's router ───────────────────────────────────────────
+// METRICS_TOKEN and TRUST_PROXY_HOPS are read once, at require time: a third
+// isolated load, as for the production redirect above. The probes of the
+// Kubernetes manifests send `Host: localhost`, which the redirect leaves alone.
+describe('cluster settings (METRICS_TOKEN, TRUST_PROXY_HOPS)', () => {
+  let clusterApp;
+  const saved = {};
+  const TOKEN = 'cluster-test-metrics-token-0123456789abcdef';
+  const KEYS = ['NODE_ENV', 'PORT', 'METRICS_TOKEN', 'TRUST_PROXY_HOPS'];
+
+  beforeAll(() => {
+    for (const k of KEYS) saved[k] = process.env[k];
+    jest.resetModules();
+    process.env.NODE_ENV = 'production';
+    process.env.PORT = '0';
+    process.env.METRICS_TOKEN = TOKEN;
+    process.env.TRUST_PROXY_HOPS = '2';
+    clusterApp = require('../../src/server');
+  });
+
+  afterAll(() => {
+    for (const k of KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  test('/metrics without the token answers 404, as nginx does from outside', async () => {
+    const res = await request(clusterApp).get('/metrics').set('Host', 'oscar-0.oscar.svc');
+    expect(res.status).toBe(404);
+    expect(res.text).toBe('');
+  });
+
+  test('/metrics with another token answers 404', async () => {
+    const res = await request(clusterApp).get('/metrics').set('Authorization', 'Bearer not-the-token');
+    expect(res.status).toBe(404);
+  });
+
+  test('the simulator relay is behind the same token', async () => {
+    const res = await request(clusterApp).get('/metrics?source=simulator');
+    expect(res.status).toBe(404);
+  });
+
+  test('/metrics with the token answers the metrics, over plain http', async () => {
+    const res = await request(clusterApp).get('/metrics')
+      .set('Host', 'oscar.oscar.svc:3001').set('Authorization', `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('oscar_');
+  });
+
+  test('a probe naming localhost reaches /health in production, not a redirect', async () => {
+    const res = await request(clusterApp).get('/health').set('Host', 'localhost');
+    expect([200, 503]).toContain(res.status);
+    expect(res.body).toHaveProperty('checks');
+  });
+
+  test('the hop count is the one given', () => {
+    expect(clusterApp.get('trust proxy')).toBe(2);
+  });
+});
+
 afterAll(() => {
   // Order matters: runs.company_id cascades on company delete, but
   // runs.user_id has no cascade — deleting users first (while a run still

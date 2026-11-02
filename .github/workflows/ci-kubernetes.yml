@@ -1,0 +1,178 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: CI · Kubernetes
+
+# #1059: OSCAR on a Kubernetes cluster, as OSCAR_Deploy/kubernetes/ deploys
+# it. A kind cluster on the runner; the base under an OpenShift-style uid
+# (restricted pod security), driven through the API by ci/smoke.sh against
+# the OSDM simulator; then the plain Kubernetes overlay.
+#
+# Not a required check: it runs when what it tests changes, and every week
+# (a change elsewhere, a new runner image), so that a failure here never holds
+# an unrelated pull request.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'OSCAR_Deploy/kubernetes/**'
+      - 'Oscar_Server/Dockerfile'
+      - 'Oscar_Server/.dockerignore'
+      - 'Oscar_Server/bruno-cli/**'
+      - 'Oscar_Server/src/server.js'
+      - 'Oscar_Server/src/utils/clusterSettings.js'
+      - 'Oscar_Server/src/worker/**'
+      - '.github/workflows/ci-kubernetes.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'OSCAR_Deploy/kubernetes/**'
+      - 'Oscar_Server/Dockerfile'
+      - 'Oscar_Server/.dockerignore'
+      - 'Oscar_Server/bruno-cli/**'
+      - 'Oscar_Server/src/server.js'
+      - 'Oscar_Server/src/utils/clusterSettings.js'
+      - 'Oscar_Server/src/worker/**'
+      - '.github/workflows/ci-kubernetes.yml'
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  kind:
+    name: Kubernetes deployment (kind)
+    # Pinned: kind, kubectl and jq come with this image; ubuntu-latest moves
+    # to 26.04 in November 2026.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Tools on the runner
+        run: |
+          kind version
+          kubectl version --client
+          jq --version
+
+      - name: Build the images (build-images.sh)
+        run: OSCAR_Deploy/kubernetes/build-images.sh local ci
+
+      - name: The image under a uid it was not built for (Docker, no volume)
+        # The image's own data directory, without a volume over it: what the
+        # Dockerfile's group-0 permissions are for.
+        run: |
+          docker run -d --name uid-check --user 1000740000:0 \
+            -e ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+            -e COLLECTION_PATH=/collection -e BRU_CMD=/usr/local/bin/bru \
+            -e COMPATIBILITY_FILE=/app/compatibility.json -e HOME=/tmp \
+            -p 127.0.0.1:3101:3001 local/oscar:ci
+          ok=""
+          for _ in $(seq 1 30); do
+            if curl -fsS -o "$RUNNER_TEMP/health.json" http://127.0.0.1:3101/health; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then docker logs uid-check; exit 1; fi
+          jq -e '.checks.database.ok and .checks.data_dir.ok' "$RUNNER_TEMP/health.json"
+          docker exec uid-check id
+          docker rm -f uid-check
+
+      - name: Start the OSDM simulator on the runner
+        run: |
+          secret=$(openssl rand -hex 24)
+          echo "::add-mask::$secret"
+          echo "SIM_SECRET=$secret" >> "$GITHUB_ENV"
+          jq -n --arg s "$secret" '{gamma: [{client_id: "gamma.tstmgr01", client_secret: $s}]}' > "$RUNNER_TEMP/clients.json"
+          SIM_HOST=0.0.0.0 SIM_PORT=3002 SIM_CLIENTS_FILE="$RUNNER_TEMP/clients.json" \
+            nohup node OSDM_Simulator/server.js > "$RUNNER_TEMP/simulator.log" 2>&1 &
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3002/healthz; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/simulator.log"
+          exit 1
+
+      - name: Create the kind cluster
+        run: |
+          kind create cluster --name oscar --wait 180s
+          kind load docker-image local/oscar:ci --name oscar
+          # Pods reach the runner (and so the simulator) at the gateway of
+          # kind's Docker network.
+          gateway=$(docker network inspect kind --format '{{range .IPAM.Config}}{{.Gateway}} {{end}}' | tr ' ' '\n' | grep -v ':' | grep -m1 .)
+          echo "SIM_BASE=http://$gateway:3002" >> "$GITHUB_ENV"
+
+      - name: Deploy as OpenShift runs it (ci/openshift-like)
+        run: |
+          kubectl create namespace oscar
+          kubectl label namespace oscar pod-security.kubernetes.io/enforce=restricted
+          boot=$(openssl rand -hex 24)
+          metrics=$(openssl rand -hex 32)
+          echo "::add-mask::$boot"
+          echo "::add-mask::$metrics"
+          echo "BOOTSTRAP_TOKEN=$boot" >> "$GITHUB_ENV"
+          echo "METRICS_TOKEN=$metrics" >> "$GITHUB_ENV"
+          printf 'ENCRYPTION_KEY=%s\nJWT_SECRET=%s\nPLATFORM_BOOTSTRAP_TOKEN=%s\nMETRICS_TOKEN=%s\n' \
+            "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$boot" "$metrics" > "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
+          rm "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/ci/openshift-like
+          kubectl -n oscar rollout status deployment/oscar --timeout=300s
+          test "$(kubectl -n oscar exec deploy/oscar -- id -u)" = 1000740000
+          test "$(kubectl -n oscar exec deploy/oscar -- id -g)" = 0
+
+      - name: Run a scenario through the API (ci/smoke.sh)
+        run: |
+          kubectl -n oscar port-forward service/oscar 3001:3001 > "$RUNNER_TEMP/port-forward.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
+            sleep 1
+          done
+          OSCAR_URL=http://127.0.0.1:3001 OSCAR_Deploy/kubernetes/ci/smoke.sh
+
+      - name: Deploy the Kubernetes overlay (ci/kubernetes)
+        run: |
+          kubectl create namespace oscar-k8s
+          kubectl label namespace oscar-k8s pod-security.kubernetes.io/enforce=restricted
+          printf 'ENCRYPTION_KEY=%s\nJWT_SECRET=%s\nMETRICS_TOKEN=%s\n' \
+            "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar-k8s create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
+          rm "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar-k8s apply -k OSCAR_Deploy/kubernetes/ci/kubernetes
+          kubectl -n oscar-k8s rollout status deployment/oscar --timeout=300s
+          test "$(kubectl -n oscar-k8s exec deploy/oscar -- id -u)" = 1000
+          kubectl -n oscar-k8s get ingress oscar
+
+      - name: The OpenShift overlay renders
+        # kind has no Route type to check it against; its content is pinned by
+        # Oscar_Server/tests/unit/kubernetes-manifests.test.js.
+        run: |
+          kubectl kustomize OSCAR_Deploy/kubernetes/overlays/openshift > "$RUNNER_TEMP/openshift.yaml"
+          grep -q '^kind: Route$' "$RUNNER_TEMP/openshift.yaml"
+
+      - name: What the cluster shows (on failure)
+        if: failure()
+        run: |
+          for ns in oscar oscar-k8s; do
+            echo "=== $ns"
+            kubectl -n "$ns" get all,pvc,configmap,events 2>&1 | tail -n 60 || true
+            kubectl -n "$ns" describe pod -l app.kubernetes.io/name=oscar 2>&1 | tail -n 60 || true
+            kubectl -n "$ns" logs deploy/oscar --tail=200 2>&1 || true
+          done
+          echo "=== simulator"
+          tail -n 100 "$RUNNER_TEMP/simulator.log" || true

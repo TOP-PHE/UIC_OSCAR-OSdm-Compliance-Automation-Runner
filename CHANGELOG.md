@@ -93,6 +93,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.443] — 2026-11-02
+
+Issue #1059, release 2026.481. The collection is unchanged (OTST_V2.0.239).
+
+### Added
+- **OSCAR on Kubernetes and OpenShift, as one pod.** A team running OSCAR on its own machine asked to move it to a cluster; nothing in the repository deployed it there. `OSCAR_Deploy/kubernetes/`, with *OSCAR - Kubernetes and OpenShift Deployment Guide*:
+  - `build-images.sh` builds, from a release checkout, the server image and a **bundle** (`Dockerfile.bundle`): that image plus `Bruno_Collection/` and `compatibility.json` of the same release. On the VPS the collection is a mounted folder pulled from git; on a cluster it travels in the image, so `/health` names the release that runs.
+  - Kustomize `base/`: one replica with `Recreate` (SQLite, the in-memory queue and the data file lock allow no second pod), a ReadWriteOnce volume on `/app/data`, `/tmp` an emptyDir with `HOME` there, settings in a generated ConfigMap and secrets in a Secret the operator creates (`secrets.env.example`), Kubernetes' "restricted" pod security. The probes ask `/health` naming `localhost`: in production any other host is redirected to https, or refused once `ALLOWED_REDIRECT_HOSTS` is set.
+  - `overlays/kubernetes` (an ingress-nginx Ingress with the VPS nginx's 50 MB and 660 s, `fsGroup: 1000`) and `overlays/openshift` (an edge Route, 660 s; runs under the default `restricted-v2` SCC, no SCC to grant).
+  - `.github/workflows/ci-kubernetes.yml` (not a required check; on changes to what it deploys, and weekly): builds both images, starts the server image under uid 1000740000 / group 0 without a volume, then on a kind cluster deploys the base under that uid with the "restricted" pod security and drives it through the API (`ci/smoke.sh`: first administrator, company, Test Manager, endpoint and credentials of the simulator's `gamma`, data file) until `SIM_SALE_SEARCH_1ADT_38` passes; then deploys the Kubernetes overlay as it is. The OpenShift Route is only rendered (kind has no Route type); `kubernetes-manifests.test.js` pins it, and every path, port, host and limit of the manifests, to the Dockerfiles, the server and the VPS's nginx.
+- **`METRICS_TOKEN`.** When set, `/metrics` (the simulator relay included) answers only `Authorization: Bearer <token>`, and 404 to anything else, as nginx does from outside on the VPS. A Route or an Ingress has no such rule, and the metrics name companies and providers. Unset, nothing changes. `utils/clusterSettings.js` `metricsAllowed()`, compared through sha256 digests.
+- **`TRUST_PROXY_HOPS`.** The `trust proxy` count, 1 by default as before (nginx, the OpenShift router or ingress-nginx alone); 2 behind a load balancer that adds its own `X-Forwarded-For`. A value that is not 0 to 5 stops the start, like a missing variable: too low shares one login rate limit among all users, too high lets a user choose the address they are counted under.
+
+### Changed
+- **The image's user is uid 1000 by number, and `/app/data` is writable by group 0.** OpenShift runs a container under an arbitrary uid in group 0, and Kubernetes checks `runAsNonRoot` only against a numeric `USER`. Same user as before (`node`), so Docker and the VPS see no difference.
+
+### Security
+- **`follow-redirects` 1.16.2 in the Bruno CLI's tree** (CVE-2026-116689, HIGH: information sent on across a cross-origin redirect). A new advisory against Bruno 4.3.0's copy (1.16.1), which fails the required Trivy scan of any PR. A `^1.16.2` floor in `Oscar_Server/bruno-cli/package.json` `overrides`, as for Bruno's other bundled copies; the lockfile resolves 1.16.2 and nothing else changes in it.
+
+---
+
 ## [server-1.11.442] / [collection-OTST_V2.0.239] — 2026-10-29
 
 Issue #1055, release 2026.480.

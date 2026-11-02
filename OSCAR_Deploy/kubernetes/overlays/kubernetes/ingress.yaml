@@ -1,0 +1,40 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# The way in, with the limits the VPS's nginx gives OSCAR
+# (OSCAR_Deploy/nginx/oscar.conf.example): 50 MB bodies (data file and
+# checklist uploads), 660 s for the longest requests. ingress-nginx adds one
+# X-Forwarded-For entry: TRUST_PROXY_HOPS=1 (settings.env).
+# The Secret oscar-tls holds the certificate (or let cert-manager make it).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oscar
+  labels:
+    app.kubernetes.io/name: oscar
+    app.kubernetes.io/component: server
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "660"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "660"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - oscar.example.org
+      secretName: oscar-tls
+  rules:
+    - host: oscar.example.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oscar
+                port:
+                  name: http

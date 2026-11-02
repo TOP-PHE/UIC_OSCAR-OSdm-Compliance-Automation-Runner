@@ -1,0 +1,33 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# The way in. TLS ends at the router (edge), which tells OSCAR so with
+# X-Forwarded-Proto and adds one X-Forwarded-For entry: TRUST_PROXY_HOPS=1
+# (settings.env). 660 s for the longest requests, as the VPS's nginx allows.
+# No certificate given here: the router's default one applies, or add
+# spec.tls.certificate / key, or let cert-manager fill them.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: oscar
+  labels:
+    app.kubernetes.io/name: oscar
+    app.kubernetes.io/component: server
+  annotations:
+    haproxy.router.openshift.io/timeout: 660s
+spec:
+  host: oscar.example.org
+  to:
+    kind: Service
+    name: oscar
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

@@ -810,6 +810,8 @@ Each MVP component maps directly to a Phase 2 / Phase 3 cloud replacement:
 
 Because all application code calls generic interfaces (SQL, filesystem path, HTTP), no business logic needs to change during migration — only the infrastructure adapters are swapped.
 
+*Update 2026-11-02 (#1059, server 1.11.443):* the MVP stack itself now runs on Kubernetes and OpenShift, as **one pod** (SQLite on a persistent volume, the in-process queue, Bruno as child processes): `OSCAR_Deploy/kubernetes/` and *OSCAR - Kubernetes and OpenShift Deployment Guide*. None of the rows above is done by it; running more than one pod still needs the Phase 2 database and queue.
+
 ### 14.11 User Management and Access Control (Updated 2026-04-05)
 
 This chapter formalizes the user and role model implemented in the MVP server to support platform governance and tenant isolation, including all UI and registration enhancements delivered to date.
