@@ -108,11 +108,11 @@ jobs:
 
       - name: SonarCloud Scan
         if: ${{ github.actor != 'dependabot[bot]' }}
-        uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
+        # sonarqube-scan-action replaces the deprecated sonarcloud-github-action,
+        # which was only a wrapper around it (#1064). It needs no GITHUB_TOKEN:
+        # the SonarQube Cloud GitHub App decorates pull requests.
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
-          # Provided automatically by GitHub for PR decoration (commit
-          # statuses, PR comments). Read-only.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Repository secret. Generate at https://sonarcloud.io/account/security
           # and store under repo settings → secrets and variables → actions.
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

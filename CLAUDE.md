@@ -1584,6 +1584,29 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   404s) added a second, distinct `sonarqubecloud`-app check plus an actual
   bot PR comment (Quality Gate verdict + issue/coverage summary). Both
   integration paths now coexist and both need to stay green.
+- **SonarCloud type-checks our JavaScript, and one type can cost 20 minutes**
+  (#1064). With no tsconfig, SonarJS 14.3 builds a TypeScript 6 program over
+  the sources ("using default options") for its type-aware rules; without it
+  the JS sensor takes under a minute. TypeScript types an object literal of
+  spreads whose values are each `{}` or `{ key }` as every combination of
+  them: `checkProvider()` (simulator `config.js`) reached 21 such spreads and
+  the analysis of `main` went from 8 to 37 minutes, all of it charged to the
+  first file needing the type (`server.test.js`). Merge many optional parts
+  with `Object.assign(target, ...parts)`, not one spread literal. To find the
+  file that costs: run the scan with `-Dsonar.verbose=true` and take the time
+  between consecutive "Cache entry created … js:ast:" lines (the analyzer's
+  own "Analyzing file" lines arrive buffered, all at the end). On a PR only
+  the changed files are analysed, so the PR touching the first file to need
+  such a type pays for it. The scan step uses `sonarqube-scan-action`
+  (v8; the old `sonarcloud-github-action` was a deprecated wrapper around
+  it) and gets no `GITHUB_TOKEN`: the GitHub App decorates PRs.
+  **Four browser scripts are never analysed** (`public/nav.js`,
+  `public/js/banner.js`, `esc.js`, `findings.js`): SonarJS takes a file whose
+  first 2 KB hold a `/* … */` comment followed by `(function (` for a bundle.
+  `sonar.javascript.detectBundles=false` would analyse them (the minified
+  check that skips `osdmRequestSchemas.js` is separate), but it brings 16
+  `S9383` bugs (unhandled promises in `findings.js` and `nav.js`) into new
+  code, so they must be fixed first.
 - **Test coverage was a deliberate, ratcheted push** (2026-07-02, 6 PRs:
   #461–#466) from ~50% to ~88% line coverage on `Oscar_Server/src`, biggest
   gaps first: the 3 previously-untested route files → `runs.js`/`admin.js`/
