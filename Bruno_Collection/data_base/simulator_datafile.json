@@ -35657,7 +35657,7 @@
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
       "code": "SIM_FARE_BICYCLE_ADMISSION_38",
-      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions and fare ancillaries asked (a provider may sell a bicycle either way; DB sells it as a passenger type), without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.8.0, for gamma.",
       "scenarioType": "SALE",
       "scenarioAction": null,
       "osdmVersion": "3.8.0",
@@ -35691,7 +35691,8 @@
         "flexibilities": [],
         "offerMode": null,
         "requestedOfferParts": [
-          "FARE_ADMISSION"
+          "FARE_ADMISSION",
+          "FARE_ANCILLARY"
         ]
       }
     },
@@ -35988,7 +35989,7 @@
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
       "code": "SIM_FARE_BICYCLE_ADMISSION_36",
-      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions and fare ancillaries asked (a provider may sell a bicycle either way; DB sells it as a passenger type), without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
       "scenarioType": "SALE",
       "scenarioAction": null,
       "osdmVersion": "3.6.0",
@@ -36021,7 +36022,7 @@
         "travelClass": [],
         "flexibilities": [],
         "offerMode": null,
-        "requestedOfferParts": ["FARE_ADMISSION"]
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_ANCILLARY"]
       }
     },
     {
@@ -36309,7 +36310,7 @@
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
       "code": "SIM_FARE_BICYCLE_ADMISSION_37",
-      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions and fare ancillaries asked (a provider may sell a bicycle either way; DB sells it as a passenger type), without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.7.0, for beta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
       "scenarioType": "SALE",
       "scenarioAction": null,
       "osdmVersion": "3.7.0",
@@ -36342,7 +36343,7 @@
         "travelClass": [],
         "flexibilities": [],
         "offerMode": null,
-        "requestedOfferParts": ["FARE_ADMISSION"]
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_ANCILLARY"]
       }
     },
     {
@@ -36630,7 +36631,7 @@
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
       "code": "SIM_FARE_BICYCLE_ADMISSION_39",
-      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions and fare ancillaries asked (a provider may sell a bicycle either way; DB sells it as a passenger type), without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.9.0, for delta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
       "scenarioType": "SALE",
       "scenarioAction": null,
       "osdmVersion": "3.9.0",
@@ -36663,7 +36664,7 @@
         "travelClass": [],
         "flexibilities": [],
         "offerMode": null,
-        "requestedOfferParts": ["FARE_ADMISSION"]
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_ANCILLARY"]
       }
     },
     {
@@ -36951,7 +36952,7 @@
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
       "code": "SIM_FARE_BICYCLE_ADMISSION_310",
-      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions and fare ancillaries asked (a provider may sell a bicycle either way; DB sells it as a passenger type), without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.10.0, for epsilon (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
       "scenarioType": "SALE",
       "scenarioAction": null,
       "osdmVersion": "3.10.0",
@@ -36984,7 +36985,7 @@
         "travelClass": [],
         "flexibilities": [],
         "offerMode": null,
-        "requestedOfferParts": ["FARE_ADMISSION"]
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_ANCILLARY"]
       }
     },
     {
@@ -37272,7 +37273,7 @@
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
       "code": "SIM_FARE_BICYCLE_ADMISSION_312",
-      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions asked without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
+      "description": "Simulated provider, fares from DB's templates (#1048): an adult and a bicycle (passenger list 34), fare admissions and fare ancillaries asked (a provider may sell a bicycle either way; DB sells it as a passenger type), without fare reservations. The bicycle travels on a bicycle fare of its own, in second class (F6); the fully flexible offer is booked and confirmed. OSDM 3.12.0, for zeta (a copy of SIM_FARE_BICYCLE_ADMISSION_38, #914).",
       "scenarioType": "SALE",
       "scenarioAction": null,
       "osdmVersion": "3.12.0",
@@ -37305,7 +37306,7 @@
         "travelClass": [],
         "flexibilities": [],
         "offerMode": null,
-        "requestedOfferParts": ["FARE_ADMISSION"]
+        "requestedOfferParts": ["FARE_ADMISSION", "FARE_ANCILLARY"]
       }
     },
     {

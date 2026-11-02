@@ -150,7 +150,8 @@
       ],
       "requestedOfferParts": [
         "ADMISSION",
-        "FARE_ADMISSION"
+        "FARE_ADMISSION",
+        "FARE_ANCILLARY"
       ],
       "travelClasses": [
         "FIRST",

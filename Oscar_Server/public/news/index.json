@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-02-bicycles-and-fare-requests",
+    "date": "November 2, 2026",
+    "tag": "Fixed",
+    "title": "Bicycles sent without personal data; fare requests trimmed",
+    "summary": "A bicycle, a dog or another passenger that is not a person is now sent with its reference and type only, and an offer request for fares only no longer asks for fulfilment options.",
+    "content": "A fare expert reviewed the OSDM simulator's bicycle scenario and pointed at what OSCAR sent. The data file asks every passenger for a date of birth, a name, an e-mail and a phone number, and OSCAR sent them for the bicycle too, in the offer request and in the booking. OSCAR now sends a passenger of a type OSDM lists as transportable (bicycle, dog, pet, luggage, pram, car, motorcycle, trailer) with its reference, type and cards only, in the offer, booking and exchange requests; the passenger update and read-back steps leave it out, and the run log says which fields of the data file were not sent.\n\nAn offer request that asks for fare parts only no longer carries requestedFulfillmentOptions: a fare fulfilment holds no document. A request that also asks for products still sends them.\n\nOn the OSDM simulator, the bicycle scenario now asks for fare admissions and fare ancillaries, so that a provider may sell a bicycle either way (the simulator, like DB, sells it as a passenger type with an admission fare), and every fare now names its accounting reference, which the booked fare keeps. Nothing to do on your side."
+  },
+  {
     "id": "2026-10-29-fare-overlap-combining-fee-fail",
     "date": "October 29, 2026",
     "tag": "Changed",

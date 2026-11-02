@@ -2238,6 +2238,26 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   overlapping offer is no longer booked (`fareSaleDecision()`).
   `SIM_WRONG_FARE_OVERLAP_*` and `SIM_WRONG_FARE_COMBINING_FEE_*` left
   `WARNING_ONLY`.
+  **A transportable is not a person** (#1045, a fare expert's review,
+  1.11.444 / OTST_V2.0.240, simulator 0.61.0). `library-bruno/transportables.js`
+  (OSDM's TransportableType, with 3.5's spellings): reference, type and
+  cards only, in the offer, booking and exchange requests
+  (`passengerSpecsOf()` in `scenarioParser.js`), and 03/04 leave it out
+  (`choosePassenger()`). The data file's schema asks every passenger for a
+  date of birth, name and contact, so the data keeps placeholders and the
+  requests drop them. A fare-only offer request asks no
+  `requestedFulfillmentOptions` (`asksFaresOnly()`). **In DB's fares a
+  bicycle is a passenger type with an admission fare, not an ancillary**
+  (maintainer, 2026-11-02): the simulator answers so;
+  `SIM_FARE_BICYCLE_ADMISSION_*` asks `FARE_ADMISSION` + `FARE_ANCILLARY` so
+  a provider may answer either way, and the simulator checklists tick P1.11
+  `FARE_ANCILLARY` (maintainer: declared, the simulator takes it), so the
+  references do. **The checklist generator can run here**: `docx` in a
+  scratch folder (`NODE_PATH`), `py -X utf8 post.py` (without UTF-8 mode
+  Windows reads the answers in its code page and garbles "…"); compare the
+  old and new answers with `answersOfDocx()`. Simulator fares carry
+  `accountingRef` (the carrier, `SIM-<template>-<serial>-<tariff>`), kept
+  when booked.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

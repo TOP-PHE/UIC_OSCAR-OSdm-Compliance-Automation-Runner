@@ -93,6 +93,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.444] / [collection-OTST_V2.0.240] — 2026-11-02
+
+Issue #1045 (a fare expert's review of the simulator's bicycle fare scenario), release 2026.482. Simulator 0.61.0. The server change is the welcome-page news entry.
+
+### Fixed
+- **A passenger that is not a person is sent without a person's data** (`library-bruno/transportables.js`). The data file's schema asks every passenger for a date of birth, a name, an e-mail and a phone number, and OSCAR sent them for a bicycle too: its date of birth in the offer request, its name and contact in the booking.
+  - A passenger of a type OSDM lists as a TransportableType (3.8: `PET`, `DOG`, `ACCOMP_DOG`, `BICYCLE`, `LUGGAGE`, `PRAM`, `CAR`, `SPECIAL_VEHICLE`, `MOTOCYCLE`, `TRAILER`; 3.5's `COMPANION_DOG` and `MOTORCYCLE`) is sent with its reference, type and cards only. This applies to the offer request, the booking request (`passengerSpecsOf()` in `scenarioParser.js`) and the exchange's offer request.
+  - Steps 03 (PATCH passenger) and 04 (GET passenger) leave it out (`choosePassenger()`), with one INFO line.
+  - An INFO line names the fields of the data file that were not sent.
+  - A person is sent as before.
+- **An offer request for fare parts only asks no fulfilment option** (`asksFaresOnly()`, in the outbound and the return offer requests). A fare fulfilment holds no document (#906). A request that also asks for products still sends `requestedFulfillmentOptions`.
+
+### Changed
+- `SIM_FARE_BICYCLE_ADMISSION_38` and its copies ask for `FARE_ADMISSION` and `FARE_ANCILLARY`, so that a provider may sell a bicycle either way. The simulator, like DB, sells it as the passenger type BICYCLE with an admission fare.
+- The simulator checklists tick P1.11 `FARE_ANCILLARY` (template unchanged, V01.07): a distributor may ask for it, and the simulator takes it, so the references declare it and the bicycle scenario gets no "not declared" warning (#949). They were rebuilt from the generator's answers, and only that answer moved in each of the six copies. Offer-part probes cover `ADMISSION`, `RESERVATION` and `ANCILLARY` only, so declaring it adds no probe.
+- The simulator reference configurations follow the checklists and the data file.
+- A welcome-page news entry.
+
+### Simulator 0.61.0
+- Every fare names its `accountingRef`: the provider's carrier as accounting company, and one accounting id made of the template and the fare's 301 serial number and tariff (`SIM-T01-50150-27`). The booked fare keeps it.
+
+### Checked
+- Replay of every `_38` fare scenario (43), the bicycle scenario's 3.6 copy and four product sales (search, card, exchange, two-offer return), on `main` and on this branch: the same checks, failures and warnings. Only the O3 check's title changes in the bicycle scenario, which now names both types asked.
+- In the branch's runs:
+  - The bicycle goes out as `{"externalRef":"00002","type":"BICYCLE"}` in the offer and booking requests; the adult keeps a date of birth, gender, name and contact.
+  - The fare-only offer requests carry no `requestedFulfillmentOptions`.
+  - The booked fare holds `accountingRef`.
+
+---
+
 ## [server-1.11.442] / [collection-OTST_V2.0.239] — 2026-10-29
 
 Issue #1055, release 2026.480.
