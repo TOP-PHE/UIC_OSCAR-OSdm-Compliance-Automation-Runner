@@ -2260,7 +2260,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   moved with them (`replay.js catalogue` on the fare `_38` scenarios). An
   overlapping offer is no longer booked (`fareSaleDecision()`).
   `SIM_WRONG_FARE_OVERLAP_*` and `SIM_WRONG_FARE_COMBINING_FEE_*` left
-  `WARNING_ONLY`.
+  `WARNING_ONLY`; their descriptions said "a WARNING" until 1.11.445, and an
+  AI analysis read the failure as OSCAR's mistake: **a scenario's
+  description is what an analysis takes as its expected result**, so a
+  change of severity changes it too (copies: `copyOf()`'s description).
+  **A step's checks work on a copy of its answer** (#1045, 1.11.445 /
+  OTST_V2.0.241). Bruno stores the response object after the scripts ran,
+  and the report and `run_requests` keep that object: `body.offers = …` in
+  `fares.js` left a stored answer without the fare offers the provider sent
+  (an analysis read `"offers": []` next to a failed "no fare" check). Steps
+  01 and 10 read `workingCopy(res.getBody())` (`envUtils.js`, a shallow
+  copy: the checks only set top-level members), and
+  `postPatchRefundOfferResponse()` reads a single `refundOffer` as a local
+  list. A step whose checks set a member on their answer does the same.
   **A transportable is not a person** (#1045, a fare expert's review,
   1.11.444 / OTST_V2.0.240, simulator 0.61.0). `library-bruno/transportables.js`
   (OSDM's TransportableType, with 3.5's spellings): reference, type and

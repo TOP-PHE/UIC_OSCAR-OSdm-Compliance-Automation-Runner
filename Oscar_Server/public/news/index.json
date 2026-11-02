@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-02-answers-kept-as-sent",
+    "date": "November 2, 2026",
+    "tag": "Fixed",
+    "title": "The answers OSCAR keeps are the provider's, as sent",
+    "summary": "The answer a run stores for the report and the AI analysis is now exactly what the provider sent, never one OSCAR's checks had edited.",
+    "content": "For a scenario that expects no fare, OSCAR's offer checks set the fare offers aside before checking the product offers. They did it on the answer itself, and the answer kept for the run's report, its HTTP traffic and the AI analysis was that edited one: an analysis of a simulator run read \"offers\": [] where the provider had sent fares, and could not tell why the check had failed. The refund checks did the same with a single refund offer. The checks now work on a copy, and the answer kept is the provider's, as sent. The results of the checks do not change.\n\nTwo deliberately wrong simulator scenarios, an overlap of fares and a wrong COMBINING refund fee, now say that their check fails, as it has done since these were made failures on October 29. Nothing to do on your side."
+  },
+  {
     "id": "2026-11-02-bicycles-and-fare-requests",
     "date": "November 2, 2026",
     "tag": "Fixed",

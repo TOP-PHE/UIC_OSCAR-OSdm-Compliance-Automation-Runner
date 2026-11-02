@@ -81,7 +81,17 @@ function parseEnvJson(name, fallback) {
   }
 }
 
-module.exports = { parseEnvJson };
+/**
+ * #1045: the answer a step's checks work on: a shallow copy of a JSON object,
+ * else the value itself. Bruno stores the response object after the scripts
+ * ran, so a check that set `offers` or `refundOffers` on it changed the answer
+ * the report and OSCAR keep: it no longer showed what the provider sent.
+ */
+function workingCopy(body) {
+  return body && typeof body === 'object' && !Array.isArray(body) ? { ...body } : body;
+}
+
+module.exports = { parseEnvJson, workingCopy };
 
 // Expose to global for parity with the other library modules (so .bru scripts
 // can call it unqualified if needed), matching the require-or-eval loader flow.

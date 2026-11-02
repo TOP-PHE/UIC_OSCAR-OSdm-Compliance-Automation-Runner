@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.482",
+  "current_release": "2026.483",
   "releases": [
+    {
+      "release": "2026.483",
+      "date": "2026-11-02",
+      "server": "1.11.445",
+      "collection": "OTST_V2.0.241",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, from the AI analysis of gamma's fare runs, collection OTST_V2.0.241: the answer OSCAR stores for the report and the run is the provider's as sent (steps 01 and 10 hand their checks a copy; the refund checks read a single refundOffer as a list without writing it into the answer), where the fare checks used to leave \"offers\": [] in place of the fares the provider sent; SIM_WRONG_FARE_OVERLAP and SIM_WRONG_FARE_COMBINING_FEE describe the failure #1055 made of their check. Server: the welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.482",
       "date": "2026-11-02",
