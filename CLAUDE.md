@@ -1597,7 +1597,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   between consecutive "Cache entry created … js:ast:" lines (the analyzer's
   own "Analyzing file" lines arrive buffered, all at the end). On a PR only
   the changed files are analysed, so the PR touching the first file to need
-  such a type pays for it.
+  such a type pays for it. The scan step uses `sonarqube-scan-action`
+  (v8; the old `sonarcloud-github-action` was a deprecated wrapper around
+  it) and gets no `GITHUB_TOKEN`: the GitHub App decorates PRs.
+  **Four browser scripts are never analysed** (`public/nav.js`,
+  `public/js/banner.js`, `esc.js`, `findings.js`): SonarJS takes a file whose
+  first 2 KB hold a `/* … */` comment followed by `(function (` for a bundle.
+  `sonar.javascript.detectBundles=false` would analyse them (the minified
+  check that skips `osdmRequestSchemas.js` is separate), but it brings 16
+  `S9383` bugs (unhandled promises in `findings.js` and `nav.js`) into new
+  code, so they must be fixed first.
 - **Test coverage was a deliberate, ratcheted push** (2026-07-02, 6 PRs:
   #461–#466) from ~50% to ~88% line coverage on `Oscar_Server/src`, biggest
   gaps first: the 3 previously-untested route files → `runs.js`/`admin.js`/
