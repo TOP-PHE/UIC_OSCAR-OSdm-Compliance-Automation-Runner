@@ -57,6 +57,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The installation documents point to Kubernetes and OpenShift** (#1061,
+  documentation only, nothing to release). The *Installation Guide* gains
+  section 10, "Kubernetes or OpenShift instead of Docker Compose": when to
+  choose it, what differs from the Compose install, the five steps, providers
+  behind a VPN, and a link to the full guide of #1059. The *Self-Hosted Quick
+  Start* and the root `README.md` (operators' callout, `OSCAR_Deploy/` row,
+  documentation map) point to it. The Installation Guide also cloned
+  `UICrail/OSCAR-OSdm-Compliance-Automation-Runner`, a private repository
+  not pushed since April 2026, and named a tag in the old `release-2026.04`
+  form: it now clones the public repository, as the other guides do. The
+  Quick Start's PDF (made with xhtml2pdf) was not regenerated and lacks the
+  new paragraph.
 - **OSDM simulator: client ids say provider and role** (#585, simulator 0.2.0).
   `scripts/make-clients.js` now creates `<provider>.tstmgr01`…`03` for Test
   Managers and `<provider>.tst01`…`03` for testers, three of each per provider

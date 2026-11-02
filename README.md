@@ -14,6 +14,8 @@ reports — without requiring testers to install a local toolchain.
 > ([PDF](Documentation/Server_Operations/OSCAR%20-%20Self-Hosted%20Quick%20Start.pdf)).
 > Takes about 15 minutes; uses the prebuilt public Docker image; no source
 > compilation needed.
+> On **Kubernetes or OpenShift**: follow the
+> [**Kubernetes and OpenShift Deployment Guide**](Documentation/Server_Operations/OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md).
 
 ---
 
@@ -23,7 +25,7 @@ reports — without requiring testers to install a local toolchain.
 |---|---|
 | [`Oscar_Server/`](Oscar_Server/) | Node.js + Express server, REST API, admin web UI, Bruno CLI integration |
 | [`Bruno_Collection/`](Bruno_Collection/) | OSDM conformance scenarios (`.bru` files) |
-| [`OSCAR_Deploy/`](OSCAR_Deploy/) | Docker Compose stack, nginx snippets, alerting + observability overlay |
+| [`OSCAR_Deploy/`](OSCAR_Deploy/) | Docker Compose stack, nginx snippets, alerting + observability overlay; [`kubernetes/`](OSCAR_Deploy/kubernetes/) for Kubernetes and OpenShift |
 | [`OSDM_Simulator/`](OSDM_Simulator/) | A stub OSDM provider for testing OSCAR itself: issues the token, answers a basic sale flow, simulates several providers |
 | [`OSCAR_MCP/`](OSCAR_MCP/) | A read-only MCP server: lets an AI assistant read a company's run results through OSCAR's API, with an API key |
 | [`Documentation/`](Documentation/) | Architecture, specification, admin and operations guides |
@@ -42,6 +44,8 @@ Loki + Alertmanager) for production-grade observability.
 ### For operators deploying their own OSCAR
 
 - 🆕 **[Self-Hosted Quick Start](Documentation/Server_Operations/OSCAR%20-%20Self-Hosted%20Quick%20Start.md)** — recommended path, ~15 min, Docker-based
+- [Kubernetes and OpenShift Deployment Guide](Documentation/Server_Operations/OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md) — OSCAR as one pod on a cluster, behind an Ingress or a Route
+- [Installation Guide](Documentation/Server_Operations/installation-guide.md) — the Docker Compose install step by step; section 10 compares it with Kubernetes and OpenShift
 - [Server Admin Guide](Documentation/Server_Operations/OSCAR%20-%20Server%20Admin%20Guide.md) — day-2 operations, Server Config UI, observability + alerting
 - [Metrics & Monitoring](Documentation/Server_Operations/metrics-and-monitoring.md) — Prometheus / Grafana / Loki stack
 - [OSDM Simulator](Documentation/Server_Operations/OSCAR%20-%20OSDM%20Simulator.md) — a stub provider on a host of its own, and how to point a company at it
