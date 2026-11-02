@@ -1,0 +1,41 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# CI only (.github/workflows/ci-kubernetes.yml): the base as OpenShift runs it
+# (a uid the image does not know, in group 0), on a kind cluster, against the
+# OSDM simulator on the runner's private address. smoke.sh runs a scenario.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  # build-images.sh local ci
+  - name: oscar-bundle
+    newName: local/oscar
+    newTag: ci
+
+configMapGenerator:
+  - name: oscar-settings
+    behavior: merge
+    literals:
+      - APP_URL=http://localhost:3001
+      - ALLOWED_REDIRECT_HOSTS=localhost
+      # The simulator answers on the runner's address, over http.
+      - ALLOW_PRIVATE_TARGETS=1
+      - MAX_CONCURRENT_RUNS=2
+
+patches:
+  - path: openshift-user.yaml
+  - target:
+      kind: PersistentVolumeClaim
+      name: oscar-data
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 2Gi

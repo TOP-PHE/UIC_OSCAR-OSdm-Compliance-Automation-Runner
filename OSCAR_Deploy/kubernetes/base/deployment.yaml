@@ -1,0 +1,131 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oscar
+  labels:
+    app.kubernetes.io/name: oscar
+    app.kubernetes.io/component: server
+spec:
+  # ONE replica, always. OSCAR keeps its database in SQLite on the data
+  # volume, its run queue in memory, and takes an in-process lock before every
+  # data file write: a second pod would corrupt the first one's work, not share
+  # it. It grows with more CPU and memory for this pod (see resources below).
+  replicas: 1
+  # Recreate, not RollingUpdate: the new pod must not start while the old one
+  # still has the database open. An update therefore stops OSCAR for the time
+  # the new pod takes to start; runs it cut off are marked as such at start
+  # (worker/reconcile.js), as after a restart of the VPS.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oscar
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oscar
+        app.kubernetes.io/component: server
+    spec:
+      # OSCAR never calls the Kubernetes API.
+      automountServiceAccountToken: false
+      # No OSCAR_SERVICE_HOST / OSCAR_PORT_… variables from the Service.
+      enableServiceLinks: false
+      # Kubernetes' "restricted" pod security and OpenShift's restricted-v2
+      # SCC both accept this pod. No runAsUser here: the image's USER is uid
+      # 1000, and OpenShift gives its own uid (the image allows any uid in
+      # group 0 to write its data directory).
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: oscar
+          # The overlay names the real image (its `images:`). It is the
+          # bundle: the server image with the Bruno collection and
+          # compatibility.json of the same release (Dockerfile.bundle).
+          image: oscar-bundle
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: oscar-settings
+            - secretRef:
+                name: oscar-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            # Not read-only yet: the root file system of the image is not
+            # written today (data on the volume, /tmp below), but nothing
+            # proves it for every path yet.
+            readOnlyRootFilesystem: false
+          # /health checks the database, the data directory and the free
+          # space. In production OSCAR redirects plain http to https unless
+          # the request names localhost: the probes do, as the VPS's Docker
+          # health check does.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            periodSeconds: 5
+            timeoutSeconds: 5
+            # Up to 5 minutes for the database migrations of a large database.
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          # One run (a Bruno process) takes about 0.2 CPU and 250 MB, so
+          # MAX_CONCURRENT_RUNS (settings.env) is about 4 per CPU. Raise the
+          # limits and that setting together.
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+          volumeMounts:
+            # The database, data files, run reports and run workspaces.
+            - name: data
+              mountPath: /app/data
+            # HOME points here (settings.env): an OpenShift uid has no home.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: oscar-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi

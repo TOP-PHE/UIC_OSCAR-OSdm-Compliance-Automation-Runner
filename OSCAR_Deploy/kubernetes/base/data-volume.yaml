@@ -1,0 +1,25 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Everything OSCAR keeps: the SQLite database, the companies' data files and
+# run reports (encrypted with ENCRYPTION_KEY), the run workspaces. Back it up
+# with ENCRYPTION_KEY kept apart: one without the other cannot be read.
+# ReadWriteOnce: one pod, one node. Use a block or local file system storage
+# class: SQLite on a network file system (NFS, SMB) risks a corrupt database.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: oscar-data
+  labels:
+    app.kubernetes.io/name: oscar
+    app.kubernetes.io/component: server
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

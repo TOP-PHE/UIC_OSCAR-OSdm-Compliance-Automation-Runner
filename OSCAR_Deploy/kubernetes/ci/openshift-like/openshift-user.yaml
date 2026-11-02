@@ -1,0 +1,29 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# What OpenShift's restricted-v2 SCC does to the pod: a uid from the
+# project's range, group 0, the volume's group from the same range. The image
+# was built for uid 1000; it must work under this one.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oscar
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 1000740000
+        runAsGroup: 0
+        fsGroup: 1000740000
+      containers:
+        - name: oscar
+          # Loaded into kind by the workflow, never pulled.
+          imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi

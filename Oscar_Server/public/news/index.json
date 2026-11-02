@@ -8,6 +8,14 @@
     "content": "A fare expert reviewed the OSDM simulator's bicycle scenario and pointed at what OSCAR sent. The data file asks every passenger for a date of birth, a name, an e-mail and a phone number, and OSCAR sent them for the bicycle too, in the offer request and in the booking. OSCAR now sends a passenger of a type OSDM lists as transportable (bicycle, dog, pet, luggage, pram, car, motorcycle, trailer) with its reference, type and cards only, in the offer, booking and exchange requests; the passenger update and read-back steps leave it out, and the run log says which fields of the data file were not sent.\n\nAn offer request that asks for fare parts only no longer carries requestedFulfillmentOptions: a fare fulfilment holds no document. A request that also asks for products still sends them.\n\nOn the OSDM simulator, the bicycle scenario now asks for fare admissions and fare ancillaries, so that a provider may sell a bicycle either way (the simulator, like DB, sells it as a passenger type with an admission fare), and every fare now names its accounting reference, which the booked fare keeps. Nothing to do on your side."
   },
   {
+    "id": "2026-11-02-kubernetes-openshift",
+    "date": "November 2, 2026",
+    "tag": "Operations",
+    "title": "OSCAR can run on Kubernetes and OpenShift",
+    "summary": "An organisation that hosts its own OSCAR can now run it on its own Kubernetes or OpenShift cluster, with ready-made deployment files and a guide.",
+    "content": "Until now OSCAR was installed with Docker on a single server. The repository now holds what a cluster needs: an image that carries the server and the test collection of one release together, the deployment files for Kubernetes (with an Ingress) and for OpenShift (with a Route), and the OSCAR - Kubernetes and OpenShift Deployment Guide. OSCAR still runs as a single instance.\n\nNothing changes for users of the UIC OSCAR, and no action is required."
+  },
+  {
     "id": "2026-10-29-fare-overlap-combining-fee-fail",
     "date": "October 29, 2026",
     "tag": "Changed",

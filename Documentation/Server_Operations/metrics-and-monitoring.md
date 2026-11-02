@@ -80,7 +80,11 @@ Full operational guide: [`OSCAR - Server Admin Guide.md` § 14](OSCAR%20-%20Serv
 
 - `/metrics` endpoint: **no auth** in the app, but **404'd by nginx**
   for external requests. Only Prometheus (in the same Docker network
-  as `oscar`) can reach it.
+  as `oscar`) can reach it. Where no nginx guards it (Kubernetes,
+  OpenShift), `METRICS_TOKEN` makes OSCAR itself answer 404 to any
+  request without that bearer token (#1059, 1.11.443; the
+  [Kubernetes and OpenShift guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md),
+  section 8).
 - Grafana: gated by **OSCAR SSO** at `https://oscar.uic.org/grafana/`.
   When you click the menu link, nginx's `auth_request` calls OSCAR's
   `/v1/auth/sso-check`. If your JWT cookie says `role=administrator`,

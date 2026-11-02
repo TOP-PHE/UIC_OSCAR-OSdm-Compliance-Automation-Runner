@@ -120,8 +120,17 @@ RUN mkdir -p data/artifacts data/datafiles
 # Security: run as non-root user
 # The official node image already has a 'node' user (uid 1000). We chown the
 # app + data dir so it can write to SQLite, datafiles, and artifacts.
-RUN chown -R node:node /app
-USER node
+#
+# OpenShift (#1059): its default security policy runs the container under an
+# arbitrary uid in group 0, and Kubernetes can only check `runAsNonRoot`
+# against a numeric USER. So the data directory also belongs to group 0 with
+# the owner's rights, and USER names uid 1000 (the same `node` user, so Docker
+# and the VPS see no difference). Only /app/data is written at run time; on a
+# cluster it is a mounted volume (OSCAR_Deploy/kubernetes/).
+RUN chown -R node:node /app && \
+    chgrp -R 0 /app/data && \
+    chmod -R g=u /app/data
+USER 1000
 
 EXPOSE 3001
 

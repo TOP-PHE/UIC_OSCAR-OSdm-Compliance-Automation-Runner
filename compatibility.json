@@ -11,7 +11,20 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Part of #1045 (a fare expert's review of the simulator's bicycle fare scenario), collection OTST_V2.0.240, simulator 0.61.0: a passenger that is not a person (OSDM's transportable types: bicycle, dog, pet, luggage, pram, car, motorcycle, trailer) is sent with its reference, type and cards only, in the offer, booking and exchange requests, and steps 03/04 leave it out; an offer request for fare parts only asks no requestedFulfillmentOptions (a fare fulfilment holds no document); SIM_FARE_BICYCLE_ADMISSION asks FARE_ADMISSION and FARE_ANCILLARY. Simulator: every fare names its accountingRef (the provider's carrier and an accounting id), kept by the booked fare. Server: the welcome-page news entry."
+        "Part of #1045 (a fare expert's review of the simulator's bicycle fare scenario), collection OTST_V2.0.240, simulator 0.61.0: a passenger that is not a person (OSDM's transportable types: bicycle, dog, pet, luggage, pram, car, motorcycle, trailer) is sent with its reference, type and cards only, in the offer, booking and exchange requests, and steps 03/04 leave it out; an offer request for fare parts only asks no requestedFulfillmentOptions (a fare fulfilment holds no document); SIM_FARE_BICYCLE_ADMISSION asks FARE_ADMISSION and FARE_ANCILLARY, which the simulator checklists (P1.11) and references now declare. Simulator: every fare names its accountingRef (the provider's carrier and an accounting id), kept by the booked fare. Server: the welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.481",
+      "date": "2026-11-02",
+      "server": "1.11.443",
+      "collection": "OTST_V2.0.239",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1059: OSCAR on Kubernetes and OpenShift, one pod: OSCAR_Deploy/kubernetes/ (bundle image of server + collection + compatibility.json, Kustomize base and overlays for an Ingress or a Route), deployed on kind under an OpenShift-style uid by .github/workflows/ci-kubernetes.yml.",
+        "Server: METRICS_TOKEN (when set, /metrics answers only that bearer token, else 404) and TRUST_PROXY_HOPS (default 1, as before). The image runs as USER 1000 by number and its data directory is writable by group 0; Docker and the VPS see no difference. The collection is unchanged (OTST_V2.0.239).",
+        "Bruno CLI: follow-redirects 1.16.2 (CVE-2026-116689, HIGH) through an overrides floor in Oscar_Server/bruno-cli/package.json."
       ]
     },
     {
