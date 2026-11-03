@@ -134,7 +134,7 @@ function traceSettingsFor(companyId) {
  * added when the Test Framework sends no trace context.
  */
 function withTraceHeaders(headers, settings) {
-  const trace = TraceContext.headersFor(settings || {}, randomUUID(), randomUUID().split('-').join('').slice(16));
+  const trace = TraceContext.headersFor(settings || {}, randomUUID(), randomUUID().replaceAll('-', '').slice(16));
   const names = Object.keys(trace);
   const kept = Object.entries(headers || {}).filter(([name]) => !names.includes(name.toLowerCase()));
   return { ...Object.fromEntries(kept), ...trace };

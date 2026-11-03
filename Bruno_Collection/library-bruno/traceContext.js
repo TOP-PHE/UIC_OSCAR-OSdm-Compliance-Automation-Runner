@@ -39,13 +39,13 @@ const FLOW_START = '01. post get offer';
 const TRACE_VAR = '__traceUuid';
 const SETTINGS_VAR = '__traceContext';
 const REPLACED_SAID = '__traceHeaderReplacedSaid';
-const PLACEHOLDERS = ['traceId', 'uuid', 'parentId'];
+const PLACEHOLDERS = new Set(['traceId', 'uuid', 'parentId']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // ── Pure ────────────────────────────────────────────────────────────────────
 
 const isPart = (p) => Array.isArray(p) && p.length === 2 && typeof p[1] === 'string'
-  && (p[0] === 't' || (p[0] === 'v' && PLACEHOLDERS.includes(p[1])));
+  && (p[0] === 't' || (p[0] === 'v' && PLACEHOLDERS.has(p[1])));
 
 /** The run's settings: { send, flags, tracestate: parts }, defaults when unset. */
 function settingsFrom(raw) {
@@ -73,7 +73,7 @@ function isTokenRequest(name) {
 
 /** The trace id of a flow's UUID: its 32 hex digits. */
 function traceIdOf(uuid) {
-  return String(uuid ?? '').toLowerCase().split('-').join('');
+  return String(uuid ?? '').toLowerCase().replaceAll('-', '');
 }
 
 /** { traceparent, tracestate? } of one request, or {} when none is sent. */
@@ -89,8 +89,8 @@ function headersFor(settings, uuid, parentId) {
 
 /** A copy of `headers` without the names given, in any case. */
 function withoutHeaders(headers, names) {
-  const drop = names.map((n) => n.toLowerCase());
-  return Object.fromEntries(Object.entries(headers || {}).filter(([k]) => !drop.includes(k.toLowerCase())));
+  const drop = new Set(names.map((n) => n.toLowerCase()));
+  return Object.fromEntries(Object.entries(headers || {}).filter(([k]) => !drop.has(k.toLowerCase())));
 }
 
 // ── Ids ─────────────────────────────────────────────────────────────────────

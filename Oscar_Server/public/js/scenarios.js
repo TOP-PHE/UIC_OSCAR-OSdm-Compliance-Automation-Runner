@@ -4435,7 +4435,7 @@ function traceContextPreviewHtml(fw) {
   const lines = [`traceparent: ${p.traceparent}`];
   if (p.tracestate) lines.push(`tracestate: ${p.tracestate}`);
   const problem = p.problem ? `<div style="color:#c62828;margin-top:4px">${esc(p.problem)} This tracestate is not saved.</div>` : '';
-  return `<div style="color:#78909c">For example, with W3C's example ids:</div><code style="display:block;overflow-wrap:anywhere">${lines.map(esc).join('<br>')}</code>${problem}`;
+  return `<div style="color:#78909c">For example, with W3C's example ids:</div><code style="display:block;overflow-wrap:anywhere">${lines.map((line) => esc(line)).join('<br>')}</code>${problem}`;
 }
 
 function refreshTraceContextPanel(fw) {

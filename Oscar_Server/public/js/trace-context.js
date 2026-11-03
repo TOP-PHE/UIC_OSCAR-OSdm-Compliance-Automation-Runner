@@ -31,7 +31,7 @@
 }(globalThis, function () {
   'use strict';
 
-  const SETTINGS = ['send', 'sampled', 'tracestate'];
+  const SETTINGS = new Set(['send', 'sampled', 'tracestate']);
   // What OSCAR fills in. traceId and uuid are one id per sale flow, written
   // two ways; parentId is new for each request.
   const PLACEHOLDERS = ['traceId', 'uuid', 'parentId'];
@@ -127,7 +127,7 @@
     const at = key.indexOf('@');
     const ok = at < 0
       ? keyPart(key, 256, /^[a-z]/)
-      : key.indexOf('@', at + 1) < 0 && keyPart(key.slice(0, at), 241, /^[a-z0-9]/) && keyPart(key.slice(at + 1), 14, /^[a-z]/);
+      : !key.includes('@', at + 1) && keyPart(key.slice(0, at), 241, /^[a-z0-9]/) && keyPart(key.slice(at + 1), 14, /^[a-z]/);
     if (ok) return null;
     return `"${key.slice(0, 60)}" is not a tracestate key: lowercase letters, digits and _ - * /, starting with a letter (or tenant@system), and no space around "=".`;
   }
@@ -185,7 +185,7 @@
   function traceContextProblem(traceContext) {
     if (traceContext === undefined || traceContext === null) return null;
     if (!isObject(traceContext)) return 'The trace context (traceContext) is an object: { send, sampled, tracestate }.';
-    const unknown = Object.keys(traceContext).find((k) => !SETTINGS.includes(k));
+    const unknown = Object.keys(traceContext).find((k) => !SETTINGS.has(k));
     if (unknown !== undefined) return `The trace context has no setting "${unknown.slice(0, 40)}": send, sampled and tracestate.`;
     for (const k of ['send', 'sampled']) {
       if (k in traceContext && typeof traceContext[k] !== 'boolean') return `The trace context's "${k}" is true or false.`;
@@ -206,7 +206,7 @@
 
   /** The trace id of a flow's UUID: its 32 hex digits. */
   function traceIdOf(uuid) {
-    return String(uuid ?? '').toLowerCase().split('-').join('');
+    return String(uuid ?? '').toLowerCase().replaceAll('-', '');
   }
 
   /**

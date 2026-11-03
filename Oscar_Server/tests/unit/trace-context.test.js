@@ -310,7 +310,7 @@ describe('the collection fills in what the server parsed, as the server does', (
 
   test('both hold the same placeholders', () => {
     const source = fs.readFileSync(path.join(LIB, 'traceContext.js'), 'utf8');
-    expect(source).toContain(`const PLACEHOLDERS = ${JSON.stringify(TC.PLACEHOLDERS).split('"').join("'").split(',').join(', ')};`);
+    expect(source).toContain(`const PLACEHOLDERS = new Set(${JSON.stringify(TC.PLACEHOLDERS).replaceAll('"', "'").replaceAll(',', ', ')});`);
   });
 });
 
