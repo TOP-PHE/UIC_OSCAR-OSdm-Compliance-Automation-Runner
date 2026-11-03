@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.487",
+  "current_release": "2026.488",
   "releases": [
+    {
+      "release": "2026.488",
+      "date": "2026-11-03",
+      "server": "1.11.450",
+      "collection": "OTST_V2.0.245",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, collection OTST_V2.0.245: a refund of fares in every form of offer request. The fare refunds were asked by trip specification only, so the launch filter Offer request Search kept none, and a provider taking search criteria alone had no fare refund to copy. New simulator scenarios SIM_FARE_REFUND_SRCH_1ADT and SIM_FARE_REFUND_TRIPIDS_1ADT (every OSDM version, in the simulator references' run lists) and reference scenarios OTST_FARE_REFUND_SRCH_1ADT (181 checks) and OTST_FARE_REFUND_TRIPIDS_1ADT (188). The fare sales by search and by trip id no longer say they end after the offer: they are booked and confirmed since #906.",
+        "Server 1.11.450: a welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.487",
       "date": "2026-11-03",

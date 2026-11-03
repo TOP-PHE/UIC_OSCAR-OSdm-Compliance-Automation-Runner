@@ -95,9 +95,9 @@ describe('#937 what a framework declares in fares', () => {
 });
 
 describe('#937 the fare entries of the catalogue', () => {
-  test('a framework declaring everything is offered all twenty-one', () => {
+  test('a framework declaring everything is offered all twenty-three', () => {
     const entries = fareEntries(FARE_FW);
-    expect(entries).toHaveLength(21);
+    expect(entries).toHaveLength(23);
     const refused = entries.filter((e) => e.missing.length && e.code !== 'NHF_FARE_PRODUCT_ONLY');
     expect(refused.map((e) => [e.code, e.missing])).toEqual([]);
     expect(entries.find((e) => e.code === 'NHF_FARE_PRODUCT_ONLY').missing).toEqual(['product-based distribution (Distribution)']);
@@ -105,7 +105,7 @@ describe('#937 the fare entries of the catalogue', () => {
 
   test('a fare entry keeps its form: no _SPEC or _TRIPID twin', () => {
     const entries = fareEntries({ ...FARE_FW, offerRequestForms: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'] });
-    expect(entries).toHaveLength(21);
+    expect(entries).toHaveLength(23);
     expect(entries.some((e) => e.variantOf)).toBe(false);
   });
 
@@ -113,6 +113,8 @@ describe('#937 the fare entries of the catalogue', () => {
     const missing = Object.fromEntries(fareEntries({ osdmVersion: '3.7.0', distributionModes: ['FARE'], salesFlows: ['SALE', 'REFUND_FULL'], passengerTypes: ['ADULT', 'BICYCLE'], fares: { combinationModels: ['CLUSTERING'] } }).map((e) => [e.code, e.missing]));
     expect(missing.OTST_FARE_SPEC_1ADT).toEqual([]);
     expect(missing.OTST_FARE_REFUND_1ADT).toEqual(['a refund of fares (Fares › Sales flows)']);
+    expect(missing.OTST_FARE_REFUND_SRCH_1ADT).toEqual(['a refund of fares (Fares › Sales flows)']);
+    expect(missing.OTST_FARE_REFUND_TRIPIDS_1ADT).toEqual(['a refund of fares (Fares › Sales flows)']);
     expect(missing.OTST_FARE_REFUND_FEE_1ADT).toEqual(['a refund of fares (Fares › Sales flows)', 'a refund fee the distributor states (Fares)', 'OSDM 3.8 or later']);
     expect(missing.OTST_FARE_REFUND_COMBINING_1ADT).toEqual(['a refund of fares (Fares › Sales flows)', 'fares combined by COMBINING (Fares › Combination models)']);
     expect(missing.OTST_FARE_BICYCLE_1ADT).toEqual(['a fare reservation for a bicycle (Fares › Reservations)', 'OSDM 3.8 or later']);
@@ -123,6 +125,17 @@ describe('#937 the fare entries of the catalogue', () => {
     expect(missing.OTST_FARE_FAMILY).toEqual(['the age under which a fare is free (Fares)']);
     expect(missing.OTST_FARE_BICYCLE_ADMISSION).toEqual([]);
     expect(missing.OTST_FARE_GROUP_6ADT).toEqual([]);
+  });
+
+  // #1045: a refund of fares was offered by trip specification only, so a
+  // provider taking search criteria alone had no fare refund to copy.
+  test('#1045: a refund of fares in each form of offer request, each offered to a provider taking that form', () => {
+    const refunds = (forms) => fareEntries({ ...FARE_FW, offerRequestForms: forms })
+      .filter((e) => /^OTST_FARE_REFUND_(1ADT|SRCH_1ADT|TRIPIDS_1ADT)$/.test(e.code) && e.missing.length === 0).map((e) => e.code);
+    expect(refunds(['SEARCH'])).toEqual(['OTST_FARE_REFUND_SRCH_1ADT']);
+    expect(refunds(['SPECIFICATION'])).toEqual(['OTST_FARE_REFUND_1ADT']);
+    expect(refunds(['TRIP_IDS'])).toEqual(['OTST_FARE_REFUND_TRIPIDS_1ADT']);
+    expect(refunds(['SEARCH', 'SPECIFICATION', 'TRIP_IDS'])).toEqual(['OTST_FARE_REFUND_1ADT', 'OTST_FARE_REFUND_SRCH_1ADT', 'OTST_FARE_REFUND_TRIPIDS_1ADT']);
   });
 
   test('#1045: a bicycle sold as a passenger needs its passenger type, nothing under Fares', () => {

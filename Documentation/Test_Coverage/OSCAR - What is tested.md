@@ -224,7 +224,7 @@ have the same, as copies. In short:
 | Negative fare requests (#905): fares not asked, no section (by search, then a product sale; on a specification sent as domestic), an empty list of sections; one wrong answer (not in the run list) | 4 + 1 | `gamma` |
 | Fares from DB's templates (#1048) and what a fare says (#1045): first class, a card holder, a family, a bicycle fare, a group, border to border, several routes, a NON_FLEX refund, the form of a real provider's answer; five wrong answers that warn only (not in the run list) | 9 + 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (96)
+### 4.2 The reference scenarios of the catalogue (98)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -359,6 +359,8 @@ youngest passenger becomes the child one year under the age declared free.
 | `NHF_FARE_NO_SECTION_TRIPIDS` | Negative fare request: FARE_ADMISSION asked by trip id without a section; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 78 | `SIM_NHF_FARE_NO_SECTION_TRIPIDS_38` |
 | `NHF_FARE_EMPTY_SECTIONS_TRIPIDS` | Negative fare request: FARE_ADMISSION asked by trip id with an empty list of sections; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 78 | `SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38` |
 | `OTST_FARE_REFUND_1ADT` | Fare sale refunded in full, no fee stated: the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED. | the fare-based distribution, a refund of fares | 181 | `SIM_FARE_REFUND_1ADT_38` |
+| `OTST_FARE_REFUND_SRCH_1ADT` | Fare sale by search criteria refunded in full, no fee stated: fares asked for the whole trip, the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED. | the fare-based distribution, a refund of fares | 181 | `SIM_FARE_REFUND_SRCH_1ADT_38` |
+| `OTST_FARE_REFUND_TRIPIDS_1ADT` | Fare sale by trip id refunded in full, no fee stated: POST /trips-collection, the fares of the trip chosen by its id, then the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED. | the fare-based distribution, a refund of fares | 188 | `SIM_FARE_REFUND_TRIPIDS_1ADT_38` |
 | `OTST_FARE_REFUND_FEE_1ADT` | Fare sale refunded in full with a refund fee stated by OSCAR (RefundSpecification.refundFee, OSDM 3.8): the refund offer keeps the fee stated, CLUSTERING fares. | the fare-based distribution, a refund of fares, a stated refund fee, OSDM 3.8 | 182 | `SIM_FARE_REFUND_FEE_1ADT_38` |
 | `OTST_FARE_REFUND_COMBINING_1ADT` | Fare sale of fares combined by COMBINING, refunded in full: the fee is the fare's own, from its refund conditions at the time of the refund offer. | the fare-based distribution, a refund of fares, COMBINING | 181 | `SIM_FARE_REFUND_COMBINING_1ADT_38` |
 | `OTST_FARE_BICYCLE_1ADT` | Fare sale for an adult and a bicycle (OSDM 3.8): the adult's fare and the bicycle's fare reservation in fare mode, selected, booked and fulfilled with the fare. | the fare-based distribution, a bicycle fare reservation, passenger type BICYCLE, OSDM 3.8 | 131 | `SIM_FARE_BICYCLE_1ADT_38` |

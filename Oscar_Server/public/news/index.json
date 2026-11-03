@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-03-fare-refund-every-form",
+    "date": "November 3, 2026",
+    "tag": "New",
+    "title": "A refund of fares in every form of offer request",
+    "summary": "The refund of a fare can now be tested with the fares asked by search criteria or by trip id, not only by trip specification.",
+    "content": "The refund of a fare was only tested with the fares asked by trip specification. With the launch filter Offer request set to Search, no fare refund ran, and a provider taking search criteria alone had none to copy.\n\nThe simulator and the reference scenarios now hold a fare refund by search criteria and one by trip id. In Copy scenarios, a provider is offered the fare refund in each form of offer request its Test Framework declares. The simulator reference configurations run them too."
+  },
+  {
     "id": "2026-11-03-w3c-trace-context",
     "date": "November 3, 2026",
     "tag": "New Feature",

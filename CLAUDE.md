@@ -2344,6 +2344,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   and ends the scenario (`stopWithoutFulfillment()`: a step cannot skip
   itself, #652). F5 is "Every booked fare is in a fulfilment"; the product
   path's #250 failure applies only when the confirmation gave none.
+  **A refund of fares in every form of offer request** (1.11.450 /
+  OTST_V2.0.245): `SIM_FARE_REFUND_SRCH_1ADT_*` and `_TRIPIDS_1ADT_*` (trip
+  1, the section the whole trip), catalogue `OTST_FARE_REFUND_SRCH_1ADT`
+  (181) and `_TRIPIDS_1ADT` (188). A fare entry is never converted to another
+  form (its section names its trip), so **a fare capability needs one
+  simulator scenario per form**, or a provider declaring one form gets none.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,
