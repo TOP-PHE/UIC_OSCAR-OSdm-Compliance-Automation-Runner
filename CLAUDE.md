@@ -1053,6 +1053,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   PRODUCT), selection `modes` (`PRODUCT` / `FARE`, both by default), the
   page's *Distribution* fieldset (`SELECT_FILTERS`). A scenario of both
   modes is kept by either box (`facetModes()`); the label names one mode.
+  **A fare refund is under Refund too** (#1045, 1.11.448): a facet's
+  `groups` (`groupsOf()`) is its main group, then those of `ALSO_IN`
+  (`fares.refund` → Refund); kept by any of its boxes, counted under each
+  (`facetGroups()`). `group` stays the coverage report's one group, which
+  `run-filters.test.js` compares with `capabilityCoverageOf()`.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

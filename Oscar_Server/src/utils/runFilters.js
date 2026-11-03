@@ -18,6 +18,9 @@
  *    and the refusal probes), else `happy`;
  *  - group: the group of its main capability, as the coverage report reads
  *    it (the catalogue entry's capability, else `derivedCapability()`);
+ *    `groups` adds the groups that capability also belongs to at launch
+ *    (`ALSO_IN`: a fare refund is a refund too, #1045), and a scenario is kept
+ *    by any of their boxes;
  *  - form: the form of its offer request (`offerRequestFormOf()`);
  *  - modes: its distribution modes, product based and / or fare based, as
  *    the Test Framework's distribution check reads them
@@ -54,6 +57,11 @@ const DEFAULT_SELECTION = Object.freeze({
   base: 'all', categories: ['happy', 'refusal'], modes: [...MODES], groups: [...K.GROUPS], forms: [...FORMS], lastRun: 'all',
 });
 
+// #1045: groups a capability also belongs to in the launch filters. The
+// coverage report keeps one group, the main capability's; at launch a fare
+// refund is kept by the Refund box as well as by Fares.
+const ALSO_IN = Object.freeze({ 'fares.refund': Object.freeze(['Refund']) });
+
 const SIMULATED_CODE = /^SIM_(?:WRONG|FAULT)_/;
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -71,13 +79,27 @@ function categoryOf(scenario) {
   return K.isRefusalTest(scenario) ? 'refusal' : 'happy';
 }
 
+// The scenario's main capability: its catalogue entry's, else derived.
+function capabilityOf(scenario, datafile, entries) {
+  const entry = catalogueEntryForScenario(scenario.code, arr(entries));
+  return K.CAPABILITY.has(entry?.capability) ? entry.capability : K.derivedCapability(scenario, datafile);
+}
+
 /** The group of the scenario's main capability, as the coverage report reads it. */
 function groupOf(scenario, datafile, entries) {
-  const entry = catalogueEntryForScenario(scenario.code, arr(entries));
-  const capability = K.CAPABILITY.has(entry?.capability) ? entry.capability : K.derivedCapability(scenario, datafile);
-  const group = K.CAPABILITY.get(capability)?.group;
+  const group = K.CAPABILITY.get(capabilityOf(scenario, datafile, entries))?.group;
   return K.GROUPS.includes(group) ? group : 'Sale';
 }
+
+/** #1045: every group whose box keeps the scenario at launch: its own, then those its capability is also in. */
+function groupsOf(scenario, datafile, entries) {
+  const main = groupOf(scenario, datafile, entries);
+  const also = arr(ALSO_IN[capabilityOf(scenario, datafile, entries)]).filter((g) => g !== main && K.GROUPS.includes(g));
+  return [main, ...also];
+}
+
+// A facet's groups; one made before `groups` existed has its group only.
+const facetGroups = (facet) => (arr(facet?.groups).length > 0 ? facet.groups : [facet?.group]);
 
 /** SEARCH, SPECIFICATION or TRIP_IDS. */
 function formOf(scenario, datafile) {
@@ -108,7 +130,7 @@ function lastRunOf(run, scenario, collectionVersion) {
 
 /**
  * The facets of each scenario named in `codes`, in that order:
- * [{ code, category, modes, group, form, lastRun, toRunAgain }]. `runs` maps a code
+ * [{ code, category, modes, group, groups, form, lastRun, toRunAgain }]. `runs` maps a code
  * to its latest finished run.
  */
 function facetsOf(codes, { datafile, entries = [], runs = {}, collectionVersion = null } = {}) {
@@ -117,6 +139,7 @@ function facetsOf(codes, { datafile, entries = [], runs = {}, collectionVersion 
     const scenario = byCode.get(code);
     return {
       code, category: categoryOf(scenario), modes: modesOf(scenario, datafile), group: groupOf(scenario, datafile, entries),
+      groups: groupsOf(scenario, datafile, entries),
       form: formOf(scenario, datafile),
       ...lastRunOf(runs?.[code], scenario, collectionVersion),
     };
@@ -163,7 +186,8 @@ function keeps(facet, selection) {
   if (!selection.categories.includes(facet.category)) return false;
   // A scenario of both modes is kept by either box.
   if (!facetModes(facet).some((m) => selection.modes.includes(m))) return false;
-  if (!selection.groups.includes(facet.group) || !selection.forms.includes(facet.form)) return false;
+  // #1045: a fare refund is kept by the Refund box or the Fares box.
+  if (!facetGroups(facet).some((g) => selection.groups.includes(g)) || !selection.forms.includes(facet.form)) return false;
   if (selection.lastRun === 'toRunAgain') return facet.toRunAgain;
   if (selection.lastRun === 'failed') return facet.lastRun === 'failed';
   return true;
@@ -189,7 +213,7 @@ function previewOf(facets, selection) {
     counts: {
       categories: tally(CATEGORIES, 'category'),
       modes: Object.fromEntries(MODES.map((m) => [m, list.filter((f) => facetModes(f).includes(m)).length])),
-      groups: tally(K.GROUPS, 'group'),
+      groups: Object.fromEntries(K.GROUPS.map((g) => [g, list.filter((f) => facetGroups(f).includes(g)).length])),
       forms: tally(FORMS, 'form'),
       lastRun: { all: list.length, toRunAgain: list.filter((f) => f.toRunAgain).length, failed: list.filter((f) => f.lastRun === 'failed').length },
     },
@@ -232,5 +256,5 @@ function selectionLabel(selection) {
 module.exports = {
   selectionLabel,
   CATEGORIES, CATEGORY_TEXT, MODES, MODE_TEXT, FORMS, FORM_TEXT, BASES, LAST_RUNS, LAST_RUN_TEXT, DEFAULT_SELECTION,
-  categoryOf, modesOf, groupOf, formOf, lastRunOf, facetsOf, selectionProblem, withDefaults, selectCodes, previewOf,
+  categoryOf, modesOf, groupOf, groupsOf, formOf, lastRunOf, facetsOf, ALSO_IN, selectionProblem, withDefaults, selectCodes, previewOf,
 };

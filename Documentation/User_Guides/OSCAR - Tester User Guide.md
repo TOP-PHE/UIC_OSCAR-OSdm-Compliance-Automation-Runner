@@ -1379,7 +1379,8 @@ log volume only — never assertion outcomes.
     fare or books the product. A scenario of both (fares asked, then a
     product sold) runs with either box;
   - **Capability**: the group of what each scenario tests (Offers, Sale,
-    Refund, Exchange, Fares…), as the coverage report reads it;
+    Refund, Exchange, Fares…), as the coverage report reads it. A refund of
+    fares is under both Refund and Fares, and runs with either box;
   - **Offer request**: by search, by specification or by trip id;
   - **Last run**: all, only those *to run again* (never run, or run before the
     current collection or the scenario's last change), or only those that
