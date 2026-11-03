@@ -105,6 +105,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.448] — 2026-11-03
+
+Issue #1045 (the launch filters on gamma), release 2026.486.
+
+### Changed
+- **At launch, a fare refund is kept by the Refund box too.** Each scenario has one capability group, the one the coverage report gives it, and a fare refund's is Fares. On gamma, Capability *Refund* with Distribution *Fare based* therefore kept nothing, and a Test Manager looking for the refunds of fares did not know where they were. A facet now also carries `groups` (`groupsOf()`, `runFilters.js`): its own group, then the groups its capability also belongs to at launch (`ALSO_IN`, `fares.refund` → Refund). A scenario is kept by any of its boxes and counted under each, as a scenario of both distribution modes already was. The coverage report is unchanged: a fare refund stays one row, under Fares.
+- *Tester User Guide*: the Capability filter.
+- A welcome-page news entry.
+
+### Checked
+- `run-filters.test.js`: on gamma's `_38` scenarios, Refund + Fare based keeps the four fare refunds, and Fares still keeps them; a product refund and a fare sale keep one group; a facet without `groups` counts under its group. Putting back the old rule fails the test. The Refund box counts 29 of gamma's 184 scenarios, 23 before.
+
+---
+
 ## [server-1.11.447] / [collection-OTST_V2.0.243] — 2026-11-03
 
 Issue #1045 (from a real provider's fare run), release 2026.485. The server change is the welcome-page news entry.

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-03-fare-refunds-under-refund",
+    "date": "November 3, 2026",
+    "tag": "Improved",
+    "title": "Fare refunds are under Refund when you launch a batch",
+    "summary": "On New Run, the Capability box Refund now keeps the refunds of fares as well as those of products.",
+    "content": "The Capability filter of the Launch card puts each scenario under the group of what it tests. A refund of fares was under Fares only, so ticking Refund with Fare based kept nothing. It is now kept by Refund as well as by Fares, and counted under both.\n\nThe coverage report does not change: a fare refund stays one row, under Fares."
+  },
+  {
     "id": "2026-11-03-refund-names-confirmed-fulfilments",
     "date": "November 3, 2026",
     "tag": "Fixed",
