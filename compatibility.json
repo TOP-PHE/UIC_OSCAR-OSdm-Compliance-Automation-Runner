@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.488",
+  "current_release": "2026.489",
   "releases": [
+    {
+      "release": "2026.489",
+      "date": "2026-11-03",
+      "server": "1.11.451",
+      "collection": "OTST_V2.0.246",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, collection OTST_V2.0.246: at step 14 a booking read that lists no fulfilment is read through the fulfilments the confirmation gave: one WARNING (their REFUNDED state cannot be read from the booking), the booked parts still checked, and a full refund held to every fulfilment the confirmation gave. Before, every refunded part failed as \"left out of the refund\" and the full-refund check passed as 0/0.",
+        "Simulator 0.62.0: variant booking-without-fulfillments (last name Simvariant-Booking-Without-Fulfillments): GET /bookings/{id} lists no fulfilment, as a real provider's fare run showed. Scenarios SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT and _FARE_REFUND_1ADT (every version, in the simulator references' run lists) show OSCAR going through with two WARNINGs and no failed check.",
+        "Server 1.11.451: a welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.488",
       "date": "2026-11-03",

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-03-booking-without-fulfilments",
+    "date": "November 3, 2026",
+    "tag": "Improved",
+    "title": "A booking that lists no fulfilment no longer stops a refund",
+    "summary": "When a provider's booking lists no fulfilment after the confirmation, OSCAR warns and still checks the whole refund, and the simulator now has scenarios that show it.",
+    "content": "Some providers return the booking with an empty list of fulfilments after the confirmation. OSCAR already warned and refunded the fulfilments the confirmation gave. After the refund, it now also reads the booked parts through those fulfilments: it warns that their refunded state cannot be read from the booking, and still checks that the parts are refunded. Before, every refunded part was reported as left out of the refund.\n\nThe simulator has a new variant whose booking lists no fulfilment, with a refund of products and a refund of fares. Both pass with two warnings."
+  },
+  {
     "id": "2026-11-03-fare-refund-every-form",
     "date": "November 3, 2026",
     "tag": "New",

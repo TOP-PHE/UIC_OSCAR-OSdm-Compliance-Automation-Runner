@@ -411,7 +411,8 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
     releaseIfExpired(booking, now());
     persons.showRequestedInformation(booking);
     showRefundReceipt(booking, provider, now());
-    return { booking };
+    // #1045: a provider may list no fulfilment in the booking it gives.
+    return { booking: variants.bookingAsRead(booking) };
   }
 
   // /bookings/{id} itself: GET reads it, DELETE deletes it (#776).

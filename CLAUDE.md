@@ -2350,6 +2350,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (181) and `_TRIPIDS_1ADT` (188). A fare entry is never converted to another
   form (its section names its trip), so **a fare capability needs one
   simulator scenario per form**, or a provider declaring one form gets none.
+  **A booking read that lists no fulfilment, end to end** (1.11.451 /
+  OTST_V2.0.246, simulator 0.62.0): variant `booking-without-fulfillments`
+  (`bookingAsRead()`, `GET /bookings/{id}` only), passenger list 40,
+  `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_*` and
+  `_FARE_REFUND_1ADT_*`: no failed check, a WARNING at 07 and at 14. At 14
+  `_fulfillmentsKnown()` (`refunds.js`) reads the confirmation's fulfilments
+  when the booking lists none: parts checked, their state not. **A replay's
+  simulator must be the one just started**: an old one still on the port
+  (`EADDRINUSE` in its log) answered the first recording of this change.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

@@ -49,6 +49,7 @@ const realTest = test;
 const C = require(path.join(LIB, 'confirmedFulfillments.js'));
 const fareBooking = require(path.join(LIB, 'fareBooking.js'));
 const bookings = require(path.join(LIB, 'bookings.js'));
+const refunds = require(path.join(LIB, 'refunds.js'));
 const { buildOfferCollection } = require('../../../OSDM_Simulator/src/osdm/offers');
 const { createBooking, confirmBooking } = require('../../../OSDM_Simulator/src/osdm/bookings');
 const { loadProviders } = require('../../../OSDM_Simulator/src/config');
@@ -189,6 +190,48 @@ describe('a product sale\'s booking read after the confirmation', () => {
     C.keepConfirmation({});
     run();
     expect(mockRecorded).toEqual([expect.stringMatching(/^Booking embeds the generated fulfillments after fulfillment .*: GET \/bookings returned no fulfillments/)]);
+  });
+});
+
+describe('step 14 on a booking read listing no fulfilment', () => {
+  // The provider's form (simulator variant booking-without-fulfillments):
+  // the confirmation gave F1 and F2, the booking lists none, F1 was refunded.
+  const booking = { fulfillments: [], bookedOffers: [{ admissions: [{ id: 'A1', status: 'REFUNDED' }, { id: 'A2', status: 'FULFILLED' }] }] };
+  const confirm = () => C.keepConfirmation({ fulfillments: [
+    { id: 'F1', status: 'FULFILLED', bookingParts: [{ id: 'A1' }] },
+    { id: 'F2', status: 'FULFILLED', bookingParts: [{ id: 'A2' }] },
+  ] });
+
+  realTest('the parts are checked through the confirmation, with one WARNING, and no fulfilment state is read', () => {
+    confirm();
+    env.__refundedFulfillmentIds = JSON.stringify(['F1']);
+    withBrunoExpect(() => refunds.checkRefundScopeOnBooking(booking));
+    expect(mockRecorded).toEqual([
+      'Booked admission A1 is REFUNDED - status: REFUNDED: ok',
+      'Booked admission A2 is not REFUNDED (left out of the refund) - status: FULFILLED: ok',
+    ]);
+    expect(mockLogs.filter((l) => l.startsWith('[WARNING] Refund scope: the booking read after the refund lists no fulfilment, so the REFUNDED state of F1, F2'))).toHaveLength(1);
+    expect(refunds.isScopedRefundOnBooking(booking)).toBe(true);
+  });
+
+  realTest('a full refund is held to every fulfilment the confirmation gave', () => {
+    confirm();
+    env.__refundedFulfillmentIds = JSON.stringify(['F1']);
+    refunds.checkFullRefundDone(booking);
+    env.__refundedFulfillmentIds = JSON.stringify(['F1', 'F2']);
+    refunds.checkFullRefundDone(booking);
+    expect(mockRecorded).toEqual([
+      'Full refund: every fulfillment of the booking is refunded (1/2): not refunded by any confirmed refund offer: [F2]',
+      'Full refund: every fulfillment of the booking is refunded (2/2): ok',
+    ]);
+  });
+
+  realTest('neither the booking nor the confirmation lists one: the part-level check is skipped, nothing fails', () => {
+    C.keepConfirmation({});
+    env.__refundedFulfillmentIds = JSON.stringify(['F1']);
+    withBrunoExpect(() => refunds.checkRefundScopeOnBooking(booking));
+    expect(mockRecorded).toEqual([]);
+    expect(mockLogs).toContain('[INFO] Refund scope: neither the booking nor the confirmation lists a fulfilment — the part-level scope check is skipped.');
   });
 });
 

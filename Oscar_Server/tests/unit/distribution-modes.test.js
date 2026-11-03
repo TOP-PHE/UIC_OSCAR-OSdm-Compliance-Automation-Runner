@@ -67,7 +67,8 @@ describe('#936 what a framework declares', () => {
 describe('#936 what a scenario needs', () => {
   // SIM_WRONG_FARE_UNREQUESTED_* asks for products only (ADMISSION) and gets
   // fares nobody asked for (check O14): a product sale.
-  const fareCode = (code) => /^SIM_(FARE|NHF_FARE|WRONG_FARE)_/.test(code) && !code.startsWith('SIM_WRONG_FARE_UNREQUESTED_');
+  // #1045: a variant of a fare sale names FARE after its variant (SIM_VARIANT_<variant>_FARE_…).
+  const fareCode = (code) => (/^SIM_(FARE|NHF_FARE|WRONG_FARE)_/.test(code) || (code.startsWith('SIM_VARIANT_') && code.includes('_FARE_'))) && !code.startsWith('SIM_WRONG_FARE_UNREQUESTED_');
 
   test('every simulator scenario: the fare ones fare, a fare one booking the product both, the others product', () => {
     const wrong = [];

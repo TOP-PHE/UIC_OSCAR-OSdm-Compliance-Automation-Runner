@@ -150,11 +150,11 @@ describe('a selection', () => {
     const codes = simulator.scenarios.map((s) => s.code).filter((c) => /_38$/.test(c));
     const all = RF.facetsOf(codes, { datafile: simulator, entries: catalogue });
     const refunds = RF.selectCodes(all, { categories: ['happy'], modes: ['FARE'], groups: ['Refund'] });
-    expect(refunds).toEqual(['SIM_FARE_REFUND_1ADT_38', 'SIM_FARE_REFUND_SRCH_1ADT_38', 'SIM_FARE_REFUND_TRIPIDS_1ADT_38', 'SIM_FARE_REFUND_FEE_1ADT_38', 'SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_FARE_REFUND_NON_FLEX_1ADT_38']);
+    expect(refunds).toEqual(['SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_FARE_REFUND_1ADT_38', 'SIM_FARE_REFUND_1ADT_38', 'SIM_FARE_REFUND_SRCH_1ADT_38', 'SIM_FARE_REFUND_TRIPIDS_1ADT_38', 'SIM_FARE_REFUND_FEE_1ADT_38', 'SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_FARE_REFUND_NON_FLEX_1ADT_38']);
     expect(RF.selectCodes(all, { categories: ['happy'], modes: ['FARE'], groups: ['Fares'] })).toEqual(expect.arrayContaining(refunds));
     // Counted under both boxes; a facet made before `groups` counts under its group only.
     const p = RF.previewOf([...all.filter((x) => refunds.includes(x.code)), { code: 'OLD', category: 'happy', group: 'Fares', form: 'SEARCH' }], {});
-    expect([p.counts.groups.Refund, p.counts.groups.Fares]).toEqual([6, 7]);
+    expect([p.counts.groups.Refund, p.counts.groups.Fares]).toEqual([7, 8]);
   });
 
   test('#1039: the distribution modes, as the Test Framework reads them', () => {
