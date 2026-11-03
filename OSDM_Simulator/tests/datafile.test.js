@@ -739,6 +739,9 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
     // #907: refunds of fare sales; COMBINING fares from their own station.
     SIM_FARE_REFUND_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
+    // #1045: the same refund with the fares asked by search and by trip id.
+    SIM_FARE_REFUND_SRCH_1ADT_38: ['urn:uic:stn:0000001', 'SEARCH', undefined, true, undefined],
+    SIM_FARE_REFUND_TRIPIDS_1ADT_38: ['urn:uic:stn:0000001', 'SEARCH', undefined, true, undefined],
     SIM_FARE_REFUND_FEE_1ADT_38: ['urn:uic:stn:0000004', 'SPECIFICATION', true, true, undefined],
     SIM_FARE_REFUND_COMBINING_1ADT_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_COMBINING_FEE_38: [v.combiningFares, 'SPECIFICATION', true, true, undefined],

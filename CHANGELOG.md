@@ -105,6 +105,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.450] / [collection-OTST_V2.0.245] — 2026-11-03
+
+Issue #1045 (a refund of fares in every form of offer request), release 2026.488. The server change is the welcome-page news entry.
+
+### Added
+- **A refund of fares asked by search criteria and by trip id.** The four fare refunds of the simulator ask their fares by trip specification, the form #907 started from. OSDM ties a refund to the booked fulfilments, never to the form of the offer request, but nothing tested the other two forms. On gamma, New Run with Offer request *Search* kept no fare refund, and a provider taking search criteria alone had no fare refund to copy.
+  - Simulator scenarios `SIM_FARE_REFUND_SRCH_1ADT_38` (trip 1, from 0000001 to 0000002, the section the whole trip) and `SIM_FARE_REFUND_TRIPIDS_1ADT_38` (the same, by trip id). Both are the refund of `SIM_FARE_REFUND_1ADT_38`: a semi-flexible CLUSTERING fare refunded in full, no fee stated. With their copies for every other version (`version-copies.js`), their rows in *OSCAR - OSDM Simulator scenarios*, and the simulator references' run lists (regenerated).
+  - Reference scenarios `OTST_FARE_REFUND_SRCH_1ADT` (181 checks) and `OTST_FARE_REFUND_TRIPIDS_1ADT` (188: the trip id checks), capability Fare refund. A provider declaring one form of offer request is offered the fare refund in that form.
+
+### Changed
+- `SIM_FARE_SRCH_1ADT_*` and `SIM_FARE_TRIPIDS_1ADT_*` said they end after the offer step; they are booked and confirmed since #906. A description is what an AI analysis takes as the expected result.
+- *What is tested*: the two rows, the count (98).
+- A welcome-page news entry.
+
+### Checked
+- Replay of the two scenarios on every provider (3.6 to 3.12) and of `SIM_FARE_REFUND_1ADT_38`: no failed check, no warning; 181 checks by search (as by specification), 188 by trip id.
+- `fare-declarations.test.js`: a framework taking one form of offer request is offered the fare refund in that form, and the three with every form. `run-filters.test.js`: Refund + Fare based keeps the six fare refunds. The simulator's tests (`datafile.test.js` per fare scenario) and the server's catalogue tests pass.
+
+---
+
 ## [server-1.11.449] / [collection-OTST_V2.0.244] — 2026-11-03
 
 Issue #1070, release 2026.487.
