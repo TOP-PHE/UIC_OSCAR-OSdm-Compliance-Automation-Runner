@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-03-fare-reference-scenarios",
+    "date": "November 3, 2026",
+    "tag": "New",
+    "title": "Five more fare scenarios to copy",
+    "summary": "Copy scenarios offers five more reference scenarios to a provider that sells fares: first class, a reduction card, a family, a bicycle as a passenger, and a group of six.",
+    "content": "If your Test Framework declares the fare-based distribution, Copy scenarios in Test Config now offers five more fare sales: one adult in first class; one adult holding a reduction card (the first card your Test Framework declares); a family of an adult, a child of 8 and a young child one year under the age you declare free under Fares; an adult and a bicycle, the bicycle as a passenger of type BICYCLE, with fare admissions and fare ancillaries asked; and six adults.\n\nThe card scenario needs a reduction card declared, the family the age under which a fare is free, and the bicycle the passenger type BICYCLE. Copy scenarios says what is missing for each one."
+  },
+  {
     "id": "2026-11-02-answers-kept-as-sent",
     "date": "November 2, 2026",
     "tag": "Fixed",
