@@ -467,7 +467,7 @@ const SUBRUN_SALE_STATE = [
   'placeSelections', 'layoutId', 'preselectedCoach', 'preselectedPlace', 'preselectedPlaces',
   '__placeMapAtOfferFailed', '__postBookingPlaceMapDone',
   // fulfillments, refund, exchange
-  'fulfillmentIds', '__bookingFulfillmentIds',
+  'fulfillmentIds', '__bookingFulfillmentIds', '__confirmedFulfillments',
   'refundOffersOfferId', 'isRefundConfirmed', '__refundProposed', '__refundedFulfillmentIds',
   '__refundOfferIds', '__refundOfferIndex', '__refundOfferRetryCount', '__bookingForRefund',
   'exchangeOffersOfferId', 'exchangeOperationId', '__partIdsBeforeExchange',

@@ -345,7 +345,7 @@ request:
                 // Exchange / Refund
                 "exchangeOffersOfferId", "exchangeOperationId",
                 "requestExchangeOffersBodyData", "requestExchangeOperationsBodyData",
-                "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed", "__refundProposed", "__refundedFulfillmentIds", "__bookingFulfillmentIds",
+                "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed", "__refundProposed", "__refundedFulfillmentIds", "__bookingFulfillmentIds", "__confirmedFulfillments",
                 "requestRefundOffersBodyData",
                 // Partial refund (#218) — runtime-only side channels
                 "__bookingForRefund",

@@ -2303,6 +2303,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   stations), REAL_FORM (a variant), and REFUND_NON_FLEX (it expects a refund
   offer of 0, where a provider may refuse to refund a non-refundable fare;
   needs OTST's reading first).
+  **A refund names the fulfilments the confirmation gave** (1.11.447 /
+  OTST_V2.0.243, from a real provider's fare run: its booking at 07 had
+  `"fulfillments": []` after 06 gave two, and the fare refund sent
+  `{"fulfillmentIds": []}`). Step 06 keeps them
+  (`library-bruno/confirmedFulfillments.js`, `__confirmedFulfillments`, in
+  both reset lists and `SUBRUN_SALE_STATE`); at 07 a booking not listing
+  them is a WARNING (OSDM does not require `Booking.fulfillments`) and the
+  refund or exchange names them; with none from either, 07 fails one check
+  and ends the scenario (`stopWithoutFulfillment()`: a step cannot skip
+  itself, #652). F5 is "Every booked fare is in a fulfilment"; the product
+  path's #250 failure applies only when the confirmation gave none.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

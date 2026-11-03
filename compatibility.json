@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.484",
+  "current_release": "2026.485",
   "releases": [
+    {
+      "release": "2026.485",
+      "date": "2026-11-03",
+      "server": "1.11.447",
+      "collection": "OTST_V2.0.243",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, from a real provider's fare run, collection OTST_V2.0.243: step 06 keeps the fulfilments the confirmation gives. At 07, a booking that does not list them is a WARNING (OSDM does not require Booking.fulfillments), and the refund or exchange names the confirmation's; it used to take its ids from that booking and sent {\"fulfillmentIds\": []}, which the provider refused. A refund or exchange with no fulfilment id from either step ends at 07 with one failed check instead of sending an invalid request. Check F5 of a fare sale is \"Every booked fare is in a fulfilment\" and reads the confirmation's fulfilments when the booking lists none; for a product sale the same case was a failure (#250) and is now that WARNING.",
+        "Server 1.11.447: a welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.484",
       "date": "2026-11-03",

@@ -27,7 +27,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *       usage or links on a fare fulfilment                    06 06b 07 WARNING
  *   F3  a fare fulfilment names the parts it covers            06 06b 07 FAIL
  *   F4  no fulfilment holds both fares and product parts       06 06b 07 FAIL
- *   F5  every booked fare is in a fulfilment                          07 FAIL
+ *   F5  every booked fare is in a fulfilment (the booking's, else
+ *       the confirmation's: confirmedFulfillments.js, #1045)            07 FAIL
  *   F6  the fulfilment-step attributes are the offer's                07 WARNING
  *
  * Sources and levels are in #906 and #242 (D3 for F2). A fare REFUND scenario
@@ -275,16 +276,21 @@ function attributesCheck(booking, offer) {
     changed, 'attributes that differ from the offer (osdm.io, constructing products from fares: fulfilment step)');
 }
 
-/** The checks of the confirmed booking (07): B1–B3, B6, F1–F4 on its fulfilments, F5, F6. */
-function confirmedBookingChecks(booking, offer) {
+/**
+ * The checks of the confirmed booking (07): B1–B3, B6, F1–F4 on its
+ * fulfilments, F5, F6. F5 reads `fulfilled`: the booking's fulfilments, else
+ * the ones the confirmation gave (#1045: a provider's booking listed none).
+ */
+function confirmedBookingChecks(booking, offer, fulfilled = booking?.fulfillments) {
   const booked = bookedFaresOf(booking);
   const fulfillments = list(booking?.fulfillments);
-  const inFulfillments = new Set(fulfillments.flatMap((f) => list(f.bookingParts).map((p) => p.id)));
+  const inUse = list(fulfilled);
+  const inFulfillments = new Set(inUse.flatMap((f) => list(f.bookingParts).map((p) => p?.id)));
   return [
     ...bookingChecks(booking, offer, 'confirmed'),
     ...fulfillmentChecks(fulfillments, { fareIds: farePartIdsOf(booking, offer), productIds: productPartIdsOf(booking, offer), documents: booking?.fulfillmentDocuments }),
-    check('F5', 'FAIL', 'The booking lists its fulfilments, and every booked fare is in one (bookingParts)',
-      fulfillments.length === 0 ? ['the booking lists no fulfilment'] : booked.filter(({ fare }) => !inFulfillments.has(fare.id)).map(({ fare, path }) => `${path} (${fare.id})`),
+    check('F5', 'FAIL', 'Every booked fare is in a fulfilment (bookingParts)',
+      inUse.length === 0 ? ['neither the booking nor the confirmation lists a fulfilment'] : booked.filter(({ fare }) => !inFulfillments.has(fare.id)).map(({ fare, path }) => `${path} (${fare.id})`),
       'fares in no fulfilment'),
     ...[fareReservations.inFulfillmentCheck(booking, offer)].filter(Boolean),
     attributesCheck(booking, offer),
@@ -346,7 +352,7 @@ function checkFarePrebookedStep(body) {
   return true;
 }
 
-/** Step 06's after-response, for a fare sale: true when it checked the fulfilments. */
+/** Step 06's after-response, for a fare sale: true when it checked the fulfilments (06 keeps them first, confirmedFulfillments.js). */
 function checkFareFulfillmentStep(body) {
   if (!isFareSale()) return false;
   const fulfillments = list(body?.fulfillments);
@@ -374,10 +380,14 @@ function fulfillmentReadChecks(body, id) {
 function checkFareConfirmedStep(body) {
   if (!isFareSale()) return false;
   const booking = bookingOf(body);
-  recordFareChecks(confirmedBookingChecks(booking, readJson('offer')));
+  // #1045: the booking's fulfilments, else those the confirmation gave (a WARNING).
+  const confirmation = require('./confirmedFulfillments.js');
+  const inUse = confirmation.checkBookingLists(booking);
+  recordFareChecks(confirmedBookingChecks(booking, readJson('offer'), inUse));
   // The booked fares (and fare reservations, #255) are the parts a refund (#907) names.
   bru.setEnvVar('admissionReservationAncillaryBookingPartsIds', farePartIdsOf(booking, readJson('offer')).filter(Boolean));
-  const next = require('./fareRefund.js').prepareFareRefund(booking);
+  const next = require('./fareRefund.js').prepareFareRefund({ ...booking, fulfillments: inUse });
+  if (next && confirmation.stopWithoutFulfillment(confirmation.idsOf(inUse))) return true;
   if (next) {
     validationLogger('[INFO] [fares] Fare sale booked and confirmed: its refund comes next (#907).');
     bru.runner.setNextRequest(next);
