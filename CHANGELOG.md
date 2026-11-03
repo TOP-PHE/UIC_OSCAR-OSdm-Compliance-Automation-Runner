@@ -105,6 +105,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.449] / [collection-OTST_V2.0.244] — 2026-11-03
+
+Issue #1070, release 2026.487.
+
+### Added
+- **The W3C Trace Context on every OSDM request.** OSDM declares `traceparent` and `tracestate` on every operation (3.4 to 3.12). Until now OSCAR sent them only when a Test Manager typed a fixed value as a dedicated header, so every request had the same parent-id, which W3C Trace Context does not allow (Level 1, Recommendation of 23 November 2021: "parent-id" set for each outgoing request), and a provider could not tell one sale from another.
+  - **One trace per sale** (maintainer, 2026-11-03). Each send of `01. POST Get Offer` starts a new trace (a first sale, a loop-back, an expiry sub-run, a retry); every request after it carries that trace id with a parent-id of its own, request files and script-sent requests alike (01b/01c/01d, probes, Idempotency-Key replays, refund per fulfilment, trips by id, exchange, refund). A request sent while no sale is open, the system information reads at the start of a run, starts a trace of its own. `library-bruno/traceContext.js`; the flow is `__traceUuid`, cleared at the scenario start only (the parser's reset runs inside 01's own script, after the new trace has started).
+  - **The run log says where each trace starts**: `[INFO] 🔗 Trace <id> starts at 01. POST Get Offer`, the id to give the provider. Not 🧭, which the runner files as an offer-option report.
+  - **Set in the Test Framework**, `traceContext: { send, sampled, tracestate }`; absent = a sampled traceparent (`01`: OSCAR keeps every request of a run) and no tracestate. The tracestate is a template in which OSCAR fills in `{{traceId}}`, `{{uuid}}` (the same id written as a UUID, for keys such as SBB's `processid`) and `{{parentId}}`. W3C fixes the rest of `traceparent`, so only its flag is a choice.
+  - **Checked at the three framework writers** (Test Config, configuration import, checklist apply): 400 for another placeholder, a stray `{{` or `}}`, or a tracestate W3C would refuse once filled in (key and value characters, no space around `=`, at most 32 members, unique keys, 512 characters). `public/js/trace-context.js`, shared by the page, the server and the tests.
+  - **The run gets the template already parsed** (`__traceContext`, written with `envVar()`), so no `{{` of it reaches Bruno, which would fill it in itself.
+  - **Test Config**: a *🔗 Trace Context (W3C)* section in the Test Framework, with a preview using W3C's example ids; a tracestate W3C would refuse is said and not saved.
+  - **OSCAR's own calls to a provider** (Discover timetable, re-probe, journey probe, fill calendars, Places refresh, Test my credentials) send the same headers, each request a trace of its own (`withTraceHeaders()`, `osdm-client.js`).
+
+### Changed
+- **A dedicated header named `traceparent` (or `tracestate`, when the Test Framework names one) is replaced** by OSCAR's, with one warning per run asking to set it in the Test Framework. With the trace context turned off, dedicated headers go as they are.
+- **The fixed `traceparent` / `tracestate` of a standalone SBB environment are gone** (`API === "SBB"` in the collection, never reached on OSCAR); `accept-language` stays.
+- A token request (`00-Access Token`, standalone runs) is not traced: it is OAuth, not OSDM.
+- A welcome-page news entry; the Tester User Guide (§3.1, §6 HTTP Traffic, §8) and the Server Admin Guide (§15.11).
+
+### Checked
+- Real Bruno CLI on the local simulator (gamma): `SIM_REFUND_PAX_2ADT_38`, `SIM_SALE_BY_TRIP_ID_1ADT_38` and `SIM_SALE_IDEMPOTENCY_1ADT_38` give the same checks and warnings on `main` and on this branch (replay `compare`); in Bruno's results every request sent carries a W3C traceparent with a parent-id of its own, one trace from `01. POST Get Offer` to the end of the refund, and `processid={{uuid}}` arrives as the trace id written as a UUID.
+- `trace-context.test.js` (70 tests): the W3C rules, the flow, the page, the collection and the server giving the same headers, and the wiring (every script-sent request to the provider carries the trace). Removing the flow start, a script-sent request's trace, the per-request parent-id, the scenario-start reset, the route's check or the dedicated-header replacement each fails a test.
+- Through a throwaway OSCAR on the simulator: a Test Framework with `processid={{uuid}}`, one run of `SIM_REFUND_PAX_2ADT_38` through the runner; the request headers OSCAR stored (HTTP Traffic) and the two `🔗 Trace` lines of the run log are as above. In Test Config, the section's preview follows the typing, `processid = {{uid}}` is refused and not saved, a valid edit and the *Sampled* box are saved.
+- Tests that pin a script-sent request's exact headers now include its `traceparent` (`bruno-trip-ids.test.js`), and the change-event chain pinned in three tests ends with `changeTraceContext`. A script-sent request with no trace open starts one without a log line (it never happens in a run: the system information reads open one), and a trace never stops a request: `withTrace()` gives the headers as they are on any error.
+
+---
+
 ## [server-1.11.448] — 2026-11-03
 
 Issue #1045 (the launch filters on gamma), release 2026.486.

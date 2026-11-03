@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.486",
+  "current_release": "2026.487",
   "releases": [
+    {
+      "release": "2026.487",
+      "date": "2026-11-03",
+      "server": "1.11.449",
+      "collection": "OTST_V2.0.244",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1070, collection OTST_V2.0.244: every OSDM request carries the W3C Trace Context headers OSDM declares on every operation (W3C Trace Context Level 1, Recommendation of 23 November 2021). One trace per sale: each send of 01. POST Get Offer starts a new trace id, which every request of that sale carries, request files and script-sent requests alike, each with a parent-id of its own; a request sent while no sale is open (the system information reads) starts a trace of its own. The run log says where each trace starts and its id. A token request is not traced. A fixed traceparent or tracestate set as a dedicated header (API Config) is replaced, with one warning per run; the fixed SBB values of a standalone environment are gone.",
+        "Server 1.11.449: the Test Framework's traceContext { send, sampled, tracestate }, absent = a sampled traceparent and no tracestate. The tracestate is a template in which OSCAR fills in {{traceId}}, {{uuid}} (the trace id as a UUID, for keys such as processid) and {{parentId}}; the three framework writers answer 400 for any other placeholder or a tracestate W3C would refuse. The runner hands it to Bruno already parsed (__traceContext), so no \"{{\" reaches the engine. Test Config's Test Framework has a Trace Context (W3C) section with a preview (public/js/trace-context.js, shared by the page and the server). OSCAR's own calls to a provider (Discover timetable, re-probe, journey probe, fill calendars, Places refresh, Test my credentials) send the same headers, each request a trace of its own. A welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.486",
       "date": "2026-11-03",

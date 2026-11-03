@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-03-w3c-trace-context",
+    "date": "November 3, 2026",
+    "tag": "New Feature",
+    "title": "W3C trace ids on every OSDM request",
+    "summary": "Every request OSCAR sends to a provider now carries the W3C traceparent header OSDM declares, with one trace id per sale, so a provider can find OSCAR's requests in its logs.",
+    "content": "OSDM declares the W3C Trace Context headers, traceparent and tracestate, on every operation. OSCAR now sends them on every request. Each offer search starts a new trace id, and every request of that sale, up to its refund or exchange, carries it with an id of its own. The run log says where each trace starts and gives its id: give it to the provider when you ask about a request.\n\nTest Managers set this in the Test Framework, section Trace Context (W3C): whether to send the headers, the sampled flag, and an optional tracestate. In the tracestate, OSCAR fills in {{traceId}}, {{uuid}} (the same trace id written as a UUID, for a key such as processid={{uuid}}) and {{parentId}}. A tracestate W3C would refuse is not saved, and the preview says why.\n\nOSCAR's own calls to the provider (Discover timetable, Places, Test my credentials) send the same headers.\n\nIf you set a fixed traceparent or tracestate as a dedicated header in API Config, OSCAR now sends its own instead and the run log warns once. Remove the dedicated header, and set the tracestate in the Test Framework if your provider needs one."
+  },
+  {
     "id": "2026-11-03-fare-refunds-under-refund",
     "date": "November 3, 2026",
     "tag": "Improved",

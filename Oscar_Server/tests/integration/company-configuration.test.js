@@ -229,6 +229,16 @@ describe('refusals change nothing', () => {
     expectProviderUnchanged();
   });
 
+  // #1070: the framework's trace context is checked as the Test Framework route checks it.
+  test('a trace context W3C would refuse stops everything', async () => {
+    const traced = structuredClone(bundle);
+    traced.framework = { ...traced.framework, traceContext: { tracestate: 'processid = {{uuid}}' } };
+    const res = await importInto(TM, traced, ALL_IN);
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/^The configuration's Test Framework: .*is not a tracestate key/);
+    expectProviderUnchanged();
+  });
+
   test('a template added in the data file stops everything', async () => {
     const templated = structuredClone(bundle);
     templated.datafile.scenarios[0].description = 'see {{access_token}}';

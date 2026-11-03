@@ -67,3 +67,43 @@ describe('mergeDedicatedHeaders decrypts the stored (encrypted) extra_headers', 
     expect(headers['X-Legacy']).toBe('plain');
   });
 });
+
+// #1070: the W3C trace context of OSCAR's own calls to a provider.
+describe('withTraceHeaders / traceSettingsFor (#1070)', () => {
+  const { withTraceHeaders, traceSettingsFor } = require('../../src/utils/osdm-client');
+  const { run } = require('../../src/db/db');
+  const { isTraceparent, settingsOf } = require('../../public/js/trace-context');
+
+  test('a copy with a trace of its own, the dedicated one replaced, the rest kept', () => {
+    const dedicated = { Requestor: 'ACME', TraceParent: 'cafebabe-0815', tracestate: 'processid=abc' };
+    const a = withTraceHeaders(dedicated, settingsOf({}));
+    const b = withTraceHeaders(dedicated, settingsOf({}));
+    expect(dedicated.TraceParent).toBe('cafebabe-0815');                  // not changed in place
+    expect(a.TraceParent).toBeUndefined();
+    expect(isTraceparent(a.traceparent)).toBe(true);
+    expect(a.traceparent.split('-')[1]).not.toBe(b.traceparent.split('-')[1]);
+    expect(a).toMatchObject({ Requestor: 'ACME', tracestate: 'processid=abc' });
+  });
+
+  test('the framework\'s tracestate is filled in with the call\'s own trace id', () => {
+    const h = withTraceHeaders({}, settingsOf({ traceContext: { tracestate: 't={{traceId}}' } }));
+    expect(h.tracestate).toBe(`t=${h.traceparent.split('-')[1]}`);
+  });
+
+  test('none sent: the headers as they are', () => {
+    expect(withTraceHeaders({ traceparent: 'fixed' }, settingsOf({ traceContext: { send: false } }))).toEqual({ traceparent: 'fixed' });
+  });
+
+  test('the settings come from the company\'s Test Framework, the defaults without one', () => {
+    const company = require('node:crypto').randomUUID();
+    run('INSERT INTO companies (id, name, slug) VALUES (?, ?, ?)', [company, 'Trace Co', `trace-${company.slice(0, 8)}`]);
+    try {
+      expect(traceSettingsFor(company)).toEqual({ send: true, sampled: true, tracestate: '' });
+      run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+        [require('node:crypto').randomUUID(), company, colEncrypt(JSON.stringify({ traceContext: { sampled: false } }))]);
+      expect(traceSettingsFor(company)).toEqual({ send: true, sampled: false, tracestate: '' });
+    } finally {
+      run('DELETE FROM companies WHERE id = ?', [company]);
+    }
+  });
+});

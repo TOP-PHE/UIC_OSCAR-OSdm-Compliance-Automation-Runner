@@ -65,13 +65,14 @@ async function send(path, body, key) {
       bru.sendRequest({
         url: `${bru.getEnvVar('api_base')}${path}`,
         method: 'POST',
-        headers: {
+        // #1070: the sale's W3C trace, a parent-id of its own.
+        headers: require('./traceContext.js').withTrace({
           'Content-Type': `application/json;version=${bru.getEnvVar('osdmVersion')}`,
           Accept: 'application/json',
           Authorization: `Bearer ${bru.getEnvVar('access_token')}`,
           ...requestorHeader(bru.getEnvVar('requestor')),
           ...(key ? { 'Idempotency-Key': key } : {}),
-        },
+        }),
         data: typeof body === 'string' ? body : JSON.stringify(body ?? {}),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });

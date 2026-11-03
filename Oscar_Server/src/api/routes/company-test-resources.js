@@ -24,7 +24,7 @@ const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
-const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
+const { mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
 const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, fitsOneTripDate, searchDates, classifyOfferProbe, summarizeOfferProbe, serviceFindings, servicesUnseen, dayOfWeekCode } = require('../../services/timetable-discovery');
 const { journeyPlan, probeDates, compareAnswer, probeSummary, collectOfferedTrips, tripToKeep } = require('../../services/journeyProbe');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
@@ -273,18 +273,19 @@ async function _vendorSession(req, res, targetCompanyId) {
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Discovery silently ignored them.
   mergeDedicatedHeaders(extraHeaders, company, token);
-  return { company, token, extraHeaders };
+  // #1070: and a W3C trace context of its own on each call (withTraceHeaders).
+  return { company, token, extraHeaders, trace: traceSettingsFor(company.id) };
 }
 
 // #717: `days` days of POST /offers for a route, one after the other.
 // { harvested: records (harvestTrips), daysAnswered }.
-async function _searchRouteDays({ company, token, extraHeaders }, origin, destination, days) {
+async function _searchRouteDays({ company, token, extraHeaders, trace }, origin, destination, days) {
   const harvested = [];
   let daysAnswered = 0;
   await searchDates(days, new Date()).reduce((previous, date) => previous.then(async () => {
     let r;
     try {
-      r = await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, origin, destination, company.api_base), extraHeaders);
+      r = await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, origin, destination, company.api_base), withTraceHeaders(extraHeaders, trace));
     } catch { return; }   // a day that fails is a day not answered
     if (!r.ok) return;
     daysAnswered++;
@@ -372,7 +373,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
 
   const session = await _vendorSession(req, res, targetCompanyId);
   if (!session) return;
-  const { company, token, extraHeaders } = session;
+  const { company, token, extraHeaders, trace } = session;
 
   // Search day-by-day. For each day we try the endpoints in preference order
   // (trips-collection → offers); both responses carry `trips[]`. Once one
@@ -401,7 +402,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
     for (const endpoint of order) {
       let r;
       try {
-        r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination, company.api_base), extraHeaders);
+        r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination, company.api_base), withTraceHeaders(extraHeaders, trace));
       } catch (err) {
         lastStatus = 0;
         lastError = err.name === 'AbortError' ? 'timeout' : err.message;
@@ -564,6 +565,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Re-probe silently ignored them.
   mergeDedicatedHeaders(extraHeaders, company, token);
+  const trace = traceSettingsFor(targetCompanyId);   // #1070
 
   const rows = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN']);
   const trains = rows.map(r => {
@@ -586,7 +588,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   let updatedCount = 0;
   const ask = async (date, od, atTime) => {
     try {
-      return await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, od.origin, od.destination, company.api_base, atTime), extraHeaders);
+      return await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, od.origin, od.destination, company.api_base, atTime), withTraceHeaders(extraHeaders, trace));
     } catch (_err) { return null; }
   };
   await inSequence([...byOd.values()], async (od) => {
@@ -634,7 +636,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
 
 // #813: one day of a journey probe. The trip search first, /offers when it
 // fails or is not there; `state.endpoint` keeps the one that answered.
-async function _probeJourneyDay({ company, token, extraHeaders }, plan, date, state) {
+async function _probeJourneyDay({ company, token, extraHeaders, trace }, plan, date, state) {
   const origin = plan.legs[0].origin;
   const destination = plan.legs.at(-1).destination;
   const atTime = plan.legs[0].departure ? `${plan.legs[0].departure}:00` : undefined;
@@ -643,7 +645,7 @@ async function _probeJourneyDay({ company, token, extraHeaders }, plan, date, st
   for (const endpoint of endpoints) {
     let r;
     try {
-      r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination, company.api_base, atTime), extraHeaders);
+      r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination, company.api_base, atTime), withTraceHeaders(extraHeaders, trace));
     } catch (err) {
       last = { date, status: null, via: endpoint, error: err.name === 'AbortError' ? 'no answer within 20 s' : 'the call failed' };
       continue;

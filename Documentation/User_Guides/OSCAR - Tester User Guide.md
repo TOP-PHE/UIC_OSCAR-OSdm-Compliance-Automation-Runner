@@ -579,6 +579,7 @@ anything — it defines the menu that scenario authoring is limited to.
 | **Ancillaries** | `ancillaries[]` | The catalog of ancillary types the vendor sells. Declaring ≥1 enables the **Add ancillary** action. Defined once, reusable per train (issue #130). |
 | **Passenger types & ages** | `passengerTypes`, `passengerAgeRanges` | e.g. `ADULT 26–99`, `CHILD 4–15`. |
 | **Concurrency limit** | per‑company | Max parallel runs OSCAR fires at this vendor. Lower it if the vendor is fragile under load (see §8). |
+| **Trace context (W3C)** | 🔗 *Trace Context (W3C)* (`traceContext`) | OSDM declares the W3C Trace Context headers `traceparent` and `tracestate` on every operation (issue #1070). On by default: **one trace per sale**. Each offer search (`01. POST Get Offer`) starts a new trace id, and every request of that sale, up to its refund or exchange, carries it with an id of its own (the parent-id). The run log gives each trace id (§6, HTTP Traffic). *Sampled* sends flag `01` (OSCAR keeps every request of a run), unticked `00`. *tracestate* is optional: `key=value` pairs, comma-separated, no space around `=`, in which OSCAR fills in `{{traceId}}`, `{{uuid}}` (the same trace id written as a UUID, for a key such as `processid={{uuid}}`) and `{{parentId}}`. A tracestate W3C would refuse is not saved, and the preview under the field says why. OSCAR's own calls (Discover timetable, Places, Test my credentials) send the same headers, each request a trace of its own. Unticked: no trace header is sent. |
 
 **The golden rule:** *a scenario can only switch on what the framework
 authorises.* If a control is greyed out during scenario authoring, the reason is
@@ -1456,6 +1457,16 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 **HTTP status vs. assertion failures are different things.** A request can be
 `200` (HTTP OK) and still have failed assertions (spec deviations), and vice‑versa.
 
+**Trace ids, to find a request in the provider's logs** (issue #1070). Every
+request carries a W3C `traceparent` header, `00-<trace id>-<parent id>-01`.
+The trace id is the same for every request of one sale, from its offer search
+to its refund or exchange; the parent id is the request's own. The Execution
+Log says where each trace starts, for example
+`[INFO] 🔗 Trace 80fc73d96fa445208a9d0117ccf68be8 starts at 01. POST Get Offer`.
+Give the provider that id, or the whole `traceparent` of one request, and it
+can find OSCAR's requests in its logs. What is sent is set in the Test
+Framework (§3.1).
+
 ### Test Framework coverage (Report Builder)
 
 The **Test Framework Coverage** card of the Report Builder is not tied to one
@@ -1806,6 +1817,8 @@ shown. A company whose shared reports were all withdrawn leaves the list.
 | `[WARNING] confirmedPrice absent at booking stage` REFUNDED / EXCHANGED | The vendor's booking omits `confirmedPrice` after a refund or exchange | A warning since 1.11.248 (#661): OSDM does not require the member, and after a full refund it would hold only what is still confirmed. Before the refund it is still required. |
 | Seat map step (`08`) **missing** from the report on a `SEATMAP_AT_OFFER` scenario | The scenario's **mode wasn't actually saved** (stale value), so it ran `ADD_TO_BOOKING` | Open the scenario, click the **Seat map at offer** pill, save, re‑run. |
 | Many "failed" assertions on `200` responses | OSDM **compliance** deviations in the vendor's responses | These are the conformance findings — review them; they're the point of the tool. |
+| `[WARNING] The dedicated header traceparent of API Config is replaced by OSCAR's W3C trace context` (or `tracestate`) | A Test Manager set a fixed `traceparent` or `tracestate` as a dedicated header, for a provider that asks for one. Since 1.11.449 OSCAR sends its own, with an id of its own for each request, as W3C requires | Remove the dedicated header from API Config. If the provider needs a `tracestate`, set it in the Test Framework (🔗 *Trace Context*), for example `processid={{uuid}}`. A dedicated `tracestate` is kept while the Test Framework names none. |
+| The provider asks which of its logs a failed request is | — | Give it the trace id of the run log's `🔗 Trace` line, or the request's `traceparent` header in HTTP Traffic (§6). |
 | Test Config shows **❌ Error: … could not be loaded …** instead of the editor, or the scenario wizard answers **The scenario was not generated** | OSCAR could not read what is stored (connection lost, server busy, rate limit). It stops there on purpose: carrying on from an empty page could replace the stored configuration | **Reload the page.** Nothing was changed. If it keeps happening, wait a minute and try again, and report the reason shown in the message. |
 | A red notification appears in Test Config after **Refresh**, deleting a train or **Save all trains** | The action failed, and the notification gives the reason (for example "The test configuration could not be loaded"). Before 1.11.204 such a failure showed nothing | **Reload the page and try again.** The page kept what it had. If it keeps happening, report the reason shown. |
 | Saving in Test Config answers **This text contains "{{" and cannot be saved** | A scenario, or one of its trips, passengers, purchasers or fulfillment options, holds two opening curly braces. The test engine reads what follows them as the name of a variable and puts that variable's value in its place. | Remove the `{{` from the place named in the message, then save again. A single `{` is fine. |
