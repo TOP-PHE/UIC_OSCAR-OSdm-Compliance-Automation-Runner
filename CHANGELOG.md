@@ -105,6 +105,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.446] / [collection-OTST_V2.0.242] — 2026-11-03
+
+Issue #1045 (the reference scenarios of the newer simulator fare scenarios), release 2026.484.
+
+### Added
+- **Five fare reference scenarios** in the catalogue, from the fare scenarios #1048 added to the simulator. Like the other fare entries, they are offered only to a Test Framework that declares the fare-based distribution, and ask fares by trip specification for the last leg's section. Each made 117 checks on gamma, none failed, no warning.
+  - `OTST_FARE_FIRST_1ADT` (`SIM_FARE_FIRST_1ADT_38`): one adult in first class.
+  - `OTST_FARE_REDUCTION_CARD_1ADT` (`SIM_FARE_CARD_1ADT_38`): one adult holding the first reduction card the framework declares (limit `REDUCTION_CARDS`, as the product card entries).
+  - `OTST_FARE_FAMILY` (`SIM_FARE_FAMILY_38`): an adult, a child of 8 and a young child one year under the age declared free (limit `FREE_CHILD`).
+  - `OTST_FARE_BICYCLE_ADMISSION` (`SIM_FARE_BICYCLE_ADMISSION_38`): an adult and a bicycle, a passenger of type BICYCLE, with `FARE_ADMISSION` and `FARE_ANCILLARY` and no fare reservation. It needs passenger type BICYCLE declared, nothing under Fares.
+  - `OTST_FARE_GROUP_6ADT` (`SIM_FARE_GROUP_6ADT_38`): six adults.
+- Left out: `SIM_FARE_TRANSIT_1ADT_38` and `SIM_FARE_ROUTES_1ADT_38` (their point is the simulator's border and route stations), `SIM_FARE_REAL_FORM_1ADT_38` (a simulator variant), and `SIM_FARE_REFUND_NON_FLEX_1ADT_38`: it expects a refund offer that gives nothing back, and a provider may instead refuse to refund a non-refundable fare.
+
+### Changed
+- **The copy of a free-child entry changes only the youngest passenger** (`freeChildPassengers()`, `catalogueMatch.js`). It gave every passenger with an age the free child's age, which would have made the family's adult and older child free children too. `OTST_FARE_FREE_CHILD` has one passenger with an age and is copied as before.
+- A welcome-page news entry.
+
+### Checked
+- Replay of the five sources and `SIM_FARE_SPEC_1ADT_38` on `main`: 117 checks each; the plain fare sale's 118th is the check of the SEMI_FLEX cluster it asks.
+- The catalogue tests, the fare declaration tests (what each entry needs, the family and card copies) and *What is tested*'s rows.
+
+---
+
 ## [server-1.11.445] / [collection-OTST_V2.0.241] — 2026-11-02
 
 Issue #1045 (from the AI analysis of gamma's fare runs), release 2026.483. The server change is the welcome-page news entry.

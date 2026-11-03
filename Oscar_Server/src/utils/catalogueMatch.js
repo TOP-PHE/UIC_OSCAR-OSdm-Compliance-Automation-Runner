@@ -379,11 +379,17 @@ function applyFreeChildLimit(source, fw, ownList) {
 }
 
 // #937: the source's passengers, the child (an age on the day of travel) one
-// year under the age the framework declares free, never below 0.
+// year under the age the framework declares free, never below 0. #1045: only
+// the youngest passenger given an age, so a family keeps its adult and its
+// older child.
 function freeChildPassengers(source, age) {
-  return arr(source).filter(isObj).map((p) => {
+  const given = arr(source).filter(isObj);
+  const ages = given.map((p) => p.bornYearsBeforeTravel).filter(Number.isInteger);
+  const min = Math.min(...ages);
+  const youngest = given.findIndex((p) => p.bornYearsBeforeTravel === min);
+  return given.map((p, i) => {
     const out = structuredClone(p);
-    if (Number.isInteger(out.bornYearsBeforeTravel)) {
+    if (i === youngest) {
       out.bornYearsBeforeTravel = Math.max(0, age - 1);
       delete out.bornDaysAfter;
     }

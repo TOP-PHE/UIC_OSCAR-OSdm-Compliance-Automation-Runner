@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.483",
+  "current_release": "2026.484",
   "releases": [
+    {
+      "release": "2026.484",
+      "date": "2026-11-03",
+      "server": "1.11.446",
+      "collection": "OTST_V2.0.242",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, collection OTST_V2.0.242: five reference scenarios from the simulator's newer fare scenarios, offered to a Test Framework that declares the fare-based distribution: a fare sale in first class (OTST_FARE_FIRST_1ADT), with a reduction card the framework declares (OTST_FARE_REDUCTION_CARD_1ADT), for a family whose youngest is one year under the age declared free (OTST_FARE_FAMILY), for an adult and a bicycle sold as a passenger of type BICYCLE with FARE_ADMISSION and FARE_ANCILLARY (OTST_FARE_BICYCLE_ADMISSION), and for six adults (OTST_FARE_GROUP_6ADT); 117 checks each on the simulator.",
+        "Server 1.11.446: the copy of a free-child entry makes only the youngest passenger the free child, so a family keeps its adult and its older child; OTST_FARE_FREE_CHILD is copied as before. A welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.483",
       "date": "2026-11-02",

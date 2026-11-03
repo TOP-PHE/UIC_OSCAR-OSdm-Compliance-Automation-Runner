@@ -2293,6 +2293,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   old and new answers with `answersOfDocx()`. Simulator fares carry
   `accountingRef` (the carrier, `SIM-<template>-<serial>-<tariff>`), kept
   when booked.
+  **Five fare reference scenarios from #1048's** (1.11.446 /
+  OTST_V2.0.242): `OTST_FARE_FIRST_1ADT`, `_REDUCTION_CARD_1ADT` (limit
+  `REDUCTION_CARDS`: the test admits `SIM_FARE_CARD_` sources),
+  `_FAMILY` (limit `FREE_CHILD`; `freeChildPassengers()` now changes the
+  youngest passenger with an age only), `_BICYCLE_ADMISSION` (passenger
+  type BICYCLE, nothing under Fares) and `_GROUP_6ADT`, 117 checks each.
+  Left out on purpose: TRANSIT and ROUTES (the simulator's border and route
+  stations), REAL_FORM (a variant), and REFUND_NON_FLEX (it expects a refund
+  offer of 0, where a provider may refuse to refund a non-refundable fare;
+  needs OTST's reading first).
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

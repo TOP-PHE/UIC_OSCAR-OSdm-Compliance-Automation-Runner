@@ -224,7 +224,7 @@ have the same, as copies. In short:
 | Negative fare requests (#905): fares not asked, no section (by search, then a product sale; on a specification sent as domestic), an empty list of sections; one wrong answer (not in the run list) | 4 + 1 | `gamma` |
 | Fares from DB's templates (#1048) and what a fare says (#1045): first class, a card holder, a family, a bicycle fare, a group, border to border, several routes, a NON_FLEX refund, the form of a real provider's answer; five wrong answers that warn only (not in the run list) | 9 + 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (89)
+### 4.2 The reference scenarios of the catalogue (96)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -336,7 +336,9 @@ Offered only to a Test Framework that declares the fare-based distribution
 asks a fare cluster the framework declares (its own, else the most flexible
 declared), and moves the requested section onto the chosen trip by position:
 the whole trip stays the whole trip, a section from a station inside it to the
-destination becomes the new trip's last leg.
+destination becomes the new trip's last leg. The card holder of a fare sale
+takes the first reduction card the framework declares; in a family, the
+youngest passenger becomes the child one year under the age declared free.
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
@@ -344,6 +346,11 @@ destination becomes the new trip's last leg.
 | `OTST_FARE_SRCH_1ADT` | Fare sale for one adult by search criteria: fares asked for the whole trip, the fare offers checked, the fare offer of the chosen cluster booked and fulfilled as fares. | the fare-based distribution | 118 | `SIM_FARE_SRCH_1ADT_38` |
 | `OTST_FARE_TRIPIDS_1ADT` | Fare sale for one adult by trip id: POST /trips-collection, then the fares of the trip chosen, by its id, for the whole trip; the fare offer of the chosen cluster booked and fulfilled as fares. | the fare-based distribution | 125 | `SIM_FARE_TRIPIDS_1ADT_38` |
 | `OTST_FARE_FREE_CHILD` | Fare sale for an adult and a child one year under the age the Test Framework declares free: every passenger has a fare, the child's priced 0. | the fare-based distribution, the age under which a fare is free | 117 | `SIM_FARE_SPEC_FREE_CHILD_38` |
+| `OTST_FARE_FIRST_1ADT` | Fare sale for one adult in first class (travelClass FIRST): the fare offers checked as in the plain fare sale, O18 warns when no fare offer is in the class asked; the fare offer chosen booked and fulfilled as fares. | the fare-based distribution | 117 | `SIM_FARE_FIRST_1ADT_38` |
+| `OTST_FARE_REDUCTION_CARD_1ADT` | Fare sale for an adult holding a reduction card, the first one the Test Framework declares: the card is sent with the passenger, O16 warns when a fare requires a card the passenger does not hold; the fare offer chosen booked and fulfilled as fares. | the fare-based distribution, a reduction card | 117 | `SIM_FARE_CARD_1ADT_38` |
+| `OTST_FARE_FAMILY` | Fare sale for a family: an adult, a child of 8 and a young child one year under the age the Test Framework declares free. Every passenger has a fare (the young child's may be priced 0), O17 warns when a passenger's age is outside its fare's passenger constraints; booked and fulfilled as fares. | the fare-based distribution, the age under which a fare is free | 117 | `SIM_FARE_FAMILY_38` |
+| `OTST_FARE_BICYCLE_ADMISSION` | Fare sale for an adult and a bicycle, the bicycle as a passenger of type BICYCLE: FARE_ADMISSION and FARE_ANCILLARY asked, no fare reservation. The bicycle is sent with its reference and type only (no name, date of birth or contact) and has a fare of its own, admission or ancillary; booked and fulfilled as fares. | the fare-based distribution, passenger type BICYCLE | 117 | `SIM_FARE_BICYCLE_ADMISSION_38` |
+| `OTST_FARE_GROUP_6ADT` | Fare sale for six adults: one fare per passenger in each fare offer, whatever fares the provider gives a group; the fare offer chosen booked and fulfilled as fares. | the fare-based distribution | 117 | `SIM_FARE_GROUP_6ADT_38` |
 | `NHF_FARE_UNASKED` | Negative fare request: a section named but only ADMISSION asked; a fare in the answer fails (fares are given only when asked). The scenario ends after the offer. | the fare-based distribution | 71 | `SIM_NHF_FARE_UNASKED_38` |
 | `NHF_FARE_NO_SECTION` | Negative fare request: FARE_ADMISSION asked by trip specification without a section; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 71 | `SIM_NHF_FARE_NO_SECTION_SPEC_38` |
 | `NHF_FARE_EMPTY_SECTIONS` | Negative fare request: FARE_ADMISSION asked by trip specification with an empty list of sections; a fare in the answer fails. The scenario ends after the offer. | the fare-based distribution | 71 | `SIM_NHF_FARE_EMPTY_SECTIONS_38` |
