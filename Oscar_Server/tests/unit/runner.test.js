@@ -566,6 +566,38 @@ describe('executeRun — S6 dedicated-header decryption', () => {
   });
 });
 
+// ── #1070: the Test Framework's W3C trace context reaches the run ─────────────
+describe('executeRun — W3C trace context', () => {
+  async function envOfRun(framework) {
+    const { companyId, userId } = seedCompanyUser();
+    if (framework) {
+      run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+        [require('node:crypto').randomUUID(), companyId, colEncrypt(JSON.stringify(framework))]);
+    }
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    const { readEnvYml, valueIn } = require('../helpers/env-yml');
+    const envFile = fs.readdirSync(ENVS_DIR).find(f => f.includes(runId.slice(0, 8)));
+    const value = valueIn(readEnvYml(fs.readFileSync(path.join(ENVS_DIR, envFile), 'utf8')), '__traceContext');
+    fakeProc.emit('close', 0);
+    await p;
+    return JSON.parse(value);
+  }
+
+  test('the framework\'s settings, the tracestate parsed', async () => {
+    expect(await envOfRun({ osdmVersion: '3.8', traceContext: { sampled: false, tracestate: 'processid={{uuid}}' } }))
+      .toEqual({ send: true, flags: '00', tracestate: [['t', 'processid='], ['v', 'uuid']] });
+  });
+
+  test('no framework: the defaults', async () => {
+    expect(await envOfRun(null)).toEqual({ send: true, flags: '01', tracestate: [] });
+  });
+});
+
 // ── Detected auth/format errors surfaced onto the run row ─────────────────────
 describe('executeRun — auth/token-format error detection from CLI output', () => {
   test('sets error_message = TOKEN_AUTH_ERROR when a 401 appears in stdout', async () => {
@@ -1068,7 +1100,7 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       expect(file.name).toBe(envName);
       expect(file.variables.map(v => v.name)).toEqual([
         'api_base', 'library_base', 'data_base', 'json_schema', 'scenariosToRunIndex', 'scenario_override',
-        'runHardDeadlineMs', '__runId', 'oscar_loopback_base',
+        '__traceContext', 'runHardDeadlineMs', '__runId', 'oscar_loopback_base',
       ]);
       expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');
       expect(valueIn(file, 'scenario_override')).toBe('OTST_SALE_1ADT_1LEG');
@@ -1083,7 +1115,7 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       const file = readEnvYml(envFile);
       expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');   // valueIn throws on a second one
       expect(valueIn(file, 'scenario_override')).toBe(crafted);
-      expect(file.variables).toHaveLength(9);
+      expect(file.variables).toHaveLength(10);   // #1070: __traceContext
     });
 
     test('single braces, and a code with no template, still run', async () => {

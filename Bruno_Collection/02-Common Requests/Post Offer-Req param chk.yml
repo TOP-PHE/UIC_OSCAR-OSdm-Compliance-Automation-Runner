@@ -115,12 +115,18 @@ runtime:
             const resolvedUrl = resolveVars(url);
             const resolvedMethod = resolveVars(method || "POST");
             validationLogger(`[DEBUG] After variable resolution - URL: ${resolvedUrl}, Method: ${resolvedMethod}`);
+            // #1070: each probe its own W3C parent-id, not a copy of the request's.
+            const traced = Object.entries(require(bru.getEnvVar("library_base") + "traceContext.js").withTrace({}))
+              .map(([key, value]) => ({ key, value }));
+            const probeHeaders = (headers || [])
+              .filter(h => !["traceparent", "tracestate"].includes(String(h.key).toLowerCase()) || !traced.some(t => t.key === String(h.key).toLowerCase()))
+              .concat(traced);
 
             bru.sendRequest(
               {
                 url: resolvedUrl,
                 method: resolvedMethod,
-                header: headers,
+                header: probeHeaders,
                 data: body,
                 proxy: false
               },

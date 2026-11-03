@@ -37,6 +37,8 @@ const { templatesForRunner, runRefusal } = require('../utils/datafileTemplates')
 const runSecrets = require('../utils/runSecrets');
 const { usableUrlRefusal } = require('../utils/urlPolicy');
 const { versionRefusal } = require('../utils/osdmVersion');
+const { frameworkConfigOf } = require('../api/helpers/configurationStore');
+const { runSettingsOf: traceRunSettingsOf } = require('../../public/js/trace-context');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
 // analyzer (jssecurity:S6549) requires the regex to live in the same
@@ -653,7 +655,7 @@ async function refusedApiBase(apiBase) {
   return `This run was not started. ${refusal} Ask your Test Manager to set a public https endpoint in API Config.`;
 }
 
-function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride, extraHeaders) {
+function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride, extraHeaders, traceSettings) {
   // #306: this file deliberately carries NO credentials. The access token,
   // Ocp-Apim-Subscription-Key and oauth_extra travel via the Bruno child
   // process's environment (OSCAR_* vars set at spawn time in executeRun) and
@@ -680,6 +682,11 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     // string for the collection's before-request hook to parse + inject (the
     // hook resolves any {{var}} templates in the values).
     lines.push(...envVar('__extraHeaders', JSON.stringify(extraHeaders)));
+  }
+  if (traceSettings) {
+    // #1070: the Test Framework's W3C trace context, its tracestate template
+    // already parsed (runSettingsOf): Bruno would fill in a "{{" itself.
+    lines.push(...envVar('__traceContext', JSON.stringify(traceSettings)));
   }
   return lines.join('\n') + '\n';
 }
@@ -898,7 +905,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // at submission time for UI display purposes.
   const runIdShort = runId.slice(0, 8);
   const envName    = `OTST_${companyRow.slug}_${runIdShort}_Env`;
-  const envYml     = buildEnvYml(envName, companyRow.api_base, requestor, datafileUrl, scenarioOverride || null, extraHeaders);
+  const traceSettings = traceRunSettingsOf(frameworkConfigOf(companyRow.id) || {});
+  const envYml     = buildEnvYml(envName, companyRow.api_base, requestor, datafileUrl, scenarioOverride || null, extraHeaders, traceSettings);
   // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs
   // the run, i.e. now + effective timeout) as a read-only env var. The
   // expired-booking test uses it to decide whether waiting until the booking's

@@ -1,4 +1,4 @@
-/* global OscarScenarioAccess, OscarTripApply, OscarJourneyPlanner, logout, oscarToast, parseServerTs */  // defined in other public/ files (S11b: public/ is now linted)
+/* global OscarScenarioAccess, OscarTripApply, OscarJourneyPlanner, OscarTraceContext, logout, oscarToast, parseServerTs */  // defined in other public/ files (S11b: public/ is now linted)
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -4397,6 +4397,94 @@ function changeOfferOptionDiscovery(action, el) {
   return true;
 }
 
+// #1070: the W3C Trace Context OSDM declares on every operation. OSCAR draws
+// the ids (one trace per sale flow, a parent-id per request); the framework
+// says whether to send them, the sampled flag and a tracestate template
+// (OscarTraceContext, public/js/trace-context.js, shared with the server).
+function traceContextPanelHtml(fw) {
+  const s = OscarTraceContext.settingsOf(fw);
+  const off = s.send ? '' : ' disabled';
+  return `
+  <div class="fw-section">
+    <div class="fw-section-head" data-action="fw-toggle">🔗 Trace Context (W3C)<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body">
+      <div style="padding:12px 14px;font-size:12px;line-height:1.5">
+        <label class="fw-subsection-label" for="fw-trace-send" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="fw-trace-send" data-action="fw-trace-send"${s.send ? ' checked' : ''}>
+          Send the W3C trace headers (traceparent, tracestate) on every OSDM request
+        </label>
+        <div style="margin:4px 0 0 24px;font-size:11px;color:#78909c">OSDM declares both headers on every operation. OSCAR starts one trace per sale: each offer search starts a new trace id, which every request of that sale carries, up to its refund or exchange, each request with an id of its own. The run log gives each trace id, to find the requests in the provider's logs. OSCAR's own calls (Discover timetable, Places, Test my credentials) send them too, each request a trace. Unticked: none is sent, and a dedicated header of the same name in API Config goes as it is.</div>
+        <label class="fw-subsection-label" for="fw-trace-sampled" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;margin-top:10px">
+          <input type="checkbox" id="fw-trace-sampled" data-action="fw-trace-sampled"${s.sampled ? ' checked' : ''}${off}>
+          Sampled (flag 01): OSCAR records the trace
+        </label>
+        <div style="margin:4px 0 0 24px;font-size:11px;color:#78909c">OSCAR keeps every request of a run, which W3C's sampled flag says. Unticked: flag 00, and the provider decides whether to record.</div>
+        <label class="fw-subsection-label" for="fw-trace-state" style="display:block;text-transform:none;letter-spacing:0;margin-top:10px">tracestate <span style="font-weight:400;color:#90a4ae">(optional) — key=value pairs, comma-separated, no space around "=". OSCAR fills in {{traceId}}, {{uuid}} (the same trace id written as a UUID) and {{parentId}} (one per request)</span></label>
+        <input class="param-input" type="text" id="fw-trace-state" data-action="fw-trace-state" value="${esc(s.tracestate)}" placeholder="processid={{uuid}}" maxlength="512" style="max-width:460px"${off}>
+        <div id="fw-trace-preview" style="margin-top:8px;font-size:11px">${traceContextPreviewHtml(fw)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// The headers a framework gives, with W3C's example ids, and why a
+// tracestate typed is refused.
+function traceContextPreviewHtml(fw) {
+  const p = OscarTraceContext.preview(fw);
+  if (!p.traceparent) return '<span style="color:#78909c">No trace header is sent.</span>';
+  const lines = [`traceparent: ${p.traceparent}`];
+  if (p.tracestate) lines.push(`tracestate: ${p.tracestate}`);
+  const problem = p.problem ? `<div style="color:#c62828;margin-top:4px">${esc(p.problem)} This tracestate is not saved.</div>` : '';
+  return `<div style="color:#78909c">For example, with W3C's example ids:</div><code style="display:block;overflow-wrap:anywhere">${lines.map((line) => esc(line)).join('<br>')}</code>${problem}`;
+}
+
+function refreshTraceContextPanel(fw) {
+  const send = OscarTraceContext.settingsOf(fw).send;
+  for (const id of ['fw-trace-sampled', 'fw-trace-state']) {
+    const control = document.getElementById(id);
+    if (control) control.disabled = !send;
+  }
+  const preview = document.getElementById('fw-trace-preview');
+  if (preview) preview.innerHTML = traceContextPreviewHtml(fw);
+}
+
+// The trace context's settings; true when handled. Only what differs from the
+// default is kept, so a framework left alone has no traceContext. A tracestate
+// the server would refuse is not stored.
+function changeTraceContext(action, el) {
+  if (!['fw-trace-send', 'fw-trace-sampled', 'fw-trace-state'].includes(action)) return false;
+  const fw = wizData.framework;
+  const settings = { ...fw.traceContext };
+  if (action === 'fw-trace-state') {
+    const typed = el.value.trim();
+    const problem = OscarTraceContext.tracestateTemplateProblem(typed);
+    if (problem) {
+      oscarToast(`The tracestate is not saved: ${problem}`, 'error');
+      refreshTraceContextPanel({ ...fw, traceContext: { ...settings, tracestate: typed } });
+      return true;
+    }
+    if (typed) settings.tracestate = typed;
+    else delete settings.tracestate;
+  } else {
+    const key = action === 'fw-trace-send' ? 'send' : 'sampled';
+    if (el.checked) delete settings[key];
+    else settings[key] = false;
+  }
+  if (Object.keys(settings).length > 0) fw.traceContext = settings;
+  else delete fw.traceContext;
+  refreshTraceContextPanel(fw);
+  saveFrameworkDebounced();
+  return true;
+}
+
+// The preview follows the tracestate as it is typed; nothing is stored.
+function inputTraceState(action, el) {
+  if (action !== 'fw-trace-state') return false;
+  const fw = wizData.framework;
+  refreshTraceContextPanel({ ...fw, traceContext: { ...fw.traceContext, tracestate: el.value } });
+  return true;
+}
+
 function clickFwList(action, el) {
   const list = fwListOf(action, 'add') || fwListOf(action, 'remove');
   if (!list) return false;
@@ -5084,6 +5172,7 @@ ${distributionPanelHtml(fw)}
       </div>
     </div>
   </div>
+${traceContextPanelHtml(fw)}
 
   <!-- ① Sales Flows -->
   <div class="fw-section">
@@ -8925,7 +9014,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el) || changeTraceContext(action, el)) return;
 
   switch (action) {
     case 'file-upload':
@@ -9398,6 +9487,7 @@ document.body.addEventListener('input', function(e) {
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }   // #515, as above
   const action = el.dataset.action;
   if (changeExchange(action, el)) return;
+  if (inputTraceState(action, el)) return;
   if (inputRequestedSection(action, el)) return;
   if (inputFareRefundFee(action, el)) return;
 

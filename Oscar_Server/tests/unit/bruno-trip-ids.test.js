@@ -192,7 +192,10 @@ describe('step 01', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].url).toBe('https://sim.example/gamma/trips-collection');
     expect(sent[0].method).toBe('POST');
-    expect(sent[0].headers).toEqual({ 'Content-Type': 'application/json;version=3.8.0', Accept: 'application/json', Authorization: 'Bearer tok', Requestor: 'req' });
+    expect(sent[0].headers).toEqual({
+      'Content-Type': 'application/json;version=3.8.0', Accept: 'application/json', Authorization: 'Bearer tok', Requestor: 'req',
+      traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/),   // #1070: the sale's W3C trace
+    });
     expect(JSON.parse(sent[0].data)).toEqual(ti.tripsCollectionRequest(search));
     expect(JSON.parse(envStore.OfferCollectionRequest)).toEqual({ tripIds: ['T2'], anonymousPassengerSpecifications: [{ externalRef: 'P1' }] });
 

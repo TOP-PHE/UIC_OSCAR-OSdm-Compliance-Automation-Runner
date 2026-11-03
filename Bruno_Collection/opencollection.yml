@@ -358,7 +358,9 @@ request:
                 "afterSaleCondition_REFUND_amount",   "afterSaleCondition_REFUND_currency",   "afterSaleCondition_REFUND_scale",
                 // Misc
                 "data_base_tmp", "scriptContent", "swaggerJson",
-                "scenarioCode"
+                "scenarioCode",
+                // W3C trace context (#1070): here only, see traceContext.js
+                "__traceUuid", "__traceHeaderReplacedSaid"
               ];
               _deleteList.forEach(key => bru.deleteEnvVar(key));
               console.log("✅ All environment variables cleared");
@@ -519,11 +521,11 @@ request:
             `);
         }
 
-        // SBB OSDM REQUIRED HEADERS
+        // SBB OSDM REQUIRED HEADERS (a standalone SBB environment). Its fixed
+        // traceparent / tracestate went with #1070: every request now gets a
+        // W3C trace context of its own below.
         if (bru.getEnvVar("API") === "SBB") {
             req.setHeader('accept-language', 'en');
-            req.setHeader('traceparent', bru.getEnvVar("traceparent"));
-            req.setHeader('tracestate', bru.getEnvVar("tracestate"));
         }
 
         // Azure APIM subscription key — required by some sandboxes (e.g. Benerail)
@@ -558,6 +560,17 @@ request:
             }
         } catch (_ehErr) {
             console.log('[WARNING] dedicated headers injection failed: ' + (_ehErr && _ehErr.message));
+        }
+
+        // #1070: the W3C Trace Context (traceparent, tracestate) OSDM declares
+        // on every operation: one trace per sale flow, from each
+        // "01. POST Get Offer", a parent-id of its own for each request. The
+        // Test Framework's settings come in __traceContext. After the
+        // dedicated headers, which it replaces.
+        try {
+            require(bru.getEnvVar("library_base") + "traceContext.js").applyTraceContext(req, bru);
+        } catch (_tcErr) {
+            console.log('[WARNING] W3C trace context not set: ' + (_tcErr && _tcErr.message));
         }
 
         // #692: no requestor configured → no Requestor header, rather than

@@ -1330,6 +1330,12 @@ sandbox was not replayed.
 | A datafile the server cannot read | The run starts and fails later | The run is not started, with the reason |
 | Dedicated headers with `{{variable}}` | Filled in | Unchanged: that is their documented use, and only a Test Manager sets them |
 
+Since v1.11.449 (issue #1070) the Test Framework's `tracestate` template also
+holds double braces, and only three: `{{traceId}}`, `{{uuid}}` and
+`{{parentId}}`, which OSCAR fills in itself. Any other name is refused when the
+framework is saved, and the runner hands the test engine the template already
+taken apart, so no `{{` of it reaches the engine.
+
 A save is refused only for text it adds. Text someone stored earlier never
 blocks a save of something else. It does block runs: **while one such text is
 stored anywhere in a company's datafile, no run of that company starts**. That

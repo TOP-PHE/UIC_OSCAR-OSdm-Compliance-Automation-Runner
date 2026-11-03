@@ -1123,7 +1123,7 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
     // Handled before the change switch (Sonar S1479 caps its cases).
-    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el)) return;");
+    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el) || changeTraceContext(action, el)) return;");
     const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
     expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
     expect(fn).toContain("const value = paxAgeValue(field, el.value);");
@@ -2189,7 +2189,7 @@ describe('scenarios.js — what an exchange is for (#959)', () => {
     const source = read(S);
     expect(source).toContain('${buildTripSection(idx, sc, trip)}\n\n  <!-- #959: what an exchange is for -->\n  ${buildExchangeSection(idx, sc)}');
     expect(source).toContain('  if (changeExchange(action, el)) return;\n');
-    expect(source).toContain('|| changeExchange(action, el)) return;');
+    expect(source).toContain('|| changeExchange(action, el) || changeTraceContext(action, el)) return;');
     expect(source).toContain('scenarioTripIds(sc).includes(trip.id) && isReadOnlyForMe(sc)');
     expect(source).toContain('...scenarioTripIds(s), s.passengersListId');
   });

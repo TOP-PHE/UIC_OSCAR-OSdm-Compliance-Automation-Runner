@@ -893,6 +893,31 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   token request is logged with a **default-deny secret mask** (#437): only an
   explicit allowlist of structural fields shows its value, everything else
   renders `***` / `(empty)`.
+- **W3C Trace Context on every OSDM request** (#1070, 1.11.449 /
+  OTST_V2.0.244). OSDM declares `traceparent` / `tracestate` on every
+  operation. **One trace per sale** (maintainer): each send of `01. POST Get
+  Offer` starts one (`isFlowStart()`), every later request carries it with a
+  parent-id of its own; a request with no sale open starts its own; token
+  requests get none. `library-bruno/traceContext.js`: `applyTraceContext()`
+  in the collection's before-request, after the dedicated headers, which it
+  replaces (one warning a run); **every `bru.sendRequest` to the provider
+  wraps its headers in `withTrace()`** (`trace-context.test.js` scans for
+  it; it never throws and logs nothing, and a test pinning such a request's
+  exact headers must expect its `traceparent`). The module logs through the
+  global `validationLogger` when one is set: requiring `displays.js` replaces
+  a test's own logger. The flow is `__traceUuid`, cleared in the /versions list only, **never
+  in the parser's or the sub-run's reset**: those run inside 01's own script,
+  after the collection-level script started the new trace. Test Framework
+  `traceContext: { send, sampled, tracestate }` (absent = sampled, no
+  tracestate); the tracestate template takes `{{traceId}}`, `{{uuid}}`,
+  `{{parentId}}` only, checked against W3C's grammar by
+  `traceContextProblem()` at the three framework writers
+  (`public/js/trace-context.js`, shared by page, server and tests). The runner
+  writes `runSettingsOf()` as `__traceContext`, the template already parsed:
+  **no `{{` may reach Bruno**. The server's own calls add
+  `withTraceHeaders(headers, traceSettingsFor(companyId))` at each fetch (a
+  trace per request). The trace start line uses 🔗: 🧭 is the runner's
+  offer-option report marker.
 - **Self-registration is Test-Manager-gated, not email-domain-gated** (#449,
   2026-07-01). The old rule ("email must contain a fragment of the company
   name") is gone — it broke the moment a company was renamed after its slug

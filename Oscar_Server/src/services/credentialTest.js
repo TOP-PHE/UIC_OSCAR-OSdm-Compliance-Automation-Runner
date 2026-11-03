@@ -25,7 +25,7 @@
 const { get, decrypt } = require('../db/db');
 const { credentialsFor } = require('../utils/testerCredentials');
 const { resolveAccessToken } = require('../worker/access-token');
-const { buildTesterHeaders, mergeDedicatedHeaders, stripTrailingSlashes } = require('../utils/osdm-client');
+const { buildTesterHeaders, mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes } = require('../utils/osdm-client');
 const { usableUrlRefusal } = require('../utils/urlPolicy');
 const { frameworkConfigOf } = require('../api/helpers/configurationStore');
 const O = require('../utils/credentialTestOutcome');
@@ -126,7 +126,8 @@ async function apiStep(companyId, userRow, token) {
   const company = get('SELECT id, api_base, extra_headers FROM companies WHERE id = ?', [companyId]);
   if (!company?.api_base) return { ok: false, outcome: 'no_endpoint' };
   if (!token) return { ok: false, outcome: 'not_tried' };
-  const headers = mergeDedicatedHeaders(buildTesterHeaders(userRow), company, token);
+  // #1070: with the W3C trace context a run sends.
+  const headers = withTraceHeaders(mergeDedicatedHeaders(buildTesterHeaders(userRow), company, token), traceSettingsFor(companyId));
   const answer = await askVersions(company.api_base, token, headers);
   if (answer.refused) return { ok: false, outcome: 'url_refused', error: answer.refused };
   if (answer.error) return { ok: false, outcome: 'no_answer', error: answer.error };
