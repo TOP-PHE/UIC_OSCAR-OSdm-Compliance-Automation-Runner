@@ -105,6 +105,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.451] / [collection-OTST_V2.0.246] — 2026-11-03
+
+Issue #1045 (a booking read that lists no fulfilment, as a real provider gave), release 2026.489. Simulator 0.62.0. The server change is the welcome-page news entry.
+
+### Added
+- **A simulator variant whose booking lists no fulfilment**, and two scenarios that show OSCAR going through. A real provider's fare run gave `"fulfillments": []` in every booking read after the confirmation. Since 1.11.447, step 07 warns and the refund names the fulfilments the confirmation gave, but nothing ran that case end to end.
+  - `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_38`: a one-way full refund of products.
+  - `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_FARE_REFUND_1ADT_38`: the refund of fares asked by search, the provider's case.
+  - Passenger list 40 (last name `Simvariant-Booking-Without-Fulfillments`). With their copies for every other version, their rows in *OSCAR - OSDM Simulator scenarios* and the simulator references' run lists (regenerated).
+  - Expected: no failed check, a WARNING at 07 and one at 14.
+
+### Fixed
+- **Step 14 on a booking read that lists no fulfilment** (`refunds.js`, `_fulfillmentsKnown()`). The refund scope check took every booked part for "left out of the refund", so a refunded part failed. The full-refund check counted 0 of 0 fulfilments and passed without checking anything.
+  - Both now read the fulfilments the confirmation gave (`__confirmedFulfillments`, kept at 06 since 1.11.447): the parts each one holds, and the ids a full refund must cover.
+  - Their REFUNDED state cannot be read from the booking: one WARNING says so, and no fulfilment state is tested.
+  - With no fulfilment from either, the part-level check is skipped with an INFO line.
+
+### Simulator 0.62.0
+- Variant `booking-without-fulfillments` (`variants.js` `bookingAsRead()`): `GET /bookings/{id}` answers a copy of the booking with `"fulfillments": []`. `POST /fulfillments`, `GET /fulfillments/{id}` and the refund work on the stored booking as before. OSDM does not require `Booking.fulfillments`, so the variant is not deliberately wrong.
+
+### Changed
+- A welcome-page news entry.
+
+### Checked
+- Replay of the two scenarios on every provider (3.6 to 3.12): no failed check; the WARNING at 07 and the one at 14, nothing else (316 checks for the product refund, 180 for the fare refund). With `main`'s collection the same runs fail one check at 14 (a refunded part "left out of the refund"). Replay of every other `_38` refund (33) on `main` and on this branch: the same checks, failures and warnings.
+- `bruno-confirmed-fulfillments.test.js`: the scope check through the confirmation (parts checked, one WARNING, no fulfilment state), a full refund held to the confirmation's fulfilments, nothing known: nothing fails. Putting back the old reading fails them. The simulator's `app.test.js` runs the variant: an empty list on every read, the fulfilment read and the refund still working.
+
+---
+
 ## [server-1.11.450] / [collection-OTST_V2.0.245] — 2026-11-03
 
 Issue #1045 (a refund of fares in every form of offer request), release 2026.488. The server change is the welcome-page news entry.
