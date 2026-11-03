@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-03-refund-names-confirmed-fulfilments",
+    "date": "November 3, 2026",
+    "tag": "Fixed",
+    "title": "A refund names the fulfilments the confirmation gave",
+    "summary": "When a provider's booking does not list its fulfilments after the confirmation, OSCAR now warns and refunds the fulfilments the confirmation gave, instead of sending an empty refund request.",
+    "content": "A provider confirmed a fare booking and gave two fulfilments, then returned the booking with an empty list of fulfilments. OSCAR took the fulfilments to refund from that booking and sent a refund request naming none, which the provider refused.\n\nOSCAR now keeps the fulfilments the confirmation gives. A booking that does not list them afterwards is a warning (OSDM does not require the list), and the refund or exchange names the confirmation's. If neither gives a fulfilment, the scenario stops before the refund or exchange with one failed check, instead of sending a request that cannot work.\n\nFor product sales, the same case used to be a failure; it is now that warning."
+  },
+  {
     "id": "2026-11-03-fare-reference-scenarios",
     "date": "November 3, 2026",
     "tag": "New",

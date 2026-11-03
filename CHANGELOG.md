@@ -105,6 +105,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.447] / [collection-OTST_V2.0.243] — 2026-11-03
+
+Issue #1045 (from a real provider's fare run), release 2026.485. The server change is the welcome-page news entry.
+
+### Fixed
+- **A refund or exchange names the fulfilments the confirmation gave.** A real provider answered the confirmation (`POST /bookings/{id}/fulfillments`) with two fulfilments, then gave the booking at 07 with `"fulfillments": []`. The fare refund took its ids from that booking and sent `{"fulfillmentIds": []}`: the provider answered 400, and OSCAR's own conformance check called it an OSCAR issue (OSDM: `fulfillmentIds`, minItems 1).
+  - Step 06 keeps the fulfilments the confirmation gives (`confirmedFulfillments.js`, `__confirmedFulfillments`, cleared with the sale).
+  - At 07, a booking that does not list them, or not all, is a WARNING: OSDM does not require `Booking.fulfillments`, though `GET /bookings/{id}` embeds ALL by default. The refund or exchange then names the confirmation's fulfilments (the booking's when it lists some).
+  - A refund or exchange with no fulfilment id from either step ends at 07 with one failed check, "A fulfilment to name in the refund offer request", instead of sending a request without one.
+
+### Changed
+- **Fare check F5 reads "Every booked fare is in a fulfilment (bookingParts)"**: the booking's fulfilments, else the confirmation's. It read "The booking lists its fulfilments, and every booked fare is in one" and failed on a booking listing none.
+- **For a product sale, a booking read after the confirmation that lists no fulfilment is that WARNING**, when the confirmation gave some. It was a failure, "Booking embeds the generated fulfillments after fulfillment" (#250), which named an OSDM rule the schema does not hold; it still fails when the confirmation gave none either.
+- *What is tested*: steps 06 and 07; R3 at step 10 is a failure since #1055 (the row still said a WARNING).
+- A welcome-page news entry.
+
+### Checked
+- Replay of every `_38` fare, refund and exchange scenario and a product sale (77), on `main` and on this branch: the same checks, failures and warnings in all 77; the only change is F5's title, in the 30 that reach it (`SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38` still fails it).
+- `bruno-confirmed-fulfillments.test.js` (12 tests) runs the provider's answers: the WARNING, the refund naming the confirmation's ids, the stop, and the product path. Putting back each old behaviour (the refund taking the booking's ids, F5 on the booking only, no stop, the #250 failure) fails a test.
+
+---
+
 ## [server-1.11.446] / [collection-OTST_V2.0.242] — 2026-11-03
 
 Issue #1045 (the reference scenarios of the newer simulator fare scenarios), release 2026.484.

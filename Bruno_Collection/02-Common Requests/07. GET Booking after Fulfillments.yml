@@ -226,6 +226,20 @@ runtime:
             bru.setEnvVar("__partIdsBeforeExchange", JSON.stringify(partIdsOf(jsonData)));
         }
 
+        // #1045: the booking's fulfilments, else those the confirmation gave
+        // (a WARNING when the booking does not list them); a refund or exchange
+        // with no fulfilment id to name ends here instead of sending none.
+        {
+          const _confirmation = require(bru.getEnvVar("library_base") + "confirmedFulfillments.js");
+          const _booking = (jsonData && jsonData.booking) || jsonData || {};
+          const _ids = _confirmation.idsOf(_confirmation.checkBookingLists(_booking));
+          if (_confirmation.idsOf(_booking.fulfillments).length === 0 && _ids.length > 0) {
+            bru.setEnvVar("fulfillmentIds", JSON.stringify(_ids));
+            bru.setEnvVar("__bookingFulfillmentIds", JSON.stringify(_ids));
+          }
+          if (_confirmation.stopWithoutFulfillment(_ids)) return;
+        }
+
         if(bru.getEnvVar("scenarioType")?.includes("REFUND")) {
             bru.runner.setNextRequest("10. POST Refund Offers");
             console.log("[INFO] scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")

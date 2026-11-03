@@ -1280,6 +1280,10 @@ function checkFulfillmentSummaryStatus(booking) {
 function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, requireFulfillments = false, siblingDocs = undefined, options = {}) {
   validationLogger("[DEBUG] ► validateFulfillments");
   if (!Array.isArray(fulfillments) || fulfillments.length === 0) {
+    // #1045: when the confirmation gave fulfilments, a booking that lists
+    // none is a WARNING, logged by 07 (confirmedFulfillments.js): OSDM does
+    // not require Booking.fulfillments, and the refund names the confirmation's.
+    if (requireFulfillments && require('./confirmedFulfillments.js').confirmedFulfillments().length > 0) return;
     if (requireFulfillments) {
       // #250: after POST /fulfillments, GET /bookings/{id} MUST embed the
       // generated fulfillments — the provider has to keep the booking object
