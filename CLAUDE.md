@@ -1083,6 +1083,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`fares.refund` → Refund); kept by any of its boxes, counted under each
   (`facetGroups()`). `group` stays the coverage report's one group, which
   `run-filters.test.js` compares with `capabilityCoverageOf()`.
+- **The OpenAPI document (`/v1/docs`) describes every route** (1.11.453).
+  `src/api/openapi.js` holds the older entries, `src/api/openapi/*.js` one
+  module per area, merged by `mergePaths()` (a method described twice
+  throws). `tests/unit/openapi-coverage.test.js` reads the routes from the
+  routers mounted in `server.js` and the app's own handlers, and fails on a
+  route without its entry or an entry without its route: **a new route needs
+  its entry in the same PR.** Only the page fallback is left out.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that

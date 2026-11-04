@@ -19,6 +19,19 @@
  */
 
 const pkg = require('../../package.json');
+const { mergePaths } = require('./openapi/common');
+
+// The routes added to this document in one go, one module per area;
+// the entries above them stay here. tests/unit/openapi-coverage.test.js holds
+// the document to the server's routes, both ways.
+const PATH_MODULES = [
+  require('./openapi/internal'),
+  require('./openapi/auth-and-me'),
+  require('./openapi/admin'),
+  require('./openapi/runs-and-reports'),
+  require('./openapi/company-data'),
+  require('./openapi/company-findings'),
+];
 
 const errorSchema = {
   type: 'object',
@@ -108,8 +121,9 @@ module.exports = {
     { name: 'Health',  description: 'Liveness/readiness probes' },
     { name: 'API',     description: 'Read-only, by API key (#503)' },
     { name: 'Certifier', description: 'What companies share with certifiers: published coverage reports (#972)' },
+    { name: 'Internal', description: 'Not called by the pages: the Bruno runs on the server itself, monitoring, and this document' },
   ],
-  paths: {
+  paths: mergePaths({
     '/health': {
       get: {
         tags: ['Health'],
@@ -835,5 +849,5 @@ module.exports = {
         },
       },
     },
-  },
+  }, ...PATH_MODULES),
 };
