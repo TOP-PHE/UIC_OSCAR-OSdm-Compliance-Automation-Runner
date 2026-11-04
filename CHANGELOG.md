@@ -105,17 +105,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.452] — 2026-11-04
+## [server-1.11.453] — 2026-11-04
 
-Release 2026.490. The OpenAPI document served at `/v1/docs` describes every route of the server. Collection unchanged; no behaviour change.
+Release 2026.491. The OpenAPI document served at `/v1/docs` describes every route of the server. Collection unchanged; no behaviour change.
 
 ### Changed
-- **`/v1/docs` and `/v1/openapi.json` list all 204 operations** (they listed 92). The 112 added ones are in `src/api/openapi/`, one module per area (internal, auth and `/v1/me`, admin and the simulator's administration, runs and reports, company data, findings), merged into `src/api/openapi.js` by `mergePaths()` (`openapi/common.js`), which refuses a method described twice. Each says who may call it, what it reads and what it answers, with its path, query and header parameters.
+- **`/v1/docs` and `/v1/openapi.json` list all 204 operations** (they listed 92). The 112 added ones are in `src/api/openapi/`, one module per area (internal, auth and `/v1/me`, admin and the simulator's administration, runs and reports, company data, findings), merged into `src/api/openapi.js` by `mergePaths()` (`openapi/common.js`), which refuses a method described twice. Each says who may call it, what it reads and what it answers, with its path, query and header parameters; the run queue and report templates follow 1.11.452's rules.
 - New tag **Internal**: the routes the pages do not call (the run's data file and access token for Bruno, the data file schema, `/metrics`, the OpenAPI document itself).
 
 ### Checked
 - `tests/unit/openapi-coverage.test.js`: the routes are read from the routers themselves (each route file mounted in `server.js`, plus the app's own handlers) and compared with the document both ways: a route without its entry fails, and so does an entry with no route. Every operation has a summary, a tag, its responses and its path parameters. Mutation-checked: renaming one entry fails both directions.
 - The document validates as OpenAPI 3.0 (`@apidevtools/swagger-parser`, outside the repository).
+
+---
+
+## [server-1.11.452] — 2026-11-04
+
+Release 2026.490. Two read and delete rules that now follow the company. Collection unchanged.
+
+### Fixed
+- **`GET /v1/runs/queue-status` answers the company's members only.** Administrators and certifiers get 403 whatever company they name (`?company_id=`, `X-Company-Id`). The queue lists who started each run and its scenario; neither role runs tests, and no page shows them a queue (the dashboard and New Run panels stay hidden for them, as before).
+- **Report templates (`/v1/reports/templates`) belong to their author and, saved by a member, to the company or provider of the request.** A platform role lists, saves and deletes its own templates only: the company it names is no longer read, and its templates are stored with no company. A template the caller cannot see answers 404, like an unknown one; a Test Manager may delete a colleague's template of the same company, a tester their own only. No page calls these routes.
+
+### Checked
+- `runs-routes.test.js`: 403 for both platform roles, with no company, their own and another one named. `reports-routes.test.js`: a platform role lists none of a company's templates and cannot delete one (404, kept); a certifier's template is stored without a company and shown to it alone; another company's member gets 404; a Test Manager deletes a colleague's. With `main`'s route files, 8 of these fail.
+- `npm run lint`, full `npx jest`: 257 suites, 5,365 tests.
 
 ---
 

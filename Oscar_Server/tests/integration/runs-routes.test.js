@@ -587,6 +587,20 @@ describe('GET /v1/runs/queue-status', () => {
     expect(queuedEntry.position).toBeGreaterThanOrEqual(1);
   });
 
+  // The queue names who started each run and its scenario. A platform role
+  // names any company with ?company_id=, so it is refused outright.
+  test.each([
+    ['certification_user', () => covCertifierId],
+    ['administrator', () => covAdminId],
+  ])('403 for %s, whatever company it names', async (role, uid) => {
+    const token = covToken(role, uid());
+    for (const q of ['', `?company_id=${covCompanyId}`, `?company_id=${covOtherCompanyId}`]) {
+      const res = await request(app).get(`/v1/runs/queue-status${q}`).set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(403);
+      expect(res.body.runs).toBeUndefined();
+    }
+  });
+
   test('falls back to concurrentLimit=1 when the stored framework config is unparsable', async () => {
     // Covers the try/catch around JSON.parse(colDecrypt(tfRow.config)) —
     // a row exists but its config isn't valid JSON.

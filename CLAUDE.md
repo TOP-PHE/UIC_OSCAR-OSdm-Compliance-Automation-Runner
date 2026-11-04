@@ -1083,7 +1083,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`fares.refund` → Refund); kept by any of its boxes, counted under each
   (`facetGroups()`). `group` stays the coverage report's one group, which
   `run-filters.test.js` compares with `capabilityCoverageOf()`.
-- **The OpenAPI document (`/v1/docs`) describes every route** (1.11.452).
+- **The OpenAPI document (`/v1/docs`) describes every route** (1.11.453).
   `src/api/openapi.js` holds the older entries, `src/api/openapi/*.js` one
   module per area, merged by `mergePaths()` (a method described twice
   throws). `tests/unit/openapi-coverage.test.js` reads the routes from the
