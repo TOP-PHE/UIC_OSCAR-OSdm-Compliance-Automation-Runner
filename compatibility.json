@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.489",
+  "current_release": "2026.490",
   "releases": [
+    {
+      "release": "2026.490",
+      "date": "2026-11-04",
+      "server": "1.11.452",
+      "collection": "OTST_V2.0.246",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.452: GET /v1/runs/queue-status answers the company's members only (administrators and certifiers 403). Report templates are their author's and, saved by a member, the company's: a platform role reads, saves and deletes its own only, whatever company it names; a template the caller cannot see answers 404; a Test Manager may delete a colleague's."
+      ]
+    },
     {
       "release": "2026.489",
       "date": "2026-11-03",

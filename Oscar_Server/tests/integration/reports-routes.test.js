@@ -224,6 +224,77 @@ describe('reports — templates', () => {
   });
 });
 
+// ── Templates: who sees and deletes them ─────────────────────────────────────
+// A template is its author's and, saved by a member, its company's. A platform
+// role reads, writes and deletes its own only, whatever company it names.
+describe('reports — templates across companies and roles', () => {
+  const certifierId = uuidv4();
+  const tmId = uuidv4();
+  const asCertifier = () => `Bearer ${makeToken('certification_user', certifierId)}`;
+  const asAdmin = () => `Bearer ${makeToken('administrator', adminId)}`;
+  let otherCompanyTemplate;
+  let ownCompanyTemplate;
+
+  beforeAll(async () => {
+    run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'certifier@reports-routes-test.com', 'x', 'certification_user')`, [certifierId, companyId]);
+    run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tm@reports-routes-test.com', 'x', 'test_manager')`, [tmId, companyId]);
+    const other = await request(app).post('/v1/reports/templates')
+      .set('Authorization', `Bearer ${makeToken('company_user', otherUserId, otherCompanyId)}`)
+      .send({ name: 'Other company template', config: {} });
+    otherCompanyTemplate = other.body.id;
+    const own = await request(app).post('/v1/reports/templates')
+      .set('Authorization', `Bearer ${makeToken('company_user')}`)
+      .send({ name: 'Own company template', config: {} });
+    ownCompanyTemplate = own.body.id;
+  });
+
+  afterAll(() => {
+    run('DELETE FROM report_templates WHERE user_id IN (?, ?, ?)', [certifierId, adminId, tmId]);
+    run('DELETE FROM users WHERE id IN (?, ?)', [certifierId, tmId]);
+  });
+
+  test.each([['certifier', asCertifier], ['administrator', asAdmin]])('a %s naming another company lists none of its templates', async (_who, auth) => {
+    for (const q of ['', `?company_id=${otherCompanyId}`, `?company_id=${companyId}`]) {
+      const res = await request(app).get(`/v1/reports/templates${q}`).set('Authorization', auth());
+      expect(res.status).toBe(200);
+      const ids = res.body.templates.map(t => t.id);
+      expect(ids).not.toContain(otherCompanyTemplate);
+      expect(ids).not.toContain(ownCompanyTemplate);
+    }
+  });
+
+  test.each([['certifier', asCertifier], ['administrator', asAdmin]])('a %s cannot delete a company\'s template (404, kept)', async (_who, auth) => {
+    const res = await request(app).delete(`/v1/reports/templates/${otherCompanyTemplate}?company_id=${otherCompanyId}`).set('Authorization', auth());
+    expect(res.status).toBe(404);
+    expect(get('SELECT id FROM report_templates WHERE id = ?', [otherCompanyTemplate])).toBeTruthy();
+  });
+
+  test('a certifier\'s template is its own: not shown to the company it named', async () => {
+    const made = await request(app).post(`/v1/reports/templates?company_id=${companyId}`)
+      .set('Authorization', asCertifier()).send({ name: 'Certifier template', config: {} });
+    expect(made.status).toBe(201);
+    expect(get('SELECT company_id FROM report_templates WHERE id = ?', [made.body.id]).company_id).toBeNull();
+    const member = await request(app).get('/v1/reports/templates').set('Authorization', `Bearer ${makeToken('company_user')}`);
+    expect(member.body.templates.map(t => t.id)).not.toContain(made.body.id);
+    const mine = await request(app).get('/v1/reports/templates').set('Authorization', asCertifier());
+    expect(mine.body.templates.map(t => t.id)).toContain(made.body.id);
+  });
+
+  test('a member of another company cannot see or delete it (404)', async () => {
+    const list = await request(app).get('/v1/reports/templates').set('Authorization', `Bearer ${makeToken('company_user')}`);
+    expect(list.body.templates.map(t => t.id)).not.toContain(otherCompanyTemplate);
+    const res = await request(app).delete(`/v1/reports/templates/${otherCompanyTemplate}`).set('Authorization', `Bearer ${makeToken('company_user')}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('a Test Manager of the company deletes a colleague\'s template', async () => {
+    const res = await request(app).delete(`/v1/reports/templates/${ownCompanyTemplate}`)
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
+    expect(res.status).toBe(200);
+    expect(get('SELECT id FROM report_templates WHERE id = ?', [ownCompanyTemplate])).toBeUndefined();
+  });
+});
+
 // ── Trends ──────────────────────────────────────────────────────────────────
 describe('reports — trends', () => {
   test('GET /trends/summary returns top_failures (includes the seeded failing assertion)', async () => {

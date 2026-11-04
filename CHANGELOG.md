@@ -105,6 +105,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.452] — 2026-11-04
+
+Release 2026.490. Two read and delete rules that now follow the company. Collection unchanged.
+
+### Fixed
+- **`GET /v1/runs/queue-status` answers the company's members only.** Administrators and certifiers get 403 whatever company they name (`?company_id=`, `X-Company-Id`). The queue lists who started each run and its scenario; neither role runs tests, and no page shows them a queue (the dashboard and New Run panels stay hidden for them, as before).
+- **Report templates (`/v1/reports/templates`) belong to their author and, saved by a member, to the company or provider of the request.** A platform role lists, saves and deletes its own templates only: the company it names is no longer read, and its templates are stored with no company. A template the caller cannot see answers 404, like an unknown one; a Test Manager may delete a colleague's template of the same company, a tester their own only. No page calls these routes.
+
+### Checked
+- `runs-routes.test.js`: 403 for both platform roles, with no company, their own and another one named. `reports-routes.test.js`: a platform role lists none of a company's templates and cannot delete one (404, kept); a certifier's template is stored without a company and shown to it alone; another company's member gets 404; a Test Manager deletes a colleague's. With `main`'s route files, 8 of these fail.
+- `npm run lint`, full `npx jest`: 257 suites, 5,365 tests.
+
+---
+
 ## [server-1.11.451] / [collection-OTST_V2.0.246] — 2026-11-03
 
 Issue #1045 (a booking read that lists no fulfilment, as a real provider gave), release 2026.489. Simulator 0.62.0. The server change is the welcome-page news entry.

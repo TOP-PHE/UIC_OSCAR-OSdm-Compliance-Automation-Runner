@@ -714,7 +714,14 @@ router.post('/bulk-admin-action', (req, res) => {
 // ── GET /v1/runs/queue-status ─────────────────────────────────────────────────
 // Returns the current queue state for the authenticated user's company.
 // Must be registered BEFORE /:id to avoid Express treating "queue-status" as an ID.
+// Members only: the queue lists who started each run and its scenario, and a
+// platform role names any company with ?company_id= / X-Company-Id, so for an
+// administrator or a certifier it would list another company's queue. Neither
+// role runs tests, and no page shows them a queue.
 router.get('/queue-status', (req, res) => {
+  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'The run queue is shown to the company\'s members only.' });
+  }
   const companyId = scopedCompanyId(req);
 
   // Get concurrent limit from test framework config
