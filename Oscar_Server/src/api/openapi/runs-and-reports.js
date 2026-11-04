@@ -59,8 +59,8 @@ const TM_SEES = 'Test Managers only, on runs they may see (own company or its pr
 module.exports = {
   '/v1/runs/queue-status': {
     get: { tags: runs, summary: 'The queued and running runs of the company, and its run slots', security: bearer,
-      description: 'For the request\'s company (or provider). { company_id, concurrent_limit (Test Framework concurrentSessionLimit, default 1), slots_used, slots_available, runs: [{ id, status, scenario_code, batch_id, user_email, is_current_user, position, queued_at, started_at }] }; position is the place in the queue of a QUEUED run.',
-      responses: ok('Queue state') },
+      description: 'Members only: administrators and certifiers get 403. For the request\'s company (or provider). { company_id, concurrent_limit (Test Framework concurrentSessionLimit, default 1), slots_used, slots_available, runs: [{ id, status, scenario_code, batch_id, user_email, is_current_user, position, queued_at, started_at }] }; position is the place in the queue of a QUEUED run.',
+      responses: { ...ok('Queue state'), 403: { description: 'Administrators and certifiers' } } },
   },
   '/v1/runs/stop-all': {
     post: { tags: runs, summary: 'Stop the caller\'s queued and running runs at once', security: bearer,
@@ -161,18 +161,18 @@ module.exports = {
   },
   '/v1/reports/templates': {
     get: { tags: reports, summary: 'The saved Report Builder templates', security: bearer,
-      description: 'Those of the request\'s company and those of no company. { templates: [{ id, name, config, created_at, updated_at, created_by }] }.',
+      description: 'The caller\'s own templates and, for a member, those of the request\'s company or provider; a platform role sees its own only. { templates: [{ id, name, config, created_at, updated_at, created_by }] }.',
       responses: ok('The templates') },
     post: { tags: reports, summary: 'Save a Report Builder template', security: bearer,
-      description: 'Body: { name, config } (config: the Report Builder\'s choices). Stored for the request\'s company. Answer: { id, name, config }.',
+      description: 'Body: { name, config } (config: the Report Builder\'s choices). A member\'s template is stored for the request\'s company or provider; a platform role\'s is its own, with no company. Answer: { id, name, config }.',
       requestBody: jsonBody('{ name, config? }'),
       responses: { 201: { description: 'Saved' }, 400: { description: 'No name' } } },
   },
   '/v1/reports/templates/{id}': {
     delete: { tags: reports, summary: 'Delete a Report Builder template', security: bearer,
-      description: 'The caller\'s own templates; a platform role may delete any.',
+      description: 'Its author, or a Test Manager of its company. A template the caller cannot see answers 404, like an unknown one.',
       parameters: [pathParam('id', 'Template id')],
-      responses: { ...ok('{ deleted: true }'), 403: { description: 'Not the caller\'s template' }, 404: { description: 'No such template' } } },
+      responses: { ...ok('{ deleted: true }'), 403: { description: 'A colleague\'s template, and the caller is not a Test Manager' }, 404: { description: 'No such template, or one the caller cannot see' } } },
   },
   '/v1/reports/trends/summary': {
     get: { tags: reports, summary: 'The most failing checks of the company over 30 days', security: bearer,
