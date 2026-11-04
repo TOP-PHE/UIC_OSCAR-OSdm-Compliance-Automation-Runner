@@ -394,8 +394,10 @@ describe('the requests carry the cards', () => {
     const path = require('node:path');
     const root = path.join(__dirname, '..', '..', '..', 'Bruno_Collection');
     const parser = fs.readFileSync(path.join(root, 'library-bruno', 'scenarioParser.js'), 'utf8');
-    expect(parser).toMatch(/if \(cards\.length > 0\) offerSpec\.cards = cards;/);
-    expect(parser).toMatch(/passengerSpecs\.at\(-1\)\.cards = cards;/);
+    // #1045: built by passengerSpecsOf() (bruno-transportables.test.js runs it).
+    expect(parser).toMatch(/if \(cards\.length > 0\) offer\.cards = cards;/);
+    expect(parser).toMatch(/if \(cards\.length > 0\) booking\.cards = cards;/);
+    expect(parser).toMatch(/transportableSpec\(passenger\.reference, passenger\.type, cards\)/);
     for (const file of [path.join(root, 'library-bruno', 'scenarioParser.js'), path.join(root, 'opencollection.yml')]) {
       expect(fs.readFileSync(file, 'utf8')).toMatch(/"__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards"/);
     }

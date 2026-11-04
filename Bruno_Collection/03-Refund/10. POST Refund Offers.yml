@@ -288,10 +288,11 @@ runtime:
           return;
         }
 
-        // Parse JSON safely
+        // Parse JSON safely. #1045: the checks work on a copy, so the answer
+        // stored for the report is the provider's as sent.
         let jsonData;
         try {
-            jsonData = _perFulfillment ? _perFulfillment.body : res.getBody();
+            jsonData = _perFulfillment ? _perFulfillment.body : require(bru.getEnvVar("library_base") + "envUtils.js").workingCopy(res.getBody());
         } catch (e) {
             validationLogger("Failed to parse JSON response");
             test("JSON parsing should succeed", () => {

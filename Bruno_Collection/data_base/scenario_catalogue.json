@@ -1130,6 +1130,30 @@
       }
     },
     {
+      "code": "OTST_FARE_REFUND_SRCH_1ADT",
+      "source": "SIM_FARE_REFUND_SRCH_1ADT_38",
+      "checks": 181,
+      "purpose": "Fare sale by search criteria refunded in full, no fee stated: fares asked for the whole trip, the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
+      "capability": "fares.refund",
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_REFUND_TRIPIDS_1ADT",
+      "source": "SIM_FARE_REFUND_TRIPIDS_1ADT_38",
+      "checks": 188,
+      "purpose": "Fare sale by trip id refunded in full, no fee stated: POST /trips-collection, the fares of the trip chosen by its id, then the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
+      "capability": "fares.refund",
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
       "code": "OTST_FARE_REFUND_FEE_1ADT",
       "source": "SIM_FARE_REFUND_FEE_1ADT_38",
       "checks": 182,
@@ -1177,6 +1201,69 @@
         "trip": "SPECIFICATION",
         "legs": 2,
         "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_FIRST_1ADT",
+      "source": "SIM_FARE_FIRST_1ADT_38",
+      "checks": 117,
+      "purpose": "Fare sale for one adult in first class (travelClass FIRST): the fare offers checked as in the plain fare sale, O18 warns when no fare offer is in the class asked; the fare offer chosen booked and fulfilled as fares.",
+      "capability": "fares.sale",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_FARE_REDUCTION_CARD_1ADT",
+      "source": "SIM_FARE_CARD_1ADT_38",
+      "checks": 117,
+      "limit": "REDUCTION_CARDS",
+      "purpose": "Fare sale for an adult holding a reduction card, the first one the Test Framework declares: the card is sent with the passenger, O16 warns when a fare requires a card the passenger does not hold; the fare offer chosen booked and fulfilled as fares.",
+      "capability": "fares.sale",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 1,
+        "reductionCards": true
+      }
+    },
+    {
+      "code": "OTST_FARE_FAMILY",
+      "source": "SIM_FARE_FAMILY_38",
+      "checks": 117,
+      "limit": "FREE_CHILD",
+      "purpose": "Fare sale for a family: an adult, a child of 8 and a young child one year under the age the Test Framework declares free. Every passenger has a fare (the young child's may be priced 0), O17 warns when a passenger's age is outside its fare's passenger constraints; booked and fulfilled as fares.",
+      "capability": "fares.sale",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 3
+      }
+    },
+    {
+      "code": "OTST_FARE_BICYCLE_ADMISSION",
+      "source": "SIM_FARE_BICYCLE_ADMISSION_38",
+      "checks": 117,
+      "purpose": "Fare sale for an adult and a bicycle, the bicycle as a passenger of type BICYCLE: FARE_ADMISSION and FARE_ANCILLARY asked, no fare reservation. The bicycle is sent with its reference and type only (no name, date of birth or contact) and has a fare of its own, admission or ancillary; booked and fulfilled as fares.",
+      "capability": "fares.sale",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 2
+      }
+    },
+    {
+      "code": "OTST_FARE_GROUP_6ADT",
+      "source": "SIM_FARE_GROUP_6ADT_38",
+      "checks": 117,
+      "purpose": "Fare sale for six adults: one fare per passenger in each fare offer, whatever fares the provider gives a group; the fare offer chosen booked and fulfilled as fares.",
+      "capability": "fares.sale",
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "passengers": 6
       }
     }
   ]

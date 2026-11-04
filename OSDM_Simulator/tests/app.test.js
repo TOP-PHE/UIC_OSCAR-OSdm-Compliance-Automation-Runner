@@ -448,6 +448,24 @@ test('refund: variant one-fulfillment-per-refund-request refuses a list with 501
   }
 });
 
+test('variant booking-without-fulfillments: the booking read lists none, the confirmation and the refund know them (#1045)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const offers = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body;
+  const request = bookingRequest(offers.offers.find((o) => o.offerSummary.overallFlexibility === 'FULL_FLEXIBLE'));
+  request.passengerSpecifications[0].detail.lastName = 'Simvariant-Booking-Without-Fulfillments';
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+  const base = `/gamma/bookings/${booking.id}`;
+  const fulfillments = (await call(sim.base, token, 'POST', `${base}/fulfillments`, {})).body.fulfillments;
+  assert.ok(fulfillments.length > 0);
+  assert.deepEqual((await call(sim.base, token, 'GET', base)).body.booking.fulfillments, []);
+  assert.equal((await call(sim.base, token, 'GET', `/gamma/fulfillments/${fulfillments[0].id}`)).body.fulfillment.id, fulfillments[0].id);
+  const [offer] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;
+  assert.equal((await call(sim.base, token, 'PATCH', `${base}/refund-offers/${offer.id}`, { status: 'CONFIRMED' })).body.refundOffer.status, 'CONFIRMED');
+  const after = (await call(sim.base, token, 'GET', base)).body.booking;
+  assert.deepEqual(after.fulfillments, []);
+  assert.ok(after.bookedOffers[0].admissions.every((part) => part.status === 'REFUNDED'));
+});
+
 test('refund: confirming one offer refunds that direction only; the other keeps its status', async () => {
   const { token, fulfillments, base } = await confirmedReturn();
   const [first, second] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;

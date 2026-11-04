@@ -9,8 +9,8 @@ http://www.apache.org/licenses/LICENSE-2.0
 /**
  * osdmPost.js — a POST to the provider sent from a step's script
  * (`bru.sendRequest`), with the headers the request files carry: the
- * version's Content-Type, the run's token, the Requestor when set, and the
- * simulator faults of the scenario (#833). A script-sent request is not
+ * version's Content-Type, the run's token, the Requestor when set, the
+ * simulator faults of the scenario (#833) and the sale's W3C trace (#1070). A script-sent request is not
  * skipped by the run filter (#652).
  *
  * Resolves { status, body } (the body parsed when it is JSON, kept as text
@@ -23,13 +23,14 @@ async function postOsdm(path, body) {
     bru.sendRequest({
       url: `${bru.getEnvVar('api_base')}${path}`,
       method: 'POST',
-      headers: {
+      // #1070: the sale's W3C trace, a parent-id of its own.
+      headers: require('./traceContext.js').withTrace({
         'Content-Type': `application/json;version=${bru.getEnvVar('osdmVersion')}`,
         Accept: 'application/json',
         Authorization: `Bearer ${bru.getEnvVar('access_token')}`,
         ...requestorHeader(bru.getEnvVar('requestor')),
         ...(faults ? { 'X-Simulator-Faults': faults } : {}),
-      },
+      }),
       data: JSON.stringify(body),
     }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
   });

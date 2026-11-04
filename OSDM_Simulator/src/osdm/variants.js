@@ -32,6 +32,11 @@
  *   one-fulfillment-per-refund-request a refund offer request naming more
  *                           than one fulfillment is refused with 501
  *                           VALUE_NOT_SUPPORTED (#883): ask one at a time
+ *   booking-without-fulfillments GET /bookings/{id} answers "fulfillments": []
+ *                           whatever was issued, as a real provider does
+ *                           (#1045); POST /fulfillments, GET /fulfillments/{id}
+ *                           and the refund still know them. OSDM does not
+ *                           require Booking.fulfillments.
  *   wrong-booking-price     provisionalPrice one cent off the sum of its parts
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
@@ -58,7 +63,7 @@
 
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
-  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request',
+  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request', 'booking-without-fulfillments',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount', 'wrong-exchange-keeps-trip',
   'fare-not-in-fulfillment', 'fare-fulfillment-document', 'fare-wrong-combining-fee', 'fare-ignores-refund-fee', 'fare-reservation-product-mode',
 ]);
@@ -135,6 +140,14 @@ function shapeIssuedFulfillments(booking) {
   }
 }
 
+/**
+ * The booking as GET /bookings/{id} gives it: for booking-without-fulfillments,
+ * a copy listing no fulfilment. The stored booking is not changed.
+ */
+function bookingAsRead(booking) {
+  return has(booking, 'booking-without-fulfillments') ? { ...booking, fulfillments: [] } : booking;
+}
+
 /** The ids of the parts a refund specification names, within one fulfillment, or null when it names none. */
 function scopedPartIds(booking, fulfillment, spec, parts) {
   const held = new Set(fulfillment.bookingParts.map((p) => p.id));
@@ -149,5 +162,5 @@ function scopedPartIds(booking, fulfillment, spec, parts) {
 }
 
 module.exports = {
-  variantsOf, keepVariants, has, shapeNewBooking, shapePassengers, mayChangePassenger, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds,
+  variantsOf, keepVariants, has, shapeNewBooking, shapePassengers, mayChangePassenger, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds, bookingAsRead,
 };

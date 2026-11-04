@@ -176,6 +176,19 @@ describe('buildEnvYml — values are data, never structure (PR-03, NEW-02)', () 
       .toEqual([a, b, c, d, e]);
   });
 
+  // #1070: the Test Framework's W3C trace context, its template parsed: Bruno
+  // fills in any "{{" it reads, so none may reach the file.
+  test('the trace context comes back as the runner wrote it, with no template in it', () => {
+    const { runSettingsOf } = require('../../public/js/trace-context');
+    const settings = runSettingsOf({ traceContext: { sampled: false, tracestate: 'processid={{uuid}},a="x"\\{{parentId}}' } });
+    expect(settings.tracestate).not.toEqual([]);
+    const yml = buildEnvYml(env, api, '', data, '', [], settings);
+    const file = expectClean(yml, [...FIXED, '__traceContext']);
+    expect(JSON.parse(valueIn(file, '__traceContext'))).toEqual(settings);
+    expect(yml).not.toContain('{{');
+    expect(names(buildEnvYml(env, api, '', data, '', [], undefined))).toEqual(FIXED);
+  });
+
   test('2,000 random strings from an awkward alphabet come back unchanged', () => {
     const alphabet = ['"', '\\', '\n', '\r', '\t', ' ', ':', '-', '#', '{', '}', "'", 'a', 'Z', '0', 'u', 'n',
       '\u0000', '\u007f', '\u0085', '\u2028', '\u2029', '\ufeff', 'é', '\ud83d', '\ude86'];

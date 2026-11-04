@@ -117,6 +117,10 @@ runtime:
             return;
         }
 
+        // #1045: the fulfilments the confirmation gave, for 07 and the refund or
+        // exchange when the booking read after it lists none.
+        require(bru.getEnvVar("library_base") + "confirmedFulfillments.js").keepConfirmation(jsonData);
+
         // #906: the fulfilment of a fare sale is checked by fareBooking.js, then 06b reads it.
         if (require(bru.getEnvVar("library_base") + "fareBooking.js").checkFareFulfillmentStep(jsonData)) {
             if (require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").armFulfillmentReads(jsonData)) {

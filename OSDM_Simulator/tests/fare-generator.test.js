@@ -256,3 +256,20 @@ test('every detail variant is an OSDM answer in every provider\'s version', () =
   }
   assert.equal(checked, 36);
 });
+
+// #1045: a fare names its accounting: the provider's carrier, and an id made
+// of the template and the fare's 301 serial number.
+test('every fare names its accounting company, the provider\'s carrier, and an accounting id', () => {
+  for (const key of ['alpha', 'gamma', 'zeta']) {
+    const provider = providers.get(key);
+    const offers = buildOfferCollection(request({ passengers: [adult(1), BICYCLE], classes: ['FIRST', 'SECOND'] }), provider, NOW).response.offers.filter((o) => o.fares);
+    assert.ok(offers.length > 0);
+    for (const fare of offers.flatMap((o) => o.fares)) {
+      assert.equal(fare.accountingRef.accountingCompany, provider.carrier.ref, key);
+      assert.equal(fare.accountingRef.accountingIds.length, 1);
+      const { serialId, tariffId } = fare.legacyAccountingIdentifier;
+      const [sim, template, ...rest] = fare.accountingRef.accountingIds[0].split('-');
+      assert.deepEqual([sim, template.startsWith('T'), rest], ['SIM', true, [serialId, tariffId].filter((x) => x != null).map(String)]);
+    }
+  }
+});

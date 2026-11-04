@@ -236,6 +236,66 @@ describe('test-resources — discover-timetable', () => {
       run(`UPDATE companies SET extra_headers = NULL WHERE id = ?`, [companyId]);
     }
   });
+
+  // #1070: the W3C Trace Context OSDM declares on every operation, on
+  // OSCAR's own calls too: each request a trace of its own.
+  describe('#1070 — W3C trace context', () => {
+    const { colEncrypt } = require('../../src/db/db');
+    const W3C = /^00-([0-9a-f]{32})-([0-9a-f]{16})-(0[01])$/;
+    function withFramework(traceContext) {
+      run('DELETE FROM test_frameworks WHERE company_id = ?', [companyId]);
+      if (traceContext !== undefined) {
+        run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+          [uuidv4(), companyId, colEncrypt(JSON.stringify({ osdmVersion: '3.8', traceContext }))]);
+      }
+    }
+    async function discover(days) {
+      const origFetch = global.fetch;
+      const sent = [];
+      global.fetch = async (_url, opts) => { sent.push(opts.headers); return { ok: true, status: 200, text: async () => JSON.stringify({ trips: [] }) }; };
+      try {
+        const res = await request(app).post('/v1/company/test-resources/discover-timetable')
+          .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+          .send({ originURN: 'urn:uic:stn:8500010', destinationURN: 'urn:uic:stn:8503000', days });
+        expect(res.status).toBe(200);
+        return sent;
+      } finally { global.fetch = origFetch; }
+    }
+    afterEach(() => {
+      run('DELETE FROM test_frameworks WHERE company_id = ?', [companyId]);
+      run(`UPDATE companies SET extra_headers = NULL WHERE id = ?`, [companyId]);
+    });
+
+    test('no framework: a sampled traceparent, a new trace for each search', async () => {
+      withFramework(undefined);
+      const sent = await discover(2);
+      expect(sent.length).toBeGreaterThanOrEqual(2);
+      const ids = sent.map((h) => W3C.exec(h.traceparent));
+      expect(ids.every(Boolean)).toBe(true);
+      expect(new Set(ids.map((m) => m[1])).size).toBe(sent.length);
+      expect(ids.every((m) => m[3] === '01')).toBe(true);
+      expect(sent.every((h) => h.tracestate === undefined)).toBe(true);
+    });
+
+    test('the framework\'s tracestate is filled in, and replaces a dedicated one', async () => {
+      withFramework({ sampled: false, tracestate: 'processid={{uuid}}' });
+      run(`UPDATE companies SET extra_headers = ? WHERE id = ?`, [JSON.stringify([{ name: 'TraceState', value: 'processid=abc' }]), companyId]);
+      const [first] = await discover(1);
+      const [, traceId] = W3C.exec(first.traceparent);
+      expect(first.traceparent.endsWith('-00')).toBe(true);
+      const uuid = `${traceId.slice(0, 8)}-${traceId.slice(8, 12)}-${traceId.slice(12, 16)}-${traceId.slice(16, 20)}-${traceId.slice(20)}`;
+      expect(first.tracestate).toBe(`processid=${uuid}`);
+      expect(first.TraceState).toBeUndefined();
+    });
+
+    test('a framework that sends none: no trace header, a dedicated one goes as it is', async () => {
+      withFramework({ send: false });
+      run(`UPDATE companies SET extra_headers = ? WHERE id = ?`, [JSON.stringify([{ name: 'traceparent', value: 'cafebabe-0815' }]), companyId]);
+      const [first] = await discover(1);
+      expect(first.traceparent).toBe('cafebabe-0815');
+      expect(first.tracestate).toBeUndefined();
+    });
+  });
 });
 
 // ── #715: connections as journeys, and the trip search ─────────────────────────
@@ -480,7 +540,7 @@ describe('test-resources — reprobe-offers', () => {
     run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'Probe me', ?)`,
       [trainId, companyId, colEncrypt(JSON.stringify({ originURN: 'urn:uic:stn:8500010', destinationURN: 'urn:uic:stn:8503000' }))]);
     run(`UPDATE companies SET extra_headers = ? WHERE id = ?`, [
-      JSON.stringify([{ name: 'traceparent', value: 'cafebabe-0815' }]),
+      JSON.stringify([{ name: 'accept-language', value: 'en' }, { name: 'traceparent', value: 'cafebabe-0815' }]),
       companyId
     ]);
     const origFetch = global.fetch;
@@ -490,7 +550,9 @@ describe('test-resources — reprobe-offers', () => {
       const res = await request(app).post('/v1/company/test-resources/reprobe-offers')
         .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
       expect(res.status).toBe(200);
-      expect(capturedHeaders.traceparent).toBe('cafebabe-0815');
+      expect(capturedHeaders['accept-language']).toBe('en');
+      // #1070: a fixed traceparent gives way to a W3C one of its own.
+      expect(capturedHeaders.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
     } finally {
       global.fetch = origFetch;
       run(`UPDATE companies SET extra_headers = NULL WHERE id = ?`, [companyId]);

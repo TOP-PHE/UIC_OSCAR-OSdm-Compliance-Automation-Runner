@@ -314,9 +314,13 @@ describe('F2, F5, F6 refund path', () => {
 
   // Old code: isRefundConfirmed was set only by a function no request calls.
   test('F6: a confirmed refund offer sets isRefundConfirmed and records its fulfillments', () => {
-    run(() => refunds.postPatchRefundOfferResponse({ refundOffer: refundOffer('CONFIRMED', ['F2']) }, ['CONFIRMED'], ['REFUNDED']));
+    const answer = { refundOffer: refundOffer('CONFIRMED', ['F2']) };
+    run(() => refunds.postPatchRefundOfferResponse(answer, ['CONFIRMED'], ['REFUNDED']));
     expect(envStore.isRefundConfirmed).toBe('true');
     expect(JSON.parse(envStore.__refundedFulfillmentIds)).toEqual(['F2']);
+    // #1045: the single refundOffer is read as a list without being written
+    // into the answer, which the report keeps as the provider sent it.
+    expect(Object.keys(answer)).toEqual(['refundOffer']);
   });
 
   // Old code: the breakdown was read as refundOfferBreakDown and required a

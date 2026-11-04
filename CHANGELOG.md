@@ -105,6 +105,194 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.451] / [collection-OTST_V2.0.246] — 2026-11-03
+
+Issue #1045 (a booking read that lists no fulfilment, as a real provider gave), release 2026.489. Simulator 0.62.0. The server change is the welcome-page news entry.
+
+### Added
+- **A simulator variant whose booking lists no fulfilment**, and two scenarios that show OSCAR going through. A real provider's fare run gave `"fulfillments": []` in every booking read after the confirmation. Since 1.11.447, step 07 warns and the refund names the fulfilments the confirmation gave, but nothing ran that case end to end.
+  - `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_38`: a one-way full refund of products.
+  - `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_FARE_REFUND_1ADT_38`: the refund of fares asked by search, the provider's case.
+  - Passenger list 40 (last name `Simvariant-Booking-Without-Fulfillments`). With their copies for every other version, their rows in *OSCAR - OSDM Simulator scenarios* and the simulator references' run lists (regenerated).
+  - Expected: no failed check, a WARNING at 07 and one at 14.
+
+### Fixed
+- **Step 14 on a booking read that lists no fulfilment** (`refunds.js`, `_fulfillmentsKnown()`). The refund scope check took every booked part for "left out of the refund", so a refunded part failed. The full-refund check counted 0 of 0 fulfilments and passed without checking anything.
+  - Both now read the fulfilments the confirmation gave (`__confirmedFulfillments`, kept at 06 since 1.11.447): the parts each one holds, and the ids a full refund must cover.
+  - Their REFUNDED state cannot be read from the booking: one WARNING says so, and no fulfilment state is tested.
+  - With no fulfilment from either, the part-level check is skipped with an INFO line.
+
+### Simulator 0.62.0
+- Variant `booking-without-fulfillments` (`variants.js` `bookingAsRead()`): `GET /bookings/{id}` answers a copy of the booking with `"fulfillments": []`. `POST /fulfillments`, `GET /fulfillments/{id}` and the refund work on the stored booking as before. OSDM does not require `Booking.fulfillments`, so the variant is not deliberately wrong.
+
+### Changed
+- A welcome-page news entry.
+
+### Checked
+- Replay of the two scenarios on every provider (3.6 to 3.12): no failed check; the WARNING at 07 and the one at 14, nothing else (316 checks for the product refund, 180 for the fare refund). With `main`'s collection the same runs fail one check at 14 (a refunded part "left out of the refund"). Replay of every other `_38` refund (33) on `main` and on this branch: the same checks, failures and warnings.
+- `bruno-confirmed-fulfillments.test.js`: the scope check through the confirmation (parts checked, one WARNING, no fulfilment state), a full refund held to the confirmation's fulfilments, nothing known: nothing fails. Putting back the old reading fails them. The simulator's `app.test.js` runs the variant: an empty list on every read, the fulfilment read and the refund still working.
+
+---
+
+## [server-1.11.450] / [collection-OTST_V2.0.245] — 2026-11-03
+
+Issue #1045 (a refund of fares in every form of offer request), release 2026.488. The server change is the welcome-page news entry.
+
+### Added
+- **A refund of fares asked by search criteria and by trip id.** The four fare refunds of the simulator ask their fares by trip specification, the form #907 started from. OSDM ties a refund to the booked fulfilments, never to the form of the offer request, but nothing tested the other two forms. On gamma, New Run with Offer request *Search* kept no fare refund, and a provider taking search criteria alone had no fare refund to copy.
+  - Simulator scenarios `SIM_FARE_REFUND_SRCH_1ADT_38` (trip 1, from 0000001 to 0000002, the section the whole trip) and `SIM_FARE_REFUND_TRIPIDS_1ADT_38` (the same, by trip id). Both are the refund of `SIM_FARE_REFUND_1ADT_38`: a semi-flexible CLUSTERING fare refunded in full, no fee stated. With their copies for every other version (`version-copies.js`), their rows in *OSCAR - OSDM Simulator scenarios*, and the simulator references' run lists (regenerated).
+  - Reference scenarios `OTST_FARE_REFUND_SRCH_1ADT` (181 checks) and `OTST_FARE_REFUND_TRIPIDS_1ADT` (188: the trip id checks), capability Fare refund. A provider declaring one form of offer request is offered the fare refund in that form.
+
+### Changed
+- `SIM_FARE_SRCH_1ADT_*` and `SIM_FARE_TRIPIDS_1ADT_*` said they end after the offer step; they are booked and confirmed since #906. A description is what an AI analysis takes as the expected result.
+- *What is tested*: the two rows, the count (98).
+- A welcome-page news entry.
+
+### Checked
+- Replay of the two scenarios on every provider (3.6 to 3.12) and of `SIM_FARE_REFUND_1ADT_38`: no failed check, no warning; 181 checks by search (as by specification), 188 by trip id.
+- `fare-declarations.test.js`: a framework taking one form of offer request is offered the fare refund in that form, and the three with every form. `run-filters.test.js`: Refund + Fare based keeps the six fare refunds. The simulator's tests (`datafile.test.js` per fare scenario) and the server's catalogue tests pass.
+
+---
+
+## [server-1.11.449] / [collection-OTST_V2.0.244] — 2026-11-03
+
+Issue #1070, release 2026.487.
+
+### Added
+- **The W3C Trace Context on every OSDM request.** OSDM declares `traceparent` and `tracestate` on every operation (3.4 to 3.12). Until now OSCAR sent them only when a Test Manager typed a fixed value as a dedicated header, so every request had the same parent-id, which W3C Trace Context does not allow (Level 1, Recommendation of 23 November 2021: "parent-id" set for each outgoing request), and a provider could not tell one sale from another.
+  - **One trace per sale** (maintainer, 2026-11-03). Each send of `01. POST Get Offer` starts a new trace (a first sale, a loop-back, an expiry sub-run, a retry); every request after it carries that trace id with a parent-id of its own, request files and script-sent requests alike (01b/01c/01d, probes, Idempotency-Key replays, refund per fulfilment, trips by id, exchange, refund). A request sent while no sale is open, the system information reads at the start of a run, starts a trace of its own. `library-bruno/traceContext.js`; the flow is `__traceUuid`, cleared at the scenario start only (the parser's reset runs inside 01's own script, after the new trace has started).
+  - **The run log says where each trace starts**: `[INFO] 🔗 Trace <id> starts at 01. POST Get Offer`, the id to give the provider. Not 🧭, which the runner files as an offer-option report.
+  - **Set in the Test Framework**, `traceContext: { send, sampled, tracestate }`; absent = a sampled traceparent (`01`: OSCAR keeps every request of a run) and no tracestate. The tracestate is a template in which OSCAR fills in `{{traceId}}`, `{{uuid}}` (the same id written as a UUID, for keys such as SBB's `processid`) and `{{parentId}}`. W3C fixes the rest of `traceparent`, so only its flag is a choice.
+  - **Checked at the three framework writers** (Test Config, configuration import, checklist apply): 400 for another placeholder, a stray `{{` or `}}`, or a tracestate W3C would refuse once filled in (key and value characters, no space around `=`, at most 32 members, unique keys, 512 characters). `public/js/trace-context.js`, shared by the page, the server and the tests.
+  - **The run gets the template already parsed** (`__traceContext`, written with `envVar()`), so no `{{` of it reaches Bruno, which would fill it in itself.
+  - **Test Config**: a *🔗 Trace Context (W3C)* section in the Test Framework, with a preview using W3C's example ids; a tracestate W3C would refuse is said and not saved.
+  - **OSCAR's own calls to a provider** (Discover timetable, re-probe, journey probe, fill calendars, Places refresh, Test my credentials) send the same headers, each request a trace of its own (`withTraceHeaders()`, `osdm-client.js`).
+
+### Changed
+- **A dedicated header named `traceparent` (or `tracestate`, when the Test Framework names one) is replaced** by OSCAR's, with one warning per run asking to set it in the Test Framework. With the trace context turned off, dedicated headers go as they are.
+- **The fixed `traceparent` / `tracestate` of a standalone SBB environment are gone** (`API === "SBB"` in the collection, never reached on OSCAR); `accept-language` stays.
+- A token request (`00-Access Token`, standalone runs) is not traced: it is OAuth, not OSDM.
+- A welcome-page news entry; the Tester User Guide (§3.1, §6 HTTP Traffic, §8) and the Server Admin Guide (§15.11).
+
+### Checked
+- Real Bruno CLI on the local simulator (gamma): `SIM_REFUND_PAX_2ADT_38`, `SIM_SALE_BY_TRIP_ID_1ADT_38` and `SIM_SALE_IDEMPOTENCY_1ADT_38` give the same checks and warnings on `main` and on this branch (replay `compare`); in Bruno's results every request sent carries a W3C traceparent with a parent-id of its own, one trace from `01. POST Get Offer` to the end of the refund, and `processid={{uuid}}` arrives as the trace id written as a UUID.
+- `trace-context.test.js` (70 tests): the W3C rules, the flow, the page, the collection and the server giving the same headers, and the wiring (every script-sent request to the provider carries the trace). Removing the flow start, a script-sent request's trace, the per-request parent-id, the scenario-start reset, the route's check or the dedicated-header replacement each fails a test.
+- Through a throwaway OSCAR on the simulator: a Test Framework with `processid={{uuid}}`, one run of `SIM_REFUND_PAX_2ADT_38` through the runner; the request headers OSCAR stored (HTTP Traffic) and the two `🔗 Trace` lines of the run log are as above. In Test Config, the section's preview follows the typing, `processid = {{uid}}` is refused and not saved, a valid edit and the *Sampled* box are saved.
+- Tests that pin a script-sent request's exact headers now include its `traceparent` (`bruno-trip-ids.test.js`), and the change-event chain pinned in three tests ends with `changeTraceContext`. A script-sent request with no trace open starts one without a log line (it never happens in a run: the system information reads open one), and a trace never stops a request: `withTrace()` gives the headers as they are on any error.
+- Sonar: the page's preview no longer passes `esc` straight to `map` (S7727, a bug). Left open on purpose: four S7721 ("move the function to the outer scope") in `public/js/trace-context.js`, whose functions sit inside the module's factory, as in `copy-report.js`, so that the browser gets one global, `OscarTraceContext`.
+
+---
+
+## [server-1.11.448] — 2026-11-03
+
+Issue #1045 (the launch filters on gamma), release 2026.486.
+
+### Changed
+- **At launch, a fare refund is kept by the Refund box too.** Each scenario has one capability group, the one the coverage report gives it, and a fare refund's is Fares. On gamma, Capability *Refund* with Distribution *Fare based* therefore kept nothing, and a Test Manager looking for the refunds of fares did not know where they were. A facet now also carries `groups` (`groupsOf()`, `runFilters.js`): its own group, then the groups its capability also belongs to at launch (`ALSO_IN`, `fares.refund` → Refund). A scenario is kept by any of its boxes and counted under each, as a scenario of both distribution modes already was. The coverage report is unchanged: a fare refund stays one row, under Fares.
+- *Tester User Guide*: the Capability filter.
+- A welcome-page news entry.
+
+### Checked
+- `run-filters.test.js`: on gamma's `_38` scenarios, Refund + Fare based keeps the four fare refunds, and Fares still keeps them; a product refund and a fare sale keep one group; a facet without `groups` counts under its group. Putting back the old rule fails the test. The Refund box counts 29 of gamma's 184 scenarios, 23 before.
+
+---
+
+## [server-1.11.447] / [collection-OTST_V2.0.243] — 2026-11-03
+
+Issue #1045 (from a real provider's fare run), release 2026.485. The server change is the welcome-page news entry.
+
+### Fixed
+- **A refund or exchange names the fulfilments the confirmation gave.** A real provider answered the confirmation (`POST /bookings/{id}/fulfillments`) with two fulfilments, then gave the booking at 07 with `"fulfillments": []`. The fare refund took its ids from that booking and sent `{"fulfillmentIds": []}`: the provider answered 400, and OSCAR's own conformance check called it an OSCAR issue (OSDM: `fulfillmentIds`, minItems 1).
+  - Step 06 keeps the fulfilments the confirmation gives (`confirmedFulfillments.js`, `__confirmedFulfillments`, cleared with the sale).
+  - At 07, a booking that does not list them, or not all, is a WARNING: OSDM does not require `Booking.fulfillments`, though `GET /bookings/{id}` embeds ALL by default. The refund or exchange then names the confirmation's fulfilments (the booking's when it lists some).
+  - A refund or exchange with no fulfilment id from either step ends at 07 with one failed check, "A fulfilment to name in the refund offer request", instead of sending a request without one.
+
+### Changed
+- **Fare check F5 reads "Every booked fare is in a fulfilment (bookingParts)"**: the booking's fulfilments, else the confirmation's. It read "The booking lists its fulfilments, and every booked fare is in one" and failed on a booking listing none.
+- **For a product sale, a booking read after the confirmation that lists no fulfilment is that WARNING**, when the confirmation gave some. It was a failure, "Booking embeds the generated fulfillments after fulfillment" (#250), which named an OSDM rule the schema does not hold; it still fails when the confirmation gave none either.
+- *What is tested*: steps 06 and 07; R3 at step 10 is a failure since #1055 (the row still said a WARNING).
+- A welcome-page news entry.
+
+### Checked
+- Replay of every `_38` fare, refund and exchange scenario and a product sale (77), on `main` and on this branch: the same checks, failures and warnings in all 77; the only change is F5's title, in the 30 that reach it (`SIM_WRONG_FARE_NOT_IN_FULFILLMENT_38` still fails it).
+- `bruno-confirmed-fulfillments.test.js` (12 tests) runs the provider's answers: the WARNING, the refund naming the confirmation's ids, the stop, and the product path. Putting back each old behaviour (the refund taking the booking's ids, F5 on the booking only, no stop, the #250 failure) fails a test.
+
+---
+
+## [server-1.11.446] / [collection-OTST_V2.0.242] — 2026-11-03
+
+Issue #1045 (the reference scenarios of the newer simulator fare scenarios), release 2026.484.
+
+### Added
+- **Five fare reference scenarios** in the catalogue, from the fare scenarios #1048 added to the simulator. Like the other fare entries, they are offered only to a Test Framework that declares the fare-based distribution, and ask fares by trip specification for the last leg's section. Each made 117 checks on gamma, none failed, no warning.
+  - `OTST_FARE_FIRST_1ADT` (`SIM_FARE_FIRST_1ADT_38`): one adult in first class.
+  - `OTST_FARE_REDUCTION_CARD_1ADT` (`SIM_FARE_CARD_1ADT_38`): one adult holding the first reduction card the framework declares (limit `REDUCTION_CARDS`, as the product card entries).
+  - `OTST_FARE_FAMILY` (`SIM_FARE_FAMILY_38`): an adult, a child of 8 and a young child one year under the age declared free (limit `FREE_CHILD`).
+  - `OTST_FARE_BICYCLE_ADMISSION` (`SIM_FARE_BICYCLE_ADMISSION_38`): an adult and a bicycle, a passenger of type BICYCLE, with `FARE_ADMISSION` and `FARE_ANCILLARY` and no fare reservation. It needs passenger type BICYCLE declared, nothing under Fares.
+  - `OTST_FARE_GROUP_6ADT` (`SIM_FARE_GROUP_6ADT_38`): six adults.
+- Left out: `SIM_FARE_TRANSIT_1ADT_38` and `SIM_FARE_ROUTES_1ADT_38` (their point is the simulator's border and route stations), `SIM_FARE_REAL_FORM_1ADT_38` (a simulator variant), and `SIM_FARE_REFUND_NON_FLEX_1ADT_38`: it expects a refund offer that gives nothing back, and a provider may instead refuse to refund a non-refundable fare.
+
+### Changed
+- **The copy of a free-child entry changes only the youngest passenger** (`freeChildPassengers()`, `catalogueMatch.js`). It gave every passenger with an age the free child's age, which would have made the family's adult and older child free children too. `OTST_FARE_FREE_CHILD` has one passenger with an age and is copied as before.
+- A welcome-page news entry.
+
+### Checked
+- Replay of the five sources and `SIM_FARE_SPEC_1ADT_38` on `main`: 117 checks each; the plain fare sale's 118th is the check of the SEMI_FLEX cluster it asks.
+- The catalogue tests, the fare declaration tests (what each entry needs, the family and card copies) and *What is tested*'s rows.
+
+---
+
+## [server-1.11.445] / [collection-OTST_V2.0.241] — 2026-11-02
+
+Issue #1045 (from the AI analysis of gamma's fare runs), release 2026.483. The server change is the welcome-page news entry.
+
+### Fixed
+- **The answer OSCAR keeps is the provider's, as sent.** Bruno stores a response object after the request's scripts have run. The report, its HTTP traffic and the run's stored requests (which the AI analysis and its download read) keep that object. Two checks set members on it:
+  - Step 01's fare checks set `offers` to the product offers only. For `SIM_WRONG_FARE_WITHOUT_SECTION_38` the stored answer read `"offers": []`, though gamma had sent fares and check N had failed on them. The analysis could not tell why.
+  - The refund checks set `refundOffers` on a step 11 answer holding a single `refundOffer`. Step 10 wrapped a `refundOffers` that was not a list.
+  - Steps 01 and 10 now give their checks a copy (`workingCopy()`, `envUtils.js`), and `postPatchRefundOfferResponse()` reads a single refund offer as a local list. No check's result changes.
+- **The two deliberately wrong scenarios whose check #1055 made a failure say so.** `SIM_WRONG_FARE_OVERLAP_*` now reads "check O8 fails at 01; the fare offer is not booked", and `SIM_WRONG_FARE_COMBINING_FEE_*` "check R3 fails at 10; the refund goes on". They still said "a WARNING", and the analysis took the failure for OSCAR's mistake. The scenarios document already said so.
+
+### Changed
+- A welcome-page news entry.
+
+### Checked
+- Replay of every `_38` fare and refund scenario (69) and two product sales (search, exchange), on #1063's head and on this branch: the same checks, failures and warnings in all 71.
+- In the runs, the stored answer at step 01 of `SIM_WRONG_FARE_WITHOUT_SECTION_38` holds the three fare offers gamma sent; before, it held none. Check N fails as before.
+- One run in the first branch recording wrote no result file, and the replay read a stale file of another scenario. Run again on its own, it matches `main`.
+
+---
+
+## [server-1.11.444] / [collection-OTST_V2.0.240] — 2026-11-02
+
+Issue #1045 (a fare expert's review of the simulator's bicycle fare scenario), release 2026.482. Simulator 0.61.0. The server change is the welcome-page news entry.
+
+### Fixed
+- **A passenger that is not a person is sent without a person's data** (`library-bruno/transportables.js`). The data file's schema asks every passenger for a date of birth, a name, an e-mail and a phone number, and OSCAR sent them for a bicycle too: its date of birth in the offer request, its name and contact in the booking.
+  - A passenger of a type OSDM lists as a TransportableType (3.8: `PET`, `DOG`, `ACCOMP_DOG`, `BICYCLE`, `LUGGAGE`, `PRAM`, `CAR`, `SPECIAL_VEHICLE`, `MOTOCYCLE`, `TRAILER`; 3.5's `COMPANION_DOG` and `MOTORCYCLE`) is sent with its reference, type and cards only. This applies to the offer request, the booking request (`passengerSpecsOf()` in `scenarioParser.js`) and the exchange's offer request.
+  - Steps 03 (PATCH passenger) and 04 (GET passenger) leave it out (`choosePassenger()`), with one INFO line.
+  - An INFO line names the fields of the data file that were not sent.
+  - A person is sent as before.
+- **An offer request for fare parts only asks no fulfilment option** (`asksFaresOnly()`, in the outbound and the return offer requests). A fare fulfilment holds no document (#906). A request that also asks for products still sends `requestedFulfillmentOptions`.
+
+### Changed
+- `SIM_FARE_BICYCLE_ADMISSION_38` and its copies ask for `FARE_ADMISSION` and `FARE_ANCILLARY`, so that a provider may sell a bicycle either way. The simulator, like DB, sells it as the passenger type BICYCLE with an admission fare.
+- The simulator checklists tick P1.11 `FARE_ANCILLARY` (template unchanged, V01.07): a distributor may ask for it, and the simulator takes it, so the references declare it and the bicycle scenario gets no "not declared" warning (#949). They were rebuilt from the generator's answers, and only that answer moved in each of the six copies. Offer-part probes cover `ADMISSION`, `RESERVATION` and `ANCILLARY` only, so declaring it adds no probe.
+- The simulator reference configurations follow the checklists and the data file.
+- A welcome-page news entry.
+
+### Simulator 0.61.0
+- Every fare names its `accountingRef`: the provider's carrier as accounting company, and one accounting id made of the template and the fare's 301 serial number and tariff (`SIM-T01-50150-27`). The booked fare keeps it.
+
+### Checked
+- Replay of every `_38` fare scenario (43), the bicycle scenario's 3.6 copy and four product sales (search, card, exchange, two-offer return), on `main` and on this branch: the same checks, failures and warnings. Only the O3 check's title changes in the bicycle scenario, which now names both types asked.
+- In the branch's runs:
+  - The bicycle goes out as `{"externalRef":"00002","type":"BICYCLE"}` in the offer and booking requests; the adult keeps a date of birth, gender, name and contact.
+  - The fare-only offer requests carry no `requestedFulfillmentOptions`.
+  - The booked fare holds `accountingRef`.
+
+---
+
 ## [server-1.11.443] — 2026-11-02
 
 Issue #1059, release 2026.481. The collection is unchanged (OTST_V2.0.239).

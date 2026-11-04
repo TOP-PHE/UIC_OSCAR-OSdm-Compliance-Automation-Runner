@@ -893,6 +893,31 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   token request is logged with a **default-deny secret mask** (#437): only an
   explicit allowlist of structural fields shows its value, everything else
   renders `***` / `(empty)`.
+- **W3C Trace Context on every OSDM request** (#1070, 1.11.449 /
+  OTST_V2.0.244). OSDM declares `traceparent` / `tracestate` on every
+  operation. **One trace per sale** (maintainer): each send of `01. POST Get
+  Offer` starts one (`isFlowStart()`), every later request carries it with a
+  parent-id of its own; a request with no sale open starts its own; token
+  requests get none. `library-bruno/traceContext.js`: `applyTraceContext()`
+  in the collection's before-request, after the dedicated headers, which it
+  replaces (one warning a run); **every `bru.sendRequest` to the provider
+  wraps its headers in `withTrace()`** (`trace-context.test.js` scans for
+  it; it never throws and logs nothing, and a test pinning such a request's
+  exact headers must expect its `traceparent`). The module logs through the
+  global `validationLogger` when one is set: requiring `displays.js` replaces
+  a test's own logger. The flow is `__traceUuid`, cleared in the /versions list only, **never
+  in the parser's or the sub-run's reset**: those run inside 01's own script,
+  after the collection-level script started the new trace. Test Framework
+  `traceContext: { send, sampled, tracestate }` (absent = sampled, no
+  tracestate); the tracestate template takes `{{traceId}}`, `{{uuid}}`,
+  `{{parentId}}` only, checked against W3C's grammar by
+  `traceContextProblem()` at the three framework writers
+  (`public/js/trace-context.js`, shared by page, server and tests). The runner
+  writes `runSettingsOf()` as `__traceContext`, the template already parsed:
+  **no `{{` may reach Bruno**. The server's own calls add
+  `withTraceHeaders(headers, traceSettingsFor(companyId))` at each fetch (a
+  trace per request). The trace start line uses 🔗: 🧭 is the runner's
+  offer-option report marker.
 - **Self-registration is Test-Manager-gated, not email-domain-gated** (#449,
   2026-07-01). The old rule ("email must contain a fragment of the company
   name") is gone — it broke the moment a company was renamed after its slug
@@ -1053,6 +1078,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   PRODUCT), selection `modes` (`PRODUCT` / `FARE`, both by default), the
   page's *Distribution* fieldset (`SELECT_FILTERS`). A scenario of both
   modes is kept by either box (`facetModes()`); the label names one mode.
+  **A fare refund is under Refund too** (#1045, 1.11.448): a facet's
+  `groups` (`groupsOf()`) is its main group, then those of `ALSO_IN`
+  (`fares.refund` → Refund); kept by any of its boxes, counted under each
+  (`facetGroups()`). `group` stays the coverage report's one group, which
+  `run-filters.test.js` compares with `capabilityCoverageOf()`.
 - **Authorise before you parse — and testers keep the datafile save, on
   purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
   runs as middleware *ahead of* any body parser. For the multipart upload that
@@ -2260,7 +2290,75 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   moved with them (`replay.js catalogue` on the fare `_38` scenarios). An
   overlapping offer is no longer booked (`fareSaleDecision()`).
   `SIM_WRONG_FARE_OVERLAP_*` and `SIM_WRONG_FARE_COMBINING_FEE_*` left
-  `WARNING_ONLY`.
+  `WARNING_ONLY`; their descriptions said "a WARNING" until 1.11.445, and an
+  AI analysis read the failure as OSCAR's mistake: **a scenario's
+  description is what an analysis takes as its expected result**, so a
+  change of severity changes it too (copies: `copyOf()`'s description).
+  **A step's checks work on a copy of its answer** (#1045, 1.11.445 /
+  OTST_V2.0.241). Bruno stores the response object after the scripts ran,
+  and the report and `run_requests` keep that object: `body.offers = …` in
+  `fares.js` left a stored answer without the fare offers the provider sent
+  (an analysis read `"offers": []` next to a failed "no fare" check). Steps
+  01 and 10 read `workingCopy(res.getBody())` (`envUtils.js`, a shallow
+  copy: the checks only set top-level members), and
+  `postPatchRefundOfferResponse()` reads a single `refundOffer` as a local
+  list. A step whose checks set a member on their answer does the same.
+  **A transportable is not a person** (#1045, a fare expert's review,
+  1.11.444 / OTST_V2.0.240, simulator 0.61.0). `library-bruno/transportables.js`
+  (OSDM's TransportableType, with 3.5's spellings): reference, type and
+  cards only, in the offer, booking and exchange requests
+  (`passengerSpecsOf()` in `scenarioParser.js`), and 03/04 leave it out
+  (`choosePassenger()`). The data file's schema asks every passenger for a
+  date of birth, name and contact, so the data keeps placeholders and the
+  requests drop them. A fare-only offer request asks no
+  `requestedFulfillmentOptions` (`asksFaresOnly()`). **In DB's fares a
+  bicycle is a passenger type with an admission fare, not an ancillary**
+  (maintainer, 2026-11-02): the simulator answers so;
+  `SIM_FARE_BICYCLE_ADMISSION_*` asks `FARE_ADMISSION` + `FARE_ANCILLARY` so
+  a provider may answer either way, and the simulator checklists tick P1.11
+  `FARE_ANCILLARY` (maintainer: declared, the simulator takes it), so the
+  references do. **The checklist generator can run here**: `docx` in a
+  scratch folder (`NODE_PATH`), `py -X utf8 post.py` (without UTF-8 mode
+  Windows reads the answers in its code page and garbles "…"); compare the
+  old and new answers with `answersOfDocx()`. Simulator fares carry
+  `accountingRef` (the carrier, `SIM-<template>-<serial>-<tariff>`), kept
+  when booked.
+  **Five fare reference scenarios from #1048's** (1.11.446 /
+  OTST_V2.0.242): `OTST_FARE_FIRST_1ADT`, `_REDUCTION_CARD_1ADT` (limit
+  `REDUCTION_CARDS`: the test admits `SIM_FARE_CARD_` sources),
+  `_FAMILY` (limit `FREE_CHILD`; `freeChildPassengers()` now changes the
+  youngest passenger with an age only), `_BICYCLE_ADMISSION` (passenger
+  type BICYCLE, nothing under Fares) and `_GROUP_6ADT`, 117 checks each.
+  Left out on purpose: TRANSIT and ROUTES (the simulator's border and route
+  stations), REAL_FORM (a variant), and REFUND_NON_FLEX (it expects a refund
+  offer of 0, where a provider may refuse to refund a non-refundable fare;
+  needs OTST's reading first).
+  **A refund names the fulfilments the confirmation gave** (1.11.447 /
+  OTST_V2.0.243, from a real provider's fare run: its booking at 07 had
+  `"fulfillments": []` after 06 gave two, and the fare refund sent
+  `{"fulfillmentIds": []}`). Step 06 keeps them
+  (`library-bruno/confirmedFulfillments.js`, `__confirmedFulfillments`, in
+  both reset lists and `SUBRUN_SALE_STATE`); at 07 a booking not listing
+  them is a WARNING (OSDM does not require `Booking.fulfillments`) and the
+  refund or exchange names them; with none from either, 07 fails one check
+  and ends the scenario (`stopWithoutFulfillment()`: a step cannot skip
+  itself, #652). F5 is "Every booked fare is in a fulfilment"; the product
+  path's #250 failure applies only when the confirmation gave none.
+  **A refund of fares in every form of offer request** (1.11.450 /
+  OTST_V2.0.245): `SIM_FARE_REFUND_SRCH_1ADT_*` and `_TRIPIDS_1ADT_*` (trip
+  1, the section the whole trip), catalogue `OTST_FARE_REFUND_SRCH_1ADT`
+  (181) and `_TRIPIDS_1ADT` (188). A fare entry is never converted to another
+  form (its section names its trip), so **a fare capability needs one
+  simulator scenario per form**, or a provider declaring one form gets none.
+  **A booking read that lists no fulfilment, end to end** (1.11.451 /
+  OTST_V2.0.246, simulator 0.62.0): variant `booking-without-fulfillments`
+  (`bookingAsRead()`, `GET /bookings/{id}` only), passenger list 40,
+  `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_*` and
+  `_FARE_REFUND_1ADT_*`: no failed check, a WARNING at 07 and at 14. At 14
+  `_fulfillmentsKnown()` (`refunds.js`) reads the confirmation's fulfilments
+  when the booking lists none: parts checked, their state not. **A replay's
+  simulator must be the one just started**: an old one still on the port
+  (`EADDRINUSE` in its log) answered the first recording of this change.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

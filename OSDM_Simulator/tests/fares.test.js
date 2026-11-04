@@ -265,6 +265,9 @@ test('a fare offer is booked and confirmed, on every provider, in its version\'s
     const [bookedOffer] = booking.bookedOffers;
     assert.deepEqual(bookedOffer.fares.map((f) => f.id), offer.fares.map((f) => f.id), provider);
     assert.deepEqual(bookedOffer.fares.map((f) => f.status), ['PREBOOKED'], provider);
+    // #1045: the booked fare keeps the offered fare's accounting reference.
+    assert.ok(offer.fares[0].accountingRef?.accountingCompany, provider);
+    assert.deepEqual(bookedOffer.fares[0].accountingRef, offer.fares[0].accountingRef, provider);
     assert.deepEqual(bookedOffer.fares[0].passengerRefs, [booking.passengers[0].id], provider);
     assert.deepEqual(bookedOffer.admissions, [], provider);
     assert.equal(booking.provisionalPrice.amount, offer.fares[0].prices[0].amount, provider);

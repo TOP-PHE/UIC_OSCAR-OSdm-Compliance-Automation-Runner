@@ -28,7 +28,7 @@ const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
-const { osdmGet, buildTesterHeaders, mergeDedicatedHeaders } = require('../../utils/osdm-client');
+const { osdmGet, buildTesterHeaders, mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders } = require('../../utils/osdm-client');
 const log = require('../../utils/logger').child({ module: 'places' });
 
 const router = express.Router();
@@ -88,6 +88,8 @@ router.post('/places/refresh', async (req, res) => {
   // #477: company-wide Dedicated Headers (API Config) were never applied on
   // this server-side direct-call path — only the Bruno run path read them.
   mergeDedicatedHeaders(extraHeaders, company, token);
+  // #1070: each page a W3C trace context of its own.
+  const trace = traceSettingsFor(companyId);
 
   // Page through /places, deduping by id. OSDM's `page` query param is an
   // opaque, vendor-defined cursor; we page 1..N and stop as soon as a page adds
@@ -100,7 +102,7 @@ router.post('/places/refresh', async (req, res) => {
     const path = page === 0 ? 'places' : `places?page=${page}`;
     let r;
     try {
-      r = await osdmGet(company.api_base, path, token, extraHeaders);
+      r = await osdmGet(company.api_base, path, token, withTraceHeaders(extraHeaders, trace));
     } catch (err) {
       const detail = err.name === 'AbortError' ? 'timeout' : err.message;
       // If the very first request fails, surface it; otherwise keep what we have.

@@ -35,34 +35,33 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
     checkWarningsAndProblems(jsonData);
   }
 
-  // Convert single refundOffer to refundOffers array if necessary
-  if (jsonData.refundOffer && !jsonData.refundOffers) {
-    jsonData.refundOffers = [jsonData.refundOffer];
-    validationLogger("[DEBUG] Converted single refundOffer to refundOffers array");
-  }
+  // A single refundOffer is read as a list of one, without writing it into
+  // the answer: the report keeps the answer as the provider sent it (#1045).
+  const refundOffers = jsonData.refundOffer && !jsonData.refundOffers ? [jsonData.refundOffer] : jsonData.refundOffers;
+  if (refundOffers !== jsonData.refundOffers) validationLogger("[DEBUG] A single refundOffer read as a list of one");
 
   // Stop flow if refundOffers invalid
-  if (!Array.isArray(jsonData.refundOffers) || jsonData.refundOffers.length === 0) {
+  if (!Array.isArray(refundOffers) || refundOffers.length === 0) {
     validationLogger("[ERROR] No refundOffers found or 'refundOffers' is not an array.");
     throw new Error("No refundOffers found or 'refundOffers' is not an array.");
   }
 
   // Check refund offers exist
-  test(`'refundOffers' array exists with ${jsonData.refundOffers.length} refund offer(s)`, () => {
-    expect(jsonData.refundOffers, "[ERROR] 'refundOffers' is missing or empty").to.be.an("array").that.is.not.empty;
-    validationLogger(`[DEBUG] 'refundOffers' array exists with ${jsonData.refundOffers.length} refund offer(s)`);
+  test(`'refundOffers' array exists with ${refundOffers.length} refund offer(s)`, () => {
+    expect(refundOffers, "[ERROR] 'refundOffers' is missing or empty").to.be.an("array").that.is.not.empty;
+    validationLogger(`[DEBUG] 'refundOffers' array exists with ${refundOffers.length} refund offer(s)`);
   });
 
   // Validate each refund offer
-  jsonData.refundOffers.forEach((refundOffer, index) => {
+  refundOffers.forEach((refundOffer, index) => {
     validateRefundOfferResponse(refundOffer, index, expectedRefundOperationStatus, expectedFulfillmentStatus);
   });
 
-  recordRefundOfferStates(jsonData.refundOffers);
+  recordRefundOfferStates(refundOffers);
 
   // Store first offer ID
-  bru.setEnvVar("refundOffersOfferId", jsonData.refundOffers[0].id);
-  validationLogger(`[DEBUG] Stored refundOffersOfferId: ${jsonData.refundOffers[0].id}`);
+  bru.setEnvVar("refundOffersOfferId", refundOffers[0].id);
+  validationLogger(`[DEBUG] Stored refundOffersOfferId: ${refundOffers[0].id}`);
 
   // Expired-refund-offer test (Phase 3): capture the RefundOffer.validUntil of
   // the offer the PATCH will accept (refundOffers[0]), but ONLY on the POST
@@ -76,7 +75,7 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
     ? expectedRefundOperationStatus
     : [expectedRefundOperationStatus];
   if (_expectedStatuses.includes("PROPOSED")) {
-    const _firstRefundOffer = jsonData.refundOffers[0];
+    const _firstRefundOffer = refundOffers[0];
     if (_firstRefundOffer?.validUntil) {
       bru.setEnvVar("refundOfferValidUntil", String(_firstRefundOffer.validUntil));
       bru.setEnvVar("refundOfferValidUntilSource", "refundOffers[0].validUntil");
@@ -240,7 +239,8 @@ function nextRefundOfferToConfirm() {
 function checkFullRefundDone(booking) {
   const partial = partialRefundArmed() && String(bru.getEnvVar("__partialRefundDegradedToFull")) !== "true";
   if (partial) return;
-  const bookingIds = (Array.isArray(booking?.fulfillments) ? booking.fulfillments : []).map((f) => f?.id).filter(Boolean);
+  // #1045: the booking's fulfilments, else those the confirmation gave.
+  const bookingIds = _fulfillmentsKnown(booking).list.map((f) => f?.id).filter(Boolean);
   const refunded = _readJson("__refundedFulfillmentIds", []);
   const left = bookingIds.filter((id) => !refunded.includes(id));
   test(`Full refund: every fulfillment of the booking is refunded (${bookingIds.length - left.length}/${bookingIds.length})`, () => {
@@ -336,9 +336,18 @@ function refundScope(refundOffer) {
 }
 
 // F2 (step 14): the refunded set comes from the confirmed refund offers.
+// #1045: the fulfilments a booking read lists, else those the confirmation
+// gave (06, confirmedFulfillments.js) when it lists none: a real provider's
+// booking listed none after the confirmation.
+function _fulfillmentsKnown(booking) {
+  const listed = booking && Array.isArray(booking.fulfillments) ? booking.fulfillments.filter(Boolean) : [];
+  if (listed.length > 0) return { list: listed, fromConfirmation: false };
+  return { list: require("./confirmedFulfillments.js").confirmedFulfillments(), fromConfirmation: true };
+}
+
 function isScopedRefundOnBooking(booking) {
   const refunded = _readJson("__refundedFulfillmentIds", []);
-  const ids = (Array.isArray(booking?.fulfillments) ? booking.fulfillments : []).map((f) => f?.id);
+  const ids = _fulfillmentsKnown(booking).list.map((f) => f?.id);
   return refunded.length > 0 && ids.some((id) => !refunded.includes(id));
 }
 
@@ -351,9 +360,15 @@ function checkRefundScopeOnBooking(booking) {
     validationLogger("[DEBUG] Refund scope check skipped — no confirmed refund offer named its fulfillments.");
     return;
   }
-  const fulfillments = booking && Array.isArray(booking.fulfillments) ? booking.fulfillments : [];
+  const { list: fulfillments, fromConfirmation } = _fulfillmentsKnown(booking);
   const refundedPartIds = new Set();
-  let partsKnown = true;
+  // Nothing to tell a refunded part from another: the part-level check is skipped below.
+  let partsKnown = fulfillments.length > 0;
+  // #1045: a booking listing no fulfilment says nothing of their state; the
+  // confirmation's still say which parts each one holds.
+  if (fromConfirmation && fulfillments.length > 0) {
+    validationLogger(`[WARNING] Refund scope: the booking read after the refund lists no fulfilment, so the REFUNDED state of ${fulfillments.map((f) => f.id).join(", ")} cannot be read from it; the booked parts are checked through the fulfilments the confirmation gave (OSDM does not require Booking.fulfillments).`);
+  }
   fulfillments.forEach((f) => {
     if (!f) return;
     const isRefunded = refunded.includes(f.id);
@@ -361,13 +376,16 @@ function checkRefundScopeOnBooking(booking) {
       if (Array.isArray(f.bookingParts)) f.bookingParts.forEach((bp) => bp && refundedPartIds.add(bp.id));
       else partsKnown = false;
     }
+    if (fromConfirmation) return;
     test(`Fulfillment ${f.id} ${isRefunded ? "is REFUNDED (held by the confirmed refund offer)" : "is not REFUNDED (left out of the refund)"} - status: ${f.status}`, () => {
       if (isRefunded) expect(f.status).to.eql("REFUNDED");
       else expect(f.status, `fulfillment ${f.id} was not part of the refund`).to.not.eql("REFUNDED");
     });
   });
   if (!partsKnown) {
-    validationLogger("[INFO] Refund scope: a refunded fulfillment does not list its booking parts — the part-level scope check is skipped.");
+    validationLogger(fulfillments.length > 0
+      ? "[INFO] Refund scope: a refunded fulfillment does not list its booking parts — the part-level scope check is skipped."
+      : "[INFO] Refund scope: neither the booking nor the confirmation lists a fulfilment — the part-level scope check is skipped.");
     return;
   }
   // #907: a booked fare is a booking part too (R5 of a fare refund).

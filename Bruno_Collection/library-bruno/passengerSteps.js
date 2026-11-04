@@ -31,17 +31,23 @@ function idsOf(raw) {
   return [];
 }
 
+const withTransportables = (result, found) => (found.length > 0 ? { ...result, transportables: found } : result);
+
 /**
  * The first index at or after `from` (below `total`) whose passenger has an
  * id, and the indices left out on the way. `index` is -1 when none is left.
+ * #1045: a passenger `isTransportableAt(i)` says is not a person has no
+ * personal data to update or read back; its index goes in `transportables`.
  */
-function nextPassengerWithId(ids, from, total) {
+function nextPassengerWithId(ids, from, total, isTransportableAt) {
   const skipped = [];
+  const found = [];
   for (let i = Math.max(0, from); i < total; i++) {
-    if (isId(ids[i])) return { index: i, skipped };
+    if (isTransportableAt?.(i)) { found.push(i); continue; }
+    if (isId(ids[i])) return withTransportables({ index: i, skipped }, found);
     skipped.push(i);
   }
-  return { index: -1, skipped };
+  return withTransportables({ index: -1, skipped }, found);
 }
 
 // ── Bruno glue ──────────────────────────────────────────────────────────────
@@ -57,10 +63,16 @@ function choosePassenger(step, from) {
   const total = Number(bru.getEnvVar('offerPassengerNumber')) || 0;
   let refs = [];
   try { refs = JSON.parse(bru.getEnvVar('bookingPassengerReferences') || '[]'); } catch { refs = []; }
-  const { index, skipped } = nextPassengerWithId(idsOf(bru.getEnvVar('passengerIdList')), Number(from) || 0, total);
+  const { isTransportable, typesOf } = require('./transportables.js');
+  const types = typesOf(bru.getEnvVar('bookingPassengerSpecifications'));
+  const { index, skipped, transportables = [] } = nextPassengerWithId(
+    idsOf(bru.getEnvVar('passengerIdList')), Number(from) || 0, total, (i) => isTransportable(types[i]));
+  const refOf = (i) => (refs[i] !== undefined ? ` (externalRef ${refs[i]})` : '');
+  for (const i of transportables) {
+    validationLogger(`[INFO] Passenger ${i}${refOf(i)} is a ${types[i]}, not a person: no ${WHAT[step] || step}.`);
+  }
   for (const i of skipped) {
-    const ref = refs[i] !== undefined ? ` (externalRef ${refs[i]})` : '';
-    validationLogger(`[WARNING] Passenger ${i}${ref} is not in the booking: its ${WHAT[step] || step} is not tested. Step 02 reports the missing passenger.`);
+    validationLogger(`[WARNING] Passenger ${i}${refOf(i)} is not in the booking: its ${WHAT[step] || step} is not tested. Step 02 reports the missing passenger.`);
   }
   return index;
 }

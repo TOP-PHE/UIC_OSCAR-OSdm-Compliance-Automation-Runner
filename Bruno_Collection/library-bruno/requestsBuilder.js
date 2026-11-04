@@ -10,7 +10,21 @@ const { parseEnvJson } = require('./envUtils.js');
 const { getComplianceVersion } = require('./osdmVersion.js');
 const { normaliseReturnModel, returnUsesInboundDate, inboundDateLike, buildInboundOfferRequest } = require('./returnJourney.js');
 const { withIssuers } = require('./reductionCards.js');
-const { sectionsToSend } = require('./fares.js');
+const { sectionsToSend, asksFaresOnly } = require('./fares.js');
+const { isTransportable, transportableSpec } = require('./transportables.js');
+
+// The requested fulfilment options of an offer request. #1045: a request for
+// fare parts only asks none: a fare fulfilment holds no document (#906).
+// PAXONE: only when there are some.
+function fulfillmentOptionsFor(body, isPaxone) {
+  if (asksFaresOnly(body.offerSearchCriteria)) {
+    validationLogger("[INFO] [fares] Fare parts only asked: no requestedFulfillmentOptions (a fare fulfilment holds no document).");
+    return;
+  }
+  const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
+  const parsed = (fulfillmentOptions != null && fulfillmentOptions !== '') ? JSON.parse(fulfillmentOptions) : [];
+  if (!isPaxone || parsed.length > 0) body.requestedFulfillmentOptions = parsed;
+}
 
 // #597: the passengers of a request, each reduction card with the issuer the
 // provider's list (step 06, __reductionCardTypes) gives its code.
@@ -88,12 +102,7 @@ function buildReturnOfferCollectionRequest() {
   if (isPaxone) {
     body.offerSearchCriteria = withPaxoneOfferSearchCriteriaDefaults(body.offerSearchCriteria);
   }
-  const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
-  const parsedFulfillmentOptions = (fulfillmentOptions != null && fulfillmentOptions !== '')
-    ? JSON.parse(fulfillmentOptions) : [];
-  if (!isPaxone || parsedFulfillmentOptions.length > 0) {
-    body.requestedFulfillmentOptions = parsedFulfillmentOptions;
-  }
+  fulfillmentOptionsFor(body, isPaxone);
 
   bru.setEnvVar("ReturnOfferCollectionRequest", JSON.stringify(body));
   const tsc = body.tripSearchCriteria;
@@ -140,13 +149,7 @@ function buildOfferCollectionRequest() {
     body.offerSearchCriteria = { ...body.offerSearchCriteria, inboundDate: inboundDateLike(inboundDate, departure) };
   }
 
-  const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
-  const parsedFulfillmentOptions = (fulfillmentOptions != null && fulfillmentOptions !== '')
-    ? JSON.parse(fulfillmentOptions)
-    : [];
-  if (!isPaxone || parsedFulfillmentOptions.length > 0) {
-    body.requestedFulfillmentOptions = parsedFulfillmentOptions;
-  }
+  fulfillmentOptionsFor(body, isPaxone);
 
   bru.setEnvVar("OfferCollectionRequest", JSON.stringify(body));
 }
@@ -783,6 +786,8 @@ function requestExchangeOffersBody(overruleCode) {
       throw new Error('offerPassengerSpecifications is empty or not an array');
     }
     anonymousPassengerSpecifications = passengerSpecs.map(function(spec, i) {
+      // #1045: a transportable goes as the offer request sent it, without a person's data.
+      if (isTransportable(spec.type)) return transportableSpec(spec.externalRef || String(i + 1).padStart(5, '0'), spec.type, spec.cards);
       const updateGender = bru.getEnvVar('updateGender_' + i);
       const entry = {
         externalRef: spec.externalRef || String(i + 1).padStart(5, '0'),

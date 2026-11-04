@@ -16,7 +16,9 @@
  * auth-header / URL-join / timeout boilerplate.
  */
 
+const { randomUUID } = require('node:crypto');
 const { decrypt, colDecrypt } = require('../db/db');
+const TraceContext = require('../../public/js/trace-context');
 const { usableUrlRefusal } = require('./urlPolicy');
 const log = require('./logger').child({ module: 'osdm-client' });
 
@@ -116,4 +118,26 @@ function mergeDedicatedHeaders(headers, companyRow, accessToken) {
   return headers;
 }
 
-module.exports = { osdmGet, buildTesterHeaders, mergeDedicatedHeaders, stripTrailingSlashes, DEFAULT_TIMEOUT_MS };
+/**
+ * #1070: the company's W3C trace context settings (its Test Framework's
+ * `traceContext`), read once for a series of calls.
+ */
+function traceSettingsFor(companyId) {
+  const { frameworkConfigOf } = require('../api/helpers/configurationStore');
+  return TraceContext.settingsOf(frameworkConfigOf(companyId) || {});
+}
+
+/**
+ * #1070: a copy of `headers` with a W3C traceparent (and tracestate) of its
+ * own: each of OSCAR's own calls to a provider is a trace, as each search is.
+ * A dedicated header of the same name is replaced, as in a run; none is
+ * added when the Test Framework sends no trace context.
+ */
+function withTraceHeaders(headers, settings) {
+  const trace = TraceContext.headersFor(settings || {}, randomUUID(), randomUUID().replaceAll('-', '').slice(16));
+  const names = Object.keys(trace);
+  const kept = Object.entries(headers || {}).filter(([name]) => !names.includes(name.toLowerCase()));
+  return { ...Object.fromEntries(kept), ...trace };
+}
+
+module.exports = { osdmGet, buildTesterHeaders, mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes, DEFAULT_TIMEOUT_MS };

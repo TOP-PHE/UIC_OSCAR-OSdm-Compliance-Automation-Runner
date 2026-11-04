@@ -1,5 +1,69 @@
 [
   {
+    "id": "2026-11-03-booking-without-fulfilments",
+    "date": "November 3, 2026",
+    "tag": "Improved",
+    "title": "A booking that lists no fulfilment no longer stops a refund",
+    "summary": "When a provider's booking lists no fulfilment after the confirmation, OSCAR warns and still checks the whole refund, and the simulator now has scenarios that show it.",
+    "content": "Some providers return the booking with an empty list of fulfilments after the confirmation. OSCAR already warned and refunded the fulfilments the confirmation gave. After the refund, it now also reads the booked parts through those fulfilments: it warns that their refunded state cannot be read from the booking, and still checks that the parts are refunded. Before, every refunded part was reported as left out of the refund.\n\nThe simulator has a new variant whose booking lists no fulfilment, with a refund of products and a refund of fares. Both pass with two warnings."
+  },
+  {
+    "id": "2026-11-03-fare-refund-every-form",
+    "date": "November 3, 2026",
+    "tag": "New",
+    "title": "A refund of fares in every form of offer request",
+    "summary": "The refund of a fare can now be tested with the fares asked by search criteria or by trip id, not only by trip specification.",
+    "content": "The refund of a fare was only tested with the fares asked by trip specification. With the launch filter Offer request set to Search, no fare refund ran, and a provider taking search criteria alone had none to copy.\n\nThe simulator and the reference scenarios now hold a fare refund by search criteria and one by trip id. In Copy scenarios, a provider is offered the fare refund in each form of offer request its Test Framework declares. The simulator reference configurations run them too."
+  },
+  {
+    "id": "2026-11-03-w3c-trace-context",
+    "date": "November 3, 2026",
+    "tag": "New Feature",
+    "title": "W3C trace ids on every OSDM request",
+    "summary": "Every request OSCAR sends to a provider now carries the W3C traceparent header OSDM declares, with one trace id per sale, so a provider can find OSCAR's requests in its logs.",
+    "content": "OSDM declares the W3C Trace Context headers, traceparent and tracestate, on every operation. OSCAR now sends them on every request. Each offer search starts a new trace id, and every request of that sale, up to its refund or exchange, carries it with an id of its own. The run log says where each trace starts and gives its id: give it to the provider when you ask about a request.\n\nTest Managers set this in the Test Framework, section Trace Context (W3C): whether to send the headers, the sampled flag, and an optional tracestate. In the tracestate, OSCAR fills in {{traceId}}, {{uuid}} (the same trace id written as a UUID, for a key such as processid={{uuid}}) and {{parentId}}. A tracestate W3C would refuse is not saved, and the preview says why.\n\nOSCAR's own calls to the provider (Discover timetable, Places, Test my credentials) send the same headers.\n\nIf you set a fixed traceparent or tracestate as a dedicated header in API Config, OSCAR now sends its own instead and the run log warns once. Remove the dedicated header, and set the tracestate in the Test Framework if your provider needs one."
+  },
+  {
+    "id": "2026-11-03-fare-refunds-under-refund",
+    "date": "November 3, 2026",
+    "tag": "Improved",
+    "title": "Fare refunds are under Refund when you launch a batch",
+    "summary": "On New Run, the Capability box Refund now keeps the refunds of fares as well as those of products.",
+    "content": "The Capability filter of the Launch card puts each scenario under the group of what it tests. A refund of fares was under Fares only, so ticking Refund with Fare based kept nothing. It is now kept by Refund as well as by Fares, and counted under both.\n\nThe coverage report does not change: a fare refund stays one row, under Fares."
+  },
+  {
+    "id": "2026-11-03-refund-names-confirmed-fulfilments",
+    "date": "November 3, 2026",
+    "tag": "Fixed",
+    "title": "A refund names the fulfilments the confirmation gave",
+    "summary": "When a provider's booking does not list its fulfilments after the confirmation, OSCAR now warns and refunds the fulfilments the confirmation gave, instead of sending an empty refund request.",
+    "content": "A provider confirmed a fare booking and gave two fulfilments, then returned the booking with an empty list of fulfilments. OSCAR took the fulfilments to refund from that booking and sent a refund request naming none, which the provider refused.\n\nOSCAR now keeps the fulfilments the confirmation gives. A booking that does not list them afterwards is a warning (OSDM does not require the list), and the refund or exchange names the confirmation's. If neither gives a fulfilment, the scenario stops before the refund or exchange with one failed check, instead of sending a request that cannot work.\n\nFor product sales, the same case used to be a failure; it is now that warning."
+  },
+  {
+    "id": "2026-11-03-fare-reference-scenarios",
+    "date": "November 3, 2026",
+    "tag": "New",
+    "title": "Five more fare scenarios to copy",
+    "summary": "Copy scenarios offers five more reference scenarios to a provider that sells fares: first class, a reduction card, a family, a bicycle as a passenger, and a group of six.",
+    "content": "If your Test Framework declares the fare-based distribution, Copy scenarios in Test Config now offers five more fare sales: one adult in first class; one adult holding a reduction card (the first card your Test Framework declares); a family of an adult, a child of 8 and a young child one year under the age you declare free under Fares; an adult and a bicycle, the bicycle as a passenger of type BICYCLE, with fare admissions and fare ancillaries asked; and six adults.\n\nThe card scenario needs a reduction card declared, the family the age under which a fare is free, and the bicycle the passenger type BICYCLE. Copy scenarios says what is missing for each one."
+  },
+  {
+    "id": "2026-11-02-answers-kept-as-sent",
+    "date": "November 2, 2026",
+    "tag": "Fixed",
+    "title": "The answers OSCAR keeps are the provider's, as sent",
+    "summary": "The answer a run stores for the report and the AI analysis is now exactly what the provider sent, never one OSCAR's checks had edited.",
+    "content": "For a scenario that expects no fare, OSCAR's offer checks set the fare offers aside before checking the product offers. They did it on the answer itself, and the answer kept for the run's report, its HTTP traffic and the AI analysis was that edited one: an analysis of a simulator run read \"offers\": [] where the provider had sent fares, and could not tell why the check had failed. The refund checks did the same with a single refund offer. The checks now work on a copy, and the answer kept is the provider's, as sent. The results of the checks do not change.\n\nTwo deliberately wrong simulator scenarios, an overlap of fares and a wrong COMBINING refund fee, now say that their check fails, as it has done since these were made failures on October 29. Nothing to do on your side."
+  },
+  {
+    "id": "2026-11-02-bicycles-and-fare-requests",
+    "date": "November 2, 2026",
+    "tag": "Fixed",
+    "title": "Bicycles sent without personal data; fare requests trimmed",
+    "summary": "A bicycle, a dog or another passenger that is not a person is now sent with its reference and type only, and an offer request for fares only no longer asks for fulfilment options.",
+    "content": "A fare expert reviewed the OSDM simulator's bicycle scenario and pointed at what OSCAR sent. The data file asks every passenger for a date of birth, a name, an e-mail and a phone number, and OSCAR sent them for the bicycle too, in the offer request and in the booking. OSCAR now sends a passenger of a type OSDM lists as transportable (bicycle, dog, pet, luggage, pram, car, motorcycle, trailer) with its reference, type and cards only, in the offer, booking and exchange requests; the passenger update and read-back steps leave it out, and the run log says which fields of the data file were not sent.\n\nAn offer request that asks for fare parts only no longer carries requestedFulfillmentOptions: a fare fulfilment holds no document. A request that also asks for products still sends them.\n\nOn the OSDM simulator, the bicycle scenario now asks for fare admissions and fare ancillaries, so that a provider may sell a bicycle either way (the simulator, like DB, sells it as a passenger type with an admission fare), and every fare now names its accounting reference, which the booked fare keeps. Nothing to do on your side."
+  },
+  {
     "id": "2026-11-02-kubernetes-openshift",
     "date": "November 2, 2026",
     "tag": "Operations",

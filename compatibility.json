@@ -1,8 +1,102 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.481",
+  "current_release": "2026.489",
   "releases": [
+    {
+      "release": "2026.489",
+      "date": "2026-11-03",
+      "server": "1.11.451",
+      "collection": "OTST_V2.0.246",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, collection OTST_V2.0.246: at step 14 a booking read that lists no fulfilment is read through the fulfilments the confirmation gave: one WARNING (their REFUNDED state cannot be read from the booking), the booked parts still checked, and a full refund held to every fulfilment the confirmation gave. Before, every refunded part failed as \"left out of the refund\" and the full-refund check passed as 0/0.",
+        "Simulator 0.62.0: variant booking-without-fulfillments (last name Simvariant-Booking-Without-Fulfillments): GET /bookings/{id} lists no fulfilment, as a real provider's fare run showed. Scenarios SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT and _FARE_REFUND_1ADT (every version, in the simulator references' run lists) show OSCAR going through with two WARNINGs and no failed check.",
+        "Server 1.11.451: a welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.488",
+      "date": "2026-11-03",
+      "server": "1.11.450",
+      "collection": "OTST_V2.0.245",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, collection OTST_V2.0.245: a refund of fares in every form of offer request. The fare refunds were asked by trip specification only, so the launch filter Offer request Search kept none, and a provider taking search criteria alone had no fare refund to copy. New simulator scenarios SIM_FARE_REFUND_SRCH_1ADT and SIM_FARE_REFUND_TRIPIDS_1ADT (every OSDM version, in the simulator references' run lists) and reference scenarios OTST_FARE_REFUND_SRCH_1ADT (181 checks) and OTST_FARE_REFUND_TRIPIDS_1ADT (188). The fare sales by search and by trip id no longer say they end after the offer: they are booked and confirmed since #906.",
+        "Server 1.11.450: a welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.487",
+      "date": "2026-11-03",
+      "server": "1.11.449",
+      "collection": "OTST_V2.0.244",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1070, collection OTST_V2.0.244: every OSDM request carries the W3C Trace Context headers OSDM declares on every operation (W3C Trace Context Level 1, Recommendation of 23 November 2021). One trace per sale: each send of 01. POST Get Offer starts a new trace id, which every request of that sale carries, request files and script-sent requests alike, each with a parent-id of its own; a request sent while no sale is open (the system information reads) starts a trace of its own. The run log says where each trace starts and its id. A token request is not traced. A fixed traceparent or tracestate set as a dedicated header (API Config) is replaced, with one warning per run; the fixed SBB values of a standalone environment are gone.",
+        "Server 1.11.449: the Test Framework's traceContext { send, sampled, tracestate }, absent = a sampled traceparent and no tracestate. The tracestate is a template in which OSCAR fills in {{traceId}}, {{uuid}} (the trace id as a UUID, for keys such as processid) and {{parentId}}; the three framework writers answer 400 for any other placeholder or a tracestate W3C would refuse. The runner hands it to Bruno already parsed (__traceContext), so no \"{{\" reaches the engine. Test Config's Test Framework has a Trace Context (W3C) section with a preview (public/js/trace-context.js, shared by the page and the server). OSCAR's own calls to a provider (Discover timetable, re-probe, journey probe, fill calendars, Places refresh, Test my credentials) send the same headers, each request a trace of its own. A welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.486",
+      "date": "2026-11-03",
+      "server": "1.11.448",
+      "collection": "OTST_V2.0.243",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, server 1.11.448: at launch (New Run), a fare refund is kept by the Capability box Refund as well as by Fares. It counted under Fares only, so Refund + Fare based kept nothing. The coverage report still gives it one group, Fares. A welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.485",
+      "date": "2026-11-03",
+      "server": "1.11.447",
+      "collection": "OTST_V2.0.243",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, from a real provider's fare run, collection OTST_V2.0.243: step 06 keeps the fulfilments the confirmation gives. At 07, a booking that does not list them is a WARNING (OSDM does not require Booking.fulfillments), and the refund or exchange names the confirmation's; it used to take its ids from that booking and sent {\"fulfillmentIds\": []}, which the provider refused. A refund or exchange with no fulfilment id from either step ends at 07 with one failed check instead of sending an invalid request. Check F5 of a fare sale is \"Every booked fare is in a fulfilment\" and reads the confirmation's fulfilments when the booking lists none; for a product sale the same case was a failure (#250) and is now that WARNING.",
+        "Server 1.11.447: a welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.484",
+      "date": "2026-11-03",
+      "server": "1.11.446",
+      "collection": "OTST_V2.0.242",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, collection OTST_V2.0.242: five reference scenarios from the simulator's newer fare scenarios, offered to a Test Framework that declares the fare-based distribution: a fare sale in first class (OTST_FARE_FIRST_1ADT), with a reduction card the framework declares (OTST_FARE_REDUCTION_CARD_1ADT), for a family whose youngest is one year under the age declared free (OTST_FARE_FAMILY), for an adult and a bicycle sold as a passenger of type BICYCLE with FARE_ADMISSION and FARE_ANCILLARY (OTST_FARE_BICYCLE_ADMISSION), and for six adults (OTST_FARE_GROUP_6ADT); 117 checks each on the simulator.",
+        "Server 1.11.446: the copy of a free-child entry makes only the youngest passenger the free child, so a family keeps its adult and its older child; OTST_FARE_FREE_CHILD is copied as before. A welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.483",
+      "date": "2026-11-02",
+      "server": "1.11.445",
+      "collection": "OTST_V2.0.241",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#1045, from the AI analysis of gamma's fare runs, collection OTST_V2.0.241: the answer OSCAR stores for the report and the run is the provider's as sent (steps 01 and 10 hand their checks a copy; the refund checks read a single refundOffer as a list without writing it into the answer), where the fare checks used to leave \"offers\": [] in place of the fares the provider sent; SIM_WRONG_FARE_OVERLAP and SIM_WRONG_FARE_COMBINING_FEE describe the failure #1055 made of their check. Server: the welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.482",
+      "date": "2026-11-02",
+      "server": "1.11.444",
+      "collection": "OTST_V2.0.240",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Part of #1045 (a fare expert's review of the simulator's bicycle fare scenario), collection OTST_V2.0.240, simulator 0.61.0: a passenger that is not a person (OSDM's transportable types: bicycle, dog, pet, luggage, pram, car, motorcycle, trailer) is sent with its reference, type and cards only, in the offer, booking and exchange requests, and steps 03/04 leave it out; an offer request for fare parts only asks no requestedFulfillmentOptions (a fare fulfilment holds no document); SIM_FARE_BICYCLE_ADMISSION asks FARE_ADMISSION and FARE_ANCILLARY, which the simulator checklists (P1.11) and references now declare. Simulator: every fare names its accountingRef (the provider's carrier and an accounting id), kept by the booked fare. Server: the welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.481",
       "date": "2026-11-02",

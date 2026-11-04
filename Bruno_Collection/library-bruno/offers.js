@@ -259,6 +259,9 @@ function ensureAuthorizationOr403() {
       validationLogger('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e?.message));
     }
 
+    // #1070: a parent-id of its own, not a copy of the offer request's.
+    resolvedHeaders = require('./traceContext.js').withTrace(resolvedHeaders);
+
     // Preflight call using bru.sendRequest
     if (resolvedBody) {
       resolvedHeaders['Content-Type'] = resolvedHeaders['Content-Type'] || 'application/json';
@@ -2370,12 +2373,13 @@ async function sendOsdmRequest(method, path, payload) {
       bru.sendRequest({
         url: `${bru.getEnvVar("api_base")}${path}`,
         method,
-        headers: {
+        // #1070: the sale's W3C trace, a parent-id of its own.
+        headers: require("./traceContext.js").withTrace({
           Accept: "application/json",
           Authorization: `Bearer ${bru.getEnvVar("access_token")}`,
           ...(post ? { "Content-Type": `application/json;version=${bru.getEnvVar("osdmVersion")}` } : {}),
           ...requestorHeader(bru.getEnvVar("requestor")),
-        },
+        }),
         ...(post ? { data: JSON.stringify(payload) } : {}),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });
@@ -2690,12 +2694,13 @@ async function sendTripsCollection(search) {
       bru.sendRequest({
         url: `${bru.getEnvVar("api_base")}/${require("./tripIds.js").tripsCollectionPath(bru.getEnvVar("osdmVersion"))}`,
         method: "POST",
-        headers: {
+        // #1070: the sale's W3C trace, a parent-id of its own.
+        headers: require("./traceContext.js").withTrace({
           "Content-Type": `application/json;version=${bru.getEnvVar("osdmVersion")}`,
           Accept: "application/json",
           Authorization: `Bearer ${bru.getEnvVar("access_token")}`,
           ...requestorHeader(bru.getEnvVar("requestor")),
-        },
+        }),
         data: JSON.stringify(search),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });

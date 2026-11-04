@@ -51,6 +51,7 @@ const { isOsdmVersion } = require('../../utils/osdmVersion');
 const { distributionModesProblem } = require('../../utils/distributionModes');
 const { fareDeclarationsProblem } = require('../../utils/fareDeclarations');
 const { offerOptionDiscoveryProblem } = require('../../utils/offerOptionDiscovery');
+const { traceContextProblem } = require('../../../public/js/trace-context');
 const configurationBundle = require('../../utils/configurationBundle');
 const referenceConfiguration = require('../../utils/referenceConfiguration');
 const referenceStore = require('../../utils/referenceStore');
@@ -774,7 +775,7 @@ function importPartsRefusal(configuration, choices, companyId) {
     }
     // #936 / #937: the distribution modes and fare declarations, as the Test Framework route checks them.
     const modesProblem = distributionModesProblem(configuration.framework.distributionModes) || fareDeclarationsProblem(configuration.framework.fares)
-    || offerOptionDiscoveryProblem(configuration.framework);
+    || offerOptionDiscoveryProblem(configuration.framework) || traceContextProblem(configuration.framework.traceContext);
     if (modesProblem) return { status: 400, detail: `The configuration's Test Framework: ${modesProblem} Nothing was changed.` };
   }
   return null;

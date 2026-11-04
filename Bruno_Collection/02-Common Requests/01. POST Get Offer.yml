@@ -169,10 +169,12 @@ runtime:
           return;
         }
 
-        // Parse JSON safely
+        // Parse JSON safely. #1045: the checks work on a copy, so the answer
+        // stored for the report is the provider's, not one whose fare-only
+        // offers the fare checks set aside.
         let jsonData;
         try {
-            jsonData = res.getBody();
+            jsonData = require(bru.getEnvVar("library_base") + "envUtils.js").workingCopy(res.getBody());
         } catch (e) {
             validationLogger("Failed to parse JSON response");
             bruTest("JSON parsing should succeed", () => {

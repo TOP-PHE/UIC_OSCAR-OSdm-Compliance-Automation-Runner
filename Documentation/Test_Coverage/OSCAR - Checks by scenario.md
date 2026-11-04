@@ -814,7 +814,7 @@ Run by 133 of 172 scenarios; 94 different checks.
 | [fares F1] Each fare fulfilment is CONFIRMED or FULFILLED | 17 |
 | [fares F3] Each fare fulfilment names the booking parts it covers (Fulfillment.bookingParts) | 17 |
 | [fares F4] No fulfilment holds both fares and product booking parts (OSDM processes) | 17 |
-| [fares F5] The booking lists its fulfilments, and every booked fare is in one (bookingParts) | 17 |
+| [fares F5] Every booked fare is in a fulfilment (bookingParts) | 17 |
 | [fares V9] Every fare reservation of the offer is in the booking (selected in optionalReservationSelections; paired by id, else passengers and leg) | 3 |
 | [fares V1] Each booked fare reservation is in FARE_MODE (Reservation.distributionMode; absent = …) | 3 |
 | [fares V3] Each booked fare reservation holds the passengers of its offer part (the bicycle) | 3 |
@@ -3887,7 +3887,7 @@ Steps: Simulator Access Token (2) → 00. GET System Version Check (10) → 01. 
 
 Failed checks:
 
-- 07. GET Booking after Fulfillments: [fares F5] The booking lists its fulfilments, and every booked fare is in one (bookingParts)
+- 07. GET Booking after Fulfillments: [fares F5] Every booked fare is in a fulfilment (bookingParts)
 
 ### `SIM_FARE_REFUND_1ADT_38`
 

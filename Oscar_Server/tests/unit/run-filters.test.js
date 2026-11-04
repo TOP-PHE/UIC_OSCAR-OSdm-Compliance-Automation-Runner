@@ -137,6 +137,26 @@ describe('a selection', () => {
     expect(p.labels.categories).toEqual(RF.CATEGORY_TEXT);
   });
 
+  // #1045: a fare refund is a refund too. On gamma, Refund + Fare based kept
+  // nothing: the fare refunds were in the Fares group only.
+  test('#1045: a fare refund is kept by the Refund box as well as by Fares; its group stays Fares', () => {
+    const scenario = (code) => simulator.scenarios.find((s) => s.code === code);
+    const fareRefund = scenario('SIM_FARE_REFUND_1ADT_38');
+    expect(RF.groupOf(fareRefund, simulator, catalogue)).toBe('Fares');
+    expect(RF.groupsOf(fareRefund, simulator, catalogue)).toEqual(['Fares', 'Refund']);
+    expect(RF.groupsOf(scenario('SIM_FARE_SPEC_1ADT_38'), simulator, catalogue)).toEqual(['Fares']);
+    expect(RF.groupsOf(scenario('SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38'), simulator, catalogue)).toEqual(['Refund']);
+
+    const codes = simulator.scenarios.map((s) => s.code).filter((c) => /_38$/.test(c));
+    const all = RF.facetsOf(codes, { datafile: simulator, entries: catalogue });
+    const refunds = RF.selectCodes(all, { categories: ['happy'], modes: ['FARE'], groups: ['Refund'] });
+    expect(refunds).toEqual(['SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_FARE_REFUND_1ADT_38', 'SIM_FARE_REFUND_1ADT_38', 'SIM_FARE_REFUND_SRCH_1ADT_38', 'SIM_FARE_REFUND_TRIPIDS_1ADT_38', 'SIM_FARE_REFUND_FEE_1ADT_38', 'SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_FARE_REFUND_NON_FLEX_1ADT_38']);
+    expect(RF.selectCodes(all, { categories: ['happy'], modes: ['FARE'], groups: ['Fares'] })).toEqual(expect.arrayContaining(refunds));
+    // Counted under both boxes; a facet made before `groups` counts under its group only.
+    const p = RF.previewOf([...all.filter((x) => refunds.includes(x.code)), { code: 'OLD', category: 'happy', group: 'Fares', form: 'SEARCH' }], {});
+    expect([p.counts.groups.Refund, p.counts.groups.Fares]).toEqual([7, 8]);
+  });
+
   test('#1039: the distribution modes, as the Test Framework reads them', () => {
     const df = { scenarios: [], offerSearchCriteriaList: [] };
     expect(RF.modesOf({ code: 'P' }, df)).toEqual(['PRODUCT']);

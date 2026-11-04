@@ -141,6 +141,13 @@ function travelValidityOf(validity, day) {
 
 const SERVICE_CLASS_NAMES = { BEST: 'Best', HIGH: 'High', STANDARD: 'Standard', BASIC: 'Basic' };
 
+// The id that links a fare to its accounting: the template, the 301 serial
+// number and the tariff, as `SIM-T01-50150-27`.
+function accountingIdOf(template, fare) {
+  const legacy = fare.legacyAccountingIdentifier || {};
+  return ['SIM', template.id, legacy.serialId, legacy.tariffId].filter((part) => part != null).join('-');
+}
+
 /**
  * One template fare as OSDM's online Fare.
  *
@@ -182,6 +189,9 @@ function onlineFare(file, template, fare, ctx) {
     passengerRefs: ctx.passengerRefs,
     passengerConstraints: [{ number: ctx.passengerRefs.length, lowerAgeLimit: passenger.lowerAgeLimit, upperAgeLimit: passenger.upperAgeLimit }],
     involvedTCOs: companies(fare.involvedTCOs),
+    // #1045: the accounting of the fare, by its carrier (the provider's own),
+    // linked by an id made of the template and the fare's 301 serial number.
+    accountingRef: { accountingCompany: carrier, accountingIds: [accountingIdOf(template, fare)] },
     legacyAccountingIdentifier: fare.legacyAccountingIdentifier,
   };
   if (fare.card) result.requiredCards = [ctx.cardFor(fare.card)];
