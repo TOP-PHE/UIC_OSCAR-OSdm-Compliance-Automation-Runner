@@ -37,7 +37,7 @@ function runRead(summary, description, extra = {}) {
       tags: runs, summary, security: bearer,
       description: `${READ_RULE} ${description}`,
       parameters: [runId, ...(extra.parameters || [])],
-      responses: { ...ok(extra.ok || 'The answer'), ...noRun, ...(extra.responses || {}) },
+      responses: { ...ok(extra.ok || 'The answer'), ...noRun, ...extra.responses },
     },
   };
 }
@@ -48,7 +48,7 @@ function shareOps(target, one, summaries, descriptions, conflicts) {
   const missing = one ? noRun : noBatch;
   return {
     post: { tags: runs, summary: summaries[0], security: bearer, description: descriptions[0], parameters: [param],
-      responses: { ...ok(`Shared ${target}`), ...testManagersOnly, ...missing, ...(conflicts || {}) } },
+      responses: { ...ok(`Shared ${target}`), ...testManagersOnly, ...missing, ...conflicts } },
     delete: { tags: runs, summary: summaries[1], security: bearer, description: descriptions[1], parameters: [param],
       responses: { ...ok('Revoked'), ...testManagersOnly, ...missing } },
   };
@@ -132,7 +132,7 @@ module.exports = {
     { 409: { description: 'The run is not finished (COMPLETED, FAILED or CANCELLED)' } }),
   '/v1/runs/{id}/share-with-operator': shareOps('with the operating company', true,
     ['Share a finished run of a provider with the company that operates it (#901)', 'Stop sharing a run with the operating company (#901)'],
-    [`${TM_SEES} The provider must be linked to that company and the link accepted; that company\'s Test Managers can then read the run. Audited. Answer: { ok, run: { id, shared } }.`,
+    [`${TM_SEES} The provider must be linked to that company and the link accepted; that company's Test Managers can then read the run. Audited. Answer: { ok, run: { id, shared } }.`,
       `${TM_SEES} Audited when a share was revoked. Answer: { ok, run: { id, shared: false } }.`],
     { 409: { description: 'Not a provider\'s run, no accepted operator link, or the run is not finished' } }),
 

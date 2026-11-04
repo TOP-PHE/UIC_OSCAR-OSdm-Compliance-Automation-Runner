@@ -24,9 +24,9 @@ function pathParam(name, description, format = 'uuid') {
   return { name, in: 'path', required: true, description, schema };
 }
 
-/** An optional query parameter. */
-function queryParam(name, description, schema = { type: 'string' }) {
-  return { name, in: 'query', required: false, description, schema };
+/** An optional query parameter; text unless a schema is given. */
+function queryParam(name, description, schema) {
+  return { name, in: 'query', required: false, description, schema: schema || { type: 'string' } };
 }
 
 /** A JSON body, described in words (the routes check their own fields). */
