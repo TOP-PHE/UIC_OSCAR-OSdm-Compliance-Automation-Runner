@@ -105,6 +105,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.452] — 2026-11-04
+
+Release 2026.490. The OpenAPI document served at `/v1/docs` describes every route of the server. Collection unchanged; no behaviour change.
+
+### Changed
+- **`/v1/docs` and `/v1/openapi.json` list all 204 operations** (they listed 92). The 112 added ones are in `src/api/openapi/`, one module per area (internal, auth and `/v1/me`, admin and the simulator's administration, runs and reports, company data, findings), merged into `src/api/openapi.js` by `mergePaths()` (`openapi/common.js`), which refuses a method described twice. Each says who may call it, what it reads and what it answers, with its path, query and header parameters.
+- New tag **Internal**: the routes the pages do not call (the run's data file and access token for Bruno, the data file schema, `/metrics`, the OpenAPI document itself).
+
+### Checked
+- `tests/unit/openapi-coverage.test.js`: the routes are read from the routers themselves (each route file mounted in `server.js`, plus the app's own handlers) and compared with the document both ways: a route without its entry fails, and so does an entry with no route. Every operation has a summary, a tag, its responses and its path parameters. Mutation-checked: renaming one entry fails both directions.
+- The document validates as OpenAPI 3.0 (`@apidevtools/swagger-parser`, outside the repository).
+
+---
+
 ## [server-1.11.451] / [collection-OTST_V2.0.246] — 2026-11-03
 
 Issue #1045 (a booking read that lists no fulfilment, as a real provider gave), release 2026.489. Simulator 0.62.0. The server change is the welcome-page news entry.
