@@ -554,16 +554,33 @@ router.get('/requests/:id/messages', (req, res) => {
 
 // ── Report Templates CRUD ────────────────────────────────────────────────────
 
+// A template belongs to the person who saved it and, when saved by a member,
+// to the company or provider of the request. A platform role's template is
+// its own only (company_id NULL): ?company_id= / X-Company-Id never reads,
+// writes or deletes another company's templates.
+const isMember = user => user.role !== 'administrator' && user.role !== 'certification_user';
+
+/** The company whose templates a member sees; null for a platform role. */
+function templateCompanyOf(req) {
+  return isMember(req.user) ? scopedCompanyId(req) : null;
+}
+
+function canSeeTemplate(row, req) {
+  if (row.user_id === req.user.id) return true;
+  const companyId = templateCompanyOf(req);
+  return companyId !== null && row.company_id === companyId;
+}
+
 // GET /v1/reports/templates — list saved templates
 router.get('/templates', (req, res) => {
-  const companyId = scopedCompanyId(req);
+  const companyId = templateCompanyOf(req);
   const rows = all(
     `SELECT rt.id, rt.name, rt.config, rt.created_at, rt.updated_at, u.email AS created_by
      FROM report_templates rt
      JOIN users u ON u.id = rt.user_id
-     ${companyId ? 'WHERE rt.company_id = ? OR rt.company_id IS NULL' : ''}
+     WHERE rt.user_id = ?${companyId ? ' OR rt.company_id = ?' : ''}
      ORDER BY rt.updated_at DESC`,
-    companyId ? [companyId] : []
+    companyId ? [req.user.id, companyId] : [req.user.id]
   );
   return res.json({ templates: rows.map(r => ({ ...r, config: JSON.parse(r.config || '{}') })) });
 });
@@ -574,7 +591,7 @@ router.post('/templates', (req, res) => {
   if (!name) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'name is required.' });
 
   const id = uuidv4();
-  const companyId = scopedCompanyId(req);
+  const companyId = templateCompanyOf(req);
   dbRun(
     `INSERT INTO report_templates (id, company_id, user_id, name, config) VALUES (?, ?, ?, ?, ?)`,
     [id, companyId, req.user.id, name, JSON.stringify(config || {})]
@@ -582,11 +599,12 @@ router.post('/templates', (req, res) => {
   return res.status(201).json({ id, name, config: config || {} });
 });
 
-// DELETE /v1/reports/templates/:id — delete a template
+// DELETE /v1/reports/templates/:id — delete a template: its author, or a Test
+// Manager of its company. One the caller cannot see is a 404, like none.
 router.delete('/templates/:id', (req, res) => {
   const row = get('SELECT * FROM report_templates WHERE id = ?', [req.params.id]);
-  if (!row) return res.status(404).json({ status: 404, title: 'Template not found.' });
-  if (row.user_id !== req.user.id && !isPlatformRole(req.user.role)) {
+  if (!row || !canSeeTemplate(row, req)) return res.status(404).json({ status: 404, title: 'Template not found.' });
+  if (row.user_id !== req.user.id && req.user.role !== 'test_manager') {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'You can only delete your own templates.' });
   }
   dbRun('DELETE FROM report_templates WHERE id = ?', [req.params.id]);
