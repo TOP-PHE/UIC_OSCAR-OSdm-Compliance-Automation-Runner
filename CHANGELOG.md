@@ -105,9 +105,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.460] / [collection-OTST_V2.0.250] — 2026-11-05
+## [server-1.11.461] / [collection-OTST_V2.0.251] — 2026-11-05
 
-Issue #1045, release 2026.498. A fare search answered with a trip that starts at a nearby stop.
+Issue #1045, release 2026.499. A fare search answered with a trip that starts at a nearby stop.
 
 A real provider's fare search stopped after step 01: O8 reported a gap on four offers of one trip, and the fare offer chosen, on another trip, was not booked although it passed every check. That trip started by tram from the tram stop in front of the station asked, then walked to another station and took a train: its fares ran from the tram stop, and OSCAR held them to the station asked.
 
@@ -121,6 +121,30 @@ A real provider's fare search stopped after step 01: O8 reported a gap on four o
 - `bruno-fares.test.js`: a searched trip starting by tram, a walk, and one fare per vehicle are covered; a train leg left out is still a gap; a trip specification gets no stand-in. `bruno-fare-booking.test.js`: another offer's gap fails O8 and the sale goes on; the chosen offer's gap stops it. Each fails when its fix is taken out.
 - Simulator replay of the 46 fare `_38` scenarios, `main` and this branch: the two recordings are the same.
 - `npm run lint`, full `npx jest`: 5,500 passed; the two Windows-only failures (`/metrics`, MCP end-to-end) as on `main`.
+
+---
+
+## [server-1.11.460] / [collection-OTST_V2.0.250] — 2026-11-05
+
+Issue #1085, release 2026.498. Simulator 0.63.0. An answer meant to attack OSCAR stops the run, is recorded, alerts the administrators and suspends the endpoint.
+
+### Security
+- **The collection checks every answer before the next request** (`library-bruno/answerThreats.js`, which replaces 1.11.458's `answerTemplates.js`, first in the collection's after-response). Three kinds are refused: text holding `{{` (template), markup meant to run in a browser (`<script`, `javascript:`, an `on…=` handler in a tag, `<iframe`, `<svg` with a handler; a plain `<` or `>` is not), and a 3xx whose `Location` is a loopback, private or link-local address or not http(s) (redirect). Each gives one failed check, one `[INTRUSION] kind=<kind> step=<request>` line, and stops the run. The patterns are linear.
+- **The server acts on that line, once per run** (`utils/intrusion.js`, from the runner's log reader):
+  - a `security_event` row (migration 47: run, company, user, kind, step, time; never the answer);
+  - the endpoint of the company or provider is suspended (`companies.endpoint_suspended_at`): `POST /v1/runs` answers 409 and a queued run is refused, until a Test Manager resumes it (`POST /v1/company/endpoint/resume`) or saves another endpoint;
+  - every cached provider token of that company or provider is dropped;
+  - an audit line, and an e-mail to every administrator (`sendSecurityAlert()`, through the notice mailer the AI access notices use).
+- **The pages say so**: a red "Intrusion attempt detected" banner on the run page (`GET /v1/runs/:id` → `intrusion`), on the Run page, and on API Config with the Test Manager's *Resume the endpoint* button; the Admin Dashboard lists the attempts (`GET /v1/admin/security-events`). All drawn as text.
+
+### Simulator 0.63.0
+Simulator 0.63.0. Three faults answer with an attack on demand (`X-Simulator-Faults`): `attack.template-in-answer` (a booking id holding `{{process.env.OSCAR_RUN_SECRET}}`), `attack.script-in-answer` (trip summaries holding markup), `attack.redirect-internal` (a booking read answered 302 to a loopback address; a fault can now set the status and headers of its answer). Scenarios `SIM_FAULT_ATTACK_TEMPLATE_IN_ANSWER_38`, `_SCRIPT_IN_ANSWER_38`, `_REDIRECT_INTERNAL_38` and their version copies, out of the run list.
+
+### Checked
+- **Through a real OSCAR server**, the three scenarios on the simulator: each run stopped at the step of its attack (02, 01, 05), one event each, endpoint suspended, tokens dropped, audit row, the administrators' e-mail prepared (no SMTP in the test), `POST /v1/runs` 409, then resumed by the Test Manager; an ordinary sale afterwards completed with 234 checks passed.
+- **The real Bruno CLI** on the simulator: each run printed one `[INTRUSION]` line and sent no further request.
+- `intrusion.test.js`, `intrusion-pages.test.js`, `bruno-answer-threats.test.js` (false positives such as "Paris <-> Lyon" and `<br>`), the simulator's fault tests.
+- `npm run lint`, full `npx jest`: 265 suites, 5,574 tests; the simulator's tests: 413.
 
 ---
 

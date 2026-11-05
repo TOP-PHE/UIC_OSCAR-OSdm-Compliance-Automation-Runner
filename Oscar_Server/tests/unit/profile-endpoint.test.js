@@ -124,7 +124,7 @@ function openPage(role, { selected = null, failing = () => false } = {}) {
   });
   const code = [
     declarationOf('CAN_EDIT_HEADERS'), declarationOf('CAN_EDIT_ENDPOINT'), declarationOf('targets'),
-    ...['field', 'inTarget', 'credentialsSet', 'badge', 'markUnsaved', 'nameTarget', 'fillShared', 'fillCredentials',
+    ...['field', 'inTarget', 'credentialsSet', 'badge', 'markUnsaved', 'nameTarget', 'fillShared', 'showSuspension', 'fillCredentials',
       'fillTarget', 'targetUnavailable', 'loadTarget', 'sharedPayload', 'credentialsPayload', 'saveShared',
       'saveTarget', 'clearCredentials', 'listTargets',
       'lifetimeText', 'credentialTestLines', 'showTestResult', 'testSavedCredentials'].map(sourceOf),

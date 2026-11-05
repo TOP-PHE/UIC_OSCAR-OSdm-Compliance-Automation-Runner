@@ -476,11 +476,46 @@ function fillCredentials(card, m) {
 }
 
 // Put what the server holds for this section into its fields.
+// An endpoint suspended after an intrusion attempt (utils/intrusion.js): a red
+// note above the endpoint, and for a Test Manager the button that resumes it.
+function showSuspension(card, c) {
+  // Found by data-f inside the section, as every field of a section is.
+  card.querySelector('[data-f="suspended-note"]')?.remove?.();
+  if (!c.endpoint_suspended_at) return;
+  const note = document.createElement('div');
+  note.className = 'suspended-note';
+  note.dataset.f = 'suspended-note';
+  note.setAttribute('role', 'alert');
+  note.style.cssText = 'background:#b71c1c;color:#fff;border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:13px;line-height:1.5';
+  const title = document.createElement('strong');
+  title.textContent = '⛔ Intrusion attempt detected — endpoint suspended. ';
+  const text = document.createElement('span');
+  text.textContent = CAN_EDIT_ENDPOINT
+    ? 'No run goes to this endpoint until you resume it. Check the provider first; saving another endpoint also resumes.'
+    : 'No run goes to this endpoint until a Test Manager resumes it.';
+  note.append(title, text);
+  if (CAN_EDIT_ENDPOINT) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Resume the endpoint';
+    btn.style.cssText = 'margin-left:10px;padding:4px 10px;border-radius:4px;border:0;cursor:pointer';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const res = await fetch('/v1/company/endpoint/resume', inTarget(card, { method: 'POST' }));
+      if (res.ok) await loadTarget(card);
+      else btn.disabled = false;
+    });
+    note.append(btn);
+  }
+  field(card, 'api_base').parentElement.insertAdjacentElement('beforebegin', note);
+}
+
 function fillTarget(card, c, m) {
   const known = targets.get(card.dataset.targetId);
   if (known) { known.company = c; known.creds = m; }
   nameTarget(card, c);
   fillShared(card, c);
+  showSuspension(card, c);
   fillCredentials(card, m);
 
   // The title line: is this section ready for a run?

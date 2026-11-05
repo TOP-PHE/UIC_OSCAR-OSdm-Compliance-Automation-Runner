@@ -36,7 +36,7 @@ test('the catalogue copy is the simulator\'s own (regenerate with scripts/genera
 
 test('the replay of the SIM_FAULT_* scenarios: every fault detected, each as expected', () => {
   const report = D.detect(replayBatch());
-  expect(report.summary).toEqual({ injected: 12, unknown: 0, detected: 12, asExpected: 12 });
+  expect(report.summary).toEqual({ injected: 15, unknown: 0, detected: 15, asExpected: 15 });
   expect(new Set(report.faults.map((f) => f.code))).toEqual(new Set(D.CATALOGUE.map((f) => f.code)));
   const html = report.faults.find((f) => f.code === 'answer.html');
   expect(html.expectations.map((e) => e.found.length)).toEqual([1, 1]);
@@ -51,7 +51,7 @@ test('a fault not reported is missed; a scenario without faults is not judged', 
   batch.runs.push({ runId: 'clean', scenarioCode: 'SIM_SALE_SEARCH_1ADT_38' });
   batch.failures.push({ runId: 'clean', step: '01. POST Get Offer', check: 'Offer minimalPrice >= sum of admission parts price' });
   const report = D.detect(batch);
-  expect(report.summary).toEqual({ injected: 12, unknown: 0, detected: 11, asExpected: 11 });
+  expect(report.summary).toEqual({ injected: 15, unknown: 0, detected: 14, asExpected: 14 });
   expect(report.faults.find((f) => f.runId === price.runId).detected).toBe(false);
   expect(report.faults.some((f) => f.runId === 'clean')).toBe(false);
 });
@@ -84,8 +84,8 @@ describe('the AI analysis read against the report', () => {
 
   test('only the faults OSCAR failed are judged: a WARNING never reaches the analysis', () => {
     const score = D.scoreAnalysis(report, { groups: [] });
-    expect(judgedCount).toBe(11);
-    expect(score.summary).toEqual({ judged: 11, explained: 0, misattributed: 0, missed: 11, score: 0 });
+    expect(judgedCount).toBe(14);
+    expect(score.summary).toEqual({ judged: 14, explained: 0, misattributed: 0, missed: 14, score: 0 });
     expect(score.judged.some((j) => j.code === 'error.problem-without-code')).toBe(false);
   });
 
@@ -102,8 +102,8 @@ describe('the AI analysis read against the report', () => {
     expect(verdict('booking.currency-changed')).toBe('misattributed');
     expect(verdict('refund.not-refunded')).toBe('explained');
     expect(verdict('passenger.name-altered')).toBe('missed');
-    expect(score.summary).toMatchObject({ judged: 11, explained: 2, misattributed: 1, missed: 8 });
-    expect(score.summary.score).toBe(0.18);
+    expect(score.summary).toMatchObject({ judged: 14, explained: 2, misattributed: 1, missed: 11 });
+    expect(score.summary.score).toBe(0.14);
     expect(score.judged.find((j) => j.code === 'offer.price-below-parts').group).toEqual({ index: 0, title: 'Price below its parts', owner: 'provider' });
   });
 
@@ -130,12 +130,12 @@ describe('the page draws the report', () => {
   test('every fault with what OSCAR saw, and the AI column only with an analysis', () => {
     const report = D.detect(replayBatch());
     const plain = ctx.faultReportHtml(report);
-    expect(plain).toContain('OSCAR detected 12 of 12 faults asked for (12 with every expected check)');
-    expect((plain.match(/✅ detected/g) || []).length).toBe(12);
+    expect(plain).toContain('OSCAR detected 15 of 15 faults asked for (15 with every expected check)');
+    expect((plain.match(/✅ detected/g) || []).length).toBe(15);
     expect(plain).not.toContain('AI analysis</th>');
     const analysis = { model: 'm <x>', ...D.scoreAnalysis(report, { groups: [{ title: 'T <b>', owner: 'provider', steps: ['01. POST Get Offer'], scenarios: [] }] }) };
     const scored = ctx.faultReportHtml({ ...report, analysis });
-    expect(scored).toContain('AI analysis (m &lt;x&gt;): 2 of 11 explained (score 0.18)');
+    expect(scored).toContain('AI analysis (m &lt;x&gt;): 3 of 14 explained (score 0.21)');
     expect(scored).toContain('T &lt;b&gt; (provider)');
     expect(scored).toContain('<td style="padding:7px 14px 7px 0;text-align:left;vertical-align:top;border-bottom:1px solid #eceff1;">—</td>');
   });

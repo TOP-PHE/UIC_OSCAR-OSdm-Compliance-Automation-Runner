@@ -568,9 +568,10 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
     const sent = seen.faults.length ? faults.faultyAnswer(seen.faults, route, structuredClone(shaped)) : { body: shaped };
     if (sent.raw) {
       const text = Buffer.from(sent.raw.text, 'utf8');
-      res.writeHead(200, { ...BASE_HEADERS, 'Content-Type': sent.raw.contentType, 'Content-Length': text.length });
+      const status = sent.raw.status || 200;
+      res.writeHead(status, { ...BASE_HEADERS, ...sent.raw.headers, 'Content-Type': sent.raw.contentType, 'Content-Length': text.length });
       res.end(text);
-      return 200;
+      return status;
     }
     sendJson(res, 200, sent.body);
     return 200;

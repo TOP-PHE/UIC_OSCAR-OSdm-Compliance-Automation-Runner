@@ -51,6 +51,7 @@ const runner = require('../../worker/runner');
 const RF = require('../../utils/runFilters');
 const { facetsFor } = require('../helpers/runCandidates');
 
+const { endpointSuspension } = require('../../utils/intrusion');
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
 
@@ -246,6 +247,11 @@ router.post('/', runSubmitLimiter, (req, res) => {
   const launch = launchCompany(req);
   if (launch.refusal) return res.status(launch.refusal[0]).json(launch.refusal[1]);
   const { company, targetCompanyId } = launch;
+  // An endpoint suspended after an intrusion attempt takes no run (utils/intrusion.js).
+  if (endpointSuspension(targetCompanyId)) {
+    return res.status(409).json({ status: 409, title: 'Conflict', endpoint_suspended: true,
+      detail: 'The OSDM endpoint is suspended: an answer meant to attack OSCAR was detected during a run. A Test Manager resumes it on the API Config page once the provider is checked.' });
+  }
 
   // Per-tester credentials, for the company the run targets (#540: per user
   // and company). The runner reads the same row when the job is dequeued;
@@ -958,7 +964,9 @@ router.get('/:id', (req, res) => {
   const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
   if (runRow.sharedView) return res.json(require('../../utils/sharedRunView').sharedRunRow(runRow, runRow.sharedView));
-  return res.json(runRow);
+  // The intrusion attempt this run met, if any: kind, step and time only.
+  const intrusion = get('SELECT kind, step, detected_at FROM security_event WHERE run_id = ?', [runRow.id]) || null;
+  return res.json({ ...runRow, intrusion });
 });
 
 // ── GET /v1/runs/:id/logs ─────────────────────────────────────────────────────

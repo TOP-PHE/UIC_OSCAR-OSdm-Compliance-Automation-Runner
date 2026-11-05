@@ -396,11 +396,21 @@ If you did not request this reset, ignore this email — your password is unchan
  * sentences. Callers do not wait for it: the page is the reliable signal.
  */
 async function sendAiAccessNotice({ to, subject, heading, lines, url }) {
+  return sendNotice('ai_access', { to, subject, heading, lines, url });
+}
+
+/** The administrators' alert on an intrusion attempt (utils/intrusion.js). */
+async function sendSecurityAlert({ to, subject, heading, lines, url }) {
+  return sendNotice('security_alert', { to, subject, heading, lines, url });
+}
+
+// A short notice: a heading, a few lines of text and an optional link.
+async function sendNotice(kind, { to, subject, heading, lines, url }) {
   if (!isSmtpConfigured()) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS in oscar-server.env');
     }
-    log.warn({ to, subject }, 'DEV MODE — SMTP not configured. AI access notice not sent.');
+    log.warn({ to, subject, kind }, 'DEV MODE — SMTP not configured. Notice not sent.');
     return { devMode: true };
   }
   const from = getConfig('SMTP_FROM', 'OSCAR Platform <noreply@oscar.uic.org>');
@@ -415,13 +425,13 @@ async function sendAiAccessNotice({ to, subject, heading, lines, url }) {
   const text = [`OSCAR — ${heading}`, '', ...(lines || []), ...(url ? ['', url] : [])].join('\n');
   try {
     const info = await createTransport().sendMail({ from, to, subject, text, html });
-    smtpSends.inc({ result: 'success', kind: 'ai_access' });
+    smtpSends.inc({ result: 'success', kind });
     return info;
   } catch (sendErr) {
-    log.error({ err: sendErr.message, code: sendErr.code }, 'AI access notice send FAILED');
-    smtpSends.inc({ result: 'failure', kind: 'ai_access' });
+    log.error({ err: sendErr.message, code: sendErr.code, kind }, 'notice send FAILED');
+    smtpSends.inc({ result: 'failure', kind });
     throw sendErr;
   }
 }
 
-module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, sendAiAccessNotice, isSmtpConfigured };
+module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, sendAiAccessNotice, sendSecurityAlert, isSmtpConfigured };

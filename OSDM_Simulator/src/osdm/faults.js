@@ -161,6 +161,38 @@ const FAULTS = [
       { step: '05. GET Booking before Fulfillments', check: 'The answer is a JSON object', level: 'FAIL' },
     ],
   },
+  // Content meant to act on the caller rather than to inform it (PR 6,
+  // intrusion detection): OSCAR must stop the run at the answer, before the
+  // next request, with one failed check and an "[INTRUSION]" line.
+  {
+    code: 'attack.template-in-answer',
+    feature: 'attack',
+    title: 'A booking id holds template text',
+    detail: 'The id of a new booking ends in template text naming a process variable, which a test engine would fill in with its own value.',
+    applies: (route) => is(route, 'POST', ['bookings']),
+    answer: (body) => { if (body.booking) body.booking.id = `${body.booking.id}-{{process.env.OSCAR_RUN_SECRET}}`; },
+    expect: [{ step: '02. POST Create Booking', check: 'The answer holds no template text', level: 'FAIL' }],
+  },
+  {
+    code: 'attack.script-in-answer',
+    feature: 'attack',
+    title: 'A trip summary holds markup meant to run in a browser',
+    detail: 'The summary of every trip of an offer answer holds an image element with an error handler and a script element.',
+    applies: (route) => is(route, 'POST', ['offers']),
+    answer: (body) => {
+      for (const trip of listOf(body.trips)) trip.summary = `${trip.summary || ''} <img src=x onerror=alert(document.domain)><script>alert(1)</script>`;
+    },
+    expect: [{ step: '01. POST Get Offer', check: 'The answer holds no markup meant to run in a browser', level: 'FAIL' }],
+  },
+  {
+    code: 'attack.redirect-internal',
+    feature: 'attack',
+    title: 'A booking read redirects to a loopback address',
+    detail: 'GET /bookings/{id} answers HTTP 302 with a Location on 127.0.0.1.',
+    applies: (route) => is(route, 'GET', ['bookings', '*']),
+    raw: { status: 302, headers: { Location: 'http://127.0.0.1:3001/data/x-datafile.json' }, contentType: 'application/json', text: '{}' },
+    expect: [{ step: '05. GET Booking before Fulfillments', check: 'The answer does not redirect to a local or private address', level: 'FAIL' }],
+  },
   {
     code: 'error.problem-without-code',
     feature: 'error',
@@ -212,7 +244,8 @@ function scopeFaults(scope) {
 /**
  * A successful answer with the faults applied: { body } (changed in place,
  * the answer is the request's own copy), or { raw: { contentType, text } }
- * for an answer that is not JSON.
+ * for an answer that is not JSON; a raw answer may also name its `status`
+ * (else 200) and `headers`.
  */
 function faultyAnswer(codes, route, body) {
   for (const code of codes) {
