@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.495",
+  "current_release": "2026.496",
   "releases": [
     {
       "release": "2026.492",
@@ -45,6 +45,17 @@
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Server 1.11.457, collection OTST_V2.0.248: a provider's answer is read up to a size (1 MB for a token endpoint, 16 MB for an OSDM answer); the token request's time limit holds until its answer is read. The parameter check request sent from a script follows no redirect, as every other one."
+      ]
+    },
+    {
+      "release": "2026.496",
+      "date": "2026-11-05",
+      "server": "1.11.458",
+      "collection": "OTST_V2.0.249",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.458, collection OTST_V2.0.249: a run's secret is taken only from the server's own machine (loopback, no forwarding header), and a provider's answer holding a template ({{) ends the run before the next request, with one failed check."
       ]
     },
     {

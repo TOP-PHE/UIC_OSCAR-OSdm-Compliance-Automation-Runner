@@ -150,10 +150,7 @@ async function _fetchAndRead({ method, url, headers, body }, label, log, control
     text = await readBody(res, MAX_TOKEN_ANSWER_BYTES);
   } catch (err) {
     if (err.name === 'AbortError') throw err;
-    let msg;
-    if (err.code === 'ANSWER_TOO_LARGE') msg = `${label} request failed — HTTP ${res.status}: ${err.message}`;
-    else if (res.ok) msg = `${label} response was not valid JSON — ${err.message}`;
-    else msg = `${label} request failed — HTTP ${res.status}`;   // the answer could not be read: its status alone
+    const msg = _readFailure(label, res, err);
     log.error(`[runner] ${msg}`, { http_status: res.status });
     throw new Error(msg);
   }
@@ -175,6 +172,13 @@ async function _fetchAndRead({ method, url, headers, body }, label, log, control
     throw new Error(msg);
   }
   return { json, status: res.status };
+}
+
+// Why an answer could not be read, in one sentence.
+function _readFailure(label, res, err) {
+  if (err.code === 'ANSWER_TOO_LARGE') return `${label} request failed — HTTP ${res.status}: ${err.message}`;
+  if (res.ok) return `${label} response was not valid JSON — ${err.message}`;
+  return `${label} request failed — HTTP ${res.status}`;   // the answer could not be read: its status alone
 }
 
 // RFC 6749 §5.2 error and description, else the raw text; 500 characters.

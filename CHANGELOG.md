@@ -105,6 +105,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.458] / [collection-OTST_V2.0.249] — 2026-11-05
+
+Release 2026.496. A run's secret works from the run only, and an answer holding a template ends the run.
+
+### Security
+- **A run's secret is taken only from the server's own machine** (`fromThisMachine()`, `server.js`): `/data/{filename}` and `POST /v1/runs/{runId}/refresh-access-token` accept `X-OSCAR-Run-Secret` only from a loopback address with no `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header. The run's Bruno calls the server on 127.0.0.1, directly; a request through the reverse proxy carries a forwarding header. Before, the secret alone was enough.
+- **A provider's answer holding `{{` ends the run before the next request** (collection OTST_V2.0.249, `library-bruno/answerTemplates.js`, first in the collection's after-response): one failed check, `[OSDM] The answer holds no template text`, then `stopExecution()`. The engine fills a `{{name}}` in with a variable's value wherever a value is used, and values read from an answer go into the next requests.
+- `auth-profiles.js`: why an answer could not be read is `_readFailure()` (Sonar S3776 on 1.11.457); same messages.
+
+### Checked
+- **The real Bruno CLI**, on a local server answering `{"id":"{{process.env.SECRET_X}}"}` to a first request whose script keeps the id for the second request's URL. Without the check the second request went out as `/use/TOPSECRET`; with it, the run stopped after the first.
+- **Replay** of seven `_38` scenarios (sale by search, return, refund of a return, reduction card, exchange, Idempotency-Key, offer request options) with `main`'s collection and this one: the same recordings.
+- `server.test.js`: a run secret sent with `X-Forwarded-For`, `Forwarded` or `X-Real-IP` reads no data file, and the token refresh answers 403. `bruno-answer-templates.test.js`: the check, its stop and its place in the collection.
+- `npm run lint`, full `npx jest`: 263 suites, 5,492 tests.
+
+---
+
 ## [server-1.11.457] / [collection-OTST_V2.0.248] — 2026-11-05
 
 Release 2026.495. A provider's answer is read up to a size.
