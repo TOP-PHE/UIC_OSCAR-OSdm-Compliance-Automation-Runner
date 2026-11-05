@@ -105,6 +105,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.456] — 2026-11-05
+
+Release 2026.494. Values users store reach other users' pages as text.
+
+### Security
+- **Run detail page**: every value of the run's details (scenario code, endpoint, status…) goes through `escHtml()`; the batch link alone is markup, built from an escaped id.
+- **Compare page**: both runs' endpoints and the error text go through `esc()`.
+- **Test Config**: a scenario's trip requirement id, and the Dashboard's "shared by" e-mail, go through `esc()`.
+- **An endpoint or token address holds no `< > " ' `` ` `` \`, space or control character** (`urlPolicy.js` `structuralReason()`, wherever `ALLOW_PRIVATE_TARGETS` is set or not): refused when saved and when used.
+- **The Report Builder's CSV** starts a cell that a spreadsheet would read as a formula (`= + - @`, a tab or a carriage return first) with `'` (`csvCell()`). Check messages and log lines were also quoted twice; they are quoted once now.
+
+### Checked
+- `page-escaping.test.js` runs the run detail page's `updateStatus()` with a scenario code and an endpoint holding markup: both come out as text, and the batch link stays a link. With the values not escaped, it fails. It also checks the compare page, Test Config and the Dashboard, and `csvCell()`.
+- `url-policy.test.js`: five addresses holding markup, a quote, a space or a backtick are refused.
+- `npm run lint`, full `npx jest`: 261 suites, 5,466 tests.
+
+---
+
 ## [server-1.11.455] — 2026-11-05
 
 Release 2026.493. A session follows the user as stored.

@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.493",
+  "current_release": "2026.494",
   "releases": [
     {
       "release": "2026.492",
@@ -23,6 +23,17 @@
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Server 1.11.455: a session follows the user as stored. Each request reads the user again; a user who is deleted or no longer active, whose role or company differs from the session's, or whose password or role changed after the session was signed, must sign in again."
+      ]
+    },
+    {
+      "release": "2026.494",
+      "date": "2026-11-05",
+      "server": "1.11.456",
+      "collection": "OTST_V2.0.247",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.456: values users store reach other users' pages as text. The run detail and compare pages, Test Config and the Dashboard escape the scenario code, endpoint, list id and e-mail they show; an endpoint or token address holding markup, a quote, a space or a control character is refused; the Report Builder's CSV never starts a cell with a formula."
       ]
     },
     {
