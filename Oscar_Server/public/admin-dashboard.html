@@ -100,6 +100,11 @@ h1{color:#0090D4;font-size:24px;margin-bottom:8px}
 
   </div>
 
+  <section class="dr" id="sec-panel" hidden>
+    <h2>⛔ Intrusion attempts</h2>
+    <p class="dr-note">Runs that met an answer meant to attack OSCAR. The run was stopped, the provider's cached tokens dropped and its endpoint suspended until a Test Manager resumes it.</p>
+    <div id="sec-body"><p class="dr-note">Loading…</p></div>
+  </section>
   <section class="dr" id="dr-panel" hidden>
     <h2>🛟 Disaster recovery</h2>
     <p class="dr-note">
@@ -222,6 +227,34 @@ function drRender(body, st) {
     .catch(function (e) {
       body.replaceChildren(drText('p', 'dr-note', 'The status could not be loaded (' + e.message + ').'));
     });
+})();
+// The intrusion attempts runs met (GET /v1/admin/security-events), as text.
+function secRender(body, events) {
+  if (!events.length) { body.replaceChildren(drText('p', 'dr-note', 'None recorded.')); return; }
+  var table = document.createElement('table');
+  table.style.cssText = 'border-collapse:collapse;width:100%;font-size:13px';
+  var head = document.createElement('tr');
+  ['Detected (UTC)', 'Company or provider', 'Kind', 'Step', 'Run started by', 'Endpoint'].forEach(function (h) { head.appendChild(drText('th', '', h)); });
+  table.appendChild(head);
+  events.forEach(function (e) {
+    var tr = document.createElement('tr');
+    [e.detected_at, e.company_name, e.kind, e.step || '', e.started_by || '',
+     e.resumed_at ? 'resumed ' + e.resumed_at + ' by ' + (e.resumed_by || '?') : 'SUSPENDED'
+    ].forEach(function (v) { tr.appendChild(drText('td', '', String(v))); });
+    table.appendChild(tr);
+  });
+  body.replaceChildren(table);
+}
+(function () {
+  var user = {};
+  try { user = JSON.parse(localStorage.getItem('oscar_user') || '{}') || {}; } catch (_e) { user = {}; }
+  if (user.role !== 'administrator') return;
+  var body = document.getElementById('sec-body');
+  document.getElementById('sec-panel').hidden = false;
+  fetch('/v1/admin/security-events')
+    .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .then(function (r) { secRender(body, r.events || []); })
+    .catch(function (e) { body.replaceChildren(drText('p', 'dr-note', 'The list could not be loaded (' + e.message + ').')); });
 })();
 </script>
 </body>

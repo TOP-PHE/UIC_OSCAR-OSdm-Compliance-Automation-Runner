@@ -59,6 +59,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .artifact-row:first-child{border-top:none}
 .spin{display:inline-block;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.intrusion-banner{background:#b71c1c;color:#fff;border-radius:8px;padding:16px 20px;margin-bottom:18px;font-size:14px;line-height:1.5}
+.intrusion-banner .ib-title{font-size:20px;font-weight:900;letter-spacing:.3px;margin-bottom:6px}
 .auth-error-banner{background:#fff3e0;border:2px solid #e65100;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px}
 .auth-error-banner .auth-icon{font-size:22px;flex-shrink:0;margin-top:1px}
 .auth-error-banner .auth-body{flex:1}
@@ -301,6 +303,30 @@ function duration(a, b) {
   return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
 }
 
+// An intrusion attempt this run met (utils/intrusion.js): a red banner above
+// everything, built as text only.
+const INTRUSION_KINDS = {
+  template: 'An answer held a template ("{{") the test engine would have filled in with its own variables.',
+  script: 'An answer held markup meant to run in a browser.',
+  redirect: 'An answer redirected to a private or internal address.',
+};
+function showIntrusionBanner(run) {
+  if (!run.intrusion || document.getElementById('intrusion-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'intrusion-banner';
+  banner.className = 'intrusion-banner';
+  banner.setAttribute('role', 'alert');
+  const title = document.createElement('div');
+  title.className = 'ib-title';
+  title.textContent = '⛔ Intrusion attempt detected';
+  const what = document.createElement('div');
+  what.textContent = `${INTRUSION_KINDS[run.intrusion.kind] || 'An answer was refused.'} Step: ${run.intrusion.step || 'unknown'}.`;
+  const done = document.createElement('div');
+  done.textContent = 'The run was stopped, the provider tokens were dropped and the endpoint is suspended. The administrators were alerted. A Test Manager resumes the endpoint on the API Config page once the provider is checked.';
+  banner.append(title, what, done);
+  document.getElementById('meta').insertAdjacentElement('beforebegin', banner);
+}
+
 function updateStatus(run) {
   currentRun = run;
   const badge = document.getElementById('status-badge');
@@ -324,6 +350,7 @@ function updateStatus(run) {
   // from an escaped id.
   if (run.batch_id) metaItems.push({ lbl: 'Batch', html: `<a href="/dashboard.html" style="color:#0090D4;text-decoration:none">${escHtml(run.batch_id.slice(0,8))}... (view batch)</a>` });
   document.getElementById('meta').innerHTML = metaItems.map(m => `<div class="meta-item"><div class="lbl">${m.lbl}</div><div class="val">${m.html ?? escHtml(m.val)}</div></div>`).join('');
+  showIntrusionBanner(run);
 
   // Auth error banner — shown when runner detected a token problem
   const existingBanner  = document.getElementById('auth-error-banner');

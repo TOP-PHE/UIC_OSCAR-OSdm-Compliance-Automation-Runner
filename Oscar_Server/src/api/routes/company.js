@@ -39,6 +39,7 @@ const { get, all, run, colDecrypt, colEncrypt } = db;
 const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
+const { endpointSuspension, resumeEndpoint } = require('../../utils/intrusion');
 const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange, familyEndpointClash } = require('../helpers/shared');
 const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
 const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
@@ -247,6 +248,9 @@ function safeCompany(c, canSeeHeaderValues = false) {
     // shares individual runs from the dashboard). The DB column is kept for
     // backward compatibility but is no longer surfaced or writable here.
     extra_headers:                canSeeHeaderValues ? headers : maskHeaderValues(headers),
+    // Set after an intrusion attempt (utils/intrusion.js): no run goes to the
+    // endpoint until a Test Manager resumes it or saves another one.
+    endpoint_suspended_at:        c.endpoint_suspended_at || null,
     created_at:                   c.created_at,
     updated_at:                   c.updated_at
   };
@@ -327,6 +331,20 @@ router.get('/', (req, res) => {
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found' });
   // Only the owning Test Manager gets the header values back (to edit them).
   return res.json(safeCompany(company, req.user.role === 'test_manager'));
+});
+
+// ── POST /v1/company/endpoint/resume ─────────────────────────────────────────
+// A Test Manager resumes an endpoint suspended after an intrusion attempt,
+// once the provider is checked (utils/intrusion.js).
+router.post('/endpoint/resume', (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = req.companyId;
+  if (!endpointSuspension(targetCompanyId)) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: 'The endpoint is not suspended.' });
+  }
+  resumeEndpoint(targetCompanyId, req.user.email);
+  auditLog(req.user.id, targetCompanyId, req.user.email, 'endpoint_resumed');
+  return res.json({ resumed: true });
 });
 
 // ── PATCH /v1/company ─────────────────────────────────────────────────────────
@@ -436,6 +454,11 @@ router.patch('/', (req, res) => {
   values.push(targetCompanyId);
 
   run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
+  // Another endpoint saved ends a suspension after an intrusion attempt.
+  if (endpoint.write !== null && endpoint.write !== company.api_base && company.endpoint_suspended_at) {
+    resumeEndpoint(targetCompanyId, req.user.email);
+    auditLog(req.user.id, targetCompanyId, req.user.email, 'endpoint_resumed:new_endpoint');
+  }
 
   // Audit: log company configuration changes
   const changedFields = updates.filter(u => !u.startsWith('updated_at')).map(u => u.split(' = ')[0]);
