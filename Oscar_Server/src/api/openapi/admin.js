@@ -99,7 +99,7 @@ module.exports = {
       parameters: [companyId], requestBody: jsonBody('{ name?, slug? }'),
       responses: { 200: { description: 'The company' }, 400: { description: 'Platform company, or nothing to change' }, 401: r401, 403: r403, 404: r404Company, 409: { description: 'Slug already used' }, 429: r429 } },
     delete: { tags, summary: 'Delete a company with no users and no providers', security: bearer,
-      description: `${ADMIN} Removes its runs, Test Data and Test Framework with it. The platform company cannot be deleted. Answer: { deleted, id, name }.`,
+      description: `${ADMIN} Removes everything the company holds with it (every row naming it, its runs, findings and their comments, its data files), unread; the deletion stays in the audit log. The list and the answers name a company by id, name and slug only, never its endpoint. The platform company cannot be deleted. Answer: { deleted, id, name }.`,
       parameters: [companyId],
       responses: { 200: { description: 'Deleted' }, 400: { description: 'Platform company' }, 401: r401, 403: r403, 404: r404Company, 409: { description: 'The company still has users or providers' }, 429: r429 } },
   },

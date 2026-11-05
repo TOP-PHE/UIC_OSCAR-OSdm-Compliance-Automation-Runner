@@ -74,13 +74,13 @@ describe('PATCH /v1/company rejects the removed share_reports_with_certifier fie
     expect(row.s).toBe(1); // schema default, untouched
   });
 
-  test('400 regardless of role (admin also rejected before any write)', async () => {
+  test('an administrator is refused before any write', async () => {
     const tk = mkToken(adminId, 'administrator', companyId);
     const res = await request(app)
       .patch(`/v1/company?company_id=${companyId}`)
       .set('Authorization', `Bearer ${tk}`)
       .send({ share_reports_with_certifier: true });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   });
 });
 

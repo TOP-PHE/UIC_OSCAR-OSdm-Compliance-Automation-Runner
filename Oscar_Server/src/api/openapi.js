@@ -243,7 +243,7 @@ module.exports = {
             },
           } } } },
           400: { description: 'Company config invalid (no datafile, missing creds, etc.)' },
-          403: { description: 'certification_user cannot start runs' },
+          403: { description: 'Administrators and certifiers do not start runs: only the company\'s Test Managers and testers do' },
           429: { description: 'Rate limit exceeded' },
         },
       },
@@ -253,7 +253,7 @@ module.exports = {
         tags: ['Runs'],
         summary: 'What a selection would run, before the launch (#1029)',
         security: [{ bearerAuth: [] }],
-        description: 'Counts, for the base of the selection, what each value of each filter holds, and how many scenarios the selection keeps. Nothing is written. Rate limited to 60 a minute per user.',
+        description: 'Counts, for the base of the selection, what each value of each filter holds, and how many scenarios the selection keeps. Members only: administrators and certifiers get 403. Nothing is written. Rate limited to 60 a minute per user.',
         requestBody: { content: { 'application/json': { schema: {
           type: 'object', properties: { selection: { $ref: '#/components/schemas/RunSelection' } },
         } } } },

@@ -257,10 +257,10 @@ describe('PATCH /v1/company — only a Test Manager changes the API endpoint (#5
     expect(storedEndpoint()).toBe(STORED);
   });
 
-  test('200 for an administrator who names the company, as before', async () => {
+  test('403 for an administrator, even naming the company', async () => {
     const res = await patchAs('administrator', adminId, { api_base: ELSEWHERE }, `?company_id=${companyId}`);
-    expect(res.status).toBe(200);
-    expect(storedEndpoint()).toBe(ELSEWHERE);
+    expect(res.status).toBe(403);
+    expect(storedEndpoint()).toBe(STORED);
   });
 
   test('403 for a certifier, as before', async () => {
@@ -374,12 +374,14 @@ describe('PATCH /v1/company — extra_headers', () => {
       expect(JSON.stringify(res.body)).not.toContain(SECRET);
     });
 
-    test('a platform administrator targeting the company sees the name but not the value', async () => {
+    test('a platform administrator cannot read company settings at all', async () => {
       const res = await request(app).get(`/v1/company?company_id=${companyId}`)
         .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`);
-      expect(res.status).toBe(200);
-      expect(res.body.extra_headers).toEqual([{ name: 'X-Api-Key', value: '', has_value: true }]);
+      expect(res.status).toBe(403);
       expect(JSON.stringify(res.body)).not.toContain(SECRET);
+      const all = await request(app).get('/v1/company')
+        .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`);
+      expect(all.status).toBe(403);
     });
 
     test('a certification_user cannot read company settings at all (no leak path)', async () => {
@@ -389,17 +391,13 @@ describe('PATCH /v1/company — extra_headers', () => {
       expect(JSON.stringify(res.body)).not.toContain(SECRET);
     });
 
-    test('a platform administrator editing the headers gets the response masked too', async () => {
-      const ADMIN_SECRET = 'admin-set-sk-7777';
+    test('a platform administrator cannot change the headers', async () => {
       const res = await request(app).patch(`/v1/company?company_id=${companyId}`)
         .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`)
-        .send({ extra_headers: [{ name: 'X-Admin-Set', value: ADMIN_SECRET }] });
-      expect(res.status).toBe(200);
-      expect(res.body.extra_headers).toEqual([{ name: 'X-Admin-Set', value: '', has_value: true }]);
-      expect(JSON.stringify(res.body)).not.toContain(ADMIN_SECRET);
-      // …and it was still stored (encrypted), readable by the owning TM.
+        .send({ extra_headers: [{ name: 'X-Admin-Set', value: 'admin-set-sk-7777' }] });
+      expect(res.status).toBe(403);
       const asTm = await request(app).get('/v1/company').set('Authorization', `Bearer ${makeToken('test_manager')}`);
-      expect(asTm.body.extra_headers).toEqual([{ name: 'X-Admin-Set', value: ADMIN_SECRET }]);
+      expect(asTm.body.extra_headers).toEqual([{ name: 'X-Api-Key', value: SECRET }]);
     });
   });
 });

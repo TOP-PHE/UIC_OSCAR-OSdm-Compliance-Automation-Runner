@@ -35,9 +35,9 @@ const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const WRITE_LIMIT = require('../../utils/datafileWriteLimit');
 const db = require('../../db/db');
-const { get, all, run, colDecrypt, colEncrypt } = db;
+const { get, run, colDecrypt, colEncrypt } = db;
 const { annotateDatafile } = require('../../utils/frameworkGating');
-const { requireAuth, isPlatformRole } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { endpointSuspension, resumeEndpoint } = require('../../utils/intrusion');
 const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange, familyEndpointClash } = require('../helpers/shared');
@@ -315,17 +315,12 @@ function normalizeExtraHeaders(input) {
 const { encryptToFileAsync, decryptFromFileAsync } = require('../../utils/at-rest');
 
 // ── GET /v1/company ───────────────────────────────────────────────────────────
+// The company's OSDM settings are its members' only: an administrator manages
+// companies (admin.js) and never reads or changes their test set-up.
 router.get('/', (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
-
-  if (isPlatformRole(req.user.role) && !targetCompanyId) {
-    // Platform list-all: header values are withheld (the S6 bulk-leak path).
-    // `.map(safeCompany)` would pass the array index as canSeeHeaderValues — be
-    // explicit and keep it false.
-    const companies = all('SELECT * FROM companies ORDER BY created_at DESC LIMIT 200').map(c => safeCompany(c, false));
-    return res.json({ companies });
-  }
 
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found' });
@@ -349,12 +344,9 @@ router.post('/endpoint/resume', (req, res) => {
 
 // ── PATCH /v1/company ─────────────────────────────────────────────────────────
 router.patch('/', (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
-
-  if (isPlatformRole(req.user.role) && !targetCompanyId) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id is required for platform users.' });
-  }
 
   // PATCH /v1/company now only handles company-shared fields. Per-tester
   // credentials moved to /v1/me/credentials in v12 — see me-credentials.js.
@@ -420,7 +412,7 @@ router.patch('/', (req, res) => {
   // Validate before touching the row so a bad payload changes nothing.
   let normalizedExtra = null;
   if (extra_headers !== undefined) {
-    if (req.user.role !== 'test_manager' && !isPlatformRole(req.user.role)) {
+    if (req.user.role !== 'test_manager') {
       return res.status(403).json({
         status: 403, title: 'Forbidden',
         detail: 'Only Test Managers can edit dedicated headers.'
