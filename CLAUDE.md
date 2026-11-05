@@ -956,13 +956,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   that changes a password, role or company sets `END_SESSIONS_SQL` in the
   same UPDATE. **A test token must stand for a stored user** with that role
   and company, or the route answers 401.
-- **A run's secret works from the run only, and no answer may hold `{{`**
-  (1.11.458 / OTST_V2.0.249). `fromThisMachine()` (`server.js`): the two
-  loopback routes take `X-OSCAR-Run-Secret` only from 127.0.0.1 / ::1 with
-  no forwarding header. `library-bruno/answerTemplates.js`, first in the
-  collection's after-response, fails one check and stops the run when an
-  answer holds `{{` (Bruno would fill it in with its variables, the data file
-  and `process.env` included, in the next request). Checked with the real CLI.
+- **A run's secret works from the run only; an answer meant to attack OSCAR
+  stops the run** (1.11.458 / OTST_V2.0.249, 1.11.460 / OTST_V2.0.250).
+  `fromThisMachine()` (`server.js`): the two loopback routes take
+  `X-OSCAR-Run-Secret` only from 127.0.0.1 / ::1 with no forwarding header.
+  `library-bruno/answerThreats.js`, first in the collection's after-response,
+  refuses an answer holding `{{` (Bruno would fill it in with its variables,
+  the data file and `process.env` included, in the next request), markup
+  meant to run in a browser, or a redirect to a loopback / private address:
+  one failed check, one `[INTRUSION] kind=<kind> step=<request> [ERROR] …`
+  line, `stopExecution()`. Checks use `.to.equal(true)`, never a getter
+  (Sonar S905). The runner hands that line to `utils/intrusion.js`
+  `onIntrusionLine()`: a `security_event` (migration 47, never the answer),
+  the endpoint suspended (`companies.endpoint_suspended_at`; `POST /v1/runs`
+  409, a queued run refused) until a Test Manager resumes it or saves another
+  endpoint, the company's cached tokens dropped, an audit line, an e-mail to
+  the administrators. Simulator faults `attack.*` and their `SIM_FAULT_ATTACK_*`
+  scenarios prove it end to end.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

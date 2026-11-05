@@ -211,5 +211,42 @@
    "[WARNING] Purchaser negative sweep 4/4: INVALID 'phoneNumber' = 'not-a-phone' — expecting the provider to reject.",
    "[WARNING] Negative requestedInformation [purchaser.phoneNumber]: provider rejects with a client error (4xx): expected 4xx, got 500 — OSDM defines this field as an unconstrained string (no format/pattern), so rejecting a malformed value is recommended practice, not a conformance requirement."
   ]
+ },
+ "SIM_FAULT_ATTACK_TEMPLATE_IN_ANSWER_38": {
+  "failures": [
+   [
+    "02. POST Create Booking",
+    "[OSDM] The answer holds no template text (\"{{\")"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ [OSDM] The answer holds no template text (\"{{\"): The answer holds \"{{\", which the test engine would fill in with its own variables in the next requests. The run stops here.: expected false to equal true"
+  ]
+ },
+ "SIM_FAULT_ATTACK_SCRIPT_IN_ANSWER_38": {
+  "failures": [
+   [
+    "01. POST Get Offer",
+    "[OSDM] The answer holds no markup meant to run in a browser"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ [OSDM] The answer holds no markup meant to run in a browser: The answer holds a script element: markup meant to run in a browser. The run stops here.: expected false to equal true"
+  ]
+ },
+ "SIM_FAULT_ATTACK_REDIRECT_INTERNAL_38": {
+  "failures": [
+   [
+    "05. GET Booking before Fulfillments",
+    "HTTP response status — expected 200, actual: 302"
+   ],
+   [
+    "05. GET Booking before Fulfillments",
+    "[OSDM] The answer does not redirect to a local or private address"
+   ]
+  ],
+  "warnings": [
+   "[WARNING] ❌ [OSDM] The answer does not redirect to a local or private address: The answer is a redirect to a loopback, private or link-local address, where a test must never be sent. The run stops here.: expected false to equal true"
+  ]
  }
 }

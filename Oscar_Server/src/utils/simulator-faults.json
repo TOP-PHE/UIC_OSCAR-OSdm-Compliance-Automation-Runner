@@ -135,6 +135,45 @@
     ]
   },
   {
+    "code": "attack.template-in-answer",
+    "feature": "attack",
+    "title": "A booking id holds template text",
+    "detail": "The id of a new booking ends in template text naming a process variable, which a test engine would fill in with its own value.",
+    "expect": [
+      {
+        "step": "02. POST Create Booking",
+        "check": "The answer holds no template text",
+        "level": "FAIL"
+      }
+    ]
+  },
+  {
+    "code": "attack.script-in-answer",
+    "feature": "attack",
+    "title": "A trip summary holds markup meant to run in a browser",
+    "detail": "The summary of every trip of an offer answer holds an image element with an error handler and a script element.",
+    "expect": [
+      {
+        "step": "01. POST Get Offer",
+        "check": "The answer holds no markup meant to run in a browser",
+        "level": "FAIL"
+      }
+    ]
+  },
+  {
+    "code": "attack.redirect-internal",
+    "feature": "attack",
+    "title": "A booking read redirects to a loopback address",
+    "detail": "GET /bookings/{id} answers HTTP 302 with a Location on 127.0.0.1.",
+    "expect": [
+      {
+        "step": "05. GET Booking before Fulfillments",
+        "check": "The answer does not redirect to a local or private address",
+        "level": "FAIL"
+      }
+    ]
+  },
+  {
     "code": "error.problem-without-code",
     "feature": "error",
     "title": "A refusal gives no problem code",

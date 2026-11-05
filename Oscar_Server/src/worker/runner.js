@@ -187,6 +187,7 @@ const STACK_FRAME_WITH_PARENS = /^\s*at\s+(?:\S[^\s(]*\(|\S+\s+\().*:\d+:\d+\)\s
 // slash. The request name is everything up to the whitespace before the first
 // "(", written so the pattern cannot backtrack over that whitespace.
 const OFFER_OPTIONS_MARK = '🧭';
+const { onIntrusionLine, INTRUSION_MARK, endpointSuspension } = require('../utils/intrusion');
 
 const FOLDER_REQUEST_ROW = /^([^()\\/]+)[\\/]([^()]*[^()\s]|\s)\s+\(([^)]+)\)/;
 
@@ -348,6 +349,9 @@ class LogParser {
         if (m) httpStatus = Number.parseInt(m[1], 10);
       } else if (/^\[runner\]/i.test(trimmed)) {
         category = 'system';
+      } else if (trimmed.includes(INTRUSION_MARK)) {
+        // The collection met an answer meant to attack OSCAR (utils/intrusion.js).
+        category = 'intrusion';
       } else if (hasLevelTag && trimmed.includes(OFFER_OPTIONS_MARK)) {
         // #227 part 3: the offer request options report, read back by the
         // Report Builder (utils/offerOptionReport.js) through this category.
@@ -765,6 +769,14 @@ async function cleanupWorkspace(runId) {
 // provider was withdrawn while the run was queued is not sent there. Platform
 // users are not tenant members and keep the path they had. Returns a refusal
 // sentence, or null. Never throws: a thrown executeRun leaves the run unmarked.
+// An endpoint suspended after an intrusion attempt takes no run until a Test
+// Manager resumes it (utils/intrusion.js); runs queued before are refused here.
+function refusedSuspendedEndpoint(companyId) {
+  return endpointSuspension(companyId)
+    ? 'The OSDM endpoint of this company or provider is suspended: an answer meant to attack OSCAR was detected during a run. A Test Manager resumes it on the API Config page once the provider is checked.'
+    : null;
+}
+
 function refusedRunScope(runRow, companyId, userId) {
   try {
     if (runRow.company_id !== companyId) return 'Run refused: the run does not belong to the company it was queued for.';
@@ -815,6 +827,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   //     stops here: before a token is asked for, before the environment file
   //     is written, before anything is started.
   const refusal = refusedRunScope(runRow, companyId, effectiveUserId)
+    || refusedSuspendedEndpoint(companyId)
     || refusedScenarioCode(scenarioOverride)
     || await refusedApiBase(companyRow.api_base)
     || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email })
@@ -1122,6 +1135,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
         const meta = logParser.parse(line);
         const level = inferLevel(line, 'info');
         logEvent(runId, level, line, meta);
+        onIntrusionLine(line, runRow);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });
@@ -1134,6 +1148,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
         const meta = logParser.parse(line);
         const level = inferLevel(line, 'error');
         logEvent(runId, level, line, meta);
+        onIntrusionLine(line, runRow);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });

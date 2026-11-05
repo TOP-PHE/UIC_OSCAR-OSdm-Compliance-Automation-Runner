@@ -499,7 +499,9 @@ Each of these scenarios asks gamma for one fault of the simulator's catalogue
 lists them with what OSCAR must report). The fault changes only what the
 caller is told, never the booking stored. They fail on purpose and stay out
 of the run list. The error faults are seen on the purchaser probe
-(`bookingPurchaserMode` `invalid`), which is where a sale is refused.
+(`bookingPurchaserMode` `invalid`), which is where a sale is refused. The
+`attack.*` faults answer with content meant to act on the caller rather than
+to inform it: the collection's after-response stops the run at that answer.
 
 | Scenario | Fault | What the simulator answers | Expected result |
 |---|---|---|---|
@@ -515,6 +517,9 @@ of the run list. The error faults are seen on the purchaser probe
 | `SIM_FAULT_REFUND_NOT_REFUNDED_38` | `refund.not-refunded` | After the refund, the booking read gives its fulfilments and parts `FULFILLED`. | Nine failed checks at 14: each fulfilment and admission is not REFUNDED. |
 | `SIM_FAULT_ERROR_PROBLEM_WITHOUT_CODE_38` | `error.problem-without-code` | The purchaser probe's refusals (400) leave out `code`. | No failed check; four WARNINGs at 14: the refusal names no OSDM problem code. |
 | `SIM_FAULT_ERROR_SERVER_ERROR_FOR_REFUSAL_38` | `error.server-error-for-refusal` | The purchaser probe's refusals come as HTTP 500. | Two failed checks at 14: the provider rejects with a client error (4xx). |
+| `SIM_FAULT_ATTACK_TEMPLATE_IN_ANSWER_38` | `attack.template-in-answer` | The new booking's id ends in template text naming a process variable. | One failed check at 02: "The answer holds no template text", one `[INTRUSION]` line (`kind=template`), and the run stops before 03. |
+| `SIM_FAULT_ATTACK_SCRIPT_IN_ANSWER_38` | `attack.script-in-answer` | Every trip summary of the offer answer holds markup meant to run in a browser. | One failed check at 01: "The answer holds no markup meant to run in a browser", one `[INTRUSION]` line (`kind=script`), and the run stops before 02. |
+| `SIM_FAULT_ATTACK_REDIRECT_INTERNAL_38` | `attack.redirect-internal` | Every booking read answers HTTP 302 with a Location on 127.0.0.1; the collection does not follow redirects. | Two failed checks at 05 (the HTTP status, "The answer does not redirect to a local or private address"), one `[INTRUSION]` line (`kind=redirect`), and the run stops before 06. |
 
 ### Requested information and purchaser (#611)
 

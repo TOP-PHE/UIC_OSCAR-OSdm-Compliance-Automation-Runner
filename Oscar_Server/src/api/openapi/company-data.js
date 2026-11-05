@@ -53,6 +53,13 @@ const PROVIDER_CALL = 'Calls the OSDM endpoint of the company or provider with t
 const TRIP_LEGS = 'legs (1-5, each { originURN, destinationURN, departureTime, arrivalTime, … } as text, as a probe\'s offeredTrips gives them) and days (MON … SUN)';
 
 module.exports = {
+  '/v1/company/endpoint/resume': {
+    post: {
+      tags: ['Company'], summary: 'Resume an endpoint suspended after an intrusion attempt', security: bearer,
+      description: 'Test Manager only. After a run met an answer meant to attack OSCAR, the endpoint of the company or provider takes no run until resumed here (or until another endpoint is saved).',
+      responses: { 200: { description: 'Resumed' }, 403: { description: 'Test Managers only' }, 409: { description: 'The endpoint is not suspended' } },
+    },
+  },
   '/v1/company': {
     get: op('The company profile (no secret)',
       'Every role but certifiers. The company or provider of the request: { id, name, slug, parent_id, api_base, datafile_hash, datafile_updated_at, extra_headers, created_at, updated_at }. Dedicated header values are returned to a Test Manager only; others get each name with has_value. An administrator naming no company (company_id / X-Company-Id) gets { companies } (200 latest), header values withheld.',
