@@ -23,10 +23,11 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
-const { encrypt } = require('../../db/db');
+const { encrypt, get } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
 const { credentialsFor, setCredentials } = require('../../utils/testerCredentials');
+const { endpointOrigin, credentialsEndpointProblem } = require('../../utils/credentialEndpoint');
 const { isValidProfile, PROFILES } = require('../../worker/auth-profiles');
 const { auditLog, denyAdminAndCertifier } = require('../helpers/shared');
 const { testCredentials } = require('../../services/credentialTest');
@@ -66,7 +67,10 @@ function safeUserCreds(u) {
     has_extra:               !!u.oauth_extra_enc,
     has_cached_token:        !!u.cached_token_enc,
     has_requestor:           !!u.requestor_enc,
-    has_subscription_key:    !!u.subscription_key_enc
+    has_subscription_key:    !!u.subscription_key_enc,
+    // The endpoint changed since the save: nothing is sent until saved again.
+    credentials_endpoint:    u.credentials_endpoint || null,
+    endpoint_changed:        !!credentialsEndpointProblem(u)
   };
 }
 
@@ -155,6 +159,10 @@ router.patch('/', (req, res) => {
 
   // Written for the company this request acts in (#540), never another's.
   const companyId = scopedCompanyId(req);
+  // A save is for the endpoint as it is now: the credentials go to no other
+  // (utils/credentialEndpoint.js). Saving again after a change confirms them.
+  const company = get('SELECT api_base FROM companies WHERE id = ?', [companyId]);
+  fields.credentials_endpoint = endpointOrigin(company?.api_base);
   setCredentials(req.user.id, companyId, fields);
 
   auditLog(req.user.id, companyId, req.user.email, `me_credential_update:${changedFields.join(',')}`);

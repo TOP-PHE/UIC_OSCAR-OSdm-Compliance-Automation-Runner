@@ -510,6 +510,23 @@ function showSuspension(card, c) {
   field(card, 'api_base').parentElement.insertAdjacentElement('beforebegin', note);
 }
 
+// The endpoint changed since these credentials were saved: OSCAR sends them
+// nowhere until they are saved again (utils/credentialEndpoint.js).
+function showEndpointChanged(card, m) {
+  card.querySelector('[data-f="endpoint-changed-note"]')?.remove?.();
+  if (!m.endpoint_changed) return;
+  const note = document.createElement('div');
+  note.dataset.f = 'endpoint-changed-note';
+  note.setAttribute('role', 'alert');
+  note.style.cssText = 'background:#fff3e0;border:2px solid #e65100;color:#bf360c;border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:13px;line-height:1.5';
+  const title = document.createElement('strong');
+  title.textContent = '⚠️ The OSDM endpoint changed since your credentials were saved. ';
+  const text = document.createElement('span');
+  text.textContent = `They were saved for ${m.credentials_endpoint || 'another address'}. OSCAR sends them nowhere, and starts no run, until you check them below and save them again.`;
+  note.append(title, text);
+  field(card, 'save-btn').insertAdjacentElement('beforebegin', note);
+}
+
 function fillTarget(card, c, m) {
   const known = targets.get(card.dataset.targetId);
   if (known) { known.company = c; known.creds = m; }
@@ -517,6 +534,7 @@ function fillTarget(card, c, m) {
   fillShared(card, c);
   showSuspension(card, c);
   fillCredentials(card, m);
+  showEndpointChanged(card, m);
 
   // The title line: is this section ready for a run?
   const credsConfigured = credentialsSet(m);

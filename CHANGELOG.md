@@ -105,6 +105,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.461] — 2026-11-05
+
+Release 2026.499. A tester's credentials go to the OSDM endpoint they were saved for, and to no other.
+
+### Security
+- **Credentials are tied to the endpoint they were saved for** (`utils/credentialEndpoint.js`). Each `tester_credentials` row keeps the origin of the company's or provider's endpoint at the time of the save (`credentials_endpoint`, migration 48; existing rows get the endpoint they have now, so nobody has to save again today). When the endpoint is changed to another origin, `resolveAccessToken()` refuses: no token is asked, no stored token is sent, no run starts, no credential test goes out, until the tester saves the credentials again on API Config. Another path on the same host changes nothing.
+- **Changing the endpoint drops every cached token of that company or provider** (`PATCH /v1/company`), and the token cache's fingerprint names the endpoint too.
+- **The tester is told**: `GET /v1/me/credentials` answers `credentials_endpoint` and `endpoint_changed`; API Config shows a warning above the section's Save button, and the Run page lists it among the things to fix. Saving the section, even unchanged, confirms the credentials for the new endpoint.
+
+### Checked
+- `credential-endpoint.test.js`: a save records the endpoint; another path changes nothing; another endpoint drops the cached tokens, marks the credentials and makes `resolveAccessToken()` refuse; saving again confirms them. With the refusal removed, the test fails.
+- `npm run lint`, full `npx jest`: 266 suites, 5,580 tests.
+
+---
+
 ## [server-1.11.460] / [collection-OTST_V2.0.250] — 2026-11-05
 
 Issue #1085, release 2026.498. Simulator 0.63.0. An answer meant to attack OSCAR stops the run, is recorded, alerts the administrators and suspends the endpoint.

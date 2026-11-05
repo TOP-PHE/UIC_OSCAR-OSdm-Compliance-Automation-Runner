@@ -973,6 +973,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   endpoint, the company's cached tokens dropped, an audit line, an e-mail to
   the administrators. Simulator faults `attack.*` and their `SIM_FAULT_ATTACK_*`
   scenarios prove it end to end.
+- **Credentials go to the endpoint they were saved for** (1.11.461).
+  `tester_credentials.credentials_endpoint` (migration 48) is the endpoint's
+  origin at the save; `credentialsEndpointProblem()`
+  (`utils/credentialEndpoint.js`) makes `resolveAccessToken()` refuse when the
+  company's endpoint now has another origin, so a changed endpoint never
+  receives a tester's token or static credentials until the tester saves
+  again. Any new path that sends a tester's credentials goes through
+  `resolveAccessToken()`. Changing the endpoint drops the company's cached
+  tokens.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;
