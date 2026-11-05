@@ -243,7 +243,7 @@ function shareLineFor(r) {
   const isTerminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status);
   let inner = '';
   if (isShared) {
-    inner = `<span title="Visible to OSDM certifiers${r.shared_with_certifier_by ? ' — shared by ' + r.shared_with_certifier_by : ''}" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
+    inner = `<span title="Visible to OSDM certifiers${r.shared_with_certifier_by ? ' — shared by ' + esc(r.shared_with_certifier_by) : ''}" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
       + (isTM ? ` <a href="#" data-action="unshare-run" data-run-id="${r.id}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a>` : '');
   } else if (isTM && isTerminal) {
     inner = `<a href="#" data-action="share-run" data-run-id="${r.id}" style="color:#0090D4;text-decoration:none">↗ Share with certifiers</a>`;

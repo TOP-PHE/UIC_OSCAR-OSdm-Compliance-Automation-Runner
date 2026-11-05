@@ -3313,7 +3313,7 @@ function buildTripSection(idx, sc, trip) {
 
   return `
   <div class="param-section">
-    <div class="param-section-head" data-action="toggle-param-section">🚂 Trip (requirement #${sc.tripRequirementId})<span class="ps-arrow">▶</span></div>
+    <div class="param-section-head" data-action="toggle-param-section">🚂 Trip (requirement #${esc(sc.tripRequirementId)})<span class="ps-arrow">▶</span></div>
     <div class="param-section-body">
       <div style="padding:12px 14px 4px">${tripTypeSelect}${journeyPicker}</div>
       <div style="padding:0 14px 12px">${inner}</div>

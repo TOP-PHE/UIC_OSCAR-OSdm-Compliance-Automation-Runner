@@ -56,6 +56,11 @@ describe('storedUrlRefusal — structural, no DNS', () => {
     ['https://grafana/x', 'internal host name'],
     ['https://oscar:3001/data/other-datafile.json', 'internal host name'],
     ['not a url', 'is not a valid URL'],
+    ['https://example.com/#<svg onload=alert(1)>', 'may not hold'],
+    ['https://example.com/a"b', 'may not hold'],
+    ["https://example.com/a'b", 'may not hold'],
+    ['https://example.com/a b', 'may not hold'],
+    ['https://example.com/a`b', 'may not hold'],
     ['', 'is empty'],
   ])('refuses %s', (raw, fragment) => {
     const msg = storedUrlRefusal(raw, 'endpoint');
