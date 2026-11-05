@@ -106,7 +106,8 @@ router.post('/access-requests/:id/confirm', async (req, res) => {
   const companyId = req.user.companyId;
   const done = await AccessRequests.confirmRequest(req.params.id, companyId, role);
   if (done.status) {
-    return res.status(done.status).json({ status: done.status, title: done.status === 404 ? 'Not Found' : done.status === 409 ? 'Conflict' : 'Bad Request', detail: done.detail });
+    const title = { 404: 'Not Found', 409: 'Conflict' }[done.status] || 'Bad Request';
+    return res.status(done.status).json({ status: done.status, title, detail: done.detail });
   }
   const company = get('SELECT name FROM companies WHERE id = ?', [companyId]);
   auditLog(req.user.id, companyId, req.user.email, `access_request_confirmed:${done.user.email}:${role}`);
