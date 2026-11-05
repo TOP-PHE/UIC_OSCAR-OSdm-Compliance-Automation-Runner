@@ -68,16 +68,19 @@ describe('run detail page', () => {
   });
 });
 
+// The pages' own template text, as it stands in their source ("$" + "{…}").
+const sub = expr => '$' + '{' + expr + '}';
+
 describe('other pages', () => {
   test('compare: the endpoints and the error text go through esc()', () => {
     const src = read('compare.html');
-    expect(src).toContain("${esc(data.run_a.api_base || '-')}");
-    expect(src).toContain("${esc(data.run_b.api_base || '-')}");
-    expect(src).toContain("${esc(data.detail || data.title || 'Failed to compute comparison.')}");
+    expect(src).toContain(sub("esc(data.run_a.api_base || '-')"));
+    expect(src).toContain(sub("esc(data.run_b.api_base || '-')"));
+    expect(src).toContain(sub("esc(data.detail || data.title || 'Failed to compute comparison.')"));
   });
 
   test('Test Config: the trip requirement id goes through esc()', () => {
-    expect(read('js/scenarios.js')).toContain('requirement #${esc(sc.tripRequirementId)}');
+    expect(read('js/scenarios.js')).toContain('requirement #' + sub('esc(sc.tripRequirementId)'));
   });
 
   test('dashboard: the e-mail in the title goes through esc()', () => {
