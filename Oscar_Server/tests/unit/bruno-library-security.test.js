@@ -115,4 +115,31 @@ describe('the library keeps clear of both', () => {
     }
     expect(missing).toEqual([]);
   });
+
+  // The same holds for a request a request file's script sends.
+  test('every bru.sendRequest in a request file asks for no redirect', () => {
+    const root = path.join(__dirname, '../../../Bruno_Collection');
+    const ymls = [];
+    const walk = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory() && e.name !== 'node_modules' && e.name !== 'library-bruno') walk(p);
+        else if (e.isFile() && e.name.endsWith('.yml')) ymls.push(p);
+      }
+    };
+    walk(root);
+    const missing = [];
+    let calls = 0;
+    for (const f of ymls) {
+      const text = fs.readFileSync(f, 'utf8');
+      let at = text.indexOf('bru.sendRequest(');
+      while (at !== -1) {
+        calls++;
+        if (!text.slice(at, at + 400).includes('maxRedirects: 0')) missing.push(path.relative(root, f));
+        at = text.indexOf('bru.sendRequest(', at + 1);
+      }
+    }
+    expect(calls).toBeGreaterThan(0);
+    expect(missing).toEqual([]);
+  });
 });

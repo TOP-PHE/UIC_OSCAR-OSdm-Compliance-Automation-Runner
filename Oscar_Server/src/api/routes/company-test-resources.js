@@ -24,7 +24,8 @@ const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
-const { mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
+const { mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes, MAX_OSDM_ANSWER_BYTES } = require('../../utils/osdm-client');
+const { readBody } = require('../../utils/boundedBody');
 const { usableUrlRefusal } = require('../../utils/urlPolicy');
 const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, fitsOneTripDate, searchDates, classifyOfferProbe, summarizeOfferProbe, serviceFindings, servicesUnseen, dayOfWeekCode } = require('../../services/timetable-discovery');
 const { journeyPlan, probeDates, compareAnswer, probeSummary, collectOfferedTrips, tripToKeep } = require('../../services/journeyProbe');
@@ -121,9 +122,10 @@ async function _postJson(apiBase, path, token, body, extraHeaders) {
       redirect: 'manual',
       signal: controller.signal
     });
-    let text = '';
+    // Read within the time limit and up to a size, as osdmGet does.
+    const text = await readBody(res, MAX_OSDM_ANSWER_BYTES);
     let json = null;
-    try { text = await res.text(); json = text ? JSON.parse(text) : null; } catch (_) { /* keep raw text */ }
+    try { json = text ? JSON.parse(text) : null; } catch (_) { /* keep raw text */ }
     return { ok: res.ok, status: res.status, json, text };
   } finally {
     clearTimeout(timer);

@@ -128,10 +128,13 @@ runtime:
                 method: resolvedMethod,
                 header: probeHeaders,
                 data: body,
-                proxy: false
+                proxy: false,
+                maxRedirects: 0
               },
               function (err, probeRes) {
                 validationLogger(`[DEBUG] sendRequest callback fired for ${resolvedUrl}`);
+                // A redirect is not followed: it is graded as the status it is.
+                if (err && err.response && !probeRes) { probeRes = err.response; err = null; }
                 if (err) {
                   let errMsg = "Unknown transport error";
                   try {

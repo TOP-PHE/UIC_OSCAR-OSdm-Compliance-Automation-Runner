@@ -20,9 +20,12 @@ const { randomUUID } = require('node:crypto');
 const { decrypt, colDecrypt } = require('../db/db');
 const TraceContext = require('../../public/js/trace-context');
 const { usableUrlRefusal } = require('./urlPolicy');
+const { readBody } = require('./boundedBody');
 const log = require('./logger').child({ module: 'osdm-client' });
 
 const DEFAULT_TIMEOUT_MS = 20000;
+// The most of an OSDM answer the server reads (a page of stop places, offers).
+const MAX_OSDM_ANSWER_BYTES = 16 * 1024 * 1024;
 
 /** Remove every trailing "/" in a single pass. */
 function stripTrailingSlashes(s) {
@@ -58,9 +61,11 @@ async function osdmGet(apiBase, path, token, extraHeaders = {}, timeoutMs = DEFA
       redirect: 'manual',
       signal: controller.signal
     });
-    let text = '';
+    // The answer is read within the time limit and up to a size: a larger
+    // one throws, as a network error does.
+    const text = await readBody(res, MAX_OSDM_ANSWER_BYTES);
     let json = null;
-    try { text = await res.text(); json = text ? JSON.parse(text) : null; } catch (_) { /* keep raw text */ }
+    try { json = text ? JSON.parse(text) : null; } catch (_) { /* keep raw text */ }
     return { ok: res.ok, status: res.status, json, text };
   } finally {
     clearTimeout(timer);
@@ -142,4 +147,6 @@ function withTraceHeaders(headers, settings) {
   return { ...Object.fromEntries(kept), ...trace };
 }
 
-module.exports = { osdmGet, buildTesterHeaders, mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes, DEFAULT_TIMEOUT_MS };
+module.exports = {
+  MAX_OSDM_ANSWER_BYTES,
+  osdmGet, buildTesterHeaders, mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes, DEFAULT_TIMEOUT_MS };
