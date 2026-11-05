@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.497",
+  "current_release": "2026.498",
   "releases": [
+    {
+      "release": "2026.498",
+      "date": "2026-11-05",
+      "server": "1.11.460",
+      "collection": "OTST_V2.0.250",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.460, collection OTST_V2.0.250: fares asked by search criteria (#1045). O8 reads the fares of a trip that starts or ends at another stop place than the requested section (a tram stop by the station asked) from the trip's own first or last stop, with one WARNING naming those offers; a walk inside a trip needs no fare. The fare offer chosen is booked unless its own checks fail: a failure of other offers stays a failed check of step 01 but no longer stops the sale. Found on a real provider's search, whose sale stopped although the offer chosen passed every check."
+      ]
+    },
     {
       "release": "2026.497",
       "date": "2026-11-05",

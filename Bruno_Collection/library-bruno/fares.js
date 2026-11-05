@@ -22,6 +22,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   O6  a validity range; the travel day within the dates     FAIL / WARNING
  *   O7  every passenger in a fare of each offer               FAIL
  *   O8  each passenger's fares cover the section: gap and overlap FAIL, unknown coverage WARNING
+ *       (a searched trip whose trains do not call at the section's start or end: its own first or last
+ *       stop stands for it, WARNING; a walk of the trip needs no fare, #1045)
  *   O9  combination model of the YAML list                    WARNING
  *   O10 CLUSTERING: reference and allowed clusters listed     WARNING
  *   O11 CLUSTERING: none allowed more flexible                WARNING
@@ -39,7 +41,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *
  *   N   no fare, as the scenario expects                      FAIL
  *
- * A fare offer that passed every FAIL-level check is booked and confirmed
+ * The fare offer chosen is booked and confirmed when its own FAIL-level checks
+ * pass (run on it alone: another offer's failure stays a failed check only, #1045)
  * (#906, `fareBooking.js`: step 01 sets `__fareSale` and routes to 02);
  * with `bookMode` PRODUCT the sale goes on with a product offer instead.
  * Fare reservations (#255, `fareReservations.js`): a request asking
@@ -197,22 +200,69 @@ const among = (station, stations) => stations.some((s) => sameStopPlace(s, stati
  * How one passenger's fares cover the section: 'covered', 'gap', 'overlap'
  * (covered, with fares left over) or 'unknown' (a fare that does not say
  * what it covers). From the section's start, each step takes a fare starting
- * where the last one ended, one reaching the end first.
+ * where the last one ended, one reaching the end first. `trip` (#1045,
+ * `tripOfOffer()`) adds the stops standing for the section's start and end
+ * when the offer's trains do not call there, and the trip's walks: where no
+ * fare starts, a walk from there is taken (a walk needs no fare).
  */
-function coverageOfPassenger(fares, section, spanOf = coveredOf) {
+function coverageOfPassenger(fares, section, spanOf = coveredOf, trip = {}) {
   const spans = fares.map((fare) => spanOf(fare));
   if (spans.includes(null)) return 'unknown';
+  const ends = [section.end, ...list(trip.ends)];
+  const walks = list(trip.walks);
+  const reaches = (stations) => stations.some((s) => among(s, ends));
   const left = [...spans];
-  let at = section.start;
-  for (let steps = 0; steps <= spans.length; steps++) {
-    if (sameStopPlace(at, section.end)) return left.length ? 'overlap' : 'covered';
-    const from = left.filter((s) => among(at, s.start));
-    if (from.length === 0) return 'gap';
-    const next = from.find((s) => among(section.end, s.end)) || from[0];
+  let at = [section.start, ...list(trip.starts)];
+  for (let steps = 0; steps <= spans.length + walks.length; steps++) {
+    if (reaches(at)) return left.length ? 'overlap' : 'covered';
+    const from = left.filter((s) => at.some((station) => among(station, s.start)));
+    if (from.length === 0) {
+      const walk = walks.find((w) => among(w.start, at));
+      if (!walk) return 'gap';
+      at = [walk.end];
+      continue;
+    }
+    const next = from.find((s) => reaches(s.end)) || from[0];
     left.splice(left.indexOf(next), 1);
-    at = next.end[0];
+    at = [next.end[0]];
   }
   return 'gap';
+}
+
+/**
+ * #1045: what O8 reads of an offer's trip (its `tripCoverage.coveredTripId`
+ * among the answer's trips). Its walks (transfer legs between two stop
+ * places) need no fare. A search may start a trip at another stop place than
+ * the one asked (a real provider: a tram stop by the station): for a search
+ * (`search`), when the trip's trains do not call at the section's start (or
+ * end), their first (or last) stop stands for it. A trip specification or a
+ * trip chosen by id is the scenario's own: a section outside it stops the
+ * scenario before the answer is read (#904). {} when the trip is not in the
+ * answer or has no train.
+ */
+function tripOfOffer(offer, response, section, search = false) {
+  const id = offer?.tripCoverage?.coveredTripId;
+  const trip = id ? list(response?.trips).find((t) => t?.id === id) : null;
+  const legs = list(trip?.legs);
+  const trains = legs.filter((leg) => isObject(leg.timedLeg));
+  if (trains.length === 0) return {};
+  const stops = stationsOfLegs(trains);
+  const first = placeOf(trains[0].timedLeg.start);
+  const last = placeOf(trains.at(-1).timedLeg.end);
+  const walks = legs.filter((leg) => isObject(leg.transferLeg))
+    .map((leg) => ({ start: placeOf(leg.transferLeg.start), end: placeOf(leg.transferLeg.end) }))
+    .filter((w) => w.start && w.end && !sameStopPlace(w.start, w.end));
+  return {
+    starts: search && first && !among(section.start, stops) ? [first] : [],
+    ends: search && last && !among(section.end, stops) ? [last] : [],
+    walks,
+  };
+}
+
+// An offer whose trip stands in for the section's start or end, for O8's warning.
+function offTripText(trip, i) {
+  const moved = [...list(trip.starts).map((s) => `starts at ${s}`), ...list(trip.ends).map((s) => `ends at ${s}`)];
+  return moved.length ? `offers[${i}] (its trip ${moved.join(' and ')})` : null;
 }
 
 function sectionOf(request) {
@@ -231,9 +281,13 @@ function passengerChecks(response, request) {
   const gaps = [];
   const overlaps = [];
   const unknown = [];
+  const offTrip = [];
   list(response?.offers).forEach((offer, i) => {
     const fares = list(offer.fares);
     if (fares.length === 0) return;
+    const trip = section ? tripOfOffer(offer, response, section, isObject(request?.tripSearchCriteria)) : {};
+    const moved = offTripText(trip, i);
+    if (moved) offTrip.push(moved);
     // #255: a bicycle travels on its reservation, without a fare (its mode is V1's).
     const reserved = new Set(list(offer.reservationOfferParts).flatMap((r) => list(r.passengerRefs)).filter((ref) => bicycles.has(ref)));
     for (const ref of passengers) {
@@ -241,13 +295,13 @@ function passengerChecks(response, request) {
       if (own.length === 0 && reserved.has(ref)) continue;
       if (own.length === 0) { withoutFare.push(`passenger ${ref} in offers[${i}]`); continue; }
       if (!section) continue;
-      const how = coverageOfPassenger(own, section, (fare) => coveredOf(fare, offer));
+      const how = coverageOfPassenger(own, section, (fare) => coveredOf(fare, offer), trip);
       if (how === 'gap') gaps.push(`passenger ${ref} in offers[${i}]`);
       if (how === 'overlap') overlaps.push(`passenger ${ref} in offers[${i}]`);
       if (how === 'unknown') unknown.push(`passenger ${ref} in offers[${i}]`);
     }
   });
-  return { withoutFare, gaps, overlaps, unknown, section };
+  return { withoutFare, gaps, overlaps, unknown, offTrip, section };
 }
 
 // O9 to O11: the combination constraints.
@@ -355,6 +409,9 @@ function sectionChecks(pax) {
     check('O8', 'FAIL', 'Each passenger\'s fares do not overlap', pax.overlaps, 'fares covering a part of the section twice'),
     check('O8', 'WARNING', "Each fare says what it covers (coveredSection, else entry and exit connection points, its route's ends or its offer's covered sections)", pax.unknown,
       'the coverage of the section cannot be checked'),
+    // #1045: a search may start or end a trip at another stop place than the section's.
+    check('O8', 'WARNING', "Each offer's trip calls at the requested section's start and end", pax.offTrip,
+      `trips whose trains do not call at ${pax.section.start} or ${pax.section.end}; their fares are read from the trip's own first or last stop`),
   ];
 }
 
@@ -616,8 +673,10 @@ function checkFareOffers(body) {
     validationLogger('[INFO] [fares] The scenario books a product (bookMode PRODUCT): the sale goes on with the product offers.');
     return false;
   }
-  // #906: the fare offer chosen is booked, unless a FAIL-level check of it failed.
-  const decision = fareSaleDecision(checks, chosen);
+  // #906: the fare offer chosen is booked, unless a FAIL-level check of it
+  // failed: the checks run on it alone (#1045: another offer's failure does
+  // not stop the sale; it stays a failed check of the step).
+  const decision = fareSaleDecision(chosen ? chosenOfferChecks(body, request, chosen) : checks, chosen, checks);
   if (decision.book) bookFareOffer(chosen);
   validationLogger(`[INFO] [fares] ${decision.reason}`);
   return true;
@@ -662,18 +721,31 @@ function bookFareOffer(chosen) {
   }
 }
 
+// #1045: the checks of step 01 on the fare offer chosen alone, the answer's
+// trips kept: what decides its sale.
+function chosenOfferChecks(body, request, chosen) {
+  const alone = { ...body, offers: [chosen] };
+  return offerStepChecks(alone, request, fareReservations.unaskedReservationsCheck(alone, request));
+}
+
+const failedIds = (checks) => [...new Set(list(checks).filter((c) => c.level === 'FAIL' && !c.ok).map((c) => c.id))];
+
 /**
- * #906: whether the fare offer chosen is booked: there is one, and no check of
- * the offer step that OSDM states as a rule failed. Booking an offer whose
- * fares broke one would test nothing reliable.
+ * #906: whether the fare offer chosen is booked: there is one, and none of
+ * its checks that OSDM states as a rule failed (`checks`, run on it alone).
+ * Booking an offer whose fares broke one would test nothing reliable. #1045:
+ * the step's checks over every offer (`all`) are only named, when they failed
+ * on other offers.
  */
-function fareSaleDecision(checks, chosen) {
+function fareSaleDecision(checks, chosen, all = []) {
   if (!chosen) return { book: false, reason: 'No fare offer chosen: the scenario ends after the offer step.' };
-  const failed = list(checks).filter((c) => c.level === 'FAIL' && !c.ok).map((c) => c.id);
+  const failed = failedIds(checks);
   if (failed.length > 0) {
-    return { book: false, reason: `Fare offer ${chosen.offerId} is not booked: the offer step failed ${[...new Set(failed)].join(', ')}. The scenario ends here.` };
+    return { book: false, reason: `Fare offer ${chosen.offerId} is not booked: its fares failed ${failed.join(', ')}. The scenario ends here.` };
   }
-  return { book: true, reason: `Fare offer chosen: ${chosen.offerId} (${list(chosen.fares).length} fare(s)). It is booked next (#906).` };
+  const others = failedIds(all);
+  const besides = others.length ? ` The checks that failed (${others.join(', ')}) name other offers only.` : '';
+  return { book: true, reason: `Fare offer chosen: ${chosen.offerId} (${list(chosen.fares).length} fare(s)). It is booked next (#906).${besides}` };
 }
 
 /** #906: the scenario is booking a fare offer (step 01 decided it). */
@@ -706,6 +778,6 @@ function stopOnSectionsOutside() {
 
 module.exports = {
   CLUSTERS, COMBINATION_MODELS, missingFareMembers, fareSaleDecision, isFareSale, stopPlaceRefOf, fareFieldsOf, sectionsToSend, asksFares, asksFaresOnly, asksFareProducts, typesAsked, fareChecks, unaskedFaresCheck, fareOffersOf,
-  noFareChecks, chooseFareOffer, coverageOfPassenger, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip,
+  noFareChecks, chooseFareOffer, coverageOfPassenger, tripOfOffer, productOffersOf, checkFareOffers, tripStationsOf, sectionsOutsideTrip,
   prepareSectionCheck, stopOnSectionsOutside,
 };

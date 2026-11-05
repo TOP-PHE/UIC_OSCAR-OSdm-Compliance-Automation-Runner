@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-05-fare-search-other-stop",
+    "date": "November 5, 2026",
+    "tag": "Fixed",
+    "title": "A fare search no longer fails on a trip that starts at a nearby stop",
+    "summary": "When a search answer holds a trip starting at another stop place than the section asked, such as a tram stop by the station, OSCAR reads its fares from that stop and warns, and a defect of another offer no longer stops the sale of the offer chosen.",
+    "content": "A search for fares may return trips that start or end at another stop place than the requested section: a provider answered with a trip starting by tram from the tram stop in front of the station asked, then a walk and a train. OSCAR held the fares of that trip to the station asked and reported a gap in the section. It now reads the fares of such a trip from the trip's own first or last stop, with a warning naming those offers. A walk inside a trip needs no fare either. A gap on a train leg still fails.\n\nThe fare offer OSCAR books is now stopped only by its own failed checks. Before, a failed check on any offer of the answer stopped the sale, even when the offer chosen passed every check. A failure on another offer is still reported as a failed check of the offer step.\n\nNothing to change in your scenarios: run the fare scenarios by search again."
+  },
+  {
     "id": "2026-11-03-booking-without-fulfilments",
     "date": "November 3, 2026",
     "tag": "Improved",
