@@ -237,6 +237,24 @@ describe('test-resources — discover-timetable', () => {
     }
   });
 
+  // A redirect from the provider's server is answered, never followed: the
+  // search would otherwise go, with the token and headers, where it points.
+  test('discover-timetable asks fetch not to follow redirects', async () => {
+    const origFetch = global.fetch;
+    const seen = [];
+    global.fetch = async (_url, opts) => { seen.push(opts.redirect); return { ok: true, status: 200, text: async () => JSON.stringify({ trips: [] }) }; };
+    try {
+      const res = await request(app).post('/v1/company/test-resources/discover-timetable')
+        .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+        .send({ originURN: 'urn:uic:stn:8500010', destinationURN: 'urn:uic:stn:8503000', days: 1 });
+      expect(res.status).toBe(200);
+      expect(seen.length).toBeGreaterThan(0);
+      expect(seen.every(r => r === 'manual')).toBe(true);
+    } finally {
+      global.fetch = origFetch;
+    }
+  });
+
   // #1070: the W3C Trace Context OSDM declares on every operation, on
   // OSCAR's own calls too: each request a trace of its own.
   describe('#1070 — W3C trace context', () => {

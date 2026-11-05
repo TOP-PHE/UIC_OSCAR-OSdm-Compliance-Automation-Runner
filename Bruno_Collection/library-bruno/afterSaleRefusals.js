@@ -60,6 +60,7 @@ async function send(path, body) {
     const res = await new Promise((resolve, reject) => {
       bru.sendRequest({
         url: `${bru.getEnvVar('api_base')}${path}`,
+        maxRedirects: 0,
         method: 'POST',
         // #1070: the sale's W3C trace, a parent-id of its own.
         headers: require('./traceContext.js').withTrace({

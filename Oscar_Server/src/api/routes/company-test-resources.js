@@ -25,6 +25,7 @@ const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = requi
 const { resolveAccessToken } = require('../../worker/access-token');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const { mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
+const { usableUrlRefusal } = require('../../utils/urlPolicy');
 const { harvestTrips, harvestConnections, journeysFromConnections, calendarFromHarvest, harvestOfferCatalog, groupAndMerge, fitsOneTripDate, searchDates, classifyOfferProbe, summarizeOfferProbe, serviceFindings, servicesUnseen, dayOfWeekCode } = require('../../services/timetable-discovery');
 const { journeyPlan, probeDates, compareAnswer, probeSummary, collectOfferedTrips, tripToKeep } = require('../../services/journeyProbe');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
@@ -116,6 +117,8 @@ async function _postJson(apiBase, path, token, body, extraHeaders) {
         ...extraHeaders
       },
       body: JSON.stringify(body),
+      // A redirect is answered, never followed (see osdm-client.js).
+      redirect: 'manual',
       signal: controller.signal
     });
     let text = '';
@@ -251,6 +254,13 @@ async function _vendorSession(req, res, targetCompanyId) {
   const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company?.api_base) {
     res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
+    return null;
+  }
+  // S5 at the time of the call, as osdm-client.js does: the address stored was
+  // checked when saved, but what its name resolves to may have changed since.
+  const endpointRefusal = await usableUrlRefusal(company.api_base, 'OSDM endpoint');
+  if (endpointRefusal) {
+    res.status(400).json({ status: 400, title: 'Bad Request', detail: endpointRefusal });
     return null;
   }
   const userRow = credentialsFor(req.user.id, targetCompanyId);

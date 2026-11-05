@@ -123,3 +123,6 @@ runtime:
         validateSchema(coachComponent, coachItems, { endpoint }).forEach((c) => {
           bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
+
+settings:
+  followRedirects: false

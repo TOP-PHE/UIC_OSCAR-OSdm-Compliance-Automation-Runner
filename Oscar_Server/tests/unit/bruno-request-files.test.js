@@ -93,6 +93,16 @@ describe('Bruno request files (#613 F1)', () => {
 // list, so a query parameter declared there never reaches the provider
 // (checked with the real CLI on a local listener). The seat map went without
 // its four required parameters for that reason.
+// A redirect is answered, never followed: Bruno would otherwise send the
+// request, with its headers, to the address the provider's server names.
+// Checked with the real CLI: followRedirects false stops at the 302.
+describe('no request file follows a redirect', () => {
+  test.each(FILES)('%s: settings.followRedirects is false', (file) => {
+    const doc = yaml.load(fs.readFileSync(path.join(COLLECTION, file), 'utf8'));
+    expect(doc.settings && doc.settings.followRedirects).toBe(false);
+  });
+});
+
 describe('#648: query parameters are written in the URL', () => {
   test.each(FILES)('%s: no params list', (file) => {
     const doc = yaml.load(fs.readFileSync(path.join(COLLECTION, file), 'utf8'));

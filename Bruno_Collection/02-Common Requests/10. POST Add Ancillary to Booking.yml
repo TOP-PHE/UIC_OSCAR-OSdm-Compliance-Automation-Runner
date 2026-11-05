@@ -216,5 +216,5 @@ runtime:
 settings:
   encodeUrl: true
   timeout: 0
-  followRedirects: true
+  followRedirects: false
   maxRedirects: 5

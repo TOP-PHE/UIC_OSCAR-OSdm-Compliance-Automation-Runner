@@ -29,7 +29,7 @@ runtime:
 settings:
   encodeUrl: true
   timeout: 0
-  followRedirects: true
+  followRedirects: false
   maxRedirects: 5
 
 docs: This endpoint is used to obtain an access token required for authorization when interacting with other API endpoints. The request includes client credentials and authentication parameters.

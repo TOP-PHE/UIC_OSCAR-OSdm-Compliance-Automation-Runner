@@ -228,7 +228,7 @@ async function renewStandaloneToken(callerLabel) {
   try {
     const resp = await new Promise(function (resolve, reject) {
       bru.sendRequest(
-        { url: url, method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: form },
+        { url: url, method: 'POST', maxRedirects: 0, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: form },
         function (err, r) { if (err && !err.response) reject(err); else resolve(r || err.response); }
       );
     });
@@ -268,7 +268,7 @@ async function refreshAccessTokenIfNeeded(opts) {
   try {
     const resp = await new Promise(function (resolve, reject) {
       bru.sendRequest(
-        { url: url, method: 'POST', proxy: false, headers: headers },
+        { url: url, method: 'POST', proxy: false, maxRedirects: 0, headers: headers },
         function (err, r) { if (err) reject(err); else resolve(r); }
       );
     });
