@@ -25,11 +25,11 @@ async function faulty(token, method, url, body, codes) {
   const headers = { Authorization: `Bearer ${token}` };
   if (codes !== undefined) headers['X-Simulator-Faults'] = codes;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  const res = await fetch(sim.base + url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await fetch(sim.base + url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), redirect: 'manual' });
   const text = await res.text();
   let json;
   try { json = JSON.parse(text); } catch { json = undefined; }
-  return { status: res.status, type: res.headers.get('content-type'), text, body: json };
+  return { status: res.status, type: res.headers.get('content-type'), location: res.headers.get('location'), text, body: json };
 }
 
 async function sale(passengers = 1) {
@@ -120,6 +120,26 @@ test('an HTML page instead of the booking', async () => {
   assert.equal(res.status, 200);
   assert.ok(res.type.startsWith('text/html'));
   assert.ok(res.text.includes('Request Rejected'));
+});
+
+test('attack faults: template text in a booking id, markup in a trip summary, a redirect to a loopback address', async () => {
+  const { token, offer, request } = await sale();
+  const open = '{' + '{';
+  const booked = await faulty(token, 'POST', '/gamma/bookings', bookingRequest(offer), 'attack.template-in-answer');
+  assert.equal(booked.status, 200);
+  assert.ok(booked.body.booking.id.includes(`${open}process.env.`));
+  const stored = (await call(sim.base, token, 'GET', `/gamma/bookings/${booked.body.booking.id.split('-' + open)[0]}`)).body.booking;
+  assert.ok(!JSON.stringify(stored).includes(open));
+  const offers = await faulty(token, 'POST', '/gamma/offers', request, 'attack.script-in-answer');
+  assert.equal(offers.status, 200);
+  assert.ok(offers.body.trips.length > 0 && offers.body.trips.every((t) => t.summary.includes('onerror=') && t.summary.includes('<script>')));
+  const clean = await call(sim.base, token, 'POST', '/gamma/offers', request);
+  assert.ok(clean.body.trips.every((t) => !t.summary.includes('<')));
+  const redirected = await faulty(token, 'GET', `/gamma/bookings/${stored.id}`, undefined, 'attack.redirect-internal');
+  assert.equal(redirected.status, 302);
+  assert.equal(redirected.location, 'http://127.0.0.1:3001/data/x-datafile.json');
+  // Only the booking read: the offers keep their answer.
+  assert.equal((await faulty(token, 'POST', '/gamma/offers', request, 'attack.redirect-internal')).status, 200);
 });
 
 test('error faults: a refusal without its problem code, or as a server error; success answers keep theirs', async () => {
