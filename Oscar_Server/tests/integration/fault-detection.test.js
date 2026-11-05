@@ -32,6 +32,7 @@ const companyId = uuidv4();
 const otherId = uuidv4();
 const tmId = uuidv4();
 const testerId = uuidv4();
+const otherTmId = uuidv4(); // a Test Manager of the other company
 const URL_ = '/v1/company/ai-analysis/fault-detection';
 // at-rest writes only under data/artifacts or data/datafiles.
 const ARTIFACTS = path.resolve(__dirname, '..', '..', 'data', 'artifacts');
@@ -63,6 +64,7 @@ beforeAll(() => {
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'FD Other', 'fd-other')`, [otherId]);
   run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tm@fd.com', 'x', 'test_manager')`, [tmId, companyId]);
   run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tester@fd.com', 'x', 'company_user')`, [testerId, companyId]);
+  run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tm@fd-other.com', 'x', 'test_manager')`, [otherTmId, otherId]);
   const file = path.join(dir, 'fd-datafile.json');
   encryptToFile(JSON.stringify({ scenarios: [
     { code: 'SIM_FAULT_OFFER_PRICE_BELOW_PARTS_38', simulatorFaults: ['offer.price-below-parts'] },
@@ -114,5 +116,5 @@ test('an analysis of another batch, an unknown one, another company\'s batch: re
   expect((await request(app).get(`${URL_}?batch=b1&analysis=nope`).set('Authorization', tm())).status).toBe(404);
   expect((await request(app).get(`${URL_}?batch=nope`).set('Authorization', tm())).status).toBe(404);
   expect((await request(app).get(URL_).set('Authorization', tm())).status).toBe(404);
-  expect((await request(app).get(`${URL_}?batch=b1`).set('Authorization', token('test_manager', uuidv4(), otherId))).status).toBe(404);
+  expect((await request(app).get(`${URL_}?batch=b1`).set('Authorization', token('test_manager', otherTmId, otherId))).status).toBe(404);
 });

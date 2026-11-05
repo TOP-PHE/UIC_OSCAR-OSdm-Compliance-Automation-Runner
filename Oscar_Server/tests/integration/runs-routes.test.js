@@ -48,6 +48,7 @@ const app = buildAppWithRoute('/v1/runs', '../../src/api/routes/runs');
 const companyId = uuidv4();
 const userId    = uuidv4();
 const adminId   = uuidv4();
+const certId    = uuidv4();   // a stored certifier: a token stands for a real user (sessionUser)
 let runId;
 
 function makeToken(role, uid = userId, cid = companyId) {
@@ -70,6 +71,11 @@ beforeAll(() => {
     `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
      VALUES (?, ?, 'admin@test.com', 'x', 'administrator')`,
     [adminId, companyId]
+  );
+  run(
+    `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+     VALUES (?, ?, 'certifier@test.com', 'x', 'certification_user')`,
+    [certId, companyId]
   );
   runId = uuidv4();
   run(
@@ -123,7 +129,7 @@ describe('DELETE /v1/runs/:id', () => {
   });
 
   test('certification_user cannot delete (403)', async () => {
-    const token = makeToken('certification_user', uuidv4(), companyId);
+    const token = makeToken('certification_user', certId, companyId);
     const res = await request(app)
       .delete(`/v1/runs/${deletableRunId}`)
       .set('Authorization', `Bearer ${token}`);

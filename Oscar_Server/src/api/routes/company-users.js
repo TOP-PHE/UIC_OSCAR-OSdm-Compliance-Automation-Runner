@@ -38,7 +38,7 @@ const bcrypt    = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction } = require('../../db/db');
-const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
+const { requireAuth, requireRole, normalizeRole, END_SESSIONS_SQL } = require('../middleware/auth');
 const { auditLog } = require('../helpers/shared');
 const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
@@ -241,6 +241,7 @@ router.patch('/:id',
 
       updates.push('role = ?');
       values.push(resolvedRole);
+      updates.push(END_SESSIONS_SQL);
     }
 
     if (updates.length === 0) {
@@ -312,7 +313,7 @@ router.post('/:id/reset-password', async (req, res) => {
   }
 
   const hash = await bcrypt.hash(new_password, SALT_ROUNDS);
-  run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, userId]);
+  run(`UPDATE users SET password_hash = ?, ${END_SESSIONS_SQL} WHERE id = ?`, [hash, userId]);
   auditLog(req.user.id, companyId, req.user.email, `company_password_reset:${target.email}`);
 
   return res.json({ id: userId, email: target.email, password_reset: true });

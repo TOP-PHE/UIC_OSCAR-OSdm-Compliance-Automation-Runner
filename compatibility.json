@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.492",
+  "current_release": "2026.493",
   "releases": [
     {
       "release": "2026.492",
@@ -12,6 +12,17 @@
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Server 1.11.454, collection OTST_V2.0.247: no request to a provider follows a redirect. The server's own calls (token request, stop places, timetable discovery and journey probes) ask for none; a token endpoint answering one fails with a plain reason. Every request file of the collection sets followRedirects false and every request a step's script sends asks maxRedirects 0. Timetable discovery checks the endpoint's address at the time of the call, as the other calls already did."
+      ]
+    },
+    {
+      "release": "2026.493",
+      "date": "2026-11-05",
+      "server": "1.11.455",
+      "collection": "OTST_V2.0.247",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.455: a session follows the user as stored. Each request reads the user again; a user who is deleted or no longer active, whose role or company differs from the session's, or whose password or role changed after the session was signed, must sign in again."
       ]
     },
     {

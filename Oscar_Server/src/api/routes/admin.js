@@ -27,7 +27,7 @@ const bcrypt  = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction, getConfig } = require('../../db/db');
-const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
+const { requireAuth, requireRole, normalizeRole, END_SESSIONS_SQL } = require('../middleware/auth');
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
 const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
@@ -258,6 +258,7 @@ router.patch('/users/:id',
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No update fields provided.' });
   }
 
+  if (updates.some(u => u.startsWith('role') || u.startsWith('company_id'))) updates.push(END_SESSIONS_SQL);
   values.push(userId);
   // #540: grants and credentials follow a change of company or role.
   transaction(() => {
@@ -317,7 +318,7 @@ router.post('/users/:id/reset-password', async (req, res) => {
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
 
   const hash = await bcrypt.hash(new_password, SALT_ROUNDS);
-  run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, userId]);
+  run(`UPDATE users SET password_hash = ?, ${END_SESSIONS_SQL} WHERE id = ?`, [hash, userId]);
   auditLog(req.user.id, null, req.user.email, `password_reset:${user.email}`);
 
   return res.json({ id: userId, email: user.email, password_reset: true });

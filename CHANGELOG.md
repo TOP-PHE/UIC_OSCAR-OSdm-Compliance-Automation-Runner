@@ -105,6 +105,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.455] — 2026-11-05
+
+Release 2026.493. A session follows the user as stored.
+
+### Security
+- **Each request reads the user again** (`sessionUser()`, `middleware/auth.js`, used by `requireAuth` and `userFromRequest`). A session token used to carry the user's role and company until it expired (8 hours); now the stored user decides. A user who is deleted or not active, whose role or company is not the session's, or whose `sessions_valid_after` is later than the session's signing time gets 401 and signs in again. E-mail, role and company of `req.user` come from the stored row.
+- **A password, role or company change ends the sessions signed before it**: `users.sessions_valid_after` (migration 46) is set by the three password writers (Test Manager and administrator reset, password reset by e-mail) and by a change of role (Test Manager or administrator) or company (administrator). A session signed after the change works.
+
+### Checked
+- `session-recheck.test.js`: a demoted Test Manager's older session cannot reset another Test Manager's password; a deleted user's cannot create a user; a password reset, a move to another company, a pending status and a role the user does not hold each give 401; a session signed before a demotion stays refused after a new promotion. With the token read alone, eight of its tests fail.
+- Older tests signed sessions for users their database did not hold; their fixtures now hold them.
+
+---
+
 ## [server-1.11.454] / [collection-OTST_V2.0.247] — 2026-11-05
 
 Release 2026.492. No request to a provider follows a redirect: neither the server's own calls nor a run's.

@@ -29,6 +29,8 @@ const app = buildAppWithRoute('/v1/runs', '../../src/api/routes/runs');
 
 const companyId = uuidv4();
 const tmId      = uuidv4();
+const otherCompanyId = uuidv4(); // another company, with a Test Manager of its own
+const otherTmId = uuidv4();
 const batchId   = uuidv4();
 const runA      = uuidv4();
 const runB      = uuidv4();
@@ -63,6 +65,9 @@ beforeAll(() => {
   run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'BZ Co', 'bz-co')`, [companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
        VALUES (?, ?, 'tm@bz.com', 'x', 'test_manager')`, [tmId, companyId]);
+  run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'BZ Other', 'bz-other')`, [otherCompanyId]);
+  run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+       VALUES (?, ?, 'tm@bz-other.com', 'x', 'test_manager')`, [otherTmId, otherCompanyId]);
   run(`INSERT INTO runs (id, company_id, user_id, status, env_name_used, batch_id, scenario_code, started_at)
        VALUES (?, ?, ?, 'COMPLETED', 'OTST_bz-sandbox_Env', ?, 'SALE_SEARCH_A', '2026-05-24 09:00:00')`,
     [runA, companyId, tmId, batchId]);
@@ -88,7 +93,7 @@ describe('GET /v1/runs/batch/:batchId/reports.zip', () => {
 
   test('404 when the batch belongs to a different company (scoping)', async () => {
     const res = await request(app).get(`/v1/runs/batch/${batchId}/reports.zip`)
-      .set('Authorization', `Bearer ${token('test_manager', uuidv4(), uuidv4())}`);
+      .set('Authorization', `Bearer ${token('test_manager', otherTmId, otherCompanyId)}`);
     expect(res.status).toBe(404);
   });
 
@@ -121,5 +126,7 @@ afterAll(() => {
   safe('DELETE FROM runs WHERE batch_id = ?', [batchId]);
   safe('DELETE FROM users WHERE company_id = ?', [companyId]);
   safe('DELETE FROM companies WHERE id = ?', [companyId]);
+  safe('DELETE FROM users WHERE company_id = ?', [otherCompanyId]);
+  safe('DELETE FROM companies WHERE id = ?', [otherCompanyId]);
   dirsToClean.forEach(d => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) { /* ignore */ } });
 });

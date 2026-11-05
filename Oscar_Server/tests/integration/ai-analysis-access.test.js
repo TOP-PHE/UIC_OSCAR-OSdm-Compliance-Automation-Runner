@@ -35,6 +35,7 @@ const foreignProviderId = uuidv4();
 const tmId = uuidv4();
 const tm2Id = uuidv4();
 const testerId = uuidv4();
+const certifierId = uuidv4(); // a real certifier: a token stands for a stored user
 const adminId = uuidv4();
 const ACCESS = '/v1/company/ai-analysis/access';
 const REQUESTS = '/v1/admin/ai-access-requests';
@@ -57,14 +58,14 @@ beforeAll(() => {
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'AI Platform', 'ai-platform')`, [otherCompanyId]);
   run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'AI Foreign', 'ai-foreign', ?)`, [foreignProviderId, otherCompanyId]);
   for (const [id, cid, role] of [[tmId, companyId, 'test_manager'], [tm2Id, companyId, 'test_manager'],
-    [testerId, companyId, 'company_user'], [adminId, otherCompanyId, 'administrator']]) {
+    [testerId, companyId, 'company_user'], [certifierId, companyId, 'certification_user'], [adminId, otherCompanyId, 'administrator']]) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [id, cid, `${id}@ai-test.com`, role]);
   }
 });
 
 describe('#801 who may use the AI analysis page', () => {
   test('a tester and a certifier are refused', async () => {
-    for (const t of [token('company_user', testerId), token('certification_user', uuidv4())]) {
+    for (const t of [token('company_user', testerId), token('certification_user', certifierId)]) {
       expect((await request(app).get(ACCESS).set('Authorization', t)).status).toBe(403);
       expect((await request(app).post(`${ACCESS}/request`).set('Authorization', t).send(accepted())).status).toBe(403);
     }

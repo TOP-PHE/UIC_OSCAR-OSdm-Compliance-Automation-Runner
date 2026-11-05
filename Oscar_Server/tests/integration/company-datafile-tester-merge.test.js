@@ -205,11 +205,11 @@ describe('PUT /v1/company/datafile/json by a tester', () => {
     expect(byCode(after, 'SHARED_1_2').created_by).toBe(ANA.email);
   });
 
-  test('a tester whose account was deleted mid-session is refused before anything is written', async () => {
+  test('a tester whose account was deleted mid-session is refused (401, session no longer valid) before anything is written', async () => {
     const ghost = { id: crypto.randomUUID(), email: `ghost-${companyId.slice(0, 6)}@merge.test`, role: 'company_user' };
     const bytes = fs.readFileSync(LIVE_PATH);
     const res = await putAs(ghost, (await getAs(ANA)).body);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     expect(fs.readFileSync(LIVE_PATH).equals(bytes)).toBe(true);
   });
 

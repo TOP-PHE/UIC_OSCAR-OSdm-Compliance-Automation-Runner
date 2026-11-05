@@ -16,6 +16,11 @@
  *   2. Authorization: Bearer <token> header (API clients, backward-compat)
  *
  * Revoked tokens (jti in token_blacklist) are rejected with 401.
+ *
+ * A token is a claim, not the truth: each request reads the user again
+ * (sessionUser). A user who is gone, not active, or whose role or company is
+ * no longer the token's gets 401, and so does a token signed before the
+ * user's sessions_valid_after (a password or role change ends older sessions).
  */
 
 const jwt = require('jsonwebtoken');
@@ -63,6 +68,28 @@ function parseCookies(cookieHeader) {
   return out;
 }
 
+const SESSION_ROW_SQL =
+  'SELECT id, email, role, company_id, status, sessions_valid_after FROM users WHERE id = ?';
+
+/**
+ * The user a verified token stands for, read from the database now, or null
+ * when the token no longer matches them. Never throws on a well-formed payload.
+ */
+function sessionUser(payload) {
+  if (!payload || typeof payload.sub !== 'string') return null;
+  const row = get(SESSION_ROW_SQL, [payload.sub]);
+  if (!row || row.status !== 'active') return null;
+  const role = normalizeRole(row.role);
+  if (role !== normalizeRole(payload.role)) return null;
+  if (row.company_id !== payload.companyId) return null;
+  const validAfter = Number(row.sessions_valid_after) || 0;
+  if (validAfter && !(Number(payload.iat) >= validAfter)) return null;
+  return { id: row.id, email: row.email, companyId: row.company_id, role };
+}
+
+/** SQL fragment that ends every session signed before now (seconds, as JWT iat). */
+const END_SESSIONS_SQL = "sessions_valid_after = CAST(strftime('%s','now') AS INTEGER)";
+
 function requireAuth(req, res, next) {
   // 1. Try httpOnly cookie
   const cookies     = parseCookies(req.headers.cookie);
@@ -94,13 +121,11 @@ function requireAuth(req, res, next) {
       }
     }
 
-    const normalizedRole = normalizeRole(payload.role);
-    req.user = {
-      id:        payload.sub,
-      email:     payload.email,
-      companyId: payload.companyId,
-      role:      normalizedRole
-    };
+    const user = sessionUser(payload);
+    if (!user) {
+      return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Session no longer valid. Please sign in again.' });
+    }
+    req.user = user;
     next();
   } catch {
     // Fail closed: a bad signature, an expired token or a failed blacklist
@@ -159,16 +184,11 @@ function userFromRequest(req) {
       const revoked = get('SELECT jti FROM token_blacklist WHERE jti = ?', [payload.jti]);
       if (revoked) return null;
     }
-    return {
-      id:        payload.sub,
-      email:     payload.email,
-      companyId: payload.companyId,
-      role:      normalizeRole(payload.role),
-    };
+    return sessionUser(payload);
   } catch {
     // Fail closed, like requireAuth: a token that cannot be verified is no user.
     return null;
   }
 }
 
-module.exports = { requireAuth, requireRole, requireNotRole, normalizeRole, isPlatformRole, isTestManagerOrAbove, userFromRequest };
+module.exports = { END_SESSIONS_SQL, sessionUser, requireAuth, requireRole, requireNotRole, normalizeRole, isPlatformRole, isTestManagerOrAbove, userFromRequest };

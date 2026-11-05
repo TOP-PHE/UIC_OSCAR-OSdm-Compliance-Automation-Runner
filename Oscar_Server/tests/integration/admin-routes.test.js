@@ -48,8 +48,10 @@ const app = buildAppWithRoute('/v1/admin', '../../src/api/routes/admin');
 const adminId   = uuidv4();
 const companyId = uuidv4();
 let regularUserId;
+// A token stands for a real user of its role (sessionUser): one row per role.
+const roleUserIds = { administrator: adminId, company_user: uuidv4(), certification_user: uuidv4(), test_manager: uuidv4() };
 
-function makeToken(role, uid = adminId) {
+function makeToken(role, uid = roleUserIds[role]) {
   return jwt.sign(
     { sub: uid, email: `${role}@admin-test.com`, companyId, role },
     process.env.JWT_SECRET,
@@ -64,6 +66,13 @@ beforeAll(() => {
      VALUES (?, ?, 'admin@admin-test.com', '$2b$12$fakehash', 'administrator')`,
     [adminId, companyId]
   );
+  for (const role of ['company_user', 'certification_user', 'test_manager']) {
+    run(
+      `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+       VALUES (?, ?, ?, '$2b$12$fakehash', ?)`,
+      [roleUserIds[role], companyId, `${role}@admin-test.com`, role]
+    );
+  }
 });
 
 afterAll(() => {

@@ -63,7 +63,7 @@ const OTHER_PATH    = path.join(DATAFILES_DIR, `${otherSlug}-datafile.json`);
 
 function makeToken(role, uid, cid = companyId) {
   return jwt.sign(
-    { sub: uid, email: `${role}@datafile-authz.test`, companyId: cid, role },
+    { sub: uid, email: `${role}-${companyId.slice(0, 8)}@datafile-authz.test`, companyId: cid, role },
     process.env.JWT_SECRET,
     { algorithm: 'HS256', expiresIn: '1h' }
   );
@@ -76,7 +76,7 @@ const HOSTILE  = asValidDatafile({ scenarios: [{ code: 'OTST_HOSTILE_OVERWRITE' 
 // What the editor sends for a tester's own new scenario: it always stamps their
 // email. Since v1.11.197 a tester's save is merged, not a whole-file replace, and
 // a scenario that does not carry their ownership is not stored as theirs.
-const TESTER_OWN = { scenarios: [{ code: 'OTST_HOSTILE_OVERWRITE', created_by: 'company_user@datafile-authz.test', shared: false }], scenariosToRun: ['OTST_HOSTILE_OVERWRITE'] };
+const TESTER_OWN = { scenarios: [{ code: 'OTST_HOSTILE_OVERWRITE', created_by: `company_user-${companyId.slice(0, 8)}@datafile-authz.test`, shared: false }], scenariosToRun: ['OTST_HOSTILE_OVERWRITE'] };
 const hostileFile = Buffer.from(JSON.stringify(HOSTILE), 'utf8');
 
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
@@ -86,9 +86,13 @@ beforeAll(() => {
   fs.mkdirSync(DATAFILES_DIR, { recursive: true });
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'Datafile Authz Test', ?)`, [companyId, slug]);
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'Datafile Authz Other', ?)`, [otherCoId, otherSlug]);
-  for (const [id, role] of [[testMgrId, 'test_manager'], [testerId, 'company_user']]) {
+  run(`INSERT INTO companies (id, name, slug) VALUES (?, 'Datafile Authz Platform', ?)`, [platformCo, `datafile-authz-platform-${platformCo.slice(0, 8)}`]);
+  // Every token stands for a stored user of the same role and company (sessionUser),
+  // whose e-mail is the token's: a tester's save stamps it as created_by.
+  for (const [id, cid, role] of [[testMgrId, companyId, 'test_manager'], [testerId, companyId, 'company_user'],
+    [adminId, platformCo, 'administrator'], [certId, platformCo, 'certification_user']]) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`,
-      [id, companyId, `${role}-${id}@datafile-authz.test`, role]);
+      [id, cid, `${role}-${companyId.slice(0, 8)}@datafile-authz.test`, role]);
   }
 });
 
@@ -125,8 +129,8 @@ afterAll(() => {
   }
   const safe = (sql, p) => { try { run(sql, p); } catch (_) { /* ignore */ } };
   safe('DELETE FROM auth_events WHERE company_id IN (?, ?)', [companyId, otherCoId]);
-  safe('DELETE FROM companies WHERE id IN (?, ?)', [companyId, otherCoId]);   // before users: runs.user_id does not cascade
-  safe('DELETE FROM users WHERE company_id = ?', [companyId]);
+  safe('DELETE FROM companies WHERE id IN (?, ?, ?)', [companyId, otherCoId, platformCo]);   // before users: runs.user_id does not cascade
+  safe('DELETE FROM users WHERE company_id IN (?, ?)', [companyId, platformCo]);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

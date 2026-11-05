@@ -45,6 +45,7 @@ const otherId = uuidv4();
 const tmId = uuidv4();
 const otherTmId = uuidv4();
 const testerId = uuidv4();
+const certifierId = uuidv4(); // a real certifier: a token stands for a stored user
 const BASE = '/v1/company/checklists';
 const sheet = name => fs.readFileSync(require('../../src/utils/checklistFiles').checklistFile(
   path.join(__dirname, '..', '..', '..', 'Documentation', 'Server_Operations', 'Simulator checklists'), `Simulator-${name}`));
@@ -69,14 +70,14 @@ beforeAll(() => {
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'CL CFG', 'cl-cfg')`, [companyId]);
   run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'CL CFG Provider', 'cl-cfg-provider', ?)`, [providerId, companyId]);
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'CL CFG Other', 'cl-cfg-other')`, [otherId]);
-  for (const [id, cid, role] of [[tmId, companyId, 'test_manager'], [testerId, companyId, 'company_user'], [otherTmId, otherId, 'test_manager']]) {
+  for (const [id, cid, role] of [[tmId, companyId, 'test_manager'], [testerId, companyId, 'company_user'], [certifierId, companyId, 'certification_user'], [otherTmId, otherId, 'test_manager']]) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [id, cid, `${id}@cl-cfg.com`, role]);
   }
 });
 
 describe('#862 who may import', () => {
   test('testers and certifiers are refused before the file is read; another company\'s provider is not found', async () => {
-    for (const t of [token('company_user', testerId), token('certification_user', uuidv4())]) {
+    for (const t of [token('company_user', testerId), token('certification_user', certifierId)]) {
       expect((await upload(ALPHA, { auth: t, provider: '' })).status).toBe(403);
       expect((await request(app).get(BASE).set('Authorization', t)).status).toBe(403);
     }
@@ -217,7 +218,7 @@ describe('#862 PR 2 the reference scenarios come with the checklist', () => {
   const p2 = uuidv4();
   const p3 = uuidv4();
   const p4 = uuidv4();
-  const email = `test_manager-${tmId.slice(0, 4)}@cl-cfg.com`;
+  const email = `${tmId}@cl-cfg.com`; // the stored user's e-mail: req.user is read from the users row
   beforeAll(() => {
     for (const [id, slug] of [[p2, 'cl-cfg-p2'], [p3, 'cl-cfg-p3'], [p4, 'cl-cfg-p4']]) {
       run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, ?, ?, ?)`, [id, slug, slug, companyId]);
