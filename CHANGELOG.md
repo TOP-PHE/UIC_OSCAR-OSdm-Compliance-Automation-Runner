@@ -115,7 +115,8 @@ Release 2026.493. A session follows the user as stored.
 
 ### Checked
 - `session-recheck.test.js`: a demoted Test Manager's older session cannot reset another Test Manager's password; a deleted user's cannot create a user; a password reset, a move to another company, a pending status and a role the user does not hold each give 401; a session signed before a demotion stays refused after a new promotion. With the token read alone, eight of its tests fail.
-- Older tests signed sessions for users their database did not hold; their fixtures now hold them.
+- Older tests signed sessions for users their database did not hold; their fixtures now hold them. Four tests that used a deleted or changed user now expect 401. `auth-middleware.test.js` checks each refusal on its own.
+- `npm run lint`, full `npx jest`: 260 suites, 5,449 tests.
 
 ---
 
