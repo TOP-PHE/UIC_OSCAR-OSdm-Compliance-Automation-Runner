@@ -973,7 +973,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   endpoint, the company's cached tokens dropped, an audit line, an e-mail to
   the administrators. Simulator faults `attack.*` and their `SIM_FAULT_ATTACK_*`
   scenarios prove it end to end.
-- **Credentials go to the endpoint they were saved for** (1.11.461).
+- **Credentials go to the endpoint they were saved for** (1.11.462).
   `tester_credentials.credentials_endpoint` (migration 48) is the endpoint's
   origin at the save; `credentialsEndpointProblem()`
   (`utils/credentialEndpoint.js`) makes `resolveAccessToken()` refuse when the
@@ -2399,6 +2399,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   when the booking lists none: parts checked, their state not. **A replay's
   simulator must be the one just started**: an old one still on the port
   (`EADDRINUSE` in its log) answered the first recording of this change.
+  **A searched trip may start at another stop place** (1.11.461 /
+  OTST_V2.0.251, from a real provider's search: one trip started by tram
+  from the tram stop by the station asked, then a walk and a train, and O8
+  read its fares as a gap). `tripOfOffer()` (`fares.js`) finds an offer's
+  trip by `coveredTripId`: its transfer legs are walks, which need no fare
+  (`coverageOfPassenger()` takes one where no fare starts); for a request by
+  search criteria only, its trains' first (or last) stop stands for the
+  section's start (or end) when they do not call there, and one O8 WARNING
+  names those offers (a log line, so no check count moved). A trip
+  specification or trip id is the scenario's own (#904 stops it first).
+  **The sale is decided on the chosen offer alone** (`chosenOfferChecks()`:
+  the step's checks re-run on `{ ...body, offers: [chosen] }`): a failure of
+  another offer stays a failed check of 01 and no longer stops the sale;
+  `fareSaleDecision(checks, chosen, all)` names it in its INFO line.
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,
