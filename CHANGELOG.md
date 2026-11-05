@@ -105,6 +105,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.459] — 2026-11-05
+
+Release 2026.497. Small security points.
+
+### Security
+- **`/metrics` answers on that exact path only** (`server.js`): Express matches routes without case and with a trailing slash, and nginx refused the exact `/metrics` only, so `/METRICS` or `/metrics/` reached the text. The nginx example and snippet now refuse `~* ^/metrics(/|$)`.
+- **A login with an unknown e-mail takes as long as a wrong password** (`auth.js`): it compares a hash of no one's password, so the time of the answer does not tell whether the address has an account.
+- **The login audit records `req.ip`**, the address the trusted proxy saw, not the leftmost `X-Forwarded-For` entry, which the client writes.
+- **A tester cancels their own runs only** (`DELETE /v1/runs/{id}/cancel`; 403 otherwise); a Test Manager or administrator any of the company's. A single or bulk delete checks the owner before it cancels a stale run.
+- **A certifier naming a company (`?company_id=`) lists only comparisons of two runs shared with certifiers** (`GET /v1/reports/comparisons`), as without it.
+- **In production, an administrator's reset link is built from `APP_URL` only** (503 without it, no token issued), never from the Host header. `APP_URL` is in `OSCAR_Deploy/.env.example`.
+- `compatibility.json`: the entries of 2026.493 to 2026.496 back in the file's newest-first order.
+- `sessionUser()`: the two Sonar notes of 1.11.455 (an optional chain; the "not at or after" kept, with its reason: a token without a numeric `iat` is refused).
+
+### Checked
+- `server.test.js`: `/METRICS`, `/Metrics`, `/metrics/` are 404. `runs-routes.test.js`: a tester's cancel of a colleague's run is 403 and the run stays queued; the Test Manager's works; a tester's delete of a colleague's stale run cancels nothing. `reports-routes.test.js`: the certifier's list holds the comparison only once both runs are shared (fails with the filter removed). `admin-routes.test.js`: 503 in production without `APP_URL`, with a forged Host, and no token is stored.
+- `npm run lint`, full `npx jest`: 263 suites, 5,499 tests.
+
+---
+
 ## [server-1.11.458] / [collection-OTST_V2.0.249] — 2026-11-05
 
 Release 2026.496. A run's secret works from the run only, and an answer holding a template ends the run.
