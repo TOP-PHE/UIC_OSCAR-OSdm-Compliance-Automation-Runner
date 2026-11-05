@@ -1,17 +1,28 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.501",
+  "current_release": "2026.502",
   "releases": [
     {
-      "release": "2026.501",
+      "release": "2026.502",
       "date": "2026-11-05",
-      "server": "1.11.463",
+      "server": "1.11.464",
       "collection": "OTST_V2.0.252",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.463, collection OTST_V2.0.252 (simulator 0.64.0): a simulator scenario for a fare search answered with a trip from a nearby stop (#1045), as a real provider answered it. Gamma's variant nearbyStopTrip (station 0000066) adds a trip by tram from a stop by the station asked, a walk and a train, whose fares start at the tram stop. SIM_FARE_NEARBY_STOP_SRCH_1ADT_38 and its version copies: no failed check, one O8 WARNING, the fare offer of the direct trip booked and confirmed. The server change is the welcome-page news entry."
+        "Server 1.11.464, collection OTST_V2.0.252 (simulator 0.64.0): a simulator scenario for a fare search answered with a trip from a nearby stop (#1045), as a real provider answered it. Gamma's variant nearbyStopTrip (station 0000066) adds a trip by tram from a stop by the station asked, a walk and a train, whose fares start at the tram stop. SIM_FARE_NEARBY_STOP_SRCH_1ADT_38 and its version copies: no failed check, one O8 WARNING, the fare offer of the direct trip booked and confirmed. The server change is the welcome-page news entry."
+      ]
+    },
+    {
+      "release": "2026.501",
+      "date": "2026-11-05",
+      "server": "1.11.463",
+      "collection": "OTST_V2.0.251",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.463: an administrator manages companies, not their tests. It starts no run on a company and neither reads nor changes its endpoint or dedicated headers; its company list names no endpoint. Deleting a company removes every row and data file it held, and the deletion stays in the audit log."
       ]
     },
     {

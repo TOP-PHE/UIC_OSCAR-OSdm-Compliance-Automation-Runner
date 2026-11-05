@@ -194,17 +194,17 @@ function launchCodes(req, datafile, companyId) {
 
 // The company a launch or its preview is for: { company } or { refusal: [status, body] }.
 function launchCompany(req) {
-  if (req.user.role === 'certification_user') {
-    return { refusal: [403, { status: 403, title: 'Forbidden', detail: 'certification_user cannot start runs.' }] };
+  // A run reads the company's data file, Test Framework and endpoint: only its
+  // members start one. An administrator manages companies, not their tests.
+  if (req.user.role === 'certification_user' || req.user.role === 'administrator') {
+    return { refusal: [403, { status: 403, title: 'Forbidden', detail: `${req.user.role} cannot start runs: a run is started by a Test Manager or tester of the company.` }] };
   }
   const selection = req.body?.selection;
   const problem = selection === undefined ? null : RF.selectionProblem(selection);
   if (problem) return { refusal: [400, { status: 400, title: 'Bad Request', detail: problem }] };
-  // A platform role may name the company in the body; everyone else gets their own.
-  const requestedCompanyId = isPlatformRole(req.user.role) ? req.body?.company_id : null;
-  const targetCompanyId = requestedCompanyId || req.companyId;
+  const targetCompanyId = req.companyId;
   if (!targetCompanyId) {
-    return { refusal: [400, { status: 400, title: 'Bad Request', detail: 'company_id is required for platform users when creating runs.' }] };
+    return { refusal: [400, { status: 400, title: 'Bad Request', detail: 'No company to run for.' }] };
   }
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company) return { refusal: [404, { status: 404, title: 'Company not found.' }] };

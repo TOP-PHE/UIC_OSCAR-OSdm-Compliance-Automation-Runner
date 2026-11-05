@@ -34,6 +34,7 @@ const { validate, v } = require('../middleware/validate');
 const { sendTestEmail, sendAiAccessNotice, isSmtpConfigured } = require('../../utils/mailer');
 const AiAccess = require('../../utils/aiAccess');
 const { readBackupStatus } = require('../../utils/backupStatus');
+const { purgeCompany } = require('../../utils/companyPurge');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
 const router = express.Router();
@@ -518,7 +519,7 @@ router.get('/security-events', (req, res) => {
 
 router.get('/companies', (req, res) => {
   const rows = all(
-    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at,
+    `SELECT c.id, c.name, c.slug, c.created_at,
             COUNT(u.id) AS user_count
      FROM companies c
      LEFT JOIN users u ON u.company_id = c.id
@@ -542,7 +543,7 @@ router.post('/companies', (req, res) => {
   const id = uuidv4();
   run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`, [id, name, cleanSlug]);
   const created = get(
-    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, COUNT(u.id) AS user_count
+    `SELECT c.id, c.name, c.slug, c.created_at, COUNT(u.id) AS user_count
      FROM companies c LEFT JOIN users u ON u.company_id = c.id WHERE c.id = ? GROUP BY c.id`,
     [id]
   );
@@ -585,7 +586,7 @@ function freeSlug(slug, companyId) {
 
 function companyRow(companyId) {
   return get(
-    `SELECT c.id, c.name, c.slug, c.auth_mode, c.api_base, c.created_at, COUNT(u.id) AS user_count
+    `SELECT c.id, c.name, c.slug, c.created_at, COUNT(u.id) AS user_count
      FROM companies c LEFT JOIN users u ON u.company_id = c.id WHERE c.id = ? GROUP BY c.id`,
     [companyId]
   );
@@ -608,17 +609,11 @@ router.delete('/companies/:id', (req, res) => {
   if (userCount > 0) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: `Cannot delete company with ${userCount} user(s). Reassign or delete them first.` });
   }
-  // Cascade delete related data (SQLite foreign_keys pragma may not be enabled)
-  transaction(() => {
-    run('DELETE FROM run_artifacts WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)', [companyId]);
-    run('DELETE FROM run_events WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)', [companyId]);
-    run('DELETE FROM runs WHERE company_id = ?', [companyId]);
-    run('DELETE FROM test_resources WHERE company_id = ?', [companyId]);
-    run('DELETE FROM test_frameworks WHERE company_id = ?', [companyId]);
-    run('DELETE FROM auth_events WHERE company_id = ?', [companyId]);
-    run('DELETE FROM companies WHERE id = ?', [companyId]);
-  });
-  auditLog(req.user.id, companyId, req.user.email, `company_deleted:${company.name}`);
+  // Everything the company holds goes with it, files included, unread
+  // (utils/companyPurge.js). The audit trail stays.
+  purgeCompany(company);
+  // Recorded under no company: a line naming the deleted row would not be kept.
+  auditLog(req.user.id, null, req.user.email, `company_deleted:${companyId}:${company.name}`);
   return res.json({ deleted: true, id: companyId, name: company.name });
 });
 

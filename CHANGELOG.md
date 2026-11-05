@@ -105,9 +105,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.463] / [collection-OTST_V2.0.252] — 2026-11-05
+## [server-1.11.464] / [collection-OTST_V2.0.252] — 2026-11-05
 
-Issue #1045 (a fare search answered with a trip from a nearby stop, as a real provider gave), release 2026.501. Simulator 0.64.0. The server change is the welcome-page news entry.
+Issue #1045 (a fare search answered with a trip from a nearby stop, as a real provider gave), release 2026.502. Simulator 0.64.0. The server change is the welcome-page news entry.
 
 ### Added
 - **`SIM_FARE_NEARBY_STOP_SRCH_1ADT_38`** and its copies for every other version: fares asked by search criteria from station 0000066 (trip 44) to 0000002, the non-flexible offer chosen. The answer holds the direct trip and one more, by tram from a stop by the station asked, then a walk and a train; that trip's fares start at the tram stop. Expected: no failed check, one O8 WARNING naming that trip's offers, the direct trip's fare offer booked and confirmed. In gamma's run list and the simulator references' run lists (regenerated); its row in *OSCAR - OSDM Simulator scenarios*.
@@ -122,6 +122,23 @@ Issue #1045 (a fare search answered with a trip from a nearby stop, as a real pr
 - Replay of the new scenario on every provider (3.6 to 3.12): 118 checks, none failed. With the collection from before server 1.11.461, the same scenario fails O8 at 01 (a gap on the tram trip's four offers) and stops there (81 checks), as the provider's run did.
 - `fare-generator.test.js`: the trip (tram, walk, train), the two forms of its fares, the order of the offers, the trips each is remembered with; a specification and another station get no such trip; the answer is an OSDM answer in every provider's version.
 - Simulator `npm test`; server `npm run lint` and full `npx jest`.
+
+---
+
+## [server-1.11.463] — 2026-11-05
+
+Release 2026.501. An administrator manages companies, not their tests.
+
+### Security
+- **An administrator starts no run on a company** (`POST /v1/runs`, `POST /v1/runs/preview`: 403, as for a certifier). A run reads the company's data file, Test Framework and endpoint: only its Test Managers and testers start one. The runner refuses a run an administrator queued before the upgrade, and an administrator's own credentials are never used for another company (`credentialsFor()`).
+- **An administrator neither reads nor changes a company's OSDM settings** (`GET` / `PATCH /v1/company`: 403). The endpoint and the dedicated headers are the Test Manager's (`companyEndpointChange()`).
+- **The administrator's company list names each company by id, name and slug only** (`GET /v1/admin/companies`), never its endpoint.
+- **Deleting a company removes everything it held, unread** (`utils/companyPurge.js`): every row of every table naming it (found in the schema, so a new table is covered), the rows of its runs and findings, the provider links naming it, its pending registrations and its two data files. Before, its findings, credentials, checklists, AI settings and data files stayed behind. The deletion stays in the audit log, now under no company: the line naming the deleted company was lost.
+- Test Config no longer offers Test Manager controls to an administrator (`scenarios.js`).
+
+### Checked
+- `admin-no-test-config.test.js`: a run or a preview by an administrator is refused, its credentials stay its own, the runner refuses its queued run, the company list holds no endpoint, a deletion removes the rows and files and keeps the audit line. With the run refusal taken out, the test fails.
+- `npm run lint`, full `npx jest`.
 
 ---
 

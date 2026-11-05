@@ -218,13 +218,13 @@ describe('companyEndpointChange', () => {
   const OTHER = 'https://elsewhere.example/collect';
   const REFUSED = { status: 403, detail: 'Only Test Managers can change the OSDM API endpoint.' };
 
-  test.each([['test_manager'], ['administrator']])('%s writes the endpoint, trimmed', (role) => {
-    expect(companyEndpointChange(role, `  ${OTHER}  `, STORED)).toEqual({ write: OTHER });
+  test('a Test Manager writes the endpoint, trimmed', () => {
+    expect(companyEndpointChange('test_manager', `  ${OTHER}  `, STORED)).toEqual({ write: OTHER });
   });
 
   // The route stops a certifier earlier (resolveCompanyScope). The rule must
   // not depend on that: isPlatformRole() is true for a certifier.
-  test.each([['company_user'], ['certification_user'], ['Test_Manager'], ['unknown'], [''], [undefined], [null]])(
+  test.each([['company_user'], ['certification_user'], ['administrator'], ['Test_Manager'], ['unknown'], [''], [undefined], [null]])(
     'role %p is refused another endpoint', (role) => {
       expect(companyEndpointChange(role, OTHER, STORED)).toEqual(REFUSED);
       expect(companyEndpointChange(role, OTHER, null)).toEqual(REFUSED);

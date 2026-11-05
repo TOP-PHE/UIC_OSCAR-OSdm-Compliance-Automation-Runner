@@ -783,7 +783,7 @@ function refusedRunScope(runRow, companyId, userId) {
     const user = get('SELECT id, company_id, role FROM users WHERE id = ?', [userId]);
     if (!user) return 'Run refused: the user who started the run no longer exists.';
     const member = { id: user.id, companyId: user.company_id, role: normalizeRole(user.role) };
-    if (member.role === 'administrator') return null;
+    if (member.role === 'administrator') return 'Run refused: an administrator does not run tests on a company.';
     if (!canUseCompany(member, companyId)) return 'Run refused: the user who started the run may no longer use this company.';
     return null;
   } catch {
