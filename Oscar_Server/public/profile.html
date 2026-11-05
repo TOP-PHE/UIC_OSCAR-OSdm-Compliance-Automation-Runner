@@ -479,10 +479,12 @@ function fillCredentials(card, m) {
 // An endpoint suspended after an intrusion attempt (utils/intrusion.js): a red
 // note above the endpoint, and for a Test Manager the button that resumes it.
 function showSuspension(card, c) {
-  card.querySelector('.suspended-note')?.remove();
+  // Found by data-f inside the section, as every field of a section is.
+  card.querySelector('[data-f="suspended-note"]')?.remove?.();
   if (!c.endpoint_suspended_at) return;
   const note = document.createElement('div');
   note.className = 'suspended-note';
+  note.dataset.f = 'suspended-note';
   note.setAttribute('role', 'alert');
   note.style.cssText = 'background:#b71c1c;color:#fff;border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:13px;line-height:1.5';
   const title = document.createElement('strong');

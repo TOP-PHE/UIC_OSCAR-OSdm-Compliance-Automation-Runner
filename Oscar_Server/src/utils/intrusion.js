@@ -10,7 +10,7 @@
 /**
  * What OSCAR does when a run meets an answer meant to attack it.
  *
- * The collection (library-bruno/answerTemplates.js) stops the run and logs one
+ * The collection (library-bruno/answerThreats.js) stops the run and logs one
  * line starting with INTRUSION_MARK: `[INTRUSION] kind=<kind> step=<request>`.
  * The runner hands each such line to onIntrusionLine(), which, once per run:
  *   - records a security event (security_event, migration 47: run, company,
