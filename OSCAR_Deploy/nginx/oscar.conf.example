@@ -43,7 +43,8 @@ server {
 
     # Internal only — the in-cluster Prometheus scrapes oscar:3001 over the
     # Docker bridge directly, so the public vhost should not expose /metrics.
-    location = /metrics {
+    # Any spelling of the path (/METRICS, /metrics/…): OSCAR's routes ignore case.
+    location ~* ^/metrics(/|$) {
         return 404;
     }
 }

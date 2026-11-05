@@ -475,6 +475,21 @@ describe('reports — comparisons', () => {
     expect(res.body.comparisons).toEqual([]);
   });
 
+  test('GET /comparisons lists a comparison to a certifier naming the company only once both runs are shared', async () => {
+    const token = makeToken('certification_user', certId);
+    const listed = async () => (await request(app).get(`/v1/reports/comparisons?company_id=${companyId}`)
+      .set('Authorization', `Bearer ${token}`)).body.comparisons.some(c => c.run_a_id === runA && c.run_b_id === runB);
+    expect(await listed()).toBe(false);
+    run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [runA]);
+    try {
+      expect(await listed()).toBe(false);
+      run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [runB]);
+      expect(await listed()).toBe(true);
+    } finally {
+      run('UPDATE runs SET shared_with_certifier_at = NULL WHERE id IN (?, ?)', [runA, runB]);
+    }
+  });
+
   test('GET /comparisons/:id is 404 for a certifier until both runs are shared', async () => {
     const list = await request(app).get('/v1/reports/comparisons').set('Authorization', `Bearer ${makeToken('company_user')}`);
     const id = list.body.comparisons.find(c => c.run_a_id === runA && c.run_b_id === runB).id;

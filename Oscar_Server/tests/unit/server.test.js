@@ -164,6 +164,13 @@ describe('GET /metrics', () => {
     expect(res.text).toContain('oscar_simulator_configured 0');
     expect((await request(app).get('/metrics?source=elsewhere')).status).toBe(404);
   });
+
+  // nginx refuses /metrics; another spelling of it must not reach the text.
+  test.each(['/METRICS', '/Metrics', '/metrics/'])('%s is 404', async (p) => {
+    const res = await request(app).get(p);
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain('oscar_');
+  });
 });
 
 // ── /json_validator/datafile.schema.json ─────────────────────────────────────
