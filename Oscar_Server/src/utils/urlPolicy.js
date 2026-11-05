@@ -67,11 +67,18 @@ function ipIsPublic(ip) {
   return addr.range() === 'unicast';
 }
 
+// Characters no endpoint address needs, and which could break out of a page
+// or a file it is written into.
+const UNSAFE_URL_CHARS = /[<>"'`\\\s\u0000-\u001f\u007f]/;
+
 // Structural check. Returns null when allowed, else a short reason (no value).
 function structuralReason(raw) {
   if (typeof raw !== 'string' || raw.trim() === '') return 'is empty';
   let url;
   try { url = new URL(raw.trim()); } catch { return 'is not a valid URL'; }
+  // An address is shown on pages and written into files: no markup, quote,
+  // space or control character, wherever ALLOW_PRIVATE_TARGETS is set or not.
+  if (UNSAFE_URL_CHARS.test(raw.trim())) return 'holds a character an address may not hold (< > " \' ` \\, a space or a control character)';
   if (allowPrivate()) return null;
   if (url.protocol !== 'https:') return 'must use https';
   const host = hostOf(url);

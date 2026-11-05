@@ -1283,6 +1283,14 @@ function renderAssertions(suites) {
 }
 
 /* ── Export CSV ─────────────────────────────────────────────────────────────── */
+// One CSV cell, quoted. A cell whose text a spreadsheet would read as a
+// formula (= + - @, a tab or a carriage return first) starts with ' instead.
+function csvCell(c) {
+  let t = String(c);
+  if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return '"' + t.replaceAll('"', '""') + '"';
+}
+
 function exportCSV() {
   if (!reportData || !reportData.suites) return;
   var rows = [];
@@ -1355,7 +1363,7 @@ function exportCSV() {
           a.category || '',
           a.domain || '',
           a.severity || '',
-          (a.error_msg || '').replaceAll('"', '""')
+          a.error_msg || ''
         ]);
       });
     });
@@ -1381,13 +1389,13 @@ function exportCSV() {
         e.ts || '',
         (e.level || ''),
         e.category || '',
-        (e.message || '').replaceAll('"', '""')
+        e.message || ''
       ]);
     });
   }
 
   var csv = rows.map(function(r) {
-    return r.map(function(c) { return '"' + String(c).replaceAll('"', '""') + '"'; }).join(',');
+    return r.map(csvCell).join(',');
   }).join('\n');
 
   var blob = new Blob([csv], { type: 'text/csv' });

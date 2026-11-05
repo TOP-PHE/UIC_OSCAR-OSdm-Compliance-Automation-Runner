@@ -306,7 +306,7 @@ function updateStatus(run) {
   const badge = document.getElementById('status-badge');
   badge.className = `status s-${run.status}`;
   const spin = (run.status === 'RUNNING' || run.status === 'QUEUED') ? '<span class="spin">⟳</span> ' : '';
-  badge.innerHTML = `${spin}${run.status}`;
+  badge.innerHTML = `${spin}${escHtml(run.status)}`;
   document.getElementById('run-title').textContent = run.env_name_used || `Run ${run.id.slice(0,8)}`;
   showSharedNote(run);
 
@@ -320,8 +320,10 @@ function updateStatus(run) {
     { lbl: 'Exit Code', val: run.exit_code != null ? run.exit_code : '-' },
   ];
   if (run.scenario_code) metaItems.push({ lbl: 'Scenario', val: run.scenario_code });
-  if (run.batch_id) metaItems.push({ lbl: 'Batch', val: `<a href="/dashboard.html" style="color:#0090D4;text-decoration:none">${run.batch_id.slice(0,8)}... (view batch)</a>` });
-  document.getElementById('meta').innerHTML = metaItems.map(m => `<div class="meta-item"><div class="lbl">${m.lbl}</div><div class="val">${m.val}</div></div>`).join('');
+  // Every value is text: escaped here. Only the batch link is markup, built
+  // from an escaped id.
+  if (run.batch_id) metaItems.push({ lbl: 'Batch', html: `<a href="/dashboard.html" style="color:#0090D4;text-decoration:none">${escHtml(run.batch_id.slice(0,8))}... (view batch)</a>` });
+  document.getElementById('meta').innerHTML = metaItems.map(m => `<div class="meta-item"><div class="lbl">${m.lbl}</div><div class="val">${m.html ?? escHtml(m.val)}</div></div>`).join('');
 
   // Auth error banner — shown when runner detected a token problem
   const existingBanner  = document.getElementById('auth-error-banner');

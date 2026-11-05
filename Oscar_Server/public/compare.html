@@ -109,13 +109,13 @@ function renderDiff(data) {
     <div class="run-cards">
       <div class="run-card">
         <h4>Run A (baseline)</h4>
-        <div class="url">${data.run_a.api_base || '-'}</div>
+        <div class="url">${esc(data.run_a.api_base || '-')}</div>
         <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_a.queued_at)}</div>
       </div>
       <div style="display:flex;align-items:center;font-size:22px;color:#90a4ae;padding-top:8px">→</div>
       <div class="run-card">
         <h4>Run B (latest)</h4>
-        <div class="url">${data.run_b.api_base || '-'}</div>
+        <div class="url">${esc(data.run_b.api_base || '-')}</div>
         <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_b.queued_at)}</div>
       </div>
     </div>
@@ -190,7 +190,7 @@ async function loadComparison() {
   });
   const data = await res.json();
   if (!res.ok) {
-    document.getElementById('main').innerHTML = `<div class="empty">⚠️ ${data.detail || data.title || 'Failed to compute comparison.'}</div>`;
+    document.getElementById('main').innerHTML = `<div class="empty">⚠️ ${esc(data.detail || data.title || 'Failed to compute comparison.')}</div>`;
     return;
   }
   renderDiff(data);
