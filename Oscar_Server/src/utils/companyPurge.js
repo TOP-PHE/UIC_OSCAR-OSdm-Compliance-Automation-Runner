@@ -17,7 +17,7 @@
  * admin-no-test-config.test.js reads the schema and fails on a new one.
  */
 
-const fs = require('fs');
+const fs = require('node:fs');
 const { run, transaction } = require('../db/db');
 const { liveDatafilePath, previousDatafilePath } = require('./datafileWrite');
 
