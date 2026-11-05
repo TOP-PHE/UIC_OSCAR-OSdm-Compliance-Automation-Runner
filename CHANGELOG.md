@@ -105,6 +105,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.463] / [collection-OTST_V2.0.252] — 2026-11-05
+
+Issue #1045 (a fare search answered with a trip from a nearby stop, as a real provider gave), release 2026.501. Simulator 0.64.0. The server change is the welcome-page news entry.
+
+### Added
+- **`SIM_FARE_NEARBY_STOP_SRCH_1ADT_38`** and its copies for every other version: fares asked by search criteria from station 0000066 (trip 44) to 0000002, the non-flexible offer chosen. The answer holds the direct trip and one more, by tram from a stop by the station asked, then a walk and a train; that trip's fares start at the tram stop. Expected: no failed check, one O8 WARNING naming that trip's offers, the direct trip's fare offer booked and confirmed. In gamma's run list and the simulator references' run lists (regenerated); its row in *OSCAR - OSDM Simulator scenarios*.
+
+### Simulator 0.64.0
+- Fares variant `nearbyStopTrip` (station `urn:uic:stn:0000066`, in every profile). A search whose section starts there gets a second trip (`nearbyStopTrip()`, `offers.js`): tram 2 from stop 0000067 to 0000068, a six-minute walk (a transfer leg) to station 0000069, a train from there to the section's end. Its fare offers (`nearbyTripOffers()`, `fares.js`) come after the direct trip's, so the offer a scenario books is the direct trip's: per cluster, fares bound to the tram and the train (a train link each, no covered section, no connection point, the offer's covered sections naming the two rides), as the real provider gave them; then one offer with a fare per ride. Each is remembered with its own trip. A trip specification or trip ids get no such trip. OSDM allows a search to start a trip at another stop place, so the variant is not deliberately wrong.
+
+### Changed
+- A welcome-page news entry.
+
+### Checked
+- Replay of the new scenario on every provider (3.6 to 3.12): 118 checks, none failed. With the collection from before server 1.11.461, the same scenario fails O8 at 01 (a gap on the tram trip's four offers) and stops there (81 checks), as the provider's run did.
+- `fare-generator.test.js`: the trip (tram, walk, train), the two forms of its fares, the order of the offers, the trips each is remembered with; a specification and another station get no such trip; the answer is an OSDM answer in every provider's version.
+- Simulator `npm test`; server `npm run lint` and full `npx jest`.
+
+---
+
 ## [server-1.11.462] — 2026-11-05
 
 Release 2026.500. A tester's credentials go to the OSDM endpoint they were saved for, and to no other.

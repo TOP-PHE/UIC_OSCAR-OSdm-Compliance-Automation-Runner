@@ -48,7 +48,7 @@ const persons = require('./persons');
 const ticketing = require('./ticketing');
 const { horizonProblem } = require('./salesHorizon');
 const ageTariffs = require('./ageTariffs');
-const { fareOffersOf, asksOnlyFares, noFareOfferProblem } = require('./fares');
+const { fareOffersOf, asksOnlyFares, noFareOfferProblem, nearbyStopsOf, nearbyTripOffers } = require('./fares');
 const { withOfferConditions } = require('./afterSales');
 
 const MAX_PASSENGERS = 19;
@@ -171,13 +171,13 @@ function categoryOf(service) {
   return out;
 }
 
-function buildLeg({ from, to, start, end, vehicleNumber, category = PRODUCT_CATEGORY }, provider) {
+function buildLeg({ from, to, start, end, vehicleNumber, category = PRODUCT_CATEGORY, ptMode = 'TRAIN' }, provider) {
   return {
     timedLeg: {
       start: { stopPlaceRef: from, stopPlaceName: stopName(from.stopPlaceRef), serviceDeparture: { timetabledTime: isoAt(start.ms, start.offset) } },
       end: { stopPlaceRef: to, stopPlaceName: stopName(to.stopPlaceRef), serviceArrival: { timetabledTime: isoAt(end.ms, end.offset) } },
       service: {
-        mode: { ptMode: 'TRAIN' },
+        mode: { ptMode },
         productCategory: category,
         vehicleNumbers: [vehicleNumber],
         carriers: [{ ref: provider.carrier.ref, name: provider.carrier.name }],
@@ -269,6 +269,47 @@ function viaOf(criteria) {
   const m = /^PT(?:(\d{1,2})H)?(?:(\d{1,3})M)?$/.exec(typeof first.dwellTime === 'string' ? first.dwellTime : '');
   const minutes = m && (m[1] || m[2]) ? Number(m[1] || 0) * 60 + Number(m[2] || 0) : 10;
   return { place, dwellMs: minutes * 60000 };
+}
+
+const TRAM_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:T', name: 'Tramway', shortName: 'T' };
+
+/**
+ * #1045 (fares variant nearbyStopTrip): the second trip of the search, as a
+ * real provider gave it: by tram from the stop by the station asked
+ * (`stops.tramStop`) five minutes after the direct trip, a six-minute walk
+ * from the tram's last stop to another station, then a train from there to
+ * the destination, arriving after the direct trip.
+ */
+function nearbyStopTrip(direct, stops, provider) {
+  const offset = direct.startTime.slice(-6);
+  const t0 = Date.parse(direct.startTime) + 5 * 60000;
+  const at = (minutes) => ({ ms: t0 + minutes * 60000, offset });
+  const place = (stopPlaceRef) => ({ objectType: 'StopPlaceRef', stopPlaceRef });
+  const rideMinutes = Math.round((Date.parse(direct.endTime) - Date.parse(direct.startTime)) / 60000);
+  const number = String((Number(direct.legs[0].timedLeg.service.vehicleNumbers[0]) || 1000) + 2);
+  const tram = buildLeg({ from: place(stops.tramStop), to: place(stops.tramEnd), start: at(0), end: at(8), vehicleNumber: '2', category: TRAM_CATEGORY, ptMode: 'TRAM' }, provider);
+  const train = buildLeg({ from: place(stops.change), to: { ...stops.end }, start: at(20), end: at(20 + rideMinutes), vehicleNumber: number }, provider);
+  const id = `${provider.idPrefix}-TRIP-${hashOf(`${provider.key}nearby${JSON.stringify([tram, train])}`).toString('hex').slice(0, 12)}`;
+  const walk = {
+    start: place(stops.tramEnd), end: place(stops.change), transferMode: 'WALK', continuousMode: 'WALK', duration: 'PT6M',
+    timeWindowStart: isoAt(at(8).ms, offset), timeWindowEnd: isoAt(at(14).ms, offset),
+  };
+  const first = tram.timedLeg.start;
+  const last = train.timedLeg.end;
+  return {
+    id,
+    summary: `${first.stopPlaceName} - ${last.stopPlaceName}`,
+    direction: 'OUT_BOUND',
+    origin: first.stopPlaceRef,
+    originName: first.stopPlaceName,
+    destination: last.stopPlaceRef,
+    destinationName: last.stopPlaceName,
+    startTime: first.serviceDeparture.timetabledTime,
+    endTime: last.serviceArrival.timetabledTime,
+    duration: isoDuration((20 + rideMinutes) * 60000),
+    transfers: 1,
+    legs: [{ id: `${id}-L1`, timedLeg: tram.timedLeg }, { id: `${id}-L2`, transferLeg: walk }, { id: `${id}-L3`, timedLeg: train.timedLeg }],
+  };
 }
 
 // A specified trip: the legs of the request, served by this provider.
@@ -799,14 +840,21 @@ function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
   const { offers: productOffers, problems: productProblems } = productsAsked ? selectProducts(criteria, built.offers) : { offers: [], problems: [] };
   // #903: fare offers for a requested section, next to the product offers
   // (alone when only fare parts are asked, #1046).
-  const fareOffers = beyondHorizon ? [] : fareOffersOf({
+  const fareContext = {
     body, criteria, trips, passengers, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS, fulfillmentOptions,
     cardOf: (p) => p[CARDS_APPLIED].applied,
-  });
-  const offers = options.noOffer ? [] : [...productOffers, ...fareOffers];
+  };
+  const fareOffers = beyondHorizon ? [] : fareOffersOf(fareContext);
+  // #1045: a search from the nearbyStopTrip station gets one more trip, by
+  // tram from a stop by that station, and its fare offers after the others.
+  const stops = beyondHorizon ? null : nearbyStopsOf(body, provider);
+  const nearbyTrip = stops ? nearbyStopTrip(trips[0], stops, provider) : null;
+  const nearbyOffers = nearbyTrip ? nearbyTripOffers(fareContext, nearbyTrip) : [];
+  const offers = options.noOffer ? [] : [...productOffers, ...fareOffers, ...nearbyOffers];
   // #906: a fare offer is booked like any other, so it is remembered too.
   for (const offer of fareOffers) remembered.push({ offer, trips, passengers, oneFulfillment: true, shortLivedMs });
-  const allTrips = [...outboundTrips, ...trips];
+  for (const offer of nearbyOffers) remembered.push({ offer, trips: [nearbyTrip], passengers, oneFulfillment: true, shortLivedMs });
+  const allTrips = [...outboundTrips, ...trips, ...(nearbyTrip ? [nearbyTrip] : [])];
   const problems = [...problemsOf(passengers, built.offers, collective && productsAsked, refusals), ...productProblems, ...options.problems];
   const partsProblem = partsProblemOf({ productsAsked, fareOffers, unanswered: beyondHorizon || options.noOffer, body, criteria, provider });
   if (partsProblem) problems.push(partsProblem);

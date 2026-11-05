@@ -243,6 +243,59 @@ test('the detail variants: the real answer\'s form, a card not held, ages outsid
   assert.ok(legs.every((o) => o.tripCoverage.coveredSections[0].endLegId === 'no-such-leg' && o.fares.every((f) => f.coveredSection)));
 });
 
+// #1045: a search from the nearbyStopTrip station, as a real provider answered
+// it: one more trip, by tram from a stop by the station asked, a walk, a train.
+function nearbySearch(from = '0000066') {
+  return {
+    tripSearchCriteria: { origin: station(from), destination: station('0000002'), departureTime: '2026-11-20T08:00:00' },
+    requestedSections: [{ startPlace: station(from), endPlace: station('0000002') }],
+    offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] },
+    anonymousPassengerSpecifications: [adult(1)],
+  };
+}
+
+test('the nearby-stop trip: tram, walk, train; fares bound to the rides, and fares per ride', () => {
+  const { response, remembered } = buildOfferCollection(nearbySearch(), providers.get('gamma'), NOW);
+  const [direct, nearby] = response.trips;
+  assert.equal(response.trips.length, 2);
+  assert.equal(direct.origin.stopPlaceRef, 'urn:uic:stn:0000066');
+  assert.deepEqual(nearby.legs.map((l) => (l.timedLeg ? l.timedLeg.service.mode.ptMode : l.transferLeg.transferMode)), ['TRAM', 'WALK', 'TRAIN']);
+  const stops = nearby.legs.map((l) => (l.timedLeg ? [l.timedLeg.start.stopPlaceRef, l.timedLeg.end.stopPlaceRef] : [l.transferLeg.start, l.transferLeg.end]).map((p) => p.stopPlaceRef.slice(-7)));
+  assert.deepEqual(stops, [['0000067', '0000068'], ['0000068', '0000069'], ['0000069', '0000002']]);
+  assert.ok(Date.parse(nearby.startTime) > Date.parse(direct.startTime) && Date.parse(nearby.endTime) > Date.parse(direct.endTime));
+  const onNearby = response.offers.filter((o) => o.tripCoverage?.coveredTripId === nearby.id);
+  const onDirect = response.offers.filter((o) => !o.tripCoverage);
+  // The direct trip's offers come first, one per cluster: the one a scenario books.
+  assert.deepEqual(response.offers.slice(0, onDirect.length), onDirect);
+  const bound = onNearby.filter((o) => o.tripCoverage.coveredSections);
+  assert.equal(bound.length, onDirect.length);
+  for (const offer of bound) {
+    assert.deepEqual(offer.tripCoverage.coveredSections.map((s) => [s.startLegId, s.endLegId]), [[nearby.legs[0].id, nearby.legs[0].id], [nearby.legs[2].id, nearby.legs[2].id]]);
+    for (const fare of offer.fares) {
+      assert.ok(!fare.coveredSection && !fare.regionalConstraint.entryConnectionPoint && !fare.regionalConstraint.exitConnectionPoint);
+      assert.deepEqual(fare.regionalConstraint.regionalValidities.map((v) => [v.trainLink.fromStation.stopPlaceRef.slice(-7), v.trainLink.serviceBrandAbbreviation]),
+        [['0000067', 'T'], ['0000069', 'IC']]);
+    }
+  }
+  const [perRide] = onNearby.filter((o) => !o.tripCoverage.coveredSections);
+  assert.deepEqual(perRide.fares.map((f) => [f.coveredSection.startPlace.stopPlaceRef.slice(-7), f.coveredSection.endPlace.stopPlaceRef.slice(-7)]), [['0000067', '0000068'], ['0000069', '0000002']]);
+  // Each is remembered with its own trip, so a booking covers that trip only.
+  assert.ok(remembered.filter((e) => onNearby.includes(e.offer)).every((e) => e.trips.length === 1 && e.trips[0] === nearby));
+  assert.ok(remembered.filter((e) => onDirect.includes(e.offer)).every((e) => e.trips.length === 1 && e.trips[0] === direct));
+});
+
+test('the nearby-stop trip is a search\'s only, from its station only, and an OSDM answer in every version', () => {
+  const gamma = providers.get('gamma');
+  assert.equal(buildOfferCollection(nearbySearch('0000001'), gamma, NOW).response.trips.length, 1);
+  assert.equal(buildOfferCollection(request({ from: '0000066' }), gamma, NOW).response.trips.length, 1);
+  for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
+    const provider = providers.get(key);
+    const response = shapeAnswer(buildOfferCollection(nearbySearch(), provider, NOW).response, provider.osdmVersion);
+    assert.equal(response.trips.length, 2, key);
+    checkConformance('POST', `/${key}/offers`, 200, response);
+  }
+});
+
 test('every detail variant is an OSDM answer in every provider\'s version', () => {
   let checked = 0;
   for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
