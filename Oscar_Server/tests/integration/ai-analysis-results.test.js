@@ -33,6 +33,8 @@ const otherCompanyId = uuidv4();
 const tmId = uuidv4();
 const tm2Id = uuidv4();
 const testerId = uuidv4();
+const certifierId = uuidv4(); // a real certifier: a token stands for a stored user
+const otherTmId = uuidv4(); // a Test Manager of the other company
 const KEY = 'sk-ant-analysis-0123456789';
 const BASE = '/v1/company/ai-analysis';
 
@@ -91,7 +93,7 @@ beforeAll(async () => {
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'AI An', 'ai-an')`, [companyId]);
   run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'AI An Provider', 'ai-an-provider', ?)`, [providerId, companyId]);
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'AI An Other', 'ai-an-other')`, [otherCompanyId]);
-  for (const [id, cid, role] of [[tmId, companyId, 'test_manager'], [tm2Id, companyId, 'test_manager'], [testerId, companyId, 'company_user']]) {
+  for (const [id, cid, role] of [[tmId, companyId, 'test_manager'], [tm2Id, companyId, 'test_manager'], [testerId, companyId, 'company_user'], [certifierId, companyId, 'certification_user'], [otherTmId, otherCompanyId, 'test_manager']]) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [id, cid, `${id}@ai-an.com`, role]);
   }
   approve(companyId, tmId);
@@ -122,7 +124,7 @@ async function waitFor(id) {
 
 describe('#801 PR 3 who may analyse', () => {
   test('testers and certifiers are refused; a Test Manager without approved access cannot preview or run', async () => {
-    for (const t of [token('company_user', testerId), token('certification_user', uuidv4())]) {
+    for (const t of [token('company_user', testerId), token('certification_user', certifierId)]) {
       expect((await request(app).get(`${BASE}/batches`).set('Authorization', t)).status).toBe(403);
       expect((await request(app).get(`${BASE}/history`).set('Authorization', t)).status).toBe(403);
     }
@@ -255,7 +257,7 @@ describe('#801 PR 3 the history', () => {
     expect(list.body.analyses[0]).not.toHaveProperty('result');
     const id = list.body.analyses.find(a => a.status === 'done').id;
     expect((await request(app).get(`${BASE}/history/${id}`).set('Authorization', tm(tm2Id))).status).toBe(200);
-    const foreign = await request(app).get(`${BASE}/history/${id}`).set('Authorization', token('test_manager', uuidv4(), otherCompanyId));
+    const foreign = await request(app).get(`${BASE}/history/${id}`).set('Authorization', token('test_manager', otherTmId, otherCompanyId));
     expect(foreign.status).toBe(404);
     const provider = await request(app).get(`${BASE}/history/${id}`).set('Authorization', tm()).set('X-Provider-Id', providerId);
     expect(provider.status).toBe(404);

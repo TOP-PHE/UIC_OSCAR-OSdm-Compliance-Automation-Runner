@@ -34,6 +34,7 @@ const provider2Id = uuidv4();
 const tmId = uuidv4();
 const tm2Id = uuidv4();
 const testerId = uuidv4();
+const certifierId = uuidv4(); // a real certifier: a token stands for a stored user
 const CONFIG = '/v1/company/ai-analysis/config';
 const KEY = 'sk-ant-test-0123456789';
 
@@ -90,7 +91,7 @@ beforeAll(async () => {
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'AI Config', 'ai-config')`, [companyId]);
   run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'AI Config Provider', 'ai-config-provider', ?)`, [providerId, companyId]);
   run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'AI Config Second', 'ai-config-second', ?)`, [provider2Id, companyId]);
-  for (const [id, role] of [[tmId, 'test_manager'], [tm2Id, 'test_manager'], [testerId, 'company_user']]) {
+  for (const [id, role] of [[tmId, 'test_manager'], [tm2Id, 'test_manager'], [testerId, 'company_user'], [certifierId, 'certification_user']]) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [id, companyId, `${id}@ai-config.com`, role]);
   }
   approve(companyId, tmId);
@@ -106,7 +107,7 @@ beforeEach(() => { calls.length = 0; reply = null; });
 
 describe('#801 PR 2 who may configure', () => {
   test('a tester and a certifier are refused', async () => {
-    for (const t of [token('company_user', testerId), token('certification_user', uuidv4())]) {
+    for (const t of [token('company_user', testerId), token('certification_user', certifierId)]) {
       expect((await request(app).get(CONFIG).set('Authorization', t)).status).toBe(403);
       expect((await request(app).put(CONFIG).set('Authorization', t).send(anthropic())).status).toBe(403);
     }

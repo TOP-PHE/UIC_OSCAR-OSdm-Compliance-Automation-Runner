@@ -949,6 +949,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `[data-place-lookup]`) drives a typeahead on every origin/destination URN
   field — selecting fills the field with the place's URN; manual typing
   still always works, this is a pure assist.
+- **A session follows the stored user** (1.11.455). `sessionUser()`
+  (`middleware/auth.js`) reads the user at each request: missing, not
+  `active`, another role or company than the token's, or a token signed
+  before `users.sessions_valid_after` (migration 46) is a 401. Any new code
+  that changes a password, role or company sets `END_SESSIONS_SQL` in the
+  same UPDATE. **A test token must stand for a stored user** with that role
+  and company, or the route answers 401.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

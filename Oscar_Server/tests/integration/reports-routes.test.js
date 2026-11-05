@@ -47,6 +47,8 @@ const otherCompanyId = uuidv4();   // a foreign tenant (cross-tenant checks)
 const userId         = uuidv4();   // company_user in companyId
 const otherUserId    = uuidv4();   // company_user in otherCompanyId
 const adminId        = uuidv4();   // platform (administrator)
+const certId         = uuidv4();   // platform (certification_user); every token is a stored user (sessionUser)
+const colleagueId    = uuidv4();   // another company_user in companyId
 
 // Runs: two COMPLETED runs with artifacts (for /compare), one non-completed run,
 // and one COMPLETED run in the other company.
@@ -86,6 +88,8 @@ beforeAll(() => {
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'user@reports-routes-test.com', 'x', 'company_user')`, [userId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'other@reports-routes-test.com', 'x', 'company_user')`, [otherUserId, otherCompanyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'admin@reports-routes-test.com', 'x', 'administrator')`, [adminId, companyId]);
+  run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'cert@reports-routes-test.com', 'x', 'certification_user')`, [certId, companyId]);
+  run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'colleague@reports-routes-test.com', 'x', 'company_user')`, [colleagueId, companyId]);
 
   // ── Runs ──────────────────────────────────────────────────────────────────
   run(`INSERT INTO runs (id, company_id, user_id, status, api_base_used, scenario_code, env_name_used, queued_at, completed_at)
@@ -212,7 +216,7 @@ describe('reports — templates', () => {
 
   test('403 DELETE another user\'s template (non-platform)', async () => {
     const res = await request(app).delete(`/v1/reports/templates/${templateId}`)
-      .set('Authorization', `Bearer ${makeToken('company_user', uuidv4())}`);
+      .set('Authorization', `Bearer ${makeToken('company_user', colleagueId)}`);
     expect(res.status).toBe(403);
   });
 
@@ -345,7 +349,7 @@ describe('reports — trends', () => {
   });
 
   test('a certifier sees trend data only from runs shared with it', async () => {
-    const token = makeToken('certification_user', adminId);
+    const token = makeToken('certification_user', certId);
     const before = await request(app).get(`/v1/reports/trends?assertion_key=${ENC_KEY}`)
       .set('Authorization', `Bearer ${token}`).set('x-company-id', companyId);
     expect(before.status).toBe(200);
@@ -444,7 +448,7 @@ describe('reports — POST /compare', () => {
 
   test('404 for a certifier while the runs are unshared', async () => {
     const res = await request(app).post('/v1/reports/compare')
-      .set('Authorization', `Bearer ${makeToken('certification_user', adminId)}`)
+      .set('Authorization', `Bearer ${makeToken('certification_user', certId)}`)
       .set('x-company-id', companyId)
       .send({ run_a_id: runA, run_b_id: runB });
     expect(res.status).toBe(404);
@@ -474,7 +478,7 @@ describe('reports — comparisons', () => {
   test('GET /comparisons/:id is 404 for a certifier until both runs are shared', async () => {
     const list = await request(app).get('/v1/reports/comparisons').set('Authorization', `Bearer ${makeToken('company_user')}`);
     const id = list.body.comparisons.find(c => c.run_a_id === runA && c.run_b_id === runB).id;
-    const token = makeToken('certification_user', adminId);
+    const token = makeToken('certification_user', certId);
 
     const before = await request(app).get(`/v1/reports/comparisons/${id}`).set('Authorization', `Bearer ${token}`);
     expect(before.status).toBe(404);
@@ -592,7 +596,7 @@ describe('reports — POST /configured', () => {
 
   test('403 for a certifier while the run is unshared', async () => {
     const res = await request(app).post('/v1/reports/configured')
-      .set('Authorization', `Bearer ${makeToken('certification_user', adminId)}`)
+      .set('Authorization', `Bearer ${makeToken('certification_user', certId)}`)
       .set('x-company-id', companyId)
       .send({ run_ids: [runA], filters: { status: 'failed' } });
     expect(res.status).toBe(403);
@@ -603,7 +607,7 @@ describe('reports — POST /configured', () => {
     run(`UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?`, [runA]);
     try {
       const res = await request(app).post('/v1/reports/configured')
-        .set('Authorization', `Bearer ${makeToken('certification_user', adminId)}`)
+        .set('Authorization', `Bearer ${makeToken('certification_user', certId)}`)
         .set('x-company-id', companyId)
         .send({ run_ids: [runA], filters: { status: 'failed' } });
       expect(res.status).toBe(200);
@@ -723,7 +727,7 @@ describe('reports — GET /requests/:id/messages', () => {
   });
 
   test('404 for a certifier while unshared, 200 once the run is shared', async () => {
-    const token = makeToken('certification_user', adminId);
+    const token = makeToken('certification_user', certId);
     const before = await request(app).get(`/v1/reports/requests/${requestPassId}/messages`)
       .set('Authorization', `Bearer ${token}`)
       .set('x-company-id', companyId);

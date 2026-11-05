@@ -78,13 +78,14 @@ function makeToken(role, uid, companyId) {
   return jwt.sign({ sub: uid, email: `${role}@server-test.com`, companyId, role, jti: uuidv4() }, JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
 }
 
-function seedCompanyUser() {
+// The user's role is the one its token will carry (sessionUser checks it).
+function seedCompanyUser(role = 'company_user') {
   const companyId = uuidv4();
   const userId = uuidv4();
   const slug = `servertest-${companyId.slice(0, 8)}`;
   run(`INSERT INTO companies (id, name, slug) VALUES (?, ?, ?)`, [companyId, 'Server Test Co', slug]);
-  run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
-    [userId, companyId, `tester@server-test.com-${userId.slice(0, 8)}`]);
+  run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`,
+    [userId, companyId, `tester@server-test.com-${userId.slice(0, 8)}`, role]);
   return { companyId, userId, slug };
 }
 
@@ -223,7 +224,7 @@ describe('GET /data/:filename', () => {
   });
 
   test('200 + decrypted content for a Test Manager of the owning company', async () => {
-    const { companyId, userId, slug } = seedCompanyUser();
+    const { companyId, userId, slug } = seedCompanyUser('test_manager');
     const token = makeToken('test_manager', userId, companyId);
     fs.mkdirSync(DATAFILES_DIR, { recursive: true });
     const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);

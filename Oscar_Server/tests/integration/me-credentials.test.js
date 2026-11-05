@@ -115,7 +115,7 @@ describe('GET /v1/me/credentials', () => {
     expect(body).not.toContain('client_secret_enc');
   });
 
-  test('404 when user does not exist', async () => {
+  test('401 when the token names a user that does not exist (the session is read from the users table)', async () => {
     const ghostToken = jwt.sign(
       { sub: uuidv4(), email: 'ghost@me-test.com', companyId, role: 'company_user' },
       process.env.JWT_SECRET,
@@ -124,7 +124,7 @@ describe('GET /v1/me/credentials', () => {
     const res = await request(app)
       .get('/v1/me/credentials')
       .set('Authorization', `Bearer ${ghostToken}`);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
   });
 });
 

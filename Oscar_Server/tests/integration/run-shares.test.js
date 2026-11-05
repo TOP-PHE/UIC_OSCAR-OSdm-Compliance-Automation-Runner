@@ -49,9 +49,11 @@ const users = {
 const emailOf = (who) => `${who.toLowerCase()}-${tag}@share.example`;
 const distributorName = `UIC ${tag}`;
 
-function token(who) {
+// A token stands for the stored user (sessionUser); `role` signs one as the role
+// the user holds now, after a test changed it.
+function token(who, role = users[who].role) {
   const u = users[who];
-  return jwt.sign({ sub: ids[who], email: emailOf(who), companyId: ids[u.company], role: u.role },
+  return jwt.sign({ sub: ids[who], email: emailOf(who), companyId: ids[u.company], role },
     process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
 }
 const as = (who) => ({ Authorization: `Bearer ${token(who)}` });
@@ -214,10 +216,15 @@ describe('what stops a share', () => {
     expect((await readRun('TMO', 'run1')).status).toBe(200);
   });
 
-  test('the reader no longer a Test Manager of the company', async () => {
+  test('the reader no longer a Test Manager of the company: the old token is refused (401), a new one reads nothing (404)', async () => {
     run(`UPDATE users SET role = 'company_user' WHERE id = ?`, [ids.TMO]);
-    expect((await readRun('TMO', 'run1')).status).toBe(404);
-    run(`UPDATE users SET role = 'test_manager' WHERE id = ?`, [ids.TMO]);
+    try {
+      expect((await readRun('TMO', 'run1')).status).toBe(401);
+      const asTester = { Authorization: `Bearer ${token('TMO', 'company_user')}` };
+      expect((await request(app).get(`/v1/runs/${ids.run1}`).set(asTester)).status).toBe(404);
+    } finally {
+      run(`UPDATE users SET role = 'test_manager' WHERE id = ?`, [ids.TMO]);
+    }
   });
 
   test('the link moved to another company: neither reads the old shares', async () => {

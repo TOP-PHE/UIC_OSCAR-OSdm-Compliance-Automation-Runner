@@ -23,7 +23,7 @@ const jwt     = require('jsonwebtoken');
 const crypto  = require('node:crypto');
 const { randomUUID: uuidv4 } = crypto;
 const { get, all, run, transaction } = require('../../db/db');
-const { requireAuth, normalizeRole } = require('../middleware/auth');
+const { requireAuth, normalizeRole, END_SESSIONS_SQL } = require('../middleware/auth');
 const { sendVerificationEmail, sendPendingApprovalEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
 const { loginAttempts } = require('../../utils/metrics');
@@ -462,7 +462,7 @@ router.post('/password-reset/confirm',
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     transaction(() => {
-      run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, user.id]);
+      run(`UPDATE users SET password_hash = ?, ${END_SESSIONS_SQL} WHERE id = ?`, [passwordHash, user.id]);
       // Single-use: token is consumed
       run('DELETE FROM password_reset_tokens WHERE id = ?', [row.id]);
     });

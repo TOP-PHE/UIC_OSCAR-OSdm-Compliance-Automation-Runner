@@ -972,6 +972,11 @@ const MIGRATIONS = [
         created_at  TEXT NOT NULL DEFAULT (datetime('now'))
       )`);
   }},
+  { version: 46, name: 'sessions-valid-after', up: () => {
+      // A session signed before this time (seconds, as a JWT's iat) is
+      // refused: set when the user's password, role or company changes.
+      _safeAlter('ALTER TABLE users ADD COLUMN sessions_valid_after INTEGER');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

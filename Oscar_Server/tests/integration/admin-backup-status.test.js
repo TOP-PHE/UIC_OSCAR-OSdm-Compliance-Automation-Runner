@@ -27,19 +27,24 @@ const { run } = require('../../src/db/db');
 const app = buildAppWithRoute('/v1/admin', '../../src/api/routes/admin');
 const companyId = randomUUID();
 const adminId = randomUUID();
-const token = (role) => jwt.sign({ sub: adminId, email: `${role}@bs-test.com`, companyId, role }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
+// One user row per role: a token stands for a real user of that role (sessionUser).
+const ROLES = ['administrator', 'company_user', 'test_manager', 'certification_user'];
+const userIds = Object.fromEntries(ROLES.map((r) => [r, r === 'administrator' ? adminId : randomUUID()]));
+const token = (role) => jwt.sign({ sub: userIds[role], email: `${role}@bs-test.com`, companyId, role }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
 
 let dir;
 beforeAll(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oscar-bs-route-'));
   process.env.OSCAR_BACKUP_STATUS_PATH = path.join(dir, 'backup-status.json');
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'BS Test Co', ?)`, [companyId, `bs-test-${companyId.slice(0, 8)}`]);
-  run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'administrator@bs-test.com', 'x', 'administrator')`, [adminId, companyId]);
+  for (const role of ROLES) {
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [userIds[role], companyId, `${role}@bs-test.com`, role]);
+  }
 });
 afterAll(() => {
   delete process.env.OSCAR_BACKUP_STATUS_PATH;
   run('DELETE FROM companies WHERE id = ?', [companyId]);
-  run('DELETE FROM users WHERE id = ?', [adminId]);
+  for (const role of ROLES) run('DELETE FROM users WHERE id = ?', [userIds[role]]);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

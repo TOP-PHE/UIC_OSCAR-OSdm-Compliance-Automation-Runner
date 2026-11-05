@@ -51,7 +51,7 @@ afterAll(() => {
   run('DELETE FROM companies WHERE id IN (?, ?)', [D1, D2]);
 });
 
-test('a Test Manager demoted since signing in loses the providers at once', async () => {
+test('a Test Manager demoted since signing in loses the providers at once: the old token is refused (401)', async () => {
   const oldTok = sign(TMb, D1, 'test_manager');
   const demote = await request(app).patch(`/v1/company/users/${TMb}`)
     .set('Authorization', `Bearer ${sign(TM1, D1, 'test_manager')}`).send({ role: 'company_user' });
@@ -62,11 +62,12 @@ test('a Test Manager demoted since signing in loses the providers at once', asyn
   const res = await request(app).get('/v1/company').set('Authorization', `Bearer ${oldTok}`).set('X-Provider-Id', P1);
   const r2  = await request(app).get(`/v1/runs/${RUN}`).set('Authorization', `Bearer ${oldTok}`);
   console.log('demoted, provider company:', res.status, '| provider run:', r2.status);
-  expect(res.status).toBe(404);
-  expect(r2.status).toBe(404);
+  // The token's role is no longer the stored one, so the session ends (sessionUser).
+  expect(res.status).toBe(401);
+  expect(r2.status).toBe(401);
 });
 
-test('a Test Manager moved to another distributor loses the old distributor\'s providers at once', async () => {
+test('a Test Manager moved to another distributor loses the old distributor\'s providers at once: the old token is refused (401)', async () => {
   const oldTok = sign(TMc, D1, 'test_manager');
   const move = await request(app).patch(`/v1/admin/users/${TMc}`)
     .set('Authorization', `Bearer ${sign(ADM, get('SELECT company_id FROM users WHERE id = ?', [ADM]).company_id, 'administrator')}`)
@@ -76,6 +77,7 @@ test('a Test Manager moved to another distributor loses the old distributor\'s p
   const res = await request(app).get('/v1/company/datafile').set('Authorization', `Bearer ${oldTok}`).set('X-Provider-Id', P1);
   const r2  = await request(app).get(`/v1/runs/${RUN}`).set('Authorization', `Bearer ${oldTok}`);
   console.log('moved, provider datafile:', res.status, '| provider run:', r2.status);
-  expect(res.body.detail).toBe('Provider not found.');
-  expect(r2.status).toBe(404);
+  // The token's company is no longer the stored one, so the session ends (sessionUser).
+  expect(res.status).toBe(401);
+  expect(r2.status).toBe(401);
 });

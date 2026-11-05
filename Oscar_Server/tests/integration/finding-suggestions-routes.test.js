@@ -27,6 +27,7 @@ const companyId = uuidv4();
 const otherCompanyId = uuidv4();
 const tmId = uuidv4();
 const testerId = uuidv4();
+const certifierId = uuidv4(); // a real certifier: a token stands for a stored user
 const otherTmId = uuidv4();
 const batchId = uuidv4();
 const BASE = '/v1/company/findings/suggestions';
@@ -63,6 +64,7 @@ beforeAll(() => {
   run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'Suggest Other', 'suggest-other')`, [otherCompanyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tm@suggest-test.com', 'x', 'test_manager')`, [tmId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tester@suggest-test.com', 'x', 'company_user')`, [testerId, companyId]);
+  run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'cert@suggest-test.com', 'x', 'certification_user')`, [certifierId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tm@suggest-other.com', 'x', 'test_manager')`, [otherTmId, otherCompanyId]);
 
   // Booking refused for a missing purchaser in two scenarios; refund 501 in one;
@@ -83,7 +85,7 @@ beforeAll(() => {
 
 describe('#735 who may use suggestions', () => {
   test('a tester and a certifier are refused, nothing is said about drafts', async () => {
-    for (const t of [token('company_user', testerId), token('certification_user', uuidv4())]) {
+    for (const t of [token('company_user', testerId), token('certification_user', certifierId)]) {
       expect((await request(app).get(BASE).set('Authorization', t)).status).toBe(403);
       expect((await request(app).post(`${BASE}/analyse`).set('Authorization', t).send({ batchId })).status).toBe(403);
     }

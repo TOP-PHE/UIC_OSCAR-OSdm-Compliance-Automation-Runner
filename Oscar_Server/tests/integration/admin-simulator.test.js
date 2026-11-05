@@ -42,7 +42,10 @@ const app = buildAppWithRoute('/v1/admin/simulator', '../../src/api/routes/admin
 const companyId = crypto.randomUUID();
 const adminId = crypto.randomUUID();
 const ADMIN_EMAIL = 'administrator@sim-admin-test.com';
-const token = (role) => jwt.sign({ sub: adminId, email: role === 'administrator' ? ADMIN_EMAIL : `${role}@sim-admin-test.com`, companyId, role }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
+// One user row per role: a token stands for a real user of that role (sessionUser).
+const OTHER_ROLES = ['company_user', 'test_manager', 'certification_user'];
+const userIds = Object.fromEntries([['administrator', adminId], ...OTHER_ROLES.map((r) => [r, crypto.randomUUID()])]);
+const token = (role) => jwt.sign({ sub: userIds[role], email: role === 'administrator' ? ADMIN_EMAIL : `${role}@sim-admin-test.com`, companyId, role }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
 const asAdmin = (r) => r.set('Authorization', `Bearer ${token('administrator')}`);
 
 const KEY = crypto.randomBytes(32).toString('hex');
@@ -80,13 +83,16 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${server.address().port}`;
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'Sim Admin Co', ?)`, [companyId, `sim-admin-${companyId.slice(0, 8)}`]);
   run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'administrator')`, [adminId, companyId, ADMIN_EMAIL]);
+  for (const role of OTHER_ROLES) {
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [userIds[role], companyId, `${role}@sim-admin-test.com`, role]);
+  }
 });
 
 afterAll(async () => {
   run("DELETE FROM server_config WHERE key LIKE 'SIMULATOR_ADMIN_%'");
   run('DELETE FROM auth_events WHERE user_id = ?', [adminId]);
   run('DELETE FROM runs WHERE user_id = ?', [adminId]);
-  run('DELETE FROM users WHERE id = ?', [adminId]);
+  for (const id of Object.values(userIds)) run('DELETE FROM users WHERE id = ?', [id]);
   run('DELETE FROM companies WHERE id = ?', [companyId]);
   await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
   fs.rmSync(dir, { recursive: true, force: true });

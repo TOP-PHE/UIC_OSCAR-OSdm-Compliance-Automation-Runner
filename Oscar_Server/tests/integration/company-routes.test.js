@@ -36,8 +36,10 @@ const testMgrId  = uuidv4();
 const certUserId = uuidv4();
 const testerId   = uuidv4();
 const adminId    = uuidv4();
+const platformCoId = uuidv4();   // the administrator's own company; it names the target with ?company_id=
 
-function makeToken(role, uid = testMgrId, cid = companyId) {
+// A token stands for a stored user of its role and company (sessionUser).
+function makeToken(role, uid = testMgrId, cid = role === 'administrator' ? platformCoId : companyId) {
   return jwt.sign(
     { sub: uid, email: `${role}@test-company.com`, companyId: cid, role },
     process.env.JWT_SECRET,
@@ -68,10 +70,11 @@ beforeAll(() => {
      VALUES (?, ?, 'tester@test-company.com', 'x', 'company_user')`,
     [testerId, companyId]
   );
+  run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'Company Route Platform', ?)`, [platformCoId, `company-route-platform-${platformCoId.slice(0, 8)}`]);
   run(
     `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
-     VALUES (?, NULL, 'admin@platform.test', 'x', 'administrator')`,
-    [adminId]
+     VALUES (?, ?, 'admin@platform.test', 'x', 'administrator')`,
+    [adminId, platformCoId]
   );
 });
 
@@ -255,7 +258,7 @@ describe('PATCH /v1/company — only a Test Manager changes the API endpoint (#5
   });
 
   test('200 for an administrator who names the company, as before', async () => {
-    const res = await patchAs('administrator', uuidv4(), { api_base: ELSEWHERE }, `?company_id=${companyId}`);
+    const res = await patchAs('administrator', adminId, { api_base: ELSEWHERE }, `?company_id=${companyId}`);
     expect(res.status).toBe(200);
     expect(storedEndpoint()).toBe(ELSEWHERE);
   });
@@ -622,4 +625,7 @@ afterAll(() => {
   safeRun('DELETE FROM test_frameworks WHERE company_id = ?', [companyId]);
   safeRun('DELETE FROM users WHERE company_id = ?', [companyId]);
   safeRun('DELETE FROM companies WHERE id = ?', [companyId]);
+  safeRun('DELETE FROM auth_events WHERE user_id = ?', [adminId]);
+  safeRun('DELETE FROM users WHERE id = ?', [adminId]);
+  safeRun('DELETE FROM companies WHERE id = ?', [platformCoId]);
 });

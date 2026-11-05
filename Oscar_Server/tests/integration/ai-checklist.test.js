@@ -36,6 +36,7 @@ const otherId = uuidv4();
 const tmId = uuidv4();
 const otherTmId = uuidv4();
 const testerId = uuidv4();
+const certifierId = uuidv4(); // a real certifier: a token stands for a stored user
 const BASE = '/v1/company/ai-analysis';
 const ALPHA = fs.readFileSync(require('../../src/utils/checklistFiles').checklistFile(
   path.join(__dirname, '..', '..', '..', 'Documentation', 'Server_Operations', 'Simulator checklists'), 'Simulator-alpha'));
@@ -52,14 +53,14 @@ beforeAll(() => {
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'AI CL', 'ai-cl')`, [companyId]);
   run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'AI CL Provider', 'ai-cl-provider', ?)`, [providerId, companyId]);
   run(`INSERT INTO companies (id, name, slug) VALUES (?, 'AI CL Other', 'ai-cl-other')`, [otherId]);
-  for (const [id, cid, role] of [[tmId, companyId, 'test_manager'], [testerId, companyId, 'company_user'], [otherTmId, otherId, 'test_manager']]) {
+  for (const [id, cid, role] of [[tmId, companyId, 'test_manager'], [testerId, companyId, 'company_user'], [certifierId, companyId, 'certification_user'], [otherTmId, otherId, 'test_manager']]) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [id, cid, `${id}@ai-cl.com`, role]);
   }
 });
 
 describe('#827 PR A who may import', () => {
   test('testers and certifiers are refused before the file is read; another company\'s provider is not found', async () => {
-    for (const t of [token('company_user', testerId), token('certification_user', uuidv4())]) {
+    for (const t of [token('company_user', testerId), token('certification_user', certifierId)]) {
       expect((await upload(t, ALPHA)).status).toBe(403);
       expect((await request(app).get(`${BASE}/checklist`).set('Authorization', t)).status).toBe(403);
     }

@@ -19,14 +19,15 @@
  *   - isPlatformRole correctly identifies admin/certifier
  *   - isTestManagerOrAbove correctly identifies test_manager/administrator
  *   - userFromRequest mirrors requireAuth's lookup for non-middleware callers
+ *   - both read the user row (sessionUser): a user gone, not active, with
+ *     another role or company, or whose sessions ended after the token, is refused
  */
 
 const jwt = require('jsonwebtoken');
 
 // Mock db.js so this unit test runs on any Node version (db.js needs node:sqlite ≥ 22).
-// requireAuth calls get() to check the token blacklist; returning null means "not revoked".
-// jest.fn() (rather than a plain arrow function) so individual tests can override the
-// return value to simulate a blacklisted jti.
+// requireAuth calls get() twice: the token blacklist (null = not revoked) and the
+// user row (sessionUser). The fake below answers both from `revoked` and `stored`.
 jest.mock('../../src/db/db', () => ({ get: jest.fn(() => null) }));
 
 process.env.JWT_SECRET = 'test-jwt-secret-deterministic';
@@ -42,10 +43,21 @@ const {
   userFromRequest,
 } = require('../../src/api/middleware/auth');
 
+const revoked = new Set();   // jti values in token_blacklist
+const stored = new Map();    // users rows by id
+
 beforeEach(() => {
+  revoked.clear();
+  stored.clear();
   mockGet.mockReset();
-  mockGet.mockReturnValue(null);   // default: token is not revoked
+  mockGet.mockImplementation((sql, params) => {
+    if (sql.includes('token_blacklist')) return revoked.has(params[0]) ? { jti: params[0] } : null;
+    if (sql.includes('FROM users')) return stored.get(params[0]) || null;
+    return null;
+  });
 });
+
+const blacklistLookups = () => mockGet.mock.calls.filter(([sql]) => sql.includes('token_blacklist'));
 
 function mockReqRes(headers = {}) {
   const req = { headers, user: undefined };
@@ -58,7 +70,17 @@ function mockReqRes(headers = {}) {
   return { req, res };
 }
 
-function makeToken(payload, opts = {}) {
+// Store the user a token stands for (same e-mail, role and company), then sign it.
+// `row` overrides the stored columns, to make the token stale on purpose.
+function storeUser(payload, row = {}) {
+  stored.set(payload.sub, {
+    id: payload.sub, email: payload.email, role: payload.role, company_id: payload.companyId,
+    status: 'active', sessions_valid_after: null, ...row,
+  });
+}
+
+function makeToken(payload, opts = {}, row = {}) {
+  storeUser(payload, row);
   return jwt.sign(payload, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h', ...opts });
 }
 
@@ -244,7 +266,7 @@ describe('requireAuth', () => {
   });
 
   test('401 when the token jti is present in the blacklist (revoked)', () => {
-    mockGet.mockReturnValue({ jti: 'revoked-jti-1' });
+    revoked.add('revoked-jti-1');
     const token = makeToken({ sub: 'u1', email: 'x@y.com', companyId: 'c1', role: 'company_user', jti: 'revoked-jti-1' });
     const { req, res } = mockReqRes({ authorization: `Bearer ${token}` });
     requireAuth(req, res, () => { throw new Error('next() should not be called'); });
@@ -253,7 +275,6 @@ describe('requireAuth', () => {
   });
 
   test('passes when the token jti is present but NOT in the blacklist', (done) => {
-    mockGet.mockReturnValue(null);   // not revoked
     const token = makeToken({ sub: 'u2', email: 'z@y.com', companyId: 'c1', role: 'company_user', jti: 'active-jti-1' });
     const { req, res } = mockReqRes({ authorization: `Bearer ${token}` });
     requireAuth(req, res, () => {
@@ -266,7 +287,7 @@ describe('requireAuth', () => {
     const token = makeToken({ sub: 'u3', email: 'nojti@y.com', companyId: 'c1', role: 'company_user' });  // no jti
     const { req, res } = mockReqRes({ authorization: `Bearer ${token}` });
     requireAuth(req, res, () => {
-      expect(mockGet).not.toHaveBeenCalled();
+      expect(blacklistLookups()).toEqual([]);
       expect(req.user.id).toBe('u3');
       done();
     });
@@ -330,6 +351,62 @@ describe('requireNotRole', () => {
   });
 });
 
+describe('requireAuth reads the user the token stands for (sessionUser)', () => {
+  const claims = { sub: 'user-s', email: 'token@x.com', companyId: 'company-s', role: 'test_manager' };
+  const refused = (token) => {
+    const { req, res } = mockReqRes({ authorization: `Bearer ${token}` });
+    requireAuth(req, res, () => { throw new Error('next() should not be called'); });
+    return res;
+  };
+
+  test('req.user takes e-mail, role and company from the stored row', (done) => {
+    const token = makeToken(claims, {}, { email: 'stored@x.com' });
+    const { req, res } = mockReqRes({ authorization: `Bearer ${token}` });
+    requireAuth(req, res, () => {
+      expect(req.user).toEqual({ id: 'user-s', email: 'stored@x.com', companyId: 'company-s', role: 'test_manager' });
+      done();
+    });
+  });
+
+  test('401 when the user no longer exists', () => {
+    const token = makeToken(claims);
+    stored.clear();
+    const res = refused(token);
+    expect(res.statusCode).toBe(401);
+    expect(res.body.detail).toBe('Session no longer valid. Please sign in again.');
+  });
+
+  test('401 when the user is not active', () => {
+    expect(refused(makeToken(claims, {}, { status: 'pending' })).statusCode).toBe(401);
+  });
+
+  test('401 when the stored role is no longer the token\'s', () => {
+    expect(refused(makeToken(claims, {}, { role: 'company_user' })).statusCode).toBe(401);
+  });
+
+  test('401 when the stored company is no longer the token\'s', () => {
+    expect(refused(makeToken(claims, {}, { company_id: 'company-other' })).statusCode).toBe(401);
+  });
+
+  test('401 when the token was signed before the user\'s sessions ended', () => {
+    const now = Math.floor(Date.now() / 1000);
+    expect(refused(makeToken({ ...claims, iat: now - 60 }, {}, { sessions_valid_after: now })).statusCode).toBe(401);
+  });
+
+  test('a token signed at or after sessions_valid_after passes', (done) => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = makeToken({ ...claims, iat: now }, {}, { sessions_valid_after: now });
+    const { req, res } = mockReqRes({ authorization: `Bearer ${token}` });
+    requireAuth(req, res, () => { expect(req.user.id).toBe('user-s'); done(); });
+  });
+
+  test('userFromRequest returns null for a user who no longer exists', () => {
+    const token = makeToken(claims);
+    stored.clear();
+    expect(userFromRequest({ headers: { authorization: `Bearer ${token}` } })).toBeNull();
+  });
+});
+
 describe('userFromRequest', () => {
   test('returns the user object from a valid Bearer token', () => {
     const token = makeToken({ sub: 'user-7', email: 'm@n.com', companyId: 'company-7', role: 'company_user' });
@@ -366,14 +443,13 @@ describe('userFromRequest', () => {
   });
 
   test('returns null when the token jti is blacklisted', () => {
-    mockGet.mockReturnValue({ jti: 'revoked-jti-2' });
+    revoked.add('revoked-jti-2');
     const token = makeToken({ sub: 'u1', email: 'x@y.com', companyId: 'c1', role: 'company_user', jti: 'revoked-jti-2' });
     const req = { headers: { authorization: `Bearer ${token}` } };
     expect(userFromRequest(req)).toBeNull();
   });
 
   test('returns the user object when the token jti is present but NOT blacklisted', () => {
-    mockGet.mockReturnValue(null);   // not revoked
     const token = makeToken({ sub: 'user-10', email: 's@t.com', companyId: 'company-10', role: 'company_user', jti: 'active-jti-2' });
     const req = { headers: { authorization: `Bearer ${token}` } };
     expect(userFromRequest(req)).toEqual({ id: 'user-10', email: 's@t.com', companyId: 'company-10', role: 'company_user' });
