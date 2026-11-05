@@ -144,8 +144,10 @@ Test Manager's (or, for the credential test, any member's) action on a page.
   data file holding `{{…}}` is refused before the token is read.
 - **A provider that stops answering** stops the run after
   `RUN_IDLE_TIMEOUT_MS` of silence.
-- **The server's own calls**: fixed timeouts (15 s for the credential test,
-  20 s a search), and the answer kept by size.
+- **The server's own calls**: the address checked again at the time of the
+  call, **no redirect followed** (a provider's server answering one gets its
+  status reported, never the request sent elsewhere), fixed timeouts (15 s for
+  the credential test, 20 s a search), and the answer kept by size.
 - **What is stored.** Requests and answers are kept per run, encrypted; the
   `Authorization` header and the run's secrets are masked before storage.
 
@@ -162,7 +164,8 @@ in the form of the chosen profile (`worker/auth-profiles.js`):
 | `paxone_json`, `sqills_extension` | POST, the provider's own JSON shape |
 | `custom` | POST, the template the Test Manager wrote (`{{client_id}}`-style placeholders) |
 
-Every field is trimmed; 15 s per request; every request is logged with its values masked except
+Every field is trimmed; 15 s per request; a redirect is never followed (the
+request fails, naming it); the address is checked as in 2.4; every request is logged with its values masked except
 an explicit list of structural fields. Tokens are cached per (user, company),
 encrypted, and dropped when a run gets a 401.
 

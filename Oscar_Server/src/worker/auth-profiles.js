@@ -111,7 +111,8 @@ async function _doFetch({ method, url, headers, body }, label, log) {
   const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   let res;
   try {
-    res = await fetch(url, { method, headers, body, signal: controller.signal });
+    // A redirect is answered, never followed (as credentialTest.js does).
+    res = await fetch(url, { method, headers, body, redirect: 'manual', signal: controller.signal });
   } catch (err) {
     clearTimeout(t);
     if (err.name === 'AbortError') {
@@ -123,6 +124,12 @@ async function _doFetch({ method, url, headers, body }, label, log) {
     throw err;
   }
   clearTimeout(t);
+
+  if (res.status >= 300 && res.status < 400) {
+    const msg = `${label} token endpoint answered a redirect (HTTP ${res.status}), which OSCAR does not follow: save the address it redirects to as the token URL.`;
+    log.error(`[runner] ${msg}`);
+    throw new Error(msg);
+  }
 
   if (!res.ok) {
     let summary = '';

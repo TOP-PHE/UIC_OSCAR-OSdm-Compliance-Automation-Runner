@@ -54,6 +54,8 @@ async function osdmGet(apiBase, path, token, extraHeaders = {}, timeoutMs = DEFA
         'Accept': 'application/json',
         ...extraHeaders
       },
+      // A redirect is answered, never followed (as credentialTest.js does).
+      redirect: 'manual',
       signal: controller.signal
     });
     let text = '';
