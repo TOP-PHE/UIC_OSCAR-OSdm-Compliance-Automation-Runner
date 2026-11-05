@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.502",
+  "current_release": "2026.503",
   "releases": [
+    {
+      "release": "2026.503",
+      "date": "2026-11-05",
+      "server": "1.11.465",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.465: no public list of companies. A visitor asks for access with their name, e-mail and company typed; an administrator places the request in a company, a Test Manager of that company confirms it, and the person chooses their own password. The administrator alone creates only a company's first Test Manager."
+      ]
+    },
     {
       "release": "2026.502",
       "date": "2026-11-05",

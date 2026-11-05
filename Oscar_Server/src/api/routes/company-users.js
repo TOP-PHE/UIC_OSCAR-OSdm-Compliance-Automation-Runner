@@ -42,6 +42,7 @@ const { requireAuth, requireRole, normalizeRole, END_SESSIONS_SQL } = require('.
 const { auditLog } = require('../helpers/shared');
 const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
+const AccessRequests = require('../../utils/accessRequests');
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
@@ -90,6 +91,37 @@ function countTestManagers(companyId) {
   );
   return r ? r.n : 0;
 }
+
+// ── Access requests (decision 3) ─────────────────────────────────────────────
+// Requests an administrator placed in this company, which a Test Manager of
+// the company confirms (as a tester or a Test Manager) or refuses. The person
+// then chooses their own password from the link they receive.
+
+router.get('/access-requests', (req, res) => {
+  res.json({ requests: AccessRequests.requestsOfCompany(req.user.companyId) });
+});
+
+router.post('/access-requests/:id/confirm', async (req, res) => {
+  const role = req.body?.role;
+  const companyId = req.user.companyId;
+  const done = await AccessRequests.confirmRequest(req.params.id, companyId, role);
+  if (done.status) {
+    return res.status(done.status).json({ status: done.status, title: done.status === 404 ? 'Not Found' : done.status === 409 ? 'Conflict' : 'Bad Request', detail: done.detail });
+  }
+  const company = get('SELECT name FROM companies WHERE id = ?', [companyId]);
+  auditLog(req.user.id, companyId, req.user.email, `access_request_confirmed:${done.user.email}:${role}`);
+  AccessRequests.noticeActivated(done.user, company?.name || 'your company', done.activationUrl);
+  return res.json({ confirmed: true, user: done.user });
+});
+
+router.post('/access-requests/:id/refuse', (req, res) => {
+  const companyId = req.user.companyId;
+  const done = AccessRequests.refuseRequest(req.params.id, companyId);
+  if (done.status) return res.status(done.status).json({ status: done.status, title: 'Not Found', detail: done.detail });
+  auditLog(req.user.id, companyId, req.user.email, `access_request_refused:${done.request.email}`);
+  AccessRequests.noticeRefused(done.request);
+  return res.json({ refused: true });
+});
 
 // ── GET /v1/company/users ─────────────────────────────────────────────────────
 router.get('/', (req, res) => {

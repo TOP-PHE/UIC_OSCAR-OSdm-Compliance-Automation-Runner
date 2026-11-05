@@ -84,6 +84,15 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
   <div id="msg" class="msg"></div>
 
   <section id="panel-users" class="panel active">
+    <div class="card hidden" id="access-card">
+      <h3>Access Requests</h3>
+      <p id="access-help" style="font-size:12px;color:#78909c;margin:0 0 10px"></p>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Company named</th><th id="access-col">Company</th><th>Actions</th></tr></thead>
+        <tbody id="access-tbody"></tbody>
+      </table>
+    </div>
+
     <div class="card">
       <h3>Create User</h3>
       <div class="row">
@@ -431,7 +440,7 @@ function switchTab(name) {
 }
 
 function refreshCurrentTab() {
-  if (currentTab === 'users') loadUsers();
+  if (currentTab === 'users') { loadUsers(); loadAccessRequests(); }
   if (currentTab === 'reports') loadReports();
   if (currentTab === 'activity') loadActivity();
   if (currentTab === 'companies') loadCompaniesPanel();
@@ -539,6 +548,88 @@ async function loadUsers() {
       </td>
     </tr>
   `).join('');
+}
+
+// ── Access requests (decision 3) ─────────────────────────────────────────────
+// The administrator places a request in a company (or refuses it); a Test
+// Manager of that company confirms it as a tester or a Test Manager.
+const ACCESS_API_BASE = isTestMgr ? '/v1/company/users/access-requests' : '/v1/admin/access-requests';
+
+function accessActionsHtml(r) {
+  const id = esc(r.id);
+  if (isTestMgr) {
+    return `<select id="access-role-${id}"><option value="company_user">Tester</option><option value="test_manager">Test Manager</option></select>
+      <button class="btn btn-small btn-success" data-access-action="confirm" data-request-id="${id}">Confirm</button>
+      <button class="btn btn-small btn-danger" data-access-action="refuse" data-request-id="${id}" data-email="${esc(r.email)}">Refuse</button>`;
+  }
+  const options = companies.map(c => `<option value="${esc(c.id)}" ${c.id === r.company_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  return `<select id="access-company-${id}"><option value="">— Choose —</option>${options}</select>
+    <button class="btn btn-small btn-success" data-access-action="assign" data-request-id="${id}">${r.state === 'assigned' ? 'Move' : 'Place'}</button>
+    <button class="btn btn-small btn-danger" data-access-action="refuse" data-request-id="${id}" data-email="${esc(r.email)}">Refuse</button>`;
+}
+
+function accessCompanyHtml(r) {
+  if (isTestMgr) return esc(r.company_name || '');
+  return r.state === 'assigned'
+    ? `${esc(r.company_name || '')} <span class="status-badge sb-pending">Waiting for its Test Manager</span>`
+    : '<span class="status-badge sb-pending">To place</span>';
+}
+
+async function loadAccessRequests() {
+  if (!isAdmin && !isTestMgr) return;
+  const res = await fetch(ACCESS_API_BASE, { headers: authHeaders });
+  if (!res.ok) return;
+  const data = await res.json();
+  const requests = data.requests || [];
+  document.getElementById('access-card').classList.toggle('hidden', requests.length === 0);
+  document.getElementById('access-help').textContent = isTestMgr
+    ? 'People an OSCAR administrator placed in your company. Confirm them as a tester or a Test Manager; they then choose their own password.'
+    : 'Requests whose e-mail is confirmed. Place each in a company: its Test Manager confirms it. A company with no Test Manager gets its first one from you.';
+  document.getElementById('access-col').textContent = isTestMgr ? 'Placed in' : 'Company';
+  document.getElementById('access-tbody').innerHTML = requests.map(r => `
+    <tr>
+      <td>${esc(r.name || '')}</td>
+      <td class="mono">${esc(r.email)}</td>
+      <td>${esc(r.company_typed || '')}</td>
+      <td>${accessCompanyHtml(r)}</td>
+      <td>${accessActionsHtml(r)}</td>
+    </tr>`).join('');
+}
+
+async function accessPost(path, body) {
+  const res = await fetch(`${ACCESS_API_BASE}/${encodeURIComponent(path.id)}/${path.action}`, {
+    method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+  });
+  return { res, data: await res.json().catch(() => ({})) };
+}
+
+async function assignAccess(id) {
+  const companyId = document.getElementById(`access-company-${id}`).value;
+  if (!companyId) { showMsg('Choose the company first.', false); return; }
+  let { res, data } = await accessPost({ id, action: 'assign' }, { company_id: companyId });
+  if (res.status === 409 && data.needs_first_test_manager) {
+    if (!confirm(`${data.detail}\n\nMake this person its first Test Manager?`)) return;
+    ({ res, data } = await accessPost({ id, action: 'assign' }, { company_id: companyId, first_test_manager: true }));
+  }
+  if (!res.ok) { showMsg(data.detail || 'The request could not be placed.', false); return; }
+  showMsg(data.activated ? 'First Test Manager created: they receive a link to choose their password.' : 'Placed: the company\'s Test Managers are told.', true);
+  loadAccessRequests(); loadUsers();
+}
+
+async function confirmAccess(id) {
+  const role = document.getElementById(`access-role-${id}`).value;
+  const { res, data } = await accessPost({ id, action: 'confirm' }, { role });
+  if (!res.ok) { showMsg(data.detail || 'The request could not be confirmed.', false); return; }
+  showMsg('Confirmed: they receive a link to choose their password.', true);
+  loadAccessRequests(); loadUsers();
+}
+
+async function refuseAccess(id, email) {
+  if (!confirm(`Refuse the access request of ${email}?`)) return;
+  const { res, data } = await accessPost({ id, action: 'refuse' });
+  if (!res.ok) { showMsg(data.detail || 'The request could not be refused.', false); return; }
+  showMsg('Refused: the person is told.', true);
+  loadAccessRequests();
 }
 
 async function createUser() {
@@ -1154,6 +1245,19 @@ if (clearBtn) clearBtn.addEventListener('click', function() {
 });
 
 // ── Event delegation for dynamically generated elements ──────────────────────
+
+// Access requests (click)
+document.getElementById('access-tbody').addEventListener('click', function(e) {
+  var el = e.target.closest('[data-access-action]');
+  if (!el) return;
+  var id = el.dataset.requestId;
+  var action = el.dataset.accessAction;
+  var done;
+  if (action === 'assign') done = assignAccess(id);
+  else if (action === 'confirm') done = confirmAccess(id);
+  else if (action === 'refuse') done = refuseAccess(id, el.dataset.email);
+  if (done) done.catch(function(err) { console.error('Access request action failed:', err); showMsg('Server unreachable.', false); });
+});
 
 // Users table delegation (click + change)
 document.getElementById('users-tbody').addEventListener('click', function(e) {

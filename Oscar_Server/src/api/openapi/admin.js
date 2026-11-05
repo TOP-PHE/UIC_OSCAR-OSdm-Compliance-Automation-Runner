@@ -59,9 +59,26 @@ module.exports = {
   },
   '/v1/admin/users/{id}/approve': {
     post: { tags, summary: 'Activate a self-registered user awaiting approval (#449)', security: bearer,
-      description: `${ADMIN} Answer: ${USER}.`,
+      description: `${ADMIN} Only for a company with no active Test Manager: elsewhere a Test Manager approves. Answer: ${USER}.`,
       parameters: [userId],
-      responses: { 200: { description: 'The user, now active' }, 400: { description: 'The user is not awaiting approval' }, 401: r401, 403: r403, 404: r404User, 429: r429 } },
+      responses: { 200: { description: 'The user, now active' }, 400: { description: 'The user is not awaiting approval' }, 401: r401, 403: r403, 404: r404User, 409: { description: 'The company has a Test Manager, who approves' }, 429: r429 } },
+  },
+  '/v1/admin/access-requests': {
+    get: { tags, summary: 'Access requests waiting to be placed or confirmed', security: bearer,
+      description: `${ADMIN} Requests whose e-mail is confirmed: { requests: [{ id, email, name, company_typed, state (verified | assigned), verified_at, company_id, company_name, assigned_at }] }.`,
+      responses: { 200: { description: 'The requests' }, 401: r401, 403: r403, 429: r429 } },
+  },
+  '/v1/admin/access-requests/{id}/assign': {
+    post: { tags, summary: 'Place an access request in a company', security: bearer,
+      description: `${ADMIN} Body: { company_id, first_test_manager? }. A top-level company, not the platform. Its Test Managers are told and confirm it. A company with no active Test Manager gets its first one here, only with first_test_manager: true (409 with needs_first_test_manager otherwise); the person then receives the link to choose a password. Audited.`,
+      parameters: [pathParam('id', 'The request')], requestBody: jsonBody('{ company_id, first_test_manager? }'),
+      responses: { 200: { description: '{ assigned: true, company } or { activated: true, user, company }' }, 400: { description: 'No company, or a provider or the platform' }, 401: r401, 403: r403, 404: { description: 'No such request waiting' }, 409: { description: 'First Test Manager to confirm, or the e-mail has an account' }, 429: r429 } },
+  },
+  '/v1/admin/access-requests/{id}/refuse': {
+    post: { tags, summary: 'Refuse an access request', security: bearer,
+      description: `${ADMIN} The request is deleted and the person told. Audited.`,
+      parameters: [pathParam('id', 'The request')],
+      responses: { 200: { description: '{ refused: true }' }, 401: r401, 403: r403, 404: { description: 'No such request waiting' }, 429: r429 } },
   },
   '/v1/admin/users/{id}/reset-password': {
     post: { tags, summary: 'Set a user\'s password', security: bearer,

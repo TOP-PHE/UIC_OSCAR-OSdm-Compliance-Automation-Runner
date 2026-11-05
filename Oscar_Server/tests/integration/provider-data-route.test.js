@@ -61,9 +61,10 @@ test('API rule for the same provider by id is 404 (contrast)', async () => {
   expect(res.status).toBe(404);
 });
 
-test('provider names are hidden from the public company list (so the slug is the secret)', async () => {
+test('no public list of companies names a provider (or any company)', async () => {
+  // The full server answers an unknown page address with the page shell.
   const res = await request(app).get('/v1/auth/register/companies');
-  const slugs = res.body.companies.map(c => c.slug);
-  expect(slugs).toContain(d1Slug);
-  expect(slugs).not.toContain(providerSlug);
+  expect(res.body?.companies).toBeUndefined();
+  expect(res.text).not.toContain(d1Slug);
+  expect(res.text).not.toContain(providerSlug);
 });

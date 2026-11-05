@@ -35,6 +35,7 @@ const { sendTestEmail, sendAiAccessNotice, isSmtpConfigured } = require('../../u
 const AiAccess = require('../../utils/aiAccess');
 const { readBackupStatus } = require('../../utils/backupStatus');
 const { purgeCompany } = require('../../utils/companyPurge');
+const AccessRequests = require('../../utils/accessRequests');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
 const router = express.Router();
@@ -283,10 +284,15 @@ router.patch('/users/:id',
 router.post('/users/:id/approve', (req, res) => {
   const userId = req.params.id;
 
-  const target = get('SELECT id, email, status FROM users WHERE id = ?', [userId]);
+  const target = get('SELECT id, email, status, company_id FROM users WHERE id = ?', [userId]);
   if (!target) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
   if (target.status !== 'pending') {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User is not awaiting approval.' });
+  }
+  // Decision 3: a company's Test Manager confirms who joins it. The
+  // administrator approves alone only where the company has none.
+  if (AccessRequests.activeTestManagers(target.company_id).length > 0) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: 'This company has a Test Manager: they approve who joins it.' });
   }
 
   run('UPDATE users SET status = ? WHERE id = ?', ['active', userId]);
@@ -513,6 +519,41 @@ router.get('/security-events', (req, res) => {
        LEFT JOIN users u ON u.id = e.user_id
       ORDER BY e.detected_at DESC LIMIT 200`);
   res.json({ events });
+});
+
+// ── Access requests (decision 3) ─────────────────────────────────────────────
+// The administrator places a request whose e-mail is confirmed in a company,
+// or refuses it. A Test Manager of that company confirms it; where the company
+// has none, the administrator creates its first one here (utils/accessRequests.js).
+
+router.get('/access-requests', (req, res) => res.json({ requests: AccessRequests.waitingRequests() }));
+
+router.post('/access-requests/:id/assign', async (req, res) => {
+  const { company_id: companyId, first_test_manager: first } = req.body || {};
+  if (typeof companyId !== 'string' || !companyId) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id is required.' });
+  }
+  const done = await AccessRequests.assignRequest(req.params.id, companyId, { firstTestManager: first === true });
+  if (done.status) {
+    return res.status(done.status).json({ status: done.status, title: done.status === 409 ? 'Conflict' : 'Bad Request',
+      detail: done.detail, needs_first_test_manager: done.needsFirstTestManager === true });
+  }
+  if (done.activated) {
+    auditLog(req.user.id, done.company.id, req.user.email, `access_first_test_manager:${done.user.email}`);
+    AccessRequests.noticeActivated(done.user, done.company.name, done.activationUrl);
+    return res.json({ activated: true, user: done.user, company: { id: done.company.id, name: done.company.name } });
+  }
+  auditLog(req.user.id, done.company.id, req.user.email, `access_request_assigned:${done.request.email}`);
+  AccessRequests.noticeAssigned(done.request, done.company, done.managers);
+  return res.json({ assigned: true, company: { id: done.company.id, name: done.company.name } });
+});
+
+router.post('/access-requests/:id/refuse', (req, res) => {
+  const done = AccessRequests.refuseRequest(req.params.id);
+  if (done.status) return res.status(done.status).json({ status: done.status, title: 'Not Found', detail: done.detail });
+  auditLog(req.user.id, null, req.user.email, `access_request_refused:${done.request.email}`);
+  AccessRequests.noticeRefused(done.request);
+  return res.json({ refused: true });
 });
 
 // ── Company management ────────────────────────────────────────────────────────

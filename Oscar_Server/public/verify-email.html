@@ -54,43 +54,28 @@ input:focus{outline:none;border-color:#0090D4}
   <div id="loading" style="text-align:center;color:#78909c;padding:20px 0">Verifying your link…</div>
 
   <div id="main" style="display:none">
-    <h2>Set your password</h2>
-    <p class="subtitle">Your email address has been confirmed. Choose a password to activate your account.</p>
+    <h2>Confirm your email address</h2>
+    <p class="subtitle">Confirm the address of your request for access to OSCAR.</p>
     <div class="info-row">
       Email: <span id="info-email"></span><br>
       Company: <span id="info-company"></span>
     </div>
     <div id="error" class="error" style="display:none"></div>
     <form id="confirm-form">
-      <div class="field">
-        <label for="password">Password <span style="color:#90a4ae;font-weight:400">(min 8 chars)</span></label>
-        <input type="password" id="password" required minlength="8" autocomplete="new-password">
-      </div>
-      <div class="field">
-        <label for="password2">Confirm Password</label>
-        <input type="password" id="password2" required minlength="8" autocomplete="new-password">
-      </div>
-      <button class="btn" type="submit" id="btn">Activate Account</button>
+      <button class="btn" type="submit" id="btn">Confirm my email address</button>
     </form>
   </div>
 
   <div id="expired" style="display:none">
-    <div class="error">This confirmation link has expired or is invalid.<br>
-    Please <a href="/?register=1" style="color:#c62828">register again</a>.</div>
-  </div>
-
-  <div id="done" style="display:none">
-    <div class="success">
-      ✅ <strong>Account activated!</strong><br>
-      Redirecting you to the dashboard…
-    </div>
+    <div class="error"><span id="expired-text">This confirmation link has expired or is invalid.</span><br>
+    Please <a href="/?register=1" style="color:#c62828">ask again</a>.</div>
   </div>
 
   <div id="pending" style="display:none">
     <div class="success">
-      ✅ <strong>Request submitted!</strong><br>
-      Your account is awaiting approval from your company's Test Manager(s).
-      You'll be able to sign in once approved.
+      ✅ <strong>Your email address is confirmed.</strong><br>
+      An OSCAR administrator, then a Test Manager of your company, will check your request.
+      You will then receive an email to choose your password.
     </div>
   </div>
 </div>
@@ -126,54 +111,36 @@ async function init() {
 function showExpired(msg) {
   document.getElementById('loading').style.display  = 'none';
   document.getElementById('expired').style.display  = 'block';
-  if (msg) document.querySelector('#expired .error').innerHTML =
-    msg + '<br>Please <a href="/" style="color:#c62828">register again</a>.';
+  if (msg) document.getElementById('expired-text').textContent = msg;
 }
 
+// The e-mail is confirmed by a click, never on load: a mail scanner opening
+// the link must not confirm it.
 async function doConfirm(e) {
   e.preventDefault();
-  const pwd  = document.getElementById('password').value;
-  const pwd2 = document.getElementById('password2').value;
   const errEl = document.getElementById('error');
   errEl.style.display = 'none';
-
-  if (pwd !== pwd2) {
-    errEl.textContent = 'Passwords do not match.';
-    errEl.style.display = 'block';
-    return;
-  }
-
   const btn = document.getElementById('btn');
-  btn.disabled = true; btn.textContent = 'Activating…';
-
+  btn.disabled = true; btn.textContent = 'Confirming…';
   try {
     const res  = await fetch('/v1/auth/register/confirm', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ token, password: pwd })
+      body: JSON.stringify({ token })
     });
     const data = await res.json();
     if (!res.ok) {
-      errEl.textContent = data.detail || data.title || 'Activation failed.';
+      errEl.textContent = data.detail || data.title || 'Confirmation failed.';
       errEl.style.display = 'block';
       return;
     }
     document.getElementById('main').style.display = 'none';
-    if (data.pending) {
-      // Issue #449 — no token is issued; account is awaiting Test Manager approval.
-      document.getElementById('pending').style.display = 'block';
-    } else {
-      // oscar_token no longer stored in localStorage — httpOnly cookie is used instead
-      localStorage.setItem('oscar_company', JSON.stringify(data.company));
-      localStorage.setItem('oscar_user',    JSON.stringify(data.user));
-      document.getElementById('done').style.display = 'block';
-      setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
-    }
+    document.getElementById('pending').style.display = 'block';
   } catch(e) {
-    console.error('Account activation failed:', e);
+    console.error('Confirming the e-mail failed:', e);
     errEl.textContent = 'Server unreachable.';
     errEl.style.display = 'block';
   } finally {
-    btn.disabled = false; btn.textContent = 'Activate Account';
+    btn.disabled = false; btn.textContent = 'Confirm my email address';
   }
 }
 

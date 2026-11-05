@@ -628,18 +628,24 @@ describe('DELETE /v1/admin/companies/:id', () => {
 
 describe('POST /v1/admin/users/:id/approve', () => {
   let pendingUserId;
+  let noTmCompanyId;
 
   beforeAll(() => {
     pendingUserId = uuidv4();
+    // The administrator approves alone only in a company with no Test
+    // Manager (access-requests.test.js covers the refusal elsewhere).
+    noTmCompanyId = uuidv4();
+    run(`INSERT INTO companies (id, name, slug) VALUES (?, 'No TM Co', ?)`, [noTmCompanyId, `no-tm-${noTmCompanyId.slice(0, 8)}`]);
     run(
       `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role, status)
        VALUES (?, ?, 'pending-approve@admin-test.com', 'x', 'company_user', 'pending')`,
-      [pendingUserId, companyId]
+      [pendingUserId, noTmCompanyId]
     );
   });
 
   afterAll(() => {
     run('DELETE FROM users WHERE id = ?', [pendingUserId]);
+    run('DELETE FROM companies WHERE id = ?', [noTmCompanyId]);
   });
 
   test('404 for non-existent user id', async () => {
