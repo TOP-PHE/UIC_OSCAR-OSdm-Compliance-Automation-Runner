@@ -708,6 +708,26 @@ describe('POST /v1/admin/users/:id/generate-reset-link', () => {
     expect(res.status).toBe(404);
   });
 
+  // In production the link never comes from the Host header.
+  test('503 in production without APP_URL, and no token is issued', async () => {
+    const saved = { env: process.env.NODE_ENV, url: process.env.APP_URL };
+    process.env.NODE_ENV = 'production';
+    delete process.env.APP_URL;
+    try {
+      run('DELETE FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]);
+      const res = await request(app)
+        .post(`/v1/admin/users/${resetLinkUserId}/generate-reset-link`)
+        .set('Authorization', `Bearer ${makeToken('administrator')}`)
+        .set('Host', 'attacker.example');
+      expect(res.status).toBe(503);
+      expect(JSON.stringify(res.body)).not.toContain('attacker.example');
+      expect(get('SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]).n).toBe(0);
+    } finally {
+      process.env.NODE_ENV = saved.env;
+      if (saved.url === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved.url;
+    }
+  });
+
   test('200 creates a password_reset_tokens row and returns a resetUrl', async () => {
     const token = makeToken('administrator');
     const res = await request(app)

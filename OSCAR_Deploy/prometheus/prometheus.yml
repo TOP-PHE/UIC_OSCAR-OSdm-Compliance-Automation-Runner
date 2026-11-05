@@ -36,7 +36,7 @@ scrape_configs:
   # The OSDM simulator (#1005), read by OSCAR through the address and key of
   # Admin → OSDM Simulator and relayed here: Prometheus holds no key and the
   # simulator's host opens nothing. Without a simulator set up, only
-  # oscar_simulator_configured 0 comes back. nginx's `location = /metrics`
+  # oscar_simulator_configured 0 comes back. nginx's `location ~* ^/metrics`
   # 404 covers this path too (the query string does not change the match).
   - job_name: osdm-simulator
     metrics_path: /metrics

@@ -1,39 +1,28 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.496",
+  "current_release": "2026.497",
   "releases": [
     {
-      "release": "2026.492",
+      "release": "2026.497",
       "date": "2026-11-05",
-      "server": "1.11.454",
-      "collection": "OTST_V2.0.247",
+      "server": "1.11.459",
+      "collection": "OTST_V2.0.249",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.454, collection OTST_V2.0.247: no request to a provider follows a redirect. The server's own calls (token request, stop places, timetable discovery and journey probes) ask for none; a token endpoint answering one fails with a plain reason. Every request file of the collection sets followRedirects false and every request a step's script sends asks maxRedirects 0. Timetable discovery checks the endpoint's address at the time of the call, as the other calls already did."
+        "Server 1.11.459: small security points. /metrics answers on its exact path only (nginx refuses any spelling); a login with an unknown e-mail takes as long as a wrong password; the login audit records the proxy-seen address; a tester cancels their own runs only; a certifier naming a company lists only comparisons of shared runs; in production an administrator's reset link is built from APP_URL only."
       ]
     },
     {
-      "release": "2026.493",
+      "release": "2026.496",
       "date": "2026-11-05",
-      "server": "1.11.455",
-      "collection": "OTST_V2.0.247",
+      "server": "1.11.458",
+      "collection": "OTST_V2.0.249",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.455: a session follows the user as stored. Each request reads the user again; a user who is deleted or no longer active, whose role or company differs from the session's, or whose password or role changed after the session was signed, must sign in again."
-      ]
-    },
-    {
-      "release": "2026.494",
-      "date": "2026-11-05",
-      "server": "1.11.456",
-      "collection": "OTST_V2.0.247",
-      "min_collection": "OTST_V2.0.103",
-      "max_collection": "OTST_V2.0.x",
-      "notes": [
-        "Server 1.11.456: values users store reach other users' pages as text. The run detail and compare pages, Test Config and the Dashboard escape the scenario code, endpoint, list id and e-mail they show; an endpoint or token address holding markup, a quote, a space or a control character is refused; the Report Builder's CSV never starts a cell with a formula."
+        "Server 1.11.458, collection OTST_V2.0.249: a run's secret is taken only from the server's own machine (loopback, no forwarding header), and a provider's answer holding a template ({{) ends the run before the next request, with one failed check."
       ]
     },
     {
@@ -48,14 +37,36 @@
       ]
     },
     {
-      "release": "2026.496",
+      "release": "2026.494",
       "date": "2026-11-05",
-      "server": "1.11.458",
-      "collection": "OTST_V2.0.249",
+      "server": "1.11.456",
+      "collection": "OTST_V2.0.247",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.458, collection OTST_V2.0.249: a run's secret is taken only from the server's own machine (loopback, no forwarding header), and a provider's answer holding a template ({{) ends the run before the next request, with one failed check."
+        "Server 1.11.456: values users store reach other users' pages as text. The run detail and compare pages, Test Config and the Dashboard escape the scenario code, endpoint, list id and e-mail they show; an endpoint or token address holding markup, a quote, a space or a control character is refused; the Report Builder's CSV never starts a cell with a formula."
+      ]
+    },
+    {
+      "release": "2026.493",
+      "date": "2026-11-05",
+      "server": "1.11.455",
+      "collection": "OTST_V2.0.247",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.455: a session follows the user as stored. Each request reads the user again; a user who is deleted or no longer active, whose role or company differs from the session's, or whose password or role changed after the session was signed, must sign in again."
+      ]
+    },
+    {
+      "release": "2026.492",
+      "date": "2026-11-05",
+      "server": "1.11.454",
+      "collection": "OTST_V2.0.247",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.454, collection OTST_V2.0.247: no request to a provider follows a redirect. The server's own calls (token request, stop places, timetable discovery and journey probes) ask for none; a token endpoint answering one fails with a plain reason. Every request file of the collection sets followRedirects false and every request a step's script sends asks maxRedirects 0. Timetable discovery checks the endpoint's address at the time of the call, as the other calls already did."
       ]
     },
     {

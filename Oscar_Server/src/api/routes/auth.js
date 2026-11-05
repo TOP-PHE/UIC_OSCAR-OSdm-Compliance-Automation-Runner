@@ -34,6 +34,8 @@ const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
+// A hash of no one's password, compared when the e-mail is unknown.
+const UNKNOWN_USER_HASH = bcrypt.hashSync(require('node:crypto').randomBytes(24).toString('hex'), SALT_ROUNDS);
 const JWT_EXPIRY     = '8h';
 const JWT_EXPIRY_SEC = 8 * 60 * 60;   // same as JWT_EXPIRY in seconds
 
@@ -124,7 +126,9 @@ function createUser({ companyId, email, passwordHash, role }) {
 
 function authClientMeta(req) {
   return {
-    ip: (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim() || null,
+    // req.ip: the address the trusted proxy saw (trust proxy), never the
+    // leftmost X-Forwarded-For entry, which the client writes.
+    ip: req.ip || req.socket?.remoteAddress || null,
     userAgent: (req.headers['user-agent'] || '').toString() || null
   };
 }
@@ -556,6 +560,9 @@ router.post('/login',
 
   const user = get('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
   if (!user) {
+    // As long as a wrong password takes: the answer's time does not tell
+    // whether the address has an account.
+    await bcrypt.compare(password, UNKNOWN_USER_HASH);
     logAuthEvent({ email: normalizedEmail, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
     loginAttempts.inc({ result: 'failure' });
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });

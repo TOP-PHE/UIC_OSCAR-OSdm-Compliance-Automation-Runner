@@ -143,13 +143,18 @@ router.get('/comparisons', (req, res) => {
        LIMIT 200`
     );
   } else {
+    // A certifier naming a company (?company_id) still sees only comparisons
+    // of two runs shared with certifiers.
+    const sharedOnly = req.user.role === 'certification_user'
+      ? 'AND ra.shared_with_certifier_at IS NOT NULL AND rb.shared_with_certifier_at IS NOT NULL'
+      : '';
     rows = all(
       `SELECT rc.id, rc.run_a_id, rc.run_b_id, rc.created_at,
               ra.queued_at as run_a_date, rb.queued_at as run_b_date
        FROM report_comparisons rc
        JOIN runs ra ON ra.id = rc.run_a_id
        JOIN runs rb ON rb.id = rc.run_b_id
-       WHERE rc.company_id = ? AND ra.status != 'DELETED' AND rb.status != 'DELETED'
+       WHERE rc.company_id = ? AND ra.status != 'DELETED' AND rb.status != 'DELETED' ${sharedOnly}
        ORDER BY rc.created_at DESC
        LIMIT 100`,
       [req.companyId]
