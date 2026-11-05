@@ -78,11 +78,12 @@ const SESSION_ROW_SQL =
 function sessionUser(payload) {
   if (!payload || typeof payload.sub !== 'string') return null;
   const row = get(SESSION_ROW_SQL, [payload.sub]);
-  if (!row || row.status !== 'active') return null;
+  if (row?.status !== 'active') return null;
   const role = normalizeRole(row.role);
   if (role !== normalizeRole(payload.role)) return null;
   if (row.company_id !== payload.companyId) return null;
   const validAfter = Number(row.sessions_valid_after) || 0;
+  // Written as "not at or after" so that a token without a numeric iat (NaN) is refused too.
   if (validAfter && !(Number(payload.iat) >= validAfter)) return null;
   return { id: row.id, email: row.email, companyId: row.company_id, role };
 }
