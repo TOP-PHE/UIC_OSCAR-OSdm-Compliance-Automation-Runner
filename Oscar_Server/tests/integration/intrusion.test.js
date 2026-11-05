@@ -60,6 +60,10 @@ describe('parseIntrusionLine()', () => {
     expect(I.parseIntrusionLine('[ERROR] [INTRUSION] kind=template step=02. POST Create Booking'))
       .toEqual({ kind: 'template', step: '02. POST Create Booking' });
   });
+  test('the step ends at the level tag the collection adds', () => {
+    expect(I.parseIntrusionLine('[INTRUSION] kind=redirect step=05. GET Booking before Fulfillments [ERROR] an answer redirects to a local address; the run stops here.'))
+      .toEqual({ kind: 'redirect', step: '05. GET Booking before Fulfillments' });
+  });
   test.each(['[INTRUSION] kind=other step=x', 'kind=template step=x', '', null])('%j is not an intrusion line', (line) => {
     expect(I.parseIntrusionLine(line)).toBeNull();
   });

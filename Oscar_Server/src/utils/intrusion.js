@@ -48,8 +48,12 @@ function parseIntrusionLine(line) {
   const rest = text.slice(at + INTRUSION_MARK.length);
   const kind = /^kind=([a-z]+)/.exec(rest)?.[1];
   if (!KINDS.has(kind)) return null;
+  // `step=<request name>` runs to the level tag the collection adds after it.
   const stepAt = rest.indexOf(' step=');
-  return { kind, step: stepAt === -1 ? null : cleanStep(rest.slice(stepAt + 6)) };
+  if (stepAt === -1) return { kind, step: null };
+  const after = rest.slice(stepAt + 6);
+  const end = after.indexOf(' [');
+  return { kind, step: cleanStep(end === -1 ? after : after.slice(0, end)) };
 }
 
 /** The open (not resumed) suspension of a company's endpoint, or null. */
