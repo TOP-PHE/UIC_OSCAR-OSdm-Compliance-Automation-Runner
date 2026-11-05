@@ -237,10 +237,11 @@ function coverageOfPassenger(fares, section, spanOf = coveredOf, trip = {}) {
  * (`search`), when the trip's trains do not call at the section's start (or
  * end), their first (or last) stop stands for it. A trip specification or a
  * trip chosen by id is the scenario's own: a section outside it stops the
- * scenario before the answer is read (#904). {} when the trip is not in the
- * answer or has no train.
+ * scenario before the answer is read (#904). {} without a section, or when
+ * the trip is not in the answer or has no train.
  */
 function tripOfOffer(offer, response, section, search = false) {
+  if (!isObject(section)) return {};
   const id = offer?.tripCoverage?.coveredTripId;
   const trip = id ? list(response?.trips).find((t) => t?.id === id) : null;
   const legs = list(trip?.legs);
@@ -259,10 +260,11 @@ function tripOfOffer(offer, response, section, search = false) {
   };
 }
 
-// An offer whose trip stands in for the section's start or end, for O8's warning.
-function offTripText(trip, i) {
+// An offer whose trip stands in for the section's start or end, for O8's
+// warning: [] when it does not.
+function offTripTexts(trip, i) {
   const moved = [...list(trip.starts).map((s) => `starts at ${s}`), ...list(trip.ends).map((s) => `ends at ${s}`)];
-  return moved.length ? `offers[${i}] (its trip ${moved.join(' and ')})` : null;
+  return moved.length ? [`offers[${i}] (its trip ${moved.join(' and ')})`] : [];
 }
 
 function sectionOf(request) {
@@ -285,9 +287,8 @@ function passengerChecks(response, request) {
   list(response?.offers).forEach((offer, i) => {
     const fares = list(offer.fares);
     if (fares.length === 0) return;
-    const trip = section ? tripOfOffer(offer, response, section, isObject(request?.tripSearchCriteria)) : {};
-    const moved = offTripText(trip, i);
-    if (moved) offTrip.push(moved);
+    const trip = tripOfOffer(offer, response, section, isObject(request?.tripSearchCriteria));
+    offTrip.push(...offTripTexts(trip, i));
     // #255: a bicycle travels on its reservation, without a fare (its mode is V1's).
     const reserved = new Set(list(offer.reservationOfferParts).flatMap((r) => list(r.passengerRefs)).filter((ref) => bicycles.has(ref)));
     for (const ref of passengers) {
