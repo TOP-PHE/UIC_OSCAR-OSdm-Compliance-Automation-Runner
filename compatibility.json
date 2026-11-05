@@ -7,11 +7,11 @@
       "release": "2026.492",
       "date": "2026-11-05",
       "server": "1.11.454",
-      "collection": "OTST_V2.0.246",
+      "collection": "OTST_V2.0.247",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.454: the server's own calls to a provider (token request, stop places, timetable discovery and journey probes) never follow a redirect; a token endpoint answering one fails with a plain reason. Timetable discovery checks the endpoint's address at the time of the call, as the other calls already did."
+        "Server 1.11.454, collection OTST_V2.0.247: no request to a provider follows a redirect. The server's own calls (token request, stop places, timetable discovery and journey probes) ask for none; a token endpoint answering one fails with a plain reason. Every request file of the collection sets followRedirects false and every request a step's script sends asks maxRedirects 0. Timetable discovery checks the endpoint's address at the time of the call, as the other calls already did."
       ]
     },
     {

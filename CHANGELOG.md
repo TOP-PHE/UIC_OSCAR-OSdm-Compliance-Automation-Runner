@@ -105,18 +105,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.454] — 2026-11-05
+## [server-1.11.454] / [collection-OTST_V2.0.247] — 2026-11-05
 
-Release 2026.492. The server's own calls to a provider never follow a redirect. Collection unchanged.
+Release 2026.492. No request to a provider follows a redirect: neither the server's own calls nor a run's.
 
 ### Fixed
 - **No redirect is followed** by the requests the server sends a provider itself: the token request (`worker/auth-profiles.js`, every profile), the stop-place list (`utils/osdm-client.js`) and timetable discovery, calendar filling and journey probes (`company-test-resources.js`). Each now asks `fetch` for `redirect: 'manual'`, as the credential test, the AI service and the simulator's administration already did. A token endpoint answering a redirect fails with a plain reason (save the address it redirects to); the other calls report the redirect's HTTP status.
 - **Timetable discovery checks the endpoint's address at the time of the call** (`_vendorSession()`, `urlPolicy.js`), as the stop-place list and the credential test already did: the address was checked when saved, but what its name resolves to can change.
+- **A run follows no redirect either** (collection OTST_V2.0.247). Every request file of `00-` to `04-` sets `settings.followRedirects: false` (Bruno's default is to follow up to five, keeping the headers), and every `bru.sendRequest` in `library-bruno/` asks `maxRedirects: 0`. Checked with the real Bruno CLI 4.3.0 on two local servers: a request file and a script request each stop at the 302 and the second server is never reached; the answer is graded as the HTTP status it is.
 - `OSCAR - Outbound Calls` says so.
 
 ### Checked
 - `no-redirects.test.js`: two real local servers, the first answering 302 to the second. The stop-place read and both OAuth token profiles answer the redirect and the second server is never reached; without a redirect both still work. A discover-timetable test checks that every call asks for no redirect. With `main`'s files, three of these fail.
-- `npm run lint`, full `npx jest`: 259 suites, 5,374 tests.
+- `bruno-request-files.test.js`: every request file sets `followRedirects: false`; `bruno-library-security.test.js`: every `bru.sendRequest` asks `maxRedirects: 0`. Each fails when one file or one call is put back.
+- Replay of eight `_38` scenarios that send requests from their scripts (offers by trip id, refund-again and confirm-again probes, offer request options, named place, seat preferences, idempotency, near a place) with `main`'s collection and this one: the same recordings.
+- `npm run lint`, full `npx jest`: 259 suites, 5,429 tests; the simulator's tests: 412.
 
 ---
 

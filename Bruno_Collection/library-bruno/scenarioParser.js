@@ -395,7 +395,7 @@ function getJson(url) {
     validationLogger(`[INFO] 🔧 data_base URL had double-slash, normalized: "${cleanUrl}"`);
   }
   return new Promise((resolve, reject) => {
-    bru.sendRequest({ url: cleanUrl, method: "GET", proxy: false, headers: oscarRunHeaders() }, function (err, res) {
+    bru.sendRequest({ url: cleanUrl, method: "GET", proxy: false, maxRedirects: 0, headers: oscarRunHeaders() }, function (err, res) {
       if (err) return reject(new Error(`Network error fetching data file from "${cleanUrl}": ${_errMsg(err)}. Is the data-file server running and reachable? When testing locally in Bruno, serve the data_base folder over HTTP (e.g. run "python -m http.server 8000" in Bruno_Collection/data_base) and point the data_base env var at it.`));
       const status = res.status || res.statusCode || 200;
       if (status < 200 || status >= 300) {

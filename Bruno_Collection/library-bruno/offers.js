@@ -272,6 +272,7 @@ function ensureAuthorizationOr403() {
     if (resolvedBody) bodyStr = typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody);
     bru.sendRequest({
       url: resolvedUrl,
+      maxRedirects: 0,
       method: method,
       header: headersArray,
       body: bodyStr ? { mode: 'raw', raw: bodyStr } : undefined,
@@ -2372,6 +2373,7 @@ async function sendOsdmRequest(method, path, payload) {
     const res = await new Promise((resolve, reject) => {
       bru.sendRequest({
         url: `${bru.getEnvVar("api_base")}${path}`,
+        maxRedirects: 0,
         method,
         // #1070: the sale's W3C trace, a parent-id of its own.
         headers: require("./traceContext.js").withTrace({
@@ -2693,6 +2695,7 @@ async function sendTripsCollection(search) {
     const res = await new Promise((resolve, reject) => {
       bru.sendRequest({
         url: `${bru.getEnvVar("api_base")}/${require("./tripIds.js").tripsCollectionPath(bru.getEnvVar("osdmVersion"))}`,
+        maxRedirects: 0,
         method: "POST",
         // #1070: the sale's W3C trace, a parent-id of its own.
         headers: require("./traceContext.js").withTrace({

@@ -99,4 +99,20 @@ describe('the library keeps clear of both', () => {
   test.each(['new Function(', 'Math.random(', 'eval('])('no %s in library-bruno', (call) => {
     expect(files.filter((f) => code(f).includes(call))).toEqual([]);
   });
+
+  // A request a script sends follows no redirect either (maxRedirects 0, the
+  // option bru.sendRequest takes; checked with the real CLI): every call names
+  // it in the first lines of its options.
+  test('every bru.sendRequest asks for no redirect', () => {
+    const missing = [];
+    for (const f of files) {
+      const text = code(f);
+      let at = text.indexOf('bru.sendRequest(');
+      while (at !== -1) {
+        if (!text.slice(at, at + 400).includes('maxRedirects: 0')) missing.push(`${f}:${text.slice(0, at).split('\n').length}`);
+        at = text.indexOf('bru.sendRequest(', at + 1);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
 });

@@ -61,7 +61,7 @@ function captureSwaggerSchemaValidator() {
   }
 
   bru.sendRequest(
-    { url, method: 'GET', proxy: false },
+    { url, method: 'GET', proxy: false, maxRedirects: 0 },
     function (err, res) {
       if (err) {
         // Inside `if (err)` so err is truthy — drop the `err && ` guard
@@ -281,7 +281,7 @@ function validateDataFileJsonWithTemplate(jsonData) {
   } catch (_logErr) { /* logging is best-effort */ }
 
   bru.sendRequest(
-    { url: schemaUrl, method: 'GET', proxy: false },
+    { url: schemaUrl, method: 'GET', proxy: false, maxRedirects: 0 },
     function (err, res) {
       if (err) {
         // Same as above — inside `if (err)` so err is truthy.

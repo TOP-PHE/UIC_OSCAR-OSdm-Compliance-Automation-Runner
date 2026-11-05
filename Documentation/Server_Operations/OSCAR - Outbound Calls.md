@@ -142,6 +142,9 @@ Test Manager's (or, for the credential test, any member's) action on a page.
   (`childBaseEnv()`), the token through its process environment and never in
   a file, and every value of its environment file escaped (`envVar()`). A
   data file holding `{{…}}` is refused before the token is read.
+- **No redirect is followed by a run**: every request file sets
+  `followRedirects: false` and every request a script sends asks
+  `maxRedirects: 0`; a redirect is graded as the HTTP status it is.
 - **A provider that stops answering** stops the run after
   `RUN_IDLE_TIMEOUT_MS` of silence.
 - **The server's own calls**: the address checked again at the time of the
