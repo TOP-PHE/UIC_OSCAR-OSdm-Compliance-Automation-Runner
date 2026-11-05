@@ -154,6 +154,14 @@ describe('step 01 decides the fare sale', () => {
     expect(fares.fareSaleDecision([{ id: 'O7', level: 'FAIL', ok: false }], offer).reason).toMatch(/failed O7/);
     expect(fares.fareSaleDecision([], null).book).toBe(false);
   });
+
+  test('#1045 the chosen offer\'s own checks decide; a failure of other offers is named only', () => {
+    const offer = { offerId: 'F1', fares: [{}] };
+    const elsewhere = [{ id: 'O8', level: 'FAIL', ok: false }];
+    expect(fares.fareSaleDecision([], offer, elsewhere)).toMatchObject({ book: true });
+    expect(fares.fareSaleDecision([], offer, elsewhere).reason).toMatch(/failed \(O8\) name other offers only/);
+    expect(fares.fareSaleDecision([], offer, []).reason).not.toMatch(/other offers/);
+  });
 });
 
 describe('the Bruno glue', () => {
@@ -226,6 +234,28 @@ describe('the Bruno glue', () => {
     expect(fares.checkFareOffers(products)).toBe(false);
     expect(fares.isFareSale()).toBe(false);
     expect(products.offers.map((o) => o.offerId)).toEqual(['P1']);
+  });
+
+  realTest('#1045 01: another offer\'s gap fails O8 but does not stop the sale; the chosen offer\'s gap does', () => {
+    const { offer } = sale();
+    const request = { requestedSections: [{ startPlace: station('0000001'), endPlace: station('0000002') }], offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] }, anonymousPassengerSpecifications: PASSENGERS };
+    const withGap = () => {
+      const broken = structuredClone(offer);
+      broken.offerId = 'GAP';
+      for (const f of broken.fares) f.coveredSection = { startPlace: station('0000003'), endPlace: station('0000002') };
+      return broken;
+    };
+    Object.assign(env, { OfferCollectionRequest: JSON.stringify(request), __travelDay: '2026-11-20' });
+    expect(fares.checkFareOffers({ offers: [structuredClone(offer), withGap()] })).toBe(true);
+    expect(recorded.find((r) => r.startsWith('[fares O8] Each passenger\'s fares cover'))).toMatch(/offers\[1\]/);
+    expect(fares.isFareSale()).toBe(true);
+    expect(env.offerId).toBe(offer.offerId);
+    expect(logged.some((l) => /name other offers only/.test(l))).toBe(true);
+    // The first fare offer is the one chosen (no cluster asked): its own gap stops the sale.
+    for (const k of Object.keys(env)) if (k !== 'OfferCollectionRequest') delete env[k];
+    expect(fares.checkFareOffers({ offers: [withGap(), structuredClone(offer)] })).toBe(true);
+    expect(fares.isFareSale()).toBe(false);
+    expect(logged.some((l) => /GAP is not booked: its fares failed O8/.test(l))).toBe(true);
   });
 });
 

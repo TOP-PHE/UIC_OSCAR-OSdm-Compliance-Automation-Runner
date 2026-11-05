@@ -105,6 +105,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.461] / [collection-OTST_V2.0.251] — 2026-11-05
+
+Issue #1045, release 2026.499. A fare search answered with a trip that starts at a nearby stop.
+
+A real provider's fare search stopped after step 01: O8 reported a gap on four offers of one trip, and the fare offer chosen, on another trip, was not booked although it passed every check. That trip started by tram from the tram stop in front of the station asked, then walked to another station and took a train: its fares ran from the tram stop, and OSCAR held them to the station asked.
+
+### Fixed
+- **O8 reads a searched trip from its own first and last stop** (`tripOfOffer()`, `fares.js`). An offer's trip is the answer's trip named by its `tripCoverage.coveredTripId`. For a request by search criteria, when that trip's trains do not call at the requested section's start (or end), their first (or last) stop stands for it, and one O8 WARNING names those offers. A gap on a train leg still fails. A trip specification or a trip chosen by id is the scenario's own: a section outside it still stops the scenario before the answer is read (#904).
+- **A walk needs no fare**: where no fare of a passenger starts, O8 takes a transfer leg of the trip from there (`coverageOfPassenger()`).
+- **The sale is decided on the fare offer chosen alone** (`chosenOfferChecks()`): step 01's checks run again on that offer, and only their failures stop the sale. A failure of other offers stays a failed check of step 01; the INFO line of the decision names it.
+
+### Checked
+- The provider's run, replayed through step 01: O8 passes with one warning naming the offers of that trip, and the offer chosen is booked; before, O8 failed and the scenario stopped. Its earlier run (no such trip) gives the same result before and after.
+- `bruno-fares.test.js`: a searched trip starting by tram, a walk, and one fare per vehicle are covered; a train leg left out is still a gap; a trip specification gets no stand-in. `bruno-fare-booking.test.js`: another offer's gap fails O8 and the sale goes on; the chosen offer's gap stops it. Each fails when its fix is taken out.
+- Simulator replay of the 46 fare `_38` scenarios, `main` and this branch: the two recordings are the same.
+- `npm run lint`, full `npx jest`: 5,500 passed; the two Windows-only failures (`/metrics`, MCP end-to-end) as on `main`.
+
+---
+
 ## [server-1.11.460] / [collection-OTST_V2.0.250] — 2026-11-05
 
 Issue #1085, release 2026.498. Simulator 0.63.0. An answer meant to attack OSCAR stops the run, is recorded, alerts the administrators and suspends the endpoint.

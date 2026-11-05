@@ -131,6 +131,73 @@ describe('fare checks on hand-made answers', () => {
   }
 });
 
+// #1045, from a real provider's search: one of the trips found starts with a
+// tram from the tram stop by the station asked (0000091), walks from the tram's
+// last stop (0000092) to another station (0000003) and takes a train from there.
+describe('#1045 O8 on a searched trip that starts at another stop place', () => {
+  const leg = (id, from, to) => ({ id, timedLeg: { start: { stopPlaceRef: station(from) }, end: { stopPlaceRef: station(to) } } });
+  const walk = (id, from, to) => ({ id, transferLeg: { start: station(from), end: station(to), transferMode: 'WALK' } });
+  const trips = [
+    { id: 'DIRECT', legs: [leg('1', '0000001', '0000002')] },
+    { id: 'TRAM', legs: [leg('1', '0000091', '0000092'), walk('2', '0000092', '0000003'), leg('3', '0000003', '0000002')] },
+  ];
+  const span = (a, b) => ({ startPlace: station(a), endPlace: station(b) });
+  const offer = (trip, fareList, sections) => ({ offerId: `${trip}-${fareList.length}`, tripCoverage: { coveredTripId: trip, coveredSections: sections }, fares: fareList });
+  const fare = (cover) => ({ id: 'F', passengerRefs: ['00001'], ...(cover ? { coveredSection: cover } : {}) });
+  const tramSections = [span('0000091', '0000092'), span('0000092', '0000003'), span('0000003', '0000002')];
+  const body = () => ({
+    trips: structuredClone(trips),
+    offers: [
+      offer('DIRECT', [fare(span('0000001', '0000002'))]),
+      // Its offer's covered sections run from the tram stop: covered from there.
+      offer('TRAM', [fare(null)], tramSections),
+      // One fare per vehicle, the walk between them.
+      offer('TRAM', [fare(span('0000091', '0000092')), { ...fare(span('0000003', '0000002')), id: 'G' }], tramSections),
+      // A fare from the station asked, as a provider gives a route between the two stations.
+      offer('TRAM', [fare(span('0000001', '0000002'))], tramSections),
+    ],
+  });
+  const search = {
+    tripSearchCriteria: { origin: station('0000001'), destination: station('0000002'), departureTime: '2026-11-20T08:00:00' },
+    requestedSections: [span('0000001', '0000002')],
+    offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] },
+    anonymousPassengerSpecifications: [ADULT],
+  };
+  const o8 = (answer, req) => fares.fareChecks(answer, req).filter((c) => c.id === 'O8' && !c.ok);
+
+  test('no gap: one WARNING names the offers on that trip', () => {
+    const failed = o8(body(), search);
+    expect(failed.map((c) => c.level)).toEqual(['WARNING']);
+    expect(failed[0].message).toContain('offers[1] (its trip starts at urn:uic:stn:0000091)');
+    expect(failed[0].message).not.toContain('offers[0]');
+  });
+
+  test('a train leg its fares leave out is still a gap', () => {
+    const answer = body();
+    answer.offers.push(offer('TRAM', [fare(span('0000003', '0000002'))], tramSections));
+    const gap = o8(answer, search).find((c) => c.level === 'FAIL');
+    expect(gap.title).toMatch(/without a gap/);
+    expect(gap.message).toContain('passenger 00001 in offers[4]');
+    expect(gap.message).not.toMatch(/offers\[[0-3]\]/);
+  });
+
+  test('the trip stands in for a search only: a trip specification is the scenario\'s own (#904)', () => {
+    const spec = { ...search, tripSearchCriteria: undefined, tripSpecifications: [{ legs: trips[0].legs }] };
+    const gap = o8(body(), spec).find((c) => c.level === 'FAIL');
+    expect(gap.message).toContain('offers[1]');
+    expect(fares.tripOfOffer(body().offers[1], body(), { start: 'urn:uic:stn:0000001', end: 'urn:uic:stn:0000002' }))
+      .toEqual({ starts: [], ends: [], walks: [{ start: 'urn:uic:stn:0000092', end: 'urn:uic:stn:0000003' }] });
+  });
+
+  test('a trip the answer does not hold changes nothing', () => {
+    const answer = body();
+    answer.trips = [];
+    const gap = o8(answer, search).find((c) => c.level === 'FAIL');
+    expect(gap.message).toContain('offers[1]');
+    expect(fares.tripOfOffer(answer.offers[1], answer, { start: 'a', end: 'b' }, true)).toEqual({});
+  });
+});
+
 describe('the pure helpers', () => {
   test('asksFares and the types asked', () => {
     expect(fares.asksFares({ offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } })).toBe(true);
@@ -147,6 +214,21 @@ describe('the pure helpers', () => {
     expect(fares.coverageOfPassenger([fare('1', '2')], section)).toBe('gap');
     expect(fares.coverageOfPassenger([fare('1', '3'), fare('1', '2')], section)).toBe('overlap');
     expect(fares.coverageOfPassenger([{}], section)).toBe('unknown');
+  });
+
+  test('#1045 the coverage walk with a trip: its own start and end stand in, a walk needs no fare', () => {
+    const fare = (a, b) => ({ coveredSection: { startPlace: station(a), endPlace: station(b) } });
+    const section = { start: 'urn:uic:stn:0000001', end: 'urn:uic:stn:0000002' };
+    const trip = { starts: ['urn:uic:stn:0000091'], ends: [], walks: [{ start: 'urn:uic:stn:0000092', end: 'urn:uic:stn:0000003' }] };
+    // From the trip's own first stop, across the walk, to the end.
+    expect(fares.coverageOfPassenger([fare('91', '92'), fare('3', '2')], section, undefined, trip)).toBe('covered');
+    // From the section's start still counts.
+    expect(fares.coverageOfPassenger([fare('1', '2')], section, undefined, trip)).toBe('covered');
+    // The tram leg left out is still a gap; so is the walk without the trip.
+    expect(fares.coverageOfPassenger([fare('3', '2')], section, undefined, trip)).toBe('gap');
+    expect(fares.coverageOfPassenger([fare('91', '92'), fare('3', '2')], section)).toBe('gap');
+    // Fares left over are still an overlap.
+    expect(fares.coverageOfPassenger([fare('91', '2'), fare('1', '2')], section, undefined, trip)).toBe('overlap');
   });
 
   test('chooseFareOffer takes the cluster asked, else the first fare offer', () => {
