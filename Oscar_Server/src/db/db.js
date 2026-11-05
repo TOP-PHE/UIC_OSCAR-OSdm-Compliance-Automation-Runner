@@ -977,6 +977,26 @@ const MIGRATIONS = [
       // refused: set when the user's password, role or company changes.
       _safeAlter('ALTER TABLE users ADD COLUMN sessions_valid_after INTEGER');
   }},
+  { version: 47, name: 'intrusion-detection', up: () => {
+      // An answer meant to attack OSCAR, met during a run (utils/intrusion.js):
+      // which run, company and user, what kind, at which step and when; never
+      // the answer. The company's endpoint is suspended until a Test Manager
+      // resumes it (resumed_at / resumed_by close the event).
+      db.exec(`CREATE TABLE IF NOT EXISTS security_event (
+        id          TEXT PRIMARY KEY,
+        run_id      TEXT NOT NULL,
+        company_id  TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        user_id     TEXT,
+        kind        TEXT NOT NULL,
+        step        TEXT,
+        detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+        resumed_at  TEXT,
+        resumed_by  TEXT
+      )`);
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS security_event_run ON security_event(run_id)');
+      _safeAlter('ALTER TABLE companies ADD COLUMN endpoint_suspended_at TEXT');
+      _safeAlter('ALTER TABLE companies ADD COLUMN endpoint_suspended_reason TEXT');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

@@ -495,6 +495,20 @@ const backupStatusLimiter = rateLimit({
 });
 router.get('/backup-status', backupStatusLimiter, (req, res) => res.json(readBackupStatus()));
 
+// ── GET /v1/admin/security-events ────────────────────────────────────────────
+// The intrusion attempts runs met (utils/intrusion.js): company, kind, step,
+// times and who started the run. No test data: never the answer.
+router.get('/security-events', (req, res) => {
+  const events = all(
+    `SELECT e.id, e.run_id, e.kind, e.step, e.detected_at, e.resumed_at, e.resumed_by,
+            c.name AS company_name, u.email AS started_by
+       FROM security_event e
+       JOIN companies c ON c.id = e.company_id
+       LEFT JOIN users u ON u.id = e.user_id
+      ORDER BY e.detected_at DESC LIMIT 200`);
+  res.json({ events });
+});
+
 // ── Company management ────────────────────────────────────────────────────────
 
 router.get('/companies', (req, res) => {

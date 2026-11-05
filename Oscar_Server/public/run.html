@@ -165,6 +165,12 @@ async function loadProfile() {
   let testReady = false;
   const warnings = [];
 
+  // An endpoint suspended after an intrusion attempt takes no run.
+  if (c.endpoint_suspended_at) {
+    warnings.push('⛔ <strong>Intrusion attempt detected</strong>: the OSDM endpoint is suspended. A Test Manager resumes it on <a href="/profile.html">API Config</a> once the provider is checked.');
+    apiReady = false;
+  }
+
   // Endpoint (company-shared)
   if (c.api_base) {
     document.getElementById('cfg-endpoint').textContent = c.api_base;
