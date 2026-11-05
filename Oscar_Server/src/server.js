@@ -406,6 +406,15 @@ function withTripCalendars(plaintext, companyId) {
   }
 }
 
+// A run's secret is accepted only from the run itself: Bruno calls the server
+// on its own machine (127.0.0.1), directly, never through the reverse proxy,
+// which adds a forwarding header. Anything else is treated as no secret.
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+function fromThisMachine(req) {
+  if (req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return false;
+  return LOOPBACK_ADDRESSES.has(req.socket?.remoteAddress);
+}
+
 app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);
@@ -420,7 +429,9 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   //     its own company's file — a secret for company A asking for company B's
   //     slug gets 404 (no disclosure). The runId travels in a header because
   //     this route is keyed on the slug, not the run.
-  const runCompanyId = runSecrets.verify(req.get('X-OSCAR-Run-Id'), req.get('X-OSCAR-Run-Secret'));
+  const runCompanyId = fromThisMachine(req)
+    ? runSecrets.verify(req.get('X-OSCAR-Run-Id'), req.get('X-OSCAR-Run-Secret'))
+    : null;
   if (runCompanyId !== null) {
     if (runCompanyId !== company.id) return res.status(404).send('Not found');
   } else {
@@ -470,7 +481,8 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
 // (Bruno is a spawned child process). The secret is bound to the run's
 // company, so it only refreshes the token of the run it was minted for; it
 // never crosses run boundaries. Until v1.11.210 this was gated on the source
-// address (127.0.0.1, no X-Forwarded-For) alone.
+// address (127.0.0.1, no X-Forwarded-For) alone; since 1.11.458 it takes both:
+// the secret, sent from this machine (fromThisMachine).
 //
 // The SAFE_RUNID_RE used below is defined further down for the
 // /artifacts/:runId path — declared inline here so the order doesn't matter.
@@ -483,7 +495,7 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
   // S8-loopback: the run's own secret, not the source address. A missing or
   // wrong secret is a 403 — the run is identified by the path and the secret
   // together, so this never hands a token to a guessed runId.
-  const runCompanyId = runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret'));
+  const runCompanyId = fromThisMachine(req) ? runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret')) : null;
   if (runCompanyId === null) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
   }

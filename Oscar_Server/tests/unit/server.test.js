@@ -298,6 +298,28 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // A run's secret counts only when sent from this machine, directly: through
+  // the reverse proxy (a forwarding header), it is no secret.
+  test.each(['X-Forwarded-For', 'Forwarded', 'X-Real-IP'])('a run secret sent with %s is not taken (no file)', async (header) => {
+    const { companyId, slug } = seedCompanyUser();
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(JSON.stringify({ scenarios: ['run-ok'] })), filePath);
+    try {
+      const res = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret)
+        .set(header, header === 'Forwarded' ? 'for=203.0.113.7' : '203.0.113.7');
+      expect(res.status).not.toBe(200);
+      expect(JSON.stringify(res.body || {})).not.toContain('run-ok');
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // #619: the run's copy carries the Test Framework's warnings; a Test
   // Manager's download stays the stored file.
   test('a run gets the framework warnings in its copy; a Test Manager the stored file', async () => {
@@ -566,6 +588,21 @@ describe('POST /v1/runs/:runId/refresh-access-token', () => {
     try {
       const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`)
         .set('X-OSCAR-Run-Secret', 'deadbeef'.repeat(8));
+      expect(res.status).toBe(403);
+    } finally {
+      runSecrets.revoke(runId);
+    }
+  });
+
+  test('403 for the right secret sent through the reverse proxy', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = uuidv4();
+    run(`INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'RUNNING')`, [runId, companyId, userId]);
+    const secret = runSecrets.issue(runId, companyId);
+    try {
+      const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`)
+        .set('X-OSCAR-Run-Secret', secret)
+        .set('X-Forwarded-For', '203.0.113.7');
       expect(res.status).toBe(403);
     } finally {
       runSecrets.revoke(runId);
