@@ -454,6 +454,12 @@ router.patch('/', (req, res) => {
   values.push(targetCompanyId);
 
   run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
+  // Another endpoint: the tokens cached for the old one are never sent to it
+  // (utils/credentialEndpoint.js asks each tester to save their credentials again).
+  if (endpoint.write !== null && endpoint.write !== company.api_base) {
+    run(`UPDATE tester_credentials SET cached_token_enc = NULL, cached_token_expires_at = NULL, cached_token_cred_fp = NULL
+         WHERE company_id = ?`, [targetCompanyId]);
+  }
   // Another endpoint saved ends a suspension after an intrusion attempt.
   if (endpoint.write !== null && endpoint.write !== company.api_base && company.endpoint_suspended_at) {
     resumeEndpoint(targetCompanyId, req.user.email);

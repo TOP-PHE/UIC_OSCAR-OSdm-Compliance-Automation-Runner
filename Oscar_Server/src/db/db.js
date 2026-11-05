@@ -997,6 +997,20 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE companies ADD COLUMN endpoint_suspended_at TEXT');
       _safeAlter('ALTER TABLE companies ADD COLUMN endpoint_suspended_reason TEXT');
   }},
+  { version: 48, name: 'credentials-endpoint', up: () => {
+      // The origin of the OSDM endpoint a tester's credentials were saved for
+      // (utils/credentialEndpoint.js): they go to no other. Existing rows get
+      // their company's endpoint now, so nobody has to save again today.
+      _safeAlter('ALTER TABLE tester_credentials ADD COLUMN credentials_endpoint TEXT');
+      const rows = db.prepare(`SELECT tc.user_id, tc.company_id, c.api_base FROM tester_credentials tc
+                                 JOIN companies c ON c.id = tc.company_id`).all();
+      const set = db.prepare('UPDATE tester_credentials SET credentials_endpoint = ? WHERE user_id = ? AND company_id = ?');
+      for (const r of rows) {
+        let origin = null;
+        try { origin = r.api_base ? new URL(String(r.api_base).trim()).origin : null; } catch { origin = null; }
+        set.run(origin, r.user_id, r.company_id);
+      }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

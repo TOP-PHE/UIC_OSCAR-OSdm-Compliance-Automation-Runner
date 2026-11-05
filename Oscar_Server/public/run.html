@@ -171,6 +171,12 @@ async function loadProfile() {
     apiReady = false;
   }
 
+  // Credentials saved for another endpoint are sent nowhere (utils/credentialEndpoint.js).
+  if (m.endpoint_changed) {
+    warnings.push('The OSDM endpoint changed since your credentials were saved: check them on <a href="/profile.html">API Config</a> and save them again.');
+    apiReady = false;
+  }
+
   // Endpoint (company-shared)
   if (c.api_base) {
     document.getElementById('cfg-endpoint').textContent = c.api_base;

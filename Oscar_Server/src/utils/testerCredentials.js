@@ -32,6 +32,7 @@ const CREDENTIAL_COLUMNS = Object.freeze([
   'token_url', 'oauth_profile', 'oauth_scope', 'oauth_extra_enc', 'oauth_custom_template',
   'cached_token_enc', 'cached_token_expires_at', 'cached_token_cred_fp',
   'requestor_enc', 'subscription_key_enc',
+  'credentials_endpoint',
 ]);
 const COLUMN_SET = new Set(CREDENTIAL_COLUMNS);
 
@@ -40,7 +41,7 @@ const EMPTY = Object.freeze({
   access_token_enc: null, client_id_enc: null, client_secret_enc: null,
   token_url: null, oauth_scope: null, oauth_extra_enc: null, oauth_custom_template: null,
   cached_token_enc: null, cached_token_expires_at: null, cached_token_cred_fp: null,
-  requestor_enc: null, subscription_key_enc: null, updated_at: null,
+  requestor_enc: null, subscription_key_enc: null, credentials_endpoint: null, updated_at: null,
 });
 
 /**
