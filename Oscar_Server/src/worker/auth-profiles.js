@@ -149,8 +149,11 @@ async function _fetchAndRead({ method, url, headers, body }, label, log, control
   try {
     text = await readBody(res, MAX_TOKEN_ANSWER_BYTES);
   } catch (err) {
-    if (err.code !== 'ANSWER_TOO_LARGE') throw err;
-    const msg = `${label} request failed — HTTP ${res.status}: ${err.message}`;
+    if (err.name === 'AbortError') throw err;
+    let msg;
+    if (err.code === 'ANSWER_TOO_LARGE') msg = `${label} request failed — HTTP ${res.status}: ${err.message}`;
+    else if (res.ok) msg = `${label} response was not valid JSON — ${err.message}`;
+    else msg = `${label} request failed — HTTP ${res.status}`;   // the answer could not be read: its status alone
     log.error(`[runner] ${msg}`, { http_status: res.status });
     throw new Error(msg);
   }

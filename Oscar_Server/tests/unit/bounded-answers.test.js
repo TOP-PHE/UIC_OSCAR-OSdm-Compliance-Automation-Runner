@@ -76,6 +76,11 @@ describe('readBody()', () => {
   test('no body reads as empty', async () => {
     expect(await readBody({ body: null }, 10)).toBe('');
   });
+
+  test('an answer without a stream is read through text(), within the size', async () => {
+    expect(await readBody({ text: async () => 'abc' }, 10)).toBe('abc');
+    await expect(readBody({ text: async () => 'x'.repeat(11) }, 10)).rejects.toMatchObject({ code: 'ANSWER_TOO_LARGE' });
+  });
 });
 
 describe('a provider answering without end', () => {
