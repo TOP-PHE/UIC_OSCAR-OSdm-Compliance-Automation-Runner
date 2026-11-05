@@ -626,6 +626,9 @@ app.get('/artifacts/:runId/:filename', fileDownloadLimiter, (req, res) => {
 // With METRICS_TOKEN (a cluster, where the Route or Ingress has no such rule,
 // #1059), a request without that bearer token gets the same 404 as from nginx.
 app.get('/metrics', async (req, res) => {
+  // Express matches routes without case and with a trailing slash; nginx
+  // refuses the exact /metrics only. Answer that path alone.
+  if (req.path !== '/metrics') return res.status(404).end();
   if (!metricsAllowed(req.headers.authorization, process.env.METRICS_TOKEN)) {
     return res.status(404).end();
   }

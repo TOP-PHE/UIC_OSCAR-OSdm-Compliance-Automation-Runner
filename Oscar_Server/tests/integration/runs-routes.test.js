@@ -1076,6 +1076,43 @@ describe('DELETE /v1/runs/:id/cancel', () => {
     expect(row.status).toBe('CANCELLED');
     run('DELETE FROM runs WHERE id = ?', [cancellableId]);
   });
+  // A tester cancels their own runs only; the Test Manager any of the company's.
+  test("403 for a tester cancelling a colleague's run; 200 for the Test Manager", async () => {
+    const colleague = uuidv4();
+    const queued = uuidv4();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
+      [colleague, covCompanyId, `colleague-${colleague}@${EMAIL_DOMAIN}`]);
+    run(`INSERT INTO runs (id, company_id, user_id, status, queued_at) VALUES (?, ?, ?, 'QUEUED', datetime('now'))`,
+      [queued, covCompanyId, colleague]);
+    try {
+      const tester = await request(app).delete(`/v1/runs/${queued}/cancel`).set('Authorization', `Bearer ${covToken('company_user', covUserId)}`);
+      expect(tester.status).toBe(403);
+      expect(get('SELECT status FROM runs WHERE id = ?', [queued]).status).toBe('QUEUED');
+      const tm = await request(app).delete(`/v1/runs/${queued}/cancel`).set('Authorization', `Bearer ${covToken('test_manager', covTmId)}`);
+      expect(tm.status).toBe(200);
+    } finally {
+      run('DELETE FROM runs WHERE id = ?', [queued]);
+      run('DELETE FROM users WHERE id = ?', [colleague]);
+    }
+  });
+
+  test("a tester's delete of a colleague's stale run cancels nothing", async () => {
+    const colleague = uuidv4();
+    const stale = uuidv4();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
+      [colleague, covCompanyId, `colleague-${colleague}@${EMAIL_DOMAIN}`]);
+    run(`INSERT INTO runs (id, company_id, user_id, status, queued_at) VALUES (?, ?, ?, 'QUEUED', datetime('now', '-1 day'))`,
+      [stale, covCompanyId, colleague]);
+    try {
+      const auth = `Bearer ${covToken('company_user', covUserId)}`;
+      expect((await request(app).delete(`/v1/runs/${stale}`).set('Authorization', auth)).status).toBe(403);
+      await request(app).post('/v1/runs/bulk-delete').set('Authorization', auth).send({ run_ids: [stale] });
+      expect(get('SELECT status FROM runs WHERE id = ?', [stale]).status).toBe('QUEUED');
+    } finally {
+      run('DELETE FROM runs WHERE id = ?', [stale]);
+      run('DELETE FROM users WHERE id = ?', [colleague]);
+    }
+  });
 });
 
 describe('POST /v1/runs/bulk-admin-action', () => {

@@ -587,6 +587,11 @@ router.post('/bulk-delete', (req, res) => {
     let runRow = runMap.get(id);
     if (runRow && req.companyId && runRow.company_id !== req.companyId) runRow = null;
     if (!runRow) { notFound.push(id); continue; }
+    // The owner check comes first: a stale run is cancelled below.
+    if (!isElevated && runRow.user_id !== req.user.id) {
+      skipped.push({ id, reason: 'Not the run owner' });
+      continue;
+    }
 
     if (runRow.status === 'QUEUED' || runRow.status === 'RUNNING') {
       // Auto-cancel stale runs (started more than 15 minutes ago, or never started)
@@ -601,10 +606,6 @@ router.post('/bulk-delete', (req, res) => {
     }
     if (DELETION_STATUSES.has(runRow.status)) {
       skipped.push({ id, reason: `Run is already in deletion state (${runRow.status})` });
-      continue;
-    }
-    if (!isElevated && runRow.user_id !== req.user.id) {
-      skipped.push({ id, reason: 'Not the run owner' });
       continue;
     }
     deleted.push({ id, previousStatus: runRow.status });
@@ -1464,6 +1465,13 @@ router.delete('/:id/cancel', (req, res) => {
   const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
+  // A tester cancels their own runs; a Test Manager or administrator any of
+  // the company's (as stop-all and delete).
+  const elevated = req.user.role === 'test_manager' || req.user.role === 'administrator';
+  if (!elevated && runRow.user_id !== req.user.id) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Testers can only cancel their own runs.' });
+  }
+
   if (runRow.status !== 'QUEUED') {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: `Cannot cancel a run with status ${runRow.status}.` });
   }
@@ -1498,6 +1506,11 @@ router.delete('/:id', (req, res) => {
     : validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
+  // The owner check comes first: a stale run is cancelled below, which a
+  // tester may only do to their own.
+  if (!isElevated && runRow.user_id !== req.user.id) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Testers can only delete their own runs.' });
+  }
   if (runRow.status === 'QUEUED' || runRow.status === 'RUNNING') {
     // Auto-cancel stale runs (>15 min old or never started)
     if (!isRunStale(runRow)) {
@@ -1507,9 +1520,6 @@ router.delete('/:id', (req, res) => {
   }
   if (DELETION_STATUSES.has(runRow.status)) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: `Run is already in deletion state (${runRow.status}).` });
-  }
-  if (!isElevated && runRow.user_id !== req.user.id) {
-    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Testers can only delete their own runs.' });
   }
 
   // Since issue #60 Phase 1, admin doesn't read vendor data, so confirming

@@ -337,6 +337,11 @@ router.post('/users/:id/generate-reset-link', (req, res) => {
   const userId = req.params.id;
   const user = get('SELECT id, email FROM users WHERE id = ?', [userId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+  // In production the link is built from APP_URL only: the Host header is
+  // the client's to write.
+  if (!process.env.APP_URL && process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ status: 503, title: 'Service Unavailable', detail: 'APP_URL is not set on the server: the reset link cannot be built.' });
+  }
 
   // Wipe any previous outstanding token for this user (one active link at a time)
   run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);

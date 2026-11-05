@@ -27,7 +27,8 @@
 # (which talks directly to oscar:3001 over the docker bridge) should
 # read them. Anyone hitting https://oscar.uic.org/metrics gets a 404
 # that doesn't even reveal the endpoint exists.
-location = /metrics {
+# Any spelling of the path (/METRICS, /metrics/…): OSCAR's routes ignore case.
+location ~* ^/metrics(/|$) {
     return 404;
 }
 
