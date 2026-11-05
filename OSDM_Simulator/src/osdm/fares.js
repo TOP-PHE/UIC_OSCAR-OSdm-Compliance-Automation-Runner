@@ -552,4 +552,80 @@ function fareOffersOf({ body, criteria, trips, passengers, provider, nowMs, life
   return offers;
 }
 
-module.exports = { fareOffersOf, sectionsOf, asksFares, asksFareReservations, asksOnlyFares, noFareOfferProblem, clusterPrices, placesFor, CLUSTERS };
+// ── #1045: a searched trip from a stop by the station asked ─────────────────
+
+// The stops of the nearbyStopTrip variant. Not a wrong answer: a real
+// provider's search gave such a trip, by tram from the stop in front of the
+// station asked, then a walk to another station and a train from there.
+const NEARBY_STOPS = { tramStop: 'urn:uic:stn:0000067', tramEnd: 'urn:uic:stn:0000068', change: 'urn:uic:stn:0000069' };
+
+/**
+ * #1045: the stops of the nearby-stop trip when a search names a section
+ * starting at the `nearbyStopTrip` station, with the section's end; null
+ * otherwise (a trip specification or trip ids get no such trip).
+ */
+function nearbyStopsOf(body, provider) {
+  const station = provider.fares?.variants?.nearbyStopTrip;
+  if (!station || !body?.tripSearchCriteria) return null;
+  const [section] = sectionsOf(body);
+  return section?.startPlace.stopPlaceRef === station ? { ...NEARBY_STOPS, end: section.endPlace } : null;
+}
+
+// Service brand codes of the simulator's own (OSDM 3.6 requires one in a train link).
+const SERVICE_BRAND_CODES = { IC: '901', T: '902' };
+const placeOfLeg = (leg, end) => ({ ...leg.timedLeg[end].stopPlaceRef });
+const sectionOfLegs = (first, last) => ({ startPlace: placeOfLeg(first, 'start'), endPlace: placeOfLeg(last, 'end') });
+
+// A fare bound to the two rides of the trip, as the real provider gave it:
+// a train link per ride, no covered section and no connection point.
+function boundToRides(fare, rides) {
+  delete fare.coveredSection;
+  delete fare.regionalConstraint.entryConnectionPoint;
+  delete fare.regionalConstraint.exitConnectionPoint;
+  fare.regionalConstraint.regionalValidities = rides.map((leg, k) => ({
+    seqNb: k + 1,
+    trainLink: {
+      fromStation: placeOfLeg(leg, 'start'),
+      toStation: placeOfLeg(leg, 'end'),
+      train: leg.timedLeg.service.vehicleNumbers[0],
+      travelDate: leg.timedLeg.start.serviceDeparture.timetabledTime,
+      serviceBrandAbbreviation: leg.timedLeg.service.productCategory.shortName,
+      serviceBrandCode: SERVICE_BRAND_CODES[leg.timedLeg.service.productCategory.shortName] || SERVICE_BRAND_CODES.IC,
+    },
+  }));
+}
+
+/**
+ * #1045: the fare offers of the nearby-stop trip (`trip`: tram, walk,
+ * train), from the tram stop to the section's end. Per cluster, fares bound
+ * to the two rides, the offer's covered sections naming them (what O8 reads);
+ * then one offer whose fares cover each ride on its own, the walk between
+ * them needing none. `ctx` is what fareOffersOf() takes.
+ */
+function nearbyTripOffers(ctx, trip) {
+  const [tram, , train] = trip.legs;
+  const asked = (section) => fareOffersOf({ ...ctx, body: { ...ctx.body, requestedSections: [section] }, trips: [trip] });
+  const bound = asked(sectionOfLegs(tram, train));
+  for (const offer of bound) {
+    for (const fare of offer.fares) boundToRides(fare, [tram, train]);
+    offer.tripCoverage = {
+      coveredTripId: trip.id,
+      coveredSections: [tram, train].map((leg) => ({ ...sectionOfLegs(leg, leg), startLegId: leg.id, endLegId: leg.id })),
+    };
+  }
+  const [byTram] = asked(sectionOfLegs(tram, tram));
+  const [byTrain] = asked(sectionOfLegs(train, train));
+  if (!byTram || !byTrain) return bound;
+  const perRide = {
+    ...byTrain,
+    summary: `${byTrain.summary}, with the tram fare`,
+    fares: [...byTram.fares, ...byTrain.fares],
+    tripCoverage: { coveredTripId: trip.id },
+  };
+  return [...bound, perRide];
+}
+
+module.exports = {
+  fareOffersOf, sectionsOf, asksFares, asksFareReservations, asksOnlyFares, noFareOfferProblem, clusterPrices, placesFor, CLUSTERS,
+  nearbyStopsOf, nearbyTripOffers, NEARBY_STOPS,
+};

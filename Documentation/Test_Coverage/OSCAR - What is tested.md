@@ -86,7 +86,7 @@ identifiers and their token lifetime:
 | Expiry after 60 s for trips from station 0000099 | yes | yes | yes | yes | yes | yes |
 | Response variants, deliberately wrong answers | yes | yes | yes | yes | yes | yes |
 | Requested information and passenger data checks, sales horizon, age tariffs | yes | yes | yes | yes | yes | yes |
-| Fare offers for a requested section (`FARE_ADMISSION`, five clusters, a free child), alone when only fare parts are asked (#1046), built from DB's fare templates (#1048: border points, first class, cards, family, group, bicycle fare, several routes), the form of a real provider's answer (#1045: coverage on the route and the offer only), seven wrong variants (one priced without a section, #905) and five that warn only (#1045: a card not held, ages outside, another class, dates offset, an unknown covered leg); booking and fulfilment of a fare, two wrong fare fulfilments (#906); the refund of a fare, COMBINING fares, two wrong fare refunds (#907) | yes | yes | yes | yes | yes | yes |
+| Fare offers for a requested section (`FARE_ADMISSION`, five clusters, a free child), alone when only fare parts are asked (#1046), built from DB's fare templates (#1048: border points, first class, cards, family, group, bicycle fare, several routes), the form of a real provider's answer (#1045: coverage on the route and the offer only), a search answered with one more trip by tram from a stop by the station asked, then a walk and a train (#1045), seven wrong variants (one priced without a section, #905) and five that warn only (#1045: a card not held, ages outside, another class, dates offset, an unknown covered leg); booking and fulfilment of a fare, two wrong fare fulfilments (#906); the refund of a fare, COMBINING fares, two wrong fare refunds (#907) | yes | yes | yes | yes | yes | yes |
 | Fare reservations: a bicycle place in fare mode, two wrong answers (#255; OSDM 3.8 and later, so not on alpha and beta) | — | — | yes | yes | yes | yes |
 
 Every new function goes to every provider: a test of the simulator
@@ -222,7 +222,7 @@ have the same, as copies. In short:
 | Fare refunds (#907): a CLUSTERING fare by its own conditions, with a fee OSCAR states, COMBINING fares by date; two wrong answers (not in the run list) | 3 + 2 | `gamma` |
 | Fare reservations (#255): a bicycle place with a fare admission, and alone; two wrong answers (not in the run list) | 2 + 2 | `gamma` |
 | Negative fare requests (#905): fares not asked, no section (by search, then a product sale; on a specification sent as domestic), an empty list of sections; one wrong answer (not in the run list) | 4 + 1 | `gamma` |
-| Fares from DB's templates (#1048) and what a fare says (#1045): first class, a card holder, a family, a bicycle fare, a group, border to border, several routes, a NON_FLEX refund, the form of a real provider's answer; five wrong answers that warn only (not in the run list) | 9 + 5 | `gamma` |
+| Fares from DB's templates (#1048) and what a fare says (#1045): first class, a card holder, a family, a bicycle fare, a group, border to border, several routes, a NON_FLEX refund, the form of a real provider's answer, a search answered with a trip from a nearby stop; five wrong answers that warn only (not in the run list) | 10 + 5 | `gamma` |
 
 ### 4.2 The reference scenarios of the catalogue (98)
 

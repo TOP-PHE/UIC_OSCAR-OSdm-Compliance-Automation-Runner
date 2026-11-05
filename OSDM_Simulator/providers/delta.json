@@ -210,7 +210,8 @@
       "agesOutside": "urn:uic:stn:0000062",
       "otherClass": "urn:uic:stn:0000063",
       "datesOffset": "urn:uic:stn:0000064",
-      "coveredLegUnknown": "urn:uic:stn:0000065"
+      "coveredLegUnknown": "urn:uic:stn:0000065",
+      "nearbyStopTrip": "urn:uic:stn:0000066"
     },
     "borderPoints": {
       "urn:uic:stn:0000004": "804",

@@ -2425,6 +2425,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   the step's checks re-run on `{ ...body, offers: [chosen] }`): a failure of
   another offer stays a failed check of 01 and no longer stops the sale;
   `fareSaleDecision(checks, chosen, all)` names it in its INFO line.
+  **The simulator answers so** (1.11.464 / OTST_V2.0.252, simulator
+  0.64.0): fares variant `nearbyStopTrip` (0000066, every profile), for a
+  search only, adds a second trip (`nearbyStopTrip()`, `offers.js`: tram
+  0000067 → 0000068, a transfer leg walking to 0000069, a train to the end)
+  and its fare offers after the direct trip's (`nearbyTripOffers()`,
+  `fares.js`: fares bound to the two rides by train links, the offer's
+  covered sections naming them, then one offer with a fare per ride), each
+  remembered with its own trip. `SIM_FARE_NEARBY_STOP_SRCH_1ADT_*` (trip
+  44): no failed check, one O8 WARNING; on the collection before 1.11.461
+  it failed O8 and stopped at 01. OSDM 3.6 requires `serviceBrandCode` in a
+  train link: the simulator's own codes (901, 902).
 - **A travel class per leg is read from the products covering each leg**
   (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
   leg's class is the highest `travelClass` of the products that cover it,

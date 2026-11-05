@@ -1321,6 +1321,32 @@
     },
     {
       "id": 41,
+      "resource_type": "TRAIN",
+      "label": "Train 3741 0000066–0000002",
+      "data": {
+        "originURN": "urn:uic:stn:0000066",
+        "destinationURN": "urn:uic:stn:0000002",
+        "operatorCode": "urn:x_osdm_simulator:carrier:gamma",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "daysOfWeek": [],
+        "services": [
+          {
+            "vehicleNumber": "3741",
+            "departureTime": "08:00:00+01:00",
+            "arrivalTime": "12:00:00+01:00"
+          }
+        ],
+        "ticketTypes": [],
+        "travelClasses": [],
+        "serviceClasses": [],
+        "accommodations": [],
+        "ancillaries": []
+      }
+    },
+    {
+      "id": 42,
       "resource_type": "JOURNEY",
       "label": "Trip 4: 0000001–0000002, 2 legs",
       "data": {
@@ -1337,7 +1363,7 @@
       }
     },
     {
-      "id": 42,
+      "id": 43,
       "resource_type": "JOURNEY",
       "label": "Trip 5: 0000001–0000002, 2 legs",
       "data": {
@@ -1354,7 +1380,7 @@
       }
     },
     {
-      "id": 43,
+      "id": 44,
       "resource_type": "JOURNEY",
       "label": "Trip 11: 0000095–0000002, 2 legs",
       "data": {
@@ -1371,7 +1397,7 @@
       }
     },
     {
-      "id": 44,
+      "id": 45,
       "resource_type": "JOURNEY",
       "label": "Trip 24: 0000001–0000002, 2 legs",
       "data": {
@@ -1531,6 +1557,7 @@
     "SIM_FARE_TRANSIT_1ADT_38",
     "SIM_FARE_ROUTES_1ADT_38",
     "SIM_FARE_REFUND_NON_FLEX_1ADT_38",
-    "SIM_FARE_REAL_FORM_1ADT_38"
+    "SIM_FARE_REAL_FORM_1ADT_38",
+    "SIM_FARE_NEARBY_STOP_SRCH_1ADT_38"
   ]
 }

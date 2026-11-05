@@ -772,6 +772,8 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_WRONG_FARE_OTHER_CLASS_38: [v.otherClass, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_DATES_OFFSET_38: [v.datesOffset, 'SPECIFICATION', true, true, undefined],
     SIM_WRONG_FARE_COVERED_LEG_38: [v.coveredLegUnknown, 'SPECIFICATION', true, true, undefined],
+    // #1045: a search answered with one more trip, from a stop by the station asked.
+    SIM_FARE_NEARBY_STOP_SRCH_1ADT_38: [v.nearbyStopTrip, 'SEARCH', undefined, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
@@ -795,7 +797,7 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
   // No other scenario starts a section at a variant station; the COMBINING
   // one (#907) is not wrong, and its two scenarios alone start there.
   const variantStations = new Set(Object.values(v));
-  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_') && startOf(x) !== v.combiningFares && startOf(x) !== v.alternativeRoutes && startOf(x) !== v.realAnswerForm)) {
+  for (const s of datafile.scenarios.filter((x) => !x.code.startsWith('SIM_WRONG_FARE_') && startOf(x) !== v.combiningFares && startOf(x) !== v.alternativeRoutes && startOf(x) !== v.realAnswerForm && startOf(x) !== v.nearbyStopTrip)) {
     assert.ok(!variantStations.has(startOf(s)), s.code);
   }
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.combiningFares).map((s) => s.code), ['SIM_FARE_REFUND_COMBINING_1ADT_38', 'SIM_WRONG_FARE_COMBINING_FEE_38']);
@@ -803,6 +805,8 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.alternativeRoutes).map((s) => s.code), ['SIM_FARE_ROUTES_1ADT_38']);
   // #1045: the answer of a real provider, not wrong either.
   assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.realAnswerForm).map((s) => s.code), ['SIM_FARE_REAL_FORM_1ADT_38']);
+  // #1045: a trip from a nearby stop, not wrong either, by search only.
+  assert.deepEqual(datafile.scenarios.filter((s) => startOf(s) === v.nearbyStopTrip).map((s) => s.code), ['SIM_FARE_NEARBY_STOP_SRCH_1ADT_38']);
   // #255: fare reservations are asked by the four bicycle scenarios only, each with a bicycle.
   const askReservations = datafile.scenarios.filter((s) => s.offerSearchCriteria?.requestedOfferParts?.includes('FARE_RESERVATION'));
   assert.deepEqual(askReservations.map((s) => s.code), ['SIM_FARE_BICYCLE_1ADT_38', 'SIM_FARE_BICYCLE_ONLY_38', 'SIM_WRONG_FARE_BICYCLE_PRODUCT_MODE_38', 'SIM_WRONG_FARE_RESERVATION_BOOKED_PRODUCT_MODE_38']);

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-05-simulator-nearby-stop-trip",
+    "date": "November 5, 2026",
+    "tag": "New",
+    "title": "A simulator scenario for a fare search answered with a trip from a nearby stop",
+    "summary": "The simulator can now answer a fare search the way a real provider did, with one more trip that starts by tram from a stop by the station asked, so the fix of O8 can be checked on gamma.",
+    "content": "A real provider answered a fare search with one more trip: by tram from the stop in front of the station asked, then a walk to another station and a train. Since the previous release, OSCAR reads the fares of such a trip from the tram stop and warns, and a failure on another offer no longer stops the sale.\n\nThe simulator now gives the same kind of answer. The new scenario SIM_FARE_NEARBY_STOP_SRCH_1ADT_38, with a copy for every OSDM version, searches from station 0000066: it passes with no failed check and one warning, and the fare offer of the direct trip is booked and confirmed. It is in the simulator references' run lists: a company following a simulator reference gets it at its next update."
+  },
+  {
     "id": "2026-11-05-fare-search-other-stop",
     "date": "November 5, 2026",
     "tag": "Fixed",
