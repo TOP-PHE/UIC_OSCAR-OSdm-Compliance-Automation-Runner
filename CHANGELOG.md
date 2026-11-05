@@ -105,6 +105,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.457] / [collection-OTST_V2.0.248] — 2026-11-05
+
+Release 2026.495. A provider's answer is read up to a size.
+
+### Security
+- **The server reads a provider's answer up to a size** (`utils/boundedBody.js` `readBody()`): 1 MB for a token endpoint (`worker/auth-profiles.js`), 16 MB for an OSDM answer (`osdmGet()`, timetable discovery and journey probes). A larger answer is not read further: the token request fails with a plain reason, the OSDM read throws as a network error does. The token request's time limit now holds until its answer is read, not only its headers.
+- **A request the parameter check of `Post Offer-Req param chk` sends from its script asks `maxRedirects: 0`** too (collection OTST_V2.0.248), as every request of `library-bruno/` has since 1.11.454; a redirect is graded as the status it is.
+- `urlPolicy.js`: the character class of 1.11.456 written without duplicates (Sonar S5869); same characters refused.
+
+### Checked
+- `bounded-answers.test.js`: a real local server streams 64 MB to the token request and 20 MB to an OSDM read; both stop at their limit, and an answer within it is read. With no limit, three of its tests fail.
+- `bruno-library-security.test.js`: every `bru.sendRequest` of a request file asks `maxRedirects: 0`; it fails when that file's call is put back.
+- `npm run lint`, full `npx jest`: 262 suites, 5,476 tests.
+
+---
+
 ## [server-1.11.456] — 2026-11-05
 
 Release 2026.494. Values users store reach other users' pages as text.

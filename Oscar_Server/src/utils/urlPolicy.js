@@ -69,7 +69,7 @@ function ipIsPublic(ip) {
 
 // Characters no endpoint address needs, and which could break out of a page
 // or a file it is written into.
-const UNSAFE_URL_CHARS = /[<>"'`\\\s\u0000-\u001f\u007f]/;
+const UNSAFE_URL_CHARS = /[<>"'`\\\u0000-\u0020\u007f]|\s/;
 
 // Structural check. Returns null when allowed, else a short reason (no value).
 function structuralReason(raw) {

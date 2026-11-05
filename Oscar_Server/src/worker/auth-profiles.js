@@ -33,7 +33,11 @@
  * secret, and surfacing them is what makes misconfiguration self-diagnosable.
  */
 
+const { readBody } = require('../utils/boundedBody');
+
 const FETCH_TIMEOUT_MS = 15000;
+// The most of a token endpoint's answer OSCAR reads (a token answer is a few KB).
+const MAX_TOKEN_ANSWER_BYTES = 1024 * 1024;
 const PROFILES = ['oauth2_basic', 'oauth2_post', 'paxone_json', 'sqills_extension', 'custom'];
 
 function isValidProfile(p) {
@@ -108,22 +112,32 @@ async function _doFetch({ method, url, headers, body }, label, log) {
   log.info(`[runner] ${label} — ${method} ${url}`);
   _logMaskedRequest(label, method, url, headers, body, log);
   const controller = new AbortController();
+  // The time limit holds until the whole answer is read, not only its headers.
   const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  let res;
   try {
-    // A redirect is answered, never followed (as credentialTest.js does).
-    res = await fetch(url, { method, headers, body, redirect: 'manual', signal: controller.signal });
+    return await _fetchAndRead({ method, url, headers, body }, label, log, controller);
   } catch (err) {
-    clearTimeout(t);
     if (err.name === 'AbortError') {
       const msg = `${label} request timed out after ${FETCH_TIMEOUT_MS / 1000}s (${url})`;
       log.error(`[runner] ${msg}`);
       throw new Error(msg);
     }
-    log.error(`[runner] ${label} — network error: ${err.message}`);
+    throw err;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// The request and its answer, read up to MAX_TOKEN_ANSWER_BYTES.
+async function _fetchAndRead({ method, url, headers, body }, label, log, controller) {
+  let res;
+  try {
+    // A redirect is answered, never followed (as credentialTest.js does).
+    res = await fetch(url, { method, headers, body, redirect: 'manual', signal: controller.signal });
+  } catch (err) {
+    if (err.name !== 'AbortError') log.error(`[runner] ${label} — network error: ${err.message}`);
     throw err;
   }
-  clearTimeout(t);
 
   if (res.status >= 300 && res.status < 400) {
     const msg = `${label} token endpoint answered a redirect (HTTP ${res.status}), which OSCAR does not follow: save the address it redirects to as the token URL.`;
@@ -131,25 +145,21 @@ async function _doFetch({ method, url, headers, body }, label, log) {
     throw new Error(msg);
   }
 
-  if (!res.ok) {
-    let summary = '';
-    try {
-      const text = await res.text();
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed && (parsed.error || parsed.error_description)) {
-          const description = parsed.error_description ? ` — ${parsed.error_description}` : '';
-          summary = `${parsed.error || 'unknown_error'}${description}`;
-        } else {
-          summary = text;
-        }
-      } catch {
-        // Not JSON: report the raw response text.
-        summary = text;
-      }
-      summary = summary.slice(0, 500);
-    } catch (_) { /* body read failed; status alone */ }
+  let text;
+  try {
+    text = await readBody(res, MAX_TOKEN_ANSWER_BYTES);
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
+    let msg;
+    if (err.code === 'ANSWER_TOO_LARGE') msg = `${label} request failed — HTTP ${res.status}: ${err.message}`;
+    else if (res.ok) msg = `${label} response was not valid JSON — ${err.message}`;
+    else msg = `${label} request failed — HTTP ${res.status}`;   // the answer could not be read: its status alone
+    log.error(`[runner] ${msg}`, { http_status: res.status });
+    throw new Error(msg);
+  }
 
+  if (!res.ok) {
+    const summary = _errorSummary(text);
     const detail = summary ? `: ${summary}` : '';
     const msg = `${label} request failed — HTTP ${res.status}${detail}`;
     log.error(`[runner] ${msg}`, { http_status: res.status });
@@ -158,13 +168,28 @@ async function _doFetch({ method, url, headers, body }, label, log) {
 
   let json;
   try {
-    json = await res.json();
+    json = JSON.parse(text);
   } catch (err) {
     const msg = `${label} response was not valid JSON — ${err.message}`;
     log.error(`[runner] ${msg}`, { http_status: res.status });
     throw new Error(msg);
   }
   return { json, status: res.status };
+}
+
+// RFC 6749 §5.2 error and description, else the raw text; 500 characters.
+function _errorSummary(text) {
+  let summary = text;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && (parsed.error || parsed.error_description)) {
+      const description = parsed.error_description ? ` — ${parsed.error_description}` : '';
+      summary = `${parsed.error || 'unknown_error'}${description}`;
+    }
+  } catch {
+    // Not JSON: report the raw response text.
+  }
+  return String(summary || '').slice(0, 500);
 }
 
 // ── Templating for the 'custom' profile ─────────────────────────────────────
