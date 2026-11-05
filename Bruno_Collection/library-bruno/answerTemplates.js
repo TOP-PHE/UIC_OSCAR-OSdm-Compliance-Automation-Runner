@@ -38,7 +38,7 @@ function checkAnswerTemplates(res, bruTest, expectFn) {
   if (!holdsTemplate(body)) return false;
   try {
     bruTest('[OSDM] The answer holds no template text ("{' + '{")', () => {
-      expectFn(false, 'The answer holds "{' + '{", which the test engine would fill in with its own variables in the next requests. The run stops here.').to.be.true;
+      expectFn(false, 'The answer holds "{' + '{", which the test engine would fill in with its own variables in the next requests. The run stops here.').to.equal(true);
     });
   } catch { /* the check is recorded or not; the run stops either way */ }
   try { bru.runner.stopExecution(); } catch { /* not in a runner context */ }

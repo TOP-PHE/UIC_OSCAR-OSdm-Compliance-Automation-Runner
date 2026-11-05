@@ -48,7 +48,7 @@ describe('checkAnswerTemplates()', () => {
     };
     return { checks, bruTest };
   };
-  const expectFn = (value, message) => ({ to: { be: { get true() { if (value !== true) throw new Error(message); return true; } } } });
+  const expectFn = (value, message) => ({ to: { equal: (want) => { if (value !== want) throw new Error(message); } } });
 
   test('an answer holding "{{" fails one check and stops the run', () => {
     const { checks, bruTest } = recorder();
