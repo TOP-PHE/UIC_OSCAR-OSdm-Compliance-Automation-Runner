@@ -956,6 +956,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   that changes a password, role or company sets `END_SESSIONS_SQL` in the
   same UPDATE. **A test token must stand for a stored user** with that role
   and company, or the route answers 401.
+- **A run's secret works from the run only, and no answer may hold `{{`**
+  (1.11.458 / OTST_V2.0.249). `fromThisMachine()` (`server.js`): the two
+  loopback routes take `X-OSCAR-Run-Secret` only from 127.0.0.1 / ::1 with
+  no forwarding header. `library-bruno/answerTemplates.js`, first in the
+  collection's after-response, fails one check and stops the run when an
+  answer holds `{{` (Bruno would fill it in with its variables, the data file
+  and `process.env` included, in the next request). Checked with the real CLI.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

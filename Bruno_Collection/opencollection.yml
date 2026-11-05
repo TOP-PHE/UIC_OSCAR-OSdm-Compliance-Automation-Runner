@@ -589,6 +589,15 @@ request:
         // ── Shared response status ────────────────────────────────────────────
         const _rptStatus = res && (typeof res.getStatus === 'function' ? res.getStatus() : res.status);
 
+        // ── A provider's answer holds no "{{" ──────────────────────────────────
+        // The engine fills a "{{name}}" in with a variable's value wherever a
+        // value is used, and values read from an answer go into the next
+        // requests: an answer holding one ends the run before the next request.
+        try {
+          const { bruTest: _tplTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+          require(bru.getEnvVar("library_base") + "answerTemplates.js").checkAnswerTemplates(res, _tplTest, expect);
+        } catch (_tplErr) { console.log(`[WARNING] answer template check: ${_tplErr && _tplErr.message}`); }
+
         // ── #208: auth-rejection fail-fast ────────────────────────────────────
         // A 401/403 on any (non-token) request means the access/bearer token was
         // rejected — typically a stale/expired token pasted in the API config, or
