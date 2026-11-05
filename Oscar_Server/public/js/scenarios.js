@@ -16,7 +16,7 @@ const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 if (!user?.email) { window.location.href = '/'; }
 const token = localStorage.getItem('oscar_token');
 const authHeaders = token ? { Authorization: 'Bearer ' + token } : {};
-const isTestManager = user.role === 'test_manager' || user.role === 'administrator';
+const isTestManager = user.role === 'test_manager';
 const isTester = user.role === 'company_user';
 // v1.11.197 — the server keeps a tester's changes to their OWN, non-shared
 // scenarios only; shared scenarios, and company scenarios with no owner, are

@@ -346,13 +346,18 @@ describe('POST /v1/runs — submission validation', () => {
     expect(res.status).toBe(403);
   });
 
-  test('400 platform user without company_id (no targetCompanyId resolvable)', async () => {
+  test('403 for an administrator: a run is started by a member of the company', async () => {
     const token = covToken('administrator', covAdminId);
     const res = await request(app)
       .post('/v1/runs')
       .set('Authorization', `Bearer ${token}`)
-      .send({});
-    expect(res.status).toBe(400);
+      .send({ company_id: covCompanyId });
+    expect(res.status).toBe(403);
+    const preview = await request(app)
+      .post('/v1/runs/preview')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ company_id: covCompanyId });
+    expect(preview.status).toBe(403);
   });
 
   test('404 company not found (platform user targets a bogus company_id)', async () => {

@@ -53,13 +53,9 @@ function credentialsFor(userId, companyId) {
   if (!userId || !companyId) return null;
   const user = get('SELECT id, email, role, company_id FROM users WHERE id = ?', [userId]);
   if (!user) return null;
-  let row = get('SELECT * FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]);
-  // An administrator has one set, kept for their own (platform) company, and
-  // used for any company they start a run on, as before #540. Members never
-  // fall back: a provider's credentials are only ever that provider's.
-  if (!row && user.role === 'administrator' && user.company_id !== companyId) {
-    row = get('SELECT * FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, user.company_id]);
-  }
+  // A provider's credentials are only ever that provider's. An administrator
+  // runs nothing on a company (runs.js), so has no set to fall back on.
+  const row = get('SELECT * FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]);
   return {
     ...EMPTY,
     ...row,

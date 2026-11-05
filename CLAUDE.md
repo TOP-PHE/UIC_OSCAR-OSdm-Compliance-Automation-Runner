@@ -982,6 +982,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   again. Any new path that sends a tester's credentials goes through
   `resolveAccessToken()`. Changing the endpoint drops the company's cached
   tokens.
+- **An administrator manages companies, not their tests** (1.11.463,
+  maintainer decision). It creates, renames and deletes companies and users,
+  and never starts a run on a company (`POST /v1/runs` and `/preview` 403,
+  the runner refuses its queued runs, `credentialsFor()` has no fallback to
+  its own set) nor reads or changes `GET` / `PATCH /v1/company`. Its company
+  list names no endpoint. A new route that touches a company's test set-up
+  refuses administrators (`denyAdminAndCertifier()`). **Deleting a company
+  is `purgeCompany()`** (`utils/companyPurge.js`): every table with a
+  `company_id` column, read from the schema, plus the rows of its runs and
+  findings, provider links, pending registrations and data files; the
+  audit line is written under no company (a line naming a deleted company
+  is not kept).
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

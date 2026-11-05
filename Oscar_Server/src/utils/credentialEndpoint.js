@@ -39,11 +39,10 @@ function endpointChangeProblem(savedFor, current) {
 
 /**
  * The refusal for a credentials row (as credentialsFor() returns it), read
- * against the endpoint of its company or provider now. Administrators keep one
- * set for every company (credentialsFor), so it is not tied to one endpoint.
+ * against the endpoint of its company or provider now.
  */
 function credentialsEndpointProblem(credRow) {
-  if (!credRow || credRow.role === 'administrator' || !credRow.credentials_endpoint) return null;
+  if (!credRow?.credentials_endpoint) return null;
   const company = get('SELECT api_base FROM companies WHERE id = ?', [credRow.company_id]);
   return endpointChangeProblem(credRow.credentials_endpoint || null, company?.api_base);
 }

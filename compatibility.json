@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.500",
+  "current_release": "2026.501",
   "releases": [
+    {
+      "release": "2026.501",
+      "date": "2026-11-05",
+      "server": "1.11.463",
+      "collection": "OTST_V2.0.251",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.463: an administrator manages companies, not their tests. It starts no run on a company and neither reads nor changes its endpoint or dedicated headers; its company list names no endpoint. Deleting a company removes every row and data file it held, and the deletion stays in the audit log."
+      ]
+    },
     {
       "release": "2026.500",
       "date": "2026-11-05",

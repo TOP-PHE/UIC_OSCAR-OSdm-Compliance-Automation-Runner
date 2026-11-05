@@ -133,7 +133,7 @@ function companyEndpointChange(role, requested, stored) {
   if (!requested) return { write: null };   // absent or empty: nothing asked, as before
   if (typeof requested !== 'string') return { status: 400, detail: 'api_base must be a string.' };
   const endpoint = requested.trim();
-  if (role === 'test_manager' || role === 'administrator') return { write: endpoint };
+  if (role === 'test_manager') return { write: endpoint };
   if (endpoint === (stored || '')) return { write: null, echoed: true };
   return { status: 403, detail: 'Only Test Managers can change the OSDM API endpoint.' };
 }
