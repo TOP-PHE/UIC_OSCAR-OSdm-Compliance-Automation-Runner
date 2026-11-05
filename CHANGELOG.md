@@ -103,6 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Simulator.md`. Linted and tested in the required CI job, analysed by Sonar
     with its own coverage report.
 
+### Changed
+
+- **Simulator `offers.js`, two Sonar findings of 0.64.0** (#1045): the
+  nearby-stop trip and its fare offers are built by `nearbyOf()`, so
+  `buildOfferCollection()` is back under the complexity limit (S3776), and the
+  trip id's seed is a string of its own (S4624). The answers are the same, trip
+  ids included: no simulator version, nothing to install.
+
 ---
 
 ## [server-1.11.464] / [collection-OTST_V2.0.252] — 2026-11-05

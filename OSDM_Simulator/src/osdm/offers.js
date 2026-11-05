@@ -289,7 +289,8 @@ function nearbyStopTrip(direct, stops, provider) {
   const number = String((Number(direct.legs[0].timedLeg.service.vehicleNumbers[0]) || 1000) + 2);
   const tram = buildLeg({ from: place(stops.tramStop), to: place(stops.tramEnd), start: at(0), end: at(8), vehicleNumber: '2', category: TRAM_CATEGORY, ptMode: 'TRAM' }, provider);
   const train = buildLeg({ from: place(stops.change), to: { ...stops.end }, start: at(20), end: at(20 + rideMinutes), vehicleNumber: number }, provider);
-  const id = `${provider.idPrefix}-TRIP-${hashOf(`${provider.key}nearby${JSON.stringify([tram, train])}`).toString('hex').slice(0, 12)}`;
+  const seed = `${provider.key}nearby${JSON.stringify([tram, train])}`;
+  const id = `${provider.idPrefix}-TRIP-${hashOf(seed).toString('hex').slice(0, 12)}`;
   const walk = {
     start: place(stops.tramEnd), end: place(stops.change), transferMode: 'WALK', continuousMode: 'WALK', duration: 'PT6M',
     timeWindowStart: isoAt(at(8).ms, offset), timeWindowEnd: isoAt(at(14).ms, offset),
@@ -805,6 +806,16 @@ function applyStopPlaceVariants(trips, provider, offers, remembered) {
   }
 }
 
+// #1045: a search from the nearbyStopTrip station gets one more trip, by tram
+// from a stop by that station, and its fare offers after the others. No trip
+// and no offer otherwise. `ctx` is what fareOffersOf() takes.
+function nearbyOf(ctx) {
+  const stops = nearbyStopsOf(ctx.body, ctx.provider);
+  if (!stops) return { trips: [], offers: [] };
+  const trip = nearbyStopTrip(ctx.trips[0], stops, ctx.provider);
+  return { trips: [trip], offers: nearbyTripOffers(ctx, trip) };
+}
+
 function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
   const trips = tripsOf(asked, providerAsIs, known);
   // #227: optional parameters this provider ignores, refuses or answers without offers.
@@ -845,16 +856,12 @@ function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
     cardOf: (p) => p[CARDS_APPLIED].applied,
   };
   const fareOffers = beyondHorizon ? [] : fareOffersOf(fareContext);
-  // #1045: a search from the nearbyStopTrip station gets one more trip, by
-  // tram from a stop by that station, and its fare offers after the others.
-  const stops = beyondHorizon ? null : nearbyStopsOf(body, provider);
-  const nearbyTrip = stops ? nearbyStopTrip(trips[0], stops, provider) : null;
-  const nearbyOffers = nearbyTrip ? nearbyTripOffers(fareContext, nearbyTrip) : [];
-  const offers = options.noOffer ? [] : [...productOffers, ...fareOffers, ...nearbyOffers];
+  const nearby = beyondHorizon ? { trips: [], offers: [] } : nearbyOf(fareContext);
+  const offers = options.noOffer ? [] : [...productOffers, ...fareOffers, ...nearby.offers];
   // #906: a fare offer is booked like any other, so it is remembered too.
   for (const offer of fareOffers) remembered.push({ offer, trips, passengers, oneFulfillment: true, shortLivedMs });
-  for (const offer of nearbyOffers) remembered.push({ offer, trips: [nearbyTrip], passengers, oneFulfillment: true, shortLivedMs });
-  const allTrips = [...outboundTrips, ...trips, ...(nearbyTrip ? [nearbyTrip] : [])];
+  for (const offer of nearby.offers) remembered.push({ offer, trips: nearby.trips, passengers, oneFulfillment: true, shortLivedMs });
+  const allTrips = [...outboundTrips, ...trips, ...nearby.trips];
   const problems = [...problemsOf(passengers, built.offers, collective && productsAsked, refusals), ...productProblems, ...options.problems];
   const partsProblem = partsProblemOf({ productsAsked, fareOffers, unanswered: beyondHorizon || options.noOffer, body, criteria, provider });
   if (partsProblem) problems.push(partsProblem);
