@@ -128,6 +128,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.475] / [collection-OTST_V2.0.253] — 2026-11-06
+
+Release 2026.513. Answers to the requests a step's script sends get the same look as the others.
+
+### Changed
+- **Collection: `stopOnScriptAnswer()`** (`library-bruno/answerThreats.js`) gives the answers of the requests a step's script sends itself (`bru.sendRequest`: `osdmPost.js`, the availability requests and `POST /trips-collection` of `offers.js`, the after-sale refusals, the Idempotency-Key replays) the look the collection's after-response gives the others (1.11.460): template text, markup meant to run in a browser, a redirect to a local or private address. On one of them: one failed check, one `[INTRUSION]` line (step `script request <path>`), the run stopped, and the caller uses nothing of the answer. A new script-sent request to the provider goes through it.
+- **Collection: the data file's copy `data_base_tmp` is deleted** once the scenario is read; it was kept for the whole run.
+
+### Checked
+- `bruno-answer-threats.test.js`: a template in a script-sent answer stops the run, logs the line and hands nothing back; a clean answer goes through; markup and a private redirect are seen in the `sendRequest` shape. The first fails without the look. `npm run lint`, full `npx jest`.
+
+---
+
+## [server-1.11.474] — 2026-11-06
+
+Release 2026.512. A token request's failure names the answer's fields, never their values.
+
+### Changed
+- **A token answer without the field expected is described by its field names** (`answerFields()` in `worker/auth-profiles.js`, for the `custom` and `paxone_json` profiles): "The answer's fields: access_token, refresh_token." Before, 200 characters of the answer were quoted. A 200 answer that is not JSON is described by its length; the parser's message, which quotes the text, is no longer used.
+- **A run's authentication failure goes through `tokenErrorText()`** (`utils/tokenErrors.js`) before it reaches the run's error, its log and the collection's token refresh: every saved value of the tester's credentials is masked and a quoted answer is cut, as "Test my credentials" already did (`cleanTokenError()`; `secretsOf()` moved there from `credentialTest.js`).
+
+### Checked
+- `auth-profiles.test.js`: the custom and Paxone answers missing the field name their fields only; a non-JSON answer is not quoted. `token-errors.test.js`: saved secrets masked, a quoted answer cut. `npm run lint`, full `npx jest`.
+
+---
+
+## [server-1.11.473] — 2026-11-06
+
+Release 2026.511. A checklist's reading stays in proportion to its size.
+
+### Fixed
+- **Reading a Word checklist** (`utils/checklistAnswers.js`, the import of `POST /v1/company/checklists` and the AI analysis's checklist) reads each content control from its own block, so the work grows with how deeply controls are nested. Every checklist template has one level; a document whose controls are nested more than eight deep is now refused with a sentence ("not a checklist OSCAR can read") before any block is read.
+
+### Checked
+- `checklist-answers.test.js`: a document nested 40,000 deep is refused in well under 2 s (it took about 6 s to read before), and eight levels are still read. The six simulator checklists and the templates have one level (counted). The first test fails without the bound. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.472] — 2026-11-06
 
 Release 2026.510. An account's e-mail is its owner's, on the Test Manager's page too.

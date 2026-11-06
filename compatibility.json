@@ -7,11 +7,44 @@
       "release": "2026.514",
       "date": "2026-11-06",
       "server": "1.11.476",
-      "collection": "OTST_V2.0.252",
+      "collection": "OTST_V2.0.253",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Server 1.11.476: the Test Framework holds no \"{{\": refused at its writers, before a run and in the run's copy."
+      ]
+    },
+    {
+      "release": "2026.513",
+      "date": "2026-11-06",
+      "server": "1.11.475",
+      "collection": "OTST_V2.0.253",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.475 / collection OTST_V2.0.253: answers to requests a script sends are checked for templates, markup and private redirects; the data file copy is cleared after reading."
+      ]
+    },
+    {
+      "release": "2026.512",
+      "date": "2026-11-06",
+      "server": "1.11.474",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.474: auth profile errors name fields, never values; token errors are cleaned of saved secrets."
+      ]
+    },
+    {
+      "release": "2026.511",
+      "date": "2026-11-06",
+      "server": "1.11.473",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.473: a Word checklist whose controls are nested more than eight deep is refused before it is read."
       ]
     },
     {

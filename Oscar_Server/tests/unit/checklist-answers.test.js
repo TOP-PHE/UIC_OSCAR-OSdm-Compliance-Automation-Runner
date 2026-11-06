@@ -120,3 +120,21 @@ describe('#827 what the model is told', () => {
     expect(ctx.cut).toBeGreaterThan(0);
   });
 });
+
+describe('a document nested deeper than any checklist is refused, at once', () => {
+  test('controls nested more than eight deep: refused, in a time in proportion to the size', () => {
+    const n = 40000;   // the reading before the bound took about 6 s here: a regression fails in seconds
+    const xml = '<w:sdt>'.repeat(n) + '</w:sdt>'.repeat(n);
+    const docx = buildZip([{ name: 'word/document.xml', data: Buffer.from(xml) }]);
+    const started = Date.now();
+    const result = CL.answersOfDocx(docx);
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(result.refusal).toMatch(/nested more than 8 deep/);
+  });
+
+  test('eight levels are still read', () => {
+    let xml = field('fw.inner', '<w:r><w:t>kept</w:t></w:r>');
+    for (let i = 0; i < 7; i++) xml = `<w:sdt><w:sdtPr><w:tag w:val="wrap${i}"/></w:sdtPr><w:sdtContent>${xml}</w:sdtContent></w:sdt>`;
+    expect(CL.answersOfXml(xml)['fw.inner']).toBe('kept');
+  });
+});
