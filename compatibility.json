@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.515",
+  "current_release": "2026.516",
   "releases": [
+    {
+      "release": "2026.516",
+      "date": "2026-11-06",
+      "server": "1.11.478",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.478 / collection OTST_V2.0.254: an intrusion line is acted on only when it carries the run's own tag; a line a scenario prints changes nothing."
+      ]
+    },
     {
       "release": "2026.515",
       "date": "2026-11-06",

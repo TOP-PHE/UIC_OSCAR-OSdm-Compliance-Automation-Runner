@@ -984,8 +984,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   refuses an answer holding `{{` (Bruno would fill it in with its variables,
   the data file and `process.env` included, in the next request), markup
   meant to run in a browser, or a redirect to a loopback / private address:
-  one failed check, one `[INTRUSION] kind=<kind> step=<request> [ERROR] …`
-  line, `stopExecution()`. Checks use `.to.equal(true)`, never a getter
+  one failed check, one `[INTRUSION] tag=<tag> kind=<kind> step=<request>
+  [ERROR] …` line, `stopExecution()`. **The tag is the run's own**
+  (1.11.478): the runner writes a random `__intrusionTag` in the environment
+  file, and `onIntrusionLine()` acts only on a line carrying it, so a
+  scenario's name or an answer that prints the mark changes nothing. Checks use `.to.equal(true)`, never a getter
   (Sonar S905). The runner hands that line to `utils/intrusion.js`
   `onIntrusionLine()`: a `security_event` (migration 47, never the answer),
   the endpoint suspended (`companies.endpoint_suspended_at`; `POST /v1/runs`

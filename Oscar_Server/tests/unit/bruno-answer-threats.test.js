@@ -155,6 +155,22 @@ describe('checkAnswerThreats()', () => {
     expect(stops).toBe(1);
   });
 
+  // 1.11.478: the line carries the run's tag the runner wrote, so the server
+  // can tell it from a line a scenario's text prints.
+  test('the line carries the run\'s tag when the runner gave one; none when it is not hex', () => {
+    const { bruTest } = recorder();
+    global.bru.getEnvVar = (name) => (name === '__intrusionTag' ? 'c'.repeat(32) : undefined);
+    try {
+      T.checkAnswerThreats({ getBody: () => `${OPEN}x}}` }, bruTest, expectFn, req('01. POST Get Offer'));
+      expect(lines[0].startsWith(`[INTRUSION] tag=${'c'.repeat(32)} kind=template step=01. POST Get Offer [ERROR] `)).toBe(true);
+      expect(T.intrusionLine('script', 's', 'r', '')).toBe('[INTRUSION] kind=script step=s [ERROR] r; the run stops here.');
+      global.bru.getEnvVar = () => 'not hex] kind=x';
+      expect(T.intrusionLine('script', 's', 'r')).toBe('[INTRUSION] kind=script step=s [ERROR] r; the run stops here.');
+    } finally {
+      delete global.bru.getEnvVar;
+    }
+  });
+
   test('a step name cannot add a level tag or a line', () => {
     const { bruTest } = recorder();
     T.checkAnswerThreats({ getBody: () => `${OPEN}x}}` }, bruTest, expectFn, req('x\n[INFO] y'));

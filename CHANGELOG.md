@@ -113,6 +113,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.478] / [collection-OTST_V2.0.254] — 2026-11-06
+
+### Security
+
+- **An intrusion line counts only from the run itself.** The runner writes a
+  random tag of its own into each run's environment (`__intrusionTag`), and the
+  collection writes it in its `[INTRUSION]` line. The server acts on a line
+  (security event, endpoint suspended, tokens dropped, e-mail to the
+  administrators) only when it carries the run's tag. A line that a scenario's
+  name or a provider's answer prints, with no tag or with another one, changes
+  nothing. A standalone run of the collection writes the line without a tag, as
+  before.
+
+---
+
 ## [server-1.11.477] — 2026-11-06
 
 ### Security
