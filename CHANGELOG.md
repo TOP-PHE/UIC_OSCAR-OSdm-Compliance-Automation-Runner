@@ -126,6 +126,30 @@ Release 2026.512. A token request's failure names the answer's fields, never the
 
 ---
 
+## [server-1.11.473] — 2026-11-06
+
+Release 2026.511. A checklist's reading stays in proportion to its size.
+
+### Fixed
+- **Reading a Word checklist** (`utils/checklistAnswers.js`, the import of `POST /v1/company/checklists` and the AI analysis's checklist) reads each content control from its own block, so the work grows with how deeply controls are nested. Every checklist template has one level; a document whose controls are nested more than eight deep is now refused with a sentence ("not a checklist OSCAR can read") before any block is read.
+
+### Checked
+- `checklist-answers.test.js`: a document nested 40,000 deep is refused in well under 2 s (it took about 6 s to read before), and eight levels are still read. The six simulator checklists and the templates have one level (counted). The first test fails without the bound. `npm run lint`, full `npx jest`.
+
+---
+
+## [server-1.11.472] — 2026-11-06
+
+Release 2026.510. An account's e-mail is its owner's, on the Test Manager's page too.
+
+### Changed
+- **A Test Manager no longer changes the e-mail of an account of the company** (`PATCH /v1/company/users/:id`, 409), as the administrator already could not (`companyAccountRefusal()`, 1.11.466). An e-mail sent back unchanged passes; a new address is invited instead. The page never sent an e-mail, so nothing changes for it.
+
+### Checked
+- `invitations.test.js`: a Test Manager's change of a peer Test Manager's or a tester's e-mail is refused and nothing is written; the same e-mail passes. It fails without the rule. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.471] — 2026-11-06
 
 Release 2026.509. A company's data files follow its slug.

@@ -11,7 +11,29 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.474: a token request's failure names the answer's fields, never their values; a run's authentication error is cleaned of the tester's saved values."
+        "Server 1.11.474: auth profile errors name fields, never values; token errors are cleaned of saved secrets."
+      ]
+    },
+    {
+      "release": "2026.511",
+      "date": "2026-11-06",
+      "server": "1.11.473",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.473: a Word checklist whose controls are nested more than eight deep is refused before it is read."
+      ]
+    },
+    {
+      "release": "2026.510",
+      "date": "2026-11-06",
+      "server": "1.11.472",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.472: a Test Manager no longer changes the e-mail of an account of the company, as the administrator already could not."
       ]
     },
     {
