@@ -256,9 +256,23 @@ function threatOf(res) {
   return null;
 }
 
-/** The line the OSCAR server reads: "[INTRUSION] kind=<kind> step=<name> [ERROR] <reason>". */
-function intrusionLine(kind, step, reason) {
-  return `[INTRUSION] kind=${kind} step=${step} [ERROR] ${String(reason).slice(0, MAX_REASON)}; the run stops here.`;
+// The run's own tag (env var __intrusionTag, hex, written by the OSCAR
+// runner): the server takes an intrusion line only when it carries it, so a
+// line a scenario's text prints cannot pass for one. Empty in a standalone run.
+function intrusionTag() {
+  try {
+    const tag = String(bru.getEnvVar('__intrusionTag') || '');
+    return /^[0-9a-f]{16,64}$/.test(tag) ? tag : '';
+  } catch { return ''; }
+}
+
+/**
+ * The line the OSCAR server reads:
+ * "[INTRUSION] tag=<run's tag> kind=<kind> step=<name> [ERROR] <reason>".
+ */
+function intrusionLine(kind, step, reason, tag = intrusionTag()) {
+  const tagged = tag ? `tag=${tag} ` : '';
+  return `[INTRUSION] ${tagged}kind=${kind} step=${step} [ERROR] ${String(reason).slice(0, MAX_REASON)}; the run stops here.`;
 }
 
 /**
