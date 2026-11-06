@@ -113,6 +113,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.479] — 2026-11-06
+
+### Security
+
+- **Credentials saved before there was an endpoint are tied to none.** A
+  tester's credentials saved while their company or provider had no OSDM
+  endpoint were sent to the first endpoint set afterwards, whoever set it.
+  They now go nowhere until the tester saves them again (API Config), as after
+  an endpoint change. API Config and the Run page say so. A credentials row
+  holding nothing to send is not concerned.
+
+---
+
 ## [server-1.11.478] / [collection-OTST_V2.0.254] — 2026-11-06
 
 ### Security

@@ -520,9 +520,15 @@ function showEndpointChanged(card, m) {
   note.setAttribute('role', 'alert');
   note.style.cssText = 'background:#fff3e0;border:2px solid #e65100;color:#bf360c;border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:13px;line-height:1.5';
   const title = document.createElement('strong');
-  title.textContent = '⚠️ The OSDM endpoint changed since your credentials were saved. ';
   const text = document.createElement('span');
-  text.textContent = `They were saved for ${m.credentials_endpoint || 'another address'}. OSCAR sends them nowhere, and starts no run, until you check them below and save them again.`;
+  // 1.11.479: saved while there was no endpoint, they are tied to none.
+  if (m.credentials_endpoint) {
+    title.textContent = '⚠️ The OSDM endpoint changed since your credentials were saved. ';
+    text.textContent = `They were saved for ${m.credentials_endpoint}. OSCAR sends them nowhere, and starts no run, until you check them below and save them again.`;
+  } else {
+    title.textContent = '⚠️ Your credentials were saved before there was an OSDM endpoint. ';
+    text.textContent = 'OSCAR sends them nowhere, and starts no run, until you check them below and save them again.';
+  }
   note.append(title, text);
   field(card, 'save-btn').insertAdjacentElement('beforebegin', note);
 }

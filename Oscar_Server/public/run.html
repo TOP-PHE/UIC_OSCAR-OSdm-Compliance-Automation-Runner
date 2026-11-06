@@ -173,7 +173,9 @@ async function loadProfile() {
 
   // Credentials saved for another endpoint are sent nowhere (utils/credentialEndpoint.js).
   if (m.endpoint_changed) {
-    warnings.push('The OSDM endpoint changed since your credentials were saved: check them on <a href="/profile.html">API Config</a> and save them again.');
+    warnings.push(m.credentials_endpoint
+      ? 'The OSDM endpoint changed since your credentials were saved: check them on <a href="/profile.html">API Config</a> and save them again.'
+      : 'Your credentials were saved before there was an OSDM endpoint: check them on <a href="/profile.html">API Config</a> and save them again.');
     apiReady = false;
   }
 
