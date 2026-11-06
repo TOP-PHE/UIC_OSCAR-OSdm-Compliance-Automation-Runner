@@ -18,7 +18,9 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const request = require('supertest');
 const { randomUUID: uuidv4 } = require('node:crypto');
-const { run, get } = require('../../src/db/db');
+const { run, get, transaction } = require('../../src/db/db');
+const { membershipChanged } = require('../../src/api/helpers/provider-access');
+const { END_SESSIONS_SQL } = require('../../src/api/middleware/auth');
 
 const app = express();
 app.use(express.json());
@@ -69,10 +71,19 @@ test('a Test Manager demoted since signing in loses the providers at once: the o
 
 test('a Test Manager moved to another distributor loses the old distributor\'s providers at once: the old token is refused (401)', async () => {
   const oldTok = sign(TMc, D1, 'test_manager');
+  // The administrator may no longer move a company account (409, nothing
+  // changes); the move is made as the route made it, so that what follows a
+  // change of company is still checked.
   const move = await request(app).patch(`/v1/admin/users/${TMc}`)
     .set('Authorization', `Bearer ${sign(ADM, get('SELECT company_id FROM users WHERE id = ?', [ADM]).company_id, 'administrator')}`)
     .send({ company_id: D2 });
-  console.log('admin move status:', move.status, move.body?.detail || '');
+  expect(move.status).toBe(409);
+  expect(get('SELECT company_id FROM users WHERE id = ?', [TMc]).company_id).toBe(D1);
+  transaction(() => {
+    const before = get('SELECT * FROM users WHERE id = ?', [TMc]);
+    run(`UPDATE users SET company_id = ?, ${END_SESSIONS_SQL} WHERE id = ?`, [D2, TMc]);
+    membershipChanged(TMc, before);
+  });
   expect(get('SELECT company_id FROM users WHERE id = ?', [TMc]).company_id).toBe(D2);
   const res = await request(app).get('/v1/company/datafile').set('Authorization', `Bearer ${oldTok}`).set('X-Provider-Id', P1);
   const r2  = await request(app).get(`/v1/runs/${RUN}`).set('Authorization', `Bearer ${oldTok}`);
