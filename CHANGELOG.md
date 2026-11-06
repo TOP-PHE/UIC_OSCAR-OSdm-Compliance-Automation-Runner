@@ -113,6 +113,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.473] — 2026-11-06
+
+Release 2026.511. A checklist's reading stays in proportion to its size.
+
+### Fixed
+- **Reading a Word checklist** (`utils/checklistAnswers.js`, the import of `POST /v1/company/checklists` and the AI analysis's checklist) reads each content control from its own block, so the work grows with how deeply controls are nested. Every checklist template has one level; a document whose controls are nested more than eight deep is now refused with a sentence ("not a checklist OSCAR can read") before any block is read.
+
+### Checked
+- `checklist-answers.test.js`: a document nested 40,000 deep is refused in well under 2 s (it took about 6 s to read before), and eight levels are still read. The six simulator checklists and the templates have one level (counted). The first test fails without the bound. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.471] — 2026-11-06
 
 Release 2026.509. A company's data files follow its slug.
