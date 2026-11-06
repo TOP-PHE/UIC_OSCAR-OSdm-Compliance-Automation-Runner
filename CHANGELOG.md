@@ -113,6 +113,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.470] — 2026-11-06
+
+Release 2026.508. Two companies never share a name.
+
+### Changed
+- **A company's name is its own** (maintainer, 2026-11-06). Creating a company, or renaming one, with the name of another company (the platform company included) is refused with 409 "Another company already has this name", compared without case or surrounding spaces; the name is stored trimmed. Providers are not concerned: a provider may share a company's name. A rename that keeps the company's own name passes, so a company that already shared its name (since 1.11.467 the platform company is named UIC, and a company named UIC existed) can still be saved, and renamed away from it. Before, the administrator saw two "UIC" in Manage Companies and could not tell which one an access request went to.
+
+### Checked
+- `company-names.test.js`: a new name taken in any case or spacing is refused, the platform's too; a rename onto another's name is refused, keeping one's own passes, an old twin can be saved and renamed; a provider may share a company's name. Two of the three fail without the rule. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.469] — 2026-11-06
 
 Release 2026.507. The administrator sees an access request before its e-mail is confirmed.

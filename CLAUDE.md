@@ -951,7 +951,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   password (`reset-password` / `generate-reset-link` 403; `send-reset` mails
   the owner). Certifiers, like administrators, belong to the platform
   company (migration 50), named UIC since 1.11.467 (migration 51; slug
-  `platform-root` unchanged). `denyAdminAndCertifier`/`requireTestManager` live
+  `platform-root` unchanged). **Two companies never share a name** (1.11.470,
+  `nameTaken()` in `admin.js`, any case; providers excluded; keeping one's own
+  name passes). `denyAdminAndCertifier`/`requireTestManager` live
   once in `api/helpers/shared.js`.
 - **Stop-place lookup via a cached OSDM `GET /places` bulk download** (#450,
   2026-07-01). `places_cache` (one row/company, plaintext JSON — places are
