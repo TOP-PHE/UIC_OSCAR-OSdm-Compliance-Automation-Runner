@@ -610,8 +610,9 @@ router.post('/companies', (req, res) => {
   if (existing) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Company slug already in use.' });
   }
+  if (nameTaken(name, null)) return res.status(409).json(NAME_TAKEN);
   const id = uuidv4();
-  run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`, [id, name, cleanSlug]);
+  run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`, [id, String(name).trim(), cleanSlug]);
   const created = get(
     `SELECT c.id, c.name, c.slug, c.created_at, COUNT(u.id) AS user_count
      FROM companies c LEFT JOIN users u ON u.company_id = c.id WHERE c.id = ? GROUP BY c.id`,
@@ -628,6 +629,9 @@ router.patch('/companies/:id', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The platform root company cannot be modified.' });
   }
   const { name, slug } = req.body || {};
+  // A new name may not be another company's; a name kept as it is passes,
+  // so a company sharing its name since before this rule can still be saved.
+  if (name && !sameName(name, company.name) && nameTaken(name, companyId)) return res.status(409).json(NAME_TAKEN);
   const plan = companyUpdates(companyId, name, slug);
   if (plan.refusal) return res.status(plan.refusal.status).json(plan.refusal);
   const { updates, values } = plan;
@@ -637,13 +641,23 @@ router.patch('/companies/:id', (req, res) => {
   return res.json({ company: companyRow(companyId) });
 });
 
+// Two companies (not providers) never share a name: the lists, the access
+// requests and the audit name them by it. Compared without case or spaces
+// around; the platform company counts too.
+const NAME_TAKEN = { status: 409, title: 'Conflict', detail: 'Another company already has this name.' };
+const sameName = (a, b) => String(a).trim().toLowerCase() === String(b || '').trim().toLowerCase();
+function nameTaken(name, exceptId) {
+  return Boolean(get(`SELECT id FROM companies WHERE parent_id IS NULL AND lower(trim(name)) = ? AND id IS NOT ?`,
+    [String(name).trim().toLowerCase(), exceptId]));
+}
+
 // The SET clauses of a company update, or the refusal to send.
 function companyUpdates(companyId, name, slug) {
   const newSlug = slug ? freeSlug(slug, companyId) : null;
   if (newSlug === false) return { refusal: { status: 409, title: 'Conflict', detail: 'Company slug already in use.' } };
   const updates = [];
   const values = [];
-  if (name) { updates.push('name = ?'); values.push(name); }
+  if (name) { updates.push('name = ?'); values.push(String(name).trim()); }
   if (newSlug) { updates.push('slug = ?'); values.push(newSlug); }
   return { updates, values };
 }
