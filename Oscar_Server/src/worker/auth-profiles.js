@@ -167,7 +167,8 @@ async function _fetchAndRead({ method, url, headers, body }, label, log, control
   try {
     json = JSON.parse(text);
   } catch (err) {
-    const msg = `${label} response was not valid JSON — ${err.message}`;
+    // Not err.message: the parser quotes the answer, which may be a token.
+    const msg = `${label} response was not JSON (${text.length} characters).`;
     log.error(`[runner] ${msg}`, { http_status: res.status });
     throw new Error(msg);
   }
@@ -177,8 +178,17 @@ async function _fetchAndRead({ method, url, headers, body }, label, log, control
 // Why an answer could not be read, in one sentence.
 function _readFailure(label, res, err) {
   if (err.code === 'ANSWER_TOO_LARGE') return `${label} request failed — HTTP ${res.status}: ${err.message}`;
-  if (res.ok) return `${label} response was not valid JSON — ${err.message}`;
+  if (res.ok) return `${label} response could not be read.`;
   return `${label} request failed — HTTP ${res.status}`;   // the answer could not be read: its status alone
+}
+
+// The names of an answer's fields, never their values: a token answer read
+// with the wrong field name still holds the token under another (it reaches the
+// run's error, which the whole company reads).
+function answerFields(json) {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return 'The answer is not a JSON object.';
+  const names = Object.keys(json).slice(0, 15).map((k) => String(k).replaceAll(/[^\w.-]/g, '?').slice(0, 40));
+  return names.length ? `The answer's fields: ${names.join(', ')}.` : 'The answer is an empty object.';
 }
 
 // RFC 6749 §5.2 error and description, else the raw text; 500 characters.
@@ -306,8 +316,7 @@ async function _paxoneJson(ctx, log) {
   if (!tok) {
     throw new Error(
       'Paxone response did not contain a recognised token field ' +
-      '(tried access_token, token, accessToken, Token). Body: ' +
-      JSON.stringify(json).slice(0, 200)
+      `(tried access_token, token, accessToken, Token). ${answerFields(json)}`
     );
   }
   return { token: tok, expiresIn: _expiresIn(json) };
@@ -397,7 +406,7 @@ async function _custom(ctx, log) {
   const tok = json && typeof json[field] === 'string' ? json[field] : null;
   if (!tok) {
     throw new Error(
-      `Custom response did not contain field "${field}". Body: ${JSON.stringify(json).slice(0, 200)}`
+      `Custom response did not contain field "${field}". ${answerFields(json)}`
     );
   }
   return { token: tok, expiresIn: _expiresIn(json) };

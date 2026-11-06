@@ -11,7 +11,40 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.475 / collection OTST_V2.0.253: answers to requests a step's script sends are looked at like the others (template text, markup, private redirect), and the data file's run copy is deleted once read."
+        "Server 1.11.475 / collection OTST_V2.0.253: answers to requests a script sends are checked for templates, markup and private redirects; the data file copy is cleared after reading."
+      ]
+    },
+    {
+      "release": "2026.512",
+      "date": "2026-11-06",
+      "server": "1.11.474",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.474: auth profile errors name fields, never values; token errors are cleaned of saved secrets."
+      ]
+    },
+    {
+      "release": "2026.511",
+      "date": "2026-11-06",
+      "server": "1.11.473",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.473: a Word checklist whose controls are nested more than eight deep is refused before it is read."
+      ]
+    },
+    {
+      "release": "2026.510",
+      "date": "2026-11-06",
+      "server": "1.11.472",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.472: a Test Manager no longer changes the e-mail of an account of the company, as the administrator already could not."
       ]
     },
     {

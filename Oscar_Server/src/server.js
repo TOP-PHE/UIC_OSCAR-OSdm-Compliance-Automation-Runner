@@ -545,7 +545,7 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ access_token: accessToken, forced: force });
   } catch (err) {
-    const detail = err?.message ? err.message : String(err);
+    const detail = require('./utils/tokenErrors').tokenErrorText(err, userRow);
     log.error({ runId, err: detail }, '[refresh-access-token] resolveAccessToken failed');
     return res.status(502).json({ status: 502, title: 'Bad Gateway', detail: `Token refresh failed: ${detail}` });
   }

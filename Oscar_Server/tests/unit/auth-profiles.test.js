@@ -476,7 +476,7 @@ describe('fetchToken — network / transport failures', () => {
       json: async () => { throw new SyntaxError('Unexpected token in JSON'); },
       text: async () => 'not json',
     });
-    await expect(fetchToken('oauth2_basic', ctx, noop)).rejects.toThrow(/response was not valid JSON/);
+    await expect(fetchToken('oauth2_basic', ctx, noop)).rejects.toThrow(/response was not JSON \(8 characters\)/);
   });
 
   test('HTTP error response with a JSON body lacking "error"/"error_description" falls back to raw text summary', async () => {
@@ -607,5 +607,35 @@ describe('fetchToken — masked request diagnostics', () => {
     };
     const result = await fetchToken('oauth2_basic', ctx, throwingLog);
     expect(result.token).toBe('resilient-tok');
+  });
+});
+
+describe('a failed token answer is described by its field names, never its values', () => {
+  const ctx2 = { tokenUrl: 'https://auth.example.org/token', clientId: 'cid', clientSecret: 'csecret' };
+  let spy;
+  beforeEach(() => { spy = jest.spyOn(global, 'fetch'); });
+  afterEach(() => spy.mockRestore());
+  const answer = (body) => spy.mockResolvedValue(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+  test('custom: the field asked is missing; the token under another name is not quoted', async () => {
+    answer({ access_token: 'SECRET-OPAQUE-TOKEN', refresh_token: 'REFRESH-xyz' });
+    const tpl = JSON.stringify({ method: 'POST', body: { id: '{{client_id}}' }, token_field: 'token' });
+    const err = await fetchToken('custom', { ...ctx2, customTemplate: tpl }, noop).catch((e) => e);
+    expect(err.message).toMatch(/did not contain field "token"\. The answer's fields: access_token, refresh_token\./);
+    expect(err.message).not.toMatch(/SECRET|REFRESH-xyz/);
+  });
+
+  test('paxone_json: no token field recognised; values not quoted', async () => {
+    answer({ jwt: 'SECRET-JWT-VALUE' });
+    const err = await fetchToken('paxone_json', ctx2, noop).catch((e) => e);
+    expect(err.message).toMatch(/The answer's fields: jwt\./);
+    expect(err.message).not.toMatch(/SECRET/);
+  });
+
+  test('a 200 answer that is not JSON is not quoted', async () => {
+    spy.mockResolvedValue(new Response('RAW-SECRET-TOKEN', { status: 200 }));
+    const err = await fetchToken('oauth2_basic', ctx2, noop).catch((e) => e);
+    expect(err.message).toMatch(/was not JSON \(16 characters\)/);
+    expect(err.message).not.toMatch(/SECRET/);
   });
 });
