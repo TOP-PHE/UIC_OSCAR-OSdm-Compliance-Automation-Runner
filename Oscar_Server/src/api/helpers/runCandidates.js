@@ -17,6 +17,7 @@ const { all } = require('../../db/db');
 const { latestRunsOf } = require('../../utils/frameworkCoverage');
 const { currentCollectionVersion } = require('../../utils/versionInfo');
 const RF = require('../../utils/runFilters');
+const { runScopeSql } = require('./run-access');
 
 // The runs read for "last run": the newest of the company, whatever their age.
 const MAX_RUNS = 20000;
@@ -26,14 +27,16 @@ const MAX_RUNS = 20000;
  * number of its failed checks: { code: { status, failed, collection_version,
  * scenario_hash } }.
  */
-function latestRunStates(companyId) {
+function latestRunStates(companyId, user) {
+  // Among the runs `user` may read: a tester's own (1.11.477).
+  const scope = runScopeSql(user, '');
   const rows = all(
     `SELECT id, scenario_code, status, collection_version, scenario_hash
        FROM runs
-      WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED')
+      WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED')${scope.sql}
       ORDER BY queued_at DESC, id DESC
       LIMIT ${MAX_RUNS}`,
-    [companyId]
+    [companyId, ...scope.params]
   );
   const latest = latestRunsOf(rows);
   const ids = Object.values(latest).map((r) => r.id);
@@ -54,14 +57,14 @@ function latestRunStates(companyId) {
 }
 
 /** The facets of `codes` in the data file, for the company's runs. */
-function facetsFor(companyId, datafile, codes) {
+function facetsFor(companyId, datafile, codes, user) {
   let entries = [];
   try {
     entries = require('./catalogueSource').readCatalogue().catalogue?.entries || [];
   } catch {
     // Without the catalogue, a scenario's capability is derived from its fields.
   }
-  return RF.facetsOf(codes, { datafile, entries, runs: latestRunStates(companyId), collectionVersion: currentCollectionVersion() });
+  return RF.facetsOf(codes, { datafile, entries, runs: latestRunStates(companyId, user), collectionVersion: currentCollectionVersion() });
 }
 
 module.exports = { latestRunStates, facetsFor };

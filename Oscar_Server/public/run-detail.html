@@ -418,10 +418,11 @@ function updateStatus(run) {
     // ── Per-run share-with-certifier toggle (issue #60, v1.10.0) ─────────────
     // Test managers explicitly choose which terminal runs are visible to
     // certifiers. Replaces the company-wide all-or-nothing toggle.
-    // Visible only to test_managers; the button text + colour reflect the
-    // current shared state, which the run object now carries via the
-    // shared_with_certifier_at timestamp (null = not shared).
-    if (user.role === 'test_manager' && !run.shared) {
+    // Visible to test_managers, and to the tester whose run it is (1.11.477);
+    // the button text + colour reflect the current shared state, which the run
+    // object now carries via the shared_with_certifier_at timestamp (null = not shared).
+    const ownTesterRun = (user.role === 'company_user' || user.role === 'tester') && run.user_id === user.id;
+    if ((user.role === 'test_manager' || ownTesterRun) && !run.shared) {
       const shareWrap = document.getElementById('share-btn-wrap');
       if (shareWrap) {
         const isShared = !!run.shared_with_certifier_at;

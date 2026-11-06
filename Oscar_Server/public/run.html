@@ -440,7 +440,8 @@ async function pollQueueStatus() {
       var pos = '';
       if (run.status === 'QUEUED') { queuePos++; pos = '#' + queuePos; }
 
-      var scenario = run.scenario_code || 'All scenarios';
+      // A colleague's run comes without its scenario or e-mail (1.11.477).
+      var scenario = run.scenario_code || ((run.user_email || run.is_current_user) ? 'All scenarios' : 'Another tester\'s run');
       var email = run.user_email || '-';
       var youBadge = run.is_current_user
         ? ' <span style="background:#e3f2fd;color:#1565c0;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px">you</span>'

@@ -895,10 +895,27 @@ describe('GET /v1/runs/:id/artifacts and /:id/artifacts/:aid', () => {
 });
 
 describe('POST /v1/runs/:id/share and DELETE /v1/runs/:id/share', () => {
-  test('403 non-test_manager cannot share', async () => {
-    const token = covToken('company_user', covUserId);
-    const res = await request(app).post(`/v1/runs/${covRunFull}/share`).set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(403);
+  // 1.11.477: a tester shares their own runs, as a Test Manager does; a
+  // colleague's run is not theirs to see (404); a certifier shares nothing.
+  test('a tester shares and unshares their own run; a colleague\'s is 404; a certifier 403', async () => {
+    const own = await request(app).post(`/v1/runs/${covRunFull}/share`).set('Authorization', `Bearer ${covToken('company_user', covUserId)}`);
+    expect(own.status).toBe(200);
+    expect(get('SELECT shared_with_certifier_at FROM runs WHERE id = ?', [covRunFull]).shared_with_certifier_at).toBeTruthy();
+    const undo = await request(app).delete(`/v1/runs/${covRunFull}/share`).set('Authorization', `Bearer ${covToken('company_user', covUserId)}`);
+    expect(undo.status).toBe(200);
+    expect(get('SELECT shared_with_certifier_at FROM runs WHERE id = ?', [covRunFull]).shared_with_certifier_at).toBeNull();
+
+    const colleague = uuidv4();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
+      [colleague, covCompanyId, `colleague-${colleague}@${EMAIL_DOMAIN}`]);
+    try {
+      const other = await request(app).post(`/v1/runs/${covRunFull}/share`).set('Authorization', `Bearer ${covToken('company_user', colleague)}`);
+      expect(other.status).toBe(404);
+    } finally {
+      run('DELETE FROM users WHERE id = ?', [colleague]);
+    }
+    const cert = await request(app).post(`/v1/runs/${covRunFull}/share`).set('Authorization', `Bearer ${covToken('certification_user', covCertifierId)}`);
+    expect(cert.status).toBe(403);
   });
 
   test('404 for a non-existent run', async () => {
@@ -946,8 +963,8 @@ describe('POST /v1/runs/:id/share and DELETE /v1/runs/:id/share', () => {
     expect(res.body.runs.find(r => r.id === covRunFull)).toBeTruthy();
   });
 
-  test('403 non-test_manager cannot revoke', async () => {
-    const token = covToken('company_user', covUserId);
+  test('403 a certifier cannot revoke', async () => {
+    const token = covToken('certification_user', covCertifierId);
     const res = await request(app).delete(`/v1/runs/${covRunFull}/share`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
@@ -994,8 +1011,8 @@ describe('POST/DELETE /v1/runs/batch/:batchId/share — a whole batch with certi
   });
   afterAll(() => { for (const id of [done1, done2, queued, foreign]) run('DELETE FROM runs WHERE id = ?', [id]); });
 
-  test('403 for anyone but a Test Manager', async () => {
-    for (const [role, uid] of [['company_user', covUserId], ['certification_user', covCertifierId]]) {
+  test('403 for a certifier', async () => {
+    for (const [role, uid] of [['certification_user', covCertifierId]]) {
       const post = await request(app).post(`/v1/runs/batch/${batchId}/share`).set('Authorization', `Bearer ${covToken(role, uid)}`);
       const del = await request(app).delete(`/v1/runs/batch/${batchId}/share`).set('Authorization', `Bearer ${covToken(role, uid)}`);
       expect([post.status, del.status]).toEqual([403, 403]);
@@ -1046,6 +1063,18 @@ describe('POST/DELETE /v1/runs/batch/:batchId/share — a whole batch with certi
     // Another tenant's run is not the Test Manager's to change.
     expect(sharedRow(foreign).shared_with_certifier_at).toBeTruthy();
   });
+
+  // 1.11.477: the tester whose runs they are shares the batch too.
+  test('the tester whose runs they are shares and unshares the batch', async () => {
+    const auth = `Bearer ${covToken('company_user', covUserId)}`;
+    const res = await request(app).post(`/v1/runs/batch/${batchId}/share`).set('Authorization', auth);
+    expect(res.status).toBe(200);
+    expect(res.body.shared).toBe(2);
+    for (const id of [done1, done2]) expect(sharedRow(id).shared_with_certifier_at).toBeTruthy();
+    const del = await request(app).delete(`/v1/runs/batch/${batchId}/share`).set('Authorization', auth);
+    expect(del.status).toBe(200);
+    for (const id of [done1, done2]) expect(sharedRow(id).shared_with_certifier_at).toBeNull();
+  });
 });
 
 describe('DELETE /v1/runs/:id/cancel', () => {
@@ -1082,7 +1111,7 @@ describe('DELETE /v1/runs/:id/cancel', () => {
     run('DELETE FROM runs WHERE id = ?', [cancellableId]);
   });
   // A tester cancels their own runs only; the Test Manager any of the company's.
-  test("403 for a tester cancelling a colleague's run; 200 for the Test Manager", async () => {
+  test("404 for a tester cancelling a colleague's run (not theirs to see); 200 for the Test Manager", async () => {
     const colleague = uuidv4();
     const queued = uuidv4();
     run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
@@ -1091,7 +1120,7 @@ describe('DELETE /v1/runs/:id/cancel', () => {
       [queued, covCompanyId, colleague]);
     try {
       const tester = await request(app).delete(`/v1/runs/${queued}/cancel`).set('Authorization', `Bearer ${covToken('company_user', covUserId)}`);
-      expect(tester.status).toBe(403);
+      expect(tester.status).toBe(404);
       expect(get('SELECT status FROM runs WHERE id = ?', [queued]).status).toBe('QUEUED');
       const tm = await request(app).delete(`/v1/runs/${queued}/cancel`).set('Authorization', `Bearer ${covToken('test_manager', covTmId)}`);
       expect(tm.status).toBe(200);
@@ -1110,7 +1139,7 @@ describe('DELETE /v1/runs/:id/cancel', () => {
       [stale, covCompanyId, colleague]);
     try {
       const auth = `Bearer ${covToken('company_user', covUserId)}`;
-      expect((await request(app).delete(`/v1/runs/${stale}`).set('Authorization', auth)).status).toBe(403);
+      expect((await request(app).delete(`/v1/runs/${stale}`).set('Authorization', auth)).status).toBe(404);
       await request(app).post('/v1/runs/bulk-delete').set('Authorization', auth).send({ run_ids: [stale] });
       expect(get('SELECT status FROM runs WHERE id = ?', [stale]).status).toBe('QUEUED');
     } finally {

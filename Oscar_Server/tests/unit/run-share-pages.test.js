@@ -97,7 +97,7 @@ describe('run detail: a shared run is read only', () => {
   });
 
   test('the certifier share is not offered on a shared run', () => {
-    expect(read('run-detail.html')).toContain("if (user.role === 'test_manager' && !run.shared) {");
+    expect(read('run-detail.html')).toContain("if ((user.role === 'test_manager' || ownTesterRun) && !run.shared) {");
   });
 });
 
@@ -124,7 +124,8 @@ describe('providers page', () => {
 });
 
 describe('dashboard: a whole batch shared with certifiers (#1041)', () => {
-  const f = (user) => loadFunction('dashboard.html', 'batchCertifierAction', { user, esc });
+  const f = (user) => loadFunction('dashboard.html', 'batchCertifierAction',
+    { user, esc, sharesWithCertifiers: loadFunction('dashboard.html', 'sharesWithCertifiers', { user }) });
   const done = (extra = {}) => ({ status: 'COMPLETED', ...extra });
 
   test('offered while a finished run of the batch is not shared; undone once all are', () => {
@@ -133,10 +134,14 @@ describe('dashboard: a whole batch shared with certifiers (#1041)', () => {
     expect(f(TM)([done({ shared_with_certifier_at: 'x' }), { status: 'RUNNING' }], 'b1')).toContain('✓ Shared with certifiers');
   });
 
-  test('nothing for a batch with no finished run, nor for anyone but a Test Manager', () => {
+  test('nothing for a batch with no finished run, nor for a certifier', () => {
     expect(f(TM)([{ status: 'QUEUED' }, { status: 'RUNNING' }], 'b1')).toBe('');
-    expect(f({ role: 'company_user' })([done()], 'b1')).toBe('');
     expect(f({ role: 'certification_user' })([done()], 'b1')).toBe('');
+  });
+
+  // 1.11.477: a tester shares their own runs; the Dashboard lists no other.
+  test('offered to a tester for their batch', () => {
+    expect(f({ role: 'company_user' })([done()], 'b1')).toContain('data-action="share-batch-certifier"');
   });
 
   test('the batch id is escaped', () => {
