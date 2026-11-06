@@ -118,17 +118,73 @@ function activeTestManagers(companyId) {
  * owner choose one. Returns { user, activationUrl }.
  */
 async function activate(request, companyId, role) {
+  return invite({ email: request.email, companyId, role }, () => run('DELETE FROM access_request WHERE id = ?', [request.id]));
+}
+
+/**
+ * An account made by invitation: no usable password, and a link (72 hours,
+ * once) for its owner to choose one. Nobody else ever knows the password.
+ * `also` runs in the same transaction. Returns { user, activationUrl }.
+ */
+async function invite({ email, companyId, role }, also = () => {}) {
+  const lowerEmail = String(email).toLowerCase().trim();
   const unusable = await bcrypt.hash(crypto.randomBytes(32).toString('base64'), 12);
   const userId = crypto.randomUUID();
   const token = crypto.randomUUID();
   transaction(() => {
     run(`INSERT INTO users (id, company_id, email, password_hash, role, status) VALUES (?, ?, ?, ?, ?, 'active')`,
-      [userId, companyId, request.email, unusable, role]);
+      [userId, companyId, lowerEmail, unusable, role]);
     run('INSERT INTO password_reset_tokens (id, user_id, token, expires_at, requested_ip) VALUES (?, ?, ?, ?, NULL)',
       [crypto.randomUUID(), userId, token, hoursFromNow(ACTIVATION_HOURS)]);
-    run('DELETE FROM access_request WHERE id = ?', [request.id]);
+    also();
   });
-  return { user: { id: userId, email: request.email, role }, activationUrl: `${appUrl()}/reset-password.html?token=${token}&welcome=1` };
+  return { user: { id: userId, email: lowerEmail, role }, activationUrl: `${appUrl()}/reset-password.html?token=${token}&welcome=1` };
+}
+
+/**
+ * A company nobody uses yet: no user and no test data. Only there may the
+ * administrator alone bring in a Test Manager: anywhere else it could empty
+ * a company of its people and take its tests over with a person of its own.
+ */
+function isNewCompany(companyId) {
+  const held = [
+    'SELECT 1 AS x FROM users WHERE company_id = ? LIMIT 1',
+    'SELECT 1 AS x FROM runs WHERE company_id = ? LIMIT 1',
+    'SELECT 1 AS x FROM test_frameworks WHERE company_id = ? LIMIT 1',
+    'SELECT 1 AS x FROM test_resources WHERE company_id = ? LIMIT 1',
+    'SELECT 1 AS x FROM finding WHERE company_id = ? LIMIT 1',
+  ];
+  if (held.some(sql => get(sql, [companyId]))) return false;
+  return !get('SELECT datafile_path FROM companies WHERE id = ?', [companyId])?.datafile_path;
+}
+
+/** A link to choose a new password, sent to the account's own address only. */
+function sendPasswordReset(user) {
+  const token = crypto.randomUUID();
+  run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+  run('INSERT INTO password_reset_tokens (id, user_id, token, expires_at, requested_ip) VALUES (?, ?, ?, ?, NULL)',
+    [crypto.randomUUID(), user.id, token, hoursFromNow(24)]);
+  const resetUrl = `${appUrl()}/reset-password.html?token=${token}`;
+  const { sendPasswordResetEmail } = require('./mailer');
+  Promise.resolve()
+    .then(() => sendPasswordResetEmail({ to: user.email, resetUrl }))
+    .catch(err => log.error({ err: err.message }, 'password-reset e-mail not sent'));
+}
+
+/**
+ * The administrator places someone in a company that has a Test Manager:
+ * an access request the company's Test Manager confirms, as if the person
+ * had asked. Returns the request.
+ */
+function placeInCompany(email, company) {
+  const lowerEmail = String(email).toLowerCase().trim();
+  const id = crypto.randomUUID();
+  transaction(() => {
+    run('DELETE FROM access_request WHERE email = ?', [lowerEmail]);
+    run(`INSERT INTO access_request (id, email, full_name, company_text, state, verified_at, company_id, assigned_at)
+         VALUES (?, ?, '', ?, 'assigned', datetime('now'), ?, datetime('now'))`, [id, lowerEmail, company.name, company.id]);
+  });
+  return get('SELECT * FROM access_request WHERE id = ?', [id]);
 }
 
 /**
@@ -151,6 +207,9 @@ async function assignRequest(id, companyId, { firstTestManager = false } = {}) {
   }
   const managers = activeTestManagers(company.id);
   if (managers.length === 0) {
+    if (!isNewCompany(company.id)) {
+      return { status: 409, detail: `${company.name} has no active Test Manager but already has users or test data: name one of its users Test Manager first.` };
+    }
     if (!firstTestManager) {
       return { status: 409, detail: `${company.name} has no Test Manager: confirming makes this person its first Test Manager.`, needsFirstTestManager: true };
     }
@@ -249,6 +308,7 @@ function noticeRefused(request) {
 module.exports = {
   createRequest, requestOfToken, verifyRequest, waitingRequests, requestsOfCompany,
   assignRequest, confirmRequest, refuseRequest, activeTestManagers,
+  invite, isNewCompany, sendPasswordReset, placeInCompany,
   noticeVerified, noticeAssigned, noticeActivated, noticeRefused,
   VERIFY_HOURS, ACTIVATION_HOURS,
 };

@@ -1034,6 +1034,16 @@ const MIGRATIONS = [
                SELECT id, email, '', company_name, token, expires_at, 'unverified', created_at FROM pending_registrations`);
       db.exec('DELETE FROM pending_registrations');
   }},
+  { version: 50, name: 'certifiers-in-the-platform-company', up: () => {
+      // Certifiers belong to the UIC (decision 3): the platform company, like
+      // administrators. A certifier of another company moves there; their
+      // sessions end with the move. Without a platform company yet, nothing
+      // to move: it is made, with its first platform account, at run time.
+      const platform = db.prepare("SELECT id FROM companies WHERE slug = 'platform-root'").get();
+      if (!platform) return;
+      db.prepare(`UPDATE users SET company_id = ?, sessions_valid_after = CAST(strftime('%s','now') AS INTEGER)
+                   WHERE role = 'certification_user' AND company_id != ?`).run(platform.id, platform.id);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

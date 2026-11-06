@@ -349,8 +349,9 @@ module.exports = {
       get: { tags: ['Admin'], summary: 'List/search users', security: [{ bearerAuth: [] }],
         parameters: [{ name: 'q', in: 'query', schema: { type: 'string' } }],
         responses: { 200: { description: 'User list' }, 403: { description: 'Administrator only' } } },
-      post: { tags: ['Admin'], summary: 'Create user', security: [{ bearerAuth: [] }],
-        responses: { 201: { description: 'User created' }, 409: { description: 'Email already used' } } },
+      post: { tags: ['Admin'], summary: 'Invite a user (no password is set)', security: [{ bearerAuth: [] }],
+        description: 'Body: { email, role, company_id? }; a password is refused. An administrator or certifier belongs to the UIC (the platform company) and receives a link to choose a password. A company account goes to the company\'s Test Manager as an access request (202); only a new company (no user, no test data) gets its first Test Manager from the administrator (201).',
+        responses: { 201: { description: 'Invited: { invited, user }' }, 202: { description: 'Placed with the company\'s Test Manager: { placed, detail }' }, 400: { description: 'A field refused, or a password sent' }, 404: { description: 'No such company' }, 409: { description: 'Email already used, or a company that is not new has no Test Manager' } } },
     },
     '/v1/admin/backup-status': {
       get: { tags: ['Admin'], summary: 'Disaster-recovery status (read only, #572)', security: [{ bearerAuth: [] }],
@@ -719,12 +720,12 @@ module.exports = {
       },
       post: {
         tags: ['Company'],
-        summary: 'Create a user in the caller\'s company (test_manager only)',
-        description: 'Role must be one of: company_user, test_manager. Platform roles (administrator, certification_user) cannot be assigned through this endpoint.',
+        summary: 'Invite a user into the caller\'s company (test_manager only)',
+        description: 'Body: { email, role } with role company_user or test_manager; a password is refused. The person receives a link (72 hours, once) to choose their own password. Platform roles (administrator, certification_user) cannot be assigned through this endpoint.',
         security: [{ bearerAuth: [] }],
         responses: {
-          201: { description: 'User created' },
-          400: { description: 'Validation failed (invalid role / weak password)' },
+          201: { description: 'Invited: { invited, user }' },
+          400: { description: 'Invalid role, or a password sent' },
           409: { description: 'Email already used' },
         },
       },
@@ -753,15 +754,15 @@ module.exports = {
         },
       },
     },
-    '/v1/company/users/{id}/reset-password': {
+    '/v1/company/users/{id}/send-reset': {
       post: {
         tags: ['Company'],
-        summary: 'Reset a company user\'s password (test_manager only)',
+        summary: 'Send a company user a link to choose a new password (test_manager only)',
+        description: 'The Test Manager never sets a password: the user receives a link (24 hours, once). Audited.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         responses: {
-          200: { description: 'Password reset' },
-          400: { description: 'Password too weak' },
+          200: { description: '{ sent: true, email }' },
           404: { description: 'User not in this company' },
         },
       },

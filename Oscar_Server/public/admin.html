@@ -94,10 +94,10 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
     </div>
 
     <div class="card">
-      <h3>Create User</h3>
+      <h3>Invite User</h3>
+      <p style="font-size:12px;color:#78909c;margin:0 0 10px">The person receives a link to choose their own password: nobody else ever knows it. An administrator's invitation into a company goes to that company's Test Manager.</p>
       <div class="row">
         <div class="field"><label for="new-email">Email</label><input id="new-email" type="email" placeholder="user@domain.com"></div>
-        <div class="field"><label for="new-password">Password</label><input id="new-password" type="password" placeholder="Min 8 chars"></div>
         <div class="field"><label for="new-role">Role</label>
           <select id="new-role">
             <option value="company_user">Tester</option>
@@ -107,7 +107,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
           </select>
         </div>
         <div class="field" id="new-company-field"><label for="new-company">Company</label><select id="new-company"></select></div>
-        <button class="btn btn-primary" id="btn-create-user">Create</button>
+        <button class="btn btn-primary" id="btn-create-user">Invite</button>
       </div>
     </div>
 
@@ -526,6 +526,14 @@ function debouncedLoadUsers() {
   userSearchTimer = setTimeout(loadUsers, 250);
 }
 
+// Set a password or hand over a reset link: platform accounts (administrators,
+// certifiers) only. The server refuses both for a company account.
+function platformPasswordButtons(u) {
+  if (isTestMgr || u.role === 'company_user' || u.role === 'test_manager') return '';
+  return `<button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${u.id}" data-email="${esc(u.email)}">Reset PWD</button>
+        <button class="btn btn-small btn-secondary" data-action="reset-link" data-user-id="${u.id}" data-email="${esc(u.email)}" title="Generate a self-service reset URL the user can click to set their own password — useful when SMTP is broken.">Reset Link</button>`;
+}
+
 async function loadUsers() {
   const q = encodeURIComponent(document.getElementById('user-search').value || '');
   const res = await fetch(`${USERS_API_BASE}?q=${q}`, { headers: authHeaders });
@@ -542,8 +550,8 @@ async function loadUsers() {
       <td>
         ${u.status === 'pending' ? `<button class="btn btn-small btn-success" data-action="approve-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Approve</button>` : ''}
         <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${u.id}">Save</button>
-        <button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${u.id}" data-email="${esc(u.email)}">Reset PWD</button>
-        <button class="btn btn-small btn-secondary" data-action="reset-link" data-user-id="${u.id}" data-email="${esc(u.email)}" title="Generate a self-service reset URL the user can click to set their own password — useful when SMTP is broken.">Reset Link</button>
+        <button class="btn btn-small btn-secondary" data-action="send-reset" data-user-id="${u.id}" data-email="${esc(u.email)}">Send reset e-mail</button>
+        ${platformPasswordButtons(u)}
         <button class="btn btn-small btn-danger" data-action="delete-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Delete</button>
       </td>
     </tr>
@@ -636,7 +644,6 @@ async function createUser() {
   const role = document.getElementById('new-role').value;
   const body = {
     email: document.getElementById('new-email').value.trim(),
-    password: document.getElementById('new-password').value,
     role
   };
 
@@ -651,11 +658,11 @@ async function createUser() {
   });
 
   const data = await res.json();
-  if (!res.ok) { showMsg(data.detail || data.title || 'User creation failed.', false); return; }
-  showMsg(`User created: ${data.user.email}`, true);
+  if (!res.ok) { showMsg(data.detail || data.title || 'The invitation failed.', false); return; }
+  showMsg(data.placed ? data.detail : `Invited: ${data.user.email} receives a link to choose a password.`, true);
   document.getElementById('new-email').value = '';
-  document.getElementById('new-password').value = '';
   loadUsers();
+  loadAccessRequests();
 }
 
 async function saveUser(userId) {
@@ -678,6 +685,16 @@ async function saveUser(userId) {
   showMsg(`User updated: ${data.user.email}${companyLabel}`, true);
   await loadCompanies();
   await loadUsers();
+}
+
+// A company account's password is its owner's (decision 3): they receive a
+// link to choose a new one. Only platform accounts keep the two buttons below.
+async function sendReset(userId, email) {
+  if (!confirm(`Send ${email} an e-mail with a link to choose a new password?`)) return;
+  const res = await fetch(`${USERS_API_BASE}/${userId}/send-reset`, { method: 'POST', headers: authHeaders });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { showMsg(data.detail || data.title || 'The e-mail could not be sent.', false); return; }
+  showMsg(`Reset e-mail sent to ${email}.`, true);
 }
 
 async function resetPwd(userId, email) {
@@ -1267,6 +1284,7 @@ document.getElementById('users-tbody').addEventListener('click', function(e) {
   var userId = el.dataset.userId;
   if (action === 'save-user') saveUser(userId);
   else if (action === 'approve-user') approveUser(userId, el.dataset.email);
+  else if (action === 'send-reset') sendReset(userId, el.dataset.email);
   else if (action === 'reset-pwd') resetPwd(userId, el.dataset.email);
   else if (action === 'reset-link') generateResetLink(userId, el.dataset.email);
   else if (action === 'delete-user') deleteUser(userId, el.dataset.email);

@@ -34,9 +34,7 @@
  */
 
 const express   = require('express');
-const bcrypt    = require('bcrypt');
 const rateLimit = require('express-rate-limit');
-const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole, END_SESSIONS_SQL } = require('../middleware/auth');
 const { auditLog } = require('../helpers/shared');
@@ -45,7 +43,6 @@ const { validate, v } = require('../middleware/validate');
 const AccessRequests = require('../../utils/accessRequests');
 
 const router = express.Router();
-const SALT_ROUNDS = 12;
 
 // Roles a test_manager may set or create. NEVER includes administrator
 // or certification_user — those are platform roles managed exclusively
@@ -163,11 +160,6 @@ router.post('/',
     v.body('email').isString().withMessage('email is required')
       .isEmail().withMessage('email must be a valid address')
       .isLength({ max: 254 }),
-    v.body('password').isString().withMessage('password is required')
-      .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
-      .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
-      .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/\d/).withMessage('password must include a digit'),
     v.body('role').isString().withMessage('role is required'),
   ]),
   async (req, res) => {
@@ -176,7 +168,10 @@ router.post('/',
       return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No company associated with this account.' });
     }
 
-    const { email, password, role } = req.body || {};
+    const { email, role } = req.body || {};
+    if ('password' in (req.body || {})) {
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No password is set here: the person receives a link to choose their own.' });
+    }
     const resolvedRole = normalizeRole(role);
     if (!COMPANY_ASSIGNABLE_ROLES.has(resolvedRole)) {
       return res.status(400).json({
@@ -191,23 +186,19 @@ router.post('/',
       return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Email already registered.' });
     }
 
-    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const userId = uuidv4();
-
-    run(
-      `INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, ?, ?)`,
-      [userId, companyId, lowerEmail, passwordHash, resolvedRole]
-    );
-    auditLog(req.user.id, companyId, req.user.email, `company_user_created:${lowerEmail}:${resolvedRole}`);
-
+    // Decision 3: an invitation. The person chooses their own password from
+    // the link they receive; the Test Manager never knows it.
+    const done = await AccessRequests.invite({ email: lowerEmail, companyId, role: resolvedRole });
+    auditLog(req.user.id, companyId, req.user.email, `company_user_invited:${lowerEmail}:${resolvedRole}`);
     const created = get(
       `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
               c.name AS company_name
        FROM users u JOIN companies c ON c.id = u.company_id
        WHERE u.id = ?`,
-      [userId]
+      [done.user.id]
     );
-    return res.status(201).json({ user: sanitizeUserRow(created) });
+    AccessRequests.noticeActivated(done.user, created.company_name, done.activationUrl);
+    return res.status(201).json({ invited: true, user: sanitizeUserRow(created) });
   }
 );
 
@@ -327,29 +318,18 @@ router.post('/:id/approve', (req, res) => {
   return res.json({ user: sanitizeUserRow(updated) });
 });
 
-// ── POST /v1/company/users/:id/reset-password ─────────────────────────────────
-router.post('/:id/reset-password', async (req, res) => {
+// ── POST /v1/company/users/:id/send-reset ─────────────────────────────────────
+// A user's password is theirs: the Test Manager sends them a link to choose a
+// new one (decision 3) and never sets it.
+router.post('/:id/send-reset', (req, res) => {
   const companyId = req.user.companyId;
-  const userId = req.params.id;
-  const { new_password } = req.body || {};
-
-  if (!new_password || new_password.length < 12) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'new_password is required (min 12 chars).' });
-  }
-  if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/\d/.test(new_password)) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Password must contain uppercase, lowercase, and a digit.' });
-  }
-
-  const target = get('SELECT id, email FROM users WHERE id = ? AND company_id = ?', [userId, companyId]);
+  const target = get('SELECT id, email FROM users WHERE id = ? AND company_id = ?', [req.params.id, companyId]);
   if (!target) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found in this company.' });
   }
-
-  const hash = await bcrypt.hash(new_password, SALT_ROUNDS);
-  run(`UPDATE users SET password_hash = ?, ${END_SESSIONS_SQL} WHERE id = ?`, [hash, userId]);
-  auditLog(req.user.id, companyId, req.user.email, `company_password_reset:${target.email}`);
-
-  return res.json({ id: userId, email: target.email, password_reset: true });
+  AccessRequests.sendPasswordReset(target);
+  auditLog(req.user.id, companyId, req.user.email, `company_password_reset_sent:${target.email}`);
+  return res.json({ sent: true, email: target.email });
 });
 
 // ── DELETE /v1/company/users/:id ──────────────────────────────────────────────

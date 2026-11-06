@@ -113,6 +113,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.466] — 2026-11-06
+
+Release 2026.504. Nobody chooses another person's password, and a company is joined through its own Test Manager.
+
+### Security
+- **Invitations, not passwords.** `POST /v1/admin/users` and `POST /v1/company/users` refuse a password: the account is made with an unusable one and the person receives a link to choose theirs (72 hours, once; `utils/accessRequests.js` `invite()`).
+- **An administrator's invitation into a company goes to its Test Manager** (an access request, 202) when the company has one. A first Test Manager comes from the administrator only into a *new* company: no user and no test data (`isNewCompany()`), for an invitation and for a placed access request alike. Before, the administrator could empty a company of its people and bring in a Test Manager of its own.
+- **What the administrator no longer changes on a company account** (`PATCH /v1/admin/users/:id`, 409): its e-mail, a move into another company (from a company or from the platform), a promotion to Test Manager where the company has one. Naming one of a company's own users Test Manager where it has none, a demotion and a platform role stay.
+- **A company account's password is its owner's.** The administrator's `reset-password` and `generate-reset-link` answer 403 for a company account (they stay for administrators and certifiers); `POST /v1/admin/users/:id/send-reset` and `POST /v1/company/users/:id/send-reset` e-mail the owner a link and answer nothing of it. The Test Manager's `reset-password` is gone.
+- **Certifiers belong to the UIC** (the platform company), like administrators: on invitation, on a role change, and for existing certifiers by migration 50 (their sessions end with the move).
+
+### Pages
+- Manage Users: *Invite User* (no password field), *Send reset e-mail* on every account; *Reset PWD* and *Reset Link* on platform accounts only.
+
+### Checked
+- `invitations.test.js`: the refused passwords, a Test Manager's invitation down to the sign-in, certifiers in the platform company, the placed invitation, the first Test Manager into a new company only (invitation and access request), the refused e-mail change, move and promotion, the refused password routes and the reset sent to the owner only. With the new-company check or the e-mail refusal taken out, it fails.
+- The tests that encoded the old behaviour now check the new one (`admin-routes`, `company-users`, `provider-admin-move`, `provider-stale-token`, `session-recheck`).
+- `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.465] — 2026-11-05
 
 Release 2026.503. Access is asked, checked twice, then given: no list of companies is shown to a visitor.
