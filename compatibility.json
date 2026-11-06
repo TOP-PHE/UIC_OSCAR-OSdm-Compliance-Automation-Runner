@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.503",
+  "current_release": "2026.504",
   "releases": [
+    {
+      "release": "2026.504",
+      "date": "2026-11-05",
+      "server": "1.11.466",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.466: nobody chooses another person's password. Administrators and Test Managers invite; the person receives a link to choose theirs. An administrator's invitation into a company goes to its Test Manager, a first Test Manager only into a new company, and it no longer changes a company account's e-mail, company or Test Manager rank, nor sets or receives its password. Certifiers belong to the UIC."
+      ]
+    },
     {
       "release": "2026.503",
       "date": "2026-11-05",

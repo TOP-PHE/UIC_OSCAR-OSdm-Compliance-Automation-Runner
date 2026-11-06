@@ -40,14 +40,28 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
 const { run, get, all } = require('../../src/db/db');
+const { ensurePlatformCompany } = require('../../src/api/helpers/shared');
 
-const app = buildAppWithRoute('/v1/admin', '../../src/api/routes/admin');
+// The admin router limits writes to 60 per 5 minutes per address, and this
+// file makes more than that. Each test speaks from an address of its own
+// (X-Forwarded-For from loopback), so one test's writes never use up the
+// next one's; the limiter itself is not what this file tests.
+const express = require('express');
+const app = express();
+app.set('trust proxy', 'loopback');
+let clientAddress = '10.0.0.1';
+let clientCount = 0;
+app.use((req, _res, next) => { req.headers['x-forwarded-for'] = clientAddress; next(); });
+app.use(buildAppWithRoute('/v1/admin', '../../src/api/routes/admin'));
+beforeEach(() => {
+  clientCount += 1;
+  clientAddress = `10.0.${Math.floor(clientCount / 250)}.${(clientCount % 250) + 1}`;
+});
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
 const adminId   = uuidv4();
 const companyId = uuidv4();
-let regularUserId;
 // A token stands for a real user of its role (sessionUser): one row per role.
 const roleUserIds = { administrator: adminId, company_user: uuidv4(), certification_user: uuidv4(), test_manager: uuidv4() };
 
@@ -203,41 +217,148 @@ describe('POST /v1/admin/users', () => {
     const res = await request(app)
       .post('/v1/admin/users')
       .set('Authorization', `Bearer ${adminToken()}`)
-      .send({ email: `nocompany${Date.now()}@admin-test.com`, password: 'ValidPass1!Valid', role: 'company_user' });
+      .send({ email: `nocompany${Date.now()}@admin-test.com`, role: 'company_user' });
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/company_id/i);
   });
 
-  test('201 creates a company_user successfully', async () => {
-    const email = `newuser${Date.now()}@admin-test.com`;
+  // Nobody chooses another person's password: a password in the body is refused.
+  test('400 when a password is sent, and nothing is created', async () => {
+    const email = `withpassword${Date.now()}@admin-test.com`;
     const res = await request(app)
       .post('/v1/admin/users')
       .set('Authorization', `Bearer ${adminToken()}`)
-      .send({ email, password: 'ValidPass1!Valid', role: 'company_user', company_id: companyId });
-    expect(res.status).toBe(201);
-    expect(res.body.user.email).toBe(email);
-    expect(res.body.user.role).toBe('company_user');
-    regularUserId = res.body.user.id;
+      .send({ email, password: 'ValidPass1!Valid', role: 'administrator' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/password/i);
+    expect(get('SELECT id FROM users WHERE email = ?', [email])).toBeUndefined();
+  });
+
+  // A company with a Test Manager: the person is placed there as an access
+  // request its Test Manager confirms; no account is made by the administrator.
+  test('202 places a company_user in a company that has a Test Manager (no user created)', async () => {
+    const email = `newuser${Date.now()}@admin-test.com`;
+    try {
+      const res = await request(app)
+        .post('/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken()}`)
+        .send({ email, role: 'company_user', company_id: companyId });
+      expect(res.status).toBe(202);
+      expect(res.body.placed).toBe(true);
+      expect(get('SELECT id FROM users WHERE email = ?', [email])).toBeUndefined();
+      const placed = get('SELECT state, company_id FROM access_request WHERE email = ?', [email]);
+      expect(placed).toEqual({ state: 'assigned', company_id: companyId });
+    } finally {
+      run('DELETE FROM access_request WHERE email = ?', [email]);
+    }
+  });
+
+  test('404 when the target company does not exist', async () => {
+    const res = await request(app)
+      .post('/v1/admin/users')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ email: `nocompanyrow${Date.now()}@admin-test.com`, role: 'company_user', company_id: uuidv4() });
+    expect(res.status).toBe(404);
+  });
+
+  describe('a company with no active Test Manager', () => {
+    let newCoId;
+    let usedCoId;
+    beforeAll(() => {
+      newCoId = uuidv4();
+      usedCoId = uuidv4();
+      run(`INSERT INTO companies (id, name, slug) VALUES (?, 'Admin Tmp New', ?)`, [newCoId, `admin-tmp-new-${newCoId.slice(0, 8)}`]);
+      run(`INSERT INTO companies (id, name, slug) VALUES (?, 'Admin Tmp Used', ?)`, [usedCoId, `admin-tmp-used-${usedCoId.slice(0, 8)}`]);
+      // Not new: it has a user (a tester), but no Test Manager.
+      run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
+        [uuidv4(), usedCoId, `used-co-tester-${usedCoId.slice(0, 8)}@admin-test.com`]);
+    });
+    afterAll(() => {
+      for (const id of [newCoId, usedCoId]) {
+        run('DELETE FROM password_reset_tokens WHERE user_id IN (SELECT id FROM users WHERE company_id = ?)', [id]);
+        run('DELETE FROM auth_events WHERE company_id = ? OR user_id IN (SELECT id FROM users WHERE company_id = ?)', [id, id]);
+        run('DELETE FROM users WHERE company_id = ?', [id]);
+        run('DELETE FROM companies WHERE id = ?', [id]);
+      }
+    });
+
+    test('409 for a company_user: only a first Test Manager is brought in by the administrator', async () => {
+      const email = `firsttester${Date.now()}@admin-test.com`;
+      const res = await request(app)
+        .post('/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken()}`)
+        .send({ email, role: 'company_user', company_id: newCoId });
+      expect(res.status).toBe(409);
+      expect(get('SELECT id FROM users WHERE email = ?', [email])).toBeUndefined();
+    });
+
+    test('409 for a test_manager when the company is not new', async () => {
+      const email = `usedtm${Date.now()}@admin-test.com`;
+      const res = await request(app)
+        .post('/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken()}`)
+        .send({ email, role: 'test_manager', company_id: usedCoId });
+      expect(res.status).toBe(409);
+      expect(get('SELECT id FROM users WHERE email = ?', [email])).toBeUndefined();
+    });
+
+    test('201 invites the first Test Manager of a new company, with no usable password and a reset link', async () => {
+      const email = `firsttm${Date.now()}@admin-test.com`;
+      const res = await request(app)
+        .post('/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken()}`)
+        .send({ email, role: 'test_manager', company_id: newCoId });
+      expect(res.status).toBe(201);
+      expect(res.body.invited).toBe(true);
+      expect(res.body.user.email).toBe(email);
+      expect(res.body.user.role).toBe('test_manager');
+      expect(res.body.user.company_id).toBe(newCoId);
+      expect(get('SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?', [res.body.user.id]).n).toBe(1);
+    });
   });
 
   test('409 for duplicate email', async () => {
     const res = await request(app)
       .post('/v1/admin/users')
       .set('Authorization', `Bearer ${adminToken()}`)
-      .send({ email: 'admin@admin-test.com', password: 'ValidPass1!Valid', role: 'administrator' });
+      .send({ email: 'admin@admin-test.com', role: 'administrator' });
     expect(res.status).toBe(409);
   });
 
-  test('creates administrator on the platform company (no company_id needed)', async () => {
+  test('invites an administrator on the platform company (no company_id needed)', async () => {
     const email = `newadmin${Date.now()}@admin-test.com`;
     const res = await request(app)
       .post('/v1/admin/users')
       .set('Authorization', `Bearer ${adminToken()}`)
-      .send({ email, password: 'ValidPass1!Valid', role: 'administrator' });
-    expect(res.status).toBe(201);
-    expect(res.body.user.role).toBe('administrator');
-    // Clean up
-    run('DELETE FROM users WHERE id = ?', [res.body.user.id]);
+      .send({ email, role: 'administrator' });
+    try {
+      expect(res.status).toBe(201);
+      expect(res.body.invited).toBe(true);
+      expect(res.body.user.role).toBe('administrator');
+      expect(res.body.user.company_slug).toBe('platform-root');
+      expect(get('SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?', [res.body.user.id]).n).toBe(1);
+    } finally {
+      // Clean up
+      run('DELETE FROM password_reset_tokens WHERE user_id = ?', [res.body.user?.id]);
+      run('DELETE FROM auth_events WHERE user_id = ?', [res.body.user?.id]);
+      run('DELETE FROM users WHERE id = ?', [res.body.user?.id]);
+    }
+  });
+
+  test('a certifier is invited on the platform company whatever company_id says', async () => {
+    const email = `newcert${Date.now()}@admin-test.com`;
+    const res = await request(app)
+      .post('/v1/admin/users')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ email, role: 'certification_user', company_id: companyId });
+    try {
+      expect(res.status).toBe(201);
+      expect(res.body.user.role).toBe('certification_user');
+      expect(res.body.user.company_slug).toBe('platform-root');
+    } finally {
+      run('DELETE FROM password_reset_tokens WHERE user_id = ?', [res.body.user?.id]);
+      run('DELETE FROM users WHERE id = ?', [res.body.user?.id]);
+    }
   });
 });
 
@@ -278,61 +399,161 @@ describe('PATCH /v1/admin/users/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  test('200 updates email', async () => {
+  // A company account's e-mail is its owner's way in to its password.
+  test('409 when changing a company account\'s email, and the email is kept', async () => {
     const token = makeToken('administrator');
     const newEmail = `patched${Date.now()}@admin-test.com`;
     const res = await request(app)
       .patch(`/v1/admin/users/${targetUserId}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ email: newEmail });
-    expect(res.status).toBe(200);
-    expect(res.body.user.email).toBe(newEmail);
+    expect(res.status).toBe(409);
+    expect(get('SELECT email FROM users WHERE id = ?', [targetUserId]).email).toBe('patch-target@admin-test.com');
+  });
+
+  test('200 updates a platform account\'s email', async () => {
+    const certId = uuidv4();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'certification_user')`,
+      [certId, companyId, `patch-cert-${certId.slice(0, 8)}@admin-test.com`]);
+    try {
+      const newEmail = `patched-cert${Date.now()}@admin-test.com`;
+      const res = await request(app)
+        .patch(`/v1/admin/users/${certId}`)
+        .set('Authorization', `Bearer ${makeToken('administrator')}`)
+        .send({ email: newEmail });
+      expect(res.status).toBe(200);
+      expect(res.body.user.email).toBe(newEmail);
+    } finally {
+      run('DELETE FROM users WHERE id = ?', [certId]);
+    }
+  });
+
+  // The company has an active Test Manager: they name its Test Managers.
+  test('409 promoting a tester to Test Manager where the company has an active Test Manager', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch(`/v1/admin/users/${targetUserId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ role: 'test_manager' });
+    expect(res.status).toBe(409);
+    expect(get('SELECT role FROM users WHERE id = ?', [targetUserId]).role).toBe('company_user');
   });
 
   // ── issue #128: role change must not move a user off their company ──────────
-  test('Tester → Test Manager (no company_id) keeps the current company', async () => {
-    const token = makeToken('administrator');
-    const res = await request(app)
-      .patch(`/v1/admin/users/${targetUserId}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ role: 'test_manager' }); // no company_id → must keep current company
-    expect(res.status).toBe(200);
-    expect(res.body.user.role).toBe('test_manager');
-    expect(res.body.user.company_id).toBe(companyId); // NOT reassigned to the platform company
+  test('Tester → Test Manager (no company_id) keeps the current company, where the company has no Test Manager', async () => {
+    const noTmCo = uuidv4();
+    const testerId = uuidv4();
+    run(`INSERT INTO companies (id, name, slug) VALUES (?, 'Admin Tmp No TM', ?)`, [noTmCo, `admin-tmp-notm-${noTmCo.slice(0, 8)}`]);
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
+      [testerId, noTmCo, `promote-${testerId.slice(0, 8)}@admin-test.com`]);
+    try {
+      const res = await request(app)
+        .patch(`/v1/admin/users/${testerId}`)
+        .set('Authorization', `Bearer ${makeToken('administrator')}`)
+        .send({ role: 'test_manager' }); // no company_id → must keep current company
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('test_manager');
+      expect(res.body.user.company_id).toBe(noTmCo); // NOT reassigned to the platform company
+    } finally {
+      run('DELETE FROM users WHERE id = ?', [testerId]);
+      run('DELETE FROM companies WHERE id = ?', [noTmCo]);
+    }
   });
 
-  test('Test Manager can be moved to another company via company_id', async () => {
+  // Someone joins a company through its Test Manager: no move by the administrator.
+  test('409 moving a company account to another company via company_id, and it stays where it is', async () => {
     const token = makeToken('administrator');
     const otherCompanyId = uuidv4();
     run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'Other Co 128', 'other-co-128')`, [otherCompanyId]);
-    const res = await request(app)
-      .patch(`/v1/admin/users/${targetUserId}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ role: 'test_manager', company_id: otherCompanyId });
-    expect(res.status).toBe(200);
-    expect(res.body.user.company_id).toBe(otherCompanyId);
-    // restore + clean up so afterAll / later suites see a consistent state
-    run('UPDATE users SET company_id = ? WHERE id = ?', [companyId, targetUserId]);
-    run('DELETE FROM companies WHERE id = ?', [otherCompanyId]);
+    try {
+      const res = await request(app)
+        .patch(`/v1/admin/users/${targetUserId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ role: 'test_manager', company_id: otherCompanyId });
+      expect(res.status).toBe(409);
+      const row = get('SELECT company_id, role FROM users WHERE id = ?', [targetUserId]);
+      expect(row).toEqual({ company_id: companyId, role: 'company_user' });
+    } finally {
+      run('DELETE FROM companies WHERE id = ?', [otherCompanyId]);
+    }
+  });
+
+  test('409 moving a platform account into a company role', async () => {
+    const certId = uuidv4();
+    const platform = ensurePlatformCompany();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'certification_user')`,
+      [certId, platform.id, `move-cert-${certId.slice(0, 8)}@admin-test.com`]);
+    try {
+      const res = await request(app)
+        .patch(`/v1/admin/users/${certId}`)
+        .set('Authorization', `Bearer ${makeToken('administrator')}`)
+        .send({ role: 'company_user', company_id: companyId });
+      expect(res.status).toBe(409);
+      expect(get('SELECT role, company_id FROM users WHERE id = ?', [certId])).toEqual({ role: 'certification_user', company_id: platform.id });
+    } finally {
+      run('DELETE FROM users WHERE id = ?', [certId]);
+    }
+  });
+
+  test('a Test Manager can still be demoted to tester, in the same company', async () => {
+    const tmId = uuidv4();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'test_manager')`,
+      [tmId, companyId, `demote-${tmId.slice(0, 8)}@admin-test.com`]);
+    try {
+      const res = await request(app)
+        .patch(`/v1/admin/users/${tmId}`)
+        .set('Authorization', `Bearer ${makeToken('administrator')}`)
+        .send({ role: 'company_user' });
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('company_user');
+      expect(res.body.user.company_id).toBe(companyId);
+    } finally {
+      run('DELETE FROM users WHERE id = ?', [tmId]);
+    }
+  });
+
+  test('a company account made certifier goes to the platform company (company_id ignored)', async () => {
+    const userId = uuidv4();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`,
+      [userId, companyId, `tocert-${userId.slice(0, 8)}@admin-test.com`]);
+    try {
+      const res = await request(app)
+        .patch(`/v1/admin/users/${userId}`)
+        .set('Authorization', `Bearer ${makeToken('administrator')}`)
+        .send({ role: 'certification_user', company_id: companyId });
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('certification_user');
+      expect(res.body.user.company_slug).toBe('platform-root');
+    } finally {
+      run('DELETE FROM users WHERE id = ?', [userId]);
+    }
   });
 });
 
 // ── POST /v1/admin/users/:id/reset-password ───────────────────────────────────
 
 describe('POST /v1/admin/users/:id/reset-password', () => {
+  // A platform account (certifier) here: a company account's password is its owner's.
   let resetTargetId;
+  let companyResetTargetId;
 
   beforeAll(() => {
     resetTargetId = uuidv4();
     run(
       `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
-       VALUES (?, ?, 'reset-target@admin-test.com', 'x', 'company_user')`,
+       VALUES (?, ?, 'reset-target@admin-test.com', 'x', 'certification_user')`,
       [resetTargetId, companyId]
+    );
+    companyResetTargetId = uuidv4();
+    run(
+      `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+       VALUES (?, ?, 'reset-target-company@admin-test.com', 'x', 'company_user')`,
+      [companyResetTargetId, companyId]
     );
   });
 
   afterAll(() => {
-    run('DELETE FROM users WHERE id = ?', [resetTargetId]);
+    run('DELETE FROM users WHERE id IN (?, ?)', [resetTargetId, companyResetTargetId]);
   });
 
   test('400 when new_password is missing', async () => {
@@ -371,6 +592,15 @@ describe('POST /v1/admin/users/:id/reset-password', () => {
     expect(res.status).toBe(200);
     expect(res.body.password_reset).toBe(true);
     expect(res.body.id).toBe(resetTargetId);
+  });
+
+  test('403 for a company account, and its password is unchanged', async () => {
+    const res = await request(app)
+      .post(`/v1/admin/users/${companyResetTargetId}/reset-password`)
+      .set('Authorization', `Bearer ${makeToken('administrator')}`)
+      .send({ new_password: 'ValidNewPass1!' });
+    expect(res.status).toBe(403);
+    expect(get('SELECT password_hash FROM users WHERE id = ?', [companyResetTargetId]).password_hash).toBe('x');
   });
 
   test('404 for non-existent user', async () => {
@@ -690,20 +920,38 @@ describe('POST /v1/admin/users/:id/approve', () => {
 // ── POST /v1/admin/users/:id/generate-reset-link (issue #15 workaround) ──────
 
 describe('POST /v1/admin/users/:id/generate-reset-link', () => {
+  // A platform account (certifier): only those still get a link handed to the administrator.
   let resetLinkUserId;
+  let companyLinkUserId;
 
   beforeAll(() => {
     resetLinkUserId = uuidv4();
     run(
       `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
-       VALUES (?, ?, 'reset-link-target@admin-test.com', 'x', 'company_user')`,
+       VALUES (?, ?, 'reset-link-target@admin-test.com', 'x', 'certification_user')`,
       [resetLinkUserId, companyId]
+    );
+    companyLinkUserId = uuidv4();
+    run(
+      `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+       VALUES (?, ?, 'reset-link-company@admin-test.com', 'x', 'company_user')`,
+      [companyLinkUserId, companyId]
     );
   });
 
   afterAll(() => {
-    run('DELETE FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]);
-    run('DELETE FROM users WHERE id = ?', [resetLinkUserId]);
+    run('DELETE FROM password_reset_tokens WHERE user_id IN (?, ?)', [resetLinkUserId, companyLinkUserId]);
+    run('DELETE FROM users WHERE id IN (?, ?)', [resetLinkUserId, companyLinkUserId]);
+  });
+
+  // A company account's password is its owner's: no link is handed to the administrator.
+  test('403 for a company account, and no token is issued', async () => {
+    const res = await request(app)
+      .post(`/v1/admin/users/${companyLinkUserId}/generate-reset-link`)
+      .set('Authorization', `Bearer ${makeToken('administrator')}`);
+    expect(res.status).toBe(403);
+    expect(res.body.resetUrl).toBeUndefined();
+    expect(get('SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?', [companyLinkUserId]).n).toBe(0);
   });
 
   test('404 for non-existent user', async () => {
@@ -761,6 +1009,44 @@ describe('POST /v1/admin/users/:id/generate-reset-link', () => {
     const rows = all('SELECT token FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]);
     expect(rows).toHaveLength(1);
     expect(rows[0].token).not.toBe(firstRow.token);
+  });
+});
+
+// ── POST /v1/admin/users/:id/send-reset ───────────────────────────────────────
+
+describe('POST /v1/admin/users/:id/send-reset', () => {
+  let sendResetUserId;
+
+  beforeAll(() => {
+    sendResetUserId = uuidv4();
+    run(
+      `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+       VALUES (?, ?, 'send-reset-target@admin-test.com', 'x', 'company_user')`,
+      [sendResetUserId, companyId]
+    );
+  });
+
+  afterAll(() => {
+    run('DELETE FROM password_reset_tokens WHERE user_id = ?', [sendResetUserId]);
+    run('DELETE FROM users WHERE id = ?', [sendResetUserId]);
+  });
+
+  test('404 for non-existent user', async () => {
+    const res = await request(app)
+      .post(`/v1/admin/users/${uuidv4()}/send-reset`)
+      .set('Authorization', `Bearer ${makeToken('administrator')}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('200 sends a company account its own reset link: a token row, no link in the answer', async () => {
+    const res = await request(app)
+      .post(`/v1/admin/users/${sendResetUserId}/send-reset`)
+      .set('Authorization', `Bearer ${makeToken('administrator')}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ sent: true, email: 'send-reset-target@admin-test.com' });
+    const rows = all('SELECT token FROM password_reset_tokens WHERE user_id = ?', [sendResetUserId]);
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(res.body)).not.toContain(rows[0].token);
   });
 });
 

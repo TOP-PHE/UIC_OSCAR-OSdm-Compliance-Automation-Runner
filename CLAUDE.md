@@ -934,12 +934,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   with `first_test_manager: true`; it approves a user left `pending` by the
   old flow only there too. Notices go through `sendAccessNotice()`, never
   awaited: Manage Users' *Access Requests* card is the reliable signal.
-  A refused request is deleted (the audit log keeps it). **PR B** (open):
-  the administrator's direct user creation, password setting, reset link
-  handed to itself and role/company changes, and the Test Manager's direct
-  creation, become invitations; certifiers belong to the UIC (platform)
-  company. `denyAdminAndCertifier`/`requireTestManager` live once in
-  `api/helpers/shared.js`.
+  A refused request is deleted (the audit log keeps it).
+  **Invitations, not passwords** (1.11.466): `POST /v1/admin/users` and
+  `POST /v1/company/users` refuse a password and call `invite()`; an
+  administrator's invitation into a company with a Test Manager becomes an
+  assigned request (`placeInCompany()`, 202). **A first Test Manager only
+  into a new company** (`isNewCompany()`: no user, run, framework, Test
+  Data, finding or data file), for an invitation and an access request:
+  otherwise the administrator could empty a company and bring in its own.
+  On a company account the administrator changes no e-mail, moves no one
+  into a company and names no Test Manager where one is
+  (`companyAccountRefusal()`, 409), and neither sets nor receives a
+  password (`reset-password` / `generate-reset-link` 403; `send-reset` mails
+  the owner). Certifiers, like administrators, belong to the platform
+  company (migration 50). `denyAdminAndCertifier`/`requireTestManager` live
+  once in `api/helpers/shared.js`.
 - **Stop-place lookup via a cached OSDM `GET /places` bulk download** (#450,
   2026-07-01). `places_cache` (one row/company, plaintext JSON — places are
   public reference data, not credentials) is populated on demand by

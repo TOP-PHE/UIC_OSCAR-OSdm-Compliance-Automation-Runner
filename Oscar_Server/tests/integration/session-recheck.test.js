@@ -24,6 +24,8 @@ const { run, get } = require('../../src/db/db');
 const { sessionUser } = require('../../src/api/middleware/auth');
 
 const app = buildAppWithRoute('/v1/company/users', '../../src/api/routes/company-users');
+// A password is changed only by its owner, through a reset link.
+app.use('/v1/auth', require('../../src/api/routes/auth'));
 
 const companyId = uuidv4();
 const otherCompanyId = uuidv4();
@@ -58,7 +60,7 @@ describe('a session follows the stored user', () => {
     expect((await listAs(tokenOf(tm, 'test_manager', companyId))).status).toBe(200);
   });
 
-  test('a demoted Test Manager cannot reset another Test Manager\'s password with an older token', async () => {
+  test('a demoted Test Manager cannot send another Test Manager a reset link with an older token', async () => {
     const tm1 = addUser('test_manager');
     const tm2 = addUser('test_manager');
     const oldToken = tokenOf(tm2, 'test_manager', companyId);
@@ -67,10 +69,10 @@ describe('a session follows the stored user', () => {
       .send({ role: 'company_user' });
     expect(demote.status).toBe(200);
 
-    const reset = await request(app).post(`/v1/company/users/${tm1}/reset-password`)
-      .set('Authorization', `Bearer ${oldToken}`)
-      .send({ new_password: 'Attacker12345' });
+    const reset = await request(app).post(`/v1/company/users/${tm1}/send-reset`)
+      .set('Authorization', `Bearer ${oldToken}`);
     expect(reset.status).toBe(401);
+    expect(get('SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?', [tm1]).n).toBe(0);
   });
 
   test('a token signed before a demotion stays refused after the user is promoted again', async () => {
@@ -94,7 +96,7 @@ describe('a session follows the stored user', () => {
     expect(del.status).toBe(200);
     const create = await request(app).post('/v1/company/users')
       .set('Authorization', `Bearer ${oldToken}`)
-      .send({ email: `${uuidv4()}@session.test`, password: 'Backdoor12345', role: 'test_manager' });
+      .send({ email: `${uuidv4()}@session.test`, role: 'test_manager' });
     expect(create.status).toBe(401);
   });
 
@@ -102,10 +104,16 @@ describe('a session follows the stored user', () => {
     const tm1 = addUser('test_manager');
     const tm2 = addUser('test_manager');
     const oldToken = tokenOf(tm2, 'test_manager', companyId);
-    const reset = await request(app).post(`/v1/company/users/${tm2}/reset-password`)
-      .set('Authorization', `Bearer ${tokenOf(tm1, 'test_manager', companyId)}`)
-      .send({ new_password: 'NewPassword123' });
+    // The Test Manager sends the link; only its owner chooses the password.
+    const sent = await request(app).post(`/v1/company/users/${tm2}/send-reset`)
+      .set('Authorization', `Bearer ${tokenOf(tm1, 'test_manager', companyId)}`);
+    expect(sent.status).toBe(200);
+    const link = get('SELECT token FROM password_reset_tokens WHERE user_id = ?', [tm2]);
+    expect(link).toBeTruthy();
+    const reset = await request(app).post('/v1/auth/password-reset/confirm')
+      .send({ token: link.token, password: 'NewPassword123' });
     expect(reset.status).toBe(200);
+    expect(get('SELECT password_hash FROM users WHERE id = ?', [tm2]).password_hash).not.toBe('x');
     expect((await listAs(oldToken)).status).toBe(401);
     // A session signed after the reset works.
     expect((await listAs(tokenOf(tm2, 'test_manager', companyId, -1))).status).toBe(200);

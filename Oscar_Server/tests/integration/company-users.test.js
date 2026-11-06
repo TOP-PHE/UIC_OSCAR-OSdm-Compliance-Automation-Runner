@@ -122,7 +122,7 @@ describe('Role assignment restrictions', () => {
     const res = await request(app)
       .post('/v1/company/users')
       .set('Authorization', `Bearer ${tk}`)
-      .send({ email: 'newadmin@cu-test.com', password: 'StrongPwd123!', role: 'administrator' });
+      .send({ email: 'newadmin@cu-test.com', role: 'administrator' });
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/role must be/);
   });
@@ -132,8 +132,9 @@ describe('Role assignment restrictions', () => {
     const res = await request(app)
       .post('/v1/company/users')
       .set('Authorization', `Bearer ${tk}`)
-      .send({ email: 'cert@cu-test.com', password: 'StrongPwd123!', role: 'certification_user' });
+      .send({ email: 'cert@cu-test.com', role: 'certification_user' });
     expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/role must be/);
   });
 
   test('400 when trying to PATCH a user to administrator', async () => {
@@ -180,16 +181,31 @@ describe('Self / last-manager guards', () => {
 describe('Successful CRUD', () => {
   let newUserId;
 
-  test('201 creates a new tester in this company', async () => {
+  // A Test Manager never chooses a colleague's password: the person gets a link.
+  test('400 when a password is sent, and nothing is created', async () => {
     const tk = mkToken(tmId, 'test_manager', companyId);
     const res = await request(app)
       .post('/v1/company/users')
       .set('Authorization', `Bearer ${tk}`)
-      .send({ email: 'fresh@cu-test.com', password: 'StrongPwd123!', role: 'company_user' });
+      .send({ email: 'withpwd@cu-test.com', password: 'StrongPwd123!', role: 'company_user' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/password/i);
+    expect(get('SELECT id FROM users WHERE email = ?', ['withpwd@cu-test.com'])).toBeUndefined();
+  });
+
+  test('201 invites a new tester in this company, with no usable password and a reset link', async () => {
+    const tk = mkToken(tmId, 'test_manager', companyId);
+    const res = await request(app)
+      .post('/v1/company/users')
+      .set('Authorization', `Bearer ${tk}`)
+      .send({ email: 'fresh@cu-test.com', role: 'company_user' });
     expect(res.status).toBe(201);
+    expect(res.body.invited).toBe(true);
     expect(res.body.user.email).toBe('fresh@cu-test.com');
     expect(res.body.user.company_id).toBe(companyId);
     newUserId = res.body.user.id;
+    expect(get('SELECT password_hash FROM users WHERE id = ?', [newUserId]).password_hash).toMatch(/^\$2[aby]\$/);
+    expect(get('SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?', [newUserId]).n).toBe(1);
   });
 
   test('200 promotes the new tester to test_manager', async () => {
@@ -202,14 +218,38 @@ describe('Successful CRUD', () => {
     expect(res.body.user.role).toBe('test_manager');
   });
 
-  test('200 resets the new user\'s password', async () => {
+  test('the old reset-password route (a password chosen by the Test Manager) is gone: 404', async () => {
     const tk = mkToken(tmId, 'test_manager', companyId);
+    const before = get('SELECT password_hash FROM users WHERE id = ?', [newUserId]).password_hash;
     const res = await request(app)
       .post(`/v1/company/users/${newUserId}/reset-password`)
       .set('Authorization', `Bearer ${tk}`)
       .send({ new_password: 'BrandNewPwd456!' });
+    expect(res.status).toBe(404);
+    expect(get('SELECT password_hash FROM users WHERE id = ?', [newUserId]).password_hash).toBe(before);
+  });
+
+  test('200 sends the new user a reset link of their own (a new token, no link in the answer)', async () => {
+    const tk = mkToken(tmId, 'test_manager', companyId);
+    const before = get('SELECT token FROM password_reset_tokens WHERE user_id = ?', [newUserId]).token;
+    const res = await request(app)
+      .post(`/v1/company/users/${newUserId}/send-reset`)
+      .set('Authorization', `Bearer ${tk}`);
     expect(res.status).toBe(200);
-    expect(res.body.password_reset).toBe(true);
+    expect(res.body).toEqual({ sent: true, email: 'fresh@cu-test.com' });
+    const rows = get('SELECT COUNT(*) AS n, MAX(token) AS token FROM password_reset_tokens WHERE user_id = ?', [newUserId]);
+    expect(rows.n).toBe(1);
+    expect(rows.token).not.toBe(before);
+    expect(JSON.stringify(res.body)).not.toContain(rows.token);
+  });
+
+  test('404 sending a reset link to a user of another company', async () => {
+    const tk = mkToken(tmId, 'test_manager', companyId);
+    const res = await request(app)
+      .post(`/v1/company/users/${otherTmId}/send-reset`)
+      .set('Authorization', `Bearer ${tk}`);
+    expect(res.status).toBe(404);
+    expect(get('SELECT COUNT(*) AS n FROM password_reset_tokens WHERE user_id = ?', [otherTmId]).n).toBe(0);
   });
 
   test('200 deletes the new user (now safe — there are 2 test_managers)', async () => {

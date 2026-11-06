@@ -108,58 +108,67 @@ router.get('/users', (req, res) => {
   return res.json({ users: rows.map(sanitizeUserRow) });
 });
 
+// Decision 3: an administrator never chooses a password. A platform account
+// (administrator, certifier: the UIC's) is invited; it receives the link to
+// choose its own. A company account goes to the company's Test Manager as an
+// access request, except the first Test Manager of a new company.
 router.post('/users',
   validate([
     v.body('email').isString().withMessage('email is required')
       .isEmail().withMessage('email must be a valid address')
       .isLength({ max: 254 }),
-    v.body('password').isString().withMessage('password is required')
-      .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
-      .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
-      .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/\d/).withMessage('password must include a digit'),
     v.body('role').isString().withMessage('role is required')
       .isIn([...ALLOWED_ROLES, 'admin', 'member']).withMessage('role must be a recognised value'),
     v.body('company_id').optional({ values: 'falsy' }).isString()
       .matches(/^[0-9a-fA-F-]{36}$/).withMessage('company_id must be a UUID'),
   ]),
   async (req, res) => {
-  const { email, password, role, company_id } = req.body || {};
+  const { email, role, company_id } = req.body || {};
+  if ('password' in (req.body || {})) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No password is set here: the person receives a link to choose their own.' });
+  }
   const resolvedRole = resolveRole(role);
   if (!resolvedRole) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'role could not be resolved to a known value.' });
   }
-
   const lowerEmail = email.toLowerCase();
-  const existingUser = get('SELECT id FROM users WHERE email = ?', [lowerEmail]);
-  if (existingUser) {
+  if (get('SELECT id FROM users WHERE email = ?', [lowerEmail])) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Email already registered.' });
   }
-
-  let targetCompany;
   const needsCompany = resolvedRole === 'company_user' || resolvedRole === 'test_manager';
-  if (needsCompany) {
-    if (!company_id) {
-      return res.status(400).json({ status: 400, title: 'Bad Request', detail: `company_id is required for ${resolvedRole}.` });
-    }
-    targetCompany = get('SELECT id, name, slug FROM companies WHERE id = ? AND parent_id IS NULL', [company_id]);
-    if (!targetCompany) {
-      return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
-    }
-  } else {
-    targetCompany = ensurePlatformCompany();
+  if (!needsCompany) {
+    const platform = ensurePlatformCompany();
+    const done = await AccessRequests.invite({ email: lowerEmail, companyId: platform.id, role: resolvedRole });
+    auditLog(req.user.id, platform.id, req.user.email, `user_invited:${lowerEmail}:${resolvedRole}`);
+    AccessRequests.noticeActivated(done.user, 'the UIC', done.activationUrl);
+    return res.status(201).json({ invited: true, user: sanitizeUserRow(userRowOf(done.user.id)) });
   }
+  if (!company_id) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: `company_id is required for ${resolvedRole}.` });
+  }
+  const company = get('SELECT id, name, slug FROM companies WHERE id = ? AND parent_id IS NULL', [company_id]);
+  if (!company || company.slug === PLATFORM_SLUG) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
+  }
+  const managers = AccessRequests.activeTestManagers(company.id);
+  if (managers.length > 0) {
+    const placed = AccessRequests.placeInCompany(lowerEmail, company);
+    auditLog(req.user.id, company.id, req.user.email, `access_request_assigned:${lowerEmail}`);
+    AccessRequests.noticeAssigned(placed, company, managers);
+    return res.status(202).json({ placed: true, detail: `${company.name}'s Test Managers confirm who joins it: they have been told.` });
+  }
+  if (resolvedRole !== 'test_manager' || !AccessRequests.isNewCompany(company.id)) {
+    return res.status(409).json({ status: 409, title: 'Conflict',
+      detail: `${company.name} has no active Test Manager. Only a new company (no user, no test data) gets its first Test Manager from you; otherwise name one of its users Test Manager.` });
+  }
+  const done = await AccessRequests.invite({ email: lowerEmail, companyId: company.id, role: 'test_manager' });
+  auditLog(req.user.id, company.id, req.user.email, `access_first_test_manager:${lowerEmail}`);
+  AccessRequests.noticeActivated(done.user, company.name, done.activationUrl);
+  return res.status(201).json({ invited: true, user: sanitizeUserRow(userRowOf(done.user.id)) });
+});
 
-  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  const userId = uuidv4();
-
-  run(
-    `INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, ?, ?)`,
-    [userId, targetCompany.id, lowerEmail, passwordHash, resolvedRole]
-  );
-  auditLog(req.user.id, targetCompany.id, req.user.email, `user_created:${lowerEmail}:${resolvedRole}`);
-
-  const created = get(
+function userRowOf(userId) {
+  return get(
     `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
             c.name AS company_name, c.slug AS company_slug
      FROM users u
@@ -167,9 +176,32 @@ router.post('/users',
      WHERE u.id = ?`,
     [userId]
   );
+}
 
-  return res.status(201).json({ user: sanitizeUserRow(created) });
-});
+const COMPANY_ROLES = new Set(['company_user', 'test_manager']);
+
+// What an administrator may not change on a company account (decision 3):
+// its e-mail (the way in to its password), a move to another company (an
+// invitation goes through that company's Test Manager), or a promotion to
+// Test Manager where the company has one. Returns the refusal, or null.
+function companyAccountRefusal(user, { email, role, companyId }) {
+  const nowCompanyRole = COMPANY_ROLES.has(normalizeRole(user.role));
+  const nextRole = role || normalizeRole(user.role);
+  const intoCompany = COMPANY_ROLES.has(nextRole);
+  if (email && nowCompanyRole && email.toLowerCase() !== user.email) {
+    return 'A company account\'s e-mail is its owner\'s: it cannot be changed here.';
+  }
+  if (!intoCompany) return null;
+  const target = companyId || user.company_id;
+  if (target !== user.company_id || !nowCompanyRole) {
+    return 'Someone joins a company through its Test Manager: invite them to that company instead.';
+  }
+  if (nextRole === 'test_manager' && normalizeRole(user.role) !== 'test_manager'
+      && AccessRequests.activeTestManagers(target).length > 0) {
+    return 'This company has a Test Manager: they name its Test Managers.';
+  }
+  return null;
+}
 
 router.patch('/users/:id',
   validate([
@@ -186,6 +218,8 @@ router.patch('/users/:id',
 
   const user = get('SELECT * FROM users WHERE id = ?', [userId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+  const refusal = companyAccountRefusal(user, { email, role: role ? resolveRole(role) : null, companyId: company_id || null });
+  if (refusal) return res.status(409).json({ status: 409, title: 'Conflict', detail: refusal });
 
   const updates = [];
   const values = [];
@@ -231,18 +265,8 @@ router.patch('/users/:id',
         // Already on a real company and no company_id provided → keep it
         // (no company_id update is pushed).
       }
-    } else if (resolvedRole === 'certification_user') {
-      // Certifiers may optionally belong to a specific company; if not provided keep current
-      if (company_id) {
-        const targetCompany = get('SELECT id FROM companies WHERE id = ? AND parent_id IS NULL', [company_id]);
-        if (!targetCompany) {
-          return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
-        }
-        updates.push('company_id = ?');
-        values.push(company_id);
-      }
     } else {
-      // administrator always belongs to the platform company
+      // Administrators and certifiers belong to the UIC (the platform company).
       const platformCompany = ensurePlatformCompany();
       updates.push('company_id = ?');
       values.push(platformCompany.id);
@@ -321,8 +345,9 @@ router.post('/users/:id/reset-password', async (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Password must contain uppercase, lowercase, and a digit.' });
   }
 
-  const user = get('SELECT id, email FROM users WHERE id = ?', [userId]);
+  const user = get('SELECT id, email, role FROM users WHERE id = ?', [userId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+  if (COMPANY_ROLES.has(normalizeRole(user.role))) return companyPasswordRefusal(res);
 
   const hash = await bcrypt.hash(new_password, SALT_ROUNDS);
   run(`UPDATE users SET password_hash = ?, ${END_SESSIONS_SQL} WHERE id = ?`, [hash, userId]);
@@ -340,10 +365,26 @@ router.post('/users/:id/reset-password', async (req, res) => {
 // Same token table (password_reset_tokens), same 24h expiry, same single-
 // use semantics as /v1/auth/password-reset/request — we just bypass the
 // email send. Audit-logged so the trail of who-issued-what is recoverable.
+// A company account's password is its owner's: the administrator sends the
+// owner a link (send-reset) and never sets it or receives a link for it.
+function companyPasswordRefusal(res) {
+  return res.status(403).json({ status: 403, title: 'Forbidden',
+    detail: 'A company account\'s password is its owner\'s: send them a reset e-mail instead.' });
+}
+
+router.post('/users/:id/send-reset', (req, res) => {
+  const user = get('SELECT id, email FROM users WHERE id = ?', [req.params.id]);
+  if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+  AccessRequests.sendPasswordReset(user);
+  auditLog(req.user.id, null, req.user.email, `password_reset_sent:${user.email}`);
+  return res.json({ sent: true, email: user.email });
+});
+
 router.post('/users/:id/generate-reset-link', (req, res) => {
   const userId = req.params.id;
-  const user = get('SELECT id, email FROM users WHERE id = ?', [userId]);
+  const user = get('SELECT id, email, role FROM users WHERE id = ?', [userId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+  if (COMPANY_ROLES.has(normalizeRole(user.role))) return companyPasswordRefusal(res);
   // In production the link is built from APP_URL only: the Host header is
   // the client's to write.
   if (!process.env.APP_URL && process.env.NODE_ENV === 'production') {
