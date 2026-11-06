@@ -113,6 +113,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.474] — 2026-11-06
+
+Release 2026.512. A token request's failure names the answer's fields, never their values.
+
+### Changed
+- **A token answer without the field expected is described by its field names** (`answerFields()` in `worker/auth-profiles.js`, for the `custom` and `paxone_json` profiles): "The answer's fields: access_token, refresh_token." Before, 200 characters of the answer were quoted. A 200 answer that is not JSON is described by its length; the parser's message, which quotes the text, is no longer used.
+- **A run's authentication failure goes through `tokenErrorText()`** (`utils/tokenErrors.js`) before it reaches the run's error, its log and the collection's token refresh: every saved value of the tester's credentials is masked and a quoted answer is cut, as "Test my credentials" already did (`cleanTokenError()`; `secretsOf()` moved there from `credentialTest.js`).
+
+### Checked
+- `auth-profiles.test.js`: the custom and Paxone answers missing the field name their fields only; a non-JSON answer is not quoted. `token-errors.test.js`: saved secrets masked, a quoted answer cut. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.473] — 2026-11-06
 
 Release 2026.511. A checklist's reading stays in proportion to its size.

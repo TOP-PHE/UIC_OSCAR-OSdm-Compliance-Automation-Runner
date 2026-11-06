@@ -22,6 +22,7 @@
  */
 
 const path        = require('node:path');
+const { tokenErrorText } = require('../utils/tokenErrors');
 const fs          = require('node:fs');
 const { spawn }   = require('node:child_process');
 const { randomUUID: uuidv4 } = require('node:crypto');
@@ -849,12 +850,15 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       logEvent(runId, 'info', '[runner] Bearer token resolved.');
     }
   } catch (err) {
+    // The run's error and log are read by the company: no secret, no quoted
+    // token answer in them (tokenErrors.js).
+    const reason = tokenErrorText(err, userRow);
     dbRun(
       `UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`,
-      [err.message, runId]
+      [reason, runId]
     );
-    logEvent(runId, 'error', `[runner] Auth failed: ${err.message}`);
-    return { exitCode: 1, error: err.message };
+    logEvent(runId, 'error', `[runner] Auth failed: ${reason}`);
+    return { exitCode: 1, error: reason };
   }
 
   // 4. Resolve requestor (optional, per-tester since v12)
