@@ -949,7 +949,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   into a company and names no Test Manager where one is
   (`companyAccountRefusal()`, 409), and neither sets nor receives a
   password (`reset-password` / `generate-reset-link` 403; `send-reset` mails
-  the owner). Certifiers, like administrators, belong to the platform
+  the owner). **A Test Manager changes no account's e-mail either** (1.11.472,
+  `PATCH /v1/company/users/:id` 409; the same e-mail passes). Certifiers, like administrators, belong to the platform
   company (migration 50), named UIC since 1.11.467 (migration 51; slug
   `platform-root` unchanged). **Two companies never share a name** (1.11.470,
   `nameTaken()` in `admin.js`, any case; providers excluded; keeping one's own
