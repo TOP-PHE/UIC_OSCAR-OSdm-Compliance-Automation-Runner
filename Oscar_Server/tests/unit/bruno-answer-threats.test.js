@@ -190,3 +190,51 @@ test('the collection runs the check on every answer, before anything else of its
   expect(check).toBeGreaterThan(after);
   expect(check).toBeLessThan(yml.indexOf('checkAuthRejection(res', after));
 });
+
+jest.mock('../../../Bruno_Collection/library-bruno/testCapture.js', () => ({
+  bruTest: (name, fn) => { try { fn(); } catch { /* recorded as failed */ } },
+  expectScale: () => {},
+}));
+
+describe('answers to requests a script sends itself (bru.sendRequest)', () => {
+  const T = require('../../../Bruno_Collection/library-bruno/answerThreats.js');
+  require('../../../Bruno_Collection/library-bruno/osdmPost.js');
+  let lines;
+  let stops;
+  let sent;
+  beforeEach(() => {
+    lines = [];
+    stops = 0;
+    sent = null;
+    global.validationLogger = (m) => lines.push(m);
+    global.bru = {
+      runner: { stopExecution: () => { stops++; } },
+      getEnvVar: (k) => ({ api_base: 'https://provider.example', osdmVersion: '3.8.0', access_token: 't' })[k],
+      sendRequest: (req, cb) => cb(null, sent),
+    };
+  });
+  afterAll(() => { delete global.bru; delete global.validationLogger; });
+
+  test('a template in the answer stops the run and is not handed back', async () => {
+    sent = { status: 200, headers: {}, data: { trips: [{ id: '{' + '{data_base_tmp}}' }] } };
+    const { postOsdm } = require('../../../Bruno_Collection/library-bruno/osdmPost.js');
+    const res = await postOsdm('/trips-collection', {});
+    expect(res).toEqual({ status: 0, body: null });
+    expect(stops).toBe(1);
+    expect(lines.some((l) => l.startsWith('[INTRUSION] kind=template step=script request /trips-collection'))).toBe(true);
+  });
+
+  test('a clean answer goes through untouched', async () => {
+    sent = { status: 200, headers: {}, data: { trips: [{ id: 'T1' }] } };
+    const { postOsdm } = require('../../../Bruno_Collection/library-bruno/osdmPost.js');
+    expect((await postOsdm('/trips-collection', {})).body).toEqual({ trips: [{ id: 'T1' }] });
+    expect(stops).toBe(0);
+  });
+
+  test('stopOnScriptAnswer reads the sendRequest shape: markup and a private redirect too', () => {
+    expect(T.stopOnScriptAnswer({ status: 200, data: '<script>x</script>' }, '/x').kind).toBe('script');
+    expect(T.stopOnScriptAnswer({ status: 302, headers: { Location: 'http://127.0.0.1/' }, data: '' }, '/x').kind).toBe('redirect');
+    expect(T.stopOnScriptAnswer({ status: 200, data: { ok: true } }, '/x')).toBeNull();
+    expect(T.stopOnScriptAnswer(null, '/x')).toBeNull();
+  });
+});

@@ -507,6 +507,9 @@ async function getScenarioData() {
 
       validationLogger("[DEBUG] 🪲 getScenarioData after fetch");
       parseScenarioData(jsonData);
+      // The whole file stays no longer than its check needs: a variable is
+      // filled into any request naming it, and this one holds every scenario.
+      bru.deleteEnvVar("data_base_tmp");
     } catch (err) {
       validationLogger(`[ERROR] ${_errMsg(err)}`);
       throw err;
