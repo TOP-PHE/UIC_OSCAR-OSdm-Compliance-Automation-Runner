@@ -6,7 +6,7 @@
 #    You may obtain a copy of the License at
 #        http://www.apache.org/licenses/LICENSE-2.0
 
-# refresh-collection.sh — Pulls the monorepo from origin/main on the VPS.
+# refresh-collection.sh — Moves the monorepo on the VPS to the latest release.
 #
 # Invoked exclusively by the refresh-collection.yml and promote-release.yml
 # CI workflows over SSH. The matching authorized_keys entry on the VPS pins
@@ -22,7 +22,11 @@
 # differs from the installed one, the script says so in its log.
 #
 # Behaviour:
-#   - Fast-forwards the local clone to origin/main.
+#   - Fast-forwards the local clone to the latest release-* tag that is on
+#     origin/main, never to main's head: the collection runs inside the
+#     server's container, so what reaches it is what was released (a release
+#     tag is pushed by the release workflow, behind the "production"
+#     environment), not whatever was last merged.
 #   - Does NOT rebuild the OSCAR image (collection is bind-mounted; no
 #     restart needed).
 #   - Logs to syslog so you can audit deploys with `journalctl -t oscar-deploy`.
@@ -57,13 +61,20 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 BEFORE=$(git rev-parse HEAD)
-git pull --ff-only origin main
+git fetch --quiet --tags origin main
+# The newest release tag that main holds (release-YYYY.NNN, by version order).
+TAG=$(git tag --list 'release-*' --merged origin/main --sort=-v:refname | grep -E '^release-[0-9]{4}\.[0-9]+$' | head -n 1 || true)
+if [ -z "$TAG" ]; then
+  log "FAIL: no release tag on origin/main — nothing deployed."
+  exit 1
+fi
+git merge --ff-only --quiet "refs/tags/$TAG"
 AFTER=$(git rev-parse HEAD)
 
 if [ "$BEFORE" = "$AFTER" ]; then
-  log "no-op: already at $AFTER"
+  log "no-op: already at $AFTER ($TAG)"
   exit 0
 fi
 
 CHANGED_FILES=$(git diff --name-only "$BEFORE" "$AFTER" | head -20 | tr '\n' ',' | sed 's/,$//')
-log "pulled $BEFORE → $AFTER (changed: $CHANGED_FILES)"
+log "moved $BEFORE → $AFTER ($TAG; changed: $CHANGED_FILES)"

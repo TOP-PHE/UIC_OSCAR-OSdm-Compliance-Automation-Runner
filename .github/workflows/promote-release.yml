@@ -31,39 +31,66 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/oscar-server
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
+concurrency:
+  group: promote-release
+  cancel-in-progress: false
+
 jobs:
   promote:
     name: Build & publish :stable from release tag
     runs-on: ubuntu-latest
+    # The deploy secrets (SSH key to the VPS) live in this environment only,
+    # which admits release-* tags and asks a reviewer before the job starts
+    # (Settings → Environments → production; see auto-deploy-setup.md).
+    environment: production
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Resolve release ref
+      - name: Resolve release tag
         id: ref
+        # Values from the event go through the environment, never into the
+        # script text: a tag or an input is data, not shell.
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "ref=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-            echo "label=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-          else
-            # Tag push — github.ref looks like refs/tags/release-2026.04
-            TAG="${GITHUB_REF#refs/tags/}"
-            echo "ref=$TAG" >> "$GITHUB_OUTPUT"
-            echo "label=$TAG" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then TAG="$INPUT_TAG"; else TAG="${GITHUB_REF#refs/tags/}"; fi
+          # release-YYYY.NNN only: nothing else is a release, and the name
+          # becomes an image tag below.
+          if ! printf '%s' "$TAG" | grep -Eq '^release-[0-9]{4}\.[0-9]{1,6}$'; then
+            echo "::error::Not a release tag: refused."
+            exit 1
           fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Checkout at release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.ref.outputs.ref }}
+          ref: refs/tags/${{ steps.ref.outputs.tag }}
+          fetch-depth: 0
+
+      - name: The tag is on main
+        # A release is a commit main holds (reviewed and merged), never a
+        # tag put on another branch's commit.
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "refs/tags/$TAG" origin/main; then
+            echo "::error::$TAG is not on main: refused."
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Lower-case image name
         id: img
-        run: echo "name=$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        run: echo "name=$(printf '%s/%s' "$REGISTRY" "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
@@ -79,25 +106,24 @@ jobs:
           push: true
           tags: |
             ${{ steps.img.outputs.name }}:stable
-            ${{ steps.img.outputs.name }}:${{ steps.ref.outputs.label }}
+            ${{ steps.img.outputs.name }}:${{ steps.ref.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
 
-      # ── Defense in depth: also refresh the host repo on the VPS ─────────────
-      # refresh-collection.yml already pulls when compatibility.json changes
-      # on main — but a release-tag push without an immediately-prior main
-      # commit (rare, e.g. promoting an old release tag manually) would
-      # otherwise leave the host repo stale. This step makes the
-      # release-tag → host-repo-fresh invariant hold regardless of how the
-      # release was triggered. Idempotent: if the host repo is already up
-      # to date, the remote `git pull` is a no-op.
+      # ── Move the host checkout to the release ─────────────────────────────
+      # The collection and compatibility.json are bind-mounted from the host
+      # checkout, which refresh-collection.sh moves to the newest release tag
+      # on main (never main's head). Idempotent.
       - name: Set up SSH for host refresh
+        env:
+          KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Refresh host repo on VPS
@@ -108,8 +134,10 @@ jobs:
         run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/usr/local/sbin/oscar-refresh-collection"
 
       - name: Summary
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
         run: |
-          echo "Promoted ${{ steps.ref.outputs.ref }} to :stable" >> "$GITHUB_STEP_SUMMARY"
+          echo "Promoted $TAG to :stable" >> "$GITHUB_STEP_SUMMARY"
           echo "Refreshed host repo on oscar.uic.org so the new container reads the freshest compatibility.json at boot." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Production Watchtower will pick up the new image within its poll interval (default 5 min)." >> "$GITHUB_STEP_SUMMARY"

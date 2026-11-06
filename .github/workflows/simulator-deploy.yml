@@ -42,6 +42,9 @@ jobs:
     name: Update the simulator host
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The SIMULATOR_* secrets live in the "simulator" environment only, which
+    # admits the main branch.
+    environment: simulator
     permissions:
       contents: read
 

@@ -71,6 +71,9 @@ jobs:
     # in the Actions UI rather than burning runner minutes.
     timeout-minutes: 10
 
+    # The release App's key lives in the "release" environment only, which
+    # admits the main branch: a workflow on another branch cannot read it.
+    environment: release
     # Job-level permissions only — no need for write access since the
     # `git push` is done via the App-issued token, not GITHUB_TOKEN.
     permissions:
