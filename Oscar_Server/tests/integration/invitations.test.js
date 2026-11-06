@@ -146,6 +146,21 @@ describe('the administrator does not take a company over', () => {
   });
 });
 
+describe('a Test Manager does not take a colleague\'s account over', () => {
+  test('no e-mail change on an account of the company, a peer Test Manager\'s included; the same e-mail passes', async () => {
+    const peer = uuidv4();
+    add(peer, ACME, 'test_manager');
+    const patch = (id, body) => request(app).patch(`/v1/company/users/${id}`).set('Authorization', bearer(TM)).send(body);
+    for (const id of [peer, TESTER]) {
+      const before = get('SELECT email FROM users WHERE id = ?', [id]).email;
+      const res = await patch(id, { email: mail('attacker') });
+      expect(res.status).toBe(409);
+      expect(get('SELECT email FROM users WHERE id = ?', [id]).email).toBe(before);
+      expect((await patch(id, { email: before.toUpperCase() })).status).toBe(400);   // nothing left to change
+    }
+  });
+});
+
 describe('a Test Manager sends a reset link, never sets a password', () => {
   test('send-reset for their own company only; the old route is gone', async () => {
     expect((await request(app).post(`/v1/company/users/${TESTER}/send-reset`).set('Authorization', bearer(TM))).status).toBe(200);
