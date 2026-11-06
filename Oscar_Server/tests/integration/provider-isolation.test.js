@@ -353,11 +353,8 @@ describe('/v1/company/providers', () => {
     }
   });
 
-  test('the registration list shows top-level companies only', async () => {
-    const res = await request(app).get('/v1/auth/register/companies');
-    const slugs = res.body.companies.map(c => c.slug);
-    expect(slugs).toContain(`d1-${tag}`);
-    expect(slugs).not.toContain(`p1a-${tag}`);
+  test('there is no public registration list of companies', async () => {
+    expect((await request(app).get('/v1/auth/register/companies')).status).toBe(404);
   });
 
   test('names: one line of plain text, unique ignoring case beyond ASCII', async () => {

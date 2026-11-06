@@ -399,6 +399,11 @@ async function sendAiAccessNotice({ to, subject, heading, lines, url }) {
   return sendNotice('ai_access', { to, subject, heading, lines, url });
 }
 
+/** A step of an access request (utils/accessRequests.js). */
+async function sendAccessNotice({ to, subject, heading, lines, url }) {
+  return sendNotice('access_request', { to, subject, heading, lines, url });
+}
+
 /** The administrators' alert on an intrusion attempt (utils/intrusion.js). */
 async function sendSecurityAlert({ to, subject, heading, lines, url }) {
   return sendNotice('security_alert', { to, subject, heading, lines, url });
@@ -434,4 +439,4 @@ async function sendNotice(kind, { to, subject, heading, lines, url }) {
   }
 }
 
-module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, sendAiAccessNotice, sendSecurityAlert, isSmtpConfigured };
+module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, sendAiAccessNotice, sendSecurityAlert, sendAccessNotice, isSmtpConfigured };

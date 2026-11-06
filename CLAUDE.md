@@ -918,23 +918,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `withTraceHeaders(headers, traceSettingsFor(companyId))` at each fetch (a
   trace per request). The trace start line uses 🔗: 🧭 is the runner's
   offer-option report marker.
-- **Self-registration is Test-Manager-gated, not email-domain-gated** (#449,
-  2026-07-01). The old rule ("email must contain a fragment of the company
-  name") is gone — it broke the moment a company was renamed after its slug
-  was set (real incident: "Paxone" renamed from something with slug
-  `paxone-gmbh`; `makeSlug('Paxone')` ≠ `'paxone-gmbh'`, so registration
-  against it 400'd as "unknown company" — the registration dropdown's
-  `<option>` value is now the company's **slug**, submitted verbatim,
-  never re-derived from the display name). Instead: the dropdown only lists
-  real, existing companies; a confirmed registration lands as
-  `users.status = 'pending'` and cannot log in (403) until a Test Manager
-  of that company (or an administrator, cross-company fallback) approves it
-  via `POST /v1/company/users/:id/approve` (mirrored at `/v1/admin/users`).
-  Every Test Manager is emailed on confirmation (`sendPendingApprovalEmail`,
-  `mailer.js`) — but email is fire-and-forget; the "Pending" badge + Approve
-  button on `admin.html`'s User Directory is the reliable signal regardless
-  of SMTP delivery. `denyAdminAndCertifier`/`requireTestManager` (the
-  test-data role guards, previously duplicated per-route) now live once in
+- **Access is asked, checked twice, then given; no company list is public**
+  (1.11.465, maintainer decision 2026-11-05; replaces #449's dropdown).
+  `utils/accessRequests.js`, table `access_request` (migration 49, one open
+  request per e-mail): a visitor sends name, e-mail and the company *typed*
+  (`POST /v1/auth/register/request`, the same answer whatever exists; an
+  e-mail with an account gets nothing), confirms the e-mail by a click
+  (`/register/confirm`, no account, no password), an administrator places it
+  in a top-level company or refuses it (`/v1/admin/access-requests`), a Test
+  Manager of that company confirms it as tester or Test Manager, or refuses it
+  (`/v1/company/users/access-requests`). The account is made with an unusable
+  password and a `password_reset_tokens` link (72 h, `reset-password.html?
+  welcome=1`): nobody but its owner knows the password. **The administrator
+  alone creates only the first Test Manager** of a company with none, and only
+  with `first_test_manager: true`; it approves a user left `pending` by the
+  old flow only there too. Notices go through `sendAccessNotice()`, never
+  awaited: Manage Users' *Access Requests* card is the reliable signal.
+  A refused request is deleted (the audit log keeps it). **PR B** (open):
+  the administrator's direct user creation, password setting, reset link
+  handed to itself and role/company changes, and the Test Manager's direct
+  creation, become invitations; certifiers belong to the UIC (platform)
+  company. `denyAdminAndCertifier`/`requireTestManager` live once in
   `api/helpers/shared.js`.
 - **Stop-place lookup via a cached OSDM `GET /places` bulk download** (#450,
   2026-07-01). `places_cache` (one row/company, plaintext JSON — places are

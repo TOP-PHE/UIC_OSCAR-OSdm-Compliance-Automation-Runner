@@ -138,44 +138,43 @@ module.exports = {
     '/v1/auth/register/request': {
       post: {
         tags: ['Auth'],
-        summary: 'Request registration (sends verification email)',
+        summary: 'Ask for access (sends a link to confirm the e-mail)',
+        description: 'No list of companies is shown: the visitor types the company they work for. The answer is the same whether the e-mail already has an account or not; an e-mail with an account gets nothing.',
         requestBody: {
           required: true,
           content: { 'application/json': { schema: {
-            type: 'object', required: ['email', 'companySlug'],
+            type: 'object', required: ['email', 'name', 'company'],
             properties: {
               email: { type: 'string', format: 'email' },
-              companySlug: { type: 'string', description: 'Stable slug of an existing company (from GET /v1/auth/register/companies)' },
+              name: { type: 'string', maxLength: 120 },
+              company: { type: 'string', maxLength: 160, description: 'The company, in the visitor\'s own words' },
             },
           } } },
         },
         responses: {
-          200: { description: 'Email sent (or dev-mode URL returned)' },
-          400: { description: 'Unknown company (no company with that slug)', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          503: { description: 'SMTP failure' },
+          200: { description: 'The same message in every case (or, without mail configured, the link)' },
+          400: { description: 'A field refused', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          503: { description: 'The e-mail could not be sent' },
         },
       },
     },
     '/v1/auth/register/confirm': {
       post: {
         tags: ['Auth'],
-        summary: 'Confirm email + set password → creates account',
+        summary: 'Confirm the e-mail of an access request',
+        description: 'No account is made: the request then waits for an administrator, who places it in a company, and a Test Manager of that company, who confirms it. The person chooses their password from the link they then receive.',
         requestBody: {
           required: true,
           content: { 'application/json': { schema: {
-            type: 'object', required: ['token', 'password'],
-            properties: { token: { type: 'string', format: 'uuid' }, password: { type: 'string', minLength: 12 } },
+            type: 'object', required: ['token'],
+            properties: { token: { type: 'string', format: 'uuid' } },
           } } },
         },
         responses: {
-          201: { description: 'Account created, JWT returned', content: { 'application/json': { schema: {
-            type: 'object',
-            properties: { token: { type: 'string' }, user: { $ref: '#/components/schemas/User' }, company: { type: 'object' } },
-          } } } },
-          400: { description: 'Password too short or lacks complexity' },
-          404: { description: 'Invalid or already-used token' },
-          410: { description: 'Token expired (24h limit)' },
-          409: { description: 'Account already created' },
+          200: { description: '{ verified: true, message }' },
+          400: { description: 'Not a token' },
+          404: { description: 'Invalid or already-used link' },
+          410: { description: 'Link expired (24h limit)' },
         },
       },
     },

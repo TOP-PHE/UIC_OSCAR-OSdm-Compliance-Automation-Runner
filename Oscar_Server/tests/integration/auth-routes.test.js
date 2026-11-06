@@ -19,6 +19,7 @@ process.env.JWT_SECRET = 'test-jwt-secret-for-auth-routes';
 process.env.PLATFORM_BOOTSTRAP_TOKEN = 'test-bootstrap-token';
 
 const jwt     = require('jsonwebtoken');
+const bcrypt  = require('bcrypt');
 const request = require('supertest');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { buildAppWithRoute } = require('../helpers/test-app');
@@ -39,113 +40,66 @@ function sessionToken({ id, email, role }) {
     process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
 }
 
-// Issue #449 — self-registration now targets a real, existing company (picked
-// from the /register/companies dropdown) instead of matching the email
-// against a free-text company name, so tests must seed one up front.
+// A user stored with a known password, as an accepted access request leaves
+// it once its owner has chosen the password (access-requests.test.js runs
+// the request itself).
+function addUser(email, status = 'active') {
+  run(`INSERT INTO users (id, company_id, email, password_hash, role, status) VALUES (?, ?, ?, ?, 'company_user', ?)`,
+    [uuidv4(), COMPANY_ID, email, bcrypt.hashSync(TEST_PASSWORD, 4), status]);
+}
+
 beforeAll(() => {
   run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`,
     [COMPANY_ID, TEST_COMPANY, TEST_COMPANY_SLUG]);
 });
 
 describe('POST /v1/auth/register/request', () => {
-  test('400 when email or company missing', async () => {
-    const res = await request(app).post('/v1/auth/register/request').send({});
-    expect(res.status).toBe(400);
+  test('400 when email, name or company missing', async () => {
+    expect((await request(app).post('/v1/auth/register/request').send({})).status).toBe(400);
+    expect((await request(app).post('/v1/auth/register/request').send({ email: 'a@b.example', name: 'A' })).status).toBe(400);
   });
 
-  test('400 when company does not exist', async () => {
+  test('a company nobody knows is not told: the same answer', async () => {
     const res = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email: 'someone@unrelated.com', companySlug: 'not-a-real-company' });
-    expect(res.status).toBe(400);
-    expect(res.body.detail).toMatch(/unknown company/i);
-  });
-
-  test('200 + dev verification URL when SMTP not configured', async () => {
-    const res = await request(app)
-      .post('/v1/auth/register/request')
-      .send({ email: TEST_EMAIL, companySlug: TEST_COMPANY_SLUG });
+      .send({ email: 'someone@unrelated.com', name: 'Someone', company: 'Not A Real Company' });
     expect(res.status).toBe(200);
     expect(res.body.verificationUrl).toMatch(/\?token=/);
   });
 
-  test('returns generic success for already-registered email (no enumeration)', async () => {
-    // This email isn't registered yet, but the response should NOT reveal that
+  test('an e-mail that has an account gets the same message and no link', async () => {
+    const email = `known${Date.now()}@acmecorp.com`;
+    addUser(email);
     const res = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email: 'never-existed@acmecorp.com', companySlug: TEST_COMPANY_SLUG });
+      .send({ email, name: 'Known', company: TEST_COMPANY });
     expect(res.status).toBe(200);
     expect(res.body.message).toBeTruthy();
-    // No leak about whether the email existed or not
+    expect(res.body.verificationUrl).toBeUndefined();
     expect(JSON.stringify(res.body).toLowerCase()).not.toMatch(/already/);
   });
 });
 
 describe('POST /v1/auth/register/confirm', () => {
-  let token;
-  const confirmEmail = `confirm${Date.now()}@acmecorp.com`;
-
-  beforeAll(async () => {
-    // Get a fresh token from the request endpoint
-    const res = await request(app)
-      .post('/v1/auth/register/request')
-      .send({ email: confirmEmail, companySlug: TEST_COMPANY_SLUG });
-    token = res.body.verificationUrl.match(/token=([^&]+)/)[1];
+  test('400 without a token, 404 for an unknown one', async () => {
+    expect((await request(app).post('/v1/auth/register/confirm').send({})).status).toBe(400);
+    expect((await request(app).post('/v1/auth/register/confirm').send({ token: '00000000-0000-0000-0000-000000000000' })).status).toBe(404);
   });
 
-  test('400 when password missing', async () => {
-    const res = await request(app).post('/v1/auth/register/confirm').send({ token });
-    expect(res.status).toBe(400);
-  });
-
-  test('400 when password too short', async () => {
-    const res = await request(app)
-      .post('/v1/auth/register/confirm')
-      .send({ token, password: 'short' });
-    expect(res.status).toBe(400);
-  });
-
-  test('400 when password lacks complexity', async () => {
-    const res = await request(app)
-      .post('/v1/auth/register/confirm')
-      .send({ token, password: 'alllowercaseonly' });
-    expect(res.status).toBe(400);
-  });
-
-  test('404 when token is invalid', async () => {
-    const res = await request(app)
-      .post('/v1/auth/register/confirm')
-      .send({ token: '00000000-0000-0000-0000-000000000000', password: TEST_PASSWORD });
-    expect(res.status).toBe(404);
-  });
-
-  test('201 + pending (no token) when valid — Test Manager approval required (#449)', async () => {
-    const res = await request(app)
-      .post('/v1/auth/register/confirm')
-      .send({ token, password: TEST_PASSWORD });
-    expect(res.status).toBe(201);
-    expect(res.body.pending).toBe(true);
-    expect(res.body.token).toBeUndefined();
-    const created = get('SELECT status FROM users WHERE email = ?', [confirmEmail]);
-    expect(created.status).toBe('pending');
+  test('confirms the e-mail and makes no account, even with a password sent', async () => {
+    const email = `confirm${Date.now()}@acmecorp.com`;
+    const reqRes = await request(app).post('/v1/auth/register/request').send({ email, name: 'C', company: TEST_COMPANY });
+    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
+    const res = await request(app).post('/v1/auth/register/confirm').send({ token, password: TEST_PASSWORD });
+    expect(res.status).toBe(200);
+    expect(res.body.verified).toBe(true);
+    expect(get('SELECT id FROM users WHERE email = ?', [email])).toBeUndefined();
+    expect(get('SELECT state FROM access_request WHERE email = ?', [email]).state).toBe('verified');
   });
 });
 
 describe('POST /v1/auth/login', () => {
-  beforeAll(async () => {
-    // Register a known user via the full flow, then approve it directly
-    // (bypassing the Test-Manager UI, which is exercised in
-    // company-users-routes.test.js) so the login tests below can focus on
-    // login behaviour rather than the approval flow itself.
-    const reqRes = await request(app)
-      .post('/v1/auth/register/request')
-      .send({ email: TEST_EMAIL, companySlug: TEST_COMPANY_SLUG });
-    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
-    await request(app)
-      .post('/v1/auth/register/confirm')
-      .send({ token, password: TEST_PASSWORD });
-    run("UPDATE users SET status = 'active' WHERE email = ?", [TEST_EMAIL]);
-  });
+  beforeAll(() => addUser(TEST_EMAIL));
 
   test('400 when email or password missing', async () => {
     const res = await request(app).post('/v1/auth/login').send({});
@@ -178,14 +132,7 @@ describe('POST /v1/auth/login', () => {
 
   test('403 when account is still pending approval (#449)', async () => {
     const email = `pending${Date.now()}@acmecorp.com`;
-    const reqRes = await request(app)
-      .post('/v1/auth/register/request')
-      .send({ email, companySlug: TEST_COMPANY_SLUG });
-    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
-    await request(app)
-      .post('/v1/auth/register/confirm')
-      .send({ token, password: TEST_PASSWORD });
-
+    addUser(email, 'pending');
     const res = await request(app)
       .post('/v1/auth/login')
       .send({ email, password: TEST_PASSWORD });
@@ -194,64 +141,9 @@ describe('POST /v1/auth/login', () => {
   });
 });
 
-// Regression (#449): a company whose stored slug does NOT equal
-// makeSlug(its current display name) — e.g. renamed after creation, like
-// the real "Paxone" (slug 'paxone-gmbh') incident — must still be
-// registerable. The dropdown submits the stable slug, so the lookup no
-// longer re-derives it from the name and no longer misses.
-describe('POST /v1/auth/register — company with a slug that differs from its name', () => {
-  const RENAMED_NAME = 'Paxone';
-  const RENAMED_SLUG = 'paxone-gmbh';      // makeSlug('Paxone') would be 'paxone' — deliberately different
-  const RENAMED_EMAIL = `pax${Date.now()}@laposte.net`;
-
-  beforeAll(() => {
-    run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`,
-      [uuidv4(), RENAMED_NAME, RENAMED_SLUG]);
-  });
-
-  test('request → confirm succeeds and creates a pending user under the right company', async () => {
-    const reqRes = await request(app)
-      .post('/v1/auth/register/request')
-      .send({ email: RENAMED_EMAIL, companySlug: RENAMED_SLUG });
-    expect(reqRes.status).toBe(200);
-    expect(reqRes.body.verificationUrl).toMatch(/\?token=/);
-
-    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
-    const confRes = await request(app)
-      .post('/v1/auth/register/confirm')
-      .send({ token, password: TEST_PASSWORD });
-    expect(confRes.status).toBe(201);
-    expect(confRes.body.pending).toBe(true);
-    expect(confRes.body.company.slug).toBe(RENAMED_SLUG);
-
-    const created = get(
-      `SELECT u.status, c.slug AS company_slug
-         FROM users u JOIN companies c ON c.id = u.company_id
-        WHERE u.email = ?`,
-      [RENAMED_EMAIL]
-    );
-    expect(created.status).toBe('pending');
-    expect(created.company_slug).toBe(RENAMED_SLUG);
-  });
-
-  afterAll(() => {
-    run('DELETE FROM auth_events WHERE email = ?', [RENAMED_EMAIL]);
-    run('DELETE FROM users WHERE email = ?', [RENAMED_EMAIL]);
-    run('DELETE FROM pending_registrations WHERE email = ?', [RENAMED_EMAIL]);
-    run("DELETE FROM companies WHERE slug = 'paxone-gmbh'");
-  });
-});
-
-// ── GET /v1/auth/register/companies ───────────────────────────────────────────
-describe('GET /v1/auth/register/companies', () => {
-  test('lists company name + slug for the dropdown (no secrets)', async () => {
-    const res = await request(app).get('/v1/auth/register/companies');
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.companies)).toBe(true);
-    const acme = res.body.companies.find(c => c.slug === TEST_COMPANY_SLUG);
-    expect(acme).toBeTruthy();
-    expect(acme.name).toBe(TEST_COMPANY);
-    expect(acme).not.toHaveProperty('id');
+describe('no list of companies is shown', () => {
+  test('GET /v1/auth/register/companies does not exist', async () => {
+    expect((await request(app).get('/v1/auth/register/companies')).status).toBe(404);
   });
 });
 
@@ -267,15 +159,15 @@ describe('GET /v1/auth/register/check-token', () => {
     expect(res.status).toBe(404);
   });
 
-  test('200 returns the email + company for a valid pending registration', async () => {
+  test('200 returns the email and the company as typed', async () => {
     const email = `checktok${Date.now()}@acmecorp.com`;
     const reqRes = await request(app).post('/v1/auth/register/request')
-      .send({ email, companySlug: TEST_COMPANY_SLUG });
+      .send({ email, name: 'Check', company: 'Acme as I write it' });
     const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
     const res = await request(app).get('/v1/auth/register/check-token?token=' + token);
     expect(res.status).toBe(200);
     expect(res.body.email).toBe(email);
-    expect(res.body.companyName).toBe(TEST_COMPANY);
+    expect(res.body.companyName).toBe('Acme as I write it');
   });
 });
 
@@ -283,13 +175,7 @@ describe('GET /v1/auth/register/check-token', () => {
 describe('password reset flow', () => {
   const email = `pwreset${Date.now()}@acmecorp.com`;
 
-  beforeAll(async () => {
-    // A real active user to reset.
-    const reqRes = await request(app).post('/v1/auth/register/request').send({ email, companySlug: TEST_COMPANY_SLUG });
-    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
-    await request(app).post('/v1/auth/register/confirm').send({ token, password: TEST_PASSWORD });
-    run("UPDATE users SET status = 'active' WHERE email = ?", [email]);
-  });
+  beforeAll(() => addUser(email));
 
   test('request returns a generic success even for an unknown email (no enumeration)', async () => {
     const res = await request(app).post('/v1/auth/password-reset/request').send({ email: 'nobody-here@acmecorp.com' });

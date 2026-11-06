@@ -10,8 +10,9 @@
 /**
  * auth.js — Authentication routes
  *
- * POST /v1/auth/register/request  — request Tester account (sends verification email)
- * POST /v1/auth/register/confirm  — confirm email + set password → creates account
+ * POST /v1/auth/register/request  — ask for access (name, e-mail, company typed)
+ * POST /v1/auth/register/confirm  — confirm the e-mail; the request then waits
+ *                                   for an administrator and a Test Manager
  * POST /v1/auth/login             — authenticate, return JWT
  * GET  /v1/auth/me                — return current user profile
  * POST /v1/auth/bootstrap/platform-user — server-side bootstrap for platform users
@@ -22,9 +23,10 @@ const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const crypto  = require('node:crypto');
 const { randomUUID: uuidv4 } = crypto;
-const { get, all, run, transaction } = require('../../db/db');
+const { get, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole, END_SESSIONS_SQL } = require('../middleware/auth');
-const { sendVerificationEmail, sendPendingApprovalEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../../utils/mailer');
+const AccessRequests = require('../../utils/accessRequests');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
 const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
@@ -98,15 +100,8 @@ const registerConfirmLimiter = rateLimit({
 // the same bucket as /login halved the effective login budget during rapid
 // user-switching — each switch is a logout + a login. Removing it doubles the
 // usable headroom for legitimate testers at no security cost.
-const REGISTRATION_EXPIRY_HOURS = 24;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function makeSlug(name) {
-  return name.trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
 function signToken(user, company) {
   const role = normalizeRole(user.role);
   const jti  = uuidv4();
@@ -138,183 +133,66 @@ function logAuthEvent({ userId = null, companyId = null, email = null, eventType
     [userId, companyId, email, eventType, ip, userAgent]);
 }
 
-// ── GET /v1/auth/register/companies ──────────────────────────────────────────
-// Public endpoint: returns list of company names for the registration dropdown.
-// Only returns name and slug — no secrets, no internal IDs. Top-level
-// companies only: a provider (#540) has no users of its own, so nobody
-// registers into one.
-router.get('/register/companies', (_req, res) => {
-  const rows = all('SELECT name, slug FROM companies WHERE parent_id IS NULL ORDER BY name ASC');
-  return res.json({ companies: rows.map(r => ({ name: r.name, slug: r.slug })) });
-});
+// ── Access requests (decision 3, 2026-11-05) ─────────────────────────────────
+// No list of companies is shown to a visitor: they type the company they work
+// for, confirm their e-mail, then an administrator places the request in a
+// company and a Test Manager of that company confirms it
+// (utils/accessRequests.js). The answers never tell whether a company or an
+// e-mail is known.
+
+const GENERIC_REQUEST_ANSWER = 'If your request can be handled, you will receive an e-mail with a link to confirm your address.';
 
 // ── POST /v1/auth/register/request ───────────────────────────────────────────
-// Step 1: user submits email + company name → receives verification email
 router.post('/register/request',
   validate([
     v.body('email').isString().withMessage('email is required')
       .isEmail().withMessage('email must be a valid address')
       .isLength({ max: 254 }).withMessage('email is too long'),
-    v.body('companySlug').isString().withMessage('companySlug is required')
-      .trim().isLength({ min: 1, max: 160 }).withMessage('companySlug length 1–160 chars'),
+    v.body('name').isString().withMessage('name is required')
+      .trim().isLength({ min: 1, max: 120 }).withMessage('name length 1–120 chars'),
+    v.body('company').isString().withMessage('company is required')
+      .trim().isLength({ min: 1, max: 160 }).withMessage('company length 1–160 chars'),
   ]),
   async (req, res) => {
-  const { email, companySlug } = req.body || {};
-
-  const lowerEmail = email.toLowerCase().trim();
-
-  // Issue #449 — self-registration no longer requires the email to match the
-  // company name; instead it must target a real, existing company picked from
-  // the /register/companies dropdown, so a Test Manager can approve it. We
-  // match on the company's stable SLUG (sent verbatim from the dropdown), not
-  // a slug re-derived from the display name — a company whose slug was frozen
-  // before a rename (name 'Paxone', slug 'paxone-gmbh') would otherwise miss.
-  const targetCompany = get('SELECT id, name, slug FROM companies WHERE slug = ? AND parent_id IS NULL', [companySlug.trim()]);
-  if (!targetCompany) {
-    return res.status(400).json({
-      status: 400, title: 'Bad Request',
-      detail: 'Unknown company. Please pick your company from the list, or contact an administrator to have it added.'
-    });
-  }
-
-  // Check not already registered — generic response to prevent email enumeration
-  const existingUser = get('SELECT id FROM users WHERE email = ?', [lowerEmail]);
-  if (existingUser) {
-    log.warn({ email: lowerEmail }, 'Registration attempt for existing user — returning generic success (no email sent)');
-    return res.json({ message: 'If this email is not already registered, a verification link has been sent.' });
-  }
-  log.info({ email: lowerEmail, company: targetCompany.slug }, 'New registration request');
-
-  // Remove any previous pending request for this email (allow re-request)
-  run('DELETE FROM pending_registrations WHERE email = ?', [lowerEmail]);
-
-  // Create pending registration — store the canonical name (for display) and
-  // the stable slug (the lookup key re-used at confirm time).
-  const token    = uuidv4();
-  const id       = uuidv4();
-  const expiresAt = new Date(Date.now() + REGISTRATION_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
-
-  run('INSERT INTO pending_registrations (id, email, company_name, company_slug, token, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, lowerEmail, targetCompany.name, targetCompany.slug, token, expiresAt]);
-
-  const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
-  const verificationUrl = `${appUrl}/verify-email.html?token=${token}`;
-
-  try {
-    log.info({
-      email: lowerEmail,
-      company: targetCompany.slug,
-      appUrl: process.env.APP_URL || 'NOT SET',
-      smtpConfigured: isSmtpConfigured(),
-    }, 'Sending verification email');
-
-    const result = await sendVerificationEmail({ to: lowerEmail, companyName: targetCompany.name, verificationUrl });
-
-    // Dev mode: return the URL directly so it can be tested without SMTP
-    if (result?.devMode) {
-      log.info({ email: lowerEmail }, 'Dev mode — returning verification URL directly (no email sent)');
-      return res.json({
-        message: 'DEV MODE — SMTP not configured. Verification URL returned directly.',
-        verificationUrl
-      });
+    const { email, name, company } = req.body;
+    const created = AccessRequests.createRequest({ email, name, company });
+    if (!created) {
+      log.warn('Access request for an e-mail that already has an account — generic answer, nothing sent');
+      return res.json({ message: GENERIC_REQUEST_ANSWER });
     }
-    log.info({ email: lowerEmail }, 'Verification email sent successfully');
-  } catch (err) {
-    // Roll back pending record if email send fails
-    run('DELETE FROM pending_registrations WHERE token = ?', [token]);
-    log.error({ email: lowerEmail, err: err.message, stack: err.stack }, 'Email send FAILED');
-    return res.status(503).json({ status: 503, title: 'Service Unavailable', detail: 'Failed to send verification email. Please try again later.' });
-  }
-
-  return res.json({ message: 'Verification email sent. Check your inbox and click the link to complete your registration.' });
-});
+    try {
+      const result = await sendVerificationEmail({ to: email.toLowerCase().trim(), companyName: company.trim(), verificationUrl: created.url });
+      if (result?.devMode) {
+        return res.json({ message: 'DEV MODE — SMTP not configured. Verification URL returned directly.', verificationUrl: created.url });
+      }
+    } catch (err) {
+      run('DELETE FROM access_request WHERE token = ?', [created.token]);
+      log.error({ err: err.message }, 'Verification e-mail send FAILED');
+      return res.status(503).json({ status: 503, title: 'Service Unavailable', detail: 'The confirmation e-mail could not be sent. Please try again later.' });
+    }
+    return res.json({ message: GENERIC_REQUEST_ANSWER });
+  });
 
 // ── POST /v1/auth/register/confirm ───────────────────────────────────────────
-// Step 2: user clicks link, sets password → account is created
+// The e-mail is confirmed; no account yet. A password sent by a page loaded
+// before this release is ignored: the person chooses it once access is given.
 router.post('/register/confirm',
   registerConfirmLimiter,
   validate([
     v.body('token').isString().withMessage('token is required')
       .matches(/^[0-9a-fA-F-]{36}$/).withMessage('token must be a UUID'),
-    v.body('password').isString().withMessage('password is required')
-      .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
-      .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
-      .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/\d/).withMessage('password must include a digit'),
   ]),
-  async (req, res) => {
-  const { token, password } = req.body || {};
-
-  const pending = get('SELECT * FROM pending_registrations WHERE token = ?', [token]);
-  if (!pending) {
-    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Invalid or already used confirmation link.' });
-  }
-  if (new Date(pending.expires_at) < new Date()) {
-    run('DELETE FROM pending_registrations WHERE token = ?', [token]);
-    return res.status(410).json({ status: 410, title: 'Link Expired', detail: 'This confirmation link has expired (24h limit). Please register again.' });
-  }
-
-  // Guard against race / double-click
-  const existingUser = get('SELECT id FROM users WHERE email = ?', [pending.email]);
-  if (existingUser) {
-    run('DELETE FROM pending_registrations WHERE token = ?', [token]);
-    return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Account already created. Please sign in.' });
-  }
-
-  // Issue #449 — the company must still exist (it was verified to exist at
-  // /register/request time, but may have been removed since). Resolve by the
-  // stable slug captured at request time (falling back to a name-derived slug
-  // only for any pre-migration pending row that predates company_slug). No
-  // auto-create: a stranger self-activating into a brand-new, unverified
-  // company would bypass the Test-Manager-approval step entirely.
-  const lookupSlug = pending.company_slug || makeSlug(pending.company_name);
-  const company = get('SELECT * FROM companies WHERE slug = ? AND parent_id IS NULL', [lookupSlug]);
-  if (!company) {
-    run('DELETE FROM pending_registrations WHERE token = ?', [token]);
-    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'This company no longer exists. Please register again.' });
-  }
-
-  const userId = uuidv4();
-  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-
-  transaction(() => {
-    run(`INSERT INTO users (id, company_id, email, password_hash, role, status) VALUES (?, ?, ?, ?, 'company_user', 'pending')`,
-      [userId, company.id, pending.email, passwordHash]);
-    run('DELETE FROM pending_registrations WHERE token = ?', [token]);
-  });
-
-  const user = get('SELECT * FROM users WHERE id = ?', [userId]);
-  logAuthEvent({ userId: user.id, companyId: company.id, email: user.email, eventType: 'register_confirmed_pending' });
-
-  // Notify every Test Manager of this company — the new account cannot log
-  // in until one of them (or an administrator) approves it.
-  const testManagers = all(
-    `SELECT email FROM users WHERE company_id = ? AND role = 'test_manager'`,
-    [company.id]
-  );
-  if (testManagers.length === 0) {
-    log.warn({ companyId: company.id, applicant: user.email }, 'No test_manager to notify for pending registration — administrators must approve');
-  } else {
-    const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
-    try {
-      await sendPendingApprovalEmail({
-        to: testManagers.map(tm => tm.email),
-        applicantEmail: user.email,
-        companyName: company.name,
-        reviewUrl: `${appUrl}/admin.html`
-      });
-    } catch (err) {
-      log.error({ err: err.message, applicant: user.email, companyId: company.id }, 'Failed to send pending-approval notification to test managers');
+  (req, res) => {
+    const done = AccessRequests.verifyRequest(req.body.token);
+    if (!done.row) {
+      return res.status(done.status).json({ status: done.status, title: done.status === 410 ? 'Link Expired' : 'Not Found', detail: done.detail });
     }
-  }
-
-  return res.status(201).json({
-    pending: true,
-    message: `Your request has been sent to ${company.name}'s Test Manager(s) for approval. You'll be able to sign in once approved.`,
-    user:    { id: user.id, email: user.email },
-    company: { id: company.id, name: company.name, slug: company.slug }
+    AccessRequests.noticeVerified(done.row);
+    return res.json({
+      verified: true,
+      message: 'Your e-mail is confirmed. An administrator, then a Test Manager of your company, will check your request. You will then receive an e-mail to choose your password.',
+    });
   });
-});
 
 // ── Password reset (issue #15) ───────────────────────────────────────────────
 // Three-step self-service reset that mirrors the verified-registration flow:
@@ -479,19 +357,15 @@ router.post('/password-reset/confirm',
 );
 
 // ── GET /v1/auth/register/check-token ────────────────────────────────────────
-// Called by verify-email.html on page load to show email/company before password entry
-router.get('/register/check-token', (req, res) => {
-  const { token } = req.query;
+// Called by verify-email.html on load, to show the e-mail and company asked.
+router.get('/register/check-token', registerConfirmLimiter, (req, res) => {
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
   if (!token) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'token is required.' });
-
-  const pending = get('SELECT email, company_name, expires_at FROM pending_registrations WHERE token = ?', [token]);
-  if (!pending) {
-    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Invalid or already used confirmation link.' });
+  const found = AccessRequests.requestOfToken(token);
+  if (!found.row) {
+    return res.status(found.status).json({ status: found.status, title: found.status === 410 ? 'Link Expired' : 'Not Found', detail: found.detail });
   }
-  if (new Date(pending.expires_at) < new Date()) {
-    return res.status(410).json({ status: 410, title: 'Link Expired', detail: 'This confirmation link has expired. Please register again.' });
-  }
-  return res.json({ email: pending.email, companyName: pending.company_name });
+  return res.json({ email: found.row.email, companyName: found.row.company_text });
 });
 
 // ── POST /v1/auth/bootstrap/platform-user ────────────────────────────────────

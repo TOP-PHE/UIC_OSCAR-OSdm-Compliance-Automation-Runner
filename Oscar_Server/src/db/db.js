@@ -1011,6 +1011,29 @@ const MIGRATIONS = [
         set.run(origin, r.user_id, r.company_id);
       }
   }},
+  { version: 49, name: 'access-requests', up: () => {
+      // Access asked by a visitor (utils/accessRequests.js): no company list is
+      // shown; the request names the company in the visitor's own words, an
+      // administrator places it, a Test Manager of that company confirms it.
+      db.exec(`CREATE TABLE IF NOT EXISTS access_request (
+        id               TEXT PRIMARY KEY,
+        email            TEXT NOT NULL UNIQUE,
+        full_name        TEXT NOT NULL,
+        company_text     TEXT NOT NULL,
+        token            TEXT UNIQUE,
+        token_expires_at TEXT,
+        state            TEXT NOT NULL DEFAULT 'unverified',
+        verified_at      TEXT,
+        company_id       TEXT REFERENCES companies(id) ON DELETE CASCADE,
+        assigned_at      TEXT,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // Links already sent under the old registration keep working: they
+      // become requests naming the company that was picked from the list.
+      db.exec(`INSERT OR IGNORE INTO access_request (id, email, full_name, company_text, token, token_expires_at, state, created_at)
+               SELECT id, email, '', company_name, token, expires_at, 'unverified', created_at FROM pending_registrations`);
+      db.exec('DELETE FROM pending_registrations');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

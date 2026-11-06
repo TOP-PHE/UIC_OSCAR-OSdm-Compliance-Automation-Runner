@@ -774,9 +774,9 @@ describe('GET /artifacts/:runId/:filename', () => {
 
 // ── Mounted API routers respond (smoke check the app.use() wiring) ───────────
 describe('mounted routers', () => {
-  test('GET /v1/auth/register/companies is reachable (auth router mounted)', async () => {
-    const res = await request(app).get('/v1/auth/register/companies');
-    expect(res.status).toBe(200);
+  test('GET /v1/auth/register/check-token is reachable (auth router mounted)', async () => {
+    const res = await request(app).get('/v1/auth/register/check-token');
+    expect(res.status).toBe(400);
   });
 
   test('GET /v1/openapi.json serves the OpenAPI spec', async () => {

@@ -223,6 +223,23 @@ module.exports = {
       { 200: { description: 'Removed' }, 403: { description: 'Not a Test Manager of the distributor' }, 404: { description: 'Not a provider of this company, or no link' }, 429: { description: 'Too many provider changes' } },
       { parameters: [PROVIDER_ID] }),
   },
+  '/v1/company/users/access-requests': {
+    get: op('Access requests placed in this company',
+      'Test Managers only: requests an administrator placed in their company. { requests: [{ id, email, name, company_typed, state, verified_at, company_id, company_name, assigned_at }] }.',
+      { 200: { description: 'The requests' }, 403: TM_ONLY }),
+  },
+  '/v1/company/users/access-requests/{id}/confirm': {
+    post: op('Confirm an access request',
+      'Test Managers only. Body: { role: company_user | test_manager }. The account is made with no usable password and the person receives a link to choose theirs (72 hours, once). Audited.',
+      { 200: { description: '{ confirmed: true, user }' }, 400: { description: 'Not a role' }, 403: TM_ONLY, 404: { description: 'No such request for this company' }, 409: { description: 'The e-mail already has an account' }, 429: { description: 'Too many user changes' } },
+      { parameters: [pathParam('id', 'The request')], requestBody: jsonBody('{ role }') }),
+  },
+  '/v1/company/users/access-requests/{id}/refuse': {
+    post: op('Refuse an access request',
+      'Test Managers only. The request is deleted and the person told. Audited.',
+      { 200: { description: '{ refused: true }' }, 403: TM_ONLY, 404: { description: 'No such request for this company' }, 429: { description: 'Too many user changes' } },
+      { parameters: [pathParam('id', 'The request')] }),
+  },
   '/v1/company/users/{id}/approve': {
     post: op('Approve a self-registered user waiting for review (#449)',
       'Test Managers only, for a user of their own company whose status is pending; the user can then sign in. Answer: { user: { id, email, role, status, company_id, company_name, created_at } }. Audited.',

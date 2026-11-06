@@ -131,8 +131,9 @@ describe('enforceTenant', () => {
 describe('guard — direct reads of the token\'s company', () => {
   const SRC = path.join(__dirname, '../../src');
   const ALLOWED = {
-    // The user directory is the distributor's: users never belong to a provider.
-    'api/routes/company-users.js': 6,
+    // The user directory and its access requests are the distributor's: users
+    // never belong to a provider.
+    'api/routes/company-users.js': 9,
     // GET /v1/auth/me describes the user's own company.
     'api/routes/auth.js': 1,
     // Providers are children of the caller's own company, by definition.

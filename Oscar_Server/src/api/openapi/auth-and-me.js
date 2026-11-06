@@ -36,14 +36,9 @@ module.exports = {
   },
   '/v1/auth/register/check-token': {
     get: { tags: ['Auth'], summary: 'Is a registration link still valid?', security: open,
-      description: `Read by the page that confirms a registration, before the password is chosen. Answer { email, companyName }. ${AUTH_LIMIT}`,
+      description: `Read by the page that confirms the e-mail of an access request. Answer { email, companyName } (the company as typed). ${AUTH_LIMIT}`,
       parameters: [TOKEN],
       responses: { 200: { description: 'Valid: { email, companyName }' }, ...LINK_ANSWERS } },
-  },
-  '/v1/auth/register/companies': {
-    get: { tags: ['Auth'], summary: 'The companies one can register with', security: open,
-      description: `The top-level companies, never providers: { companies: [{ name, slug }] }; the slug is what POST /register/request takes. ${AUTH_LIMIT}`,
-      responses: { 200: { description: 'The companies' }, 429: { description: 'Too many requests' } } },
   },
   '/v1/auth/sso-check': {
     get: { tags: ['Auth'], summary: 'Is the session an administrator\'s? (for the reverse proxy)', security: bearer,

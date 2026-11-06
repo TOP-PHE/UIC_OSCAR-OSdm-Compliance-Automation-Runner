@@ -113,6 +113,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.465] — 2026-11-05
+
+Release 2026.503. Access is asked, checked twice, then given: no list of companies is shown to a visitor.
+
+### Security
+- **No public list of companies** (`GET /v1/auth/register/companies` is gone). A visitor asks for access with their name, e-mail and the company they work for, typed. The answer is the same whether the company or the e-mail is known; an e-mail that has an account gets nothing.
+- **Two checks before any account** (`utils/accessRequests.js`, `access_request`, migration 49). The visitor confirms their e-mail (no account, no password yet); an administrator places the request in a company or refuses it (`/v1/admin/access-requests`); a Test Manager of that company confirms it, as a tester or a Test Manager, or refuses it (`/v1/company/users/access-requests`). The account is then made with no usable password, and the person receives a link to choose theirs (72 hours, once): nobody else ever knows it.
+- **The administrator alone creates only the first Test Manager** of a company that has none, and only when it says so (`first_test_manager`). It approves a user left pending by the earlier registration only in such a company too; elsewhere the company's Test Manager does.
+- Links already sent under the earlier registration become requests naming the company that was picked; they are then placed and confirmed like the others.
+
+### Pages
+- Sign-in page: the registration asks name, e-mail and company, typed. The confirmation page confirms the e-mail by a click (never on load, so a mail scanner opening the link confirms nothing). Manage Users shows *Access Requests* to administrators (place, refuse) and Test Managers (confirm, refuse). The password page greets a new account.
+
+### Checked
+- `access-requests.test.js`: the whole path, the first Test Manager, refusals, another company's Test Manager, the platform and providers refused, an unconfirmed e-mail not shown, testers refused. With the company check or the first-Test-Manager confirmation taken out, it fails.
+- `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.464] / [collection-OTST_V2.0.252] — 2026-11-05
 
 Issue #1045 (a fare search answered with a trip from a nearby stop, as a real provider gave), release 2026.502. Simulator 0.64.0. The server change is the welcome-page news entry.
