@@ -1034,6 +1034,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   with `shared_with_certifier_at` set (the company-wide
   `share_reports_with_certifier` toggle was removed in v1.11.15 and is dead
   schema); tester/test_manager → own company; unknown role → fail closed.
+  **A tester's runs are theirs** (1.11.477, maintainer decision 2026-11-06):
+  a tester reads their own runs and the Test Managers', never a colleague
+  tester's (`testerReads()`); lists and aggregates that read runs by company
+  add `runScopeSql(user, alias)` (trends, comparisons, coverage, the Run
+  page's last-run facets); the queue gives a colleague's run its place only.
+  A tester shares their own runs with certifiers (`sharesWithCertifiers()`).
   **A whole batch is shared with certifiers** (#1041, 1.11.436):
   `POST`/`DELETE /v1/runs/batch/:batchId/share` over `batchRunsOf()` (each
   run through `canUserSeeRun()`), finished runs only, an earlier share kept,

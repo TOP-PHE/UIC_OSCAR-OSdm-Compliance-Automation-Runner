@@ -102,14 +102,32 @@ describe('canUserSeeRun — administrator (issue #60 strict mode)', () => {
 });
 
 describe('canUserSeeRun — tester (company_user)', () => {
-  const testerA = { role: 'company_user', companyId: COMPANY_A };
-  const testerB = { role: 'company_user', companyId: COMPANY_B };
+  const testerA = { id: USER_A_TESTER, role: 'company_user', companyId: COMPANY_A };
+  const testerB = { id: USER_A_TESTER, role: 'company_user', companyId: COMPANY_B };
+  const colleagueA = { id: 'a3333333-3333-3333-3333-333333333333', role: 'company_user', companyId: COMPANY_A };
 
-  test('sees own company RUNNING run', () =>
+  test('sees own RUNNING run', () =>
     expect(canUserSeeRun(RUN_A_OPEN_NOT_SHARED, testerA)).not.toBeNull());
-  test('sees own company COMPLETED run regardless of share state', () => {
+  test('sees own COMPLETED run regardless of share state', () => {
     expect(canUserSeeRun(RUN_A_TERM_NOT_SHARED, testerA)).not.toBeNull();
     expect(canUserSeeRun(RUN_A_TERM_SHARED,     testerA)).not.toBeNull();
+  });
+  // 1.11.477: a tester's runs are theirs, shared with certifiers or not.
+  test('cannot see a colleague\'s run of the same company, shared or not', () => {
+    expect(canUserSeeRun(RUN_A_OPEN_NOT_SHARED, colleagueA)).toBeNull();
+    expect(canUserSeeRun(RUN_A_TERM_NOT_SHARED, colleagueA)).toBeNull();
+    expect(canUserSeeRun(RUN_A_TERM_SHARED,     colleagueA)).toBeNull();
+    expect(canUserSeeRun(RUN_A_TERM_SHARED, { role: 'tester', companyId: COMPANY_A })).toBeNull();
+  });
+  test('sees a Test Manager\'s run of the company: the company\'s campaign', () => {
+    const tmRun = 'a9999999-9999-9999-9999-999999999999';
+    dbRun(`INSERT OR REPLACE INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'COMPLETED')`, [tmRun, COMPANY_A, USER_A_TM]);
+    try {
+      expect(canUserSeeRun(tmRun, colleagueA)).not.toBeNull();
+      expect(canUserSeeRun(tmRun, testerB)).toBeNull();
+    } finally {
+      dbRun('DELETE FROM runs WHERE id = ?', [tmRun]);
+    }
   });
   test('cannot see another company\'s run', () =>
     expect(canUserSeeRun(RUN_A_TERM_SHARED, testerB)).toBeNull());

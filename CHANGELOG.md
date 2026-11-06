@@ -113,6 +113,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.477] — 2026-11-06
+
+### Security
+
+- **A tester's runs are theirs.** A tester reads their own runs and the Test
+  Managers' runs (the company's campaigns), never another tester's: the run
+  and its checks, requests and messages answer 404, and the trends, the
+  comparisons, the coverage and the "last run" filters of the Run page leave
+  them out. The run queue still shows a colleague's run, by its place only
+  (no scenario, batch or e-mail). A Test Manager still reads every run of the
+  company.
+- **A tester shares their own runs with certifiers**, one by one or a whole
+  batch, as a Test Manager does, and can stop sharing them (Dashboard and run
+  page).
+
+---
+
 ## [server-1.11.476] — 2026-11-06
 
 ### Security

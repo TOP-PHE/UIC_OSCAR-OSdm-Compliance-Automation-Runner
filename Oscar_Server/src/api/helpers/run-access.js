@@ -22,12 +22,14 @@
  *
  *   Role               | Can see runs in own company | Can see runs in other companies
  *   -------------------+-----------------------------+----------------------------------
- *   tester             | Yes                         | Only providers of their company
- *                      |                             | listed for them in provider_access
+ *   tester             | Their own and the Test      | The same, in the providers of
+ *                      | Managers' (1.11.477)        | their company listed for them in
+ *                      |                             | provider_access
  *   test_manager       | Yes                         | Every provider of their company
  *   certification_user | n/a (no own company)        | Only runs explicitly shared with
  *                      |                             | certifier (per-run flag set by
- *                      |                             | the company's test_manager)
+ *                      |                             | a test_manager, or by the tester
+ *                      |                             | whose run it is)
  *   administrator      | n/a (platform company)      | NO — admin role no longer reads
  *                      |                             | test data (issue #60 strict mode)
  *   api_key (#503)     | Only the key's company or   | No
@@ -41,6 +43,29 @@
 
 const { get } = require('../../db/db');
 const { canUseCompany } = require('./provider-access');
+
+const isTester = (user) => user?.role === 'tester' || user?.role === 'company_user';
+
+// A tester reads their own runs and those a Test Manager launched.
+function testerReads(run, user) {
+  if (run.user_id === user.id) return true;
+  return get('SELECT role FROM users WHERE id = ?', [run.user_id])?.role === 'test_manager';
+}
+
+/**
+ * The part of a WHERE clause that keeps, among a company's runs, those `user`
+ * may read: a tester's own and the Test Managers', a certifier's shared ones,
+ * every one for a Test Manager. For lists and aggregates that read runs by company; a single run
+ * goes through canUserSeeRun(). `alias` is the runs table's name in the query.
+ */
+function runScopeSql(user, alias = 'r') {
+  const col = alias ? `${alias}.` : '';
+  if (isTester(user)) {
+    return { sql: ` AND (${col}user_id = ? OR ${col}user_id IN (SELECT id FROM users WHERE role = 'test_manager'))`, params: [user.id] };
+  }
+  if (user?.role === 'certification_user') return { sql: ` AND ${col}shared_with_certifier_at IS NOT NULL`, params: [] };
+  return { sql: '', params: [] };
+}
 
 /**
  * Resolve a run for the given user. Returns the run row if the user is
@@ -56,35 +81,36 @@ function canUserSeeRun(runId, user) {
     [runId],
   );
   if (!run) return null;
+  return mayRead(run, user) ? run : null;
+}
 
+// Whether `user` may read `run`, by role. An unknown role fails closed.
+function mayRead(run, user) {
   // Administrator: locked out of test-data read. Operations role only.
-  if (user.role === 'administrator') return null;
+  if (user.role === 'administrator') return false;
 
   // Tester / test_manager: the run's company must be one they may act in,
-  // their own or a provider of it (#540) — the rule enforceTenant uses.
-  if (user.role === 'tester' || user.role === 'company_user' || user.role === 'test_manager') {
-    return canUseCompany(user, run.company_id) ? run : null;
-  }
+  // their own or a provider of it (#540) — the rule enforceTenant uses. A
+  // tester's runs are theirs (1.11.477): a tester reads their own runs and
+  // the Test Managers' (the company's campaigns), never another tester's; a
+  // Test Manager every run of the company.
+  if (user.role === 'test_manager') return canUseCompany(user, run.company_id);
+  if (isTester(user)) return canUseCompany(user, run.company_id) && testerReads(run, user);
 
   // API key (#503): the runs of the one company or provider the key was made
   // for, never its providers. requireApiKey has checked that the key's
   // creator may still use that company.
   if (user.role === 'api_key') {
     const keyCompany = user.keyCompanyId;
-    return typeof keyCompany === 'string' && keyCompany !== '' && run.company_id === keyCompany ? run : null;
+    return typeof keyCompany === 'string' && keyCompany !== '' && run.company_id === keyCompany;
   }
 
-  // Certifier: only sees runs the test_manager has explicitly shared.
-  // Sole gate (v1.11.15): the per-run shared_with_certifier_at column is set.
-  // The legacy company-wide share_reports_with_certifier master toggle was
-  // removed — sharing is now decided per-report by the test_manager from the
-  // dashboard. Default is private (column null → certifier sees nothing).
-  if (user.role === 'certification_user') {
-    return run.shared_with_certifier_at ? run : null;
-  }
+  // Certifier: only sees runs a Test Manager, or the tester whose run it is,
+  // has explicitly shared (per-run shared_with_certifier_at, the sole gate
+  // since v1.11.15). Default is private (column null → certifier sees nothing).
+  if (user.role === 'certification_user') return Boolean(run.shared_with_certifier_at);
 
-  // Unknown role — fail closed.
-  return null;
+  return false;
 }
 
 /**
@@ -111,4 +137,4 @@ function canUserReadRun(runId, user) {
   return run;
 }
 
-module.exports = { canUserSeeRun, canUserReadRun };
+module.exports = { canUserSeeRun, canUserReadRun, runScopeSql, isTester };

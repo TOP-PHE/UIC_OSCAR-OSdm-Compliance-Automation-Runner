@@ -231,6 +231,12 @@ function fmtDate(d) {
   return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
 }
 
+// Who shares runs with certifiers: a Test Manager, and a tester their own
+// runs (1.11.477), the only ones the Dashboard lists for them.
+function sharesWithCertifiers() {
+  return user.role === 'test_manager' || user.role === 'company_user' || user.role === 'tester';
+}
+
 // Certifier-share line for one run. The wrapping div carries a stable
 // data-share-line attribute so toggleShare() can replace just this element
 // after a share/unshare — no full re-render, so expanded batches and scroll
@@ -239,7 +245,7 @@ function fmtDate(d) {
 // read-only and get no control.
 function shareLineFor(r) {
   const isShared   = !!r.shared_with_certifier_at;
-  const isTM       = user.role === 'test_manager';
+  const isTM       = sharesWithCertifiers();
   const isTerminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status);
   let inner = '';
   if (isShared) {
@@ -291,7 +297,7 @@ function batchOperatorAction(batchRuns, batchId) {
 // #1041: the batch's certifier share: every finished run of it, or undo once
 // they all are. Test Managers only, as the per-run line.
 function batchCertifierAction(batchRuns, batchId) {
-  if (user.role !== 'test_manager') return '';
+  if (!sharesWithCertifiers()) return '';
   const finished = batchRuns.filter(r => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status));
   if (!finished.length) return '';
   if (finished.every(r => r.shared_with_certifier_at)) {
@@ -906,6 +912,13 @@ loadOperators().catch(() => {}).then(loadRuns);
 loadSharedRuns().catch(() => {});
 
 // ── Live queue status ────────────────────────────────────────────────────────
+// A tester is told the place of a colleague's run in the queue, not what it
+// runs nor who runs it (1.11.477): no e-mail comes with such a run.
+function queueScenarioText(r) {
+  if (r.scenario_code) return r.scenario_code;
+  return (r.user_email || r.is_current_user) ? 'All scenarios' : 'Another tester\'s run';
+}
+
 async function pollQueueInfo() {
   try {
     const res = await fetch('/v1/runs/queue-status', {});
@@ -930,8 +943,8 @@ async function pollQueueInfo() {
         : `<span style="color:#1565c0">QUEUED #${r.position}</span>`;
       return `<div style="display:flex;gap:12px;padding:3px 0;border-bottom:1px solid #f5f5f5">
         <span style="min-width:60px">${status}</span>
-        <span style="min-width:200px;font-weight:600;color:#1a2e40">${esc(r.scenario_code || 'All scenarios')}</span>
-        <span style="color:#78909c">${esc(r.user_email)}${you}</span>
+        <span style="min-width:200px;font-weight:600;color:#1a2e40">${esc(queueScenarioText(r))}</span>
+        <span style="color:#78909c">${esc(r.user_email || '—')}${you}</span>
       </div>`;
     }).join('');
     document.getElementById('qi-runs').innerHTML = rows;

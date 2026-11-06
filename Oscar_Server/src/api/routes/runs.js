@@ -119,7 +119,7 @@ function isRunStale(runRow) {
  * Returning null means "treat as not-found" — never disclose existence to
  * a user who shouldn't see the run.
  */
-const { canUserSeeRun, canUserReadRun } = require('../helpers/run-access');
+const { canUserSeeRun, canUserReadRun, isTester } = require('../helpers/run-access');
 function validateRunOwnership(runId, _companyId, req) {
   if (!req?.user) return null;
   return canUserSeeRun(runId, req.user);
@@ -189,7 +189,7 @@ function launchCodes(req, datafile, companyId) {
   if (req.body?.selection === undefined) return runListOf(req, datafile, companyId);
   const selection = RF.withDefaults(req.body.selection);
   const base = selectionBase(req, datafile, companyId, selection);
-  return RF.selectCodes(facetsFor(companyId, datafile, base), selection);
+  return RF.selectCodes(facetsFor(companyId, datafile, base, req.user), selection);
 }
 
 // The company a launch or its preview is for: { company } or { refusal: [status, body] }.
@@ -238,7 +238,7 @@ router.post('/preview', runPreviewLimiter, (req, res) => {
   }
   const selection = RF.withDefaults(req.body?.selection);
   const base = selectionBase(req, datafile, targetCompanyId, selection).filter(code => typeof code === 'string' && code !== '');
-  const preview = RF.previewOf(facetsFor(targetCompanyId, datafile, base), selection);
+  const preview = RF.previewOf(facetsFor(targetCompanyId, datafile, base, req.user), selection);
   return res.json({ selection, ...preview, seen: seenCodes(req, datafile).length, runList: runListOf(req, datafile, targetCompanyId).length });
 });
 
@@ -742,7 +742,7 @@ router.get('/queue-status', (req, res) => {
   // Get all QUEUED + RUNNING runs for this company
   const runs = all(`
     SELECT r.id, r.status, r.scenario_code, r.batch_id, r.queued_at, r.started_at,
-           u.email AS user_email
+           r.user_id, u.email AS user_email
     FROM runs r
     JOIN users u ON u.id = r.user_id
     WHERE r.company_id = ? AND r.status IN ('QUEUED', 'RUNNING')
@@ -757,19 +757,27 @@ router.get('/queue-status', (req, res) => {
     concurrent_limit: concurrentLimit,
     slots_used:       running.length,
     slots_available:  Math.max(0, concurrentLimit - running.length),
-    runs: runs.map(r => ({
-      id:              r.id,
-      status:          r.status,
-      scenario_code:   r.scenario_code,
-      batch_id:        r.batch_id,
-      user_email:      r.user_email,
-      is_current_user: r.user_email === req.user.email,
-      position:        r.status === 'QUEUED' ? queued.indexOf(r) + 1 : null,
-      queued_at:       r.queued_at,
-      started_at:      r.started_at
-    }))
+    // A tester sees where the others' runs are in the queue, not what they
+    // run nor who runs them (1.11.477).
+    runs: runs.map(r => queueEntry(r, req.user, queued)),
   });
 });
+
+function queueEntry(r, user, queued) {
+  const mine = r.user_id === user.id;
+  const told = mine || !isTester(user);
+  return {
+    id:              told ? r.id : null,
+    status:          r.status,
+    scenario_code:   told ? r.scenario_code : null,
+    batch_id:        told ? r.batch_id : null,
+    user_email:      told ? r.user_email : null,
+    is_current_user: mine,
+    position:        r.status === 'QUEUED' ? queued.indexOf(r) + 1 : null,
+    queued_at:       r.queued_at,
+    started_at:      r.started_at,
+  };
+}
 
 // ── POST /v1/runs/stop-all ────────────────────────────────────────────────────
 // Emergency stop: forcibly terminate active runs "hard but sure".
@@ -1273,15 +1281,16 @@ router.get('/:id/artifacts/:aid', (req, res) => {
 // dashboard per-row share control (and still available on the run-detail page).
 //
 // Restrictions:
-//   - Only test_manager role of the run's owning company can share.
+//   - A test_manager of the run's owning company, or the tester whose run it
+//     is (1.11.477), can share.
 //   - Run must be in a terminal status (COMPLETED / FAILED / CANCELLED).
 //     Sharing in-progress runs is meaningless and would leak partial state.
 //
 // Audit-logged with the run id and the actor's email.
 router.post('/:id/share', (req, res) => {
-  if (req.user.role !== 'test_manager') {
+  if (!sharesWithCertifiers(req.user)) {
     return res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Only test_manager can share runs with certifiers.' });
+      detail: 'Only a Test Manager, or the tester whose run it is, can share a run with certifiers.' });
   }
   // Tenant scope: a test_manager can only share runs of their own company or
   // of its providers (#540) — the run-visibility rule, which answers 404.
@@ -1298,6 +1307,11 @@ router.post('/:id/share', (req, res) => {
   const updated = get('SELECT id, shared_with_certifier_at, shared_with_certifier_by FROM runs WHERE id = ?', [req.params.id]);
   return res.json({ ok: true, run: updated });
 });
+
+// Who may share a run with certifiers: a Test Manager, any run of the
+// company; a tester, their own (1.11.477), which canUserSeeRun() alone gives
+// them.
+const sharesWithCertifiers = (user) => user.role === 'test_manager' || isTester(user);
 
 // One run shared with certifiers, audited (the run page, a Dashboard row and a
 // batch, #1041). The caller checks the role, the run's visibility and status.
@@ -1321,11 +1335,11 @@ function unshareWithCertifier(req, runRow) {
 }
 
 // ── DELETE /v1/runs/:id/share — revoke certifier access to THIS run ──────────
-// Test manager unshare: certifiers immediately lose access. Audit-logged.
+// Test manager or the run's tester unshares: certifiers immediately lose access. Audit-logged.
 router.delete('/:id/share', (req, res) => {
-  if (req.user.role !== 'test_manager') {
+  if (!sharesWithCertifiers(req.user)) {
     return res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Only test_manager can revoke certifier access.' });
+      detail: 'Only a Test Manager, or the tester whose run it is, can stop sharing a run with certifiers.' });
   }
   const runRow = canUserSeeRun(req.params.id, req.user);
   if (!runRow) {
@@ -1431,9 +1445,9 @@ router.delete('/batch/:batchId/share-with-operator', (req, res) => {
 // finished ones are shared, the others come back with their reason. Already
 // shared runs keep who shared them and when. One audit event per run changed.
 router.post('/batch/:batchId/share', (req, res) => {
-  if (req.user.role !== 'test_manager') {
+  if (!sharesWithCertifiers(req.user)) {
     return res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Only test_manager can share runs with certifiers.' });
+      detail: 'Only a Test Manager, or the tester whose run it is, can share a run with certifiers.' });
   }
   const runs = batchRunsOf(req);
   if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
@@ -1446,9 +1460,9 @@ router.post('/batch/:batchId/share', (req, res) => {
 });
 
 router.delete('/batch/:batchId/share', (req, res) => {
-  if (req.user.role !== 'test_manager') {
+  if (!sharesWithCertifiers(req.user)) {
     return res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Only test_manager can revoke certifier access.' });
+      detail: 'Only a Test Manager, or the tester whose run it is, can stop sharing a run with certifiers.' });
   }
   const runs = batchRunsOf(req);
   if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });

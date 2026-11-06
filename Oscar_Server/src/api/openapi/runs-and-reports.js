@@ -28,7 +28,7 @@ const noBatch = { 404: { description: 'No run of the batch the caller may see' }
 const testManagersOnly = { 403: { description: 'Test Managers only' } };
 
 // Who reads a run: the visibility rule, widened for a run shared with the reader's company.
-const READ_RULE = 'Readable by whoever may see the run (own company or provider; a certifier only for a run shared with certifiers; never an administrator), or by a Test Manager of a company the run is shared with (#901), for whom the distributor\'s people are named by the distributor.';
+const READ_RULE = 'Readable by whoever may see the run (own company or provider: a Test Manager every run, a tester their own and the Test Managers\' runs; a certifier only for a run shared with certifiers; never an administrator), or by a Test Manager of a company the run is shared with (#901), for whom the distributor\'s people are named by the distributor.';
 
 /** A read of one run: GET, with the run id and the read rule. */
 function runRead(summary, description, extra = {}) {
@@ -43,23 +43,26 @@ function runRead(summary, description, extra = {}) {
 }
 
 /** Share with certifiers or with the operating company, one run or one batch. */
-function shareOps(target, one, summaries, descriptions, conflicts) {
+function shareOps(target, one, summaries, descriptions, conflicts, refused = testManagersOnly) {
   const param = one ? runId : batchId;
   const missing = one ? noRun : noBatch;
   return {
     post: { tags: runs, summary: summaries[0], security: bearer, description: descriptions[0], parameters: [param],
-      responses: { ...ok(`Shared ${target}`), ...testManagersOnly, ...missing, ...conflicts } },
+      responses: { ...ok(`Shared ${target}`), ...refused, ...missing, ...conflicts } },
     delete: { tags: runs, summary: summaries[1], security: bearer, description: descriptions[1], parameters: [param],
-      responses: { ...ok('Revoked'), ...testManagersOnly, ...missing } },
+      responses: { ...ok('Revoked'), ...refused, ...missing } },
   };
 }
 
 const TM_SEES = 'Test Managers only, on runs they may see (own company or its providers; 404 otherwise).';
+// 1.11.477: certifier sharing is also the tester's, for their own runs.
+const CERT_SHARERS = 'A Test Manager, on runs they may see (own company or its providers), or a tester on their own runs; 404 otherwise.';
+const notCertifiers = { 403: { description: 'Certifiers and administrators' } };
 
 module.exports = {
   '/v1/runs/queue-status': {
     get: { tags: runs, summary: 'The queued and running runs of the company, and its run slots', security: bearer,
-      description: 'Members only: administrators and certifiers get 403. For the request\'s company (or provider). { company_id, concurrent_limit (Test Framework concurrentSessionLimit, default 1), slots_used, slots_available, runs: [{ id, status, scenario_code, batch_id, user_email, is_current_user, position, queued_at, started_at }] }; position is the place in the queue of a QUEUED run.',
+      description: 'Members only: administrators and certifiers get 403. For the request\'s company (or provider). { company_id, concurrent_limit (Test Framework concurrentSessionLimit, default 1), slots_used, slots_available, runs: [{ id, status, scenario_code, batch_id, user_email, is_current_user, position, queued_at, started_at }] }; position is the place in the queue of a QUEUED run. A tester gets id, scenario_code, batch_id and user_email of their own runs only (null for the others).',
       responses: { ...ok('Queue state'), 403: { description: 'Administrators and certifiers' } } },
   },
   '/v1/runs/stop-all': {
@@ -83,8 +86,8 @@ module.exports = {
   },
   '/v1/runs/batch/{batchId}/share': shareOps('with certifiers', false,
     ['Share the finished runs of a batch with certifiers (#1041)', 'Revoke certifier access to every run of a batch (#1041)'],
-    [`${TM_SEES} Runs not finished are not shared and come back with their reason; runs already shared keep who shared them and when. Audited per run. Answer: { shared, runs: [{ id, shared, reason? }] }.`,
-      `${TM_SEES} Audited per run changed. Answer: { runs: [{ id, shared: false }] }.`]),
+    [`${CERT_SHARERS} Runs not finished are not shared and come back with their reason; runs already shared keep who shared them and when. Audited per run. Answer: { shared, runs: [{ id, shared, reason? }] }.`,
+      `${CERT_SHARERS} Audited per run changed. Answer: { runs: [{ id, shared: false }] }.`], {}, notCertifiers),
   '/v1/runs/batch/{batchId}/share-with-operator': shareOps('with the operating company', false,
     ['Share the runs of a batch with the company that operates the provider (#901)', 'Stop sharing the runs of a batch with the operating company (#901)'],
     [`${TM_SEES} Each finished run of a provider whose operator link is accepted is shared; the others come back with their reason. Audited per run. Answer: { shared, runs: [{ id, shared, reason? }] }.`,
@@ -127,9 +130,9 @@ module.exports = {
         500: { description: 'The file could not be read' } } }),
   '/v1/runs/{id}/share': shareOps('with certifiers', true,
     ['Share a finished run with certifiers', 'Revoke certifier access to a run'],
-    [`${TM_SEES} A certifier can read a run only once it is shared. Audited. Answer: { ok, run: { id, shared_with_certifier_at, shared_with_certifier_by } }.`,
-      `${TM_SEES} Certifiers lose access at once. Audited. Answer: { ok, run: { id, shared_with_certifier_at: null } }.`],
-    { 409: { description: 'The run is not finished (COMPLETED, FAILED or CANCELLED)' } }),
+    [`${CERT_SHARERS} A certifier can read a run only once it is shared. Audited. Answer: { ok, run: { id, shared_with_certifier_at, shared_with_certifier_by } }.`,
+      `${CERT_SHARERS} Certifiers lose access at once. Audited. Answer: { ok, run: { id, shared_with_certifier_at: null } }.`],
+    { 409: { description: 'The run is not finished (COMPLETED, FAILED or CANCELLED)' } }, notCertifiers),
   '/v1/runs/{id}/share-with-operator': shareOps('with the operating company', true,
     ['Share a finished run of a provider with the company that operates it (#901)', 'Stop sharing a run with the operating company (#901)'],
     [`${TM_SEES} The provider must be linked to that company and the link accepted; that company's Test Managers can then read the run. Audited. Answer: { ok, run: { id, shared } }.`,

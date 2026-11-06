@@ -27,7 +27,7 @@ const { requireAuth, isPlatformRole } = require('../middleware/auth');
 // test data everywhere else. canUserSeeRun() encodes the whole policy:
 // administrator → null (operations role only), certifier → only runs the
 // test_manager explicitly shared, tester/test_manager → own company.
-const { canUserSeeRun } = require('../helpers/run-access');
+const { canUserSeeRun, runScopeSql } = require('../helpers/run-access');
 // #227 part 3: the offer request options report of each run (shared with the coverage, #995).
 const { offerOptionReportsOf } = require('../helpers/offerOptionReports');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
@@ -144,20 +144,19 @@ router.get('/comparisons', (req, res) => {
     );
   } else {
     // A certifier naming a company (?company_id) still sees only comparisons
-    // of two runs shared with certifiers.
-    const sharedOnly = req.user.role === 'certification_user'
-      ? 'AND ra.shared_with_certifier_at IS NOT NULL AND rb.shared_with_certifier_at IS NOT NULL'
-      : '';
+    // of two runs shared with certifiers; a tester, of two of their own runs.
+    const scopeA = runScopeSql(req.user, 'ra');
+    const scopeB = runScopeSql(req.user, 'rb');
     rows = all(
       `SELECT rc.id, rc.run_a_id, rc.run_b_id, rc.created_at,
               ra.queued_at as run_a_date, rb.queued_at as run_b_date
        FROM report_comparisons rc
        JOIN runs ra ON ra.id = rc.run_a_id
        JOIN runs rb ON rb.id = rc.run_b_id
-       WHERE rc.company_id = ? AND ra.status != 'DELETED' AND rb.status != 'DELETED' ${sharedOnly}
+       WHERE rc.company_id = ? AND ra.status != 'DELETED' AND rb.status != 'DELETED'${scopeA.sql}${scopeB.sql}
        ORDER BY rc.created_at DESC
        LIMIT 100`,
-      [req.companyId]
+      [req.companyId, ...scopeA.params, ...scopeB.params]
     );
   }
 
@@ -628,9 +627,8 @@ router.get('/trends/summary', (req, res) => {
   if (req.user.role === 'administrator') {
     return res.json({ company_id: companyId, top_failures: [] });
   }
-  const certifierOnlyShared = req.user.role === 'certification_user'
-    ? 'AND r.shared_with_certifier_at IS NOT NULL'
-    : '';
+  // A certifier reads the shared runs only, a tester their own (1.11.477).
+  const scope = runScopeSql(req.user, 'r');
 
   const limit = Math.min(Number.parseInt(req.query.limit || '20', 10), 50);
 
@@ -644,12 +642,12 @@ router.get('/trends/summary', (req, res) => {
     WHERE ra.company_id = ?
       AND r.status IN ('COMPLETED', 'FAILED')
       AND r.queued_at >= datetime('now', '-30 days')
-      ${certifierOnlyShared}
+      ${scope.sql}
     GROUP BY ra.assertion_key
     HAVING fail_count > 0
     ORDER BY fail_count DESC, pass_rate ASC
     LIMIT ?
-  `, [companyId, limit]);
+  `, [companyId, ...scope.params, limit]);
 
   return res.json({ company_id: companyId, top_failures: rows });
 });
@@ -670,9 +668,8 @@ router.get('/trends', (req, res) => {
   if (req.user.role === 'administrator') {
     return res.json({ assertion_key, points: [] });
   }
-  const certifierOnlyShared = req.user.role === 'certification_user'
-    ? 'AND r.shared_with_certifier_at IS NOT NULL'
-    : '';
+  // A certifier reads the shared runs only, a tester their own (1.11.477).
+  const scope = runScopeSql(req.user, 'r');
 
   const rows = all(`
     SELECT ra.run_id, ra.passed, ra.error_msg, ra.category, ra.severity,
@@ -680,10 +677,10 @@ router.get('/trends', (req, res) => {
     FROM run_assertions ra
     JOIN runs r ON r.id = ra.run_id
     WHERE ra.company_id = ? AND ra.assertion_key = ? AND r.status IN ('COMPLETED', 'FAILED')
-      ${certifierOnlyShared}
+      ${scope.sql}
     ORDER BY r.queued_at DESC
     LIMIT ?
-  `, [companyId, assertion_key, limit]);
+  `, [companyId, assertion_key, ...scope.params, limit]);
 
   return res.json({
     assertion_key,

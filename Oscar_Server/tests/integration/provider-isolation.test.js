@@ -267,7 +267,8 @@ describe('API Config — a section is saved on its own (#580)', () => {
 describe('run visibility across providers', () => {
   const see = [
     ['A1', 'runP1a', 200], ['A1', 'runP1b', 404], ['A1', 'runP2a', 404],
-    ['B1', 'runP1a', 404], ['B1', 'runD1', 200],
+    // A tester reads their own runs and the Test Managers' (1.11.477): B1 not A1's run.
+    ['B1', 'runP1a', 404], ['B1', 'runD1', 404], ['A1', 'runD1', 200],
     ['TM1', 'runP1a', 200], ['TM1', 'runP1b', 200], ['TM1', 'runP2a', 404],
     ['TM2', 'runP1a', 404], ['A2', 'runP1a', 404], ['A2', 'runP2a', 200],
   ];

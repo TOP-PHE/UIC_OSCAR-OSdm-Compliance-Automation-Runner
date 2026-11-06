@@ -43,6 +43,7 @@ const { capabilityCoverageOf } = require('../../utils/capabilityCoverage');
 const { armed, ALWAYS_REQUIRED } = require('../../utils/capabilities');
 const { offerOptionCoverageOf, withOfferOptions } = require('../../utils/offerOptionCoverage');
 const { offerOptionReportsOf } = require('../helpers/offerOptionReports');
+const { runScopeSql } = require('../helpers/run-access');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const { fileNameFor } = require('../../utils/fileNames');
 const { problemOf } = require('../../utils/findingSuggestions');
@@ -130,18 +131,19 @@ function stepsOfRuns(ids) {
 }
 
 // The latest finished run of each scenario of the company within the window,
-// with its check counts, its steps and its failed checks. `sharedOnly`: the
-// runs shared with certifiers only (#1043).
-function latestRuns(companyId, days, sharedOnly = false) {
-  const shared = sharedOnly ? 'AND shared_with_certifier_at IS NOT NULL' : '';
+// with its check counts, its steps and its failed checks, among the runs
+// `user` may read (runScopeSql(): a certifier the shared ones, #1043; a tester
+// their own, 1.11.477).
+function latestRuns(companyId, days, user) {
+  const scope = runScopeSql(user, '');
   const rows = all(
     `SELECT id, scenario_code, status, queued_at, completed_at, server_version, collection_version, scenario_hash
        FROM runs
-      WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED') ${shared}
+      WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED')${scope.sql}
         AND queued_at >= datetime('now', ?)
       ORDER BY queued_at DESC, id DESC
       LIMIT ${MAX_RUNS}`,
-    [companyId, `-${days} days`]
+    [companyId, ...scope.params, `-${days} days`]
   );
   const latest = latestRunsOf(rows);
   const ids = Object.values(latest).map((r) => r.id);
@@ -260,7 +262,7 @@ function sharedScenariosOnly(datafile, runs) {
  */
 async function buildCoverage(companyId, days, user) {
   const certifier = user.role === 'certification_user';
-  const runs = latestRuns(companyId, days, certifier);
+  const runs = latestRuns(companyId, days, user);
   let datafile = await readDatafile(companyId);
   if (datafile && certifier) datafile = sharedScenariosOnly(datafile, runs);
   else if (datafile && user.role !== 'test_manager') {
