@@ -44,12 +44,16 @@ function clean(text, max) {
 
 /**
  * Step 1. Returns { token } when a link is to be sent, or null when nothing
- * is (the e-mail already has an account). The caller answers the same in
- * both cases.
+ * is (the e-mail already has an account, or a request for it is still open:
+ * confirmed, or its link not expired). The caller answers the same in every case.
  */
 function createRequest({ email, name, company }) {
   const lowerEmail = String(email).toLowerCase().trim();
   if (get('SELECT id FROM users WHERE email = ?', [lowerEmail])) return null;
+  // One e-mail per address while its link is valid, and a request already
+  // confirmed is not replaced (1.11.480): the form cannot be used to flood an
+  // address, nor to undo someone's request. Only an expired link gives way.
+  if (stillOpen(get('SELECT state, token_expires_at FROM access_request WHERE email = ?', [lowerEmail]))) return null;
   const token = crypto.randomUUID();
   transaction(() => {
     run('DELETE FROM access_request WHERE email = ?', [lowerEmail]);
@@ -58,6 +62,13 @@ function createRequest({ email, name, company }) {
       [crypto.randomUUID(), lowerEmail, clean(name, 120), clean(company, 160), token, hoursFromNow(VERIFY_HOURS)]);
   });
   return { token, url: `${appUrl()}/verify-email.html?token=${token}` };
+}
+
+// A request that holds its address: confirmed, or a link not expired yet.
+function stillOpen(row) {
+  if (!row) return false;
+  if (row.state !== 'unverified') return true;
+  return !row.token_expires_at || new Date(row.token_expires_at) > new Date();
 }
 
 /** The request a verification link stands for, or { status, detail }. */

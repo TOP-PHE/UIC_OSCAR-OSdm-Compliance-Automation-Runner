@@ -157,11 +157,11 @@ router.post('/register/request',
     const { email, name, company } = req.body;
     const created = AccessRequests.createRequest({ email, name, company });
     if (!created) {
-      log.warn('Access request for an e-mail that already has an account — generic answer, nothing sent');
+      log.warn('Access request for an e-mail with an account, or a request still open — generic answer, nothing sent');
       return res.json({ message: GENERIC_REQUEST_ANSWER });
     }
     try {
-      const result = await sendVerificationEmail({ to: email.toLowerCase().trim(), companyName: company.trim(), verificationUrl: created.url });
+      const result = await sendVerificationEmail({ to: email.toLowerCase().trim(), verificationUrl: created.url });
       if (result?.devMode) {
         return res.json({ message: 'DEV MODE — SMTP not configured. Verification URL returned directly.', verificationUrl: created.url });
       }

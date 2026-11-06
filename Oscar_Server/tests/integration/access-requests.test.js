@@ -142,6 +142,33 @@ describe('the double check', () => {
     expect((await request(app).post(`/v1/company/users/access-requests/${id}/confirm`).set('Authorization', asTm()).send({ role: 'administrator' })).status).toBe(400);
   });
 
+  // 1.11.480: the public form sends one e-mail per address while its link is
+  // valid, and cannot replace a request already confirmed.
+  test('one link per address while it is valid; a new one once it expired', async () => {
+    const email = `once-${uuidv4().slice(0, 8)}@access.test`;
+    const first = await request(app).post('/v1/auth/register/request').send({ email, name: 'A', company: 'First' });
+    expect(first.body.verificationUrl).toMatch(/token=/);
+    const again = await request(app).post('/v1/auth/register/request').send({ email, name: 'B', company: 'Call this number' });
+    expect(again.status).toBe(200);
+    expect(again.body.verificationUrl).toBeUndefined();
+    expect(again.body.message).toMatch(/^If your request can be handled/);
+    expect(get('SELECT company_text FROM access_request WHERE email = ?', [email]).company_text).toBe('First');
+    run(`UPDATE access_request SET token_expires_at = '2000-01-01T00:00:00.000Z' WHERE email = ?`, [email]);
+    const later = await request(app).post('/v1/auth/register/request').send({ email, name: 'A', company: 'Second' });
+    expect(later.body.verificationUrl).toMatch(/token=/);
+    expect(get('SELECT company_text FROM access_request WHERE email = ?', [email]).company_text).toBe('Second');
+    run('DELETE FROM access_request WHERE email = ?', [email]);
+  });
+
+  test('a confirmed request is not replaced by the form, and no e-mail goes out', async () => {
+    const { id, email } = await verifiedRequest('Kept company');
+    const asked = await request(app).post('/v1/auth/register/request').send({ email, name: 'Other', company: 'Other text' });
+    expect(asked.status).toBe(200);
+    expect(asked.body.verificationUrl).toBeUndefined();
+    expect(get('SELECT id, state, company_text FROM access_request WHERE email = ?', [email])).toEqual({ id, state: 'verified', company_text: 'Kept company' });
+    run('DELETE FROM access_request WHERE id = ?', [id]);
+  });
+
   test('an unconfirmed e-mail is shown to the administrator, who can only refuse it', async () => {
     const email = `unverified-${uuidv4().slice(0, 8)}@access.test`;
     await request(app).post('/v1/auth/register/request').send({ email, name: 'U', company: 'X' });

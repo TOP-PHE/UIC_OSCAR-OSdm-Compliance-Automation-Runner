@@ -113,6 +113,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.480] — 2026-11-06
+
+### Security
+
+- **The public access form cannot be used to send messages.** The
+  confirmation e-mail goes to an address nobody has confirmed yet, so it no
+  longer carries any text the visitor typed (the company name was written in
+  it). One e-mail per address while its link is valid (24 h): asking again
+  sends nothing and answers the same as always. A request already confirmed is
+  no longer replaced by a new form. An administrator can still refuse an
+  unconfirmed request to free its address at once.
+
+---
+
 ## [server-1.11.477] — 2026-11-06
 
 ### Security
