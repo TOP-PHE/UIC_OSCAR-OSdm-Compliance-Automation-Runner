@@ -38,7 +38,10 @@ function createTransport() {
   });
 }
 
-async function sendVerificationEmail({ to, companyName, verificationUrl }) {
+// The e-mail goes to an address nobody has confirmed yet: it carries no text
+// the visitor typed (1.11.480), so it cannot be used to send a message of
+// someone's choosing from OSCAR's address.
+async function sendVerificationEmail({ to, verificationUrl }) {
   if (!isSmtpConfigured()) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS in oscar-server.env');
@@ -63,7 +66,7 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
     <div style="padding:32px">
       <h2 style="color:#37474f;font-size:20px;margin:0 0 12px">Confirm your registration</h2>
       <p style="color:#546e7a;font-size:14px;line-height:1.6;margin:0 0 8px">
-        You asked for access to OSCAR for <strong>${escHtml(companyName)}</strong>.
+        Someone, perhaps you, asked for access to OSCAR with this e-mail address.
       </p>
       <p style="color:#546e7a;font-size:14px;line-height:1.6;margin:0 0 28px">
         Click the button below, then <strong>Confirm my email address</strong> on the page that opens.
@@ -87,12 +90,12 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
 </body>
 </html>`;
 
-  const text = `OSCAR — Confirm your e-mail address\n\nYou asked for access to OSCAR for ${companyName}.\n\nOpen this link, then click "Confirm my email address":\n${verificationUrl}\n\nThis link expires in 24 hours. An OSCAR administrator, then a Test Manager of your company, will then check your request; you will choose your password after that.\n\nIf you did not ask for access, ignore this email.`;
+  const text = `OSCAR — Confirm your e-mail address\n\nSomeone, perhaps you, asked for access to OSCAR with this e-mail address.\n\nOpen this link, then click "Confirm my email address":\n${verificationUrl}\n\nThis link expires in 24 hours. An OSCAR administrator, then a Test Manager of your company, will then check your request; you will choose your password after that.\n\nIf you did not ask for access, ignore this email.`;
 
   const transporter = createTransport();
 
   log.info({
-    to, from, companyName,
+    to, from,
     smtpHost: getConfig('SMTP_HOST', ''),
     smtpPort: getConfig('SMTP_PORT', '587'),
     smtpSecure: getConfig('SMTP_SECURE', 'false'),

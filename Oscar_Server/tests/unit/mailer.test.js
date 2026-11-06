@@ -174,7 +174,6 @@ describe('mailer.js', () => {
       expect(call.to).toBe(params.to);
       expect(call.subject).toBe('OSCAR — Confirm your e-mail address');
       expect(call.from).toBe('OSCAR Platform <noreply@oscar.uic.org>');
-      expect(call.html).toContain(params.companyName);
       expect(call.html).toContain(params.verificationUrl);
       expect(call.text).toContain(params.verificationUrl);
       expect(incSpy).toHaveBeenCalledWith({ result: 'success', kind: 'verification' });
@@ -196,16 +195,18 @@ describe('mailer.js', () => {
       incSpy.mockRestore();
     });
 
-    test('escapes HTML-significant characters in companyName', async () => {
+    // 1.11.480: the address is not confirmed yet, so nothing the visitor
+    // typed is written in the e-mail, escaped or not.
+    test('carries no text the visitor typed', async () => {
       setSmtpConfigured();
       mockSendMail.mockResolvedValueOnce({ messageId: 'x', response: 'ok', accepted: [], rejected: [] });
-      const dangerousParams = { ...params, companyName: '<b>Acme</b> & Co' };
-
-      await sendVerificationEmail(dangerousParams);
-
+      await sendVerificationEmail({ ...params, companyName: 'Call +1 555 0100 to claim your refund' });
       const call = mockSendMail.mock.calls[0][0];
-      expect(call.html).toContain('&lt;b&gt;Acme&lt;/b&gt; &amp; Co');
-      expect(call.html).not.toContain('<b>Acme</b> & Co');
+      for (const part of [call.html, call.text, call.subject]) {
+        expect(part).not.toContain('Acme Rail');
+        expect(part).not.toContain('claim your refund');
+      }
+      expect(call.text).toContain('Someone, perhaps you, asked for access to OSCAR with this e-mail address.');
     });
   });
 

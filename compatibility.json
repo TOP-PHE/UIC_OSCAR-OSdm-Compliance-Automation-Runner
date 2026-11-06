@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.517",
+  "current_release": "2026.518",
   "releases": [
+    {
+      "release": "2026.518",
+      "date": "2026-11-06",
+      "server": "1.11.480",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.480: the public access form's e-mail carries no typed text, one e-mail per address while its link is valid, and a confirmed request is not replaced."
+      ]
+    },
     {
       "release": "2026.517",
       "date": "2026-11-06",
