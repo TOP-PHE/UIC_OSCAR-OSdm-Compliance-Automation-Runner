@@ -113,6 +113,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.476] — 2026-11-06
+
+### Security
+
+- **The Test Framework holds no `{{`.** A run's copy of the data file takes
+  values from the Test Framework (cards, products, codes and other lists),
+  and the test engine fills in `{{…}}` wherever a value is read. The three
+  framework writers (Test Framework save, configuration import, checklist
+  apply) refuse a framework holding `{{` anywhere, naming the place; the
+  W3C trace state template keeps its own check. A run whose stored framework
+  holds one is refused before a token is asked for, and the copy served to a
+  run is checked the same way as the stored data file.
+
+---
+
 ## [server-1.11.475] / [collection-OTST_V2.0.253] — 2026-11-06
 
 Release 2026.513. Answers to the requests a step's script sends get the same look as the others.

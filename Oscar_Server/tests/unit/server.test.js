@@ -364,6 +364,30 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // The run's copy adds the framework's values: one holding "{{" is not served.
+  test('a run copy holding "{{" from the framework is not served', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [uuidv4(), companyId, colEncrypt(JSON.stringify({ products: [{ code: '{{access_token}}' }] }))]);
+    const stored = JSON.stringify({ scenarios: [{ code: 'A', offerOptionDiscovery: true }] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.status).toBe(409);
+      expect(forRun.text).not.toContain('access_token');
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // #785: a scenario naming no OSDM version runs with the Test Framework's;
   // one naming its own keeps it; the stored file is not changed.
   test('a run\'s copy gives the framework\'s OSDM version to the scenarios naming none', async () => {

@@ -317,4 +317,41 @@ function runRefusal(found) {
     + `It has to be removed in Test Config first.${where}`;
 }
 
-module.exports = { templatePaths, templatesInDatafile, templatesForRunner, templatesAddedBy, saveRefusal, runRefusal, TEST_MANAGER_ROOT_KEYS };
+/**
+ * The places where a Test Framework holds two opening braces. A run's copy of
+ * the data file takes values from the framework (cards, products, codes…), so
+ * a template there would be filled in like one in the data file. The trace
+ * state template is left out: it takes its own three names only
+ * (traceContextProblem) and reaches the run already filled in.
+ */
+function templatesInFramework(framework) {
+  if (!isObj(framework)) return [];
+  const looked = { ...framework };
+  if (isObj(framework.traceContext)) {
+    looked.traceContext = { ...framework.traceContext };
+    delete looked.traceContext.tracestate;
+  }
+  const found = collector();
+  for (const [at] of templateTexts(looked)) {
+    if (found.add('Test Framework', at || ITSELF)) break;
+  }
+  return found.kept;
+}
+
+/** The sentence for a framework that is not saved, or null. */
+function frameworkTemplateProblem(framework) {
+  const found = templatesInFramework(framework);
+  if (totalOf(found) === 0) return null;
+  return `The Test Framework contains "${OPEN}" and cannot be saved. ${WHY}. Remove it in: ${listed(found)}.`;
+}
+
+/** The sentence for a run that is not started because of its framework, or null. */
+function frameworkRunRefusal(framework) {
+  const found = templatesInFramework(framework);
+  if (totalOf(found) === 0) return null;
+  return `This run was not started: the Test Framework holds text that contains "${OPEN}". ${WHY}, in every run of the company. `
+    + `It has to be removed in the Test Framework first. Where: ${listed(found)}.`;
+}
+
+module.exports = { templatePaths, templatesInDatafile, templatesForRunner, templatesAddedBy, saveRefusal, runRefusal,
+  templatesInFramework, frameworkTemplateProblem, frameworkRunRefusal, TEST_MANAGER_ROOT_KEYS };

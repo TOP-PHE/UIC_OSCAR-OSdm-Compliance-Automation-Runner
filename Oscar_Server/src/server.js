@@ -413,6 +413,15 @@ function withTripCalendars(plaintext, companyId) {
   }
 }
 
+function runCopyHoldsTemplates(plaintext) {
+  try {
+    const { templatesInDatafile } = require('./utils/datafileTemplates');
+    return templatesInDatafile(JSON.parse(plaintext.toString('utf8'))).length > 0;
+  } catch {
+    return false; // not JSON: Bruno's own read reports it
+  }
+}
+
 // A run's secret is accepted only from the run itself: Bruno calls the server
 // on its own machine (127.0.0.1), directly, never through the reverse proxy,
 // which adds a forwarding header. Anything else is treated as no secret.
@@ -468,7 +477,15 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   } catch (err) {
     return res.status(500).send('Decryption failed: ' + err.message);
   }
-  if (runCompanyId !== null) plaintext = withTripCalendars(withFrameworkWarnings(plaintext, company.id), company.id);
+  if (runCompanyId !== null) {
+    plaintext = withTripCalendars(withFrameworkWarnings(plaintext, company.id), company.id);
+    // The copy adds values of the Test Framework and the Test Data: like the
+    // stored file (checked before the run started), it must hold no "{{".
+    if (runCopyHoldsTemplates(plaintext)) {
+      log.warn({ companyId: company.id }, 'run datafile: the run copy holds a template, not served');
+      return res.status(409).send('The data file of this run holds "{{" and is not served.');
+    }
+  }
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', String(plaintext.length));
   return res.end(plaintext);

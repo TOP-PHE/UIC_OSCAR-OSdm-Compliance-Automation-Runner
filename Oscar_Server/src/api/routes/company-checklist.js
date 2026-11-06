@@ -53,7 +53,7 @@ const { offerOptionDiscoveryProblem } = require('../../utils/offerOptionDiscover
 const { traceContextProblem } = require('../../../public/js/trace-context');
 const CS = require('../../utils/checklistScenarios');
 const { applyCopy } = require('../../utils/scenarioCopy');
-const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
+const { templatesAddedBy, saveRefusal, frameworkTemplateProblem } = require('../../utils/datafileTemplates');
 const { withDatafileLock } = require('../../utils/datafileLock');
 const { writeDatafile } = require('../../utils/datafileWrite');
 const { Refusal, readDatafile, readCatalogue, testDataChoices } = require('../helpers/catalogueSource');
@@ -287,7 +287,8 @@ router.post('/checklists/:id/apply', limiter, guard, async (req, res) => {
   }
   // #936 / #937: the distribution modes and fare declarations, as the Test Framework route checks them.
   const modesProblem = distributionModesProblem(proposedFramework.distributionModes) || fareDeclarationsProblem(proposedFramework.fares)
-    || offerOptionDiscoveryProblem(proposedFramework) || traceContextProblem(proposedFramework.traceContext);
+    || offerOptionDiscoveryProblem(proposedFramework) || traceContextProblem(proposedFramework.traceContext)
+    || frameworkTemplateProblem(proposedFramework);
   if (modesProblem) return problem(res, 400, 'Bad Request', `${modesProblem} Nothing was changed.`);
   let testDataOutcome;
   try {

@@ -518,3 +518,26 @@ describe('the two sentences', () => {
     expect(runRefusal(['a'])).toContain('Where: a.');
   });
 });
+
+describe('a Test Framework holding "{{"', () => {
+  const { templatesInFramework, frameworkTemplateProblem, frameworkRunRefusal } = require('../../src/utils/datafileTemplates');
+
+  test('a card, a product or any other value is named; a clean framework passes', () => {
+    const fw = { reductionCards: [{ code: '{{access_token}}', issuer: 'X' }], products: [{ code: 'P', name: 'a {{b}}' }] };
+    expect([...templatesInFramework(fw)]).toEqual(['Test Framework: reductionCards[0].code', 'Test Framework: products[0].name']);
+    expect(frameworkTemplateProblem(fw)).toContain('reductionCards[0].code');
+    expect(frameworkRunRefusal(fw)).toMatch(/^This run was not started: the Test Framework/);
+    expect(frameworkTemplateProblem({ reductionCards: [{ code: 'BC50' }] })).toBeNull();
+    expect(frameworkRunRefusal(null)).toBeNull();
+  });
+
+  test('the trace state template is left to its own check; the rest of the trace context is not', () => {
+    expect(frameworkTemplateProblem({ traceContext: { tracestate: 'p={{uuid}}' } })).toBeNull();
+    expect(frameworkTemplateProblem({ traceContext: { tracestate: 'p={{uuid}}', other: '{{x}}' } })).toContain('traceContext.other');
+  });
+
+  test('a field name holding it counts too', () => {
+    expect(frameworkTemplateProblem({ fares: { '{{x}}': 1 } })).toContain('the name of the field');
+  });
+});
+
