@@ -3557,8 +3557,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `backup-status.test.js` runs `oscar-backup.sh` with stub `sqlite3`, `gpg`
   and `docker` in `PATH`.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
-  **bind-mounted, not baked into the image** — a `refresh-collection.yml`
-  workflow `git pull`s the VPS on every push to `main`.
+  **bind-mounted, not baked into the image**. **The VPS checkout follows the
+  newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):
+  `refresh-collection.sh` (its installed copy) moves it, run by
+  `promote-release.yml` at each release; `refresh-collection.yml` is manual
+  only. Deploy jobs name a GitHub environment (`production`: promote and
+  refresh, `release`: auto-tag, `simulator`): **a new job that needs a deploy
+  secret names its environment**, never a repository secret.
+  `promote-release.yml` takes `release-YYYY.NNN` tags on `main` only, and
+  event values reach scripts through `env:` only. Every `OSCAR_Deploy` image
+  is pinned by digest (Dependabot `docker-compose`); the metrics overlay puts
+  Grafana, Loki and Promtail on a `monitoring` network the `oscar` container
+  is not on.
 - **Kubernetes and OpenShift: one pod** (#1059, 1.11.443). `OSCAR_Deploy/kubernetes/`
   and *OSCAR - Kubernetes and OpenShift Deployment Guide*. On a cluster the
   collection is **in the image**: `build-images.sh` builds the server image

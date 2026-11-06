@@ -9,6 +9,7 @@
 #   1. npm (Oscar_Server) — server runtime + dev deps, weekly
 #      npm (Oscar_Server/bruno-cli) — the Bruno CLI the image and CI install, weekly
 #   2. docker (Oscar_Server/Dockerfile) — base image tag and digest, weekly
+#      docker-compose (OSCAR_Deploy) — the deployment's images, weekly
 #   3. github-actions (.github/workflows) — action versions, monthly
 #
 # All updates open as PRs against main. Combined with branch protection
@@ -129,6 +130,23 @@ updates:
       - dependency-name: node
         update-types:
           - version-update:semver-major
+
+  # ── docker-compose: the deployment's images (OSCAR_Deploy) ────────────────
+  # Every image there is pinned by digest (several hold the Docker socket);
+  # this proposes the next version and digest. Majors come one per PR.
+  - package-ecosystem: docker-compose
+    directory: /OSCAR_Deploy
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Paris"
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
 
   # ── github-actions: action versions in workflows ───────────────────────────
   # Every `uses:` is a commit SHA with the version in a trailing comment

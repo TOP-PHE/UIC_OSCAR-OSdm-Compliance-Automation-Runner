@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Releases and deployment: what reaches production, and who holds the
+  keys.** Workflows, deployment files and documentation only: no server,
+  collection or simulator code change, nothing to release.
+  - The VPS checkout (the bind-mounted collection and `compatibility.json`)
+    follows the newest `release-*` tag on `main`, never `main`'s head
+    (`refresh-collection.sh`); `refresh-collection.yml` no longer runs on a
+    merge, only by hand. Takes effect once the installed copy of the script
+    is replaced (`auto-deploy-setup.md`, step 4).
+  - `promote-release.yml` takes `release-YYYY.NNN` tags only, refuses a tag
+    that is not on `main`, checks out `refs/tags/<tag>`, and passes every
+    event value through the environment, never into a script.
+  - Deploy jobs name their GitHub environment: `production` (promote,
+    refresh), `release` (auto-tag), `simulator` (simulator update). Moving
+    the secrets into those environments, with a reviewer on `production`,
+    and protecting the release tags are settings: `auto-deploy-setup.md`,
+    step 5. Until then the workflows run as before.
+  - Every image of `OSCAR_Deploy` is pinned by digest; `watchtower` moves
+    from `:latest` to 1.23.2. Dependabot proposes their updates
+    (`docker-compose` ecosystem).
+  - Metrics overlay: Grafana, Loki and Promtail are on a `monitoring`
+    network the `oscar` container is not on; Prometheus and Alertmanager on
+    both. Applied by the next `docker compose up -d`.
+
 - **Deployment hardening, OSCAR and simulator hosts.** Deployment files and
   documentation only: no server, collection or simulator code change, nothing
   to release; each item takes effect when it is applied on the host.

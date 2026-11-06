@@ -10,11 +10,12 @@ day-to-day updates — pushing a Git tag or merging a PR is enough.
 | ------------------------------------------- | ------------------------------------------------------------------- |
 | Push to `main` touching `Oscar_Server/**`   | CI builds image and pushes to GHCR as `:edge` and `:sha-XXXXX`      |
 | Push of `server-vX.Y.Z` Git tag             | CI tags the image with `:server-vX.Y.Z` (immutable per-server-version) |
-| Push of `release-YYYY.MM` Git tag           | CI rebuilds at that ref and pushes as `:stable` and `:release-YYYY.MM` — Watchtower on the VPS picks it up within 5 min and rolls the production container |
-| Push to `main` touching `Bruno_Collection/**` | CI SSHes into the VPS and runs `git pull` — collection bind-mount means new `.bru` files are visible immediately, no rebuild |
+| Push of `release-YYYY.NNN` Git tag          | Once a reviewer approves the `production` environment: CI checks the tag is on `main`, rebuilds at that ref and pushes as `:stable` and `:release-YYYY.NNN`, then moves the VPS checkout (collection, `compatibility.json`) to that tag. Watchtower picks the image up within 5 min |
 
-Production therefore only changes when **you** push a release tag. Day-to-day
-collection edits flow through automatically.
+Production therefore only changes with a release tag, and only once the
+`production` environment is approved. A merge to `main`, collection changes
+included, deploys nothing by itself: the VPS checkout follows the newest
+release tag on `main`, never `main`'s head.
 
 ---
 
@@ -73,7 +74,7 @@ Append the public key to `ubuntu`'s `authorized_keys`, restricted via
 `command=` so a leaked private key can only run the refresh script.
 
 The key runs a **copy** of the script installed outside the checkout, never
-the checkout's own file. The script `git pull`s the checkout it lives in, so
+the checkout's own file. The script moves the checkout it lives in (to the newest release tag on `main`), so
 with the checkout's file as the command, any change to it merged into `main`
 would be run by the next deploy as `ubuntu`, who has `sudo`. With a copy, a
 merge cannot change what the key runs; the script logs a `NOTE` when the
@@ -105,16 +106,43 @@ rest of the line). Check it with
 Run workflow): it must end green. The other server settings that go with it
 are in `OSCAR - Server Hardening.md`.
 
-### 5. Add the secrets to GitHub
+### 5. Add the secrets to GitHub, in environments
 
-Go to: repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
+Deploy secrets live in **environments**, not in the repository's secrets: a
+repository secret can be read by a workflow on any branch, an environment
+secret only by the jobs its rules admit.
 
-| Name             | Value                                                            |
-| ---------------- | ---------------------------------------------------------------- |
-| `SSH_DEPLOY_KEY` | Full contents of `oscar-deploy-key` (the private key file)       |
-| `SSH_KNOWN_HOSTS`| Output of `ssh-keyscan -t ed25519 oscar.uic.org` from any machine |
+**5a. Create three environments** (repo → **Settings** → **Environments** →
+**New environment**):
 
-After adding both, **delete `oscar-deploy-key` from your laptop** — there is no other copy needed.
+| Environment  | Deployment branches and tags                     | Required reviewers | Used by |
+| ------------ | ------------------------------------------------ | ------------------ | ------- |
+| `production` | Selected: tag rule `release-*`, branch `main`    | Yes: the maintainers who may ship; tick *Prevent self-review* if there are two or more | `promote-release.yml`, `refresh-collection.yml` |
+| `release`    | Selected: branch `main`                          | No (it runs on every merge that bumps a version) | `auto-tag-on-release.yml` |
+| `simulator`  | Selected: branch `main`                          | Optional           | `simulator-deploy.yml` |
+
+**5b. Put each secret in its environment** (the environment's page →
+**Environment secrets** → **Add secret**):
+
+| Environment  | Name                            | Value |
+| ------------ | ------------------------------- | ----- |
+| `production` | `SSH_DEPLOY_KEY`                | Full contents of `oscar-deploy-key` (the private key file) |
+| `production` | `SSH_KNOWN_HOSTS`               | Output of `ssh-keyscan -t ed25519 oscar.uic.org` from any machine |
+| `release`    | `OSCAR_RELEASE_APP_ID`, `OSCAR_RELEASE_APP_PRIVATE_KEY` | The release App's id and private key |
+| `simulator`  | `SIMULATOR_SSH_KEY`, `SIMULATOR_KNOWN_HOSTS`, `SIMULATOR_SSH_TARGET`, `SIMULATOR_URL` | As in *OSCAR - OSDM Simulator* |
+
+Then **delete the repository-level copies** of these secrets (**Secrets and
+variables** → **Actions**): while one remains, every workflow can still read
+it. `SONAR_TOKEN`, `GITLEAKS_LICENSE` and `TEST_ENCRYPTION_KEY` stay
+repository secrets (CI only, no access to a server).
+
+**5c. Protect the release tags** (repo → **Settings** → **Rules** →
+**Rulesets** → **New tag ruleset**): target `release-*` (and `server-v*`),
+rules *Restrict creations*, *Restrict updates*, *Restrict deletions*, bypass
+list: the release App only. A release tag is then pushed by the release
+workflow alone, and never moved.
+
+After adding the deploy key, **delete `oscar-deploy-key` from your laptop** — there is no other copy needed.
 
 ### 6. Switch the VPS to image-based deploy
 
@@ -158,11 +186,11 @@ git push origin server-v1.3.0 release-2026.05
 
 ### Collection change you want in production
 
-```bash
-git commit -am "fix: scenario OTST_BKG_REFUND_PARTIAL — clarify currency assertion"
-git push origin main
-# → refresh-collection.yml runs, SSHes into VPS, git-pulls. Live in seconds.
-```
+A collection change ships like any other: with a release (a
+`compatibility.json` entry), whose tag the release workflow pushes, then
+`promote-release.yml` once the `production` environment is approved. It moves
+the VPS checkout to the release tag. *Refresh · Bruno collection on
+production VPS* (Actions → Run workflow) does that last step again by hand.
 
 If the change should also be tagged as a new collection version:
 
@@ -176,7 +204,7 @@ git push origin main collection-OTST_V2.0.2
 ### When `refresh-collection.sh` fails with "working tree dirty"
 
 The deploy workflows (`refresh-collection.yml` and `promote-release.yml`) both
-SSH the VPS and run `refresh-collection.sh`, which refuses to `git pull` if
+SSH the VPS and run `refresh-collection.sh`, which refuses to move the checkout if
 `/opt/OSCAR/` has any uncommitted edits OR untracked files. Two common
 sources during incident response:
 

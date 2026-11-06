@@ -90,7 +90,10 @@ services:
   # for the alert side, this gives self-healing + paging without a heavy
   # external monitoring stack.
   autoheal:
-    image: willfarrell/autoheal:1.2.0
+    # Pinned by digest, like every image that is given the Docker socket:
+    # a tag can be moved to other content, a digest cannot. Dependabot
+    # (docker-compose ecosystem) proposes the next one.
+    image: willfarrell/autoheal:1.2.0@sha256:31f580ef0279eaced5b38d631b08c474d70d8403c1c2fdd6ddcf2e879d5f3f7c
     container_name: oscar-autoheal
     restart: always
     environment:
@@ -115,7 +118,9 @@ services:
     # Engine 25+ rejects that as below the minimum (1.40), causing the
     # container to spin in an error loop. nickfedor/watchtower is the
     # maintained drop-in replacement using the same env-var contract.
-    image: nickfedor/watchtower:latest
+    # A version and its digest, never :latest: this container holds the
+    # Docker socket, so whatever the tag points to runs as root on the host.
+    image: nickfedor/watchtower:1.23.2@sha256:62fb91130ddb493f869cad7e198fa260dd16c5da293ed092cbd5d8781566f7a6
     container_name: watchtower
     restart: unless-stopped
     environment:
@@ -134,12 +139,12 @@ services:
       - /home/ubuntu/.docker/config.json:/config.json:ro
 
 # ── Notes ─────────────────────────────────────────────────────────────────────
-# - Production rollout = push a release-YYYY.MM tag. The promote-release CI
-#   workflow rebuilds the image and pushes it as :stable. Watchtower picks
-#   it up within ~5 min.
-# - Collection updates do NOT need a release tag — the refresh-collection
-#   workflow SSHes in and `git pull`s, the bind-mount makes the new .bru
-#   files immediately visible to the running container.
+# - Production rollout = a release-YYYY.NNN tag. The promote-release CI
+#   workflow (GitHub environment "production") rebuilds the image, pushes it
+#   as :stable and moves the host checkout to that tag. Watchtower picks the
+#   image up within ~5 min.
+# - The collection is the host checkout at the latest release tag, never
+#   main's head (refresh-collection.sh): a merge alone deploys nothing.
 # - To roll back: on the VPS, edit the `image:` line above to a specific
 #   tag (e.g. ghcr.io/top-phe/oscar-server:server-v1.2.0) and `docker compose
 #   up -d`. To re-enable auto-update later, restore :stable.
