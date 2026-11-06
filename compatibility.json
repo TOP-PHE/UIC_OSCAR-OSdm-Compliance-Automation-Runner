@@ -7,11 +7,22 @@
       "release": "2026.517",
       "date": "2026-11-06",
       "server": "1.11.479",
-      "collection": "OTST_V2.0.253",
+      "collection": "OTST_V2.0.254",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Server 1.11.479: credentials saved before the company or provider had an endpoint are sent nowhere until the tester saves them again."
+      ]
+    },
+    {
+      "release": "2026.516",
+      "date": "2026-11-06",
+      "server": "1.11.478",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.478 / collection OTST_V2.0.254: an intrusion line is acted on only when it carries the run's own tag; a line a scenario prints changes nothing."
       ]
     },
     {
