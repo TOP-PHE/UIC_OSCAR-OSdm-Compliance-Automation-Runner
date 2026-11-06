@@ -225,14 +225,13 @@ router.patch('/:id',
     const updates = [];
     const values  = [];
 
-    if (email) {
-      const lowerEmail = email.toLowerCase();
-      const dup = get('SELECT id FROM users WHERE email = ? AND id != ?', [lowerEmail, userId]);
-      if (dup) {
-        return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Email already in use by another user.' });
-      }
-      updates.push('email = ?');
-      values.push(lowerEmail);
+    // An account's e-mail is its owner's (decision 3): a Test Manager who could
+    // change it could then send the reset link to an address of their own and
+    // take the account over. The same rule as the administrator's
+    // (companyAccountRefusal in admin.js); the e-mail sent back unchanged passes.
+    if (email && email.toLowerCase() !== target.email) {
+      return res.status(409).json({ status: 409, title: 'Conflict',
+        detail: 'An account\'s e-mail is its owner\'s: it cannot be changed here. Invite the new address instead.' });
     }
 
     if (role) {

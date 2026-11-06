@@ -15,6 +15,17 @@
       ]
     },
     {
+      "release": "2026.510",
+      "date": "2026-11-06",
+      "server": "1.11.472",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.472: a Test Manager no longer changes the e-mail of an account of the company, as the administrator already could not."
+      ]
+    },
+    {
       "release": "2026.509",
       "date": "2026-11-06",
       "server": "1.11.471",
