@@ -72,6 +72,7 @@ async function send(path, body) {
         data: JSON.stringify(body ?? {}),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });
+    if (require('./answerThreats.js').stopOnScriptAnswer(res, path)) return { status: 0, body: null };
     let data = res?.data ?? res?.body ?? null;
     if (typeof data === 'string') {
       try { data = JSON.parse(data); } catch { data = null; }

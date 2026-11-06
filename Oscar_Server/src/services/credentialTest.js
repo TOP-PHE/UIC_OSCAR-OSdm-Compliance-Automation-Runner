@@ -23,6 +23,7 @@
  */
 
 const { get, decrypt } = require('../db/db');
+const { tokenErrorText } = require('../utils/tokenErrors');
 const { credentialsFor } = require('../utils/testerCredentials');
 const { resolveAccessToken } = require('../worker/access-token');
 const { buildTesterHeaders, mergeDedicatedHeaders, traceSettingsFor, withTraceHeaders, stripTrailingSlashes } = require('../utils/osdm-client');
@@ -36,14 +37,6 @@ const MAX_ANSWER_BYTES = 64 * 1024;
 
 // Every secret of a credentials row, decrypted, so that none can be echoed
 // back in a message.
-function secretsOf(userRow) {
-  return ['access_token_enc', 'client_id_enc', 'client_secret_enc', 'oauth_extra_enc', 'requestor_enc', 'subscription_key_enc']
-    .map((column) => {
-      try { return userRow?.[column] ? decrypt(userRow[column]) : null; } catch { return null; }
-    })
-    .filter(Boolean);
-}
-
 // Seconds left of the token the resolver just cached, when the token
 // endpoint said how long it lives.
 function cachedLifetime(userId, companyId) {
@@ -62,7 +55,7 @@ async function tokenStep(userId, companyId) {
   try {
     token = await resolveAccessToken(userRow, { info: (m) => log.debug(m), error: (m) => log.warn(m) }, { forceRefresh: true });
   } catch (err) {
-    result.error = O.cleanTokenError(err?.message, secretsOf(userRow));
+    result.error = tokenErrorText(err, userRow);
     return { result, token: null, userRow };
   }
   result.ok = true;

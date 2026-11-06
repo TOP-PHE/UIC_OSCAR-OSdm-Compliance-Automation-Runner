@@ -54,6 +54,14 @@ function textOf(content) {
   return text.trim();
 }
 
+// A checklist's controls are not nested (one level in every template); a few
+// levels are allowed for a provider's edits. Each control's text is read from
+// its own block, so the work grows with the depth: bounding it keeps a
+// document's reading in proportion to its size.
+const MAX_DEPTH = 8;
+
+class ChecklistTooNested extends Error {}
+
 // Each content control as { props, content }: the text of its properties and
 // of its content. Found by one pass over the start and end tags, so a control
 // inside another is read on its own.
@@ -61,7 +69,11 @@ function controlsOf(xml) {
   const controls = [];
   const open = [];
   for (const m of xml.matchAll(/<w:sdt[\s>]|<\/w:sdt>/g)) {
-    if (m[0] !== '</w:sdt>') { open.push(m.index); continue; }
+    if (m[0] !== '</w:sdt>') {
+      if (open.length >= MAX_DEPTH) throw new ChecklistTooNested(`content controls nested more than ${MAX_DEPTH} deep`);
+      open.push(m.index);
+      continue;
+    }
     const start = open.pop();
     if (start === undefined) continue;
     const block = xml.slice(start, m.index);
@@ -113,7 +125,14 @@ function answersOfDocx(buffer) {
     throw err;
   }
   if (!xml) return { refusal: 'This is not a Word file: it has no word/document.xml.' };
-  const answers = keptAnswers(answersOfXml(xml.toString('utf8')));
+  let read;
+  try {
+    read = answersOfXml(xml.toString('utf8'));
+  } catch (err) {
+    if (err instanceof ChecklistTooNested) return { refusal: `This is not a checklist OSCAR can read (${err.message}).` };
+    throw err;
+  }
+  const answers = keptAnswers(read);
   if (Object.keys(answers).length === 0) {
     return { refusal: 'No answer found: this file is not an OSCAR set-up checklist (v2), or nothing is filled in.' };
   }

@@ -42,7 +42,7 @@ const { enforceTenant } = require('../middleware/tenant');
 const { endpointSuspension, resumeEndpoint } = require('../../utils/intrusion');
 const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange, familyEndpointClash } = require('../helpers/shared');
 const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
-const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
+const { templatesAddedBy, saveRefusal, frameworkTemplateProblem } = require('../../utils/datafileTemplates');
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
 const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
 const { withDatafileLock } = require('../../utils/datafileLock');
@@ -796,7 +796,8 @@ function importPartsRefusal(configuration, choices, companyId) {
     }
     // #936 / #937: the distribution modes and fare declarations, as the Test Framework route checks them.
     const modesProblem = distributionModesProblem(configuration.framework.distributionModes) || fareDeclarationsProblem(configuration.framework.fares)
-    || offerOptionDiscoveryProblem(configuration.framework) || traceContextProblem(configuration.framework.traceContext);
+    || offerOptionDiscoveryProblem(configuration.framework) || traceContextProblem(configuration.framework.traceContext)
+    || frameworkTemplateProblem(configuration.framework);
     if (modesProblem) return { status: 400, detail: `The configuration's Test Framework: ${modesProblem} Nothing was changed.` };
   }
   return null;

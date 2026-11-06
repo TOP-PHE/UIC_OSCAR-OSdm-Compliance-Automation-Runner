@@ -993,6 +993,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   endpoint, the company's cached tokens dropped, an audit line, an e-mail to
   the administrators. Simulator faults `attack.*` and their `SIM_FAULT_ATTACK_*`
   scenarios prove it end to end.
+  **A script-sent request's answer gets the same look** (1.11.475 /
+  OTST_V2.0.253, `stopOnScriptAnswer()`): a new `bru.sendRequest` to the
+  provider calls it on its answer and uses nothing when it answers a threat.
 - **Credentials go to the endpoint they were saved for** (1.11.462).
   `tester_credentials.credentials_endpoint` (migration 48) is the endpoint's
   origin at the save; `credentialsEndpointProblem()`
@@ -1479,6 +1482,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     whole value: keep `lookAtNext()` lazy. What still costs about a second is
     a save over a file that already *stores* several hundred thousand, which
     no save or upload can create any more.
+  - **The Test Framework is held to the same rule** (1.11.476): the run's
+    copy takes its values, so its three writers refuse `{{` anywhere but
+    `traceContext.tracestate` (`frameworkTemplateProblem()`), the runner
+    refuses a run whose framework holds one (`frameworkRunRefusal()`), and
+    `/data` answers 409 when the run's copy holds one.
   - **Left alone on purpose:** dedicated headers (templates are their
     documented use) and the two root keys only a Test Manager writes.
   - Two test files cover the routes because `datafileMutationLimiter` allows

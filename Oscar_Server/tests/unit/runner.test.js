@@ -598,6 +598,24 @@ describe('executeRun — W3C trace context', () => {
   });
 });
 
+// The run's copy takes values from the Test Framework: one holding "{{" refuses the run.
+describe('executeRun — a Test Framework holding "{{"', () => {
+  test('the run is refused before a token is asked for or Bruno started', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [require('node:crypto').randomUUID(), companyId, colEncrypt(JSON.stringify({ products: [{ code: '{{access_token}}' }] }))]);
+    const runId = seedRun(companyId, userId);
+    spawn.mockClear();
+    resolveAccessToken.mockClear();
+    const out = await executeRun({ runId, companyId, userId });
+    expect(out.exitCode).toBe(1);
+    expect(out.error).toContain('Test Framework holds text that contains "{{"');
+    expect(out.error).toContain('products[0].code');
+    expect(resolveAccessToken).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
 // ── Detected auth/format errors surfaced onto the run row ─────────────────────
 describe('executeRun — auth/token-format error detection from CLI output', () => {
   test('sets error_message = TOKEN_AUTH_ERROR when a 401 appears in stdout', async () => {

@@ -281,6 +281,34 @@ function checkAnswerThreats(res, bruTest, expectFn, req) {
   return threat.kind;
 }
 
+/**
+ * The same look at an answer to a request a step's script sends itself
+ * (bru.sendRequest: { status, headers, data }), which the collection's
+ * after-response never sees: values read from it go into the next requests
+ * too. On a threat: one failed check, one "[INTRUSION]" line, the run stopped,
+ * and the threat returned, so the caller uses nothing of the answer. Null
+ * otherwise. Never throws.
+ */
+function stopOnScriptAnswer(r, label) {
+  if (!r) return null;
+  let threat;
+  try {
+    threat = threatOf({ status: r.status ?? r.statusCode, headers: r.headers, body: r.data ?? r.body });
+  } catch { threat = null; }
+  if (!threat) return null;
+  const check = CHECKS[threat.kind];
+  try {
+    require('./testCapture.js').bruTest(check.name, () => {
+      throw new Error(`${check.message(threat.reason)} The run stops here.`);
+    });
+  } catch { /* the check is recorded or not; the run stops either way */ }
+  const step = `script request ${String(label || '').split('?')[0]}`.replace(/[\r\n[\]]/g, ' ').slice(0, 120);
+  log(intrusionLine(threat.kind, step, threat.said));
+  try { bru.runner.stopExecution(); } catch { /* not in a runner context */ }
+  return threat;
+}
+
 module.exports = {
   holdsTemplate, holdsScript, scriptReason, redirectReason, isInternalHost, threatOf, intrusionLine, checkAnswerThreats,
+  stopOnScriptAnswer,
 };
