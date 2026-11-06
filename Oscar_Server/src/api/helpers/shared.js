@@ -43,7 +43,7 @@ function ensurePlatformCompany() {
   const companyId = uuidv4();
   run(
     `INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`,
-    [companyId, 'OSCAR Platform', PLATFORM_SLUG]
+    [companyId, 'UIC', PLATFORM_SLUG]
   );
 
   return get('SELECT id, name, slug FROM companies WHERE id = ?', [companyId]);

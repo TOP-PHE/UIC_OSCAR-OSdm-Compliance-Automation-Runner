@@ -924,7 +924,7 @@ After first bootstrap, user administration is performed via the web admin panel 
 | Column | Administrator row | Certifier row | Tester row |
 |---|---|---|---|
 | Role dropdown | Editable | Editable | Editable |
-| Company | Read-only label ("OSCAR Platform") | Editable dropdown | Editable dropdown |
+| Company | Read-only label ("UIC") | Editable dropdown | Editable dropdown |
 
 Rules:
 - When the role dropdown is changed to `Tester` or `Certifier`, the company cell instantly switches to an editable dropdown.

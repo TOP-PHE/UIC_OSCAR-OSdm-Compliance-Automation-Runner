@@ -1044,6 +1044,11 @@ const MIGRATIONS = [
       db.prepare(`UPDATE users SET company_id = ?, sessions_valid_after = CAST(strftime('%s','now') AS INTEGER)
                    WHERE role = 'certification_user' AND company_id != ?`).run(platform.id, platform.id);
   }},
+  { version: 51, name: 'platform-company-named-uic', up: () => {
+      // The company of administrators and certifiers is the UIC's (decision
+      // 3): it is named so. A name an administrator already changed is kept.
+      db.prepare(`UPDATE companies SET name = 'UIC' WHERE slug = 'platform-root' AND name = 'OSCAR Platform'`).run();
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

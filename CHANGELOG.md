@@ -113,6 +113,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.467] — 2026-11-06
+
+Release 2026.505. The company of administrators and certifiers is named UIC.
+
+### Changed
+- **The platform company is named UIC** (maintainer decision, 2026-11-06): certifiers and administrators belong to the UIC. A new platform company is made under that name (`ensurePlatformCompany()`), and migration 51 renames an existing one still named "OSCAR Platform"; a name an administrator already changed is kept. Its slug (`platform-root`) does not change.
+
+### Checked
+- `invitations.test.js`: the platform company is named UIC. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.466] — 2026-11-06
 
 Release 2026.504. Nobody chooses another person's password, and a company is joined through its own Test Manager.
