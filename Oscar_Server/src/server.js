@@ -119,6 +119,13 @@ try {
   log.error({ err: e.message }, 'Startup run reconciliation threw (non-fatal)');
 }
 
+// Data files named after a slug changed before 1.11.471 take the current one.
+try {
+  require('./utils/datafileRename').alignDatafileNames();
+} catch (e) {
+  log.error({ err: e.message }, 'Startup data file renaming threw (non-fatal)');
+}
+
 // Periodically refresh queue depth + active-runs gauges from the queue's
 // own state. Every 5s — well below Prometheus's typical 15s scrape interval,
 // so a scrape never sees a totally stale value.

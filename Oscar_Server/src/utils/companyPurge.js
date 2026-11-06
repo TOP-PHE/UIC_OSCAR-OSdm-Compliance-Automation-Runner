@@ -19,7 +19,8 @@
 
 const fs = require('node:fs');
 const { run, transaction } = require('../db/db');
-const { liveDatafilePath, previousDatafilePath } = require('./datafileWrite');
+const path = require('node:path');
+const { liveDatafilePath, previousDatafilePath, DATAFILES_DIR } = require('./datafileWrite');
 
 // Rows that hang from the company's runs and findings: deleted first.
 const BY_PARENT = [
@@ -50,8 +51,12 @@ function purgeCompany(company) {
     run('DELETE FROM pending_registrations WHERE company_slug = ?', [company.slug]);
     run('DELETE FROM companies WHERE id = ?', [id]);
   });
-  for (const pathOf of [liveDatafilePath, previousDatafilePath]) {
-    try { fs.rmSync(pathOf(company.slug), { force: true }); } catch { /* the rows are gone; a file left is removed by hand */ }
+  // The files named after the slug, and the live file where the row says it is
+  // (a slug changed before 1.11.471 left it under the old name).
+  const stored = company.datafile_path && path.dirname(path.resolve(company.datafile_path)) === DATAFILES_DIR
+    ? [path.resolve(company.datafile_path)] : [];
+  for (const file of [liveDatafilePath(company.slug), previousDatafilePath(company.slug), ...stored]) {
+    try { fs.rmSync(file, { force: true }); } catch { /* the rows are gone; a file left is removed by hand */ }
   }
 }
 

@@ -113,6 +113,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.471] — 2026-11-06
+
+Release 2026.509. A company's data files follow its slug.
+
+### Fixed
+- **Changing a company's slug left its data files under the old name.** The files are named after the slug (`{slug}-datafile.json`, `{slug}-datafile.previous.json`): the live file was still read (the row keeps its path), but *Restore previous file* found nothing, and deleting the company left the old files on the server. A new slug now renames both files with it, under the company's data file lock, and the row's path with them; the row and the files change together or not at all (`utils/datafileRename.js`). A slug whose file name is already taken by a file left on the server is refused (409), nothing moved. At start, files left under an old slug name are renamed (`alignDatafileNames()`), and deleting a company also removes the live file where its row says it is.
+
+### Checked
+- `company-slug-rename.test.js`: a new slug renames the live and previous files and the stored path; a taken file name is refused with nothing moved; a name change alone touches no file; files under an old slug are renamed at start; a deletion removes a live file still under an old name. Two of the five fail without the rename. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.470] — 2026-11-06
 
 Release 2026.508. Two companies never share a name.
