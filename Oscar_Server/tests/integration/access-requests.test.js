@@ -142,11 +142,20 @@ describe('the double check', () => {
     expect((await request(app).post(`/v1/company/users/access-requests/${id}/confirm`).set('Authorization', asTm()).send({ role: 'administrator' })).status).toBe(400);
   });
 
-  test('an unconfirmed e-mail is not shown to the administrator', async () => {
+  test('an unconfirmed e-mail is shown to the administrator, who can only refuse it', async () => {
     const email = `unverified-${uuidv4().slice(0, 8)}@access.test`;
     await request(app).post('/v1/auth/register/request').send({ email, name: 'U', company: 'X' });
     const listed = await request(app).get('/v1/admin/access-requests').set('Authorization', asAdmin());
-    expect(listed.body.requests.find(r => r.email === email)).toBeUndefined();
+    const shown = listed.body.requests.find(r => r.email === email);
+    expect(shown).toMatchObject({ state: 'unverified', company_typed: 'X' });
+    expect(Date.parse(shown.link_expires_at)).toBeGreaterThan(Date.now());
+    expect(JSON.stringify(shown)).not.toMatch(/token/);
+    // Not placed before its owner confirms it, and not shown to a Test Manager.
+    const placed = await request(app).post(`/v1/admin/access-requests/${shown.id}/assign`).set('Authorization', asAdmin()).send({ company_id: ACME, first_test_manager: true });
+    expect(placed.status).toBe(404);
+    expect((await request(app).get('/v1/company/users/access-requests').set('Authorization', asTm())).body.requests.map(r => r.id)).not.toContain(shown.id);
+    expect((await request(app).post(`/v1/admin/access-requests/${shown.id}/refuse`).set('Authorization', asAdmin())).status).toBe(200);
+    expect(get('SELECT id FROM access_request WHERE id = ?', [shown.id])).toBeUndefined();
   });
 
   test('a tester cannot reach either side', async () => {

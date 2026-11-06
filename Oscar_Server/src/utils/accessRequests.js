@@ -92,14 +92,17 @@ function viewOf(row) {
     company_id: row.company_id || null,
     company_name: row.company_name || null,
     assigned_at: row.assigned_at || null,
+    // An address not confirmed yet: shown to the administrator, who can only
+    // refuse it, with the time its confirmation link runs out.
+    link_expires_at: row.state === 'unverified' ? row.token_expires_at : null,
   };
 }
 
 function waitingRequests() {
   return all(`SELECT r.*, c.name AS company_name FROM access_request r
                 LEFT JOIN companies c ON c.id = r.company_id
-               WHERE r.state IN ('verified', 'assigned')
-               ORDER BY r.verified_at`).map(viewOf);
+               WHERE r.state IN ('verified', 'assigned', 'unverified')
+               ORDER BY r.state = 'unverified', r.verified_at, r.created_at`).map(viewOf);
 }
 
 function requestsOfCompany(companyId) {
@@ -236,7 +239,7 @@ async function confirmRequest(id, companyId, role) {
 function refuseRequest(id, companyId = null) {
   const request = companyId
     ? get(`SELECT * FROM access_request WHERE id = ? AND state = 'assigned' AND company_id = ?`, [id, companyId])
-    : get(`SELECT * FROM access_request WHERE id = ? AND state IN ('verified', 'assigned')`, [id]);
+    : get(`SELECT * FROM access_request WHERE id = ? AND state IN ('verified', 'assigned', 'unverified')`, [id]);
   if (!request) return { status: 404, detail: 'Request not found.' };
   run('DELETE FROM access_request WHERE id = ?', [id]);
   return { request };

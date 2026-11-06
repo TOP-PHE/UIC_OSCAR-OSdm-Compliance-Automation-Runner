@@ -63,18 +63,19 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
     <div style="padding:32px">
       <h2 style="color:#37474f;font-size:20px;margin:0 0 12px">Confirm your registration</h2>
       <p style="color:#546e7a;font-size:14px;line-height:1.6;margin:0 0 8px">
-        You requested a Tester account for <strong>${escHtml(companyName)}</strong>.
+        You asked for access to OSCAR for <strong>${escHtml(companyName)}</strong>.
       </p>
       <p style="color:#546e7a;font-size:14px;line-height:1.6;margin:0 0 28px">
-        Click the button below to confirm your email address and set your password.
-        This link expires in <strong>24 hours</strong>.
+        Click the button below, then <strong>Confirm my email address</strong> on the page that opens.
+        This link expires in <strong>24 hours</strong>. An OSCAR administrator, then a Test Manager of your
+        company, will then check your request; you will choose your password after that.
       </p>
       <a href="${verificationUrl}"
          style="display:inline-block;background:#0090D4;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:15px;font-weight:700">
-        Confirm &amp; Set Password
+        Confirm my email address
       </a>
       <p style="color:#90a4ae;font-size:12px;margin:28px 0 0;line-height:1.5">
-        If you did not request this account, ignore this email — no account will be created.<br>
+        If you did not ask for access, ignore this email — nothing will be created.<br>
         If the button does not work, copy this link into your browser:<br>
         <a href="${verificationUrl}" style="color:#0090D4;word-break:break-all">${verificationUrl}</a>
       </p>
@@ -86,7 +87,7 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
 </body>
 </html>`;
 
-  const text = `OSCAR — Confirm your registration\n\nYou requested a Tester account for ${companyName}.\n\nConfirm your email and set your password by visiting:\n${verificationUrl}\n\nThis link expires in 24 hours.\n\nIf you did not request this account, ignore this email.`;
+  const text = `OSCAR — Confirm your e-mail address\n\nYou asked for access to OSCAR for ${companyName}.\n\nOpen this link, then click "Confirm my email address":\n${verificationUrl}\n\nThis link expires in 24 hours. An OSCAR administrator, then a Test Manager of your company, will then check your request; you will choose your password after that.\n\nIf you did not ask for access, ignore this email.`;
 
   const transporter = createTransport();
 
@@ -99,7 +100,7 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
   }, 'Email send attempt');
 
   try {
-    const info = await transporter.sendMail({ from, to, subject: 'OSCAR — Confirm your account registration', text, html });
+    const info = await transporter.sendMail({ from, to, subject: 'OSCAR — Confirm your e-mail address', text, html });
     log.info({
       messageId: info.messageId,
       response:  info.response,
