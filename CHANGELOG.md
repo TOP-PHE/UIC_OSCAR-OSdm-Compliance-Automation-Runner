@@ -113,6 +113,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.475] / [collection-OTST_V2.0.253] — 2026-11-06
+
+Release 2026.513. Answers to the requests a step's script sends get the same look as the others.
+
+### Changed
+- **Collection: `stopOnScriptAnswer()`** (`library-bruno/answerThreats.js`) gives the answers of the requests a step's script sends itself (`bru.sendRequest`: `osdmPost.js`, the availability requests and `POST /trips-collection` of `offers.js`, the after-sale refusals, the Idempotency-Key replays) the look the collection's after-response gives the others (1.11.460): template text, markup meant to run in a browser, a redirect to a local or private address. On one of them: one failed check, one `[INTRUSION]` line (step `script request <path>`), the run stopped, and the caller uses nothing of the answer. A new script-sent request to the provider goes through it.
+- **Collection: the data file's copy `data_base_tmp` is deleted** once the scenario is read; it was kept for the whole run.
+
+### Checked
+- `bruno-answer-threats.test.js`: a template in a script-sent answer stops the run, logs the line and hands nothing back; a clean answer goes through; markup and a private redirect are seen in the `sendRequest` shape. The first fails without the look. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.474] — 2026-11-06
 
 Release 2026.512. A token request's failure names the answer's fields, never their values.

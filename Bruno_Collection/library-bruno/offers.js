@@ -2385,6 +2385,7 @@ async function sendOsdmRequest(method, path, payload) {
         ...(post ? { data: JSON.stringify(payload) } : {}),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });
+    if (require("./answerThreats.js").stopOnScriptAnswer(res, path)) return { status: 0, body: null };
     let body = res?.data ?? res?.body ?? null;
     if (body instanceof Uint8Array) body = new TextDecoder().decode(body);
     if (typeof body === "string") {
@@ -2707,6 +2708,7 @@ async function sendTripsCollection(search) {
         data: JSON.stringify(search),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
     });
+    if (require("./answerThreats.js").stopOnScriptAnswer(res, "/trips-collection")) return { status: 0, body: null };
     let body = res?.data ?? res?.body ?? null;
     let raw = null;
     if (body instanceof Uint8Array) body = new TextDecoder().decode(body);
