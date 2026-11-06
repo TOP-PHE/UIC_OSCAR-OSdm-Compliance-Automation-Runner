@@ -9,7 +9,7 @@
 # CI only (#1059, .github/workflows/ci-kubernetes.yml). Drives an OSCAR
 # deployed on a cluster through its public API, as the first users of a new
 # installation would, then runs one scenario against the OSDM simulator and
-# expects it to pass. Needs curl and jq.
+# expects it to pass. Needs curl, jq and kubectl.
 #
 #   OSCAR_URL        where this script reaches OSCAR (a port-forward)
 #   SIM_BASE         where OSCAR reaches the simulator, without the provider
@@ -17,7 +17,10 @@
 #   BOOTSTRAP_TOKEN  PLATFORM_BOOTSTRAP_TOKEN of the Secret oscar-secrets
 #   METRICS_TOKEN    METRICS_TOKEN of the same Secret
 #   SCENARIO         optional, SIM_SALE_SEARCH_1ADT_38 by default
+#   OSCAR_NAMESPACE  optional, the namespace of deploy/oscar (oscar by default);
+#                    kubectl reads the Test Manager's activation link there
 set -euo pipefail
+OSCAR_NAMESPACE=${OSCAR_NAMESPACE:-oscar}
 
 : "${OSCAR_URL:?}" "${SIM_BASE:?}" "${SIM_SECRET:?}" "${BOOTSTRAP_TOKEN:?}" "${METRICS_TOKEN:?}"
 root=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -95,10 +98,21 @@ expect "create company" 201 "$code"
 company_id=$(jq -r .company.id "$work/out")
 tm_email=tm@ci-smoke.example.org
 tm_password=$(password)
-body=$(json --arg e "$tm_email" --arg p "$tm_password" --arg c "$company_id" \
-  '{email: $e, password: $p, role: "test_manager", company_id: $c}')
+# Since 1.11.466 nobody sets another person's password: the administrator
+# invites the company's first Test Manager, who chooses a password from the
+# link e-mailed to them. CI has no mail, so the link's token is read from the
+# pod's database, as the person would read it from their inbox.
+body=$(json --arg e "$tm_email" --arg c "$company_id" '{email: $e, role: "test_manager", company_id: $c}')
 code=$(call POST /v1/admin/users "$admin_token" "$body")
-expect "create Test Manager" 201 "$code"
+expect "invite the first Test Manager" 201 "$code"
+token=$(kubectl -n "$OSCAR_NAMESPACE" exec deploy/oscar -- node -e '
+  const { DatabaseSync } = require("node:sqlite");
+  const db = new DatabaseSync(process.env.OSCAR_DB_PATH || "/app/data/oscar.db");
+  const row = db.prepare("SELECT t.token FROM password_reset_tokens t JOIN users u ON u.id = t.user_id WHERE u.email = ?").get(process.argv[1]);
+  process.stdout.write(row ? row.token : "");' "$tm_email" 2>/dev/null)
+[ -n "$token" ] || fail "no activation link was made for the Test Manager"
+code=$(call POST /v1/auth/password-reset/confirm "" "$(json --arg t "$token" --arg p "$tm_password" '{token: $t, password: $p}')")
+expect "choose the Test Manager's password" 200 "$code"
 tm_token=$(login "$tm_email" "$tm_password")
 
 step "endpoint, credentials, data file (simulator gamma)"
