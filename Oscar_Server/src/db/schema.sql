@@ -402,6 +402,7 @@ CREATE INDEX IF NOT EXISTS idx_run_assertions_company   ON run_assertions(compan
 CREATE INDEX IF NOT EXISTS idx_run_assertions_key       ON run_assertions(company_id, assertion_key);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_category  ON run_assertions(company_id, category);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_domain    ON run_assertions(company_id, domain);
+CREATE INDEX IF NOT EXISTS idx_run_assertions_suite     ON run_assertions(suite_id);
 
 -- ── Report Templates (certifier saved report configurations) ────────────────
 CREATE TABLE IF NOT EXISTS report_templates (

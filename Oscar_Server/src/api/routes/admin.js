@@ -35,6 +35,7 @@ const { sendTestEmail, sendAiAccessNotice, isSmtpConfigured } = require('../../u
 const AiAccess = require('../../utils/aiAccess');
 const { readBackupStatus } = require('../../utils/backupStatus');
 const { purgeCompany } = require('../../utils/companyPurge');
+const { deleteUserAccount } = require('../../utils/userDeletion');
 const AccessRequests = require('../../utils/accessRequests');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
@@ -424,24 +425,10 @@ router.delete('/users/:id', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'You cannot delete your own account.' });
   }
 
-  const user = get('SELECT id, email FROM users WHERE id = ?', [userId]);
+  const user = get('SELECT id, email, company_id FROM users WHERE id = ?', [userId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
 
-  transaction(() => {
-    // Nullify auth_events references (user_id is nullable — keeps the login history rows)
-    run('UPDATE auth_events SET user_id = NULL WHERE user_id = ?', [userId]);
-
-    // Delete report_comparisons that involve any of this user's runs (run_id FK has no cascade)
-    run(`DELETE FROM report_comparisons
-         WHERE run_a_id IN (SELECT id FROM runs WHERE user_id = ?)
-            OR run_b_id IN (SELECT id FROM runs WHERE user_id = ?)`, [userId, userId]);
-
-    // Delete runs (cascades automatically to run_events and run_artifacts)
-    run('DELETE FROM runs WHERE user_id = ?', [userId]);
-
-    // Now safe to delete the user
-    run('DELETE FROM users WHERE id = ?', [userId]);
-  });
+  deleteUserAccount(userId);
 
   auditLog(req.user.id, user.company_id, req.user.email, `user_deleted:${user.email}`);
   return res.json({ deleted: true, id: userId, email: user.email });

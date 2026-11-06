@@ -113,6 +113,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.468] — 2026-11-06
+
+Release 2026.506. Deleting an account no longer holds the server.
+
+### Fixed
+- **Deleting an account held the server for minutes, then failed.** The account's runs are deleted with it, and their checks by cascade; `run_assertions` had no index on `suite_id`, so each suite deleted read the whole table, and the server answered nothing else meanwhile (504 at the proxy). Migration 52 adds the index (`idx_run_assertions_suite`), which also serves the deletion of a company or a run. The deletion then failed on the account's report templates (no cascade): they go with it now. The administrator's and the Test Manager's Delete share one function (`utils/userDeletion.js`).
+
+### Checked
+- `user-deletion.test.js`: an account with runs (suite, request, check, log), a comparison, a report template and a login is deleted by an administrator and by a Test Manager; every table the deletion of runs cascades into is read through an index. All three fail without the fix. Measured on a local base: 300 runs, 180,000 checks, 3.5 s before, 0.9 s after; the time grows with the square of the base without the index. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.467] — 2026-11-06
 
 Release 2026.505. The company of administrators and certifiers is named UIC.

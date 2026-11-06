@@ -1008,6 +1008,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   findings, provider links, pending registrations and data files; the
   audit line is written under no company (a line naming a deleted company
   is not kept).
+  **Deleting an account is `deleteUserAccount()`** (`utils/userDeletion.js`,
+  1.11.468), for the administrator and the Test Manager: its runs go by
+  cascade, so every table that cascade reaches needs an index on its key
+  (`run_assertions.suite_id` had none: the deletion held the server for
+  minutes, a 504). `user-deletion.test.js` fails on a new unindexed one.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;
