@@ -175,6 +175,18 @@ describe('test-framework — PUT create/update + GET', () => {
     expect((await put({ offerOptionDiscovery: { maxRequests: 40, invalidValues: 'skip' }, corporateCodes: [{ code: 'ACME', issuer: 'urn:x:acme' }], promotionCodes: [] })).status).toBe(200);
   });
 
+  // A run's copy takes values from the framework: "{{" is never stored there.
+  test('400 for a framework holding "{{" anywhere but the trace state', async () => {
+    const put = (extra) => request(app).put('/v1/company/test-framework')
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ config: { profile: 'OTST', salesFlows: ['sale'], _salesFlowsMigratedAt: '2026-01-01T00:00:00.000Z', ...extra } });
+    const refused = await put({ reductionCards: [{ code: '{{access_token}}', issuer: '1080' }] });
+    expect(refused.status).toBe(400);
+    expect(refused.body.detail).toContain('reductionCards[0].code');
+    expect((await put({ products: [{ code: 'P1', name: '{{x}}' }] })).status).toBe(400);
+    expect((await put({ reductionCards: [{ code: 'BC50', issuer: '1080' }] })).status).toBe(200);
+  });
+
   // #1070: the W3C trace context; a tracestate W3C would refuse is never stored.
   test('400 for a trace context W3C would refuse; a good one is stored', async () => {
     const put = (traceContext) => request(app).put('/v1/company/test-framework')

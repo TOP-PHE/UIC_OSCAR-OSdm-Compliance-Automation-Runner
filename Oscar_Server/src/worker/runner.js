@@ -33,7 +33,7 @@ const { credentialsFor } = require('../utils/testerCredentials');
 const { canUseCompany } = require('../api/helpers/provider-access');
 const { normalizeRole } = require('../api/middleware/auth');
 const { safeJoinUuid } = require('../utils/paths');
-const { templatesForRunner, runRefusal } = require('../utils/datafileTemplates');
+const { templatesForRunner, runRefusal, frameworkRunRefusal } = require('../utils/datafileTemplates');
 const runSecrets = require('../utils/runSecrets');
 const { usableUrlRefusal } = require('../utils/urlPolicy');
 const { versionRefusal } = require('../utils/osdmVersion');
@@ -610,6 +610,18 @@ async function refusedDatafileText(datafilePath, runner) {
   }
 }
 
+// The run's copy of the data file takes values from the Test Framework, so a
+// framework holding "{{" refuses the run like a data file does.
+function refusedFrameworkText(companyId) {
+  try {
+    const fwRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
+    if (!fwRow?.config) return null;
+    return frameworkRunRefusal(JSON.parse(colDecrypt(fwRow.config)));
+  } catch {
+    return 'The Test Framework could not be read, so it could not be checked and the run was not started. Try again; if it happens again, ask your Test Manager to check the Test Framework.';
+  }
+}
+
 // #785: the OSDM version the scenario runs with (its own, else the Test
 // Framework's) goes in every request's Content-Type; a run with one that is
 // not a version is refused before anything is sent. A data file that cannot
@@ -831,6 +843,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     || refusedScenarioCode(scenarioOverride)
     || await refusedApiBase(companyRow.api_base)
     || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email })
+    || refusedFrameworkText(companyId)
     || await refusedOsdmVersion(companyRow.datafile_path, scenarioOverride, companyId);
   if (refusal) {
     dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);
