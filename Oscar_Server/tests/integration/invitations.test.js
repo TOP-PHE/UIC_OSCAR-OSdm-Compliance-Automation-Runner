@@ -77,6 +77,10 @@ describe('invitations: the person chooses their own password', () => {
     expect((await request(app).post('/v1/auth/login').send({ email, password: PASSWORD })).status).toBe(200);
   });
 
+  test('the platform company is named UIC', () => {
+    expect(get('SELECT name FROM companies WHERE id = ?', [PLAT]).name).toBe('UIC');
+  });
+
   test('certifiers and administrators are invited into the UIC (platform) company', async () => {
     const email = mail('certifier');
     const res = await request(app).post('/v1/admin/users').set('Authorization', bearer(ADMIN)).send({ email, role: 'certification_user', company_id: ACME });
