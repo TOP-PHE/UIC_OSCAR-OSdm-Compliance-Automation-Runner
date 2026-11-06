@@ -13,9 +13,13 @@
  * credentialsAsMigrated(userId) does for one user what migration 29 did for
  * every user: copies the users-row credentials into a row for the user's own
  * company. Fixtures call it right after inserting the user.
+ *
+ * Like migration 48, it ties them to the company's endpoint as it is
+ * (credentials_endpoint): credentials tied to none are sent nowhere (1.11.479).
  */
 
-const { run } = require('../../src/db/db');
+const { run, get } = require('../../src/db/db');
+const { endpointOrigin } = require('../../src/utils/credentialEndpoint');
 
 function credentialsAsMigrated(userId) {
   run(`INSERT OR REPLACE INTO tester_credentials
@@ -28,6 +32,16 @@ function credentialsAsMigrated(userId) {
           cached_token_enc, cached_token_expires_at, cached_token_cred_fp,
           requestor_enc, subscription_key_enc
        FROM users WHERE id = ?`, [userId]);
+  tieToEndpoint(userId);
 }
 
-module.exports = { credentialsAsMigrated };
+/** Ties every credentials row of the user to its company's endpoint now. */
+function tieToEndpoint(userId) {
+  const rows = require('../../src/db/db').all('SELECT company_id FROM tester_credentials WHERE user_id = ?', [userId]);
+  for (const r of rows) {
+    const origin = endpointOrigin(get('SELECT api_base FROM companies WHERE id = ?', [r.company_id])?.api_base);
+    run('UPDATE tester_credentials SET credentials_endpoint = ? WHERE user_id = ? AND company_id = ?', [origin, userId, r.company_id]);
+  }
+}
+
+module.exports = { credentialsAsMigrated, tieToEndpoint };

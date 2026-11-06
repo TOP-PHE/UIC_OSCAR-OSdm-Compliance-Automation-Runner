@@ -11,7 +11,10 @@
  * What OSCAR does when a run meets an answer meant to attack it.
  *
  * The collection (library-bruno/answerThreats.js) stops the run and logs one
- * line starting with INTRUSION_MARK: `[INTRUSION] kind=<kind> step=<request>`.
+ * line starting with INTRUSION_MARK: `[INTRUSION] tag=<tag> kind=<kind> step=<request>`.
+ * The tag is the run's own (a random value the runner writes in Bruno's
+ * environment as __intrusionTag): a line without it, such as one a scenario's
+ * name or a provider's answer prints, is not acted on (1.11.478).
  * The runner hands each such line to onIntrusionLine(), which, once per run:
  *   - records a security event (security_event, migration 47: run, company,
  *     user, kind, step, time; never the answer);
@@ -40,20 +43,26 @@ function cleanStep(raw) {
   return String(raw || '').replace(/[^\x20-\x7e -ɏ]/g, '').trim().slice(0, 120) || null;
 }
 
-/** { kind, step } from a log line, or null when it is not an intrusion line. */
+/**
+ * { kind, step, tag } from a log line, or null when it is not an intrusion
+ * line. `tag` is the run's tag the line carries, '' when it carries none.
+ */
 function parseIntrusionLine(line) {
   const text = String(line || '');
   const at = text.indexOf(INTRUSION_MARK);
   if (at === -1) return null;
-  const rest = text.slice(at + INTRUSION_MARK.length);
+  let rest = text.slice(at + INTRUSION_MARK.length);
+  const tagged = /^tag=([0-9a-f]{16,64}) /.exec(rest);
+  const tag = tagged ? tagged[1] : '';
+  if (tagged) rest = rest.slice(tagged[0].length);
   const kind = /^kind=([a-z]+)/.exec(rest)?.[1];
   if (!KINDS.has(kind)) return null;
   // `step=<request name>` runs to the level tag the collection adds after it.
   const stepAt = rest.indexOf(' step=');
-  if (stepAt === -1) return { kind, step: null };
+  if (stepAt === -1) return { kind, step: null, tag };
   const after = rest.slice(stepAt + 6);
   const end = after.indexOf(' [');
-  return { kind, step: cleanStep(end === -1 ? after : after.slice(0, end)) };
+  return { kind, step: cleanStep(end === -1 ? after : after.slice(0, end)), tag };
 }
 
 /** The open (not resumed) suspension of a company's endpoint, or null. */
@@ -98,11 +107,21 @@ function recordIntrusion({ runId, companyId, userId, kind, step }, notify = noti
   }
 }
 
-/** The runner's hook: a log line of a run. True when it was an intrusion line. */
-function onIntrusionLine(line, runRow, notify) {
+/** A random tag for one run: 32 hex characters. */
+function newIntrusionTag() {
+  return require('node:crypto').randomBytes(16).toString('hex');
+}
+
+/**
+ * The runner's hook: a log line of a run. True when it was an intrusion line
+ * carrying the run's own tag, the only kind acted on.
+ */
+function onIntrusionLine(line, runRow, notify, runTag) {
   const found = parseIntrusionLine(line);
   if (!found || !runRow) return false;
-  recordIntrusion({ runId: runRow.id, companyId: runRow.company_id, userId: runRow.user_id, ...found }, notify);
+  if (typeof runTag !== 'string' || runTag === '' || found.tag !== runTag) return false;
+  const { kind, step } = found;
+  recordIntrusion({ runId: runRow.id, companyId: runRow.company_id, userId: runRow.user_id, kind, step }, notify);
   return true;
 }
 
@@ -129,5 +148,5 @@ async function notifyAdministrators(event) {
 
 module.exports = {
   INTRUSION_MARK, KINDS, KIND_TEXT,
-  parseIntrusionLine, recordIntrusion, onIntrusionLine, endpointSuspension, resumeEndpoint, notifyAdministrators,
+  parseIntrusionLine, recordIntrusion, onIntrusionLine, newIntrusionTag, endpointSuspension, resumeEndpoint, notifyAdministrators,
 };

@@ -15,6 +15,8 @@
 
 jest.mock('../../src/db/db', () => ({
   run: jest.fn(),
+  // The company's endpoint (utils/credentialEndpoint.js): none here.
+  get: jest.fn(() => null),
   // Simple reversible "encryption" so the test can assert round-trips.
   encrypt: jest.fn((s) => (s == null ? null : 'enc:' + s)),
   decrypt: jest.fn((s) => (s == null ? null : String(s).replace(/^enc:/, ''))),

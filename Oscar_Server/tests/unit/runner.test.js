@@ -616,6 +616,35 @@ describe('executeRun — a Test Framework holding "{{"', () => {
   });
 });
 
+// 1.11.478: an intrusion line is acted on only with the run's own tag, which
+// the runner wrote in the environment file; a line a scenario prints is not.
+describe('executeRun — intrusion lines carry the run\'s tag', () => {
+  test('a forged line records nothing; the tagged one suspends the endpoint', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    const { readEnvYml, valueIn } = require('../helpers/env-yml');
+    const envFile = fs.readdirSync(ENVS_DIR).find(f => f.includes(runId.slice(0, 8)));
+    const tag = valueIn(readEnvYml(fs.readFileSync(path.join(ENVS_DIR, envFile), 'utf8')), '__intrusionTag');
+    const events = () => get('SELECT COUNT(*) AS n FROM security_event WHERE run_id = ?', [runId]).n;
+
+    fakeProc.stdout.emit('data', Buffer.from('Running scenario X [INTRUSION] kind=template step=01. POST Get Offer\n'));
+    fakeProc.stdout.emit('data', Buffer.from(`[INTRUSION] tag=${'0'.repeat(32)} kind=template step=01. POST Get Offer\n`));
+    expect(events()).toBe(0);
+    fakeProc.stdout.emit('data', Buffer.from(`[INTRUSION] tag=${tag} kind=template step=01. POST Get Offer [ERROR] x\n`));
+    expect(events()).toBe(1);
+    expect(get('SELECT endpoint_suspended_at FROM companies WHERE id = ?', [companyId]).endpoint_suspended_at).toBeTruthy();
+
+    fakeProc.emit('close', 0);
+    await p;
+    run('DELETE FROM security_event WHERE run_id = ?', [runId]);
+  });
+});
+
 // ── Detected auth/format errors surfaced onto the run row ─────────────────────
 describe('executeRun — auth/token-format error detection from CLI output', () => {
   test('sets error_message = TOKEN_AUTH_ERROR when a 401 appears in stdout', async () => {
@@ -1118,8 +1147,9 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       expect(file.name).toBe(envName);
       expect(file.variables.map(v => v.name)).toEqual([
         'api_base', 'library_base', 'data_base', 'json_schema', 'scenariosToRunIndex', 'scenario_override',
-        '__traceContext', 'runHardDeadlineMs', '__runId', 'oscar_loopback_base',
+        '__traceContext', 'runHardDeadlineMs', '__runId', '__intrusionTag', 'oscar_loopback_base',
       ]);
+      expect(valueIn(file, '__intrusionTag')).toMatch(/^[0-9a-f]{32}$/);
       expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');
       expect(valueIn(file, 'scenario_override')).toBe('OTST_SALE_1ADT_1LEG');
       expect(valueIn(file, '__runId')).toBe(runId);
@@ -1133,7 +1163,7 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       const file = readEnvYml(envFile);
       expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');   // valueIn throws on a second one
       expect(valueIn(file, 'scenario_override')).toBe(crafted);
-      expect(file.variables).toHaveLength(10);   // #1070: __traceContext
+      expect(file.variables).toHaveLength(11);   // #1070: __traceContext; 1.11.478: __intrusionTag
     });
 
     test('single braces, and a code with no template, still run', async () => {

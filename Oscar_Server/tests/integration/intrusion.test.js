@@ -55,17 +55,38 @@ beforeAll(() => {
   run(`INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'RUNNING')`, [runId, companyId, testerId]);
 });
 
+const TAG = 'a'.repeat(32);
+
 describe('parseIntrusionLine()', () => {
   test('reads kind and step from the collection\'s line', () => {
     expect(I.parseIntrusionLine('[ERROR] [INTRUSION] kind=template step=02. POST Create Booking'))
-      .toEqual({ kind: 'template', step: '02. POST Create Booking' });
+      .toEqual({ kind: 'template', step: '02. POST Create Booking', tag: '' });
   });
   test('the step ends at the level tag the collection adds', () => {
     expect(I.parseIntrusionLine('[INTRUSION] kind=redirect step=05. GET Booking before Fulfillments [ERROR] an answer redirects to a local address; the run stops here.'))
-      .toEqual({ kind: 'redirect', step: '05. GET Booking before Fulfillments' });
+      .toEqual({ kind: 'redirect', step: '05. GET Booking before Fulfillments', tag: '' });
+  });
+  test('reads the run\'s tag before the kind', () => {
+    expect(I.parseIntrusionLine(`[INTRUSION] tag=${TAG} kind=script step=01. POST Get Offer [ERROR] x`))
+      .toEqual({ kind: 'script', step: '01. POST Get Offer', tag: TAG });
   });
   test.each(['[INTRUSION] kind=other step=x', 'kind=template step=x', '', null])('%j is not an intrusion line', (line) => {
     expect(I.parseIntrusionLine(line)).toBeNull();
+  });
+});
+
+// 1.11.478: only a line carrying the run's own tag is acted on.
+describe('a line without the run\'s tag is not acted on', () => {
+  test.each([
+    ['no tag', '[INTRUSION] kind=template step=05. GET Booking', TAG],
+    ['another tag', `[INTRUSION] tag=${'b'.repeat(32)} kind=template step=05. GET Booking`, TAG],
+    ['no tag for the run', `[INTRUSION] tag=${TAG} kind=template step=05. GET Booking`, undefined],
+  ])('%s: nothing recorded', (_, line, runTag) => {
+    const runRow = get('SELECT * FROM runs WHERE id = ?', [runId]);
+    const seen = [];
+    expect(I.onIntrusionLine(line, runRow, (e) => { seen.push(e); }, runTag)).toBe(false);
+    expect(get('SELECT COUNT(*) AS n FROM security_event WHERE run_id = ?', [runId]).n).toBe(0);
+    expect(seen).toEqual([]);
   });
 });
 
@@ -73,9 +94,9 @@ describe('a run meets an intrusion attempt', () => {
   beforeAll(() => {
     notified = [];
     const runRow = get('SELECT * FROM runs WHERE id = ?', [runId]);
-    expect(I.onIntrusionLine('[INTRUSION] kind=template step=05. GET Booking', runRow, (e) => { notified.push(e); })).toBe(true);
+    expect(I.onIntrusionLine(`[INTRUSION] tag=${TAG} kind=template step=05. GET Booking`, runRow, (e) => { notified.push(e); }, TAG)).toBe(true);
     // A second line of the same run records nothing more.
-    I.onIntrusionLine('[INTRUSION] kind=script step=06. POST Fulfillment', runRow, (e) => { notified.push(e); });
+    I.onIntrusionLine(`[INTRUSION] tag=${TAG} kind=script step=06. POST Fulfillment`, runRow, (e) => { notified.push(e); }, TAG);
   });
 
   test('one event is recorded, without the answer, and the administrators are told once', async () => {

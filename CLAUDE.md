@@ -988,8 +988,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   refuses an answer holding `{{` (Bruno would fill it in with its variables,
   the data file and `process.env` included, in the next request), markup
   meant to run in a browser, or a redirect to a loopback / private address:
-  one failed check, one `[INTRUSION] kind=<kind> step=<request> [ERROR] …`
-  line, `stopExecution()`. Checks use `.to.equal(true)`, never a getter
+  one failed check, one `[INTRUSION] tag=<tag> kind=<kind> step=<request>
+  [ERROR] …` line, `stopExecution()`. **The tag is the run's own**
+  (1.11.478): the runner writes a random `__intrusionTag` in the environment
+  file, and `onIntrusionLine()` acts only on a line carrying it, so a
+  scenario's name or an answer that prints the mark changes nothing. Checks use `.to.equal(true)`, never a getter
   (Sonar S905). The runner hands that line to `utils/intrusion.js`
   `onIntrusionLine()`: a `security_event` (migration 47, never the answer),
   the endpoint suspended (`companies.endpoint_suspended_at`; `POST /v1/runs`
@@ -1008,7 +1011,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   receives a tester's token or static credentials until the tester saves
   again. Any new path that sends a tester's credentials goes through
   `resolveAccessToken()`. Changing the endpoint drops the company's cached
-  tokens.
+  tokens. **Credentials saved while there was no endpoint are tied to
+  none** (1.11.479): refused once an endpoint is set, until saved again
+  (never tied at first use: whoever sets that endpoint would get them). Test
+  fixtures that insert credentials call `tieToEndpoint()`
+  (`tests/helpers/credentials.js`, also in `credentialsAsMigrated()`).
 - **An administrator manages companies, not their tests** (1.11.463,
   maintainer decision). It creates, renames and deletes companies and users,
   and never starts a run on a company (`POST /v1/runs` and `/preview` 403,

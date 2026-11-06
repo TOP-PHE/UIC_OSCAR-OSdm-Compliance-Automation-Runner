@@ -188,7 +188,7 @@ const STACK_FRAME_WITH_PARENS = /^\s*at\s+(?:\S[^\s(]*\(|\S+\s+\().*:\d+:\d+\)\s
 // slash. The request name is everything up to the whitespace before the first
 // "(", written so the pattern cannot backtrack over that whitespace.
 const OFFER_OPTIONS_MARK = '🧭';
-const { onIntrusionLine, INTRUSION_MARK, endpointSuspension } = require('../utils/intrusion');
+const { onIntrusionLine, newIntrusionTag, INTRUSION_MARK, endpointSuspension } = require('../utils/intrusion');
 
 const FOLDER_REQUEST_ROW = /^([^()\\/]+)[\\/]([^()]*[^()\s]|\s)\s+\(([^)]+)\)/;
 
@@ -970,9 +970,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // #204: inject the runId so 06.yml can call the loopback refresh-access-token
   // endpoint after the wait. The endpoint validates that the requested runId
   // exists and only refreshes the token bound to that run.
+  // The run's own tag on its intrusion lines (utils/intrusion.js): a line
+  // without it is not acted on, whatever prints it.
+  const intrusionTag = newIntrusionTag();
   const envYmlOut  = envYml + [
     ...envVar('runHardDeadlineMs', Date.now() + _runBudget.effectiveMs),
     ...envVar('__runId', runId),
+    ...envVar('__intrusionTag', intrusionTag),
     ...envVar('oscar_loopback_base', `http://127.0.0.1:${process.env.PORT || 3001}`),
   ].join('\n') + '\n';
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
@@ -1152,7 +1156,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
         const meta = logParser.parse(line);
         const level = inferLevel(line, 'info');
         logEvent(runId, level, line, meta);
-        onIntrusionLine(line, runRow);
+        onIntrusionLine(line, runRow, undefined, intrusionTag);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });
@@ -1165,7 +1169,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
         const meta = logParser.parse(line);
         const level = inferLevel(line, 'error');
         logEvent(runId, level, line, meta);
-        onIntrusionLine(line, runRow);
+        onIntrusionLine(line, runRow, undefined, intrusionTag);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });

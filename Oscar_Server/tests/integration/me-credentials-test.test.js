@@ -23,7 +23,12 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
 const { run, get, all, encrypt, colEncrypt } = require('../../src/db/db');
-const { setCredentials } = require('../../src/utils/testerCredentials');
+const { tieToEndpoint } = require('../helpers/credentials');
+// Credentials saved here are tied to the company's endpoint, as a save is.
+const setCredentials = (uid, cid, fields) => {
+  require('../../src/utils/testerCredentials').setCredentials(uid, cid, fields);
+  tieToEndpoint(uid);
+};
 
 const app = buildAppWithRoute('/v1/me/credentials', '../../src/api/routes/me-credentials');
 const TEST = '/v1/me/credentials/test';
