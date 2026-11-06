@@ -36,6 +36,10 @@ const AiAccess = require('../../utils/aiAccess');
 const { readBackupStatus } = require('../../utils/backupStatus');
 const { purgeCompany } = require('../../utils/companyPurge');
 const { deleteUserAccount } = require('../../utils/userDeletion');
+const { planMove, applyMoves } = require('../../utils/datafileRename');
+const { liveDatafilePath } = require('../../utils/datafileWrite');
+const { withDatafileLock } = require('../../utils/datafileLock');
+const path = require('node:path');
 const AccessRequests = require('../../utils/accessRequests');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
@@ -621,7 +625,7 @@ router.post('/companies', (req, res) => {
   return res.status(201).json({ company: created });
 });
 
-router.patch('/companies/:id', (req, res) => {
+router.patch('/companies/:id', async (req, res) => {
   const companyId = req.params.id;
   const company = get('SELECT * FROM companies WHERE id = ?', [companyId]);
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Company not found.' });
@@ -637,7 +641,13 @@ router.patch('/companies/:id', (req, res) => {
   const { updates, values } = plan;
   if (updates.length === 0) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No update fields provided.' });
   values.push(companyId);
-  run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
+  if (!plan.newSlug || plan.newSlug === company.slug) {
+    run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
+    return res.json({ company: companyRow(companyId) });
+  }
+  // A new slug renames the data files with it (they are named after it).
+  const refusal = await withDatafileLock(companyId, () => renameWithSlug(company, plan.newSlug, updates, values));
+  if (refusal) return res.status(409).json({ status: 409, title: 'Conflict', detail: refusal });
   return res.json({ company: companyRow(companyId) });
 });
 
@@ -659,7 +669,27 @@ function companyUpdates(companyId, name, slug) {
   const values = [];
   if (name) { updates.push('name = ?'); values.push(String(name).trim()); }
   if (newSlug) { updates.push('slug = ?'); values.push(newSlug); }
-  return { updates, values };
+  return { updates, values, newSlug };
+}
+
+// The company's row and data files take the new slug together, or neither.
+function renameWithSlug(company, newSlug, updates, values) {
+  const livePath = company.datafile_path || liveDatafilePath(company.slug);
+  const plan = planMove(livePath, newSlug);
+  if (plan.refusal) return plan.refusal;
+  const undo = applyMoves(plan.moves);
+  try {
+    transaction(() => {
+      run(`UPDATE companies SET ${updates.join(', ')} WHERE id = ?`, values);
+      if (plan.moves.some(([from]) => from === path.resolve(livePath))) {
+        run('UPDATE companies SET datafile_path = ? WHERE id = ?', [liveDatafilePath(newSlug), company.id]);
+      }
+    });
+  } catch (err) {
+    undo();
+    throw err;
+  }
+  return null;
 }
 
 // The slug cleaned, or false when another company already uses it.

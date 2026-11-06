@@ -1012,7 +1012,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `company_id` column, read from the schema, plus the rows of its runs and
   findings, provider links, pending registrations and data files; the
   audit line is written under no company (a line naming a deleted company
-  is not kept).
+  is not kept). **A new slug renames the data files** (1.11.471,
+  `utils/datafileRename.js`, under the data file lock; old names renamed at
+  start by `alignDatafileNames()`).
   **Deleting an account is `deleteUserAccount()`** (`utils/userDeletion.js`,
   1.11.468), for the administrator and the Test Manager: its runs go by
   cascade, so every table that cascade reaches needs an index on its key
