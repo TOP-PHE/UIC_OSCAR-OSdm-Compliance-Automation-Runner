@@ -1049,6 +1049,12 @@ const MIGRATIONS = [
       // 3): it is named so. A name an administrator already changed is kept.
       db.prepare(`UPDATE companies SET name = 'UIC' WHERE slug = 'platform-root' AND name = 'OSCAR Platform'`).run();
   }},
+  { version: 52, name: 'run-assertions-suite-index', up: () => {
+      // Deleting a run's suites looks for their checks by suite: without this
+      // index each suite read the whole table, and deleting an account with
+      // many runs held the server for minutes.
+      db.exec('CREATE INDEX IF NOT EXISTS idx_run_assertions_suite ON run_assertions(suite_id)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

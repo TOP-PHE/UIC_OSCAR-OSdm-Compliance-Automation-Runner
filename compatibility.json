@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.505",
+  "current_release": "2026.506",
   "releases": [
+    {
+      "release": "2026.506",
+      "date": "2026-11-06",
+      "server": "1.11.468",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.468: deleting an account no longer holds the server (migration 52 indexes run_assertions.suite_id) and no longer fails on its report templates."
+      ]
+    },
     {
       "release": "2026.505",
       "date": "2026-11-05",

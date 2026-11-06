@@ -41,6 +41,7 @@ const { auditLog } = require('../helpers/shared');
 const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
 const AccessRequests = require('../../utils/accessRequests');
+const { deleteUserAccount } = require('../../utils/userDeletion');
 
 const router = express.Router();
 
@@ -354,14 +355,7 @@ router.delete('/:id', (req, res) => {
     });
   }
 
-  transaction(() => {
-    run('UPDATE auth_events SET user_id = NULL WHERE user_id = ?', [userId]);
-    run(`DELETE FROM report_comparisons
-         WHERE run_a_id IN (SELECT id FROM runs WHERE user_id = ?)
-            OR run_b_id IN (SELECT id FROM runs WHERE user_id = ?)`, [userId, userId]);
-    run('DELETE FROM runs WHERE user_id = ?', [userId]);
-    run('DELETE FROM users WHERE id = ?', [userId]);
-  });
+  deleteUserAccount(userId);
 
   auditLog(req.user.id, companyId, req.user.email, `company_user_deleted:${target.email}`);
   return res.json({ deleted: true, id: userId, email: target.email });
