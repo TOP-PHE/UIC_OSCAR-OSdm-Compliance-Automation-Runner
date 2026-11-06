@@ -1004,7 +1004,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   receives a tester's token or static credentials until the tester saves
   again. Any new path that sends a tester's credentials goes through
   `resolveAccessToken()`. Changing the endpoint drops the company's cached
-  tokens.
+  tokens. **Credentials saved while there was no endpoint are tied to
+  none** (1.11.479): refused once an endpoint is set, until saved again
+  (never tied at first use: whoever sets that endpoint would get them). Test
+  fixtures that insert credentials call `tieToEndpoint()`
+  (`tests/helpers/credentials.js`, also in `credentialsAsMigrated()`).
 - **An administrator manages companies, not their tests** (1.11.463,
   maintainer decision). It creates, renames and deletes companies and users,
   and never starts a run on a company (`POST /v1/runs` and `/preview` 403,
