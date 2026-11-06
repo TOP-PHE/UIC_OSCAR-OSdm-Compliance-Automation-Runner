@@ -81,37 +81,36 @@ function canUserSeeRun(runId, user) {
     [runId],
   );
   if (!run) return null;
+  return mayRead(run, user) ? run : null;
+}
 
+// Whether `user` may read `run`, by role. An unknown role fails closed.
+function mayRead(run, user) {
   // Administrator: locked out of test-data read. Operations role only.
-  if (user.role === 'administrator') return null;
+  if (user.role === 'administrator') return false;
 
   // Tester / test_manager: the run's company must be one they may act in,
   // their own or a provider of it (#540) — the rule enforceTenant uses. A
   // tester's runs are theirs (1.11.477): a tester reads their own runs and
   // the Test Managers' (the company's campaigns), never another tester's; a
   // Test Manager every run of the company.
-  if (user.role === 'test_manager') return canUseCompany(user, run.company_id) ? run : null;
-  if (isTester(user)) return canUseCompany(user, run.company_id) && testerReads(run, user) ? run : null;
+  if (user.role === 'test_manager') return canUseCompany(user, run.company_id);
+  if (isTester(user)) return canUseCompany(user, run.company_id) && testerReads(run, user);
 
   // API key (#503): the runs of the one company or provider the key was made
   // for, never its providers. requireApiKey has checked that the key's
   // creator may still use that company.
   if (user.role === 'api_key') {
     const keyCompany = user.keyCompanyId;
-    return typeof keyCompany === 'string' && keyCompany !== '' && run.company_id === keyCompany ? run : null;
+    return typeof keyCompany === 'string' && keyCompany !== '' && run.company_id === keyCompany;
   }
 
-  // Certifier: only sees runs the test_manager has explicitly shared.
-  // Sole gate (v1.11.15): the per-run shared_with_certifier_at column is set.
-  // The legacy company-wide share_reports_with_certifier master toggle was
-  // removed — sharing is now decided per-report by the test_manager from the
-  // dashboard. Default is private (column null → certifier sees nothing).
-  if (user.role === 'certification_user') {
-    return run.shared_with_certifier_at ? run : null;
-  }
+  // Certifier: only sees runs a Test Manager, or the tester whose run it is,
+  // has explicitly shared (per-run shared_with_certifier_at, the sole gate
+  // since v1.11.15). Default is private (column null → certifier sees nothing).
+  if (user.role === 'certification_user') return Boolean(run.shared_with_certifier_at);
 
-  // Unknown role — fail closed.
-  return null;
+  return false;
 }
 
 /**
