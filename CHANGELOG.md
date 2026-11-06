@@ -113,6 +113,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.469] — 2026-11-06
+
+Release 2026.507. The administrator sees an access request before its e-mail is confirmed.
+
+### Changed
+- **Manage Users lists a request whose e-mail is not confirmed yet**, greyed, with "E-mail not confirmed yet" and when its link runs out (`link_expires_at`, never the token). It cannot be placed until its owner confirms the address; the administrator may refuse it, and no e-mail is sent to an address nobody confirmed. Before, such a request was invisible, and a person who had not clicked the link (or never received it) looked like no request at all. Test Managers still see only the requests placed in their company.
+- **The confirmation e-mail says what happens next**: open the link, click *Confirm my email address*, then an administrator and a Test Manager check the request, and the password is chosen after that. It still said "set your password", which this step no longer does. Subject: "OSCAR — Confirm your e-mail address".
+
+### Checked
+- `access-requests.test.js`: an unconfirmed request is listed for the administrator with its link's expiry and no token, cannot be placed, is not shown to a Test Manager, and can be refused. `access-requests-page.test.js` runs the page's own functions: badge, expiry, Refuse only. `npm run lint`, full `npx jest`.
+
+---
+
 ## [server-1.11.468] — 2026-11-06
 
 Release 2026.506. Deleting an account no longer holds the server.

@@ -580,7 +580,8 @@ router.post('/access-requests/:id/refuse', (req, res) => {
   const done = AccessRequests.refuseRequest(req.params.id);
   if (done.status) return res.status(done.status).json({ status: done.status, title: 'Not Found', detail: done.detail });
   auditLog(req.user.id, null, req.user.email, `access_request_refused:${done.request.email}`);
-  AccessRequests.noticeRefused(done.request);
+  // An address nobody confirmed is not written to.
+  if (done.request.state !== 'unverified') AccessRequests.noticeRefused(done.request);
   return res.json({ refused: true });
 });
 

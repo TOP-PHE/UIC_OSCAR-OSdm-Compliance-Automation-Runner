@@ -172,7 +172,7 @@ describe('mailer.js', () => {
       expect(mockSendMail).toHaveBeenCalledTimes(1);
       const call = mockSendMail.mock.calls[0][0];
       expect(call.to).toBe(params.to);
-      expect(call.subject).toBe('OSCAR — Confirm your account registration');
+      expect(call.subject).toBe('OSCAR — Confirm your e-mail address');
       expect(call.from).toBe('OSCAR Platform <noreply@oscar.uic.org>');
       expect(call.html).toContain(params.companyName);
       expect(call.html).toContain(params.verificationUrl);

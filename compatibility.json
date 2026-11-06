@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.506",
+  "current_release": "2026.507",
   "releases": [
+    {
+      "release": "2026.507",
+      "date": "2026-11-06",
+      "server": "1.11.469",
+      "collection": "OTST_V2.0.252",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.469: Manage Users shows the administrator access requests whose e-mail is not confirmed yet (refuse only); the confirmation e-mail says what happens next."
+      ]
+    },
     {
       "release": "2026.506",
       "date": "2026-11-06",

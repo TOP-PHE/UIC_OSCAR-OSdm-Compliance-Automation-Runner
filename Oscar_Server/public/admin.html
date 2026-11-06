@@ -570,6 +570,9 @@ function accessActionsHtml(r) {
       <button class="btn btn-small btn-success" data-access-action="confirm" data-request-id="${id}">Confirm</button>
       <button class="btn btn-small btn-danger" data-access-action="refuse" data-request-id="${id}" data-email="${esc(r.email)}">Refuse</button>`;
   }
+  if (r.state === 'unverified') {
+    return `<button class="btn btn-small btn-danger" data-access-action="refuse" data-request-id="${id}" data-email="${esc(r.email)}">Refuse</button>`;
+  }
   const options = companies.map(c => `<option value="${esc(c.id)}" ${c.id === r.company_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   return `<select id="access-company-${id}"><option value="">— Choose —</option>${options}</select>
     <button class="btn btn-small btn-success" data-access-action="assign" data-request-id="${id}">${r.state === 'assigned' ? 'Move' : 'Place'}</button>
@@ -578,9 +581,18 @@ function accessActionsHtml(r) {
 
 function accessCompanyHtml(r) {
   if (isTestMgr) return esc(r.company_name || '');
+  if (r.state === 'unverified') return unconfirmedHtml(r.link_expires_at);
   return r.state === 'assigned'
     ? `${esc(r.company_name || '')} <span class="status-badge sb-pending">Waiting for its Test Manager</span>`
     : '<span class="status-badge sb-pending">To place</span>';
+}
+
+// A request whose address is not confirmed yet: the person has not clicked
+// the link sent to it. It can only be refused.
+function unconfirmedHtml(expiresAt) {
+  const expired = expiresAt && parseServerTs(expiresAt).getTime() < Date.now();
+  const detail = expired ? 'link expired' : `link valid until ${esc(fmtDate(expiresAt))}`;
+  return `<span class="status-badge sb-CANCELLED">E-mail not confirmed yet</span> <span style="color:#90a4ae;font-size:12px">${detail}</span>`;
 }
 
 async function loadAccessRequests() {
@@ -592,10 +604,10 @@ async function loadAccessRequests() {
   document.getElementById('access-card').classList.toggle('hidden', requests.length === 0);
   document.getElementById('access-help').textContent = isTestMgr
     ? 'People an OSCAR administrator placed in your company. Confirm them as a tester or a Test Manager; they then choose their own password.'
-    : 'Requests whose e-mail is confirmed. Place each in a company: its Test Manager confirms it. A company with no Test Manager gets its first one from you.';
+    : 'Place each confirmed request in a company: its Test Manager confirms it. A company with no Test Manager gets its first one from you. A request whose e-mail is not confirmed yet waits for its owner to click the link sent to it; it can only be refused.';
   document.getElementById('access-col').textContent = isTestMgr ? 'Placed in' : 'Company';
   document.getElementById('access-tbody').innerHTML = requests.map(r => `
-    <tr>
+    <tr${r.state === 'unverified' ? ' style="opacity:.6"' : ''}>
       <td>${esc(r.name || '')}</td>
       <td class="mono">${esc(r.email)}</td>
       <td>${esc(r.company_typed || '')}</td>

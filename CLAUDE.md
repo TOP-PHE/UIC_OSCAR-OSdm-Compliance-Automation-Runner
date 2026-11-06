@@ -935,6 +935,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   old flow only there too. Notices go through `sendAccessNotice()`, never
   awaited: Manage Users' *Access Requests* card is the reliable signal.
   A refused request is deleted (the audit log keeps it).
+  **The administrator sees unconfirmed requests too** (1.11.469): greyed,
+  with their link's expiry (`link_expires_at`, never the token), refuse
+  only, and no e-mail to an address nobody confirmed.
   **Invitations, not passwords** (1.11.466): `POST /v1/admin/users` and
   `POST /v1/company/users` refuse a password and call `invite()`; an
   administrator's invitation into a company with a Test Manager becomes an
