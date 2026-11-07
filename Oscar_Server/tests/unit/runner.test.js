@@ -485,7 +485,8 @@ describe('executeRun — spawn happy paths', () => {
     const runId = seedRun(companyId, userId);
     resolveAccessToken.mockResolvedValueOnce('tok-abc');
 
-    const writeFileSpy = jest.spyOn(fs.promises, 'writeFile').mockRejectedValueOnce(new Error('EACCES: permission denied'));
+    // The env file is the first file the run opens (runFolder.js writeRunFile).
+    const openSpy = jest.spyOn(fs.promises, 'open').mockRejectedValueOnce(new Error('EACCES: permission denied'));
 
     const result = await executeRun({ runId, companyId, userId });
 
@@ -494,7 +495,7 @@ describe('executeRun — spawn happy paths', () => {
     expect(getRunRow(runId).status).toBe('FAILED');
     expect(spawn).not.toHaveBeenCalled();
 
-    writeFileSpy.mockRestore();
+    openSpy.mockRestore();
   });
 });
 
@@ -1127,7 +1128,8 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
   }
 
   // Starts a run that reaches the second spawn, and gives back both spawn calls.
-  async function runWithReportScript({ scenarioOverride, platform, datafile } = {}) {
+  // `plant(cwd, runId, envName)` adds what the run leaves in its folder, before it ends.
+  async function runWithReportScript({ scenarioOverride, platform, datafile, plant } = {}) {
     const { encrypt } = require('../../src/db/db');
     const { companyId, userId } = seedCompanyUser();
     if (scenarioOverride !== undefined) useDatafile(companyId, datafile || datafileFor(scenarioOverride));
@@ -1153,11 +1155,21 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       const envFile = fs.readFileSync(path.join(cwd, 'environments', `${envName}.yml`), 'utf8');
       fs.mkdirSync(path.join(cwd, 'Validation_Reports'), { recursive: true });
       fs.writeFileSync(path.join(cwd, 'Validation_Reports', `.bru_results_${runId.slice(0, 8)}.json`), JSON.stringify({ results: [] }));
+      if (plant) plant(cwd, runId, envName);
       mainProc.emit('close', 0);
       await waitForSpawnCalls(2);
+      // What mergeReport.js was given, read while it "runs".
+      const stdJson = path.join(cwd, 'Validation_Reports', '.bru_results.json');
+      let mergeInput = null;
+      try {
+        const text = fs.readFileSync(stdJson, 'utf8');
+        mergeInput = { link: fs.lstatSync(stdJson).isSymbolicLink(), text };
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+      }
       mergeProc.emit('close', 0);
       await runPromise;
-      return { runId, envName, envFile, cwd, bruno: spawn.mock.calls[0], report: spawn.mock.calls[1] };
+      return { runId, envName, envFile, cwd, mergeInput, bruno: spawn.mock.calls[0], report: spawn.mock.calls[1] };
     } finally {
       Object.defineProperty(process, 'platform', realPlatform);
     }
@@ -1240,6 +1252,127 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
         jest.clearAllMocks();
       }
     });
+  });
+
+  // The run writes its own folder (with RUN_ISOLATION=isolated, from another
+  // container). The server reads and writes there without following a link
+  // (src/worker/runFolder.js); a file that is not a plain file of the folder is
+  // left out with a line in the log. tests/unit/run-folder.test.js holds the
+  // rules; these check that the runner goes through them.
+  describe('the files a run leaves in its folder are read only as plain files of it', () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-outside-'));
+    afterAll(() => { fs.rmSync(outside, { recursive: true, force: true }); });
+    // A link to a file needs Developer Mode on Windows; CI runs these tests.
+    const canLink = (() => {
+      try {
+        fs.writeFileSync(path.join(outside, 'probe'), 'x');
+        fs.symlinkSync(path.join(outside, 'probe'), path.join(outside, 'probe-link'), 'file');
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    const linkTest = canLink ? test : test.skip;
+
+    function serverFile(name, content) {
+      const file = path.join(outside, name);
+      fs.writeFileSync(file, content);
+      return file;
+    }
+    const prefixOf = (envName) => `${new Date().toISOString().slice(0, 10).replaceAll('-', '')}_${envName.replace(/^OTST_/, '').replace(/_Env$/, '')}`;
+    const artifactsOf = (runId) => require('../../src/db/db').all('SELECT type, filename FROM run_artifacts WHERE run_id = ?', [runId]);
+    const SCENARIO = 'OTST_SALE_1ADT_1LEG';
+
+    describe.each(MODES)('%s', (_where, platform) => {
+      linkTest('a report that is a link is left out; a plain one is linked; what the link names is not read', async () => {
+        const secret = serverFile(`db-${platform}`, 'SERVER-SECRET');
+        const { runId } = await runWithReportScript({
+          scenarioOverride: SCENARIO, platform,
+          plant: (cwd, _id, envName) => {
+            const reports = path.join(cwd, 'Validation_Reports');
+            fs.writeFileSync(path.join(reports, `${prefixOf(envName)}_PLAIN_Report.html`), '<html>plain</html>');
+            fs.symlinkSync(secret, path.join(reports, `${prefixOf(envName)}_LINKED_Report.html`), 'file');
+          },
+        });
+        const files = artifactsOf(runId).map(a => a.filename);
+        expect(files).toContain('report_PLAIN.html');
+        expect(files).not.toContain('report_LINKED.html');
+        expect(fs.existsSync(path.join(ARTIFACTS_DIR, runId, 'report_LINKED.html'))).toBe(false);
+        expect(getDecryptedEvents(runId).some(e => e.level === 'error' && /_LINKED_Report\.html left out/.test(e.message))).toBe(true);
+      });
+
+      linkTest('a link where the results copy goes is replaced, and what it names is not written', async () => {
+        const secret = serverFile(`target-${platform}`, 'SERVER-SECRET');
+        const { runId, mergeInput } = await runWithReportScript({
+          scenarioOverride: SCENARIO, platform,
+          plant: (cwd) => fs.symlinkSync(secret, path.join(cwd, 'Validation_Reports', '.bru_results.json'), 'file'),
+        });
+        expect(fs.readFileSync(secret, 'utf8')).toBe('SERVER-SECRET');
+        expect(mergeInput).toEqual({ link: false, text: JSON.stringify({ results: [] }) });
+        expect(artifactsOf(runId).some(a => a.type === 'json_results')).toBe(true);
+      });
+
+      linkTest('results that are a link are left out, and the report script is not started', async () => {
+        const secret = serverFile(`results-${platform}`, '{"secret":true}');
+        const { runId } = await runWithReportScriptNoMerge({
+          scenarioOverride: SCENARIO, platform,
+          plant: (cwd, id) => {
+            const results = path.join(cwd, 'Validation_Reports', `.bru_results_${id.slice(0, 8)}.json`);
+            fs.rmSync(results);
+            fs.symlinkSync(secret, results, 'file');
+          },
+        });
+        expect(artifactsOf(runId).some(a => a.type === 'json_results')).toBe(false);
+        expect(getDecryptedEvents(runId).some(e => /\.bru_results_[0-9a-f]{8}\.json left out/.test(e.message))).toBe(true);
+      });
+    });
+
+    test('in a workspace, a reports folder swapped for a link is not read at all', async () => {
+      const server = fs.mkdtempSync(path.join(outside, 'server-'));
+      const { runId } = await runWithReportScriptNoMerge({
+        scenarioOverride: SCENARIO, platform: 'linux',
+        plant: (cwd, id, envName) => {
+          const reports = path.join(cwd, 'Validation_Reports');
+          fs.writeFileSync(path.join(server, `${prefixOf(envName)}_X_Report.html`), 'SERVER');
+          fs.writeFileSync(path.join(server, `.bru_results_${id.slice(0, 8)}.json`), '{"server":true}');
+          fs.rmSync(reports, { recursive: true });
+          fs.symlinkSync(server, reports, 'junction');
+        },
+      });
+      expect(artifactsOf(runId)).toEqual([]);
+      expect(getDecryptedEvents(runId).some(e => /not the run's own folder/.test(e.message))).toBe(true);
+      expect(fs.readdirSync(server).sort()).toHaveLength(2);       // nothing added or removed there
+    });
+
+    // Like runWithReportScript, for a run whose results are not there to read:
+    // the report script is never started.
+    async function runWithReportScriptNoMerge({ scenarioOverride, platform, plant }) {
+      const { companyId, userId } = seedCompanyUser();
+      useDatafile(companyId, datafileFor(scenarioOverride));
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-secret-123');
+      fs.mkdirSync(path.dirname(MERGE_REPORT_JS), { recursive: true });
+      fs.writeFileSync(MERGE_REPORT_JS, '// stub, never executed (spawn is mocked)');
+      const mainProc = makeFakeProc();
+      spawn.mockReturnValueOnce(mainProc);
+      const realPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+      Object.defineProperty(process, 'platform', { ...realPlatform, value: platform });
+      try {
+        const runPromise = executeRun({ runId, companyId, userId, scenarioOverride });
+        await waitForSpawnCalls(1);
+        const cwd = spawn.mock.calls[0][2].cwd;
+        const slug = get('SELECT slug FROM companies WHERE id = ?', [companyId]).slug;
+        fs.mkdirSync(path.join(cwd, 'Validation_Reports'), { recursive: true });
+        fs.writeFileSync(path.join(cwd, 'Validation_Reports', `.bru_results_${runId.slice(0, 8)}.json`), JSON.stringify({ results: [] }));
+        plant(cwd, runId, `OTST_${slug}_${runId.slice(0, 8)}_Env`);
+        mainProc.emit('close', 0);
+        await runPromise;
+        expect(spawn).toHaveBeenCalledTimes(1);
+        return { runId, cwd };
+      } finally {
+        Object.defineProperty(process, 'platform', realPlatform);
+      }
+    }
   });
 
   // Escaping keeps a code from adding to the file. Bruno then does one more

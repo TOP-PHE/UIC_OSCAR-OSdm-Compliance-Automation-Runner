@@ -212,6 +212,8 @@ module.exports = {
           { name: 'limit',  in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
           { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
           { name: 'whole_batches', in: 'query', description: '1 adds the other runs of every batch on the page, so the answer may hold more rows than limit (#986).', schema: { type: 'string', enum: ['1'] } },
+          { name: 'before_at', in: 'query', description: 'With before_id: the runs after this one in the list order (queued_at, then id), from next_before of the page before.', schema: { type: 'string', maxLength: 40 } },
+          { name: 'before_id', in: 'query', description: 'With before_at (both or neither, else 400).', schema: { type: 'string', maxLength: 64 } },
         ],
         responses: { 200: { description: 'List of runs', content: { 'application/json': { schema: {
           type: 'object',
@@ -220,6 +222,7 @@ module.exports = {
             limit:  { type: 'integer' },
             offset: { type: 'integer' },
             runs:   { type: 'array', items: { $ref: '#/components/schemas/Run' } },
+            next_before: { type: 'object', nullable: true, description: 'The cursor of the next page (before_at, before_id); null when this page was the last.', properties: { at: { type: 'string' }, id: { type: 'string' } } },
           },
         } } } } },
       },

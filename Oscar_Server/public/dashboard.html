@@ -139,6 +139,9 @@ h2{color:#0090D4;font-size:20px}
       <div style="text-align:center" title="Tick checkboxes to compare runs">⚖</div>
     </div>
     <div id="runs-list"><div class="empty">Loading…</div></div>
+    <div id="older-runs" style="display:none;text-align:center;padding:12px">
+      <button class="btn btn-secondary" id="older-runs-btn" type="button">Show older batches</button>
+    </div>
   </div>
 
   <!-- #901: runs other companies share with this one, read only -->
@@ -214,6 +217,9 @@ if (!canDelete) {
 let selected  = new Set();   // runs selected for deletion
 let compared  = new Set();   // runs selected for comparison
 let allRuns  = [];
+// The pages read with "Show older batches", and where the next one starts.
+let olderRuns = [];
+let olderCursor = null;
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function duration(start, end) {
@@ -688,6 +694,7 @@ async function confirmDelete() {
 
   if (data.deleted && data.deleted.length) {
     data.deleted.forEach(id => selected.delete(id));
+    olderRuns = olderRuns.filter(r => !data.deleted.includes(r.id));
     loadRuns();
   }
   if (data.skipped && data.skipped.length) {
@@ -697,11 +704,65 @@ async function confirmDelete() {
 }
 
 // ── Load runs ─────────────────────────────────────────────────────────────────
+// The first page, then the older pages already read: each run once (the
+// first page's copy, which is the fresher), newest first.
+function mergeRunPages(first, older) {
+  const seen = new Set();
+  const out = [];
+  for (const r of [...first, ...older]) {
+    if (!r || seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push(r);
+  }
+  return out.sort((a, b) => String(b.queued_at).localeCompare(String(a.queued_at)) || String(b.id).localeCompare(String(a.id)));
+}
+
+// The address of the page after `cursor` (the answer's next_before).
+function olderRunsUrl(cursor) {
+  return '/v1/runs?limit=100&whole_batches=1'
+    + '&before_at=' + encodeURIComponent(cursor.at)
+    + '&before_id=' + encodeURIComponent(cursor.id);
+}
+
+function showOlderButton() {
+  document.getElementById('older-runs').style.display = olderCursor ? '' : 'none';
+}
+
+// A large batch can fill several pages: read on until one brings a run not
+// shown yet, or there is none left (10 pages at most per click).
+async function loadOlderRuns() {
+  const btn = document.getElementById('older-runs-btn');
+  btn.disabled = true;
+  try {
+    for (let i = 0; i < 10 && olderCursor; i++) {
+      const res = await fetch(olderRunsUrl(olderCursor), {});
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok) { oscarToast('Older batches could not be read (' + res.status + ').', 'error'); return; }
+      const data = await res.json();
+      const known = new Set(allRuns.map(r => r.id));
+      const fresh = (data.runs || []).filter(r => !known.has(r.id));
+      olderRuns = olderRuns.concat(fresh);
+      olderCursor = data.next_before || null;
+      if (fresh.length) break;
+    }
+    allRuns = mergeRunPages(allRuns, olderRuns);
+    renderRuns(allRuns);
+    renderAdminDeletedRuns(allRuns);
+    updateBars();
+  } finally {
+    btn.disabled = false;
+    showOlderButton();
+  }
+}
+
 async function loadRuns() {
   const res = await fetch('/v1/runs?limit=100&whole_batches=1', {});
   if (res.status === 401) { logout(); return; }
   const data = await res.json();
-  allRuns = data.runs || [];
+  // Before any older page is read, the next one starts after this page.
+  if (!olderRuns.length) olderCursor = data.next_before || null;
+  allRuns = mergeRunPages(data.runs || [], olderRuns);
+  showOlderButton();
   renderRuns(allRuns);
   renderAdminDeletedRuns(allRuns);
   updateBars();
@@ -712,6 +773,7 @@ async function loadRuns() {
 
 // ── Event delegation (replaces inline onclick/onchange handlers) ─────────────
 document.getElementById('compare-btn').addEventListener('click', goCompare);
+document.getElementById('older-runs-btn').addEventListener('click', () => { loadOlderRuns().catch(e => oscarToast(e.message, 'error')); });
 document.getElementById('delete-btn').addEventListener('click', openDeleteModal);
 document.getElementById('modal-cancel-btn').addEventListener('click', closeDeleteModal);
 document.getElementById('modal-confirm-btn').addEventListener('click', confirmDelete);

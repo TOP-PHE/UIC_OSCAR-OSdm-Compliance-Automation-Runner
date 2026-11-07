@@ -1127,6 +1127,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   page with the page's own query (`listed.sql` + `listed.params`, so scope
   and hidden statuses cannot drift); rows may exceed `limit`. Any page that
   groups runs by batch asks for it.
+  **Older pages go by cursor, not offset** (1.11.484): `before_at` +
+  `before_id` (both or neither) read after the last run of the page before,
+  in the order `queued_at DESC, id DESC` (a batch is queued in one second:
+  the id breaks the tie); the answer's `next_before` is the base page's last
+  row, taken before `whole_batches` adds rows. The Dashboard's *Show older
+  batches* keeps the pages read in `olderRuns` and merges them under each
+  refresh (`mergeRunPages()`).
 - **A batch is chosen at launch** (#1029, PR 1 = 1.11.431). `POST /v1/runs`
   takes `selection: { base, categories, groups, forms, lastRun }`; without it
   the run list runs, as before (every other caller, the API key's included).
@@ -1411,6 +1418,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   30 s), the run's secret still required. Switching: `OSCAR - Server
   Hardening` 4.1. In isolated mode `oscar_run_processes` counts nothing (the
   processes are the runner's).
+  **The server touches a run's working folder only through
+  `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
+  folder, so nothing there is followed as a link. Reads open with
+  `O_NOFOLLOW | O_NONBLOCK` (Windows: lstat compared with the open file), a
+  plain file of at most 100 MB, its folder's realpath equal to the expected
+  one (`runFolderCheck()`, the workspace's real path + sub-folder; the
+  collection's own folder, no workspace, is not checked) and, on Linux, the
+  open fd's `/proc/self/fd` path equal to it. Writes unlink the name, then
+  `O_EXCL`; folders are `mkdir` without `recursive`; the collection copy is
+  `copyIntoRunFolder()`, never `fs.cp`. A refusal is `ERUNFILE`; the runner
+  leaves the file out with an error line (`leftOutText()`). **A new file the
+  server reads or writes in a run folder goes through that module**, never
+  `fs.readFile` / `copyFile` / `stat` on a path there.
+  `run-folder.test.js` uses real links (Windows: Developer Mode for file
+  links, else skipped; CI runs them all).
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's
