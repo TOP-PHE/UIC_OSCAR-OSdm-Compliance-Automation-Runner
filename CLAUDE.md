@@ -1127,6 +1127,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   page with the page's own query (`listed.sql` + `listed.params`, so scope
   and hidden statuses cannot drift); rows may exceed `limit`. Any page that
   groups runs by batch asks for it.
+  **Older pages go by cursor, not offset** (1.11.484): `before_at` +
+  `before_id` (both or neither) read after the last run of the page before,
+  in the order `queued_at DESC, id DESC` (a batch is queued in one second:
+  the id breaks the tie); the answer's `next_before` is the base page's last
+  row, taken before `whole_batches` adds rows. The Dashboard's *Show older
+  batches* keeps the pages read in `olderRuns` and merges them under each
+  refresh (`mergeRunPages()`).
 - **A batch is chosen at launch** (#1029, PR 1 = 1.11.431). `POST /v1/runs`
   takes `selection: { base, categories, groups, forms, lastRun }`; without it
   the run list runs, as before (every other caller, the API key's included).

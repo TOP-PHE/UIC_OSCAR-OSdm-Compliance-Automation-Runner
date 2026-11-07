@@ -376,6 +376,14 @@ router.post('/', runSubmitLimiter, (req, res) => {
 router.get('/', (req, res) => {
   const limit  = Math.min(Number.parseInt(req.query.limit  || '50',  10), 200);
   const offset = Number.parseInt(req.query.offset || '0',  10);
+  // The dashboard's "older batches": the runs after the last one of the page
+  // before, in the page's own order (queued_at, then id).
+  const before = runsCursorOf(req.query);
+  if (before === false) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'before_at and before_id go together: the queued_at and id of the last run of the page before.' });
+  }
+  const cursorSql = before ? ' AND (r.queued_at < ? OR (r.queued_at = ? AND r.id < ?))' : '';
+  const cursorParams = before ? [before.at, before.at, before.id] : [];
 
   // Issue #60 (v1.10.0) — administrator role no longer reads test data, with
   // ONE narrow exception: the operational data-lifecycle queue. Admins must
@@ -451,9 +459,9 @@ router.get('/', (req, res) => {
        WHERE r.status != 'DELETED' ${certifierFilter}`,
       params: []
     };
-    rows = all(`${listed.sql}
-       ORDER BY r.queued_at DESC
-       LIMIT ? OFFSET ?`, [...listed.params, limit, offset]);
+    rows = all(`${listed.sql}${cursorSql}
+       ORDER BY r.queued_at DESC, r.id DESC
+       LIMIT ? OFFSET ?`, [...listed.params, ...cursorParams, limit, offset]);
     total = get(
       `SELECT COUNT(*) AS n FROM runs r JOIN companies c ON c.id = r.company_id
        WHERE r.status != 'DELETED' ${certifierFilter}`
@@ -491,9 +499,9 @@ router.get('/', (req, res) => {
        WHERE r.company_id = ?${ownScope} AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
       params: isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
     };
-    rows = all(`${listed.sql}
-       ORDER BY r.queued_at DESC
-       LIMIT ? OFFSET ?`, [...listed.params, limit, offset]);
+    rows = all(`${listed.sql}${cursorSql}
+       ORDER BY r.queued_at DESC, r.id DESC
+       LIMIT ? OFFSET ?`, [...listed.params, ...cursorParams, limit, offset]);
     total = get(
       `SELECT COUNT(*) AS n FROM runs WHERE company_id = ?${ownScopeCount} AND status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
       isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
@@ -504,11 +512,24 @@ router.get('/', (req, res) => {
   // was counted, listed and selected from part of its runs. With
   // whole_batches=1 the other runs of each batch on the page are added, read
   // under the same rule as the page.
+  const last = rows.length === limit ? rows.at(-1) : null;
+  const nextBefore = last ? { at: last.queued_at, id: last.id } : null;
   if (req.query.whole_batches === '1') rows = withWholeBatches(rows, listed);
   rows = withBatchLabels(rows);
 
-  return res.json({ total: total.n, limit, offset, runs: rows });
+  return res.json({ total: total.n, limit, offset, runs: rows, next_before: nextBefore });
 });
+
+// before_at + before_id, both or neither: null when absent, false when only
+// one is given or either is not one plain short value.
+function runsCursorOf(query) {
+  const at = query.before_at;
+  const id = query.before_id;
+  if (at === undefined && id === undefined) return null;
+  const plain = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+  if (!plain(at, 40) || !plain(id, 64)) return false;
+  return { at, id };
+}
 
 // #1029 PR 3: each run of a batch chosen at launch carries what it was
 // chosen by, in words (runFilters.selectionLabel()); null otherwise.
