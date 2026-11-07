@@ -35,8 +35,9 @@ function inClusterConfig(env = process.env, read = fs.readFileSync) {
   const host = env.KUBERNETES_SERVICE_HOST;
   if (!host) throw new Error('not in a Kubernetes pod (KUBERNETES_SERVICE_HOST is not set)');
   const port = env.KUBERNETES_SERVICE_PORT || '443';
+  const hostPart = host.includes(':') ? `[${host}]` : host;     // an IPv6 address goes in brackets
   return {
-    base: `https://${host.includes(':') ? `[${host}]` : host}:${port}`,
+    base: `https://${hostPart}:${port}`,
     ca: read(`${SA_DIR}/ca.crt`),
     tokenFile: `${SA_DIR}/token`,
     ownNamespace: read(`${SA_DIR}/namespace`, 'utf8').trim(),

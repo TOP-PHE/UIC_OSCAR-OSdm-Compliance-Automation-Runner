@@ -209,7 +209,7 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
     const stop = () => {
       if (!run || run.stopped || run.done) return;
       run.stopped = true;
-      removeRun(run);                     // the pod is stopped; its log, then the run, end
+      void removeRun(run);                // the pod is stopped; its log, then the run, end (removeRun logs its own failure)
     };
 
     socket.on('data', P.lineReader((text) => {
@@ -230,8 +230,8 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
       ).finally(() => {
         run.done = true;
         running.delete(run);
-        removeRun(run);
-      });
+        return removeRun(run);
+      }).catch((err) => log.warn?.(`[run-dispatcher] ${run.name}: ${err?.message || err}`));
       return undefined;
     }, () => finish({ t: 'refused', reason: 'line too long' })));
 

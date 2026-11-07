@@ -251,6 +251,8 @@ describe('a run in a pod of its own', () => {
     const done = ask(req, { socketRef: ref, onMessage: (m, socket) => { if (m.t === 'out') socket.destroy(); } });
     await done;
     await until(() => !api.s.jobs.has(J.jobNameOf(req.runId)));
+    expect(api.s.jobs.has(J.jobNameOf(req.runId))).toBe(false);
+    expect(api.s.secrets.has(J.jobNameOf(req.runId))).toBe(false);
   });
 
   test('a pod that cannot pull its image ends the run at once, saying so', async () => {
