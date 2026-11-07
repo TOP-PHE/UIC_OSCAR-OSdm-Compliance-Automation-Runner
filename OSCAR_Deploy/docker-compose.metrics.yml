@@ -163,7 +163,7 @@ services:
   # logs through the Grafana "OSCAR · Logs" dashboard provisioned alongside
   # the Overview dashboard.
   loki:
-    image: grafana/loki:3.4.1@sha256:1d0c5ddc7644b88956aa0bd775ad796d9635180258a225d6ab3552751d5e2a66
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
     container_name: oscar-loki
     restart: unless-stopped
     command: -config.file=/etc/loki/loki-config.yaml
