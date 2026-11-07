@@ -1470,6 +1470,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Everything it makes carries `app.kubernetes.io/managed-by=oscar-dispatcher`
   and is removed at its start. Tests use a stand-in API server
   (`run-dispatcher.test.js` `fakeApi()`): extend it, never mock the client.
+  **PR 4 (1.11.490): `RUN_ISOLATION=pod`.** `launchRun()` (launcher; `launch()`
+  refuses kinds in pod mode) sends `{ kind: 'run', runId, envName, envYml
+  (base64), deadlineSeconds, env }` to `RUN_AGENT_HOST:RUN_AGENT_PORT` (the
+  dispatcher); `podProblem()` needs `RUN_SERVER_URL` and `INTERNAL_PORT`.
+  `RemoteProcess` sends any request object and emits `pod` (address). In
+  `executeRun`, `podMode` skips the workspace, the env file on disk, its
+  deletion and `valDir`; step 10 is `linkUploadedResults()` (report names by
+  `reportCodeOf()`, the date prefix the pod's). **The run's secret is bound
+  to its pod's address** (`runSecrets.bindAddress()` from the `pod` message,
+  `fromRunAddress()` on first use, both after the secret is verified:
+  `verifiedRunCompany()`; `internalRunCaller()` adds the pod address in pod
+  mode only). A mismatch withdraws the secret and stops the run
+  (`onRunPodAddress()`).
   **The server touches a run's working folder only through
   `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
   folder, so nothing there is followed as a link. Reads open with

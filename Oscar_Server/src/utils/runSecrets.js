@@ -60,6 +60,37 @@ function verify(runId, secret) {
   return rec.companyId;
 }
 
+// Run isolation, option 4 (#1130): a run in a pod of its own calls the
+// internal port from its pod's address. Its secret is bound to that address:
+// the one the dispatcher reports, else the first one the secret came from.
+const plainAddress = (address) => String(address || '').replace(/^::ffff:/, '');
+
+/**
+ * Binds a run's secret to its pod's address (the dispatcher's word). Returns
+ * false when the secret was already used from another address: the caller
+ * then revokes it.
+ */
+function bindAddress(runId, address) {
+  const rec = _byRun.get(runId);
+  const a = plainAddress(address);
+  if (!rec || !a) return false;
+  if (rec.address && rec.address !== a) return false;
+  rec.address = a;
+  return true;
+}
+
+/**
+ * Whether the run's secret, already verified, may come from `address`: its
+ * bound address, or (none yet) this one, which it is then bound to.
+ */
+function fromRunAddress(runId, address) {
+  const rec = _byRun.get(runId);
+  const a = plainAddress(address);
+  if (!rec || !a) return false;
+  if (!rec.address) rec.address = a;
+  return rec.address === a;
+}
+
 /** Drop a run's secret. Called when the Bruno child exits. Idempotent. */
 function revoke(runId) {
   _byRun.delete(runId);
@@ -70,4 +101,4 @@ function _clear() {
   _byRun.clear();
 }
 
-module.exports = { issue, verify, revoke, _clear };
+module.exports = { issue, verify, revoke, bindAddress, fromRunAddress, _clear };

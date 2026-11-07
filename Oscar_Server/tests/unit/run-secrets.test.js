@@ -65,3 +65,32 @@ describe('runSecrets', () => {
     expect(runSecrets.verify('run-1', second)).toBe('company-A');
   });
 });
+
+// Option 4 (#1130): a run in a pod of its own calls from its pod's address.
+describe('the address a run pod calls from', () => {
+  beforeEach(() => runSecrets._clear());
+
+  test('the first address the secret comes from is the run\'s; another is refused', () => {
+    runSecrets.issue('run-1', 'company-A');
+    expect(runSecrets.fromRunAddress('run-1', '::ffff:10.1.0.9')).toBe(true);
+    expect(runSecrets.fromRunAddress('run-1', '10.1.0.9')).toBe(true);
+    expect(runSecrets.fromRunAddress('run-1', '10.1.0.10')).toBe(false);
+  });
+
+  test('the dispatcher\'s word binds it; a secret used from elsewhere first is not rebound', () => {
+    runSecrets.issue('run-1', 'company-A');
+    expect(runSecrets.bindAddress('run-1', '10.1.0.9')).toBe(true);
+    expect(runSecrets.fromRunAddress('run-1', '10.9.9.9')).toBe(false);
+    runSecrets.issue('run-2', 'company-A');
+    expect(runSecrets.fromRunAddress('run-2', '10.9.9.9')).toBe(true);
+    expect(runSecrets.bindAddress('run-2', '10.1.0.9')).toBe(false);
+  });
+
+  test('no run, no address: nothing is bound', () => {
+    expect(runSecrets.fromRunAddress('none', '10.1.0.9')).toBe(false);
+    expect(runSecrets.bindAddress('none', '10.1.0.9')).toBe(false);
+    runSecrets.issue('run-1', 'company-A');
+    expect(runSecrets.fromRunAddress('run-1', '')).toBe(false);
+    expect(runSecrets.bindAddress('run-1', undefined)).toBe(false);
+  });
+});

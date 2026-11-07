@@ -35,7 +35,7 @@ describe('mode', () => {
 
   test('a mode the server does not know refuses runs, and says which', () => {
     process.env.RUN_ISOLATION = 'separate';
-    expect(L.launcherProblem()).toMatch(/^RUN_ISOLATION="separate" is not a mode this server knows \(local, isolated\)/);
+    expect(L.launcherProblem()).toMatch(/^RUN_ISOLATION="separate" is not a mode this server knows \(local, isolated, pod\)/);
     expect(() => L.launch('bru', { args: [], cwd: '/w', env: {} })).toThrow(/not a mode this server knows/);
     expect(spawn).not.toHaveBeenCalled();
   });
@@ -77,5 +77,62 @@ describe('RUN_WORKSPACES_DIR', () => {
     } finally {
       if (saved === undefined) delete process.env.RUN_WORKSPACES_DIR; else process.env.RUN_WORKSPACES_DIR = saved;
     }
+  });
+});
+
+// Option 4 (#1130): pod mode, a whole run per request to the run dispatcher.
+describe('pod mode', () => {
+  const net = require('node:net');
+  const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_AGENT_HOST', 'RUN_AGENT_PORT', 'RUN_SERVER_URL', 'INTERNAL_PORT'];
+  const saved = {};
+  beforeEach(() => {
+    for (const k of keys) saved[k] = process.env[k];
+    Object.assign(process.env, { RUN_ISOLATION: 'pod', RUN_AGENT_TOKEN: 't'.repeat(40), RUN_SERVER_URL: 'http://oscar-internal:3003', INTERNAL_PORT: '3003' });
+  });
+  afterEach(() => { for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
+
+  test.each([
+    ['RUN_AGENT_TOKEN', 'short', /RUN_AGENT_TOKEN/],
+    ['RUN_AGENT_PORT', 'x', /RUN_AGENT_PORT/],
+    ['RUN_SERVER_URL', 'oscar-internal', /RUN_SERVER_URL/],
+    ['INTERNAL_PORT', '', /INTERNAL_PORT/],
+  ])('%s = %p: no run is started', (key, value, message) => {
+    process.env[key] = value;
+    expect(L.launcherProblem()).toMatch(message);
+  });
+
+  test('the settings are complete: no problem; a process by kind is refused', () => {
+    expect(L.launcherProblem()).toBeNull();
+    expect(() => L.launch('bru', { args: [], cwd: '.', env: {} })).toThrow(/launchRun/);
+  });
+
+  test('a whole run goes to the dispatcher with the run\'s credentials only; its pod\'s address comes back', async () => {
+    let request;
+    const server = net.createServer((socket) => {
+      socket.once('data', (chunk) => {
+        request = JSON.parse(chunk.toString().split('\n')[0]);
+        socket.write(`${JSON.stringify({ t: 'started' })}\n${JSON.stringify({ t: 'pod', address: '10.1.0.9' })}\n`);
+        socket.end(`${JSON.stringify({ t: 'exit', code: 0 })}\n`);
+      });
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    process.env.RUN_AGENT_HOST = '127.0.0.1';
+    process.env.RUN_AGENT_PORT = String(server.address().port);
+    const proc = L.launchRun({
+      runId: '11111111-2222-3333-4444-555555555555', envName: 'OTST_x_11111111_Env', envYml: 'bmFtZTogeAo=',
+      deadlineSeconds: 600, env: { OSCAR_ACCESS_TOKEN: 'tok', OSCAR_RUN_SECRET: 's', ENCRYPTION_KEY: 'never' },
+    });
+    const pod = new Promise((resolve) => proc.on('pod', resolve));
+    const code = await new Promise((resolve) => proc.on('close', resolve));
+    server.close();
+    expect(await pod).toBe('10.1.0.9');
+    expect(code).toBe(0);
+    expect(request).toMatchObject({ kind: 'run', runId: '11111111-2222-3333-4444-555555555555', deadlineSeconds: 600, token: 't'.repeat(40) });
+    expect(request.env).toEqual({ OSCAR_ACCESS_TOKEN: 'tok', OSCAR_RUN_SECRET: 's' });
+  });
+
+  test('outside pod mode, a whole run is refused', () => {
+    process.env.RUN_ISOLATION = 'local';
+    expect(() => L.launchRun({ runId: 'x', envName: 'e', envYml: 'e', deadlineSeconds: 60, env: {} })).toThrow(/pod mode only/);
   });
 });

@@ -22,16 +22,17 @@ const P = require('../runner-agent/protocol');
 class RemoteProcess extends EventEmitter {
   /**
    * @param {{ host: string, port: number, token: string }} agent
-   * @param {{ kind: string, args: string[], cwd: string, env: object }} request
+   * @param {object} request  { kind, args, cwd, env } for the runner agent, or
+   *   a whole run for the run dispatcher ({ kind: 'run', runId, envName, ... })
    */
-  constructor(agent, { kind, args, cwd, env }) {
+  constructor(agent, request) {
     super();
     this.stdout = new EventEmitter();
     this.stderr = new EventEmitter();
     this.exitCode = null;
     this._done = false;
     this._socket = net.connect(agent.port, agent.host, () => {
-      this._socket.write(P.line({ v: P.VERSION, token: agent.token, kind, args, cwd, env }));
+      this._socket.write(P.line({ v: P.VERSION, token: agent.token, ...request }));
     });
     this._socket.on('data', P.lineReader((text) => this._onLine(text), () => this._fail('the runner agent sent a line too long')));
     this._socket.on('error', (err) => this._fail(`the runner agent could not be reached (${err.code || err.message})`));
@@ -44,6 +45,7 @@ class RemoteProcess extends EventEmitter {
     if (msg?.t === 'out' && typeof msg.d === 'string') this.stdout.emit('data', Buffer.from(msg.d, 'utf8'));
     else if (msg?.t === 'err' && typeof msg.d === 'string') this.stderr.emit('data', Buffer.from(msg.d, 'utf8'));
     else if (msg?.t === 'exit') this._finish(Number.isInteger(msg.code) ? msg.code : null);
+    else if (msg?.t === 'pod' && typeof msg.address === 'string') this.emit('pod', msg.address.slice(0, 64));
     else if (msg?.t === 'refused') this._fail(`the runner agent refused: ${String(msg.reason || '').slice(0, 200)}`);
     return undefined;
   }

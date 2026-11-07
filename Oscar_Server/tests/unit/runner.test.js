@@ -646,6 +646,126 @@ describe('executeRun — RUN_ISOLATION=isolated', () => {
   });
 });
 
+// Option 4 (#1130): each run in a pod of its own, which the dispatcher makes.
+// The run is one request; nothing is started or written here; the pod's
+// results come back through the internal port (utils/runResults.js).
+describe('executeRun — RUN_ISOLATION=pod (#1130)', () => {
+  const runSecrets = require('../../src/utils/runSecrets');
+  const runResults = require('../../src/utils/runResults');
+  const { readEnvYml, valueIn } = require('../helpers/env-yml');
+  const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_AGENT_HOST', 'RUN_SERVER_URL', 'INTERNAL_PORT', 'JSON_SCHEMA_URL'];
+  const saved = {};
+  beforeEach(() => {
+    for (const k of keys) saved[k] = process.env[k];
+    Object.assign(process.env, {
+      RUN_ISOLATION: 'pod', RUN_AGENT_TOKEN: 't'.repeat(40), RUN_AGENT_HOST: 'oscar-dispatcher',
+      RUN_SERVER_URL: 'http://oscar-internal:3003', INTERNAL_PORT: '3003',
+    });
+    delete process.env.JSON_SCHEMA_URL;
+  });
+  afterEach(() => {
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+    RemoteProcess.mockReset();
+  });
+
+  async function startPodRun() {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-pod');
+    spawn.mockClear();
+    const calls = [];
+    RemoteProcess.mockImplementation(function FakeRemote(agent, request) {
+      const proc = makeFakeProc();
+      calls.push({ agent, request, proc });
+      return proc;
+    });
+    const done = executeRun({ runId, companyId, userId });
+    const start = Date.now();
+    while (calls.length === 0 && Date.now() - start < 4000) await new Promise((r) => setTimeout(r, 10));
+    expect(calls).toHaveLength(1);
+    return { runId, done, ...calls[0] };
+  }
+  const shortEnv = (envName) => envName.replace(/^OTST_/, '').replace(/_Env$/, '');
+
+  test('one run request to the dispatcher: the environment file, the deadline and the run\'s credentials; nothing here', async () => {
+    const { runId, agent, request, proc, done } = await startPodRun();
+    expect(agent).toMatchObject({ host: 'oscar-dispatcher', port: 3002, token: 't'.repeat(40) });
+    expect(request).toMatchObject({ kind: 'run', runId, deadlineSeconds: 600 });
+    const file = readEnvYml(Buffer.from(request.envYml, 'base64').toString('utf8'));
+    expect(file.name).toBe(request.envName);
+    expect(valueIn(file, 'data_base')).toMatch(/^http:\/\/oscar-internal:3003\/data\/runner-test-[0-9a-f]{8}-datafile\.json$/);
+    expect(valueIn(file, 'json_schema')).toBe('http://oscar-internal:3003/json_validator/datafile.schema.json');
+    expect(valueIn(file, 'oscar_loopback_base')).toBe('http://oscar-internal:3003');
+    expect(valueIn(file, '__runId')).toBe(runId);
+    expect(Object.keys(request.env).sort()).toEqual(['OSCAR_ACCESS_TOKEN', 'OSCAR_RUN_SECRET']);
+    expect(request.env.OSCAR_ACCESS_TOKEN).toBe('tok-pod');
+    expect(spawn).not.toHaveBeenCalled();
+    expect(fs.existsSync(path.join(ENVS_DIR, `${request.envName}.yml`))).toBe(false);
+    expect(fs.existsSync(path.join(path.resolve(__dirname, '../../data/workspaces'), runId))).toBe(false);
+    proc.emit('close', 0);
+    expect((await done).exitCode).toBe(0);
+  });
+
+  test('the run\'s secret is bound to its pod\'s address', async () => {
+    const { runId, request, proc, done } = await startPodRun();
+    proc.emit('pod', '10.1.0.9');
+    expect(runSecrets.verify(runId, request.env.OSCAR_RUN_SECRET)).not.toBeNull();
+    expect(runSecrets.fromRunAddress(runId, '::ffff:10.1.0.9')).toBe(true);
+    expect(runSecrets.fromRunAddress(runId, '10.1.0.10')).toBe(false);
+    proc.emit('close', 0);
+    await done;
+  });
+
+  test('a secret already used from another address is withdrawn, and the run stopped', async () => {
+    const { runId, request, proc, done } = await startPodRun();
+    expect(runSecrets.fromRunAddress(runId, '10.9.9.9')).toBe(true);     // the first caller with the secret
+    proc.emit('pod', '10.1.0.9');                                         // the dispatcher names another
+    expect(runSecrets.verify(runId, request.env.OSCAR_RUN_SECRET)).toBeNull();
+    expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
+    proc.emit('close', 143);
+    await done;
+    expect(getDecryptedEvents(runId).some((e) => e.level === 'error' && /not its pod's/.test(e.message))).toBe(true);
+  });
+
+  test('the results the pod sent are linked as the run\'s artifacts, then removed', async () => {
+    const { runId, request, proc, done } = await startPodRun();
+    const env = shortEnv(request.envName);
+    await runResults.storeRunResult(runId, `20261107_${env}_SIM_SALE_1ADT_Report.html`, Buffer.from('<html>scenario</html>'));
+    await runResults.storeRunResult(runId, `20261107_${env}_Report.html`, Buffer.from('<html>merged</html>'));
+    await runResults.storeRunResult(runId, `.bru_results_${runId.slice(0, 8)}.json`, Buffer.from('{"results":[]}'));
+    proc.emit('close', 0);
+    await done;
+    const artifacts = require('../../src/db/db').all('SELECT type, filename FROM run_artifacts WHERE run_id = ?', [runId]);
+    expect(artifacts.map((a) => `${a.type}:${a.filename}`).sort()).toEqual(['html_report:report_SIM_SALE_1ADT.html', 'json_results:.bru_results.json']);
+    expect(await runResults.listRunResults(runId)).toEqual([]);
+  });
+
+  test('without a scenario report, mergeReport.js\'s is linked; with nothing sent, the run says so', async () => {
+    const first = await startPodRun();
+    await runResults.storeRunResult(first.runId, `20261107_${shortEnv(first.request.envName)}_Report.html`, Buffer.from('<html>merged</html>'));
+    first.proc.emit('close', 0);
+    await first.done;
+    const linked = require('../../src/db/db').all('SELECT filename FROM run_artifacts WHERE run_id = ?', [first.runId]);
+    expect(linked.map((a) => a.filename)).toEqual(['report.html']);
+
+    const second = await startPodRun();
+    second.proc.emit('close', 1);
+    await second.done;
+    expect(getDecryptedEvents(second.runId).some((e) => e.level === 'warn' && /sent no result file/.test(e.message))).toBe(true);
+  });
+
+  test('a mode set to pod without its settings starts nothing', async () => {
+    delete process.env.RUN_SERVER_URL;
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    RemoteProcess.mockClear();
+    const result = await executeRun({ runId, companyId, userId });
+    expect(result.exitCode).toBe(1);
+    expect(RemoteProcess).not.toHaveBeenCalled();
+    expect(getRunRow(runId).error_message).toMatch(/RUN_SERVER_URL/);
+  });
+});
+
 // Option 2b: a mode the server does not know starts no run, and spawns nothing.
 describe('executeRun — RUN_ISOLATION', () => {
   test('an unknown mode refuses the run before a token is asked for', async () => {

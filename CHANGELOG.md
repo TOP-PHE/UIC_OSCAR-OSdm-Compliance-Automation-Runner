@@ -162,6 +162,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.490] — 2026-11-07
+
+### Added
+
+- **`RUN_ISOLATION=pod`: each run in a pod of its own** (run isolation,
+  option 4, part 4; #1130). Listed in `compatibility.json` (2026.528) without
+  moving `current_release`: released with the other option 4 parts. The
+  server sends the run dispatcher one `run` request per run
+  (`launchRun()`, `worker/launcher.js`), at `RUN_AGENT_HOST:RUN_AGENT_PORT`
+  with `RUN_AGENT_TOKEN`: the environment file built in memory (base64), the
+  run's deadline (its budget, at least 60 s) and the run's credentials. No
+  working folder, no environment file and no process here. The run's data
+  file, schema and token refresh are at `RUN_SERVER_URL`, the internal port
+  (`INTERNAL_PORT` must be set). The pod's log is the run's output, as
+  before; stop, time limits and the idle watchdog go to the dispatcher. **The
+  run's secret is bound to its pod's address**: the one the dispatcher
+  reports, else the first one the secret came from on the internal port
+  (`runSecrets.bindAddress()` / `fromRunAddress()`, checked after the secret,
+  so only its holder binds it); a secret already used from another address is
+  withdrawn and the run stopped. The handlers now check the secret first
+  (`verifiedRunCompany()` in `server.js`). The results the pod sent are linked
+  from `utils/runResults.js` (every scenario report, else mergeReport.js's,
+  and Bruno's results), then removed. A mode set to `pod` without
+  `RUN_SERVER_URL` or `INTERNAL_PORT` starts no run and says why.
+- Tests: `runner.test.js` (the request, the environment file's addresses,
+  nothing written or started here, the pod's address binding the secret, a
+  secret used elsewhere withdrawn, the results linked and removed, the
+  merge report as fallback, a pod that sent nothing, missing settings),
+  `launcher.test.js` (pod mode's settings, a whole run over a real socket and
+  the pod's address coming back) and `run-secrets.test.js` (the binding).
+
+---
+
 ## [server-1.11.489] — 2026-11-07
 
 ### Added
