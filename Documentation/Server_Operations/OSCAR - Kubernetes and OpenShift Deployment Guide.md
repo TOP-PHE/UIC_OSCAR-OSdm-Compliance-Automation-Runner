@@ -347,15 +347,23 @@ To switch:
    # overlays/<yours>/kustomization.yaml
    components:
      - ../../components/pod-runs
-   configMapGenerator:
-     - name: oscar-dispatcher-settings
-       behavior: merge
-       literals:
-         - RUN_IMAGE=registry.example.org/oscar/oscar-run:release-2026.528
+   patches:
+     - patch: |-
+         apiVersion: v1
+         kind: ConfigMap
+         metadata:
+           name: oscar-dispatcher-settings
+         data:
+           RUN_IMAGE: registry.example.org/oscar/oscar-run:release-2026.528
    ```
 
-   The dispatcher's own image is the cluster image (`oscar-bundle`), as the
-   server's is.
+   A patch, not a `configMapGenerator` with `behavior: merge`: kustomize
+   runs an overlay's own generators before its components, so a merge into
+   a ConfigMap the component makes finds nothing ("does not exist; cannot
+   merge"), and a merge into `oscar-settings` of a key the component sets
+   (`RUN_SERVER_URL`…) is overwritten by the component. Change any value the
+   component sets with a patch like this one. The dispatcher's own image is
+   the cluster image (`oscar-bundle`), as the server's is.
 4. **Apply** (section 6). OSCAR's pod comes back with one container, and the
    `oscar-dispatcher` Deployment starts beside it. The Secret `oscar-runner`
    (section 4) is the key the server and the dispatcher share.

@@ -487,12 +487,68 @@ describe('pod mode (option 4)', () => {
     const workflow = fs.readFileSync(path.join(REPO, '.github/workflows/ci-kubernetes.yml'), 'utf8');
     const ci = load('ci/pod-mode/kustomization.yaml');
     expect(ci.components).toEqual(['../../components/pod-runs']);
-    const ciDispatcher = envOf((ci.configMapGenerator.find(g => g.name === 'oscar-dispatcher-settings').literals).join('\n'));
-    expect(ciDispatcher.RUN_IMAGE).toBe('local/oscar-run:ci');
+    expect(runImagePatchOf(ci)).toBe('local/oscar-run:ci');
     expect(workflow).toContain('kind load docker-image local/oscar-run:ci --name oscar');
     expect(workflow).toContain('kubectl apply -k OSCAR_Deploy/kubernetes/ci/pod-runs');
     expect(workflow).toContain('kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/ci/pod-mode');
     expect(workflow).toContain('OSCAR_Deploy/kubernetes/ci/probe-run-network.sh');
     expect(load('ci/pod-runs/kustomization.yaml').resources).toEqual(['../../runs']);
   });
+
+  // kustomize (5.1 and later) runs a kustomization's own generators before its
+  // components: a `behavior: merge` into a ConfigMap a component makes fails
+  // ("does not exist; cannot merge"), and one setting a key a component also
+  // merges is overwritten by the component. The kind CI met the first.
+  function mergeProblems(k, dir) {
+    const theirs = (k.components || []).flatMap(c => load(path.posix.join(dir, c, 'kustomization.yaml')).configMapGenerator || []);
+    const problems = [];
+    for (const g of (k.configMapGenerator || []).filter(x => x.behavior === 'merge')) {
+      const same = theirs.filter(c => c.name === g.name);
+      if (same.some(c => !c.behavior || c.behavior === 'create')) {
+        problems.push(`${g.name}: made by a component`);
+        continue;
+      }
+      const keys = new Set(same.flatMap(c => Object.keys(envOf((c.literals || []).join('\n')))));
+      for (const key of Object.keys(envOf((g.literals || []).join('\n')))) if (keys.has(key)) problems.push(`${g.name}: ${key} is a component's`);
+    }
+    return problems;
+  }
+
+  test('an overlay sets what a component makes with a patch, never a merge', () => {
+    const found = [];
+    const walk = (dir) => {
+      for (const e of fs.readdirSync(path.join(K8S, dir), { withFileTypes: true })) {
+        const rel = path.posix.join(dir, e.name);
+        if (e.isDirectory()) walk(rel);
+        else if (e.name === 'kustomization.yaml') found.push(rel);
+      }
+    };
+    walk('.');
+    const users = found.map(rel => ({ rel, k: load(rel) })).filter(({ k }) => k.kind !== 'Component' && k.components);
+    expect(users.map(u => u.rel)).toContain('ci/pod-mode/kustomization.yaml');
+    for (const { rel, k } of users) expect([rel, mergeProblems(k, path.posix.dirname(rel))]).toEqual([rel, []]);
+    // The mutation this guards against.
+    const merged = { ...load('ci/pod-mode/kustomization.yaml') };
+    merged.configMapGenerator = [...merged.configMapGenerator,
+      { name: 'oscar-dispatcher-settings', behavior: 'merge', literals: ['RUN_IMAGE=x'] },
+      { name: 'oscar-settings', behavior: 'merge', literals: ['RUN_SERVER_URL=http://x:3003'] }];
+    expect(mergeProblems(merged, 'ci/pod-mode')).toEqual(['oscar-dispatcher-settings: made by a component', 'oscar-settings: RUN_SERVER_URL is a component\'s']);
+  });
+
+  test('the guide\'s overlay for pod mode names the run image with a patch', () => {
+    const guide = fs.readFileSync(path.join(REPO, 'Documentation/Server_Operations/OSCAR - Kubernetes and OpenShift Deployment Guide.md'), 'utf8');
+    const start = guide.indexOf('## 10a.');
+    const section = guide.slice(start, guide.indexOf('\n## ', start + 1));
+    const blocks = [...section.matchAll(/```yaml\n([\s\S]*?)```/g)].map(m => yaml.load(m[1].replace(/^ {3}/gm, '')));
+    const overlay = blocks.find(b => b?.components);
+    expect(overlay.components).toEqual(['../../components/pod-runs']);
+    expect(mergeProblems(overlay, 'overlays/kubernetes')).toEqual([]);
+    expect(runImagePatchOf(overlay)).toMatch(/\/oscar-run:/);
+  });
 });
+
+// RUN_IMAGE as an overlay's strategic-merge patch of oscar-dispatcher-settings sets it.
+function runImagePatchOf(k) {
+  const patches = (k.patches || []).filter(p => p.patch).map(p => yaml.load(p.patch));
+  return patches.find(p => p?.kind === 'ConfigMap' && p.metadata?.name === 'oscar-dispatcher-settings')?.data?.RUN_IMAGE;
+}

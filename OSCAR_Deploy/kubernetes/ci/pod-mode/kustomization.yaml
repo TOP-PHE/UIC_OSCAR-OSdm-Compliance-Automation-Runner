@@ -24,11 +24,17 @@ configMapGenerator:
       # The simulator answers on the runner's address, over http.
       - ALLOW_PRIVATE_TARGETS=1
       - MAX_CONCURRENT_RUNS=2
-  - name: oscar-dispatcher-settings
-    behavior: merge
-    literals:
-      - RUN_IMAGE=local/oscar-run:ci
 patches:
+  # The component makes oscar-dispatcher-settings, and an overlay's own
+  # generators run before its components: a merge here would find nothing.
+  # A patch runs after them (and the name's hash is added last).
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: oscar-dispatcher-settings
+      data:
+        RUN_IMAGE: local/oscar-run:ci
   - target:
       kind: Deployment
       name: oscar
