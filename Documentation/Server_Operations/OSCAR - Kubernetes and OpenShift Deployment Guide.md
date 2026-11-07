@@ -22,10 +22,18 @@ are checked by reading, not by running. Tell us what you meet.
 
 ## 1. What runs, and what does not change
 
-OSCAR is **one pod**: the Node.js server, its SQLite database on a persistent
-volume, its run queue in memory, and one Bruno process per running scenario,
-started by the server inside the same container. That is the same program as
-on the VPS; only the packaging differs.
+OSCAR is **one pod of two containers**, from the same image:
+
+- `oscar`, the Node.js server, with its SQLite database on a persistent
+  volume and its run queue in memory;
+- `runner`, the runner agent, which starts one Bruno process per running
+  scenario when the server asks. It holds none of the server's data, settings
+  or secrets: not the data volume, not `oscar-secrets`. The two share only the
+  runs' working folders (an `emptyDir`) and the pod's network; they do not see
+  each other's processes.
+
+That is the same program as on the VPS (where the runner is the optional
+`oscar-runner` service); only the packaging differs.
 
 | | VPS (Docker Compose) | Cluster (this guide) |
 |---|---|---|
@@ -90,6 +98,14 @@ kubectl create namespace oscar          # OpenShift: oc new-project oscar
 kubectl -n oscar create secret generic oscar-secrets --from-env-file=secrets.env
 ```
 
+The runner container has a Secret of its own, `oscar-runner`, holding only
+the key the server and the runner share. The pod does not start without it:
+
+```bash
+kubectl -n oscar create secret generic oscar-runner \
+  --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
+```
+
 | Key | What it is |
 |---|---|
 | `ENCRYPTION_KEY` | encrypts every stored credential, data file and report. `openssl rand -hex 32`. **Keep a copy apart from the backups**: the volume cannot be read without it. |
@@ -127,14 +143,15 @@ change one, add it to the overlay's `configMapGenerator` literals
 
 | Setting | Default | When to change it |
 |---|---|---|
-| `MAX_CONCURRENT_RUNS` | 6 | with the pod's CPU limit: about 4 runs per CPU. One run is about 0.2 CPU and 250 MB. Raise `resources.limits` (in a patch) and this together. |
+| `MAX_CONCURRENT_RUNS` | 6 | with the `runner` container's CPU limit: about 4 runs per CPU. One run is about 0.2 CPU and 250 MB. Raise that container's `resources.limits` (in a patch) and this together. |
 | `TRUST_PROXY_HOPS` | 1 | 2 when a load balancer that adds its own `X-Forwarded-For` sits in front of the router or ingress controller. Too low: every user shares one login rate limit, so one person's failed logins lock everyone out. Too high: a user can pick the address they are counted under. |
 | `TZ` | Europe/Paris | the time zone of logs and e-mails |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM` | none | to send registration, approval and password-reset e-mails |
 | `ALLOW_PRIVATE_TARGETS` | not set | section 7 |
 
-The volume asks for 20 GiB (`base/data-volume.yaml`): reports and run
-workspaces grow with the number of runs.
+The volume asks for 20 GiB (`base/data-volume.yaml`): reports grow with the
+number of runs. The runs' working folders are an `emptyDir` of 4 GiB, emptied
+as each run ends.
 
 ## 6. Deploy
 
@@ -257,6 +274,9 @@ cluster it stays empty.
 
 ## 10. Updating
 
+**From a deployment made before the runner container**: create the Secret
+`oscar-runner` (section 4) before you apply, or the new pod waits for it.
+
 Build the new release's images (section 3), change `newTag` in the overlay,
 apply. The old pod stops, the new one starts and migrates the database: OSCAR
 is unavailable for that time. Runs in progress are cut off; they are marked
@@ -289,3 +309,6 @@ for long: a migration is not undone.
 | Long requests end with 504 | the router's timeout: `proxy-read-timeout` / `haproxy.router.openshift.io/timeout` (660 s) |
 | `/health` shows `compatibility_status: "untested_combination"` | the image was not built from one release: rebuild from a `release-…` tag |
 | Prometheus gets 404 on `/metrics` | its bearer token is not `METRICS_TOKEN` |
+| The pod stays in `CreateContainerConfigError` | the Secret `oscar-runner` is missing (section 4) |
+| Every run fails at once: *the runner agent could not be reached* | the `runner` container is not running: `kubectl -n oscar logs deploy/oscar -c runner` |
+| The `runner` container stops at once, naming a secret or the database | it was given the server's settings (an `envFrom` or a volume added in a patch): it refuses to run beside them |

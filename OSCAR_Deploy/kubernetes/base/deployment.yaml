@@ -61,6 +61,16 @@ spec:
                 name: oscar-settings
             - secretRef:
                 name: oscar-secrets
+          env:
+            # The key the runner container asks for (below). A Secret of its
+            # own, oscar-runner, so that the runner never receives
+            # oscar-secrets: kubectl create secret generic oscar-runner
+            #   --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
+            - name: RUN_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: oscar-runner
+                  key: RUN_AGENT_TOKEN
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -105,27 +115,96 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
-          # One run (a Bruno process) takes about 0.2 CPU and 250 MB, so
-          # MAX_CONCURRENT_RUNS (settings.env) is about 4 per CPU. Raise the
-          # limits and that setting together.
+          # The server alone: the runs are the runner container's.
           resources:
             requests:
-              cpu: 500m
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
               memory: 1Gi
+          volumeMounts:
+            # The database, data files and run reports.
+            - name: data
+              mountPath: /app/data
+            # The runs' working folders, shared with the runner.
+            - name: run-workspaces
+              mountPath: /app/run-workspaces
+            # HOME points here (settings.env): an OpenShift uid has no home.
+            - name: tmp
+              mountPath: /tmp
+        # The runner: the same image, running the runner agent, which starts
+        # the Bruno CLI of each run (RUN_ISOLATION=isolated in settings.env).
+        # It gets none of the server's settings, secrets or data: not the data
+        # volume, not oscar-secrets, not the server's /tmp. The containers of a
+        # pod share the network (the agent listens on 127.0.0.1 only, Bruno
+        # calls the server back on 127.0.0.1) but not their processes: the
+        # code of a run cannot see the server's process or its environment.
+        - name: runner
+          image: oscar-bundle
+          imagePullPolicy: IfNotPresent
+          command: ["node", "src/runner-agent/agent.js"]
+          env:
+            - name: RUN_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: oscar-runner
+                  key: RUN_AGENT_TOKEN
+            - name: RUN_WORKSPACES_DIR
+              value: /app/run-workspaces
+            - name: BRU_CMD
+              value: /usr/local/bin/bru
+            - name: NODE_ENV
+              value: production
+            - name: HOME
+              value: /tmp
+            - name: TZ
+              value: Europe/Paris
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+          # The agent listens on the pod's loopback only, which a kubelet
+          # tcpSocket probe (the pod's address) cannot reach.
+          startupProbe:
+            exec:
+              command: ["node", "-e", "require('node:net').connect(3002,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            exec:
+              command: ["node", "-e", "require('node:net').connect(3002,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          # One run (a Bruno process) takes about 0.2 CPU and 250 MB, so
+          # MAX_CONCURRENT_RUNS (settings.env) is about 4 per CPU of this
+          # limit. Raise the limits and that setting together.
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
             limits:
               cpu: "2"
               memory: 3Gi
           volumeMounts:
-            # The database, data files, run reports and run workspaces.
-            - name: data
-              mountPath: /app/data
-            # HOME points here (settings.env): an OpenShift uid has no home.
-            - name: tmp
+            - name: run-workspaces
+              mountPath: /app/run-workspaces
+            - name: runner-tmp
               mountPath: /tmp
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: oscar-data
         - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: run-workspaces
+          emptyDir:
+            sizeLimit: 4Gi
+        - name: runner-tmp
           emptyDir:
             sizeLimit: 1Gi

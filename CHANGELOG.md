@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Kubernetes and OpenShift: runs in a container of their own** (run
+  isolation, part 4 of 4). Deployment files, CI and documentation only. The
+  pod has a second container, `runner`, from the same image: it starts the
+  Bruno CLI of each run and holds none of the server's data, settings or
+  secrets (`RUN_ISOLATION=isolated` in `base/settings.env`). Its key is a
+  Secret of its own, `oscar-runner`, **to create before applying** (guide,
+  section 4; section 10 for an existing deployment). The kind CI runs the
+  scenario through it and checks that the runner holds no server secret, no
+  database and sees no server process.
+
 - **Releases and deployment: what reaches production, and who holds the
   keys.** Workflows, deployment files and documentation only: no server,
   collection or simulator code change, nothing to release.

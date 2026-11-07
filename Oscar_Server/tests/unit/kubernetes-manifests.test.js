@@ -117,6 +117,7 @@ describe('the pod', () => {
   test('the data directory is the volume, /tmp an emptyDir, HOME in /tmp', () => {
     expect(container.volumeMounts).toEqual([
       { name: 'data', mountPath: '/app/data' },
+      { name: 'run-workspaces', mountPath: settings.RUN_WORKSPACES_DIR },
       { name: 'tmp', mountPath: '/tmp' },
     ]);
     expect(pod.volumes.find(v => v.name === 'data').persistentVolumeClaim.claimName).toBe('oscar-data');
@@ -133,12 +134,64 @@ describe('the pod', () => {
     expect(load('base/kustomization.yaml').configMapGenerator[0].name).toBe('oscar-settings');
   });
 
+  test('settings and secrets reach the server, and the runner\'s key comes from a Secret of its own', () => {
+    expect(container.env).toEqual([
+      { name: 'RUN_AGENT_TOKEN', valueFrom: { secretKeyRef: { name: 'oscar-runner', key: 'RUN_AGENT_TOKEN' } } },
+    ]);
+  });
+
   test('the Service selects the pod', () => {
     const service = load('base/service.yaml');
     for (const [k, v] of Object.entries(service.spec.selector)) {
       expect(deployment.spec.template.metadata.labels[k]).toBe(v);
     }
     expect(service.spec.ports).toEqual([{ name: 'http', port: 3001, targetPort: 'http' }]);
+  });
+});
+
+describe('the runner container (run isolation)', () => {
+  const runner = pod.containers.find(c => c.name === 'runner');
+  const { SERVER_SECRETS, startupProblem } = require('../../src/runner-agent/agent');
+  const envOfRunner = Object.fromEntries((runner.env || []).filter(e => 'value' in e).map(e => [e.name, e.value]));
+
+  test('the server sends its runs there', () => {
+    expect(pod.containers.map(c => c.name)).toEqual(['oscar', 'runner']);
+    expect(settings.RUN_ISOLATION).toBe('isolated');
+    // The pod's containers share 127.0.0.1: the agent's and the server's defaults.
+    expect(settings).not.toHaveProperty('RUN_AGENT_HOST');
+    expect(settings).not.toHaveProperty('RUN_SERVER_URL');
+  });
+
+  test('the same image, the agent, and none of the server\'s settings, secrets or data', () => {
+    expect(runner.image).toBe(container.image);
+    expect(runner.command).toEqual(['node', 'src/runner-agent/agent.js']);
+    expect(runner.envFrom).toBeUndefined();
+    expect(runner.volumeMounts).toEqual([
+      { name: 'run-workspaces', mountPath: settings.RUN_WORKSPACES_DIR },
+      { name: 'runner-tmp', mountPath: '/tmp' },
+    ]);
+    expect(envOfRunner.RUN_WORKSPACES_DIR).toBe(settings.RUN_WORKSPACES_DIR);
+    expect(envOfRunner.BRU_CMD).toBe(settings.BRU_CMD);
+    for (const k of [...SERVER_SECRETS, ...secretKeys]) expect(runner.env.map(e => e.name)).not.toContain(k);
+    expect(runner.env.find(e => e.name === 'RUN_AGENT_TOKEN')).toEqual(container.env[0]);
+    expect(startupProblem({ ...envOfRunner, RUN_AGENT_TOKEN: 'x'.repeat(64) }, () => false)).toBeNull();
+  });
+
+  test('the two share the run folders only, and not their processes', () => {
+    expect(pod.shareProcessNamespace).toBeUndefined();
+    for (const name of ['run-workspaces', 'runner-tmp']) {
+      expect(pod.volumes.find(v => v.name === name).emptyDir).toBeDefined();
+    }
+    expect(runner.securityContext.allowPrivilegeEscalation).toBe(false);
+    expect(runner.securityContext.capabilities.drop).toEqual(['ALL']);
+  });
+
+  test('its probes reach the agent on the pod\'s loopback, at its port', () => {
+    const agent = fs.readFileSync(path.join(REPO, 'Oscar_Server/src/runner-agent/agent.js'), 'utf8');
+    expect(agent).toContain("process.env.RUN_AGENT_PORT || '3002'");
+    for (const probe of ['startupProbe', 'livenessProbe']) {
+      expect(runner[probe].exec.command.join(' ')).toContain("connect(3002,'127.0.0.1')");
+    }
   });
 });
 
@@ -261,6 +314,11 @@ describe('what CI deploys', () => {
     expect(workflow).toContain(`= ${user.runAsUser}`);
   });
 
+  test('both CI deployments create the runner\'s Secret, and check what the runner holds', () => {
+    expect(workflow.match(/create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN=/g)).toHaveLength(2);
+    expect(workflow).toContain('exec deploy/oscar -c runner');
+  });
+
   test('both CI deployments use the image the workflow builds', () => {
     const build = /build-images\.sh (\S+) (\S+)/.exec(workflow);
     for (const rel of ['ci/openshift-like/kustomization.yaml', 'ci/kubernetes/kustomization.yaml']) {
@@ -271,7 +329,8 @@ describe('what CI deploys', () => {
   });
 
   test('the workflow runs when what it deploys changes', () => {
-    for (const p of ['OSCAR_Deploy/kubernetes/**', 'Oscar_Server/Dockerfile', 'Oscar_Server/src/server.js', 'Oscar_Server/src/utils/clusterSettings.js']) {
+    for (const p of ['OSCAR_Deploy/kubernetes/**', 'Oscar_Server/Dockerfile', 'Oscar_Server/src/server.js', 'Oscar_Server/src/utils/clusterSettings.js',
+      'Oscar_Server/src/runner-agent/**', 'Oscar_Server/src/utils/runAgentPeer.js']) {
       expect(workflow.split(`'${p}'`).length - 1).toBe(2);   // pull_request and push
     }
   });

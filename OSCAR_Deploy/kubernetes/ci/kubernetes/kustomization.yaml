@@ -33,6 +33,14 @@ patches:
         value:
           cpu: 250m
           memory: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/1/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/1/resources/requests
+        value:
+          cpu: 100m
+          memory: 256Mi
   - target:
       kind: PersistentVolumeClaim
       name: oscar-data

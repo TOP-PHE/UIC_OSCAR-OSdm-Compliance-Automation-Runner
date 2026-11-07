@@ -26,6 +26,8 @@ on:
       - 'Oscar_Server/src/server.js'
       - 'Oscar_Server/src/utils/clusterSettings.js'
       - 'Oscar_Server/src/worker/**'
+      - 'Oscar_Server/src/runner-agent/**'
+      - 'Oscar_Server/src/utils/runAgentPeer.js'
       - '.github/workflows/ci-kubernetes.yml'
   push:
     branches: [main]
@@ -37,6 +39,8 @@ on:
       - 'Oscar_Server/src/server.js'
       - 'Oscar_Server/src/utils/clusterSettings.js'
       - 'Oscar_Server/src/worker/**'
+      - 'Oscar_Server/src/runner-agent/**'
+      - 'Oscar_Server/src/utils/runAgentPeer.js'
       - '.github/workflows/ci-kubernetes.yml'
   schedule:
     - cron: '23 5 * * 1'
@@ -131,10 +135,29 @@ jobs:
             "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$boot" "$metrics" > "$RUNNER_TEMP/secrets.env"
           kubectl -n oscar create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
           rm "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
           kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/ci/openshift-like
           kubectl -n oscar rollout status deployment/oscar --timeout=300s
-          test "$(kubectl -n oscar exec deploy/oscar -- id -u)" = 1000740000
-          test "$(kubectl -n oscar exec deploy/oscar -- id -g)" = 0
+          test "$(kubectl -n oscar exec deploy/oscar -c oscar -- id -u)" = 1000740000
+          test "$(kubectl -n oscar exec deploy/oscar -c oscar -- id -g)" = 0
+
+      - name: The runner holds none of the server's data, secrets or processes
+        run: |
+          r() { kubectl -n oscar exec deploy/oscar -c runner -- "$@"; }
+          test "$(kubectl -n oscar exec deploy/oscar -c oscar -- printenv RUN_ISOLATION)" = isolated
+          # No secret of the server in its environment.
+          for k in ENCRYPTION_KEY JWT_SECRET PLATFORM_BOOTSTRAP_TOKEN METRICS_TOKEN SMTP_PASS; do
+            if r printenv "$k" > /dev/null; then echo "the runner holds $k"; exit 1; fi
+          done
+          # No database: the data volume is not mounted there.
+          r node -e "process.exit(require('node:fs').existsSync('/app/data/oscar.db') ? 1 : 0)"
+          # No server process in its view.
+          r node -e "
+            const fs = require('node:fs');
+            const seen = fs.readdirSync('/proc').filter(p => /^\d+$/.test(p))
+              .map(p => { try { return fs.readFileSync('/proc/' + p + '/cmdline', 'utf8'); } catch { return ''; } });
+            if (seen.some(c => c.includes('src/' + 'server.js'))) { console.error(seen); process.exit(1); }
+          "
 
       - name: Run a scenario through the API (ci/smoke.sh)
         run: |
@@ -153,9 +176,11 @@ jobs:
             "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > "$RUNNER_TEMP/secrets.env"
           kubectl -n oscar-k8s create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
           rm "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar-k8s create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
           kubectl -n oscar-k8s apply -k OSCAR_Deploy/kubernetes/ci/kubernetes
           kubectl -n oscar-k8s rollout status deployment/oscar --timeout=300s
-          test "$(kubectl -n oscar-k8s exec deploy/oscar -- id -u)" = 1000
+          test "$(kubectl -n oscar-k8s exec deploy/oscar -c oscar -- id -u)" = 1000
+          test "$(kubectl -n oscar-k8s exec deploy/oscar -c runner -- id -u)" = 1000
           kubectl -n oscar-k8s get ingress oscar
 
       - name: The OpenShift overlay renders
@@ -172,7 +197,8 @@ jobs:
             echo "=== $ns"
             kubectl -n "$ns" get all,pvc,configmap,events 2>&1 | tail -n 60 || true
             kubectl -n "$ns" describe pod -l app.kubernetes.io/name=oscar 2>&1 | tail -n 60 || true
-            kubectl -n "$ns" logs deploy/oscar --tail=200 2>&1 || true
+            kubectl -n "$ns" logs deploy/oscar -c oscar --tail=200 2>&1 || true
+            kubectl -n "$ns" logs deploy/oscar -c runner --tail=100 2>&1 || true
           done
           echo "=== simulator"
           tail -n 100 "$RUNNER_TEMP/simulator.log" || true
