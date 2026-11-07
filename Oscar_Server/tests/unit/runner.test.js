@@ -599,6 +599,27 @@ describe('executeRun — W3C trace context', () => {
 });
 
 // The run's copy takes values from the Test Framework: one holding "{{" refuses the run.
+// Option 2b: a mode the server does not know starts no run, and spawns nothing.
+describe('executeRun — RUN_ISOLATION', () => {
+  test('an unknown mode refuses the run before a token is asked for', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    spawn.mockClear();
+    resolveAccessToken.mockClear();
+    const saved = process.env.RUN_ISOLATION;
+    process.env.RUN_ISOLATION = 'nonsense';
+    try {
+      const out = await executeRun({ runId, companyId, userId });
+      expect(out.exitCode).toBe(1);
+      expect(out.error).toMatch(/^RUN_ISOLATION="nonsense" is not a mode this server knows/);
+      expect(resolveAccessToken).not.toHaveBeenCalled();
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      if (saved === undefined) delete process.env.RUN_ISOLATION; else process.env.RUN_ISOLATION = saved;
+    }
+  });
+});
+
 describe('executeRun — a Test Framework holding "{{"', () => {
   test('the run is refused before a token is asked for or Bruno started', async () => {
     const { companyId, userId } = seedCompanyUser();

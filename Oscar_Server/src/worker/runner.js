@@ -24,7 +24,7 @@
 const path        = require('node:path');
 const { tokenErrorText } = require('../utils/tokenErrors');
 const fs          = require('node:fs');
-const { spawn }   = require('node:child_process');
+const { launch, launcherProblem } = require('./launcher');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
@@ -48,7 +48,6 @@ const RUN_ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const COLLECTION_PATH = process.env.COLLECTION_PATH || '';
-const BRU_CMD         = process.env.BRU_CMD || 'bru.cmd';
 // v1.11.115: default to the schema OSCAR serves itself (loopback — Bruno
 // runs inside the same container as the server). Previously an unset
 // JSON_SCHEMA_URL produced an empty json_schema env var and every run
@@ -59,7 +58,11 @@ const JSON_SCHEMA_URL = process.env.JSON_SCHEMA_URL ||
   `http://127.0.0.1:${process.env.PORT || 3001}/json_validator/datafile.schema.json`;
 const ARTIFACTS_DIR   = path.resolve(__dirname, '../../data/artifacts');
 const ENVS_DIR        = path.join(COLLECTION_PATH, 'environments');
-const WORKSPACES_DIR  = path.resolve(__dirname, '../../data/workspaces');
+// A run's working folder (collection copy, env file, reports). RUN_WORKSPACES_DIR
+// puts them outside data/, on a volume a runner agent shares (option 2b).
+const WORKSPACES_DIR  = process.env.RUN_WORKSPACES_DIR
+  ? path.resolve(process.env.RUN_WORKSPACES_DIR)
+  : path.resolve(__dirname, '../../data/workspaces');
 
 // ── What a child process may inherit (tracker NEW-01) ────────────────────────
 // process.env holds ENCRYPTION_KEY, JWT_SECRET and the SMTP credentials. No
@@ -841,6 +844,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   //     is written, before anything is started.
   const refusal = refusedRunScope(runRow, companyId, effectiveUserId)
     || refusedSuspendedEndpoint(companyId)
+    || launcherProblem()
     || refusedScenarioCode(scenarioOverride)
     || await refusedApiBase(companyRow.api_base)
     || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email })
@@ -1049,19 +1053,17 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // The collection sends it back as a header on both loopback calls; the
     // routes bind it to this run's company. Revoked when the child exits.
     safeEnv.OSCAR_RUN_SECRET = runSecrets.issue(runId, companyRow.id);
-    // Shell mode is only required when BRU_CMD points at a Windows
-    // batch wrapper (.cmd / .bat) — direct execve cannot launch those.
-    // On Linux / macOS / Windows-with-.exe we use shell: false so
-    // arguments cannot be reinterpreted by sh -c (closes Sonar S4721
-    // command-injection hotspot). args remains an array either way; the
-    // change only affects whether the shell wraps the invocation.
-    const needsShell = process.platform === 'win32'
-      && /\.(cmd|bat)$/i.test(BRU_CMD);
-    const proc = spawn(BRU_CMD, args, {
-      cwd:   runCwd,
-      shell: needsShell,
-      env:   safeEnv
-    });
+    // Started by kind through the launcher (worker/launcher.js), which
+    // keeps the shell off unless BRU_CMD is a Windows batch wrapper.
+    let proc;
+    try {
+      proc = launch('bru', { args, cwd: runCwd, env: safeEnv });
+    } catch (err) {
+      runSecrets.revoke(runId);
+      logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
+      resolve(1);
+      return;
+    }
     // Register for emergency-stop (killRun). Cleared in close/error below.
     _activeProcs.set(runId, proc);
 
@@ -1293,11 +1295,14 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     const htmlExitCode = await new Promise((resolve) => {
       // NEW-01: the same allowlist as the Bruno spawn, and none of the run's
       // credentials — the script reads its argument and two files, nothing else.
-      const proc = spawn(process.execPath, [mergeReportJs, envName], {
-        cwd:   runCwd,
-        shell: false,
-        env:   childBaseEnv()
-      });
+      let proc;
+      try {
+        proc = launch('merge', { args: [envName], cwd: runCwd, env: childBaseEnv() });
+      } catch (err) {
+        logEvent(runId, 'error', err.message);
+        resolve(1);
+        return;
+      }
       proc.stdout.on('data', c => logEvent(runId, 'stdout', c.toString().trim()));
       proc.stderr.on('data', c => logEvent(runId, 'stderr', c.toString().trim()));
       proc.on('close', code => resolve(code ?? 0));
@@ -1394,4 +1399,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs };
+module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, WORKSPACES_DIR };

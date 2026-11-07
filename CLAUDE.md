@@ -1387,6 +1387,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     a new save site in `scenarios.js` must too, and
     `scenarios-load-guard.test.js` counts the PUT sites. Upload, delete and the
     scenario copy are not checked, on purpose.
+- **A run's processes are started by kind, through `worker/launcher.js`**
+  (run isolation, part 1, 1.11.481): `launch('bru' | 'merge', { args, cwd,
+  env })`, never a path, so a runner agent in another container (part 2,
+  `RUN_ISOLATION=isolated`) can start exactly these two and nothing else.
+  `RUN_ISOLATION` (default `local`, the old child processes) refuses runs
+  for a mode it does not know; `RUN_WORKSPACES_DIR` moves the working
+  folders out of `data/`. A new process a run needs is a new kind there.
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's

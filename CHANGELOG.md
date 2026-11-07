@@ -138,6 +138,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.481] — 2026-11-07
+
+### Changed
+
+- **A run's processes are started by kind, through one launcher** (run
+  isolation, part 1 of 4). `worker/launcher.js` starts the Bruno CLI (`bru`)
+  and the collection's report merger (`merge`) for the runner, by kind, never
+  by path. `RUN_ISOLATION` names the mode: `local` (default) starts them as
+  before, as child processes of the server; any other value refuses runs with
+  a sentence saying so. `RUN_WORKSPACES_DIR` moves the runs' working folders
+  out of `data/` when set (default unchanged). Nothing else changes: the
+  runner's tests pass as they were.
+
+---
+
 ## [server-1.11.480] — 2026-11-06
 
 ### Security
