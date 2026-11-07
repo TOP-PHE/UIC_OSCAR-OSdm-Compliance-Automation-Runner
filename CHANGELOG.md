@@ -200,6 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OscarRunPodsNotStarting` (a pod that never ran: image, quota, pod
   security) and `OscarRunDispatcherRefusing`. In any other mode they stay
   empty.
+- **News** (`public/news/index.json`): "On Kubernetes and OpenShift, each run
+  can have a pod of its own" (Security), for the whole of option 4.
 - Tests: `runner.test.js` (the start time once the pod is named, one outcome
   per run, a refusal, the outcomes against the dispatcher's codes) and
   `run-pod-metrics.test.js` (the dashboard and the alerts read only what the

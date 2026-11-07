@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-07-run-pods",
+    "date": "November 7, 2026",
+    "tag": "Security",
+    "title": "On Kubernetes and OpenShift, each run can have a pod of its own",
+    "summary": "An organisation that runs OSCAR on its own cluster can now run each test in a pod of its own, made for that run and removed after it, apart from the server and from every other run.",
+    "content": "Since the previous releases, a run of the test collection is kept apart from the OSCAR server: it has none of the server's data or secrets. On a Kubernetes or OpenShift cluster it can now go one step further: each run is a pod of its own, in a namespace of its own, started for that run and removed when it ends. Runs going at the same time no longer share anything, and a run pod can reach only the providers and the one OSCAR address it needs.\n\nThe OSCAR - Kubernetes and OpenShift Deployment Guide (section 10a) explains how to switch it on. Two new alerts and a row of the OSCAR Overview dashboard show how quickly run pods start and how they end.\n\nNothing changes for users of the UIC OSCAR, and no action is required."
+  },
+  {
     "id": "2026-11-05-simulator-nearby-stop-trip",
     "date": "November 5, 2026",
     "tag": "New",
