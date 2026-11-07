@@ -10,7 +10,10 @@
 # deploy (git checkout release-YYYY.NNN):
 #   <prefix>/oscar-server:<tag>  the server (Oscar_Server/Dockerfile), as on the VPS
 #   <prefix>/oscar:<tag>         that image + Bruno_Collection/ + compatibility.json
-# The cluster runs the second one; push it to a registry the cluster can read.
+#   <prefix>/oscar-run:<tag>     one run in a pod of its own (#1130): Bruno, the
+#                                collection and Oscar_Server/src/run-pod only
+# The cluster runs the second one (and the third, with RUN_ISOLATION=pod);
+# push them to a registry the cluster can read.
 #
 #   OSCAR_Deploy/kubernetes/build-images.sh registry.example.org/oscar release-2026.480
 #   docker push registry.example.org/oscar/oscar:release-2026.480
@@ -47,4 +50,11 @@ if [ "$cli" = podman ]; then ignore="--ignorefile=$here/Dockerfile.bundle.docker
   --build-arg "OSCAR_SERVER_IMAGE=$prefix/oscar-server:$tag" \
   -t "$prefix/oscar:$tag" "$root"
 
-echo "Built $prefix/oscar-server:$tag and $prefix/oscar:$tag"
+# The run image (#1130): Bruno, the collection and the run pod's entrypoint,
+# for one run in a pod of its own. Same context and ignore-file rule.
+ignore=""
+if [ "$cli" = podman ]; then ignore="--ignorefile=$here/Dockerfile.run.dockerignore"; fi
+# shellcheck disable=SC2086
+"$cli" build -f "$here/Dockerfile.run" $ignore -t "$prefix/oscar-run:$tag" "$root"
+
+echo "Built $prefix/oscar-server:$tag, $prefix/oscar:$tag and $prefix/oscar-run:$tag"

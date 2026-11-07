@@ -32,6 +32,9 @@ const {
   readRunFile, writeRunFile, removeRunFile, listRunFolder, makeRunFolder,
   copyIntoRunFolder, copyFileIntoRunFolder,
 } = require('./runFolder');
+const {
+  COLLECTION_DIRS, COLLECTION_FILES, MERGE_RESULTS_NAME, bruResultsName, bruRunArgs,
+} = require('../run-pod/runLayout');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken, dropCachedToken } = require('./access-token');
 const { credentialsFor } = require('../utils/testerCredentials');
@@ -745,12 +748,9 @@ async function createWorkspace(runId) {
     makeRunFolder(realDir, 'Validation_Reports', inRunFolder),
   ]);
 
-  // Copy collection folders into workspace, in parallel for speed.
-  const copyDirs = [
-    '00-Access Token', '01-System Infos Requests', '02-Common Requests',
-    '03-Refund', '04-Exchange', 'library-bruno', 'data_base'
-  ];
-  await Promise.all(copyDirs.map(async (item) => {
+  // Copy collection folders into workspace, in parallel for speed (the
+  // lists are the run pod's too, run-pod/runLayout.js).
+  await Promise.all(COLLECTION_DIRS.map(async (item) => {
     const src  = path.join(COLLECTION_PATH, item);
     if (await fsExists(src)) {
       await copyIntoRunFolder(src, realDir, item, inRunFolder);
@@ -758,8 +758,7 @@ async function createWorkspace(runId) {
   }));
 
   // Copy collection-level files
-  const copyFiles = ['opencollection.yml', '.gitignore'];
-  await Promise.all(copyFiles.map((file) =>
+  await Promise.all(COLLECTION_FILES.map((file) =>
     copyFileIntoRunFolder(path.join(COLLECTION_PATH, file), realDir, file, inRunFolder)));
 
   return { dir: workspaceDir, realDir };
@@ -884,7 +883,7 @@ async function mergeAndStoreResults({ runId, runCwd, valDir, bruJsonFile, envNam
   if (results === null) return;
   logEvent(runId, 'info', '[runner] Running mergeReport.js...');
 
-  const stdJson = '.bru_results.json';
+  const stdJson = MERGE_RESULTS_NAME;
   try {
     await writeRunFile(valDir, stdJson, results, { ...reports, mode: 0o644 });
   } catch (err) {
@@ -1179,8 +1178,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // runCwd is either the workspace (Linux) or COLLECTION_PATH (Windows).
   // Each run gets its own JSON file to prevent collisions under concurrent execution.
   const valDir         = path.join(runCwd, 'Validation_Reports');
-  const bruJsonFile    = `.bru_results_${runIdShort}.json`;
-  const bruJsonRel     = `Validation_Reports/${bruJsonFile}`;             // relative to cwd
+  const bruJsonFile    = bruResultsName(runId);   // the run pod names it alike (run-pod/runLayout.js)
 
   if (!workspaceDir) await fs.promises.mkdir(valDir, { recursive: true });
   logEvent(runId, 'info', `[runner] Spawning bru.cmd — env=${envName} cwd=${runCwd}`);
@@ -1204,12 +1202,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const TOKEN_FORMAT_PATTERN = /Error parsing environment|YAMLParseError|Unexpected scalar/i;
 
   const exitCode = await new Promise((resolve) => {
-    const args = [
-      'run',
-      '--sandbox=developer',
-      `--env`, envName,
-      `--reporter-json`, bruJsonRel    // relative path — no spaces issue
-    ];
+    // Relative --reporter-json path (no spaces issue); the run pod starts Bruno alike.
+    const args = bruRunArgs(envName, runId);
 
     // Security: only the allowlisted env vars, never process.env — it holds
     // ENCRYPTION_KEY, JWT_SECRET and the SMTP credentials (CHILD_ENV_ALLOWLIST).

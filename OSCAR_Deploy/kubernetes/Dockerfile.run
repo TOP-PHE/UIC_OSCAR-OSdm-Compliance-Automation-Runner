@@ -1,0 +1,53 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# The run image (run isolation, option 4, #1130): one run in a pod of its own,
+# created when the run starts and deleted after it. It holds the Bruno CLI from
+# the server's lockfile (the engine production runs), the collection of the
+# same checkout, and the run pod's entrypoint (Oscar_Server/src/run-pod): no
+# other server code, no database, no server secret. The run's own credentials
+# come from its pod's Secret.
+#
+# Built from the repository root by build-images.sh, with
+# Dockerfile.run.dockerignore. The base image is the server's, by digest:
+# kubernetes-manifests.test.js keeps the two equal, as Dependabot moves the
+# server's.
+FROM node:22-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d
+
+# Security patches of the base image, and a CA store for the providers' TLS.
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# The Bruno CLI as the server image installs it (#545): the same lockfile,
+# no install script, then npm and corepack removed.
+COPY Oscar_Server/bruno-cli/package.json Oscar_Server/bruno-cli/package-lock.json /opt/bruno-cli/
+RUN cd /opt/bruno-cli && \
+    npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
+    ln -s /opt/bruno-cli/node_modules/.bin/bru /usr/local/bin/bru && \
+    bru --version && \
+    cd / && \
+    rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+           /usr/local/bin/corepack \
+           /root/.npm
+
+COPY --chown=0:0 Bruno_Collection/ /collection/
+COPY --chown=0:0 Oscar_Server/src/run-pod/ /opt/run-pod/
+
+# The work folder (an emptyDir in the pod, the root file system read-only)
+# belongs to group 0 too: OpenShift runs any uid in group 0.
+RUN mkdir -p /work && chown 1000:0 /work && chmod 0770 /work
+ENV HOME=/tmp NODE_ENV=production
+WORKDIR /work
+USER 1000
+
+ENTRYPOINT ["node", "/opt/run-pod/entrypoint.js"]

@@ -218,6 +218,43 @@ describe('the image', () => {
   });
 });
 
+// #1130: one run in a pod of its own. The run image holds Bruno, the
+// collection and the run pod's entrypoint, and nothing else of the server.
+describe('the run image (option 4)', () => {
+  const runImage = read('Dockerfile.run');
+  const fromOf = (text) => text.split('\n').filter(l => l.startsWith('FROM ')).map(l => l.split(/\s+/)[1]);
+
+  test('its base image is the server\'s, by digest', () => {
+    const server = fromOf(dockerfile);
+    expect(fromOf(runImage)).toEqual([server[server.length - 1]]);
+    expect(fromOf(runImage)[0]).toMatch(/@sha256:[0-9a-f]{64}$/);
+  });
+
+  test('Bruno is installed as the server image installs it', () => {
+    const install = (text) => text.split('\n')
+      .filter(l => /npm ci --omit=dev --ignore-scripts|ln -s \/opt\/bruno-cli|bru --version/.test(l)).map(l => l.trim());
+    expect(install(runImage)).toEqual(install(dockerfile));
+  });
+
+  test('of the server, it copies the run pod\'s entrypoint only', () => {
+    const copies = runImage.split('\n').filter(l => l.startsWith('COPY ')).map(l => l.replace(/--chown=\S+ /, '').split(/\s+/).slice(1, -1)).flat();
+    expect(copies.filter(c => c.startsWith('Oscar_Server/'))).toEqual(
+      ['Oscar_Server/bruno-cli/package.json', 'Oscar_Server/bruno-cli/package-lock.json', 'Oscar_Server/src/run-pod/']);
+    expect(runImage).toMatch(/^USER 1000$/m);
+    expect(runImage).toMatch(/^ENTRYPOINT \["node", "\/opt\/run-pod\/entrypoint\.js"\]$/m);
+    const ignore = read('Dockerfile.run.dockerignore').split('\n').map(l => l.trim());
+    expect(ignore).toEqual(expect.arrayContaining(['*', '!Oscar_Server/src/run-pod', '!Bruno_Collection', 'Bruno_Collection/Validation_Reports']));
+    expect(ignore.filter(l => l.startsWith('!Oscar_Server/'))).toEqual(
+      ['!Oscar_Server/bruno-cli/package.json', '!Oscar_Server/bruno-cli/package-lock.json', '!Oscar_Server/src/run-pod']);
+  });
+
+  test('build-images.sh builds it from the repository root', () => {
+    const script = read('build-images.sh');
+    expect(script).toContain('build -f "$here/Dockerfile.run" $ignore -t "$prefix/oscar-run:$tag" "$root"');
+    expect(script).toContain('--ignorefile=$here/Dockerfile.run.dockerignore');
+  });
+});
+
 describe('settings and secrets', () => {
   const SECRETS = ['ENCRYPTION_KEY', 'JWT_SECRET', 'PLATFORM_BOOTSTRAP_TOKEN', 'METRICS_TOKEN', 'SMTP_PASS'];
 
@@ -330,7 +367,7 @@ describe('what CI deploys', () => {
 
   test('the workflow runs when what it deploys changes', () => {
     for (const p of ['OSCAR_Deploy/kubernetes/**', 'Oscar_Server/Dockerfile', 'Oscar_Server/src/server.js', 'Oscar_Server/src/utils/clusterSettings.js',
-      'Oscar_Server/src/runner-agent/**', 'Oscar_Server/src/utils/runAgentPeer.js']) {
+      'Oscar_Server/src/runner-agent/**', 'Oscar_Server/src/utils/runAgentPeer.js', 'Oscar_Server/src/run-pod/**']) {
       expect(workflow.split(`'${p}'`).length - 1).toBe(2);   // pull_request and push
     }
   });

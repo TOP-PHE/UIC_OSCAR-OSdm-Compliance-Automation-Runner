@@ -162,6 +162,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.488] — 2026-11-07
+
+### Added
+
+- **The run image, `oscar-run`** (run isolation, option 4, part 2; #1130).
+  Listed in `compatibility.json` (2026.526) without moving `current_release`:
+  released with the other option 4 parts. `OSCAR_Deploy/kubernetes/Dockerfile.run`
+  holds the Bruno CLI installed from the server's lockfile, the collection of
+  the same checkout and the run pod's entrypoint (`Oscar_Server/src/run-pod/`),
+  nothing else of the server; same base image as the server, by digest, uid
+  1000, a group-0 work folder. `build-images.sh` builds it as the third image.
+  The entrypoint (`runPod.js`) takes its inputs from the pod's environment (run
+  id, environment name, the environment file in base64, the internal port's
+  address, the run's secret and credentials), copies the collection into its
+  work folder, writes the environment file, starts Bruno as the server does
+  (`run-pod/runLayout.js`: the collection's items, Bruno's arguments and the
+  result names, now shared with `worker/runner.js` and `utils/runResults.js`),
+  starts `mergeReport.js` without the run's credentials, sends every result
+  file to the internal port with the run's secret (plain files only, at most
+  100 MB) and ends with Bruno's exit code (2 for wrong inputs, nothing
+  started; 127 when Bruno cannot start). Nothing uses it yet: the dispatcher
+  and the server's pod mode follow.
+- Tests: `run-pod.test.js` (a stand-in Bruno and mergeReport.js, a local
+  server for the results: the work folder, Bruno's arguments and environment,
+  no credential to mergeReport.js, only result files sent, exit codes, a link
+  not sent, wrong inputs; the run-pod folder requires only Node's modules and
+  its own files), `kubernetes-manifests.test.js` (base image and Bruno install
+  equal to the server's, nothing else of the server copied, build-images.sh).
+
+---
+
 ## [server-1.11.487] — 2026-11-07
 
 ### Added
