@@ -127,6 +127,12 @@ services:
       - no-new-privileges:true
     # The runs' Bruno processes live here now.
     pids_limit: 2048
+    # A ceiling on the runs' memory, so a run that runs away cannot starve the
+    # server and the monitoring beside it. One run takes about 80 MB on the
+    # VPS (20 at once: 1.6 GB); the default leaves room for twice the server's
+    # run limit. Set RUNNER_MEMORY_LIMIT in .env to change it (e.g. 4g).
+    mem_limit: ${RUNNER_MEMORY_LIMIT:-6g}
+    memswap_limit: ${RUNNER_MEMORY_LIMIT:-6g}
     healthcheck:
       test: ["CMD", "node", "-e", "require('net').connect(3002,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       interval: 30s

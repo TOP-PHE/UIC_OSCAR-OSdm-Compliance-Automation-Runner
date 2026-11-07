@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.521",
+  "current_release": "2026.522",
   "releases": [
+    {
+      "release": "2026.522",
+      "date": "2026-11-06",
+      "server": "1.11.484",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.484: Dashboard 'Show older batches' (GET /v1/runs before_at/before_id, next_before); the runner container's memory capped (RUNNER_MEMORY_LIMIT, 6g)."
+      ]
+    },
     {
       "release": "2026.521",
       "date": "2026-11-06",

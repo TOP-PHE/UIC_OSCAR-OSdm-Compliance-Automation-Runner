@@ -148,6 +148,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.484] — 2026-11-07
+
+### Added
+
+- **Dashboard: "Show older batches".** The Dashboard lists the newest 100
+  runs, so one large batch (several hundred scenarios) filled the page and
+  hid every batch before it. A button under the list now reads the next
+  page, and goes on through a batch larger than a page until older runs
+  appear. `GET /v1/runs` takes `before_at` + `before_id` (both or neither,
+  else 400) and answers `next_before`, the cursor of the next page, in the
+  list's own order (queued_at, then id, so runs queued in the same second
+  are neither skipped nor repeated). A run deleted from the page leaves the
+  older pages too.
+
+### Security
+
+- **The runner container's memory is capped** (VPS, `docker-compose.yml`):
+  6 GB by default (`RUNNER_MEMORY_LIMIT` in `.env`), so runs that run away
+  cannot starve the server and the monitoring. Measured on the VPS: about
+  80 MB per run, 1.6 GB for 20 at once.
+
+---
+
 ## [server-1.11.483] — 2026-11-07
 
 ### Security

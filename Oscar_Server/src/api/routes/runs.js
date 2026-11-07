@@ -373,9 +373,18 @@ router.post('/', runSubmitLimiter, (req, res) => {
 });
 
 // ── GET /v1/runs ──────────────────────────────────────────────────────────────
-router.get('/', (req, res) => {
+// The dashboard's "older batches": the runs after the last one of the page
+// before, in the page's own order (queued_at, then id). A cursor that is not
+// one is refused before the list is read.
+function refuseBadCursor(req, res, next) {
+  if (!pageCursorOf(req.query).problem) return next();
+  return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'before_at and before_id go together: the queued_at and id of the last run of the page before.' });
+}
+
+router.get('/', refuseBadCursor, (req, res) => {
   const limit  = Math.min(Number.parseInt(req.query.limit  || '50',  10), 200);
   const offset = Number.parseInt(req.query.offset || '0',  10);
+  const { sql: cursorSql, params: cursorParams } = pageCursorOf(req.query);
 
   // Issue #60 (v1.10.0) — administrator role no longer reads test data, with
   // ONE narrow exception: the operational data-lifecycle queue. Admins must
@@ -451,9 +460,9 @@ router.get('/', (req, res) => {
        WHERE r.status != 'DELETED' ${certifierFilter}`,
       params: []
     };
-    rows = all(`${listed.sql}
-       ORDER BY r.queued_at DESC
-       LIMIT ? OFFSET ?`, [...listed.params, limit, offset]);
+    rows = all(`${listed.sql}${cursorSql}
+       ORDER BY r.queued_at DESC, r.id DESC
+       LIMIT ? OFFSET ?`, [...listed.params, ...cursorParams, limit, offset]);
     total = get(
       `SELECT COUNT(*) AS n FROM runs r JOIN companies c ON c.id = r.company_id
        WHERE r.status != 'DELETED' ${certifierFilter}`
@@ -491,9 +500,9 @@ router.get('/', (req, res) => {
        WHERE r.company_id = ?${ownScope} AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
       params: isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
     };
-    rows = all(`${listed.sql}
-       ORDER BY r.queued_at DESC
-       LIMIT ? OFFSET ?`, [...listed.params, limit, offset]);
+    rows = all(`${listed.sql}${cursorSql}
+       ORDER BY r.queued_at DESC, r.id DESC
+       LIMIT ? OFFSET ?`, [...listed.params, ...cursorParams, limit, offset]);
     total = get(
       `SELECT COUNT(*) AS n FROM runs WHERE company_id = ?${ownScopeCount} AND status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
       isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
@@ -504,11 +513,32 @@ router.get('/', (req, res) => {
   // was counted, listed and selected from part of its runs. With
   // whole_batches=1 the other runs of each batch on the page are added, read
   // under the same rule as the page.
+  const nextBefore = nextCursorOf(rows, limit);
   if (req.query.whole_batches === '1') rows = withWholeBatches(rows, listed);
   rows = withBatchLabels(rows);
 
-  return res.json({ total: total.n, limit, offset, runs: rows });
+  return res.json({ total: total.n, limit, offset, runs: rows, next_before: nextBefore });
 });
+
+// before_at + before_id, both or neither, each one plain short value: the
+// condition that reads after that run in the list's order. A problem when
+// only one is given or either is not such a value.
+function pageCursorOf(query) {
+  const at = query.before_at;
+  const id = query.before_id;
+  if (at === undefined && id === undefined) return { problem: false, sql: '', params: [] };
+  const plain = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+  if (!plain(at, 40) || !plain(id, 64)) return { problem: true, sql: '', params: [] };
+  return { problem: false, sql: ' AND (r.queued_at < ? OR (r.queued_at = ? AND r.id < ?))', params: [at, at, id] };
+}
+
+// Where the next page starts: the last run of a full page, before
+// whole_batches adds rows; null after a short page.
+function nextCursorOf(rows, limit) {
+  if (rows.length !== limit) return null;
+  const last = rows.at(-1);
+  return { at: last.queued_at, id: last.id };
+}
 
 // #1029 PR 3: each run of a batch chosen at launch carries what it was
 // chosen by, in words (runFilters.selectionLabel()); null otherwise.
