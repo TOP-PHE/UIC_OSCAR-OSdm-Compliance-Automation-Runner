@@ -1442,6 +1442,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   and JSON 404. `internalRunCaller` is `fromThisMachine` until the pod mode
   binds a run's secret to its pod. Never publish that port outside the
   cluster network.
+  **PR 2 (1.11.488): the run image.** `OSCAR_Deploy/kubernetes/Dockerfile.run`
+  (+ `.dockerignore`, repository-root context, built third by
+  `build-images.sh`): Bruno from `bruno-cli`'s lockfile, `/collection`,
+  `/opt/run-pod`, uid 1000, `/work` group 0, entrypoint
+  `src/run-pod/entrypoint.js` → `runPod()`. **`src/run-pod/` requires only
+  `node:` modules and its own files** (a test scans it): the image copies that
+  folder and nothing else of the server. `runLayout.js` is shared with the
+  runner and `runResults.js` (collection items, `bruRunArgs()`,
+  `bruResultsName()`, `resultNameProblem()`): change a run's layout there
+  only. Inputs `OSCAR_RUN_ID`, `OSCAR_ENV_NAME`, `OSCAR_RUN_ENV_YML` (base64),
+  `OSCAR_RESULTS_URL`, `OSCAR_RUN_SECRET` and the credentials
+  (`RUN_CREDENTIALS`, pinned to `childEnv.RUN_ENV_KEYS`); exit 2 = wrong
+  inputs, 127 = Bruno missing, else Bruno's code. `Dockerfile.run`'s `FROM`
+  and Bruno install are pinned to the server Dockerfile's.
   **The server touches a run's working folder only through
   `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
   folder, so nothing there is followed as a link. Reads open with

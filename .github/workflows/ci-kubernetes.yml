@@ -27,6 +27,7 @@ on:
       - 'Oscar_Server/src/utils/clusterSettings.js'
       - 'Oscar_Server/src/worker/**'
       - 'Oscar_Server/src/runner-agent/**'
+      - 'Oscar_Server/src/run-pod/**'
       - 'Oscar_Server/src/utils/runAgentPeer.js'
       - '.github/workflows/ci-kubernetes.yml'
   push:
@@ -40,6 +41,7 @@ on:
       - 'Oscar_Server/src/utils/clusterSettings.js'
       - 'Oscar_Server/src/worker/**'
       - 'Oscar_Server/src/runner-agent/**'
+      - 'Oscar_Server/src/run-pod/**'
       - 'Oscar_Server/src/utils/runAgentPeer.js'
       - '.github/workflows/ci-kubernetes.yml'
   schedule:

@@ -22,6 +22,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { encryptToFileAsync, decryptFromFileAsync } = require('./at-rest');
 const { safeJoinUuid } = require('./paths');
+// The name rule is the run pod's too, which sends only such files (#1130).
+const { resultNameProblem } = require('../run-pod/runLayout');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 const INCOMING = 'incoming';
@@ -31,24 +33,11 @@ const MAX_RESULT_BYTES = 100 * 1024 * 1024;
 const MAX_RUN_RESULT_BYTES = 200 * 1024 * 1024;
 const MAX_RESULT_FILES = 50;
 
-// The names Bruno and the collection give a run's results:
-// {date}_{env}[_{code}]_Report.html, .bru_results_<id>.json, .report_tmp.json.
-// One file name, no folder, nothing that reads as "..".
-const RESULT_NAME_RE = /^\.?[A-Za-z0-9][A-Za-z0-9._-]{0,199}\.(?:html|json)$/;
-
 class ResultRefusal extends Error {
   constructor(status, message) {
     super(message);
     this.status = status;
   }
-}
-
-/** Why `name` cannot be a result file's name, or null. */
-function resultNameProblem(name) {
-  if (typeof name !== 'string' || !RESULT_NAME_RE.test(name) || name.includes('..')) {
-    return 'not the name of a run\'s result file';
-  }
-  return null;
 }
 
 /** The folder the run's results are kept in, or null for a run id that is not one. */

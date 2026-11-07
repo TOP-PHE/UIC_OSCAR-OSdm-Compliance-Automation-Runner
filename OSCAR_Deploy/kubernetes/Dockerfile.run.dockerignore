@@ -1,0 +1,9 @@
+# The run image's build context is the repository root: only the Bruno CLI's
+# lockfile, the collection and the run pod's entrypoint are needed. Local run
+# reports stay out.
+*
+!Oscar_Server/bruno-cli/package.json
+!Oscar_Server/bruno-cli/package-lock.json
+!Oscar_Server/src/run-pod
+!Bruno_Collection
+Bruno_Collection/Validation_Reports

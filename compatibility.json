@@ -4,6 +4,17 @@
   "current_release": "2026.524",
   "releases": [
     {
+      "release": "2026.526",
+      "date": "2026-11-07",
+      "server": "1.11.488",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.488: the run image oscar-run (Dockerfile.run, build-images.sh) and its entrypoint (src/run-pod): one run in a pod of its own, results sent to the internal port, run isolation option 4 part 2 (#1130). Listed, not released: current_release stays until the option 4 parts are released together."
+      ]
+    },
+    {
       "release": "2026.525",
       "date": "2026-11-07",
       "server": "1.11.487",

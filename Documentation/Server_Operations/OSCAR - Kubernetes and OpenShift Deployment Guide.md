@@ -78,9 +78,12 @@ OSCAR_Deploy/kubernetes/build-images.sh registry.example.org/oscar release-2026.
 docker push registry.example.org/oscar/oscar:release-2026.481
 ```
 
-`build-images.sh` makes two images: `…/oscar-server:<tag>` (the server, as on
-the VPS) and `…/oscar:<tag>` (that image plus `Bruno_Collection/` and
-`compatibility.json`, from `Dockerfile.bundle`). The cluster runs the second.
+`build-images.sh` makes three images: `…/oscar-server:<tag>` (the server, as
+on the VPS), `…/oscar:<tag>` (that image plus `Bruno_Collection/` and
+`compatibility.json`, from `Dockerfile.bundle`), and `…/oscar-run:<tag>` (the
+Bruno CLI, the collection and the run pod's entrypoint only, from
+`Dockerfile.run`: one run in a pod of its own, for run isolation option 4,
+#1130). The cluster runs the second; the third is for the per-run pods.
 With Podman: `CONTAINER_CLI=podman OSCAR_Deploy/kubernetes/build-images.sh …`.
 
 After the deployment, `GET /health` names the release that runs
