@@ -183,7 +183,7 @@ services:
   # No host-side file paths to maintain — picks up any new container that
   # docker compose adds to this project automatically.
   promtail:
-    image: grafana/promtail:3.4.1@sha256:8b2aa61745bc4a9343cc47bd391fb935a80e7da0793c7566d5985c75858ba3f8
+    image: grafana/promtail:3.6.8@sha256:6cfa64ec432b24a912d640e2edb940eeae2666f61861a66c121d763dd7241381
     container_name: oscar-promtail
     restart: unless-stopped
     command: -config.file=/etc/promtail/promtail-config.yaml
