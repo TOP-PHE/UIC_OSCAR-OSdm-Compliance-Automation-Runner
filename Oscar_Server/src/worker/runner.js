@@ -24,7 +24,7 @@
 const path        = require('node:path');
 const { tokenErrorText } = require('../utils/tokenErrors');
 const fs          = require('node:fs');
-const { launch, launcherProblem } = require('./launcher');
+const { launch, launcherProblem, isolationMode } = require('./launcher');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
@@ -65,26 +65,9 @@ const WORKSPACES_DIR  = process.env.RUN_WORKSPACES_DIR
   : path.resolve(__dirname, '../../data/workspaces');
 
 // ── What a child process may inherit (tracker NEW-01) ────────────────────────
-// process.env holds ENCRYPTION_KEY, JWT_SECRET and the SMTP credentials. No
-// child process is handed it. The runner starts two: the Bruno CLI, and
-// library-bruno/mergeReport.js, which is a file of the bind-mounted collection
-// and not of the server. Both start from this list and nothing else; a spawn
-// with no `env` option inherits everything, which is what mergeReport.js did.
-// Windows needs ComSpec + PATHEXT for shell:true to find .cmd files.
-const CHILD_ENV_ALLOWLIST = Object.freeze([
-  'PATH', 'PATHEXT', 'ComSpec', 'SystemRoot', 'SystemDrive',
-  'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'USERNAME',
-  'TEMP', 'TMP', 'HOME', 'HOMEDRIVE', 'HOMEPATH',
-  'ProgramFiles', 'ProgramFiles(x86)', 'ProgramData',
-  'NODE_ENV', 'NODE_PATH',
-]);
-function childBaseEnv() {
-  const env = {};
-  for (const key of CHILD_ENV_ALLOWLIST) {
-    if (process.env[key] !== undefined) env[key] = process.env[key];
-  }
-  return env;
-}
+// The list and childBaseEnv() live in worker/childEnv.js, shared with the
+// runner agent, which must not load this module (it opens the database).
+const { CHILD_ENV_ALLOWLIST, childBaseEnv } = require('./childEnv');
 
 // ── Stream backpressure — cap log events per run to prevent OOM/DB bloat ─────
 // A pathological Bruno run could emit millions of log lines (e.g. infinite
@@ -919,7 +902,9 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // 5b. Workspace isolation (Linux only — for parallel/concurrent runs)
   // Only create a workspace when scenarioOverride is set (parallel mode).
   // Sequential runs use COLLECTION_PATH directly — Bruno CLI may not follow symlinks.
-  const useWorkspace = process.platform !== 'win32' && !!scenarioOverride;
+  // An isolated run always has one: the runner agent sees the working
+  // folders only, never the collection's own folder.
+  const useWorkspace = isolationMode() === 'isolated' || (process.platform !== 'win32' && !!scenarioOverride);
   let workspaceDir = null;
   let runCwd = COLLECTION_PATH;
 

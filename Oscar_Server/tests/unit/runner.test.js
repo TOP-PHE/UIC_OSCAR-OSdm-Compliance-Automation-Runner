@@ -38,6 +38,10 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 jest.mock('child_process');
 const { spawn } = require('child_process');
 
+// Isolated mode (option 2b): the runner agent's client, replaced by a fake.
+jest.mock('../../src/worker/remoteProcess', () => ({ RemoteProcess: jest.fn() }));
+const { RemoteProcess } = require('../../src/worker/remoteProcess');
+
 jest.mock('../../src/worker/access-token');
 const { resolveAccessToken, dropCachedToken } = require('../../src/worker/access-token');
 
@@ -599,6 +603,48 @@ describe('executeRun — W3C trace context', () => {
 });
 
 // The run's copy takes values from the Test Framework: one holding "{{" refuses the run.
+// Option 2b: in isolated mode the runner agent starts bru, in a working folder
+// of its own, with the run's credentials only; nothing is spawned here.
+describe('executeRun — RUN_ISOLATION=isolated', () => {
+  const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_WORKSPACES_DIR'];
+  const saved = {};
+  beforeEach(() => {
+    for (const k of keys) saved[k] = process.env[k];
+    process.env.RUN_ISOLATION = 'isolated';
+    process.env.RUN_AGENT_TOKEN = 't'.repeat(40);
+    process.env.RUN_WORKSPACES_DIR = path.resolve(__dirname, '../../data/workspaces');
+  });
+  afterEach(() => { for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
+
+  test('bru goes through the agent, always in a working folder, with the run\'s credentials only', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);           // no scenario: a local run would use the collection folder
+    resolveAccessToken.mockResolvedValueOnce('tok-isolated');
+    spawn.mockClear();
+    const calls = [];
+    RemoteProcess.mockImplementation(function FakeRemote(agent, request) {
+      const proc = makeFakeProc();
+      calls.push({ agent, request, proc });
+      return proc;
+    });
+    const p = executeRun({ runId, companyId, userId });
+    const start = Date.now();
+    while (calls.length === 0 && Date.now() - start < 4000) await new Promise((r) => setTimeout(r, 10));
+    expect(calls).toHaveLength(1);
+    const { agent, request, proc } = calls[0];
+    expect(agent).toMatchObject({ host: '127.0.0.1', port: 3002, token: 't'.repeat(40) });
+    expect(request.kind).toBe('bru');
+    expect(path.dirname(request.cwd)).toBe(path.resolve(__dirname, '../../data/workspaces'));
+    expect(path.basename(request.cwd)).toBe(runId);
+    expect(Object.keys(request.env).sort()).toEqual(['OSCAR_ACCESS_TOKEN', 'OSCAR_RUN_SECRET']);
+    expect(request.env.OSCAR_ACCESS_TOKEN).toBe('tok-isolated');
+    expect(spawn).not.toHaveBeenCalled();
+    proc.emit('close', 0);
+    await p;
+    RemoteProcess.mockReset();
+  });
+});
+
 // Option 2b: a mode the server does not know starts no run, and spawns nothing.
 describe('executeRun — RUN_ISOLATION', () => {
   test('an unknown mode refuses the run before a token is asked for', async () => {
