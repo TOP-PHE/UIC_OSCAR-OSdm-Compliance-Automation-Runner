@@ -96,7 +96,22 @@ const ignoreGone = (promise) => promise.catch((err) => { if (err?.status !== 404
 const podsOf = async (kube, name) => (await kube.listPods(`job-name=${name}`))?.items || [];
 const runStatusOf = (pod) => pod?.status?.containerStatuses?.find((c) => c.name === J.CONTAINER) || pod?.status?.containerStatuses?.[0];
 
-/** The run's pod once it runs or has ended, or { failed } saying why it will not. */
+/** How the Job failed, as { code, reason }, or null while it has not (or is gone). */
+async function jobOutcome(kube, name) {
+  try {
+    const job = await kube.getJob(name);
+    const failed = (job?.status?.conditions || []).find((c) => c.type === 'Failed' && c.status === 'True');
+    if (failed?.reason === 'DeadlineExceeded') return { code: EXIT_TIMEOUT, reason: 'DeadlineExceeded' };
+    if (failed) return { code: 1, reason: String(failed.reason || 'the Job failed').slice(0, 300) };
+  } catch { /* the Job is gone too */ }
+  return null;
+}
+
+/**
+ * The run's pod once it runs or has ended, { ended } when its Job ended with
+ * no pod left to read (a deadline reached before the pod was seen running),
+ * or { failed } saying why it will not start.
+ */
 async function waitForPod(kube, name, { pollMs, startTimeoutMs, isStopped }) {
   const until = Date.now() + startTimeoutMs;
   for (;;) {
@@ -104,6 +119,10 @@ async function waitForPod(kube, name, { pollMs, startTimeoutMs, isStopped }) {
     const pod = (await podsOf(kube, name))[0];
     const state = runStatusOf(pod)?.state || {};
     if (state.running || state.terminated) return { pod };
+    if (!pod) {
+      const ended = await jobOutcome(kube, name);
+      if (ended) return { ended };
+    }
     const waiting = state.waiting?.reason;
     if (waiting && FAILED_WAITING.has(waiting)) return { failed: `${waiting} ${state.waiting.message || ''}`.trim().slice(0, 300) };
     if (pod?.status?.phase === 'Failed') return { failed: String(pod.status.reason || 'the pod failed').slice(0, 300) };
@@ -125,12 +144,7 @@ async function exitOf(kube, name, podName, { pollMs, tries = 30 }) {
     await sleep(pollMs);
   }
   // No pod any more: the Job's conditions say why.
-  try {
-    const job = await kube.getJob(name);
-    const failed = (job?.status?.conditions || []).find((c) => c.type === 'Failed' && c.status === 'True');
-    if (failed?.reason === 'DeadlineExceeded') return { code: EXIT_TIMEOUT, reason: 'DeadlineExceeded' };
-  } catch { /* the Job is gone too */ }
-  return { code: 1, reason: 'the pod ended without an exit code' };
+  return (await jobOutcome(kube, name)) || { code: 1, reason: 'the pod ended without an exit code' };
 }
 
 /** Removes the Jobs and Secrets the dispatcher made before (a restart ends their runs). */
@@ -191,11 +205,15 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
       if (!run.stopped) send({ t: 'err', d: `[run-dispatcher] The run's pod did not start: ${started.failed}\n` });
       return { code: run.stopped ? EXIT_STOPPED : EXIT_NOT_STARTED };
     }
+    if (started.ended) return endedWith(started.ended, send);
     const podName = started.pod.metadata.name;
     if (started.pod.status?.podIP) send({ t: 'pod', address: started.pod.status.podIP });
     await followLog(podName, send);
     if (run.stopped) return { code: EXIT_STOPPED };
-    const ended = await exitOf(kube, run.name, podName, { pollMs });
+    return endedWith(await exitOf(kube, run.name, podName, { pollMs }), send);
+  }
+
+  function endedWith(ended, send) {
     if (ended.reason === 'OOMKilled' || ended.reason === 'DeadlineExceeded') {
       send({ t: 'err', d: `[run-dispatcher] The run's pod was stopped: ${ended.reason}\n` });
     }

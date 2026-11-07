@@ -31,7 +31,7 @@ const KUBE_TOKEN = 'kube-token';
 const AGENT_TOKEN = randomBytes(24).toString('hex');   // 48 characters
 
 // ── The stand-in API server ──────────────────────────────────────────────────
-// scripts: runId -> { lines, exitCode, reason, waiting, pending, hang, vanish }
+// scripts: runId -> { lines, exitCode, reason, waiting, pending, hang, vanish, gone }
 function fakeApi() {
   const s = { secrets: new Map(), jobs: new Map(), pods: new Map(), logs: new Map(), scripts: new Map(), calls: [], created: { jobs: [], secrets: [] } };
   const matches = (obj, selector) => selector.split(',').every((pair) => {
@@ -55,6 +55,10 @@ function fakeApi() {
   function startPod(job) {
     const runId = job.metadata.labels[J.RUN_ID_LABEL];
     const script = s.scripts.get(runId) || { lines: ['bru output\n'], exitCode: 0 };
+    if (script.gone) {                          // the Job ended before its pod was ever seen running
+      job.status = { conditions: [{ type: 'Failed', status: 'True', reason: script.gone }] };
+      return;
+    }
     const name = `${job.metadata.name}-x1`;
     const pod = {
       metadata: { name, labels: { 'job-name': job.metadata.name } },
@@ -284,6 +288,21 @@ describe('a run in a pod of its own', () => {
     api.s.scripts.set(req.runId, { lines: ['slow\n'], vanish: true });
     const messages = await ask(req);
     expect(last(messages)).toMatchObject({ t: 'exit', code: D.EXIT_TIMEOUT, reason: 'DeadlineExceeded' });
+  });
+
+  test('a Job past its deadline before its pod was seen running ends with 124, not as never started', async () => {
+    const req = runRequest();
+    api.s.scripts.set(req.runId, { gone: 'DeadlineExceeded' });
+    const messages = await ask(req);
+    expect(messages.some((m) => m.t === 'err' && m.d.includes('stopped: DeadlineExceeded'))).toBe(true);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: D.EXIT_TIMEOUT, reason: 'DeadlineExceeded' });
+  });
+
+  test('a Job failed otherwise with no pod left ends with 1 and its reason', async () => {
+    const req = runRequest();
+    api.s.scripts.set(req.runId, { gone: 'BackoffLimitExceeded' });
+    const messages = await ask(req);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 1, reason: 'BackoffLimitExceeded' });
   });
 });
 
