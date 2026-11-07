@@ -92,6 +92,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Monitoring images updated** (`docker-compose.metrics.yml`, four
+  Dependabot updates in one change; deployment files only, nothing to
+  release): Prometheus v3.1.0 → v3.15.1, Alertmanager v0.27.0 → v0.34.2,
+  Loki 3.4.1 → 3.7.9, Promtail 3.4.1 → 3.6.8, each still pinned by digest.
+  Checked against the projects' changelogs: none removes a flag or a setting
+  our files use (Prometheus' console flags, Alertmanager's SMTP settings and
+  `matchers`, Loki's single-binary filesystem setup). Alertmanager no longer
+  sends CORS headers (nothing here calls it from another origin); Loki's
+  parsed labels no longer override structured metadata (our dashboards use
+  no parser). Promtail 3.6 is its last release: Loki 3.7 removed it, and
+  Grafana Alloy replaces it. Applied by the next `docker compose -f
+  docker-compose.yml -f docker-compose.metrics.yml up -d` on the host.
+  Grafana (11.4 → 13.3, two major versions) is left for a test of its own.
+
 - **The installation documents point to Kubernetes and OpenShift** (#1061,
   documentation only, nothing to release). The *Installation Guide* gains
   section 10, "Kubernetes or OpenShift instead of Docker Compose": when to
