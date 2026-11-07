@@ -1456,6 +1456,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`RUN_CREDENTIALS`, pinned to `childEnv.RUN_ENV_KEYS`); exit 2 = wrong
   inputs, 127 = Bruno missing, else Bruno's code. `Dockerfile.run`'s `FROM`
   and Bruno install are pinned to the server Dockerfile's.
+  **PR 3 (1.11.489): the dispatcher**, `src/run-dispatcher/`
+  (`dispatcher.js` entry, `jobSpec.js` pure, `kube.js` node:https client,
+  token re-read per call). Agent protocol, kind `run` (`checkRunRequest()`;
+  the agent's `checkRequest()` still takes `bru`/`merge` only). Per run: Secret
+  `oscar-run-<runId>` (inputs as `stringData`), then the Job of that name,
+  Secret patched to be owned by it; messages `started`, `pod` {address},
+  `out`, `err`, `exit` {code, reason}. Exit 125 = never started (waiting
+  reasons in `FAILED_WAITING`, `RUN_POD_START_TIMEOUT_MS`), 124 = deadline
+  (Job condition `DeadlineExceeded`), 143 = stopped. Settings `RUN_IMAGE`,
+  `RUN_RESULTS_URL`, `RUN_NAMESPACE`, `RUN_SERVICE_ACCOUNT` (default
+  `oscar-run`), resources, `RUN_RUNTIME_CLASS`, `RUN_DISPATCHER_MAX_RUNS`.
+  Everything it makes carries `app.kubernetes.io/managed-by=oscar-dispatcher`
+  and is removed at its start. Tests use a stand-in API server
+  (`run-dispatcher.test.js` `fakeApi()`): extend it, never mock the client.
   **The server touches a run's working folder only through
   `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
   folder, so nothing there is followed as a link. Reads open with

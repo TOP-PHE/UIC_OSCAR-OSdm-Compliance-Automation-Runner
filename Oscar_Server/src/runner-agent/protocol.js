@@ -71,17 +71,53 @@ function checkRequest(msg, { token, workspacesDir }) {
   }
   const cwd = runFolderOf(msg.cwd, workspacesDir);
   if (!cwd) return { reason: 'not a run folder' };
-  const env = {};
-  if (msg.env !== undefined) {
-    if (!isObj(msg.env)) return { reason: 'environment refused' };
-    for (const key of RUN_ENV_KEYS) {
-      const value = msg.env[key];
-      if (value === undefined) continue;
-      if (!plainText(value, MAX_ENV_VALUE)) return { reason: 'environment refused' };
-      env[key] = value;
-    }
-  }
+  const env = runEnvOf(msg.env);
+  if (!env) return { reason: 'environment refused' };
   return { request: { kind: msg.kind, args: [...msg.args], cwd, env } };
+}
+
+// The run's own credentials of a request, the others dropped, or null when one is not plain text.
+function runEnvOf(env) {
+  const out = {};
+  if (env === undefined) return out;
+  if (!isObj(env)) return null;
+  for (const key of RUN_ENV_KEYS) {
+    const value = env[key];
+    if (value === undefined) continue;
+    if (!plainText(value, MAX_ENV_VALUE)) return null;
+    out[key] = value;
+  }
+  return out;
+}
+
+// A run request (run isolation, option 4, #1130): one whole run, in a pod of
+// its own that the dispatcher creates. The run pod's inputs, nothing else.
+const RUN_KIND = 'run';
+const ENV_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,199}$/;
+const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+const MAX_ENV_YML_BASE64 = 1400 * 1024;               // the pod takes 1 MB of environment file
+const SECRET_RE = /^[0-9a-f]{64}$/;
+const MIN_DEADLINE_S = 60;
+const MAX_DEADLINE_S = 24 * 60 * 60;
+
+/**
+ * Checks a run request line (already parsed) for the dispatcher. Returns
+ * { request: { runId, envName, envYml, deadlineSeconds, env } } or { reason }.
+ */
+function checkRunRequest(msg, { token }) {
+  if (!isObj(msg) || msg.v !== VERSION) return { reason: 'not a request of this protocol' };
+  if (!sameToken(msg.token, token)) return { reason: 'not authorised' };
+  if (msg.kind !== RUN_KIND) return { reason: 'unknown kind' };
+  if (typeof msg.runId !== 'string' || !RUN_DIR_RE.test(msg.runId)) return { reason: 'not a run id' };
+  if (typeof msg.envName !== 'string' || !ENV_NAME_RE.test(msg.envName)) return { reason: 'not an environment name' };
+  if (!plainText(msg.envYml, MAX_ENV_YML_BASE64) || msg.envYml === '' || !BASE64_RE.test(msg.envYml)) {
+    return { reason: 'environment file refused' };
+  }
+  const deadline = msg.deadlineSeconds;
+  if (!Number.isInteger(deadline) || deadline < MIN_DEADLINE_S || deadline > MAX_DEADLINE_S) return { reason: 'deadline refused' };
+  const env = runEnvOf(msg.env);
+  if (!env || !SECRET_RE.test(env.OSCAR_RUN_SECRET || '')) return { reason: 'environment refused' };
+  return { request: { runId: msg.runId.toLowerCase(), envName: msg.envName, envYml: msg.envYml, deadlineSeconds: deadline, env } };
 }
 
 /** A kill message's signal, if it is one the agent sends on. */
@@ -115,6 +151,6 @@ function lineReader(onLine, onTooLong, max = MAX_LINE) {
 }
 
 module.exports = {
-  VERSION, KINDS, SIGNALS, MAX_LINE, MIN_TOKEN_LENGTH,
-  sameToken, runFolderOf, checkRequest, killSignalOf, line, lineReader,
+  VERSION, KINDS, RUN_KIND, SIGNALS, MAX_LINE, MIN_TOKEN_LENGTH,
+  sameToken, runFolderOf, checkRequest, checkRunRequest, killSignalOf, line, lineReader,
 };
