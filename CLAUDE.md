@@ -1394,6 +1394,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `RUN_ISOLATION` (default `local`, the old child processes) refuses runs
   for a mode it does not know; `RUN_WORKSPACES_DIR` moves the working
   folders out of `data/`. A new process a run needs is a new kind there.
+  **The runner agent** (part 2, 1.11.482): `src/runner-agent/agent.js`
+  (`protocol.js` pure, `worker/remoteProcess.js` the server's side). One TCP
+  connection per process, newline JSON, `RUN_AGENT_TOKEN`; the agent checks
+  kind, arguments, that the folder is a run folder of `RUN_WORKSPACES_DIR`
+  (realpath, no link), keeps only `RUN_ENV_KEYS` of the env sent, and
+  **refuses to start while it sees a server secret or the database**
+  (`startupProblem()`). It must not load anything that opens the database:
+  `worker/childEnv.js` holds the env allowlist for both.
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's

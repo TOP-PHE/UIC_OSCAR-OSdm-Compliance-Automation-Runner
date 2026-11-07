@@ -34,8 +34,8 @@ describe('mode', () => {
   });
 
   test('a mode the server does not know refuses runs, and says which', () => {
-    process.env.RUN_ISOLATION = 'isolated';
-    expect(L.launcherProblem()).toMatch(/^RUN_ISOLATION="isolated" is not a mode this server knows \(local\)/);
+    process.env.RUN_ISOLATION = 'separate';
+    expect(L.launcherProblem()).toMatch(/^RUN_ISOLATION="separate" is not a mode this server knows \(local, isolated\)/);
     expect(() => L.launch('bru', { args: [], cwd: '/w', env: {} })).toThrow(/not a mode this server knows/);
     expect(spawn).not.toHaveBeenCalled();
   });

@@ -138,6 +138,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.482] — 2026-11-07
+
+### Security
+
+- **The runner agent: a run's processes in a container of their own** (run
+  isolation, part 2 of 4). `RUN_ISOLATION=isolated` makes the launcher hand
+  each process to the runner agent (`npm run agent`,
+  `src/runner-agent/agent.js`) over a local connection authenticated by
+  `RUN_AGENT_TOKEN`, instead of starting it as a child of the server. The
+  agent starts the two kinds of process a run needs (`bru`, `merge`) and
+  nothing else, only in a run folder of `RUN_WORKSPACES_DIR` (no link out of
+  it), with the run's own credentials and its own PATH/HOME; it streams their
+  output back and stops a process whose connection drops. It refuses to start
+  while it can see any of the server's secrets or its database. An isolated
+  run always gets a working folder. The default stays `local`: nothing
+  changes until part 3 deploys the agent and part 4 switches to it.
+
+---
+
 ## [server-1.11.481] — 2026-11-07
 
 ### Changed
