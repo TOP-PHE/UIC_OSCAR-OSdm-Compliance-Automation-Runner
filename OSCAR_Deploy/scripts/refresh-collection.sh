@@ -61,7 +61,12 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 BEFORE=$(git rev-parse HEAD)
-git fetch --quiet --tags origin main
+# A failed fetch is said, not silent (its output is kept for that: a tag that moved
+# on the remote is refused, "would clobber existing tag").
+if ! FETCH_OUT=$(git fetch --tags origin main 2>&1); then
+  log "FAIL: git fetch failed — nothing deployed: $(printf '%s' "$FETCH_OUT" | tr '\n' ' ' | cut -c1-400)"
+  exit 1
+fi
 # The newest release tag that main holds (release-YYYY.NNN, by version order).
 TAG=$(git tag --list 'release-*' --merged origin/main --sort=-v:refname | grep -E '^release-[0-9]{4}\.[0-9]+$' | head -n 1 || true)
 if [ -z "$TAG" ]; then
