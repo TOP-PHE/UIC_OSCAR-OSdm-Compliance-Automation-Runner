@@ -25,6 +25,17 @@ services:
       COLLECTION_PATH: /collection
       # Path to the monorepo-level compatibility matrix mounted below.
       COMPATIBILITY_FILE: /app/compatibility.json
+      # ── Run isolation (option 2b; OSCAR - Server Hardening, "Isolating the
+      # runs") ─────────────────────────────────────────────────────────────
+      # The runs' working folders, on a volume the runner container shares.
+      RUN_WORKSPACES_DIR: /app/run-workspaces
+      # local (default): Bruno runs inside this container, as before.
+      # isolated: the oscar-runner container runs it (set RUN_ISOLATION,
+      # RUN_AGENT_TOKEN and COMPOSE_PROFILES=isolated in .env).
+      RUN_ISOLATION: ${RUN_ISOLATION:-local}
+      RUN_AGENT_HOST: oscar-runner
+      # Where Bruno, in the runner container, reaches this server.
+      RUN_SERVER_URL: http://oscar:3001
       NODE_ENV: production
       # Process timezone — affects every Date object the Node process
       # constructs (log timestamps, audit log entries, "Sent at" in emails,
@@ -46,6 +57,8 @@ services:
       - ../Bruno_Collection:/collection:ro
       # Monorepo compatibility matrix — read-only.
       - ../compatibility.json:/app/compatibility.json:ro
+      # The runs' working folders, shared with oscar-runner.
+      - run-workspaces:/app/run-workspaces
     restart: unless-stopped
     # ── Container hardening ─────────────────────────────────────────────────
     # The image already runs as the unprivileged `node` user (Dockerfile
@@ -80,6 +93,48 @@ services:
       # of the :stable tag. Containers without this label are ignored.
       com.centurylinklabs.watchtower.enable: "true"
       # Opts this container in to the autoheal sidecar — see service below.
+      autoheal: "true"
+
+  # ── Runner agent — the runs' processes, isolated (option 2b) ──────────────
+  # Started only with COMPOSE_PROFILES=isolated. The same image, another
+  # command: it runs Bruno for the server and holds NONE of the server's
+  # data or secrets — no env_file, no ./data, no collection mount (the server
+  # copies what a run needs into its working folder). It refuses to start if
+  # it can see a server secret or the database. The server reaches it at
+  # oscar-runner:3002 with RUN_AGENT_TOKEN; Bruno reaches the server at
+  # http://oscar:3001, and the server takes the run's calls from this
+  # container's address only (utils/runAgentPeer.js), with the run's secret.
+  oscar-runner:
+    image: ghcr.io/top-phe/oscar-server:stable
+    container_name: oscar-runner
+    profiles: ["isolated"]
+    command: ["node", "src/runner-agent/agent.js"]
+    environment:
+      RUN_AGENT_TOKEN: ${RUN_AGENT_TOKEN:-}
+      RUN_AGENT_HOST: 0.0.0.0
+      RUN_WORKSPACES_DIR: /app/run-workspaces
+      BRU_CMD: /usr/local/bin/bru
+      NODE_ENV: production
+      TZ: ${OSCAR_TZ:-Europe/Paris}
+    volumes:
+      - run-workspaces:/app/run-workspaces
+    depends_on:
+      - oscar
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # The runs' Bruno processes live here now.
+    pids_limit: 2048
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3002,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
       autoheal: "true"
 
   # ── Autoheal — restart sidecar (PR — v1.8.0) ──────────────────────────────
@@ -137,6 +192,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Read GHCR creds set up on the host with `docker login ghcr.io`.
       - /home/ubuntu/.docker/config.json:/config.json:ro
+
+volumes:
+  # The runs' working folders: the oscar and oscar-runner containers share
+  # them, and nothing else.
+  run-workspaces:
 
 # ── Notes ─────────────────────────────────────────────────────────────────────
 # - Production rollout = a release-YYYY.NNN tag. The promote-release CI

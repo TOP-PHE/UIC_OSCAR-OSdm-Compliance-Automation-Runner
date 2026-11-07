@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.520",
+  "current_release": "2026.521",
   "releases": [
+    {
+      "release": "2026.521",
+      "date": "2026-11-06",
+      "server": "1.11.483",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.483: the oscar-runner container (compose profile isolated) runs Bruno with none of the server's data or secrets; RUN_SERVER_URL and the runner's address for the run's calls."
+      ]
+    },
     {
       "release": "2026.520",
       "date": "2026-11-06",

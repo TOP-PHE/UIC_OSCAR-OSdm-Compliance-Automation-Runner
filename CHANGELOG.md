@@ -138,6 +138,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.483] — 2026-11-07
+
+### Security
+
+- **The runner container on the VPS** (run isolation, part 3 of 4).
+  `docker-compose.yml` has an `oscar-runner` service (profile `isolated`):
+  the same image running the runner agent, with none of the server's data or
+  secrets (no `.env`, no `./data`, no collection), sharing only the runs'
+  working folders (`run-workspaces` volume, `/app/run-workspaces` in the
+  image). The two containers talk over the Docker network, so the runner
+  survives the server's container being recreated by an update:
+  - Bruno reaches the server at `RUN_SERVER_URL` (isolated mode only;
+    `http://oscar:3001` in the compose file);
+  - the server takes a run's calls back (data file, token refresh) from the
+    runner container's address too, still only with the run's secret
+    (`utils/runAgentPeer.js`, the address looked up every 30 s).
+  Switching is three lines of `.env` (`OSCAR - Server Hardening`, 4.1).
+  Checked end to end with the real server, agent, Bruno CLI and simulator:
+  `SIM_SALE_SEARCH_1ADT_38` gives the same 234 passed checks isolated as
+  local, and `SIM_FAULT_ATTACK_TEMPLATE_IN_ANSWER_38` is still detected
+  (security event, endpoint suspended).
+
+---
+
 ## [server-1.11.482] — 2026-11-07
 
 ### Security

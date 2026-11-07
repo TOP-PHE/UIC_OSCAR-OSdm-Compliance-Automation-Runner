@@ -190,11 +190,49 @@ under those limits: `/health` answers 200, and two complete scenarios against
 the simulator gave the same checks as without them. A change to the compose
 file takes effect at the next `docker compose up -d`, not at a restart.
 
-### 4.1 Still open
+### 4.1 Isolating the runs (runner container)
+
+A run executes the Bruno collection's code. By default (`RUN_ISOLATION=local`)
+it runs inside the `oscar` container, as the server's own user, next to the
+database and the server's secrets. With run isolation, it runs in a second
+container, `oscar-runner`, made from the same image, that has **none of the
+server's data or secrets**: no `.env`, no `./data`, no collection mount. The
+two containers share only the runs' working folders (volume `run-workspaces`).
+The runner refuses to start if it can see a server secret or the database.
+
+To switch, on the VPS:
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+# One shared secret between the server and the runner (never written elsewhere).
+echo "RUN_AGENT_TOKEN=$(openssl rand -hex 32)" | sudo tee -a .env >/dev/null
+echo "RUN_ISOLATION=isolated"                   | sudo tee -a .env >/dev/null
+echo "COMPOSE_PROFILES=isolated"                | sudo tee -a .env >/dev/null
+sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
+sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml ps
+sudo docker logs oscar-runner          # "[runner-agent] listening on 0.0.0.0:3002"
+```
+
+Then check that the runner sees nothing of the server, and run one scenario:
+
+```bash
+sudo docker exec oscar-runner sh -c 'ls /app/data; env | grep -c -E "ENCRYPTION_KEY|JWT_SECRET|SMTP" || true'
+# → an empty data folder, and 0
+```
+
+Each run's log shows `[runner-agent] started bru in <run id>` in
+`docker logs oscar-runner`. To go back: `RUN_ISOLATION=local` in `.env`, then
+`up -d` (the runner may keep running; it is not used).
+
+What stays shared on purpose: the run's own provider token and its company's
+data file, which the run needs; and runs that execute at the same moment share
+the runner container. One container per run is the next step (Kubernetes Jobs).
+
+### 4.2 Still open
 
 - `watchtower` (automatic updates) and `autoheal` (restarts) mount the Docker
-  socket, so each of them is root on the OSCAR host, and `watchtower`'s image
-  is taken as `:latest`. Replacing `watchtower` with a deployment triggered by
+  socket, so each of them is root on the OSCAR host (their images are pinned
+  by digest since 2026-11-06). Replacing `watchtower` with a deployment triggered by
   the release workflow, through a pinned deploy key like the one above, is a
   separate change: it changes how releases reach production.
 - The OSCAR container's root file system is writable; making it read-only

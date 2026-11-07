@@ -425,10 +425,15 @@ function runCopyHoldsTemplates(plaintext) {
 // A run's secret is accepted only from the run itself: Bruno calls the server
 // on its own machine (127.0.0.1), directly, never through the reverse proxy,
 // which adds a forwarding header. Anything else is treated as no secret.
+// With RUN_ISOLATION=isolated and the runner agent in a container of its own,
+// Bruno calls from that container: its address counts too (utils/runAgentPeer).
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const { isRunAgentPeer, watchRunAgentPeer } = require('./utils/runAgentPeer');
+watchRunAgentPeer();
 function fromThisMachine(req) {
   if (req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return false;
-  return LOOPBACK_ADDRESSES.has(req.socket?.remoteAddress);
+  const remote = req.socket?.remoteAddress;
+  return LOOPBACK_ADDRESSES.has(remote) || isRunAgentPeer(remote);
 }
 
 app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
