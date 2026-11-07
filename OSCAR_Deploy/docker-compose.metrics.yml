@@ -99,7 +99,7 @@ services:
       - "127.0.0.1:9093:9093"
 
   grafana:
-    image: grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     container_name: oscar-grafana
     restart: unless-stopped
     depends_on:
