@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.518",
+  "current_release": "2026.519",
   "releases": [
+    {
+      "release": "2026.519",
+      "date": "2026-11-06",
+      "server": "1.11.481",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.481: a run's processes are started by kind through one launcher (RUN_ISOLATION=local, as before); RUN_WORKSPACES_DIR moves the runs' working folders."
+      ]
+    },
     {
       "release": "2026.518",
       "date": "2026-11-06",
