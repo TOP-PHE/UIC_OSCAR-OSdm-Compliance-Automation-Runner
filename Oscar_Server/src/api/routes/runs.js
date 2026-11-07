@@ -373,15 +373,18 @@ router.post('/', runSubmitLimiter, (req, res) => {
 });
 
 // ── GET /v1/runs ──────────────────────────────────────────────────────────────
-router.get('/', (req, res) => {
+// The dashboard's "older batches": the runs after the last one of the page
+// before, in the page's own order (queued_at, then id). A cursor that is not
+// one is refused before the list is read.
+function refuseBadCursor(req, res, next) {
+  if (!pageCursorOf(req.query).problem) return next();
+  return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'before_at and before_id go together: the queued_at and id of the last run of the page before.' });
+}
+
+router.get('/', refuseBadCursor, (req, res) => {
   const limit  = Math.min(Number.parseInt(req.query.limit  || '50',  10), 200);
   const offset = Number.parseInt(req.query.offset || '0',  10);
-  // The dashboard's "older batches": the runs after the last one of the page
-  // before, in the page's own order (queued_at, then id).
-  const { problem: cursorProblem, sql: cursorSql, params: cursorParams } = pageCursorOf(req.query);
-  if (cursorProblem) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'before_at and before_id go together: the queued_at and id of the last run of the page before.' });
-  }
+  const { sql: cursorSql, params: cursorParams } = pageCursorOf(req.query);
 
   // Issue #60 (v1.10.0) — administrator role no longer reads test data, with
   // ONE narrow exception: the operational data-lifecycle queue. Admins must
