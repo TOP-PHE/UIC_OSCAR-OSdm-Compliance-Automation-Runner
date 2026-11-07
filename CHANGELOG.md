@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     follows the newest `release-*` tag on `main`, never `main`'s head
     (`refresh-collection.sh`); `refresh-collection.yml` no longer runs on a
     merge, only by hand. Takes effect once the installed copy of the script
-    is replaced (`auto-deploy-setup.md`, step 4).
+    is replaced (`auto-deploy-setup.md`, step 4). A failed `git fetch` there
+    (a tag moved on the remote is refused) is now written to the log and the
+    workflow's output, with git's reason, instead of ending silently.
   - `promote-release.yml` takes `release-YYYY.NNN` tags only, refuses a tag
     that is not on `main`, checks out `refs/tags/<tag>`, and passes every
     event value through the environment, never into a script.
