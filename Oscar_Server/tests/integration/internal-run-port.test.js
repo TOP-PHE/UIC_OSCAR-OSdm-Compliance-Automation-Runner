@@ -135,3 +135,38 @@ describe('a run sends its result files', () => {
     expect(await runResults.listRunResults(runId)).toEqual([]);
   });
 });
+
+// Pod mode (#1130): a run's pod calls the internal port from its own address.
+// supertest always calls from this machine, so the checks are run on requests
+// made up here, from other addresses.
+describe('where a run\'s secret is taken from in pod mode', () => {
+  const { verifiedRunCompany, internalRunCaller } = app._runCallers;
+  const fakeReq = (address, secret, headers = {}) => ({
+    socket: { remoteAddress: address },
+    get: (name) => ({ 'X-OSCAR-Run-Secret': secret, ...headers })[name],
+  });
+  const saved = process.env.RUN_ISOLATION;
+  beforeEach(() => { process.env.RUN_ISOLATION = 'pod'; });
+  afterAll(() => { if (saved === undefined) delete process.env.RUN_ISOLATION; else process.env.RUN_ISOLATION = saved; });
+
+  test('the first address the secret comes from is the pod\'s; another is refused, as is a proxied call', () => {
+    const { C, runId, secret } = seedRun();
+    expect(verifiedRunCompany(fakeReq('::ffff:10.1.0.9', secret), runId, internalRunCaller)).toBe(C);
+    expect(verifiedRunCompany(fakeReq('10.1.0.9', secret), runId, internalRunCaller)).toBe(C);
+    expect(verifiedRunCompany(fakeReq('10.1.0.10', secret), runId, internalRunCaller)).toBeNull();
+    expect(verifiedRunCompany(fakeReq('10.1.0.9', secret, { 'X-Forwarded-For': '203.0.113.9' }), runId, internalRunCaller)).toBeNull();
+  });
+
+  test('a call without the secret binds nothing', () => {
+    const { C, runId, secret } = seedRun();
+    expect(verifiedRunCompany(fakeReq('10.9.9.9', 'f'.repeat(64)), runId, internalRunCaller)).toBeNull();
+    expect(verifiedRunCompany(fakeReq('10.1.0.9', secret), runId, internalRunCaller)).toBe(C);
+  });
+
+  test('outside pod mode, only this machine or the runner container', () => {
+    process.env.RUN_ISOLATION = 'local';
+    const { runId, secret } = seedRun();
+    expect(verifiedRunCompany(fakeReq('10.1.0.9', secret), runId, internalRunCaller)).toBeNull();
+    expect(verifiedRunCompany(fakeReq('127.0.0.1', secret), runId, internalRunCaller)).not.toBeNull();
+  });
+});

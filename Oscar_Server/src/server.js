@@ -449,10 +449,19 @@ function fromThisMachine(req) {
   return LOOPBACK_ADDRESSES.has(req.socket?.remoteAddress) || fromRunAgentContainer(req);
 }
 
+// The run's company when the request carries the run's own secret and
+// `runCaller(req, runId)` takes it from where the request comes from; else
+// null. The secret is checked first: a caller without it never binds a run
+// pod's address (utils/runSecrets.js).
+function verifiedRunCompany(req, runId, runCaller) {
+  const companyId = runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret'));
+  return companyId !== null && runCaller(req, runId) ? companyId : null;
+}
+
 // GET /data/:filename, on the public port and on the internal one (#1130).
-// `runCaller(req)` says whether a run's secret is taken from where the request
-// comes from; `allowSession` whether a signed-in Test Manager may read it
-// (the public port only).
+// `runCaller(req, runId)` says whether a run's secret is taken from where the
+// request comes from; `allowSession` whether a signed-in Test Manager may
+// read it (the public port only).
 const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);
@@ -467,9 +476,7 @@ const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
   //     its own company's file — a secret for company A asking for company B's
   //     slug gets 404 (no disclosure). The runId travels in a header because
   //     this route is keyed on the slug, not the run.
-  const runCompanyId = runCaller(req)
-    ? runSecrets.verify(req.get('X-OSCAR-Run-Id'), req.get('X-OSCAR-Run-Secret'))
-    : null;
+  const runCompanyId = verifiedRunCompany(req, req.get('X-OSCAR-Run-Id'), runCaller);
   if (runCompanyId !== null) {
     if (runCompanyId !== company.id) return res.status(404).send('Not found');
   } else if (!allowSession) {
@@ -544,7 +551,7 @@ const refreshAccessTokenHandler = ({ runCaller }) => async (req, res) => {
   // S8-loopback: the run's own secret, not the source address. A missing or
   // wrong secret is a 403 — the run is identified by the path and the secret
   // together, so this never hands a token to a guessed runId.
-  const runCompanyId = runCaller(req) ? runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret')) : null;
+  const runCompanyId = verifiedRunCompany(req, runId, runCaller);
   if (runCompanyId === null) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
   }
@@ -616,7 +623,7 @@ const storeRunResultHandler = ({ runCaller }) => async (req, res) => {
   if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid runId format.' });
   }
-  const runCompanyId = runCaller(req) ? runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret')) : null;
+  const runCompanyId = verifiedRunCompany(req, runId, runCaller);
   const runRow = runCompanyId === null ? null : dbGet('SELECT company_id FROM runs WHERE id = ?', [runId]);
   if (!runRow || runRow.company_id !== runCompanyId) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
@@ -633,8 +640,15 @@ const storeRunResultHandler = ({ runCaller }) => async (req, res) => {
   }
 };
 // Where a run's secret is taken from on the internal port: as on the public
-// one, the run's own machine or the runner container (PR 4 adds a run pod).
-const internalRunCaller = fromThisMachine;
+// one, the run's own machine or the runner container; in pod mode (#1130),
+// the run's pod: the address the dispatcher reported, else the first one the
+// secret came from, never through a proxy.
+const { isolationMode } = require('./worker/launcher');
+function internalRunCaller(req, runId) {
+  if (fromThisMachine(req)) return true;
+  if (isolationMode() !== 'pod' || req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return false;
+  return runSecrets.fromRunAddress(runId, req.socket?.remoteAddress);
+}
 const internalApp = express();
 internalApp.disable('x-powered-by');
 internalApp.set('trust proxy', false);
@@ -965,3 +979,5 @@ if (process.env.INTERNAL_PORT !== undefined && process.env.INTERNAL_PORT !== '')
 
 module.exports = app;
 module.exports.internalApp = internalApp;
+// Tests only: where a run's secret is taken from, which supertest cannot vary.
+module.exports._runCallers = { verifiedRunCompany, internalRunCaller };

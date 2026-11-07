@@ -24,7 +24,7 @@
 const path        = require('node:path');
 const { tokenErrorText } = require('../utils/tokenErrors');
 const fs          = require('node:fs');
-const { launch, launcherProblem, isolationMode } = require('./launcher');
+const { launch, launchRun, launcherProblem, isolationMode } = require('./launcher');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require('../db/db');
 const { encryptToFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
@@ -35,6 +35,7 @@ const {
 const {
   COLLECTION_DIRS, COLLECTION_FILES, MERGE_RESULTS_NAME, bruResultsName, bruRunArgs,
 } = require('../run-pod/runLayout');
+const { listRunResults, readRunResult, removeRunResults } = require('../utils/runResults');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken, dropCachedToken } = require('./access-token');
 const { credentialsFor } = require('../utils/testerCredentials');
@@ -71,7 +72,7 @@ function withoutTrailingSlashes(url) {
 }
 function serverUrls() {
   const port = process.env.PORT || 3001;
-  const isolatedBase = isolationMode() === 'isolated' && process.env.RUN_SERVER_URL
+  const isolatedBase = ['isolated', 'pod'].includes(isolationMode()) && process.env.RUN_SERVER_URL
     ? withoutTrailingSlashes(process.env.RUN_SERVER_URL) : '';
   const loopback = isolatedBase || `http://127.0.0.1:${port}`;
   return {
@@ -921,6 +922,73 @@ async function mergeAndStoreResults({ runId, runCwd, valDir, bruJsonFile, envNam
   } catch { /* as above */ }
 }
 
+// ── Pod mode (run isolation, option 4, #1130) ────────────────────────────────
+// The run's pod address, as the dispatcher reports it: the run's secret is
+// bound to it. A secret already used from another address is withdrawn and
+// the run stopped.
+function onRunPodAddress(runId, address, proc) {
+  if (runSecrets.bindAddress(runId, address)) {
+    logEvent(runId, 'info', `[runner] The run's pod is at ${address}.`);
+    return;
+  }
+  runSecrets.revoke(runId);
+  logEvent(runId, 'error', `[runner] The run's secret was used from an address that is not its pod's (${address}): it is withdrawn and the run stopped.`);
+  try { proc.kill('SIGTERM'); } catch { /* already gone */ }
+}
+
+const REPORT_SUFFIX = '_Report.html';
+// The scenario code a report's name gives ({date}_{envShort}_{code}_Report.html),
+// '' for mergeReport.js's ({date}_{envShort}_Report.html), else null.
+function reportCodeOf(name, envShort) {
+  if (!name.endsWith(REPORT_SUFFIX) || !/^\d{8}_/.test(name)) return null;
+  const middle = name.slice(9, -REPORT_SUFFIX.length);
+  if (middle === envShort) return '';
+  return middle.startsWith(`${envShort}_`) ? middle.slice(envShort.length + 1) : null;
+}
+
+// One file the run's pod sent, stored as an artifact of the run.
+async function linkUploadedResult(runId, name, dest, type, filename) {
+  let content;
+  try {
+    content = await readRunResult(runId, name);
+  } catch (err) {
+    logEvent(runId, 'error', `[runner] ${name}, sent by the run's pod, could not be read: ${err.message}`);
+    return false;
+  }
+  if (!(await storeArtifact(runId, content, dest))) return false;
+  dbRun(`INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, ?, ?, ?)`, [uuidv4(), runId, type, filename, dest]);
+  return true;
+}
+
+/**
+ * 10 (pod mode). Links what the run's pod sent (utils/runResults.js): every
+ * scenario report, else mergeReport.js's, and Bruno's results; then removes
+ * the files sent.
+ */
+async function linkUploadedResults({ runId, envShort, runArtifactDir }) {
+  const names = await listRunResults(runId);
+  if (names.length === 0) logEvent(runId, 'warn', '[runner] The run\'s pod sent no result file.');
+  let linked = false;
+  for (const name of names) {
+    const code = reportCodeOf(name, envShort);
+    if (!code) continue;
+    const filename = `report_${code.replaceAll(/[^a-zA-Z0-9_-]/g, '_')}.html`;   // S6: safe characters only
+    if (await linkUploadedResult(runId, name, path.join(runArtifactDir, filename), 'html_report', filename)) {
+      linked = true;
+      logEvent(runId, 'info', `[runner] HTML report artifact linked (${name}).`);
+    }
+  }
+  const merged = names.find((n) => reportCodeOf(n, envShort) === '');
+  if (!linked && merged && await linkUploadedResult(runId, merged, path.join(runArtifactDir, 'report.html'), 'html_report', 'report.html')) {
+    logEvent(runId, 'info', '[runner] HTML report artifact linked (mergeReport fallback).');
+  }
+  const results = bruResultsName(runId);
+  if (names.includes(results)) {
+    await linkUploadedResult(runId, results, path.join(runArtifactDir, MERGE_RESULTS_NAME), 'json_results', MERGE_RESULTS_NAME);
+  }
+  await removeRunResults(runId);
+}
+
 async function cleanupWorkspace(runId) {
   // Inline path-traversal guard (Sonar S6549). Recursive remove on a
   // tainted path is the most dangerous filesystem operation in this
@@ -1085,7 +1153,9 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // Sequential runs use COLLECTION_PATH directly — Bruno CLI may not follow symlinks.
   // An isolated run always has one: the runner agent sees the working
   // folders only, never the collection's own folder.
-  const useWorkspace = isolationMode() === 'isolated' || (process.platform !== 'win32' && !!scenarioOverride);
+  // Pod mode (#1130): the run's pod makes its own folder from its image; nothing here.
+  const podMode = isolationMode() === 'pod';
+  const useWorkspace = !podMode && (isolationMode() === 'isolated' || (process.platform !== 'win32' && !!scenarioOverride));
   let workspaceDir = null;
   let runRealDir = null;   // the workspace's real path: its files are checked against it
   let runCwd = COLLECTION_PATH;
@@ -1162,15 +1232,21 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);
 
-  try {
-    if (!workspaceDir) await fs.promises.mkdir(envsDir, { recursive: true });
-    await writeRunFile(envsDir, `${envName}.yml`, envYmlOut, { ...runFolderCheck(runRealDir, 'environments'), mode: 0o600 });
-    logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml` + (scenarioOverride ? ` (scenario_override: ${scenarioOverride})` : ''));
-  } catch (err) {
-    const msg = `Failed to write env file: ${err.message}`;
-    dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
-    logEvent(runId, 'error', `[runner] ${msg}`);
-    return { exitCode: 1, error: msg };
+  const forScenario = scenarioOverride ? ` (scenario_override: ${scenarioOverride})` : '';
+  if (podMode) {
+    // The pod writes it in its own folder, from the run request (run-pod/runPod.js).
+    logEvent(runId, 'info', `[runner] Environment file ${envName}.yml sent with the run to its pod${forScenario}`);
+  } else {
+    try {
+      if (!workspaceDir) await fs.promises.mkdir(envsDir, { recursive: true });
+      await writeRunFile(envsDir, `${envName}.yml`, envYmlOut, { ...runFolderCheck(runRealDir, 'environments'), mode: 0o600 });
+      logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml${forScenario}`);
+    } catch (err) {
+      const msg = `Failed to write env file: ${err.message}`;
+      dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
+      logEvent(runId, 'error', `[runner] ${msg}`);
+      return { exitCode: 1, error: msg };
+    }
   }
 
   // 7. Paths for Bruno output
@@ -1180,7 +1256,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const valDir         = path.join(runCwd, 'Validation_Reports');
   const bruJsonFile    = bruResultsName(runId);   // the run pod names it alike (run-pod/runLayout.js)
 
-  if (!workspaceDir) await fs.promises.mkdir(valDir, { recursive: true });
+  if (!workspaceDir && !podMode) await fs.promises.mkdir(valDir, { recursive: true });
   logEvent(runId, 'info', `[runner] Spawning bru.cmd — env=${envName} cwd=${runCwd}`);
 
   // Record wall-clock time before Bruno starts so we can later filter report
@@ -1227,7 +1303,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // keeps the shell off unless BRU_CMD is a Windows batch wrapper.
     let proc;
     try {
-      proc = launch('bru', { args, cwd: runCwd, env: safeEnv });
+      proc = podMode
+        ? launchRun({
+          runId, envName, envYml: Buffer.from(envYmlOut, 'utf8').toString('base64'),
+          deadlineSeconds: Math.max(60, Math.ceil(_runBudget.effectiveMs / 1000)), env: safeEnv,
+        })
+        : launch('bru', { args, cwd: runCwd, env: safeEnv });
+      if (podMode) proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
     } catch (err) {
       runSecrets.revoke(runId);
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
@@ -1369,7 +1451,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // 9. Clean up ephemeral env file
   // When using workspace, the entire workspace directory is cleaned up later (step 10d).
   // Individual env file deletion is only needed on Windows (no workspace).
-  if (!workspaceDir) {
+  // In pod mode none was written here.
+  if (!workspaceDir && !podMode) {
     let envDeleted = false;
     for (let attempt = 1; attempt <= 3 && !envDeleted; attempt++) {
       try {
@@ -1394,14 +1477,20 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const prefix   = `${dateStr}_${envShort}`;
   const mergeReportName = `${prefix}_Report.html`;   // mergeReport.js exact output name
 
-  // The run wrote this folder: its files are read as plain files of it only
-  // (runFolder.js); one that is not is left out, with a line in the log.
-  const reports = runFolderCheck(runRealDir, 'Validation_Reports');
-  const htmlArtifactLinked = await linkScenarioReports({ runId, valDir, prefix, mergeReportName, runStartTime, runArtifactDir, reports });
+  if (podMode) {
+    // The run's pod ran mergeReport.js too, and sent its result files to the
+    // internal port (utils/runResults.js): they are linked from there.
+    await linkUploadedResults({ runId, envShort, runArtifactDir });
+  } else {
+    // The run wrote this folder: its files are read as plain files of it only
+    // (runFolder.js); one that is not is left out, with a line in the log.
+    const reports = runFolderCheck(runRealDir, 'Validation_Reports');
+    const htmlArtifactLinked = await linkScenarioReports({ runId, valDir, prefix, mergeReportName, runStartTime, runArtifactDir, reports });
 
-  // 10b. Run mergeReport.js (produces a separate report with req/res bodies from .report_tmp.json).
-  //      We run it for completeness; its output is used as fallback if reportGenerator.js produced nothing.
-  await mergeAndStoreResults({ runId, runCwd, valDir, bruJsonFile, envName, mergeReportName, htmlArtifactLinked, runArtifactDir, reports });
+    // 10b. Run mergeReport.js (produces a separate report with req/res bodies from .report_tmp.json).
+    //      We run it for completeness; its output is used as fallback if reportGenerator.js produced nothing.
+    await mergeAndStoreResults({ runId, runCwd, valDir, bruJsonFile, envName, mergeReportName, htmlArtifactLinked, runArtifactDir, reports });
+  }
 
   // 10d. Clean up workspace (Linux only — includes env file)
   if (workspaceDir) {
