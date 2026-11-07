@@ -1,0 +1,8 @@
+# The run pods' service account: no Role names it, and its token is never
+# mounted (the Job says so too).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oscar-run
+  namespace: oscar-runs
+automountServiceAccountToken: false

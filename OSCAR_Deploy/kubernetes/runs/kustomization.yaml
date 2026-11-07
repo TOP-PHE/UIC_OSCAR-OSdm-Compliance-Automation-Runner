@@ -1,0 +1,29 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# The runs' namespace (run isolation, option 4, #1130): one pod per run, made
+# by the run dispatcher. A namespace of its own, so that the dispatcher's
+# rights cover the runs and nothing of the server (oscar-secrets is not
+# there). Applied once, on its own and without -n:
+#
+#   kubectl apply -k OSCAR_Deploy/kubernetes/runs
+#
+# It names OSCAR's namespace, "oscar", in three places (the dispatcher's
+# RoleBinding and the network policy here, RUN_SERVER_URL and RUN_RESULTS_URL
+# in components/pod-runs): change all of them together for another name.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: oscar
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - run-account.yaml
+  - dispatcher-role.yaml
+  - quota.yaml
+  - network-policy.yaml

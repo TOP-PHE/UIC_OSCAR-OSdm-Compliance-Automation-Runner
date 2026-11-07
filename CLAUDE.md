@@ -1483,6 +1483,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `verifiedRunCompany()`; `internalRunCaller()` adds the pod address in pod
   mode only). A mismatch withdraws the secret and stops the run
   (`onRunPodAddress()`).
+  **PR 5: the manifests** (no version: deployment files, tests, CI).
+  `OSCAR_Deploy/kubernetes/runs/` (applied alone, no `-n`: every object names
+  `oscar-runs`; `kubectl apply -n oscar` would refuse them) and component
+  `components/pod-runs/` (dispatcher, `oscar-internal`, server patch deleting
+  the `runner` container, network policies, `oscar-dispatcher-settings`).
+  **OSCAR's namespace `oscar` is written in four places** (RoleBinding
+  subject, run pods' policy, `RUN_SERVER_URL`, `RUN_RESULTS_URL`). The kind
+  CI deletes the isolated deployment's namespace and deploys pod mode in a
+  fresh `oscar` (`smoke.sh` makes the first administrator), with
+  `ci/pod-runs` opening 172.16.0.0/12:3002 to the simulator. A file of the
+  K8s folder may hold several YAML documents: tests read with `loadAll`.
   **The server touches a run's working folder only through
   `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
   folder, so nothing there is followed as a link. Reads open with

@@ -1,0 +1,102 @@
+# The run dispatcher (src/run-dispatcher): makes one Job per run in the runs'
+# namespace and streams its pod's log back to the server. Its service
+# account is the only one with Kubernetes rights (runs/dispatcher-role.yaml);
+# it gets none of the server's settings, secrets or data: its own settings,
+# and the key the server sends (the Secret oscar-runner). It refuses to
+# start if it can see a server secret or the database.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oscar-dispatcher
+automountServiceAccountToken: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oscar-dispatcher
+  labels:
+    app.kubernetes.io/name: oscar-dispatcher
+    app.kubernetes.io/component: run-dispatcher
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oscar-dispatcher
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oscar-dispatcher
+        app.kubernetes.io/component: run-dispatcher
+    spec:
+      serviceAccountName: oscar-dispatcher
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dispatcher
+          image: oscar-bundle
+          imagePullPolicy: IfNotPresent
+          command: ["node", "src/run-dispatcher/dispatcher.js"]
+          ports:
+            - name: dispatch
+              containerPort: 3002
+          envFrom:
+            - configMapRef:
+                name: oscar-dispatcher-settings
+          env:
+            - name: RUN_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: oscar-runner
+                  key: RUN_AGENT_TOKEN
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          startupProbe:
+            tcpSocket:
+              port: dispatch
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            tcpSocket:
+              port: dispatch
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oscar-dispatcher
+  labels:
+    app.kubernetes.io/name: oscar-dispatcher
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: oscar-dispatcher
+  ports:
+    - name: dispatch
+      port: 3002
+      targetPort: dispatch

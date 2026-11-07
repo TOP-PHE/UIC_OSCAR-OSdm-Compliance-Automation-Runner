@@ -1,0 +1,19 @@
+# A ceiling on what runs take together, whatever the server asks for: room
+# for MAX_CONCURRENT_RUNS (6 by default, up to 50) run pods of the
+# dispatcher's default size (200m / 256Mi asked, 1 CPU / 1Gi at most).
+# Raise it with MAX_CONCURRENT_RUNS. A pod over the quota is not made, and its
+# run ends as "did not start".
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: oscar-runs
+  namespace: oscar-runs
+spec:
+  hard:
+    pods: "50"
+    count/jobs.batch: "60"
+    count/secrets: "60"
+    requests.cpu: "10"
+    requests.memory: 13Gi
+    limits.cpu: "50"
+    limits.memory: 50Gi

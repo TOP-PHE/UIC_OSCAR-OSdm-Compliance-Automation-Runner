@@ -28,6 +28,7 @@ on:
       - 'Oscar_Server/src/worker/**'
       - 'Oscar_Server/src/runner-agent/**'
       - 'Oscar_Server/src/run-pod/**'
+      - 'Oscar_Server/src/run-dispatcher/**'
       - 'Oscar_Server/src/utils/runAgentPeer.js'
       - '.github/workflows/ci-kubernetes.yml'
   push:
@@ -42,6 +43,7 @@ on:
       - 'Oscar_Server/src/worker/**'
       - 'Oscar_Server/src/runner-agent/**'
       - 'Oscar_Server/src/run-pod/**'
+      - 'Oscar_Server/src/run-dispatcher/**'
       - 'Oscar_Server/src/utils/runAgentPeer.js'
       - '.github/workflows/ci-kubernetes.yml'
   schedule:
@@ -60,7 +62,7 @@ jobs:
     # Pinned: kind, kubectl and jq come with this image; ubuntu-latest moves
     # to 26.04 in November 2026.
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 55
 
     steps:
       - name: Checkout
@@ -192,9 +194,81 @@ jobs:
           kubectl kustomize OSCAR_Deploy/kubernetes/overlays/openshift > "$RUNNER_TEMP/openshift.yaml"
           grep -q '^kind: Route$' "$RUNNER_TEMP/openshift.yaml"
 
+      # ── Pod mode (run isolation option 4, #1130): each run in a pod of its own ──
+      - name: Pod mode, deployed (ci/pod-runs, ci/pod-mode)
+        run: |
+          kind load docker-image local/oscar-run:ci --name oscar
+          # A fresh OSCAR namespace: ci/smoke.sh makes the first administrator.
+          pkill -f 'port-forward service/oscar 3001:3001' || true
+          kubectl delete namespace oscar --wait=true --timeout=300s
+          kubectl apply -k OSCAR_Deploy/kubernetes/ci/pod-runs
+          kubectl create namespace oscar
+          kubectl label namespace oscar pod-security.kubernetes.io/enforce=restricted
+          boot=$(openssl rand -hex 24)
+          metrics=$(openssl rand -hex 32)
+          echo "::add-mask::$boot"
+          echo "::add-mask::$metrics"
+          echo "BOOTSTRAP_TOKEN=$boot" >> "$GITHUB_ENV"
+          echo "METRICS_TOKEN=$metrics" >> "$GITHUB_ENV"
+          printf 'ENCRYPTION_KEY=%s\nJWT_SECRET=%s\nPLATFORM_BOOTSTRAP_TOKEN=%s\nMETRICS_TOKEN=%s\n' \
+            "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$boot" "$metrics" > "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
+          rm "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
+          kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/ci/pod-mode
+          kubectl -n oscar rollout status deployment/oscar-dispatcher --timeout=300s
+          kubectl -n oscar rollout status deployment/oscar --timeout=300s
+          test "$(kubectl -n oscar get deployment oscar -o jsonpath='{.spec.template.spec.containers[*].name}')" = oscar
+          test "$(kubectl -n oscar exec deploy/oscar -c oscar -- printenv RUN_ISOLATION)" = pod
+
+      - name: Pod mode, who may do what
+        run: |
+          can() { kubectl auth can-i "$@" 2> /dev/null || true; }
+          d=system:serviceaccount:oscar:oscar-dispatcher
+          # Only the dispatcher makes run pods, and only in the runs' namespace.
+          test "$(can create jobs -n oscar-runs --as=$d)" = yes
+          test "$(can create jobs -n oscar --as=$d)" = no
+          test "$(can get secrets -n oscar --as=$d)" = no
+          test "$(can get secrets -n oscar-runs --as=$d)" = no
+          test "$(can create jobs -n oscar-runs --as=system:serviceaccount:oscar:default)" = no
+          test "$(can list pods -n oscar-runs --as=system:serviceaccount:oscar-runs:oscar-run)" = no
+          # The dispatcher holds none of the server's secrets.
+          for k in ENCRYPTION_KEY JWT_SECRET PLATFORM_BOOTSTRAP_TOKEN METRICS_TOKEN SMTP_PASS; do
+            if kubectl -n oscar exec deploy/oscar-dispatcher -- printenv "$k" > /dev/null; then echo "the dispatcher holds $k"; exit 1; fi
+          done
+
+      - name: Pod mode, a scenario in a pod of its own (ci/smoke.sh)
+        run: |
+          kubectl -n oscar port-forward service/oscar 3001:3001 > "$RUNNER_TEMP/port-forward-pod.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
+            sleep 1
+          done
+          OSCAR_URL=http://127.0.0.1:3001 OSCAR_Deploy/kubernetes/ci/smoke.sh
+          kubectl -n oscar logs deploy/oscar-dispatcher | grep -q 'started oscar-run-'
+          # The run's Job, pod and Secret are removed once it has ended.
+          left=1
+          for _ in $(seq 1 30); do
+            left=$(kubectl -n oscar-runs get jobs,pods,secrets -l app.kubernetes.io/managed-by=oscar-dispatcher -o name | wc -l)
+            if [ "$left" = 0 ]; then break; fi
+            sleep 2
+          done
+          test "$left" = 0
+
+      - name: Pod mode, what a run pod may reach
+        run: |
+          p=OSCAR_Deploy/kubernetes/ci/probe-run-network.sh
+          # OSCAR's internal port, nothing else of OSCAR's.
+          test "$($p probe-internal oscar-internal.oscar.svc.cluster.local 3003)" = open
+          test "$($p probe-public oscar.oscar.svc.cluster.local 3001)" = closed
+          test "$($p probe-dispatcher oscar-dispatcher.oscar.svc.cluster.local 3002)" = closed
+
       - name: What the cluster shows (on failure)
         if: failure()
         run: |
+          echo "=== oscar-runs"
+          kubectl -n oscar-runs get all,secrets,networkpolicy,resourcequota,events 2>&1 | tail -n 60 || true
+          kubectl -n oscar logs deploy/oscar-dispatcher --tail=200 2>&1 || true
           for ns in oscar oscar-k8s; do
             echo "=== $ns"
             kubectl -n "$ns" get all,pvc,configmap,events 2>&1 | tail -n 60 || true

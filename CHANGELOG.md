@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Kubernetes and OpenShift: each run in a pod of its own** (run isolation,
+  option 4, part 5; #1130). Deployment files, CI and documentation only. New
+  `OSCAR_Deploy/kubernetes/runs/`, applied once on its own: the runs'
+  namespace `oscar-runs` ("restricted", a quota), the run pods' service
+  account (no rights, no token), the dispatcher's Role there only (Jobs,
+  Secrets without get, pods, pods' logs) bound to its service account in
+  OSCAR's namespace, and the run pods' network policy (DNS, OSCAR's internal
+  port, public addresses; nothing reaches them). New component
+  `components/pod-runs/`, added to an overlay: the dispatcher's Deployment,
+  service account and Service (its own settings and the `oscar-runner` key
+  only, read-only root file system), the internal port's Service
+  `oscar-internal`, OSCAR's pod without its runner container and with port
+  3003, `RUN_ISOLATION=pod`, and network policies (the internal port from run
+  pods only, the dispatcher from OSCAR's pod only). The kind CI now deploys it
+  too (`ci/pod-runs`, `ci/pod-mode`): rights checked with `kubectl auth
+  can-i`, a scenario on the simulator in a pod of its own, the run's Job,
+  pod and Secret removed after it, and what a run pod may reach
+  (`ci/probe-run-network.sh`). Guide, section 10a; `kubernetes-manifests.test.js`
+  pins the Role, the policies, the dispatcher's settings against what it
+  reads, and the CI.
+
 - **Kubernetes and OpenShift: runs in a container of their own** (run
   isolation, part 4 of 4). Deployment files, CI and documentation only. The
   pod has a second container, `runner`, from the same image: it starts the

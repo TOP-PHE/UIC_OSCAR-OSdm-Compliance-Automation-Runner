@@ -1,0 +1,56 @@
+# What a run pod may reach: the cluster's DNS, OSCAR's internal port, and the
+# public internet (the providers tested). Not the cluster's other services,
+# not private or link-local addresses (the cloud's metadata endpoint), not
+# another run. Nothing may reach a run pod. Enforced where the cluster's
+# network plugin enforces NetworkPolicy.
+#
+# Providers on private addresses (a VPN, a peering): add their range, as the
+# CI's patch does for the simulator (ci/pod-runs).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: oscar-run
+  namespace: oscar-runs
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: oscar-run
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    # DNS: kube-dns / CoreDNS (53), OpenShift's DNS (5353).
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+        - { protocol: UDP, port: 5353 }
+        - { protocol: TCP, port: 5353 }
+    # OSCAR's internal port: the run's data file, schema, token and results.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: oscar
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oscar
+      ports:
+        - { protocol: TCP, port: 3003 }
+    # The providers, on public addresses only.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fc00::/7
+              - fe80::/10
+              - ::1/128

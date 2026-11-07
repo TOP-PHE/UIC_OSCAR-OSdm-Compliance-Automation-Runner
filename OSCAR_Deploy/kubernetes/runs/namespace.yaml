@@ -1,0 +1,9 @@
+# The runs' namespace, held to the "restricted" pod security standard.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oscar-runs
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
