@@ -162,6 +162,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.487] — 2026-11-07
+
+### Added
+
+- **An internal port for a run's calls** (run isolation, option 4, part 1;
+  #1130). Not released on its own: the option 4 changes are released
+  together. With `INTERNAL_PORT` set, the server opens a second listener that
+  serves only what a run calls, each with the run's secret: its data file (no
+  session fallback, unlike the public port), the schema, the token refresh,
+  and a new route, `PUT /v1/runs/:runId/results/:name`, by which a run that
+  shares no folder with the server (a pod of its own) sends its reports and
+  Bruno's results. They are kept encrypted in a folder the server owns
+  (`data/artifacts/<runId>/incoming/`, `utils/runResults.js`): result file
+  names only, each sent once, at most 100 MB a file, 50 files and 200 MB a
+  run. No session, no page, no HTTPS redirect, its own rate limit; meant for
+  the cluster network only. Unset (the default), nothing changes: the
+  public port's routes are the same handlers as before, now shared with the
+  internal port.
+- Tests: `run-results.test.js` (names, encryption at rest, once per name,
+  limits), `internal-run-port.test.js` (the four routes, refusals without
+  the run's own secret, through a proxy, or after the run; no other route).
+  Three mutations (session fallback on the internal port, the upload's
+  secret check, any source accepted) each fail a test.
+
+---
+
 ## [server-1.11.486] — 2026-11-07
 
 ### Fixed

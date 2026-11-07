@@ -355,7 +355,7 @@ const SCHEMA_FILE_PATH     = path.join(COLLECTION_PATH_SAFE, 'json_validator', '
 // should be rate-limited even if it's auth-less, to prevent abusive
 // polling). 300/min is generous — the schema is fetched once per scenario
 // run via the loopback Bruno subprocess.
-app.get('/json_validator/datafile.schema.json', fileDownloadLimiter, (req, res) => {
+function sendDatafileSchema(req, res) {
   res.set('Cache-Control', 'public, max-age=300');
   res.type('application/json');
   res.sendFile(SCHEMA_FILE_PATH, err => {
@@ -368,7 +368,8 @@ app.get('/json_validator/datafile.schema.json', fileDownloadLimiter, (req, res) 
       if (!res.headersSent) res.status(404).type('text/plain').send('schema file not found');
     }
   });
-});
+}
+app.get('/json_validator/datafile.schema.json', fileDownloadLimiter, sendDatafileSchema);
 
 // #619: the run's own copy of the data file carries the Test Framework's
 // warnings (__featureNotDeclaredWarnings), as GET /v1/company/datafile does,
@@ -448,7 +449,11 @@ function fromThisMachine(req) {
   return LOOPBACK_ADDRESSES.has(req.socket?.remoteAddress) || fromRunAgentContainer(req);
 }
 
-app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
+// GET /data/:filename, on the public port and on the internal one (#1130).
+// `runCaller(req)` says whether a run's secret is taken from where the request
+// comes from; `allowSession` whether a signed-in Test Manager may read it
+// (the public port only).
+const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);
   if (!m) return res.status(400).send('Bad request');
@@ -462,11 +467,13 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   //     its own company's file — a secret for company A asking for company B's
   //     slug gets 404 (no disclosure). The runId travels in a header because
   //     this route is keyed on the slug, not the run.
-  const runCompanyId = fromThisMachine(req)
+  const runCompanyId = runCaller(req)
     ? runSecrets.verify(req.get('X-OSCAR-Run-Id'), req.get('X-OSCAR-Run-Secret'))
     : null;
   if (runCompanyId !== null) {
     if (runCompanyId !== company.id) return res.status(404).send('Not found');
+  } else if (!allowSession) {
+    return res.status(403).send(DENIAL_TEXT[403]);
   } else {
     // (b) No run secret: fall back to a signed-in Test Manager of the owning
     //     company (datafileSessionDenial). No page calls this path; it is only
@@ -506,7 +513,8 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', String(plaintext.length));
   return res.end(plaintext);
-});
+};
+app.get('/data/:filename', fileDownloadLimiter, runDatafileHandler({ runCaller: fromThisMachine, allowSession: true }));
 
 // ── Loopback refresh of an OAuth access token mid-run (issue #204) ───────────
 // Long-running scenarios (e.g. expiredBookingTest's ~15 min wait on Paxone)
@@ -528,7 +536,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
 // The SAFE_RUNID_RE used below is defined further down for the
 // /artifacts/:runId path — declared inline here so the order doesn't matter.
 const SAFE_RUNID_RE_FOR_REFRESH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req, res) => {
+const refreshAccessTokenHandler = ({ runCaller }) => async (req, res) => {
   const { runId } = req.params;
   if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid runId format.' });
@@ -536,7 +544,7 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
   // S8-loopback: the run's own secret, not the source address. A missing or
   // wrong secret is a 403 — the run is identified by the path and the secret
   // together, so this never hands a token to a guessed runId.
-  const runCompanyId = fromThisMachine(req) ? runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret')) : null;
+  const runCompanyId = runCaller(req) ? runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret')) : null;
   if (runCompanyId === null) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
   }
@@ -583,6 +591,61 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
     log.error({ runId, err: detail }, '[refresh-access-token] resolveAccessToken failed');
     return res.status(502).json({ status: 502, title: 'Bad Gateway', detail: `Token refresh failed: ${detail}` });
   }
+};
+app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, refreshAccessTokenHandler({ runCaller: fromThisMachine }));
+
+// ── The internal port: a run's calls only (run isolation, option 4, #1130) ───
+// With INTERNAL_PORT set, a second listener serves what a run calls and
+// nothing else: its data file, the schema, the token refresh and its result
+// files. No session, no HTTPS redirect, no page, no other route; every call
+// carries the run's secret (the schema is the collection's own file). It is
+// meant for the cluster network only: never publish it outside.
+// A run's results (its reports, Bruno's results) come back here when the run
+// shares no folder with the server: kept in a folder the server owns
+// (utils/runResults.js) until the runner links them.
+const { storeRunResult, ResultRefusal, MAX_RESULT_BYTES } = require('./utils/runResults');
+const runCallLimiter = require('express-rate-limit')({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many run calls in a short window.' },
+});
+const storeRunResultHandler = ({ runCaller }) => async (req, res) => {
+  const { runId, name } = req.params;
+  if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid runId format.' });
+  }
+  const runCompanyId = runCaller(req) ? runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret')) : null;
+  const runRow = runCompanyId === null ? null : dbGet('SELECT company_id FROM runs WHERE id = ?', [runId]);
+  if (!runRow || runRow.company_id !== runCompanyId) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
+  }
+  try {
+    await storeRunResult(runId, name, req.body);
+    return res.status(201).json({ stored: name });
+  } catch (err) {
+    if (err instanceof ResultRefusal) return res.status(err.status).json({ status: err.status, title: 'Refused', detail: err.message });
+    log.error({ runId, err: err.message }, '[run-results] a result file could not be kept');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The result file could not be kept.' });
+  }
+};
+// Where a run's secret is taken from on the internal port: as on the public
+// one, the run's own machine or the runner container (PR 4 adds a run pod).
+const internalRunCaller = fromThisMachine;
+const internalApp = express();
+internalApp.disable('x-powered-by');
+internalApp.set('trust proxy', false);
+internalApp.get('/data/:filename', runCallLimiter, runDatafileHandler({ runCaller: internalRunCaller, allowSession: false }));
+internalApp.get('/json_validator/datafile.schema.json', runCallLimiter, sendDatafileSchema);
+internalApp.post('/v1/runs/:runId/refresh-access-token', runCallLimiter, refreshAccessTokenHandler({ runCaller: internalRunCaller }));
+internalApp.put('/v1/runs/:runId/results/:name', runCallLimiter,
+  express.raw({ type: () => true, limit: MAX_RESULT_BYTES }), storeRunResultHandler({ runCaller: internalRunCaller }));
+internalApp.use((req, res) => res.status(404).json({ status: 404, title: 'Not Found', detail: 'Not a run call.' }));
+// Express tells an error handler by its four parameters.
+internalApp.use((err, req, res, _next) => {
+  const status = err?.type === 'entity.too.large' ? 413 : 400;
+  res.status(status).json({ status, title: status === 413 ? 'Payload Too Large' : 'Bad Request', detail: 'The request could not be read.' });
 });
 
 // ── Serve run artifacts (HTML reports, JSON results) ─────────────────────────
@@ -887,4 +950,16 @@ app.listen(PORT, () => {
   }
 });
 
+// The internal port (#1130): only when INTERNAL_PORT names one.
+if (process.env.INTERNAL_PORT !== undefined && process.env.INTERNAL_PORT !== '') {
+  const INTERNAL_PORT = Number(process.env.INTERNAL_PORT);
+  // 0 = a free port (tests), on either listener.
+  if (!Number.isInteger(INTERNAL_PORT) || INTERNAL_PORT < 0 || INTERNAL_PORT > 65535 || (INTERNAL_PORT !== 0 && INTERNAL_PORT === PORT)) {
+    log.fatal({ internalPort: process.env.INTERNAL_PORT }, 'INTERNAL_PORT must be a port other than PORT. Not started.');
+    process.exit(1);
+  }
+  internalApp.listen(INTERNAL_PORT, () => log.info({ port: INTERNAL_PORT }, 'Internal port for run calls listening'));
+}
+
 module.exports = app;
+module.exports.internalApp = internalApp;
