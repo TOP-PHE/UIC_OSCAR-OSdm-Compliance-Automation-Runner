@@ -167,8 +167,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **An internal port for a run's calls** (run isolation, option 4, part 1;
-  #1130). Not released on its own: the option 4 changes are released
-  together. With `INTERNAL_PORT` set, the server opens a second listener that
+  #1130). Not released on its own: listed in `compatibility.json` (2026.525)
+  without moving `current_release`, so no release tag is made; the option 4
+  changes are released together. With `INTERNAL_PORT` set, the server opens a second listener that
   serves only what a run calls, each with the run's secret: its data file (no
   session fallback, unlike the public port), the schema, the token refresh,
   and a new route, `PUT /v1/runs/:runId/results/:name`, by which a run that

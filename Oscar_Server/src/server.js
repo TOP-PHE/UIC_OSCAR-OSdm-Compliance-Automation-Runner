@@ -622,7 +622,9 @@ const storeRunResultHandler = ({ runCaller }) => async (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
   }
   try {
-    await storeRunResult(runId, name, req.body);
+    // A body that is not bytes (no raw body came) is an empty one: refused as such.
+    const content = Buffer.isBuffer(req.body) ? Buffer.from(req.body) : Buffer.alloc(0);
+    await storeRunResult(runId, String(name), content);
     return res.status(201).json({ stored: name });
   } catch (err) {
     if (err instanceof ResultRefusal) return res.status(err.status).json({ status: err.status, title: 'Refused', detail: err.message });

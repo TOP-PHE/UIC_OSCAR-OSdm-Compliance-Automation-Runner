@@ -1426,8 +1426,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   **Option 4, a Kubernetes Job per run** (#1130, tracking issue; decided
   2026-11-07: a separate dispatcher holds the only Kubernetes rights, the run
   pod sends its results, kind CI first). The option 4 PRs bump the server
-  version but add **no `compatibility.json` release**: they are released
-  together by a last PR the maintainer merges. **PR 1 (1.11.487): the
+  version and **list it in `compatibility.json` without moving
+  `current_release`** (the kind smoke test refuses a server version that is
+  not listed; only a `current_release` change mints a release tag): they are
+  released together by a last PR the maintainer merges. **PR 1 (1.11.487): the
   internal port.** `INTERNAL_PORT` set = a second Express app (`internalApp`,
   exported beside `app`) serving only a run's calls: `/data/:filename`
   (run secret only, no session fallback: `runDatafileHandler({ runCaller,
