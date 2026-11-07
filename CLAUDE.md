@@ -1418,6 +1418,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   30 s), the run's secret still required. Switching: `OSCAR - Server
   Hardening` 4.1. In isolated mode `oscar_run_processes` counts nothing (the
   processes are the runner's).
+  **The server touches a run's working folder only through
+  `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
+  folder, so nothing there is followed as a link. Reads open with
+  `O_NOFOLLOW | O_NONBLOCK` (Windows: lstat compared with the open file), a
+  plain file of at most 100 MB, its folder's realpath equal to the expected
+  one (`runFolderCheck()`, the workspace's real path + sub-folder; the
+  collection's own folder, no workspace, is not checked) and, on Linux, the
+  open fd's `/proc/self/fd` path equal to it. Writes unlink the name, then
+  `O_EXCL`; folders are `mkdir` without `recursive`; the collection copy is
+  `copyIntoRunFolder()`, never `fs.cp`. A refusal is `ERUNFILE`; the runner
+  leaves the file out with an error line (`leftOutText()`). **A new file the
+  server reads or writes in a run folder goes through that module**, never
+  `fs.readFile` / `copyFile` / `stat` on a path there.
+  `run-folder.test.js` uses real links (Windows: Developer Mode for file
+  links, else skipped; CI runs them all).
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's
