@@ -243,7 +243,9 @@ run's log.
 
 What stays shared on purpose: the run's own provider token and its company's
 data file, which the run needs; and runs that execute at the same moment share
-the runner container. One container per run is the next step (Kubernetes Jobs).
+the runner container. On Kubernetes or OpenShift, each run can have a pod of
+its own (`RUN_ISOLATION=pod`): *OSCAR - Kubernetes and OpenShift Deployment
+Guide*, section 10a.
 
 ### 4.2 Still open
 

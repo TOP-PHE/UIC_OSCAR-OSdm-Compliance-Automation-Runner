@@ -754,6 +754,42 @@ describe('executeRun — RUN_ISOLATION=pod (#1130)', () => {
     expect(getDecryptedEvents(second.runId).some((e) => e.level === 'warn' && /sent no result file/.test(e.message))).toBe(true);
   });
 
+  describe('metrics', () => {
+    const metrics = require('../../src/utils/metrics');
+    const ended = async (outcome) => (await metrics.runPodsEnded.get()).values.find((v) => v.labels.outcome === outcome)?.value || 0;
+    const started = async () => (await metrics.runPodStart.get()).values.find((v) => v.metricName === 'oscar_run_pod_start_seconds_count')?.value || 0;
+
+    test('a run\'s pod start time once its pod is named, and its outcome once, when it ends', async () => {
+      const [before, deadline, refused] = [await started(), await ended('deadline'), await ended('refused')];
+      const { proc, done } = await startPodRun();
+      proc.emit('pod', '10.1.0.9');
+      proc.emit('pod', '10.1.0.9');
+      expect(await started()).toBe(before + 1);
+      proc.emit('close', 124);
+      proc.emit('error', new Error('late'));
+      await done;
+      expect(await ended('deadline')).toBe(deadline + 1);
+      expect(await ended('refused')).toBe(refused);
+    });
+
+    test('a run refused by the dispatcher, or lost, counts as refused; no pod named, no start time', async () => {
+      const [before, refused] = [await started(), await ended('refused')];
+      const { proc, done } = await startPodRun();
+      proc.emit('error', new Error('the runner agent refused: too many runs'));
+      await done;
+      expect(await ended('refused')).toBe(refused + 1);
+      expect(await started()).toBe(before);
+    });
+
+    test('the outcomes are the dispatcher\'s exit codes, else Bruno ran', () => {
+      const D = require('../../src/run-dispatcher/dispatcher');
+      const { podOutcomeOf } = require('../../src/worker/runner');
+      expect([0, 1, D.EXIT_TIMEOUT, D.EXIT_NOT_STARTED, D.EXIT_STOPPED, null].map(podOutcomeOf))
+        .toEqual(['ran', 'ran', 'deadline', 'not_started', 'stopped', 'ran']);
+      for (const code of [0, 2, 124, 125, 127, 143]) expect(metrics.RUN_POD_OUTCOMES).toContain(podOutcomeOf(code));
+    });
+  });
+
   test('a mode set to pod without its settings starts nothing', async () => {
     delete process.env.RUN_SERVER_URL;
     const { companyId, userId } = seedCompanyUser();

@@ -36,6 +36,7 @@ const {
   COLLECTION_DIRS, COLLECTION_FILES, MERGE_RESULTS_NAME, bruResultsName, bruRunArgs,
 } = require('../run-pod/runLayout');
 const { listRunResults, readRunResult, removeRunResults } = require('../utils/runResults');
+const metrics = require('../utils/metrics');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken, dropCachedToken } = require('./access-token');
 const { credentialsFor } = require('../utils/testerCredentials');
@@ -936,6 +937,27 @@ function onRunPodAddress(runId, address, proc) {
   try { proc.kill('SIGTERM'); } catch { /* already gone */ }
 }
 
+// How a run's pod ended, from the exit code the dispatcher gives
+// (run-dispatcher/dispatcher.js: 124 deadline, 125 never started, 143 stopped;
+// any other code is Bruno's own). One of metrics.RUN_POD_OUTCOMES.
+const POD_EXIT_OUTCOMES = new Map([[124, 'deadline'], [125, 'not_started'], [143, 'stopped']]);
+function podOutcomeOf(code) {
+  return POD_EXIT_OUTCOMES.get(code) || 'ran';
+}
+
+// The pod mode's two metrics for one run: its start time once the dispatcher
+// names its pod, its outcome once it ends (or is refused), each once.
+function watchRunPod(proc) {
+  const askedAt = process.hrtime.bigint();
+  let ended = false;
+  proc.once('pod', () => metrics.runPodStart.observe(Number(process.hrtime.bigint() - askedAt) / 1e9));
+  return (outcome) => {
+    if (ended) return;
+    ended = true;
+    metrics.runPodsEnded.inc({ outcome });
+  };
+}
+
 const REPORT_SUFFIX = '_Report.html';
 // The scenario code a report's name gives ({date}_{envShort}_{code}_Report.html),
 // '' for mergeReport.js's ({date}_{envShort}_Report.html), else null.
@@ -1302,6 +1324,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // Started by kind through the launcher (worker/launcher.js), which
     // keeps the shell off unless BRU_CMD is a Windows batch wrapper.
     let proc;
+    let podEnded = () => {};
     try {
       proc = podMode
         ? launchRun({
@@ -1309,8 +1332,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
           deadlineSeconds: Math.max(60, Math.ceil(_runBudget.effectiveMs / 1000)), env: safeEnv,
         })
         : launch('bru', { args, cwd: runCwd, env: safeEnv });
-      if (podMode) proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
+      if (podMode) {
+        podEnded = watchRunPod(proc);
+        proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
+      }
     } catch (err) {
+      if (podMode) metrics.runPodsEnded.inc({ outcome: 'refused' });
       runSecrets.revoke(runId);
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
@@ -1435,6 +1462,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       stopTokenWatchdog();
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: the child is gone; no more loopback calls
+      podEnded(podOutcomeOf(code));
       resolve(code ?? 1);
     });
     proc.on('error', err => {
@@ -1443,6 +1471,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       stopTokenWatchdog();
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: no child, no valid secret
+      podEnded('refused');
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
     });
@@ -1552,4 +1581,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, WORKSPACES_DIR, serverUrls };
+module.exports = { executeRun, killRun, refusedRunScope, podOutcomeOf, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, WORKSPACES_DIR, serverUrls };

@@ -1494,6 +1494,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   fresh `oscar` (`smoke.sh` makes the first administrator), with
   `ci/pod-runs` opening 172.16.0.0/12:3002 to the simulator. A file of the
   K8s folder may hold several YAML documents: tests read with `loadAll`.
+  **An overlay changes what a component sets with a patch, never a
+  `configMapGenerator` merge**: kustomize (5.1+) runs an overlay's own
+  generators before its components, so a merge into
+  `oscar-dispatcher-settings` fails ("does not exist; cannot merge") and a
+  merge of a key the component sets (`RUN_SERVER_URL`) is overwritten; the
+  kind CI met the first. `kubernetes-manifests.test.js` refuses both, in
+  every kustomization and in the guide's example (no kustomize runs locally).
+  **PR 6 (1.11.491): metrics.** `oscar_run_pod_start_seconds` (from
+  `launchRun()` to the pod's address) and `oscar_run_pods_ended_total
+  {outcome}` (`podOutcomeOf()`: the dispatcher's 124 / 125 / 143, else
+  `ran`; `refused` on an error), once per run (`watchRunPod()` in
+  `runner.js`); row *Run pods* of *OSCAR · Overview*, group `oscar.run-pods`
+  of `oscar-alerts.yml`, pinned by `run-pod-metrics.test.js`. A pod
+  removed at its deadline before the dispatcher saw it running is read from
+  the Job's conditions (`jobOutcome()`), else it read as never started.
   **The server touches a run's working folder only through
   `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
   folder, so nothing there is followed as a link. Reads open with
