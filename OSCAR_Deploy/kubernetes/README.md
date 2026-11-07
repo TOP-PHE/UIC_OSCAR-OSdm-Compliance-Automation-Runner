@@ -7,7 +7,7 @@ One OSCAR pod on a cluster (#1059). The guide is
 |---|---|
 | `build-images.sh` | builds the server image and the bundle (server + collection + `compatibility.json`) from a release checkout |
 | `Dockerfile.bundle` | the bundle |
-| `base/` | Deployment (one replica, `Recreate`), Service, volume, settings; `secrets.env.example` lists the Secret's keys |
+| `base/` | Deployment (one replica, `Recreate`; the server and the runner container), Service, volume, settings; `secrets.env.example` lists the Secret's keys (the runner's key is the Secret `oscar-runner`) |
 | `overlays/kubernetes/` | an Ingress (ingress-nginx), `fsGroup: 1000` |
 | `overlays/openshift/` | a Route; runs under the default `restricted-v2` SCC |
 | `ci/` | what `.github/workflows/ci-kubernetes.yml` deploys on kind, and `smoke.sh` |

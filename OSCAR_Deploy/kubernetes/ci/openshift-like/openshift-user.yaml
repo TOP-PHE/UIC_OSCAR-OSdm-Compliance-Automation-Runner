@@ -27,3 +27,9 @@ spec:
             requests:
               cpu: 250m
               memory: 512Mi
+        - name: runner
+          imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi

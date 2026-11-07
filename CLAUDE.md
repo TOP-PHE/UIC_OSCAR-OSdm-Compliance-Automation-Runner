@@ -3623,6 +3623,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     gateway), then `ci/kubernetes`. The Route is only rendered.
     `kubernetes-manifests.test.js` pins paths, port, hosts, limits (to
     `nginx/oscar.conf.example`) and the settings to what the server reads.
+  - **Runs go to a `runner` container of the pod** (run isolation 4/4):
+    same image, `node src/runner-agent/agent.js`, env from its own Secret
+    `oscar-runner` (`RUN_AGENT_TOKEN`) and literals only, volumes the shared
+    `run-workspaces` emptyDir and its own `/tmp`; `RUN_ISOLATION=isolated` in
+    `settings.env`. The pod's loopback is shared (no `RUN_SERVER_URL`), its
+    processes are not (no `shareProcessNamespace`). Probes are `exec`: the
+    agent listens on 127.0.0.1 only. The kind CI checks the runner holds no
+    server secret, no database and sees no server process.
   - Not tested on a real OpenShift yet.
 
 ## 3. OSCAR/OSDM conventions & terminology
