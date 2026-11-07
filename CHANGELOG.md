@@ -162,6 +162,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.489] — 2026-11-07
+
+### Added
+
+- **The run dispatcher** (run isolation, option 4, part 3; #1130). Listed in
+  `compatibility.json` (2026.527) without moving `current_release`: released
+  with the other option 4 parts. `src/run-dispatcher/` is meant to run as a
+  Deployment of its own, the only component with Kubernetes rights (Jobs and
+  Secrets in the runs' namespace, its pods' logs); the server keeps no
+  Kubernetes credentials. It speaks the runner agent's protocol, with a new
+  `run` request (`checkRunRequest()` in `runner-agent/protocol.js`: run id,
+  environment name, environment file in base64, a deadline of 60 s to 24 h,
+  the run's secret and credentials only; the runner agent refuses it). For
+  each run it creates a Secret with the run pod's inputs and a Job running the
+  run image once (`jobSpec.js`: no service account token, no service links,
+  read-only root file system, every capability dropped, no privilege
+  escalation, RuntimeDefault seccomp, never restarted, `backoffLimit: 0`, the
+  run's deadline plus two minutes, removed 5 minutes after it ends, an
+  optional `RUN_RUNTIME_CLASS`), gives the pod's address once known, streams
+  the pod's log as the run's output, and ends with the container's exit code
+  (125 when the pod never started, image pull and start timeout included; 124
+  at the deadline; 143 when stopped; the reason said for OOMKilled). A stop
+  request or a dropped connection deletes the Job; at start it removes the
+  Jobs and Secrets it made before. `kube.js` calls the API server with
+  node:https and the pod's service account (token read at each call). Like
+  the runner agent, it refuses to start next to a server secret or the
+  database. Nothing deploys it yet: the server's pod mode and the manifests
+  follow.
+- Tests: `run-dispatcher.test.js`, against a stand-in API server whose Jobs
+  play a scenario (output, exit codes, image pull failure, a pod that never
+  starts, OOMKilled, the deadline, stop request, dropped connection, the run
+  limit, refusals, leftovers, the token read at each call, the start-up
+  guard). Three mutations (no stop on a dropped connection, a service account
+  token in the pod, another kind accepted) each fail a test.
+
+---
+
 ## [server-1.11.488] — 2026-11-07
 
 ### Added
