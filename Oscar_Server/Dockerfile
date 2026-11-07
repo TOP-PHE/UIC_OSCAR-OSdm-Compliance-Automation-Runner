@@ -116,6 +116,9 @@ COPY package.json ./
 
 # Create data directory for SQLite DB, artifacts, and datafiles
 RUN mkdir -p data/artifacts data/datafiles
+# The runs' working folders (RUN_WORKSPACES_DIR), outside data/: with run
+# isolation the runner agent's container shares this folder, never data/.
+RUN mkdir -p run-workspaces
 
 # Security: run as non-root user
 # The official node image already has a 'node' user (uid 1000). We chown the
@@ -125,11 +128,12 @@ RUN mkdir -p data/artifacts data/datafiles
 # arbitrary uid in group 0, and Kubernetes can only check `runAsNonRoot`
 # against a numeric USER. So the data directory also belongs to group 0 with
 # the owner's rights, and USER names uid 1000 (the same `node` user, so Docker
-# and the VPS see no difference). Only /app/data is written at run time; on a
-# cluster it is a mounted volume (OSCAR_Deploy/kubernetes/).
+# and the VPS see no difference). Only /app/data and /app/run-workspaces are
+# written at run time; on a cluster they are mounted volumes
+# (OSCAR_Deploy/kubernetes/).
 RUN chown -R node:node /app && \
-    chgrp -R 0 /app/data && \
-    chmod -R g=u /app/data
+    chgrp -R 0 /app/data /app/run-workspaces && \
+    chmod -R g=u /app/data /app/run-workspaces
 USER 1000
 
 EXPOSE 3001

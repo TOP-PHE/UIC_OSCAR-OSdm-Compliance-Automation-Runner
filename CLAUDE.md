@@ -1402,6 +1402,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   **refuses to start while it sees a server secret or the database**
   (`startupProblem()`). It must not load anything that opens the database:
   `worker/childEnv.js` holds the env allowlist for both.
+  **On the VPS** (part 3, 1.11.483): compose service `oscar-runner`
+  (profile `isolated`), same image, no env_file / data / collection, volume
+  `run-workspaces` shared. Not `network_mode: service:oscar` (a recreated
+  `oscar` would leave it without network): Bruno reaches the server at
+  `RUN_SERVER_URL` (isolated only), and `fromThisMachine()` also takes the
+  runner container's address (`utils/runAgentPeer.js`, looked up again every
+  30 s), the run's secret still required. Switching: `OSCAR - Server
+  Hardening` 4.1. In isolated mode `oscar_run_processes` counts nothing (the
+  processes are the runner's).
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's

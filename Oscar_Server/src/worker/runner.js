@@ -54,8 +54,25 @@ const COLLECTION_PATH = process.env.COLLECTION_PATH || '';
 // failed datafile validation with "Missing env var json_schema". The
 // loopback route exists since v1.11.112 and always matches the running
 // collection, so it is the correct out-of-the-box value.
-const JSON_SCHEMA_URL = process.env.JSON_SCHEMA_URL ||
-  `http://127.0.0.1:${process.env.PORT || 3001}/json_validator/datafile.schema.json`;
+// Where Bruno reaches this server (data file, schema, token refresh): the
+// loopback, as Bruno runs on this machine; with RUN_ISOLATION=isolated and
+// RUN_SERVER_URL set, the server's address on the runner agent's network.
+function withoutTrailingSlashes(url) {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === '/') end--;
+  return url.slice(0, end);
+}
+function serverUrls() {
+  const port = process.env.PORT || 3001;
+  const isolatedBase = isolationMode() === 'isolated' && process.env.RUN_SERVER_URL
+    ? withoutTrailingSlashes(process.env.RUN_SERVER_URL) : '';
+  const loopback = isolatedBase || `http://127.0.0.1:${port}`;
+  return {
+    data: isolatedBase || `http://localhost:${port}`,
+    loopback,
+    schema: process.env.JSON_SCHEMA_URL || `${loopback}/json_validator/datafile.schema.json`,
+  };
+}
 const ARTIFACTS_DIR   = path.resolve(__dirname, '../../data/artifacts');
 const ENVS_DIR        = path.join(COLLECTION_PATH, 'environments');
 // A run's working folder (collection copy, env file, reports). RUN_WORKSPACES_DIR
@@ -671,7 +688,7 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     ...envVar('api_base', apiBase),
     ...envVar('library_base', './library-bruno/'),
     ...envVar('data_base', datafileUrl),
-    ...envVar('json_schema', JSON_SCHEMA_URL),
+    ...envVar('json_schema', serverUrls().schema),
     ...envVar('scenariosToRunIndex', '0'),
   ];
   if (requestor) {
@@ -890,7 +907,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   }
 
   // 5. Validate data file exists
-  const datafileUrl = `http://localhost:${process.env.PORT || 3001}/data/${companyRow.slug}-datafile.json`;
+  const datafileUrl = `${serverUrls().data}/data/${companyRow.slug}-datafile.json`;
   const datafilePath = companyRow.datafile_path;
   if (!datafilePath || !(await fsExists(datafilePath))) {
     const msg = 'No data file uploaded. Upload a data file in your company profile before running.';
@@ -966,7 +983,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     ...envVar('runHardDeadlineMs', Date.now() + _runBudget.effectiveMs),
     ...envVar('__runId', runId),
     ...envVar('__intrusionTag', intrusionTag),
-    ...envVar('oscar_loopback_base', `http://127.0.0.1:${process.env.PORT || 3001}`),
+    ...envVar('oscar_loopback_base', serverUrls().loopback),
   ].join('\n') + '\n';
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);
@@ -1384,4 +1401,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, WORKSPACES_DIR };
+module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, WORKSPACES_DIR, serverUrls };
