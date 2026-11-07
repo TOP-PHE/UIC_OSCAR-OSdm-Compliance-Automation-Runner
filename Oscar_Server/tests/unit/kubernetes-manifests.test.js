@@ -63,7 +63,8 @@ describe('every manifest is there and reads', () => {
   })(K8S);
 
   test.each(files.map(f => path.relative(K8S, f)))('%s', (rel) => {
-    expect(() => load(rel)).not.toThrow();
+    // A file may hold several documents (---), as the pod mode's do.
+    expect(() => yaml.loadAll(read(rel))).not.toThrow();
   });
 
   test.each(files.filter(f => f.endsWith('kustomization.yaml')).map(f => path.relative(K8S, f)))(
@@ -352,7 +353,8 @@ describe('what CI deploys', () => {
   });
 
   test('both CI deployments create the runner\'s Secret, and check what the runner holds', () => {
-    expect(workflow.match(/create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN=/g)).toHaveLength(2);
+    // The two deployments with a runner container, and the pod mode's (the dispatcher's key).
+    expect(workflow.match(/create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN=/g)).toHaveLength(3);
     expect(workflow).toContain('exec deploy/oscar -c runner');
   });
 
@@ -367,8 +369,130 @@ describe('what CI deploys', () => {
 
   test('the workflow runs when what it deploys changes', () => {
     for (const p of ['OSCAR_Deploy/kubernetes/**', 'Oscar_Server/Dockerfile', 'Oscar_Server/src/server.js', 'Oscar_Server/src/utils/clusterSettings.js',
-      'Oscar_Server/src/runner-agent/**', 'Oscar_Server/src/utils/runAgentPeer.js', 'Oscar_Server/src/run-pod/**']) {
+      'Oscar_Server/src/runner-agent/**', 'Oscar_Server/src/utils/runAgentPeer.js', 'Oscar_Server/src/run-pod/**',
+      'Oscar_Server/src/run-dispatcher/**']) {
       expect(workflow.split(`'${p}'`).length - 1).toBe(2);   // pull_request and push
     }
+  });
+});
+
+// ── #1130: pod mode, each run in a pod of its own ────────────────────────────
+// The runs' namespace (runs/), the component that turns an overlay to pod
+// mode (components/pod-runs/), and what the kind CI deploys of them.
+describe('pod mode (option 4)', () => {
+  const loadAll = (rel) => yaml.loadAll(read(rel));
+  const byKind = (docs, kind, name) => docs.find(d => d.kind === kind && (!name || d.metadata.name === name));
+  const runsK = load('runs/kustomization.yaml');
+  const runsDocs = runsK.resources.flatMap(r => loadAll(`runs/${r}`));
+  const component = load('components/pod-runs/kustomization.yaml');
+  const compDocs = component.resources.flatMap(r => loadAll(`components/pod-runs/${r}`));
+  const generated = (name) => envOf((component.configMapGenerator.find(g => g.name === name)?.literals || []).join('\n'));
+  const serverSettings = generated('oscar-settings');
+  const dispatcherSettings = generated('oscar-dispatcher-settings');
+  const dispatcher = byKind(compDocs, 'Deployment', 'oscar-dispatcher');
+  const dPod = dispatcher.spec.template.spec;
+  const dContainer = dPod.containers[0];
+
+  test('the runs\' namespace is held to "restricted", and everything in it names it', () => {
+    const ns = byKind(runsDocs, 'Namespace');
+    expect(ns.metadata.name).toBe('oscar-runs');
+    expect(ns.metadata.labels['pod-security.kubernetes.io/enforce']).toBe('restricted');
+    for (const d of runsDocs.filter(x => x.kind !== 'Namespace')) expect([d.kind, d.metadata.namespace]).toEqual([d.kind, 'oscar-runs']);
+    expect(byKind(runsDocs, 'ServiceAccount', 'oscar-run').automountServiceAccountToken).toBe(false);
+    expect(byKind(runsDocs, 'ResourceQuota')).toBeDefined();
+  });
+
+  test('the dispatcher may make and remove runs there, and nothing more', () => {
+    const role = byKind(runsDocs, 'Role', 'oscar-dispatcher');
+    const rights = role.rules.flatMap(r => r.resources.map(res => `${res}:${[...r.verbs].sort().join(',')}`)).sort();
+    expect(rights).toEqual(['jobs:create,delete,get,list', 'pods/log:get', 'pods:get,list', 'secrets:create,delete,list,patch']);
+    const binding = byKind(runsDocs, 'RoleBinding', 'oscar-dispatcher');
+    expect(binding.roleRef).toMatchObject({ kind: 'Role', name: 'oscar-dispatcher' });
+    expect(binding.subjects).toEqual([{ kind: 'ServiceAccount', name: 'oscar-dispatcher', namespace: 'oscar' }]);
+    expect(runsDocs.some(d => d.kind === 'ClusterRole' || d.kind === 'ClusterRoleBinding')).toBe(false);
+  });
+
+  test('a run pod reaches DNS, OSCAR\'s internal port and public addresses only; nothing reaches it', () => {
+    const np = byKind(runsDocs, 'NetworkPolicy', 'oscar-run');
+    expect(np.spec.podSelector.matchLabels).toEqual({ 'app.kubernetes.io/name': 'oscar-run' });
+    expect(np.spec.policyTypes).toEqual(['Ingress', 'Egress']);
+    expect(np.spec.ingress).toBeUndefined();
+    expect(np.spec.egress).toHaveLength(3);
+    const [dns, internal, publicNet] = np.spec.egress;
+    expect(dns.ports.map(p => p.port).sort((a, b) => a - b)).toEqual([53, 53, 5353, 5353]);
+    expect(internal.ports).toEqual([{ protocol: 'TCP', port: Number(serverSettings.INTERNAL_PORT) }]);
+    expect(internal.to[0].namespaceSelector.matchLabels).toEqual({ 'kubernetes.io/metadata.name': 'oscar' });
+    const v4 = publicNet.to.find(t => t.ipBlock.cidr === '0.0.0.0/0').ipBlock.except;
+    expect(v4).toEqual(expect.arrayContaining(['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16', '127.0.0.0/8', '100.64.0.0/10']));
+    expect(publicNet.ports).toBeUndefined();
+  });
+
+  test('the component sets pod mode and the internal port, and takes the runner out of OSCAR\'s pod', () => {
+    expect(component.kind).toBe('Component');
+    expect(serverSettings).toMatchObject({ RUN_ISOLATION: 'pod', INTERNAL_PORT: '3003', RUN_AGENT_HOST: 'oscar-dispatcher', RUN_AGENT_PORT: '3002' });
+    expect(serverSettings.RUN_SERVER_URL).toBe(dispatcherSettings.RUN_RESULTS_URL);
+    expect(serverSettings.RUN_SERVER_URL).toBe(`http://oscar-internal.oscar.svc:${serverSettings.INTERNAL_PORT}`);
+    const patch = load('components/pod-runs/server-pod-mode.yaml').spec.template.spec;
+    expect(patch.containers).toEqual(expect.arrayContaining([{ name: 'runner', $patch: 'delete' }]));
+    expect(patch.containers.find(c => c.name === 'oscar').ports).toEqual([{ name: 'internal', containerPort: 3003 }]);
+    const svc = byKind(compDocs, 'Service', 'oscar-internal');
+    expect(svc.spec.ports).toEqual([{ name: 'internal', port: 3003, targetPort: 'internal' }]);
+    expect(svc.spec.selector).toEqual({ 'app.kubernetes.io/name': 'oscar' });
+  });
+
+  test('the dispatcher holds none of the server\'s settings, secrets or data', () => {
+    expect(dPod.serviceAccountName).toBe('oscar-dispatcher');
+    expect(byKind(compDocs, 'ServiceAccount', 'oscar-dispatcher').automountServiceAccountToken).toBe(true);
+    expect(dContainer.command).toEqual(['node', 'src/run-dispatcher/dispatcher.js']);
+    expect(dContainer.image).toBe(container.image);
+    expect(dContainer.envFrom).toEqual([{ configMapRef: { name: 'oscar-dispatcher-settings' } }]);
+    expect(dContainer.env).toEqual([{ name: 'RUN_AGENT_TOKEN', valueFrom: { secretKeyRef: { name: 'oscar-runner', key: 'RUN_AGENT_TOKEN' } } }]);
+    expect(JSON.stringify(dispatcher)).not.toMatch(/oscar-secrets|oscar-data|\/app\/data/);
+    expect(dContainer.securityContext).toMatchObject({ allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ['ALL'] } });
+    expect(dPod.securityContext).toEqual({ runAsNonRoot: true, seccompProfile: { type: 'RuntimeDefault' } });
+  });
+
+  test('the dispatcher\'s settings are the ones it reads, and it starts with them', () => {
+    const D = require('../../src/run-dispatcher/dispatcher');
+    const source = fs.readFileSync(path.join(REPO, 'Oscar_Server/src/run-dispatcher/dispatcher.js'), 'utf8');
+    const readByIt = new Set([...source.matchAll(/env\.(RUN_[A-Z_]+)/g)].map(m => m[1]));
+    for (const key of Object.keys(dispatcherSettings).filter(k => k.startsWith('RUN_'))) expect([key, readByIt.has(key)]).toEqual([key, true]);
+    expect(D.startupProblem({ ...dispatcherSettings, RUN_AGENT_TOKEN: 'k'.repeat(40) }, undefined, () => false)).toBeNull();
+    expect(D.settingsOf(dispatcherSettings).serviceAccount).toBe('oscar-run');
+  });
+
+  test('the internal port is reached by run pods only, the dispatcher by OSCAR\'s pod only', () => {
+    const server = byKind(compDocs, 'NetworkPolicy', 'oscar-server');
+    expect(server.spec.podSelector.matchLabels).toEqual({ 'app.kubernetes.io/name': 'oscar' });
+    const open = server.spec.ingress.find(r => !r.from);
+    expect(open.ports).toEqual([{ protocol: 'TCP', port: 3001 }]);
+    const internal = server.spec.ingress.find(r => r.from);
+    expect(internal.ports).toEqual([{ protocol: 'TCP', port: 3003 }]);
+    expect(internal.from).toEqual([{
+      namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'oscar-runs' } },
+      podSelector: { matchLabels: { 'app.kubernetes.io/name': 'oscar-run' } },
+    }]);
+    const disp = byKind(compDocs, 'NetworkPolicy', 'oscar-dispatcher');
+    expect(disp.spec.ingress).toEqual([{ from: [{ podSelector: { matchLabels: { 'app.kubernetes.io/name': 'oscar' } } }], ports: [{ protocol: 'TCP', port: 3002 }] }]);
+  });
+
+  test('the run pods\' labels and service account are the ones the dispatcher gives them', () => {
+    const J = require('../../src/run-dispatcher/jobSpec');
+    expect(J.LABELS['app.kubernetes.io/name']).toBe('oscar-run');
+    expect(dispatcherSettings.RUN_SERVICE_ACCOUNT).toBe(byKind(runsDocs, 'ServiceAccount', 'oscar-run').metadata.name);
+    expect(dispatcherSettings.RUN_NAMESPACE).toBe('oscar-runs');
+  });
+
+  test('the kind CI deploys pod mode with the run image it builds, and checks it', () => {
+    const workflow = fs.readFileSync(path.join(REPO, '.github/workflows/ci-kubernetes.yml'), 'utf8');
+    const ci = load('ci/pod-mode/kustomization.yaml');
+    expect(ci.components).toEqual(['../../components/pod-runs']);
+    const ciDispatcher = envOf((ci.configMapGenerator.find(g => g.name === 'oscar-dispatcher-settings').literals).join('\n'));
+    expect(ciDispatcher.RUN_IMAGE).toBe('local/oscar-run:ci');
+    expect(workflow).toContain('kind load docker-image local/oscar-run:ci --name oscar');
+    expect(workflow).toContain('kubectl apply -k OSCAR_Deploy/kubernetes/ci/pod-runs');
+    expect(workflow).toContain('kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/ci/pod-mode');
+    expect(workflow).toContain('OSCAR_Deploy/kubernetes/ci/probe-run-network.sh');
+    expect(load('ci/pod-runs/kustomization.yaml').resources).toEqual(['../../runs']);
   });
 });

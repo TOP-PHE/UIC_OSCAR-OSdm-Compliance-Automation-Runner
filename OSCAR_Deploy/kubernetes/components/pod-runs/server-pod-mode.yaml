@@ -1,0 +1,19 @@
+# OSCAR's pod in pod mode: no runner container (the runs are pods of their
+# own), and the internal port the run pods call.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oscar
+spec:
+  template:
+    spec:
+      containers:
+        - name: runner
+          $patch: delete
+        - name: oscar
+          ports:
+            - name: internal
+              containerPort: 3003
+      volumes:
+        - name: runner-tmp
+          $patch: delete

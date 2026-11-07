@@ -1,0 +1,18 @@
+# The server's internal port (INTERNAL_PORT): what a run pod calls, and
+# nothing else (src/server.js, internalApp). Never exposed by an Ingress or a
+# Route; the network policy lets run pods only reach it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: oscar-internal
+  labels:
+    app.kubernetes.io/name: oscar
+    app.kubernetes.io/component: server-internal
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: oscar
+  ports:
+    - name: internal
+      port: 3003
+      targetPort: internal

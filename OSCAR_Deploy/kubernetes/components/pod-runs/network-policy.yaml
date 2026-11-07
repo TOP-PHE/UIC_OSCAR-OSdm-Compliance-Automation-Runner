@@ -1,0 +1,43 @@
+# In OSCAR's namespace. The server's public port stays open to whatever
+# reached it before (the Ingress or Route, Prometheus); its internal port is
+# reached by run pods only. The dispatcher is reached by OSCAR's pod only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: oscar-server
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: oscar
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - { protocol: TCP, port: 3001 }
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: oscar-runs
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oscar-run
+      ports:
+        - { protocol: TCP, port: 3003 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: oscar-dispatcher
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: oscar-dispatcher
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oscar
+      ports:
+        - { protocol: TCP, port: 3002 }

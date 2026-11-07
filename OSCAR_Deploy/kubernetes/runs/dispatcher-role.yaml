@@ -1,0 +1,36 @@
+# What the run dispatcher (OSCAR's namespace, service account
+# oscar-dispatcher) may do, in the runs' namespace only: make and remove a
+# run's Job and Secret, follow its pod and read its log. Nothing else, and
+# nothing in OSCAR's own namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: oscar-dispatcher
+  namespace: oscar-runs
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "list", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oscar-dispatcher
+  namespace: oscar-runs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: oscar-dispatcher
+subjects:
+  - kind: ServiceAccount
+    name: oscar-dispatcher
+    namespace: oscar

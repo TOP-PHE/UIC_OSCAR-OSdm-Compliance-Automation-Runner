@@ -1,0 +1,21 @@
+# The runs' namespace as the kind CI applies it: the simulator answers on the
+# runner, at the gateway of kind's Docker network, a private address the run
+# pods' network policy otherwise refuses.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../runs
+patches:
+  - target:
+      kind: NetworkPolicy
+      name: oscar-run
+    patch: |-
+      - op: add
+        path: /spec/egress/-
+        value:
+          to:
+            - ipBlock:
+                cidr: 172.16.0.0/12
+          ports:
+            - protocol: TCP
+              port: 3002

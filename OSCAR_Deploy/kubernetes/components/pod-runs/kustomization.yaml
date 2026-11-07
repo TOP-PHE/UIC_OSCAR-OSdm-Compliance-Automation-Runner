@@ -1,0 +1,46 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Run isolation, option 4 (#1130): each run in a pod of its own. Add this
+# component to an overlay (components: [../../components/pod-runs]) after
+# applying the runs' namespace (OSCAR_Deploy/kubernetes/runs). It:
+#   - adds the run dispatcher (its own Deployment and service account, the
+#     only one with rights, in the runs' namespace only) and its Service;
+#   - adds the server's internal port (3003) and its Service, oscar-internal;
+#   - takes the runner container out of OSCAR's pod (no run starts there);
+#   - sets RUN_ISOLATION=pod;
+#   - adds network policies: the internal port is reached by run pods only,
+#     the dispatcher by OSCAR's pod only.
+# The overlay sets RUN_IMAGE (oscar-dispatcher-settings) to its run image,
+# build-images.sh's third: <prefix>/oscar-run:<tag>.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - dispatcher.yaml
+  - internal-service.yaml
+  - network-policy.yaml
+configMapGenerator:
+  - name: oscar-settings
+    behavior: merge
+    literals:
+      - RUN_ISOLATION=pod
+      - INTERNAL_PORT=3003
+      - RUN_AGENT_HOST=oscar-dispatcher
+      - RUN_AGENT_PORT=3002
+      - RUN_SERVER_URL=http://oscar-internal.oscar.svc:3003
+  - name: oscar-dispatcher-settings
+    literals:
+      - RUN_NAMESPACE=oscar-runs
+      - RUN_IMAGE=oscar-run
+      - RUN_RESULTS_URL=http://oscar-internal.oscar.svc:3003
+      - RUN_SERVICE_ACCOUNT=oscar-run
+      - RUN_DISPATCHER_MAX_RUNS=50
+      - NODE_ENV=production
+      - HOME=/tmp
+      - TZ=Europe/Paris
+patches:
+  - path: server-pod-mode.yaml

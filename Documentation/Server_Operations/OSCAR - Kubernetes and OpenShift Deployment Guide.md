@@ -287,6 +287,113 @@ as such at the start (as after a restart of the VPS), and can be run again.
 To go back, apply the previous tag, **before** anyone has used the new one
 for long: a migration is not undone.
 
+## 10a. Each run in a pod of its own (pod mode)
+
+By default the runs execute in the pod's `runner` container. Runs that execute
+at the same moment share that container. **Pod mode** (run isolation option 4,
+#1130) gives each run a pod of its own, created when the run starts and
+deleted when it ends. Runs then share nothing with each other: no container,
+no process space, no file system, no network identity.
+
+Pod mode adds three things to the cluster:
+
+- **The run dispatcher**, a small Deployment beside OSCAR. It is the only
+  component with Kubernetes rights, and those rights are limited to a
+  namespace of its own, `oscar-runs`: create and delete a run's Job and
+  Secret, follow its pod and read its log. The server keeps no Kubernetes
+  credentials. The dispatcher holds none of the server's settings, secrets or
+  data, and refuses to start if it can see one.
+- **The runs' namespace, `oscar-runs`.** It is held to the "restricted" pod
+  security standard and has a quota. Each run pod there runs the run image
+  `oscar-run`, which holds Bruno, the collection and nothing of the server. A
+  run pod gets:
+  - no service account token, no service links;
+  - a read-only root file system, every capability dropped, no privilege
+    escalation, the RuntimeDefault seccomp profile;
+  - the run's deadline;
+  - only its own run's inputs and credentials.
+- **The server's internal port, 3003**, the only thing a run pod calls. It
+  serves the run's data file, the schema, the token refresh and the upload of
+  the run's results, each with the run's secret, which is bound to that pod's
+  address. The port has no page, no session and no other route. It is never
+  exposed by an Ingress or a Route.
+
+Network policies say who reaches what:
+- a run pod reaches DNS, OSCAR's internal port and public addresses (the
+  providers), not the cluster's other services, not private or link-local
+  addresses, not another run;
+- only run pods reach the internal port;
+- only OSCAR's pod reaches the dispatcher.
+
+They need a network plugin that enforces NetworkPolicy (Calico, Cilium,
+OVN-Kubernetes on OpenShift, kindnet in recent kind). Without one, the rest
+still holds, but nothing filters the run pods' traffic.
+
+To switch:
+
+1. **Push the run image** that `build-images.sh` makes as its third image
+   (section 3): `docker push registry.example.org/oscar/oscar-run:<tag>`.
+2. **Create the runs' namespace and the dispatcher's rights.** This needs a
+   cluster administrator, or a project administrator on OpenShift who may
+   create a project:
+
+   ```bash
+   kubectl apply -k OSCAR_Deploy/kubernetes/runs
+   ```
+
+3. **Add the component to your overlay** and name the run image:
+
+   ```yaml
+   # overlays/<yours>/kustomization.yaml
+   components:
+     - ../../components/pod-runs
+   configMapGenerator:
+     - name: oscar-dispatcher-settings
+       behavior: merge
+       literals:
+         - RUN_IMAGE=registry.example.org/oscar/oscar-run:release-2026.528
+   ```
+
+   The dispatcher's own image is the cluster image (`oscar-bundle`), as the
+   server's is.
+4. **Apply** (section 6). OSCAR's pod comes back with one container, and the
+   `oscar-dispatcher` Deployment starts beside it. The Secret `oscar-runner`
+   (section 4) is the key the server and the dispatcher share.
+5. **Check:**
+
+   ```bash
+   kubectl -n oscar exec deploy/oscar -- printenv RUN_ISOLATION          # pod
+   kubectl auth can-i create jobs -n oscar-runs --as=system:serviceaccount:oscar:oscar-dispatcher   # yes
+   kubectl auth can-i get secrets -n oscar      --as=system:serviceaccount:oscar:oscar-dispatcher   # no
+   ```
+
+   Then run one scenario. `kubectl -n oscar logs deploy/oscar-dispatcher`
+   shows `started oscar-run-<run id>`, and `kubectl -n oscar-runs get jobs`
+   is empty again once the run has ended.
+
+Details to know:
+
+- **OSCAR's namespace is named in four places**: the dispatcher's
+  RoleBinding and the network policy in `runs/`, and `RUN_SERVER_URL` and
+  `RUN_RESULTS_URL` in the component. They say `oscar`; patch all four for
+  another name.
+- **A provider on a private address** (a VPN, a peering) also needs its
+  range in the run pods' policy (`runs/network-policy.yaml`), as well as
+  `ALLOW_PRIVATE_TARGETS` (section 7). The CI's `ci/pod-runs` does so for
+  the simulator.
+- **Size.** Each run pod asks for 200m CPU and 256 MiB, and may use 1 CPU
+  and 1 GiB (`RUN_CPU_*`, `RUN_MEMORY_*` in `oscar-dispatcher-settings`).
+  The quota of `oscar-runs` allows 50 pods: keep `MAX_CONCURRENT_RUNS` within
+  it. A run pod over the quota is not made, and its run ends as "did not
+  start".
+- **Start time.** A run waits for its pod: a few seconds with the image
+  already on the node, more on a node that must pull it first.
+- **A sandboxed runtime** (gVisor, Kata Containers / OpenShift sandboxed
+  containers) puts each run behind a kernel of its own. Set `RUN_RUNTIME_CLASS`
+  to the RuntimeClass your cluster offers.
+- **Going back:** remove the component from the overlay and apply. OSCAR's
+  pod gets its `runner` container again. The runs' namespace can stay.
+
 ## 11. Not there on a cluster
 
 - More than one replica (section 1).
@@ -315,3 +422,7 @@ for long: a migration is not undone.
 | The pod stays in `CreateContainerConfigError` | the Secret `oscar-runner` is missing (section 4) |
 | Every run fails at once: *the runner agent could not be reached* | the `runner` container is not running: `kubectl -n oscar logs deploy/oscar -c runner` |
 | The `runner` container stops at once, naming a secret or the database | it was given the server's settings (an `envFrom` or a volume added in a patch): it refuses to run beside them |
+| Pod mode: every run fails at once, *the runner agent could not be reached* | the dispatcher is not running: `kubectl -n oscar logs deploy/oscar-dispatcher` |
+| Pod mode: the dispatcher stops at once, naming a setting, a secret or the database | `RUN_IMAGE` or `RUN_RESULTS_URL` is missing, or it was given the server's settings: it refuses to run beside them |
+| Pod mode: runs end as *the run's pod did not start* | `kubectl -n oscar-runs get events`: the run image cannot be pulled (`RUN_IMAGE`, the registry's credentials), the quota is full, or the pod is refused by the namespace's pod security |
+| Pod mode: runs stop at their first request, *Required scenario variable … is empty* | the run pod cannot reach the internal port: the network policies, or `RUN_SERVER_URL` does not name OSCAR's namespace |

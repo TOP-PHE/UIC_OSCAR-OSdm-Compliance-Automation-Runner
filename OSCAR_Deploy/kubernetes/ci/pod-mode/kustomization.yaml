@@ -1,0 +1,57 @@
+# The Kubernetes overlay in pod mode (run isolation option 4, #1130), as the
+# kind CI deploys it: the images the workflow builds and loads, the
+# simulator on a private address, the run image local.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../overlays/kubernetes
+components:
+  - ../../components/pod-runs
+images:
+  # build-images.sh local ci
+  - name: registry.example.org/oscar/oscar
+    newName: local/oscar
+    newTag: ci
+  - name: oscar-bundle
+    newName: local/oscar
+    newTag: ci
+configMapGenerator:
+  - name: oscar-settings
+    behavior: merge
+    literals:
+      - APP_URL=http://localhost:3001
+      - ALLOWED_REDIRECT_HOSTS=localhost
+      # The simulator answers on the runner's address, over http.
+      - ALLOW_PRIVATE_TARGETS=1
+      - MAX_CONCURRENT_RUNS=2
+  - name: oscar-dispatcher-settings
+    behavior: merge
+    literals:
+      - RUN_IMAGE=local/oscar-run:ci
+patches:
+  - target:
+      kind: Deployment
+      name: oscar
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests
+        value:
+          cpu: 250m
+          memory: 512Mi
+  - target:
+      kind: Deployment
+      name: oscar-dispatcher
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: PersistentVolumeClaim
+      name: oscar-data
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 2Gi
