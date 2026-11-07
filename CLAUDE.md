@@ -1415,7 +1415,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `oscar` would leave it without network): Bruno reaches the server at
   `RUN_SERVER_URL` (isolated only), and `fromThisMachine()` also takes the
   runner container's address (`utils/runAgentPeer.js`, looked up again every
-  30 s), the run's secret still required. Switching: `OSCAR - Server
+  30 s), the run's secret still required. **Those calls are not redirected
+  to https in production** (`fromRunAgentContainer()` in `server.js`, before
+  the redirect, #1127, 1.11.486): their `Host` is `oscar`, not `localhost`,
+  and until then every isolated run on the VPS failed to load its data file
+  (the collection follows no redirect). A check of isolated mode is made
+  with `NODE_ENV=production`. Switching: `OSCAR - Server
   Hardening` 4.1. In isolated mode `oscar_run_processes` counts nothing (the
   processes are the runner's).
   **The server touches a run's working folder only through

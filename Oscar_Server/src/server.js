@@ -188,6 +188,19 @@ app.use(metrics.httpDurationMiddleware);
 const ALLOWED_REDIRECT_HOSTS = (process.env.ALLOWED_REDIRECT_HOSTS || '')
   .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
+// The runner agent's container (RUN_ISOLATION=isolated on the VPS,
+// utils/runAgentPeer.js) is where Bruno runs: it calls this server in plain
+// HTTP on the Docker network, at RUN_SERVER_URL (http://oscar:3001), for the
+// data file, the schema and the token refresh (#1127). Those calls are not
+// redirected, as loopback calls are not. Only straight from that container,
+// never through the proxy, which adds a forwarding header; the routes keep
+// their own checks (the run's secret).
+const { isRunAgentPeer, watchRunAgentPeer } = require('./utils/runAgentPeer');
+function fromRunAgentContainer(req) {
+  if (req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return false;
+  return isRunAgentPeer(req.socket?.remoteAddress);
+}
+
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
     // /metrics is scraped by Prometheus over plain HTTP from inside the
@@ -199,6 +212,7 @@ if (process.env.NODE_ENV === 'production') {
     const host = (req.headers.host || '').split(':')[0].toLowerCase();
     const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
     if (isLocalhost) return next();   // never redirect loopback traffic
+    if (fromRunAgentContainer(req)) return next();
     const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
     if (proto !== 'https') {
       // Sonar S5146: validate Host: against the allow-list before redirecting.
@@ -428,12 +442,10 @@ function runCopyHoldsTemplates(plaintext) {
 // With RUN_ISOLATION=isolated and the runner agent in a container of its own,
 // Bruno calls from that container: its address counts too (utils/runAgentPeer).
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
-const { isRunAgentPeer, watchRunAgentPeer } = require('./utils/runAgentPeer');
 watchRunAgentPeer();
 function fromThisMachine(req) {
   if (req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return false;
-  const remote = req.socket?.remoteAddress;
-  return LOOPBACK_ADDRESSES.has(remote) || isRunAgentPeer(remote);
+  return LOOPBACK_ADDRESSES.has(req.socket?.remoteAddress) || fromRunAgentContainer(req);
 }
 
 app.get('/data/:filename', fileDownloadLimiter, (req, res) => {

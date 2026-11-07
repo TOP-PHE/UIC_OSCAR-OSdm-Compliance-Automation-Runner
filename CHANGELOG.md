@@ -162,6 +162,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.486] — 2026-11-07
+
+### Fixed
+
+- **Isolated runs on the VPS load their data file** (#1127). With
+  `RUN_ISOLATION=isolated` (Docker Compose), Bruno runs in the `oscar-runner`
+  container and calls the server at `RUN_SERVER_URL` (`http://oscar:3001`)
+  for the data file, the schema and the token refresh. In production the
+  server's HTTPS redirect sent every plain-HTTP request whose `Host` is not
+  `localhost` to `https://…` (or answered 400 with `ALLOWED_REDIRECT_HOSTS`),
+  and the collection does not follow redirects: every scenario stopped at
+  `01. POST Get Offer` ("Required scenario variable … is empty or not set"),
+  and the steps after it went out with their templates unfilled. A request
+  straight from the runner container (its address, as `utils/runAgentPeer.js`
+  resolves it, and no forwarding header) is no longer redirected, as a
+  loopback call is not (`fromRunAgentContainer()`, also used by
+  `fromThisMachine()`); the routes keep their run-secret checks. Kubernetes
+  was not affected: there the runner calls `localhost` in its pod.
+- Tests: the production redirect block of `server.test.js` gains the runner
+  container's calls (not redirected), the same with a forwarding header
+  (redirected) and another address (redirected). Without the exemption, the
+  first fails.
+- Until this release is installed, a VPS in isolated mode goes back with
+  `RUN_ISOLATION=local` in `.env`, then `docker compose up -d`.
+
+---
+
 ## [server-1.11.485] — 2026-11-07
 
 ### Security
