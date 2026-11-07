@@ -148,6 +148,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.485] — 2026-11-07
+
+### Security
+
+- **A run's working folder: plain files of it only** (#1124). The run's own
+  processes write that folder (with `RUN_ISOLATION=isolated`, from the runner
+  container), so the server now reads and writes it through one module,
+  `worker/runFolder.js`, which never follows a link:
+  - a file is opened without following a link (`O_NOFOLLOW`; on Windows, a
+    link check on the open file) and without waiting on a pipe
+    (`O_NONBLOCK`), and must be a plain file of at most 100 MB (about ten
+    times the largest report seen);
+  - the folder holding it must resolve to the run's own folder, checked
+    before opening and, on Linux, on the open file (`/proc/self/fd`);
+  - a write makes a new file (`O_EXCL`) after removing whatever had the
+    name; the run's folder and its sub-folders are always made new, and the
+    collection is copied into them file by file.
+  The runner uses it for the collection copy, the environment file, the
+  scenario reports, `.bru_results.json` given to `mergeReport.js` (now
+  written from the results read once, no longer copied by name) and the
+  raw results. A file that does not pass is left out of the run's artifacts,
+  with an error line in the run's log; the run's result is unchanged. A run
+  whose working folder cannot be made is now marked FAILED with the reason,
+  instead of ending unmarked.
+- Tests: `run-folder.test.js` (real links to files and folders, a folder
+  swapped after the check, a named pipe, the size limit), and runner tests
+  in both modes (collection folder, workspace). Seven mutations, one per
+  guard, each fail a test.
+
+---
+
 ## [server-1.11.484] — 2026-11-07
 
 ### Added

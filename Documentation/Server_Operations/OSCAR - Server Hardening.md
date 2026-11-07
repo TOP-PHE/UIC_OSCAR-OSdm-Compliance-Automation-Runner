@@ -230,6 +230,12 @@ one run takes about 80 MB, so 20 at once about 1.6 GB). To change it, set
 `up -d`. When the cap is reached, Docker stops the runner: the runs in
 progress fail, and the container restarts on its own.
 
+The server reads and writes the runs' working folders as files of those
+folders only: it never follows a link there, reads plain files of at most
+100 MB, and always writes new files and folders (since 1.11.485). A report
+that does not pass is left out of the run's artifacts, with a line in the
+run's log.
+
 What stays shared on purpose: the run's own provider token and its company's
 data file, which the run needs; and runs that execute at the same moment share
 the runner container. One container per run is the next step (Kubernetes Jobs).
