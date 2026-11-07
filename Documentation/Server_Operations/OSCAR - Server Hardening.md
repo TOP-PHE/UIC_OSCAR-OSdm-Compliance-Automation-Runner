@@ -224,6 +224,11 @@ Each run's log shows `[runner-agent] started bru in <run id>` in
 `docker logs oscar-runner`. To go back: `RUN_ISOLATION=local` in `.env`, then
 `up -d` (the runner may keep running; it is not used).
 
+Isolated mode needs server 1.11.486 or later. Before it, the server sent the
+runner's calls (data file, schema, token refresh) to https, and every run
+stopped at its first offer request with "Required scenario variable … is
+empty or not set". On an earlier version, stay on `RUN_ISOLATION=local`.
+
 The runner's memory is capped at 6 GB (`mem_limit` in `docker-compose.yml`;
 one run takes about 80 MB, so 20 at once about 1.6 GB). To change it, set
 `RUNNER_MEMORY_LIMIT` in `.env` (for example `RUNNER_MEMORY_LIMIT=4g`), then

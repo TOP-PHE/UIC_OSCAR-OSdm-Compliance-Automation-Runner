@@ -917,6 +917,48 @@ describe('HTTPS-redirect middleware (NODE_ENV=production only)', () => {
     const res = await request(prodApp).get('/health').set('Host', 'oscar.example.com').set('X-Forwarded-Proto', 'https');
     expect(res.status).not.toBe(301);
   });
+
+  // #1127: with RUN_ISOLATION=isolated on the VPS, Bruno runs in the runner
+  // container and calls http://oscar:3001 (RUN_SERVER_URL) on the Docker
+  // network. Here that container is this test's own address, given to the
+  // peer table as the runner's (the module prodApp loaded, not a fresh one).
+  describe('calls straight from the runner container (#1127)', () => {
+    const peer = () => require('../../src/utils/runAgentPeer');
+    const saved = { RUN_ISOLATION: process.env.RUN_ISOLATION, RUN_AGENT_HOST: process.env.RUN_AGENT_HOST };
+
+    beforeAll(async () => {
+      process.env.RUN_ISOLATION = 'isolated';
+      process.env.RUN_AGENT_HOST = 'oscar-runner';
+      await peer().refreshRunAgentPeer(async () => [{ address: '127.0.0.1' }, { address: '::1' }]);
+    });
+
+    afterAll(async () => {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name]; else process.env[name] = value;
+      }
+      await peer().refreshRunAgentPeer();               // no agent host any more: the table empties
+    });
+
+    test('are not redirected: the data file, the schema and the token refresh stay plain HTTP', async () => {
+      for (const url of ['/health', '/data/acme-datafile.json', '/json_validator/datafile.schema.json']) {
+        const res = await request(prodApp).get(url).set('Host', 'oscar:3001');
+        expect([url, res.status]).not.toEqual([url, 301]);
+        expect([url, res.status]).not.toEqual([url, 400]);
+        expect(res.headers.location).toBeUndefined();
+      }
+    });
+
+    test('a call carrying a forwarding header came through the proxy, and is redirected', async () => {
+      const res = await request(prodApp).get('/health').set('Host', 'oscar:3001').set('X-Forwarded-For', '203.0.113.9');
+      expect(res.status).toBe(301);
+      expect(res.headers.location).toBe('https://oscar/health');
+    });
+  });
+
+  test('a call from an address that is not the runner\'s is redirected (#1127)', async () => {
+    const res = await request(prodApp).get('/health').set('Host', 'oscar:3001');
+    expect(res.status).toBe(301);
+  });
 });
 
 // ── #1059: behind a cluster's router ───────────────────────────────────────────

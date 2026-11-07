@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.523",
+  "current_release": "2026.524",
   "releases": [
+    {
+      "release": "2026.524",
+      "date": "2026-11-07",
+      "server": "1.11.486",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.486: with RUN_ISOLATION=isolated on the VPS, the runner container's calls to the server (data file, schema, token refresh) are no longer redirected to https in production, so isolated runs load their data file (#1127)."
+      ]
+    },
     {
       "release": "2026.523",
       "date": "2026-11-07",
