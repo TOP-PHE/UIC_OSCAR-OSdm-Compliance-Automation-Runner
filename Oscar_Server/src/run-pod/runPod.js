@@ -125,6 +125,36 @@ function runProcess(command, args, { cwd, env, stdio, log }) {
   });
 }
 
+// Linux has both flags; where one is missing, the open file is compared with
+// what lstat finds under its name.
+const NOFOLLOW = fs.constants.O_NOFOLLOW || 0;
+const NONBLOCK = fs.constants.O_NONBLOCK || 0;
+
+/**
+ * A result file's content, read once from the file opened (never followed as
+ * a link, never waited on as a pipe), or { why } it is not sent.
+ */
+async function readPlainFile(file) {
+  let handle;
+  try {
+    handle = await fs.promises.open(file, fs.constants.O_RDONLY | NOFOLLOW | NONBLOCK);
+  } catch (err) {
+    return { why: err.code === 'ELOOP' ? 'not a plain file' : err.code || err.message };
+  }
+  try {
+    const st = await handle.stat();
+    if (!st.isFile()) return { why: 'not a plain file' };
+    if (!NOFOLLOW) {
+      const named = await fs.promises.lstat(file);
+      if (named.isSymbolicLink() || named.ino !== st.ino) return { why: 'not a plain file' };
+    }
+    if (st.size === 0 || st.size > MAX_RESULT_BYTES) return { why: `${st.size} bytes` };
+    return { content: await handle.readFile() };
+  } finally {
+    await handle.close();
+  }
+}
+
 /** Sends the run's result files to the server; returns how many went. */
 async function sendResults({ workDir, runId, resultsBase, secret, fetchImpl, log }) {
   const reports = path.join(workDir, L.REPORTS_DIR);
@@ -138,15 +168,13 @@ async function sendResults({ workDir, runId, resultsBase, secret, fetchImpl, log
   let sent = 0;
   for (const name of names.sort((a, b) => a.localeCompare(b))) {
     if (name === L.MERGE_RESULTS_NAME || L.resultNameProblem(name)) continue;
-    const file = path.join(reports, name);
-    const st = await fs.promises.lstat(file);
-    if (!st.isFile()) { log(`[run-pod] ${name} not sent: not a plain file`); continue; }
-    if (st.size === 0 || st.size > MAX_RESULT_BYTES) { log(`[run-pod] ${name} not sent: ${st.size} bytes`); continue; }
+    const read = await readPlainFile(path.join(reports, name));
+    if (read.why) { log(`[run-pod] ${name} not sent: ${read.why}`); continue; }
     try {
       const res = await fetchImpl(`${resultsBase}/v1/runs/${runId}/results/${encodeURIComponent(name)}`, {
         method: 'PUT',
         headers: { 'X-OSCAR-Run-Secret': secret, 'Content-Type': 'application/octet-stream' },
-        body: await fs.promises.readFile(file),
+        body: read.content,
         redirect: 'manual',
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
