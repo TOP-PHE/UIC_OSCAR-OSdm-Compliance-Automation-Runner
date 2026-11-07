@@ -153,8 +153,8 @@ describe('writing a file of the run folder', () => {
     fs.symlinkSync(secret, at, 'file');
     await F.writeRunFile(reports, '.bru_results.json', '{"results":[]}', { expectedDir: reports });
     expect(fs.readFileSync(secret, 'utf8')).toBe('SERVER-SECRET');
-    expect(fs.lstatSync(at).isSymbolicLink()).toBe(false);
     expect(fs.readFileSync(at, 'utf8')).toBe('{"results":[]}');
+    expect(fs.lstatSync(at).isSymbolicLink()).toBe(false);
   });
 
   test('a folder of the path that is a link is refused, and nothing is written there', async () => {

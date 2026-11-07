@@ -208,14 +208,21 @@ async function makeRunFolder(dir, name, { expectedDir = null } = {}) {
  * `dir`, with its mode. Returns false when `source` is not there.
  */
 async function copyFileIntoRunFolder(source, dir, name, { expectedDir = null } = {}) {
-  let content;
-  let mode;
+  let handle;
   try {
-    ({ mode } = await fs.promises.stat(source));
-    content = await fs.promises.readFile(source);
+    handle = await fs.promises.open(source, 'r');
   } catch (err) {
     if (err.code === 'ENOENT') return false;
     throw err;
+  }
+  let content;
+  let mode;
+  try {
+    // Mode and content of the one file opened, never looked up twice by name.
+    ({ mode } = await handle.stat());
+    content = await handle.readFile();
+  } finally {
+    await handle.close();
   }
   await writeRunFile(dir, name, content, { expectedDir, mode: mode & 0o777 });
   return true;

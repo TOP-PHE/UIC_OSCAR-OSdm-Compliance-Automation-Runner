@@ -1160,9 +1160,13 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       await waitForSpawnCalls(2);
       // What mergeReport.js was given, read while it "runs".
       const stdJson = path.join(cwd, 'Validation_Reports', '.bru_results.json');
-      const mergeInput = fs.existsSync(stdJson)
-        ? { link: fs.lstatSync(stdJson).isSymbolicLink(), text: fs.readFileSync(stdJson, 'utf8') }
-        : null;
+      let mergeInput = null;
+      try {
+        const text = fs.readFileSync(stdJson, 'utf8');
+        mergeInput = { link: fs.lstatSync(stdJson).isSymbolicLink(), text };
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+      }
       mergeProc.emit('close', 0);
       await runPromise;
       return { runId, envName, envFile, cwd, mergeInput, bruno: spawn.mock.calls[0], report: spawn.mock.calls[1] };
