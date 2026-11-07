@@ -1423,6 +1423,25 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   with `NODE_ENV=production`. Switching: `OSCAR - Server
   Hardening` 4.1. In isolated mode `oscar_run_processes` counts nothing (the
   processes are the runner's).
+  **Option 4, a Kubernetes Job per run** (#1130, tracking issue; decided
+  2026-11-07: a separate dispatcher holds the only Kubernetes rights, the run
+  pod sends its results, kind CI first). The option 4 PRs bump the server
+  version and **list it in `compatibility.json` without moving
+  `current_release`** (the kind smoke test refuses a server version that is
+  not listed; only a `current_release` change mints a release tag): they are
+  released together by a last PR the maintainer merges. **PR 1 (1.11.487): the
+  internal port.** `INTERNAL_PORT` set = a second Express app (`internalApp`,
+  exported beside `app`) serving only a run's calls: `/data/:filename`
+  (run secret only, no session fallback: `runDatafileHandler({ runCaller,
+  allowSession })`), the schema, the token refresh
+  (`refreshAccessTokenHandler({ runCaller })`) and `PUT
+  /v1/runs/:runId/results/:name` (`express.raw`, 100 MB), kept by
+  `utils/runResults.js` in `data/artifacts/<runId>/incoming/`, encrypted, one
+  file per name, 50 files / 200 MB a run, names of the results only
+  (`resultNameProblem()`). No session, no HTTPS redirect, its own limiter
+  and JSON 404. `internalRunCaller` is `fromThisMachine` until the pod mode
+  binds a run's secret to its pod. Never publish that port outside the
+  cluster network.
   **The server touches a run's working folder only through
   `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
   folder, so nothing there is followed as a link. Reads open with
