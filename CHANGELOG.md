@@ -183,6 +183,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.491] — 2026-11-07
+
+### Added
+
+- **Run pods in Grafana, and two alerts** (run isolation, option 4, part 6;
+  #1130). Listed in `compatibility.json` (2026.529) without moving
+  `current_release`: released with the other option 4 parts. In pod mode the
+  server writes `oscar_run_pod_start_seconds` (from asking the dispatcher for
+  a run to its pod running) and `oscar_run_pods_ended_total{outcome}`: `ran`
+  (Bruno ended, passed or not), `deadline`, `not_started`, `stopped`
+  (the dispatcher's exit codes 124, 125, 143) or `refused` (by the
+  dispatcher, or it was lost). Each run counts once. *OSCAR · Overview* has a
+  row *Run pods* (start time, median and 95th percentile; pods ended by
+  outcome), and `oscar-alerts.yml` a group `oscar.run-pods`:
+  `OscarRunPodsNotStarting` (a pod that never ran: image, quota, pod
+  security) and `OscarRunDispatcherRefusing`. In any other mode they stay
+  empty.
+- Tests: `runner.test.js` (the start time once the pod is named, one outcome
+  per run, a refusal, the outcomes against the dispatcher's codes) and
+  `run-pod-metrics.test.js` (the dashboard and the alerts read only what the
+  server writes, and only its outcomes).
+
+---
+
 ## [server-1.11.490] — 2026-11-07
 
 ### Added

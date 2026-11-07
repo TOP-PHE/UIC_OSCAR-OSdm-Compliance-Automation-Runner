@@ -98,6 +98,23 @@ const companyRunRequests = new promClient.Counter({
   registers: [register]
 });
 
+// ─── Run pods (RUN_ISOLATION=pod, #1130) ─────────────────────────────────────
+// How long a run waits for its pod, and how its pod ended. Written in pod mode
+// only (worker/runner.js); the outcomes are RUN_POD_OUTCOMES.
+const RUN_POD_OUTCOMES = Object.freeze(['ran', 'deadline', 'not_started', 'stopped', 'refused']);
+const runPodStart = new promClient.Histogram({
+  name: 'oscar_run_pod_start_seconds',
+  help: 'Seconds from asking the run dispatcher for a run to its pod running',
+  buckets: [1, 2, 5, 10, 20, 30, 60, 120, 300],
+  registers: [register]
+});
+const runPodsEnded = new promClient.Counter({
+  name: 'oscar_run_pods_ended_total',
+  help: 'Run pods ended, by outcome: ran (Bruno ended), deadline, not_started, stopped, refused (by the dispatcher, or it was lost)',
+  labelNames: ['outcome'],
+  registers: [register]
+});
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 const loginAttempts = new promClient.Counter({
   name: 'oscar_login_attempts_total',
@@ -142,6 +159,9 @@ module.exports = {
   companyRunsQueued,
   companyRunsFinished,
   companyRunRequests,
+  RUN_POD_OUTCOMES,
+  runPodStart,
+  runPodsEnded,
   loginAttempts,
   smtpSends
 };

@@ -146,6 +146,26 @@ the series would grow with every user. *Admin → Server Activity → Runs in
 Progress* lists runs going and waiting by user and company or provider. A
 company renamed keeps its old name in the labels until OSCAR restarts.
 
+### Run pods (#1130)
+
+With `RUN_ISOLATION=pod` (Kubernetes or OpenShift, each run in a pod of its
+own; *OSCAR - Kubernetes and OpenShift Deployment Guide*, section 10a), two
+more metrics; in any other mode they stay empty:
+
+- `oscar_run_pod_start_seconds`, a histogram: from the server asking the run
+  dispatcher for a run to its pod running. A few seconds with the run image
+  already on the node; more on a node that must pull it.
+- `oscar_run_pods_ended_total{outcome}`, one per run: `ran` (Bruno ended,
+  passed or not), `deadline` (the run's Job reached its deadline),
+  `not_started` (the pod never ran), `stopped` (on the server's word: a stop,
+  a time limit) or `refused` (by the dispatcher, or the server lost it).
+
+The row *Run pods* of *OSCAR · Overview* shows both. Two alerts:
+`OscarRunPodsNotStarting` (the run image cannot be pulled, the runs'
+namespace's quota is full, or its pod security refuses the pod) and
+`OscarRunDispatcherRefusing` (the dispatcher is down, refuses the server's
+key, or has as many runs as `RUN_DISPATCHER_MAX_RUNS`).
+
 ### The OSDM simulator (#1005)
 
 The simulator runs on a host of its own and is read **through OSCAR**: the

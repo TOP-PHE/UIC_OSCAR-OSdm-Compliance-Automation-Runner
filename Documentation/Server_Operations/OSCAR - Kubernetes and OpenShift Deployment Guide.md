@@ -396,6 +396,11 @@ Details to know:
   start".
 - **Start time.** A run waits for its pod: a few seconds with the image
   already on the node, more on a node that must pull it first.
+- **Metrics and alerts.** The server writes `oscar_run_pod_start_seconds`
+  and `oscar_run_pods_ended_total{outcome}` (row *Run pods* of *OSCAR ·
+  Overview*), and two alerts watch them: `OscarRunPodsNotStarting` and
+  `OscarRunDispatcherRefusing` (*metrics-and-monitoring.md*, "Run pods").
+  Your Prometheus reads them as section 8 says.
 - **A sandboxed runtime** (gVisor, Kata Containers / OpenShift sandboxed
   containers) puts each run behind a kernel of its own. Set `RUN_RUNTIME_CLASS`
   to the RuntimeClass your cluster offers.

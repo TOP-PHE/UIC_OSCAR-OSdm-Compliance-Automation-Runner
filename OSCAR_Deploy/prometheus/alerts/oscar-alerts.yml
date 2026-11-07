@@ -166,3 +166,26 @@ groups:
           summary: "The OSCAR container uses {{ $value | humanizePercentage }} of its memory limit"
           description: "Over 90 % of the container's memory limit for 5 minutes. Past the limit Docker kills the container. Lower Max Concurrent Runs or raise the limit."
           runbook: "Documentation/Server_Operations/metrics-and-monitoring.md#the-oscar-servers-machine-1013"
+
+  # RUN_ISOLATION=pod only (#1130): each run in a pod of its own, made by the
+  # run dispatcher. In any other mode these metrics stay empty.
+  - name: oscar.run-pods
+    interval: 30s
+    rules:
+      - alert: OscarRunPodsNotStarting
+        expr: sum(increase(oscar_run_pods_ended_total{outcome="not_started"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value | humanize }} run pod(s) did not start in 15 minutes"
+          description: "Runs ended as \"the run's pod did not start\": the run image cannot be pulled (RUN_IMAGE, registry credentials), the quota of the runs' namespace is full, or its pod security refuses the pod. See `kubectl -n oscar-runs get events`."
+          runbook: "Documentation/Server_Operations/OSCAR - Kubernetes and OpenShift Deployment Guide.md#10a-each-run-in-a-pod-of-its-own-pod-mode"
+
+      - alert: OscarRunDispatcherRefusing
+        expr: sum(increase(oscar_run_pods_ended_total{outcome="refused"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "The run dispatcher refused or lost {{ $value | humanize }} run(s) in 15 minutes"
+          description: "The server could not have a run's pod made: the dispatcher is down, refuses the server's key (RUN_AGENT_TOKEN), or has reached RUN_DISPATCHER_MAX_RUNS. See `kubectl -n oscar logs deploy/oscar-dispatcher`."
+          runbook: "Documentation/Server_Operations/OSCAR - Kubernetes and OpenShift Deployment Guide.md#10a-each-run-in-a-pod-of-its-own-pod-mode"
