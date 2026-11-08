@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Kubernetes and OpenShift: each release's images on GHCR, and moving an
+  OSCAR from a VPS** (#1059, #1130). Workflow, deployment files, CI and
+  documentation only. New `.github/workflows/publish-cluster-images.yml`: on
+  each `release-*` tag on main (or by hand for an earlier release), it builds
+  with `build-images.sh` and pushes `ghcr.io/top-phe/oscar:<release>` (the
+  bundle) and `ghcr.io/top-phe/oscar-run:<release>` (pod mode), after checking
+  that the bundle answers `/health` as a tested pair; `GITHUB_TOKEN` only, no
+  environment, `:stable` untouched. The overlays name those images
+  (`release-2026.529`). New `OSCAR_Deploy/kubernetes/oscar-data.sh`: `load` puts
+  a VPS backup's `data/` (database, data files, reports) into the volume in
+  place of a database without users (`--replace` for one with users), `save`
+  copies the volume out as a cold backup; OSCAR is stopped meanwhile, a pod of
+  OSCAR's image, user and volume copies, the database is checked and its counts
+  compared with the backup's `manifest.json`. The guide's new section 6a is the
+  move from the VPS (backup, secrets with the VPS's keys, deploy, load, check,
+  the outbound address for the simulator and providers, going back); sections
+  3, 5, 9, 10 and 10a follow. The kind CI now saves the first deployment's
+  data, refuses to load it over users, loads it into the second deployment
+  (another uid, the same keys) and reads the data file and the run back
+  through the API.
+
 ### Security
 
 - **Kubernetes and OpenShift: each run in a pod of its own** (run isolation,

@@ -9,7 +9,7 @@ components:
   - ../../components/pod-runs
 images:
   # build-images.sh local ci
-  - name: registry.example.org/oscar/oscar
+  - name: ghcr.io/top-phe/oscar
     newName: local/oscar
     newTag: ci
   - name: oscar-bundle

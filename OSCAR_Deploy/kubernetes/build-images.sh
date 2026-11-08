@@ -13,7 +13,10 @@
 #   <prefix>/oscar-run:<tag>     one run in a pod of its own (#1130): Bruno, the
 #                                collection and Oscar_Server/src/run-pod only
 # The cluster runs the second one (and the third, with RUN_ISOLATION=pod);
-# push them to a registry the cluster can read.
+# push them to a registry the cluster can read. Each release's two are also on
+# GHCR (ghcr.io/top-phe/oscar and oscar-run, .github/workflows/
+# publish-cluster-images.yml, which runs this script): build your own for
+# another registry, or to check what you run.
 #
 #   OSCAR_Deploy/kubernetes/build-images.sh registry.example.org/oscar release-2026.480
 #   docker push registry.example.org/oscar/oscar:release-2026.480

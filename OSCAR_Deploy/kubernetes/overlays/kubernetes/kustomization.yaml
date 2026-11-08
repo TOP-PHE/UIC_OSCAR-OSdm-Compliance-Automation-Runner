@@ -9,7 +9,8 @@
 #   kubectl create namespace oscar
 #   kubectl -n oscar create secret generic oscar-secrets --from-env-file=secrets.env
 #   kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/kubernetes
-# Before that, change below: the image you built (build-images.sh), and the
+# Before that, change below: the release to run (published on GHCR at each
+# release, or the images you built with build-images.sh), and the
 # host oscar.example.org here, in ingress.yaml and in its TLS Secret.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -20,8 +21,8 @@ resources:
 
 images:
   - name: oscar-bundle
-    newName: registry.example.org/oscar/oscar
-    newTag: release-2026.481
+    newName: ghcr.io/top-phe/oscar
+    newTag: release-2026.529
 
 configMapGenerator:
   - name: oscar-settings

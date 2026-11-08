@@ -15,8 +15,10 @@ guide is for an organisation that runs its own OSCAR on its own cluster.
 **Status.** Every change to these files, and every week, a CI workflow
 (`.github/workflows/ci-kubernetes.yml`) deploys them on a throw-away
 Kubernetes cluster (kind), runs the pod under a user id the image does not
-know (as OpenShift does) with the "restricted" pod security, and runs a sale
-scenario against the OSDM simulator through OSCAR's API. They have not yet
+know (as OpenShift does) with the "restricted" pod security, runs a sale
+scenario against the OSDM simulator through OSCAR's API, moves that data to a
+second deployment with `oscar-data.sh` (section 6a) and reads it back there,
+and runs the scenario again with each run in a pod of its own. They have not yet
 been run on a real OpenShift cluster: the Route and OpenShift's own admission
 are checked by reading, not by running. Tell us what you meet.
 
@@ -37,20 +39,22 @@ That is the same program as on the VPS (where the runner is the optional
 
 | | VPS (Docker Compose) | Cluster (this guide) |
 |---|---|---|
-| Image | `oscar-server` from GHCR | the same server image, plus the Bruno collection and `compatibility.json` of the same release (the *bundle*) |
+| Image | `oscar-server` from GHCR | the same server image, plus the Bruno collection and `compatibility.json` of the same release (the *bundle*), `oscar` on GHCR (section 3) |
 | Collection | a folder mounted beside the container, updated by `git pull` | inside the bundle image: a new collection is a new image |
 | Way in | nginx on the host, TLS | an Ingress (ingress-nginx) or an OpenShift Route |
 | `/metrics` | nginx answers 404 from outside | OSCAR asks for `METRICS_TOKEN` |
 | Updates | Watchtower follows `:stable` | you change the image tag and apply |
 | Restarts | autoheal sidecar | Kubernetes, from the liveness probe |
-| Backups | `oscar-backup.sh` on the host | volume snapshots (section 9) |
+| Backups | `oscar-backup.sh` on the host | volume snapshots, or `oscar-data.sh save` (section 9) |
 
 **One replica, always.** A second pod would open the same SQLite file and run
 its own queue: it would corrupt the first one's work, not share it. The
 Deployment says `replicas: 1` and `strategy: Recreate` (the old pod stops
 before the new one starts). OSCAR grows by giving its one pod more CPU and
-memory (section 5). Spreading runs over several pods (PostgreSQL, a shared
-queue, one Kubernetes Job per run) is the Phase 3 architecture of the
+memory (section 5). The runs, though, can each have a pod of their own,
+spread over the cluster's nodes: pod mode, section 10a. Spreading the server
+itself over several pods (PostgreSQL, a shared queue) is the Phase 3
+architecture of the
 [Solution Architecture](../Oscar_Server/OSCAR%20-%20OSDM%20Conformance%20Automation%20Runner%20Solution%20Architecture.md)
 (§14.10); it is not built.
 
@@ -62,22 +66,37 @@ queue, one Kubernetes Job per run) is the Phase 3 architecture of the
 - For plain Kubernetes, ingress-nginx (another controller works: translate
   the annotations of `ingress.yaml`). For OpenShift, nothing more: OSCAR
   runs under the default `restricted-v2` SCC.
-- A registry the cluster can pull from, and Docker or Podman to build.
+- The cluster pulls OSCAR's images from GHCR (section 3), or from your own
+  registry if you build them (Docker or Podman).
 - A way from the cluster to your OSDM providers' test systems (section 7).
 
-## 3. Build the images
+## 3. The images
 
-Build from a checkout of the **release** you deploy, so that the server and
-the collection are a pair OSCAR has tested together:
+Each release's images are published on GitHub's registry, a few minutes after
+the release (`.github/workflows/publish-cluster-images.yml`), under the
+release's tag:
+
+| Image | What it is |
+|---|---|
+| `ghcr.io/top-phe/oscar:release-YYYY.NNN` | the cluster's image (the *bundle*): the server image plus the Bruno collection and `compatibility.json` of that release. The overlays name it (`images:`). |
+| `ghcr.io/top-phe/oscar-run:release-YYYY.NNN` | the run image, for pod mode only (section 10a) |
+
+There is no `:stable` or `:latest` for a cluster: it runs the release its
+overlay names, and moves to another by changing that tag (section 10).
+
+**Building your own** (for a registry of yours, or to check what you run):
+from a checkout of the **release** you deploy, so that the server and the
+collection are a pair OSCAR has tested together:
 
 ```bash
 git clone https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner.git oscar
 cd oscar
-git checkout release-2026.481          # the release to deploy
-OSCAR_Deploy/kubernetes/build-images.sh registry.example.org/oscar release-2026.481
-docker push registry.example.org/oscar/oscar:release-2026.481
+git checkout release-2026.529          # the release to deploy
+OSCAR_Deploy/kubernetes/build-images.sh registry.example.org/oscar release-2026.529
+docker push registry.example.org/oscar/oscar:release-2026.529
 ```
 
+The overlay's `images:` then names `registry.example.org/oscar/oscar`.
 `build-images.sh` makes three images: `…/oscar-server:<tag>` (the server, as
 on the VPS), `…/oscar:<tag>` (that image plus `Bruno_Collection/` and
 `compatibility.json`, from `Dockerfile.bundle`), and `…/oscar-run:<tag>` (the
@@ -132,7 +151,8 @@ Work in an overlay, not in `base/`:
 
 In the overlay you use, change:
 
-1. **The image**: `images:` → your registry, name and tag (section 3).
+1. **The release**: `newTag` under `images:` (section 3). The overlays name
+   `ghcr.io/top-phe/oscar`; name your registry there if you build your own.
 2. **The host**: `oscar.example.org` in `kustomization.yaml` (`APP_URL`,
    `ALLOWED_REDIRECT_HOSTS`) and in `ingress.yaml` or `route.yaml`.
    `APP_URL` is where the links of OSCAR's e-mails lead.
@@ -151,6 +171,11 @@ change one, add it to the overlay's `configMapGenerator` literals
 | `TZ` | Europe/Paris | the time zone of logs and e-mails |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM` | none | to send registration, approval and password-reset e-mails |
 | `ALLOW_PRIVATE_TARGETS` | not set | section 7 |
+
+`MAX_CONCURRENT_RUNS` and the `SMTP_*` settings are read once, at the first
+start, into Admin → *Server Config*; from then on that page's value counts, and
+a change in `settings.env` does nothing. A database moved from a VPS (section
+6a) brings the VPS's values.
 
 The volume asks for 20 GiB (`base/data-volume.yaml`): reports grow with the
 number of runs. The runs' working folders are an `emptyDir` of 4 GiB, emptied
@@ -178,6 +203,108 @@ The probes ask `/health` with `Host: localhost`: in production OSCAR
 redirects plain http to https unless the request names localhost, and a probe
 that got a redirect (or a 400 once `ALLOWED_REDIRECT_HOSTS` is set) would
 restart the pod for nothing.
+
+## 6a. Moving an OSCAR from a VPS
+
+What moves is what a VPS backup holds: the database, the data files, the run
+reports and the keys. Everything else is in the database and comes with it:
+companies, providers, users and their passwords, endpoints, credentials, Test
+Frameworks, findings, run history, Admin → *Server Config*.
+
+**Before you start:**
+- The cluster runs the **same release as the VPS, or a later one**. The first
+  start migrates the database forward, and a migration is not undone: never an
+  earlier release.
+- Plan a pause. What is done on the VPS after its backup is lost: tell the
+  users, and wait until the Dashboard shows no run going.
+- On the workstation that does the move: `kubectl` (or `oc`), `jq`, `tar`,
+  `gpg`, and bash.
+
+**1. On the VPS: a backup, then stop OSCAR** at once
+([Disaster Recovery](OSCAR%20-%20Disaster%20Recovery.md), section 5):
+
+```bash
+OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass /opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup.sh
+cd /opt/OSCAR/OSCAR_Deploy && docker compose --profile isolated stop oscar oscar-runner
+```
+
+Copy the archive to the workstation (`scp`, as the script prints).
+
+**2. On the workstation: open the archive** in a folder you keep as safely
+as a backup (it holds the key and every account's password hash):
+
+```bash
+mkdir oscar-move && cd oscar-move
+gpg --decrypt ../oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg | tar -xz
+ls                     # data/  .env  manifest.json
+```
+
+**3. The secrets, with the VPS's keys.** The same `ENCRYPTION_KEY`, or the
+stored credentials, data files and reports cannot be read; the same
+`JWT_SECRET`; a new `METRICS_TOKEN`; no `PLATFORM_BOOTSTRAP_TOKEN` (the
+administrators come with the database):
+
+```bash
+grep -E '^(ENCRYPTION_KEY|JWT_SECRET|SMTP_PASS)=' .env > secrets.env
+printf 'METRICS_TOKEN=%s\n' "$(openssl rand -hex 32)" >> secrets.env
+kubectl create namespace oscar          # OpenShift: oc new-project oscar
+kubectl -n oscar create secret generic oscar-secrets --from-env-file=secrets.env
+kubectl -n oscar create secret generic oscar-runner \
+  --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
+rm secrets.env
+```
+
+`kubectl` keeps a value as it is: if one is between quotes in `.env`, remove
+them in `secrets.env` first.
+
+**4. Deploy** (sections 5 and 6, and 10a for pod mode). OSCAR starts on the
+empty volume and makes an empty database: do not create an administrator.
+
+**5. Load the data:**
+
+```bash
+OSCAR_Deploy/kubernetes/oscar-data.sh load oscar-move/data
+```
+
+[`oscar-data.sh`](../../OSCAR_Deploy/kubernetes/oscar-data.sh) stops OSCAR
+(its Deployment to 0), starts a pod of the same image, user and volume, puts
+`oscar.db`, `datafiles/` and `artifacts/` there in place of the empty
+database, checks the database and that its users and companies are those of
+`manifest.json`, removes that pod and starts OSCAR again (the first start of a
+later release migrates the database). It replaces a database that holds no
+user, and refuses one that does unless you add `--replace`. `NAMESPACE`
+(default `oscar`) and `KUBECTL=oc` change where and with what. If the copy
+stops half-way, OSCAR stays stopped: run the load again.
+
+**6. Check, before anyone uses it.** Through
+`kubectl -n oscar port-forward service/oscar 3001:3001` and
+`http://localhost:3001`, or the new address:
+- `/health` names the release and says `compatibility_status: "tested"`;
+- sign in as a known user; open a company's Test Config (its data file is
+  read with the key) and run one scenario on the simulator (the credentials
+  are read with the key, and the provider is reached);
+- Admin → *Server Config* → *Max Concurrent Runs* is the VPS's: set it for the
+  cluster (section 5 with the `runner` container; within the quota of the
+  runs' namespace and your nodes in pod mode, section 10a).
+
+**7. Switch.**
+- The name: point it at the Ingress or Route. With the VPS's name, `APP_URL`
+  and the links already sent keep working; the certificate must cover it.
+- The outbound address: the cluster's traffic leaves from other addresses
+  (an egress IP, a NAT gateway, or each node's address in pod mode). Give
+  them to the providers that allow-list callers, and to the simulator, which
+  trusts the VPS's address only: `SIM_TRUSTED_ADDRESSES` and nginx's `geo`
+  block ([OSCAR - OSDM Simulator](OSCAR%20-%20OSDM%20Simulator.md), section 7,
+  "Trusting the OSCAR server's address"). Without it a large batch meets the
+  simulator's rate limits (429).
+- Monitoring (section 8) and backups (section 9): the VPS's backup timer and
+  Prometheus stay on the VPS. Once the cluster is in use, set the VPS's timer
+  to `on-demand` (`oscar-backup-schedule.sh`).
+
+**8. Keep the VPS stopped, not removed,** until the cluster has run for a
+while. Going back is `docker compose up -d` there (in `/opt/OSCAR/OSCAR_Deploy`) and the
+name pointed back: what was done on the cluster meanwhile stays on the
+cluster (`oscar-data.sh save` copies it out, as a cold backup does).
 
 ## 7. Reaching the providers
 
@@ -268,6 +395,11 @@ section 1. `oscar-backup.sh` is a host script for the VPS; on a cluster:
   --replicas=0`, snapshot, `--replicas=1`.
 - **Restore**: a new volume from the snapshot, named `oscar-data`, the same
   `ENCRYPTION_KEY` in `oscar-secrets`, then apply.
+- **Without snapshots**: `OSCAR_Deploy/kubernetes/oscar-data.sh save <new
+  folder>` stops OSCAR, copies the database, data files and reports out
+  (with a `manifest.json` of their counts), and starts OSCAR again: a cold
+  backup, as complete as a VPS backup's `data/`. Encrypt the folder and keep
+  it off the cluster. `oscar-data.sh load <folder> --replace` puts it back.
 
 Keep `ENCRYPTION_KEY` in your secret manager or vault, not only in the
 cluster: a backup without it cannot be read, and the key alone holds no data.
@@ -280,8 +412,9 @@ cluster it stays empty.
 **From a deployment made before the runner container**: create the Secret
 `oscar-runner` (section 4) before you apply, or the new pod waits for it.
 
-Build the new release's images (section 3), change `newTag` in the overlay,
-apply. The old pod stops, the new one starts and migrates the database: OSCAR
+Change `newTag` in the overlay to the new release (its images are on GHCR a
+few minutes after the release, section 3; or build them), and in pod mode
+`RUN_IMAGE` to the same release (section 10a), then apply. The old pod stops, the new one starts and migrates the database: OSCAR
 is unavailable for that time. Runs in progress are cut off; they are marked
 as such at the start (as after a restart of the VPS), and can be run again.
 To go back, apply the previous tag, **before** anyone has used the new one
@@ -331,8 +464,10 @@ still holds, but nothing filters the run pods' traffic.
 
 To switch:
 
-1. **Push the run image** that `build-images.sh` makes as its third image
-   (section 3): `docker push registry.example.org/oscar/oscar-run:<tag>`.
+1. **The run image** of each release is on GHCR,
+   `ghcr.io/top-phe/oscar-run:release-YYYY.NNN` (section 3). If you build your
+   own, push the third image `build-images.sh` makes:
+   `docker push registry.example.org/oscar/oscar-run:<tag>`.
 2. **Create the runs' namespace and the dispatcher's rights.** This needs a
    cluster administrator, or a project administrator on OpenShift who may
    create a project:
@@ -341,7 +476,9 @@ To switch:
    kubectl apply -k OSCAR_Deploy/kubernetes/runs
    ```
 
-3. **Add the component to your overlay** and name the run image:
+3. **Add the component to your overlay** and name the run image of the same
+   release as the overlay's `newTag` (the patch joins the overlay's
+   `patches:` list when it has one):
 
    ```yaml
    # overlays/<yours>/kustomization.yaml
@@ -354,7 +491,7 @@ To switch:
          metadata:
            name: oscar-dispatcher-settings
          data:
-           RUN_IMAGE: registry.example.org/oscar/oscar-run:release-2026.528
+           RUN_IMAGE: ghcr.io/top-phe/oscar-run:release-2026.529
    ```
 
    A patch, not a `configMapGenerator` with `behavior: merge`: kustomize
@@ -439,3 +576,7 @@ Details to know:
 | Pod mode: the dispatcher stops at once, naming a setting, a secret or the database | `RUN_IMAGE` or `RUN_RESULTS_URL` is missing, or it was given the server's settings: it refuses to run beside them |
 | Pod mode: runs end as *the run's pod did not start* | `kubectl -n oscar-runs get events`: the run image cannot be pulled (`RUN_IMAGE`, the registry's credentials), the quota is full, or the pod is refused by the namespace's pod security |
 | Pod mode: runs stop at their first request, *Required scenario variable … is empty* | the run pod cannot reach the internal port: the network policies, or `RUN_SERVER_URL` does not name OSCAR's namespace |
+| The pod stays in `ImagePullBackOff` on `ghcr.io/top-phe/oscar` | the release named is not published yet (a few minutes after the release), or the tag is wrong: `release-` and the release, as in `compatibility.json` |
+| `oscar-data.sh load` stops: *the volume holds a database with N users* | nothing was changed and OSCAR runs as before. Loading over a database in use needs `--replace` |
+| `oscar-data.sh` stops: *the copy did not finish; OSCAR stays stopped* | the volume holds part of the data: run the same load again (it replaces it), then OSCAR starts |
+| After a move, sign-in works but data files or credentials cannot be read | `oscar-secrets` does not hold the VPS's `ENCRYPTION_KEY` (section 6a, step 3) |

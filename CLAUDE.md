@@ -3744,6 +3744,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     processes are not (no `shareProcessNamespace`). Probes are `exec`: the
     agent listens on 127.0.0.1 only. The kind CI checks the runner holds no
     server secret, no database and sees no server process.
+  - **Each release's cluster images are on GHCR** (`publish-cluster-images.yml`,
+    on the `release-*` tag; `workflow_dispatch` for an earlier one):
+    `ghcr.io/top-phe/oscar` and `oscar-run`, tagged with the release only,
+    built by `build-images.sh`. The overlays name them with a release
+    `compatibility.json` lists (a test), not necessarily the current one.
+  - **Moving data in or out of the volume is `oscar-data.sh`** (`load` a VPS
+    backup's `data/`, `save` a cold copy): OSCAR's Deployment to 0, a pod
+    made from that Deployment's own image, security context and claim (jq),
+    the database checked. **The database's `server_config` wins over
+    `settings.env`** (`MAX_CONCURRENT_RUNS`, `SMTP_*` are read once, at the
+    first start), so a moved database keeps the VPS's values. The kind CI
+    moves the first deployment's data into the second and reads it back.
   - Not tested on a real OpenShift yet.
 
 ## 3. OSCAR/OSDM conventions & terminology
