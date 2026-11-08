@@ -206,6 +206,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.492] — 2026-11-08
+
+Listed in `compatibility.json` (2026.530) without moving `current_release`.
+
+### Fixed
+
+- **The run dispatcher: a pod gone just after it was seen running** (pod
+  mode, #1130). When a run's deadline removed its pod between the moment the
+  dispatcher saw it running and the moment it asked for its log, the log
+  request got 404 and the run ended as *refused* ("the run could not be
+  dispatched: no pod"). The dispatcher now reads that 404 as "nothing more to
+  read" and takes the end from the Job, as for any pod that is gone: 124,
+  DeadlineExceeded. Any other refusal of the log still ends the run. Seen as
+  an intermittent failure of `run-dispatcher.test.js` on a slow CI machine;
+  a test now makes that moment happen every time.
+
+### Added
+
+- **OSCAR on one VPS with k3s, step by step** (#1059, #1130). Deployment
+  files, CI and documentation. New guide *OSCAR - k3s on one VPS*: an
+  Ubuntu machine, the pinned k3s (v1.36.6+k3s1), its Traefik, the runs'
+  namespace, OSCAR in pod mode, the first administrator, a test on the
+  simulators, and what looking after k3s means (updates, certificates,
+  backups with `oscar-data.sh save`, disk). New `OSCAR_Deploy/kubernetes/k3s/`:
+  `config.yaml` (kubeconfig root's only, Secrets encrypted in k3s's
+  datastore) and `traefik-config.yaml` (a HelmChartConfig of k3s's Traefik:
+  the client's own address kept, http sent to https, Let's Encrypt by the TLS
+  challenge, 660 s for a slow upload). New `overlays/k3s/`: pod mode, the
+  published images of a release, a Traefik Ingress and its 50 MB body limit
+  (`middleware.yaml`), as the VPS's nginx. Traefik and not ingress-nginx:
+  the community ingress-nginx stopped being maintained in March 2026, which
+  the Kubernetes guide now says. The kind CI gains a job on a real k3s
+  installed as the guide does: a scenario in a pod of its own, http sent to
+  https, a 51 MB body refused, the sign-in recorded under the client's own
+  address, and what a run pod may reach.
+
+---
+
 ## [server-1.11.491] — 2026-11-07
 
 ### Added

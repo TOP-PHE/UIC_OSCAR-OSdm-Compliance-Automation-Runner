@@ -1,0 +1,19 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# A request body of 50 MB at most, as the VPS's nginx allows
+# (client_max_body_size 50M): a larger one gets 413 from Traefik before it
+# reaches OSCAR.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: oscar-limits
+  labels:
+    app.kubernetes.io/name: oscar
+spec:
+  buffering:
+    maxRequestBodyBytes: 52428800

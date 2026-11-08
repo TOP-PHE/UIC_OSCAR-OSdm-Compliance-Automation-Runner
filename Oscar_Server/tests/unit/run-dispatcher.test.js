@@ -31,7 +31,7 @@ const KUBE_TOKEN = 'kube-token';
 const AGENT_TOKEN = randomBytes(24).toString('hex');   // 48 characters
 
 // ── The stand-in API server ──────────────────────────────────────────────────
-// scripts: runId -> { lines, exitCode, reason, waiting, pending, hang, vanish, gone }
+// scripts: runId -> { lines, exitCode, reason, waiting, pending, hang, vanish, gone, goneAtLog }
 function fakeApi() {
   const s = { secrets: new Map(), jobs: new Map(), pods: new Map(), logs: new Map(), scripts: new Map(), calls: [], created: { jobs: [], secrets: [] } };
   const matches = (obj, selector) => selector.split(',').every((pair) => {
@@ -106,7 +106,13 @@ function fakeApi() {
       if (parts.at(-1) === 'log') {
         const podName = decodeURIComponent(parts.at(-2));
         const pod = s.pods.get(podName);
-        if (!pod) return json(res, 404, { message: 'no pod' });
+        const job = pod && s.jobs.get(pod.metadata.labels['job-name']);
+        if (job && s.scripts.get(job.metadata.labels[J.RUN_ID_LABEL])?.goneAtLog) {
+          // The deadline falls between the pod seen running and its log asked.
+          s.pods.delete(podName);
+          job.status = { conditions: [{ type: 'Failed', status: 'True', reason: 'DeadlineExceeded' }] };
+        }
+        if (!s.pods.has(podName)) return json(res, 404, { message: 'no pod' });
         res.statusCode = 200;
         const log = s.logs.get(podName);
         for (const line of log.lines) res.write(line);
@@ -287,6 +293,15 @@ describe('a run in a pod of its own', () => {
     const req = runRequest();
     api.s.scripts.set(req.runId, { lines: ['slow\n'], vanish: true });
     const messages = await ask(req);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: D.EXIT_TIMEOUT, reason: 'DeadlineExceeded' });
+  });
+
+  test('a pod gone between being seen running and its log being asked ends as its Job says, not as refused', async () => {
+    const req = runRequest();
+    api.s.scripts.set(req.runId, { lines: [], hang: true, goneAtLog: true });
+    const messages = await ask(req);
+    expect(messages.some((m) => m.t === 'refused')).toBe(false);
+    expect(messages.some((m) => m.t === 'err' && m.d.includes('stopped: DeadlineExceeded'))).toBe(true);
     expect(last(messages)).toMatchObject({ t: 'exit', code: D.EXIT_TIMEOUT, reason: 'DeadlineExceeded' });
   });
 

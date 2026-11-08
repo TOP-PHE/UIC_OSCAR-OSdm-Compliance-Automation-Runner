@@ -55,6 +55,9 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  # The k3s the guide "OSCAR - k3s on one VPS" installs (the same version:
+  # kubernetes-manifests.test.js).
+  K3S_VERSION: v1.36.6+k3s1
 
 jobs:
   kind:
@@ -325,5 +328,199 @@ jobs:
             kubectl -n "$ns" logs deploy/oscar -c oscar --tail=200 2>&1 || true
             kubectl -n "$ns" logs deploy/oscar -c runner --tail=100 2>&1 || true
           done
+          echo "=== simulator"
+          tail -n 100 "$RUNNER_TEMP/simulator.log" || true
+
+  # ── k3s on one machine (guide: "OSCAR - k3s on one VPS") ──────────────────
+  # The guide's own files on a real k3s, installed on the runner as the guide
+  # installs it: k3s/config.yaml and k3s/traefik-config.yaml in place first,
+  # the pinned k3s, the runs' namespace, overlays/k3s (pod mode behind
+  # Traefik) through ci/k3s. Then a scenario on the simulator, what Traefik
+  # does (http sent to https, the 50 MB limit, the client's own address
+  # reaching OSCAR) and what a run pod may reach under k3s's own NetworkPolicy
+  # enforcement. Let's Encrypt is left out: the runner has no public name.
+  k3s:
+    name: k3s on one machine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Build the images (build-images.sh)
+        run: OSCAR_Deploy/kubernetes/build-images.sh local ci
+
+      - name: Start the OSDM simulator on the runner
+        run: |
+          secret=$(openssl rand -hex 24)
+          echo "::add-mask::$secret"
+          echo "SIM_SECRET=$secret" >> "$GITHUB_ENV"
+          jq -n --arg s "$secret" '{gamma: [{client_id: "gamma.tstmgr01", client_secret: $s}]}' > "$RUNNER_TEMP/clients.json"
+          SIM_HOST=0.0.0.0 SIM_PORT=3002 SIM_CLIENTS_FILE="$RUNNER_TEMP/clients.json" \
+            nohup node OSDM_Simulator/server.js > "$RUNNER_TEMP/simulator.log" 2>&1 &
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3002/healthz; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/simulator.log"
+          exit 1
+
+      - name: Install k3s as the guide does
+        run: |
+          set -euo pipefail
+          # The runner's address: where the simulator answers and Traefik listens.
+          node_ip=$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+          test -n "$node_ip"
+          echo "NODE_IP=$node_ip" >> "$GITHUB_ENV"
+          sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
+          sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
+          sudo cp OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+          curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="$K3S_VERSION" sh -
+          mkdir -p ~/.kube
+          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+          sudo chown "$(id -u):$(id -g)" ~/.kube/config
+          kubectl wait node --all --for=condition=Ready --timeout=180s
+          docker save local/oscar:ci local/oscar-run:ci | sudo k3s ctr images import -
+          # k3s installs its Traefik itself (a Helm job), with our values.
+          for _ in $(seq 1 90); do
+            if kubectl -n kube-system get deployment traefik > /dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          kubectl -n kube-system rollout status deployment/traefik --timeout=300s
+          test "$(kubectl -n kube-system get service traefik -o jsonpath='{.spec.externalTrafficPolicy}')" = Local
+          kubectl wait --for condition=established crd/middlewares.traefik.io --timeout=120s
+          # Secrets are encrypted in k3s's datastore (k3s/config.yaml).
+          sudo k3s secrets-encrypt status | tee "$RUNNER_TEMP/encryption.txt"
+          grep -q 'Encryption Status: Enabled' "$RUNNER_TEMP/encryption.txt"
+
+      - name: The runs' namespace, and the simulator for the run pods
+        run: |
+          set -euo pipefail
+          kubectl apply -k OSCAR_Deploy/kubernetes/runs
+          # CI only: run pods may reach the simulator on the runner's private
+          # address. A policy of its own (policies add up), as ci/pod-runs
+          # does for kind.
+          kubectl apply -f - <<EOF
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: ci-simulator
+            namespace: oscar-runs
+          spec:
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: oscar-run
+            policyTypes: [Egress]
+            egress:
+              - to:
+                  - ipBlock:
+                      cidr: ${NODE_IP}/32
+                ports:
+                  - { protocol: TCP, port: 3002 }
+          EOF
+
+      - name: Deploy the k3s overlay (ci/k3s)
+        run: |
+          set -euo pipefail
+          kubectl create namespace oscar
+          kubectl label namespace oscar pod-security.kubernetes.io/enforce=restricted
+          boot=$(openssl rand -hex 24)
+          metrics=$(openssl rand -hex 32)
+          echo "::add-mask::$boot"
+          echo "::add-mask::$metrics"
+          echo "BOOTSTRAP_TOKEN=$boot" >> "$GITHUB_ENV"
+          echo "METRICS_TOKEN=$metrics" >> "$GITHUB_ENV"
+          printf 'ENCRYPTION_KEY=%s\nJWT_SECRET=%s\nPLATFORM_BOOTSTRAP_TOKEN=%s\nMETRICS_TOKEN=%s\n' \
+            "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$boot" "$metrics" > "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
+          rm "$RUNNER_TEMP/secrets.env"
+          kubectl -n oscar create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
+          kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/ci/k3s
+          kubectl -n oscar rollout status deployment/oscar-dispatcher --timeout=300s
+          kubectl -n oscar rollout status deployment/oscar --timeout=300s
+          test "$(kubectl -n oscar exec deploy/oscar -c oscar -- printenv RUN_ISOLATION)" = pod
+          test "$(kubectl -n oscar exec deploy/oscar -c oscar -- id -u)" = 1000
+
+      - name: A scenario in a pod of its own (ci/smoke.sh)
+        run: |
+          kubectl -n oscar port-forward service/oscar 3001:3001 > "$RUNNER_TEMP/port-forward.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
+            sleep 1
+          done
+          OSCAR_URL=http://127.0.0.1:3001 SIM_BASE="http://$NODE_IP:3002" \
+            SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json" OSCAR_Deploy/kubernetes/ci/smoke.sh
+          kubectl -n oscar logs deploy/oscar-dispatcher | grep -q 'started oscar-run-'
+
+      - name: Traefik as the guide sets it
+        run: |
+          set -euo pipefail
+          host=oscar.example.org
+          # http is sent to https.
+          out=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --resolve "$host:80:$NODE_IP" "http://$host/health")
+          echo "http: $out"
+          [[ "$out" =~ ^30[18]\ https://oscar\.example\.org(:443)?/health$ ]]
+          # https reaches OSCAR (Traefik's own certificate: no Let's Encrypt here).
+          curl -fsSk --resolve "$host:443:$NODE_IP" "https://$host/health" | jq -e '.status == "ok"'
+          # The VPS's nginx limit: 50 MB of body, then 413 from Traefik.
+          head -c 52428801 /dev/zero > "$RUNNER_TEMP/big"
+          code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:443:$NODE_IP" -X POST \
+            -H 'Content-Type: application/octet-stream' --data-binary "@$RUNNER_TEMP/big" "https://$host/v1/auth/login")
+          rm "$RUNNER_TEMP/big"
+          echo "51 MB body: $code"
+          test "$code" = 413
+          # The client's own address reaches OSCAR. The client is a network
+          # namespace of its own (192.0.2.2, behind a veth pair): its traffic
+          # comes into the machine as a visitor's does, not through the
+          # loopback. Its sign-in through Traefik must be recorded under
+          # 192.0.2.2, not a cluster address.
+          sudo ip netns add client
+          sudo ip link add oscar-h type veth peer name oscar-c
+          sudo ip link set oscar-c netns client
+          sudo ip addr add 192.0.2.1/24 dev oscar-h
+          sudo ip link set oscar-h up
+          sudo ip netns exec client ip link set lo up
+          sudo ip netns exec client ip addr add 192.0.2.2/24 dev oscar-c
+          sudo ip netns exec client ip link set oscar-c up
+          sudo ip netns exec client ip route add default via 192.0.2.1
+          jq '{email: .tm_email, password: .tm_password}' "$RUNNER_TEMP/smoke-account.json" > "$RUNNER_TEMP/login.json"
+          sudo ip netns exec client curl -fsSk -o /dev/null --resolve "$host:443:$NODE_IP" -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/login.json" "https://$host/v1/auth/login"
+          rm "$RUNNER_TEMP/login.json"
+          seen=$(kubectl -n oscar exec deploy/oscar -c oscar -- node -e '
+            const { DatabaseSync } = require("node:sqlite");
+            const db = new DatabaseSync(process.env.OSCAR_DB_PATH || "/app/data/oscar.db");
+            const row = db.prepare("SELECT ip FROM auth_events WHERE event_type = ? ORDER BY id DESC LIMIT 1").get("login_success");
+            process.stdout.write(row ? String(row.ip) : "");' 2>/dev/null)
+          echo "OSCAR recorded the sign-in from $seen; the client is 192.0.2.2"
+          test "$seen" = 192.0.2.2 || test "$seen" = ::ffff:192.0.2.2
+
+      - name: What a run pod may reach (k3s enforces NetworkPolicy)
+        run: |
+          p=OSCAR_Deploy/kubernetes/ci/probe-run-network.sh
+          test "$($p probe-internal oscar-internal.oscar.svc.cluster.local 3003)" = open
+          test "$($p probe-public oscar.oscar.svc.cluster.local 3001)" = closed
+          test "$($p probe-dispatcher oscar-dispatcher.oscar.svc.cluster.local 3002)" = closed
+
+      - name: What the cluster shows (on failure)
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide 2>&1 | tail -n 40 || true
+          kubectl -n kube-system logs deployment/traefik --tail=100 2>&1 || true
+          kubectl -n kube-system get helmcharts,helmchartconfigs,jobs 2>&1 || true
+          echo "=== oscar-runs"
+          kubectl -n oscar-runs get all,networkpolicy,events 2>&1 | tail -n 60 || true
+          echo "=== oscar"
+          kubectl -n oscar get all,pvc,ingress,events 2>&1 | tail -n 60 || true
+          kubectl -n oscar logs deploy/oscar -c oscar --tail=200 2>&1 || true
+          kubectl -n oscar logs deploy/oscar-dispatcher --tail=100 2>&1 || true
+          echo "=== k3s"
+          sudo journalctl -u k3s --no-pager 2>&1 | tail -n 80 || true
           echo "=== simulator"
           tail -n 100 "$RUNNER_TEMP/simulator.log" || true

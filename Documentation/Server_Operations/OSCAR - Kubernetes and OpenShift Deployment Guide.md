@@ -12,6 +12,10 @@ How to run OSCAR on a Kubernetes cluster or on OpenShift, with the files in
 ([Self-Hosted Quick Start](OSCAR%20-%20Self-Hosted%20Quick%20Start.md)); this
 guide is for an organisation that runs its own OSCAR on its own cluster.
 
+**On one machine:** [OSCAR - k3s on one VPS](OSCAR%20-%20k3s%20on%20one%20VPS.md)
+is the step-by-step for a single Ubuntu machine with k3s, its Traefik and pod
+mode (`overlays/k3s`), tested by the CI on a real k3s.
+
 **Status.** Every change to these files, and every week, a CI workflow
 (`.github/workflows/ci-kubernetes.yml`) deploys them on a throw-away
 Kubernetes cluster (kind), runs the pod under a user id the image does not
@@ -63,9 +67,12 @@ architecture of the
 - A cluster with a storage class giving **ReadWriteOnce** volumes on a block
   or local file system. SQLite on a network file system (NFS, SMB, some
   "file" storage classes) risks a corrupt database: ask for block storage.
-- For plain Kubernetes, ingress-nginx (another controller works: translate
-  the annotations of `ingress.yaml`). For OpenShift, nothing more: OSCAR
-  runs under the default `restricted-v2` SCC.
+- For plain Kubernetes, an Ingress controller. `overlays/kubernetes` is
+  written for ingress-nginx; **the community ingress-nginx stopped being
+  maintained in March 2026** (no more security fixes): with another
+  controller, translate the annotations of `ingress.yaml`, as `overlays/k3s`
+  does for Traefik (`ingress.yaml`, `middleware.yaml`). For OpenShift,
+  nothing more: OSCAR runs under the default `restricted-v2` SCC.
 - The cluster pulls OSCAR's images from GHCR (section 3), or from your own
   registry if you build them (Docker or Podman).
 - A way from the cluster to your OSDM providers' test systems (section 7).

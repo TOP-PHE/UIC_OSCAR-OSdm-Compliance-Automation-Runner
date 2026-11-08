@@ -1,0 +1,56 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# The Traefik k3s ships (chart 40), set for OSCAR. Copied to
+# /var/lib/rancher/k3s/server/manifests/ BEFORE k3s is installed, with
+# CHANGE-ME@example.org replaced by the address Let's Encrypt writes to
+# (guide: "OSCAR - k3s on one VPS"). k3s applies it over its own Traefik
+# values; never edit k3s's traefik.yaml, which k3s rewrites at each start.
+#
+# Traefik and not ingress-nginx: the community ingress-nginx stopped being
+# maintained in March 2026, and Traefik is the controller k3s installs and
+# updates itself.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    # The client's own address reaches Traefik (and OSCAR, through
+    # X-Forwarded-For): its sign-in rate limit is per person, not one for all.
+    service:
+      spec:
+        externalTrafficPolicy: Local
+    ports:
+      web:
+        # http goes to https; Let's Encrypt asks on 443 (tlsChallenge).
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
+      websecure:
+        # A slow upload of a 50 MB data file still arrives (nginx on the
+        # VPS waits 660 s). Traefik puts no limit on the time OSCAR takes
+        # to answer.
+        transport:
+          respondingTimeouts:
+            readTimeout: 660s
+    # The certificates Traefik obtains are kept on the machine (acme.json,
+    # a local-path volume: Traefik makes the file 0600 itself).
+    persistence:
+      enabled: true
+    # The chart turns these keys into Traefik arguments; an empty map would
+    # give none, so the challenge is "true", not "{}".
+    certificatesResolvers:
+      letsencrypt:
+        acme:
+          email: CHANGE-ME@example.org
+          storage: /data/acme.json
+          tlsChallenge: true
