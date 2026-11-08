@@ -136,7 +136,8 @@ stopped=""
 changed=""
 done_ok=""
 finish() {
-  k delete pod "$HELPER" --ignore-not-found --wait=false > /dev/null 2>&1 || true
+  # Gone when the script ends, so a next copy can start at once.
+  k delete pod "$HELPER" --ignore-not-found --wait=true --timeout=90s > /dev/null 2>&1 || true
   if [ -n "$stopped" ]; then
     if [ -n "$changed" ] && [ -z "$done_ok" ]; then
       echo "oscar-data: the copy did not finish; OSCAR stays stopped. Run the load again, or restore the volume." >&2
