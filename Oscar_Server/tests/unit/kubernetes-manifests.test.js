@@ -613,7 +613,9 @@ describe('moving the data (oscar-data.sh)', () => {
     const items = /^ITEMS=\(([^)]*)\)/m.exec(script)[1].split(/\s+/).filter(Boolean);
     expect(items).toEqual(['oscar.db', 'oscar.db-wal', 'datafiles', 'artifacts']);
     expect(backup).toContain('$STAGE/data/oscar.db');
-    for (const dir of ['datafiles', 'artifacts']) expect(backup).toContain(`"$DATA_DIR/${dir}"`);
+    // The backup reads the two folders in place and puts them under data/.
+    expect(backup).toMatch(/^for d in datafiles artifacts; do$/m);
+    expect(backup).toContain(String.raw`--transform 's,^\(datafiles\|artifacts\)\(/\|$\),data/\1\2,S'`);
   });
 
   test('it copies into the volume where OSCAR\'s Deployment mounts it, in a pod like OSCAR\'s', () => {
