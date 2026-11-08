@@ -1,0 +1,66 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# CI only (.github/workflows/ci-kubernetes.yml, job "k3s on one machine"):
+# overlays/k3s on a real k3s on the runner, with the images the workflow
+# builds and imports, and no Let's Encrypt (the runner has no public name:
+# Traefik serves its own certificate). Everything else is the overlay's.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../overlays/k3s
+
+images:
+  # build-images.sh local ci, imported into k3s's containerd.
+  - name: ghcr.io/top-phe/oscar
+    newName: local/oscar
+    newTag: ci
+
+configMapGenerator:
+  - name: oscar-settings
+    behavior: merge
+    literals:
+      # The simulator answers on the runner's address, over http.
+      - ALLOW_PRIVATE_TARGETS=1
+      - MAX_CONCURRENT_RUNS=2
+
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: oscar-dispatcher-settings
+      data:
+        RUN_IMAGE: local/oscar-run:ci
+  - target:
+      kind: Deployment
+      name: oscar
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: Deployment
+      name: oscar-dispatcher
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: Ingress
+      name: oscar
+    patch: |-
+      - op: remove
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.tls.certresolver
+  - target:
+      kind: PersistentVolumeClaim
+      name: oscar-data
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 2Gi

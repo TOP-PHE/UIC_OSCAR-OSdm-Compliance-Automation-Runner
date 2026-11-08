@@ -76,3 +76,5 @@ OSDM_Simulator/deploy/data/
 # A host's own compose settings, such as raised limits for a load test (#676).
 OSDM_Simulator/deploy/docker-compose.override.yml
 OSDM_Simulator/replay/
+# A machine's own copy of overlays/k3s (guide "OSCAR - k3s on one VPS", step 6).
+OSCAR_Deploy/kubernetes/overlays/site/

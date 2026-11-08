@@ -1,0 +1,49 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# OSCAR on one machine with k3s, each run in a pod of its own (pod mode,
+# #1130), behind the Traefik k3s ships. Guide: "OSCAR - k3s on one VPS".
+#   kubectl apply -k OSCAR_Deploy/kubernetes/runs
+#   kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/k3s
+# Before that, change below: oscar.example.org (here and in ingress.yaml),
+# and the release (newTag and RUN_IMAGE name the same one).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - ingress.yaml
+  - middleware.yaml
+
+components:
+  - ../../components/pod-runs
+
+images:
+  - name: oscar-bundle
+    newName: ghcr.io/top-phe/oscar
+    newTag: release-2026.529
+
+configMapGenerator:
+  - name: oscar-settings
+    behavior: merge
+    literals:
+      - APP_URL=https://oscar.example.org
+      - ALLOWED_REDIRECT_HOSTS=oscar.example.org
+
+patches:
+  # The volume (k3s's local-path, a folder of the machine) written by the
+  # image's uid.
+  - path: data-volume-group.yaml
+  # The run image of the same release. A patch, not a configMapGenerator
+  # merge: the component makes this ConfigMap after the overlay's generators.
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: oscar-dispatcher-settings
+      data:
+        RUN_IMAGE: ghcr.io/top-phe/oscar-run:release-2026.529

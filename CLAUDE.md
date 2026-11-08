@@ -3756,6 +3756,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `settings.env`** (`MAX_CONCURRENT_RUNS`, `SMTP_*` are read once, at the
     first start), so a moved database keeps the VPS's values. The kind CI
     moves the first deployment's data into the second and reads it back.
+  - **One machine with k3s** (guide *OSCAR - k3s on one VPS*): `k3s/`
+    (k3s's `config.yaml`, a `HelmChartConfig` of its Traefik, both put in
+    place *before* the install) and `overlays/k3s` (pod mode, Traefik
+    Ingress + `buffering` Middleware for the 50 MB limit, named
+    `oscar-<name>@kubernetescrd`). **The Traefik chart turns values into
+    arguments, and an empty map gives none**: `tlsChallenge: true`, never
+    `{}`. **ingress-nginx is retired upstream since March 2026**:
+    `overlays/kubernetes` still names it. The CI job `k3s` installs the
+    pinned `K3S_VERSION` (equal to the guide's, a test) on the runner and
+    checks the redirect, the 413, the client address in `auth_events.ip`
+    and the run pods' network.
   - Not tested on a real OpenShift yet.
 
 ## 3. OSCAR/OSDM conventions & terminology

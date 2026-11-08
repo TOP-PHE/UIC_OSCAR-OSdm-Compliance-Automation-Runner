@@ -13,6 +13,8 @@ own (#1130). The guide is
 | `base/` | Deployment (one replica, `Recreate`; the server and the runner container), Service, volume, settings; `secrets.env.example` lists the Secret's keys (the runner's key is the Secret `oscar-runner`) |
 | `overlays/kubernetes/` | an Ingress (ingress-nginx), `fsGroup: 1000` |
 | `overlays/openshift/` | a Route; runs under the default `restricted-v2` SCC |
+| `overlays/k3s/` | one machine with k3s: its Traefik (`ingress.yaml`, `middleware.yaml`) and pod mode; guide *OSCAR - k3s on one VPS* |
+| `k3s/` | k3s's settings (`config.yaml`) and its Traefik's (`traefik-config.yaml`), put in place before k3s is installed |
 | `runs/` | pod mode: the runs' namespace `oscar-runs`, its quota and network policy, the dispatcher's rights there |
 | `components/pod-runs/` | pod mode: the dispatcher, OSCAR's internal port and network policies, OSCAR's pod without its runner container |
-| `ci/` | what `.github/workflows/ci-kubernetes.yml` deploys on kind, and `smoke.sh` |
+| `ci/` | what `.github/workflows/ci-kubernetes.yml` deploys on kind and on k3s, and `smoke.sh` |

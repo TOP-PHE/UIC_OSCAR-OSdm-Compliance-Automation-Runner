@@ -353,8 +353,9 @@ describe('what CI deploys', () => {
   });
 
   test('both CI deployments create the runner\'s Secret, and check what the runner holds', () => {
-    // The two deployments with a runner container, and the pod mode's (the dispatcher's key).
-    expect(workflow.match(/create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN=/g)).toHaveLength(3);
+    // The two deployments with a runner container, the pod mode's (the
+    // dispatcher's key) on kind, and k3s's.
+    expect(workflow.match(/create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN=/g)).toHaveLength(4);
     expect(workflow).toContain('exec deploy/oscar -c runner');
   });
 
@@ -648,5 +649,108 @@ describe('moving the data (oscar-data.sh)', () => {
     expect(move).toContain('gpg --decrypt');
     expect(move).toContain('OSCAR_Deploy/kubernetes/oscar-data.sh load oscar-move/data');
     expect(move).toMatch(/grep -E '\^\(ENCRYPTION_KEY\|JWT_SECRET\|SMTP_PASS\)='/);
+  });
+});
+
+// ── k3s on one machine (guide: OSCAR - k3s on one VPS) ──────────────────────
+// The overlay, k3s's settings and Traefik's, held to the VPS's nginx, to the
+// published images and to what the CI installs. kind cannot run Traefik as
+// k3s ships it: the CI's job "k3s on one machine" does, on a real k3s.
+describe('k3s on one machine (overlays/k3s, k3s/)', () => {
+  const overlay = load('overlays/k3s/kustomization.yaml');
+  const ingress = load('overlays/k3s/ingress.yaml');
+  const middleware = load('overlays/k3s/middleware.yaml');
+  const traefik = load('k3s/traefik-config.yaml');
+  const values = yaml.load(traefik.spec.valuesContent);
+  const k3sConfig = load('k3s/config.yaml');
+  const ci = load('ci/k3s/kustomization.yaml');
+  const workflowText = fs.readFileSync(path.join(REPO, '.github/workflows/ci-kubernetes.yml'), 'utf8');
+  const workflow = yaml.load(workflowText);
+  const steps = workflow.jobs.k3s.steps.map(s => s.run || '').join('\n');
+  const doc = fs.readFileSync(path.join(REPO, 'Documentation/Server_Operations/OSCAR - k3s on one VPS.md'), 'utf8');
+  const nginxBody = Number(/client_max_body_size\s+(\d+)M;/.exec(nginx)[1]);
+  const nginxTimeout = /proxy_read_timeout\s+(\d+)s;/.exec(nginx)[1];
+  const annotations = ingress.metadata.annotations;
+
+  test('one host for the Ingress, APP_URL and the redirect; Traefik, on https only', () => {
+    const host = ingress.spec.rules[0].host;
+    const lit = literalsOf(overlay);
+    expect(lit.APP_URL).toBe(`https://${host}`);
+    expect(lit.ALLOWED_REDIRECT_HOSTS).toBe(host);
+    expect(ingress.spec.ingressClassName).toBe('traefik');
+    expect(annotations['traefik.ingress.kubernetes.io/router.entrypoints']).toBe('websecure');
+    expect(annotations['traefik.ingress.kubernetes.io/router.tls']).toBe('true');
+    expect(ingress.spec.rules[0].http.paths).toEqual([
+      { path: '/', pathType: 'Prefix', backend: { service: { name: 'oscar', port: { name: 'http' } } } },
+    ]);
+  });
+
+  test('the limits of the VPS\'s nginx: 50 MB of body, 660 s for a slow upload', () => {
+    expect(middleware.spec.buffering.maxRequestBodyBytes).toBe(nginxBody * 1024 * 1024);
+    // A middleware of OSCAR's namespace is named <namespace>-<name> by Traefik.
+    expect(annotations['traefik.ingress.kubernetes.io/router.middlewares']).toBe(`oscar-${middleware.metadata.name}@kubernetescrd`);
+    expect(overlay.resources).toEqual(expect.arrayContaining(['ingress.yaml', 'middleware.yaml']));
+    expect(values.ports.websecure.transport.respondingTimeouts.readTimeout).toBe(`${nginxTimeout}s`);
+  });
+
+  test('Traefik keeps the client address, sends http to https and obtains certificates on 443', () => {
+    expect(traefik.kind).toBe('HelmChartConfig');
+    expect(traefik.metadata).toEqual({ name: 'traefik', namespace: 'kube-system' });
+    expect(values.service.spec.externalTrafficPolicy).toBe('Local');
+    expect(values.ports.web.http.redirections.entryPoint).toEqual({ to: 'websecure', scheme: 'https', permanent: true });
+    const resolver = annotations['traefik.ingress.kubernetes.io/router.tls.certresolver'];
+    const acme = values.certificatesResolvers[resolver].acme;
+    // The chart turns these keys into arguments: an empty map would give none.
+    expect(acme.tlsChallenge).toBe(true);
+    expect(acme.email).toBe('CHANGE-ME@example.org');
+    expect(values.persistence.enabled).toBe(true);
+    expect(acme.storage.startsWith('/data/')).toBe(true);
+  });
+
+  test('pod mode, with the cluster image and the run image of one published release', () => {
+    expect(overlay.components).toEqual(['../../components/pod-runs']);
+    const image = overlay.images[0];
+    expect(image).toEqual({ name: 'oscar-bundle', newName: 'ghcr.io/top-phe/oscar', newTag: expect.stringMatching(/^release-/) });
+    expect(runImagePatchOf(overlay)).toBe(`ghcr.io/top-phe/oscar-run:${image.newTag}`);
+    const compat = JSON.parse(fs.readFileSync(path.join(REPO, 'compatibility.json'), 'utf8'));
+    expect(compat.releases.map(r => `release-${r.release}`)).toContain(image.newTag);
+    expect(load('overlays/k3s/data-volume-group.yaml')).toEqual(load('overlays/kubernetes/data-volume-group.yaml'));
+  });
+
+  test('k3s keeps the kubeconfig root\'s and encrypts Secrets', () => {
+    expect(k3sConfig).toEqual({ 'write-kubeconfig-mode': '0600', 'secrets-encryption': true });
+  });
+
+  test('the guide and the CI install the same k3s, with the same files, in the same places', () => {
+    const version = workflow.env.K3S_VERSION;
+    expect(version).toMatch(/^v\d+\.\d+\.\d+\+k3s\d+$/);
+    expect(doc).toContain(`curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${version} sh -`);
+    expect(steps).toContain('curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="$K3S_VERSION" sh -');
+    for (const copy of [
+      'OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml',
+      'OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml',
+    ]) {
+      expect(doc).toContain(`sudo cp ${copy}`);
+      expect(steps).toContain(`sudo cp ${copy}`);
+    }
+    expect(doc).toContain("sed -i 's/CHANGE-ME@example.org/");
+    expect(doc).toContain('kubectl apply -k OSCAR_Deploy/kubernetes/runs');
+    expect(steps).toContain('kubectl apply -k OSCAR_Deploy/kubernetes/runs');
+    expect(doc).toContain('cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site');
+    expect(fs.readFileSync(path.join(REPO, '.gitignore'), 'utf8')).toContain('OSCAR_Deploy/kubernetes/overlays/site/');
+  });
+
+  test('the CI deploys the overlay as it is, but for its images and Let\'s Encrypt', () => {
+    expect(ci.resources).toEqual(['../../overlays/k3s']);
+    expect(ci.images).toEqual([{ name: 'ghcr.io/top-phe/oscar', newName: 'local/oscar', newTag: 'ci' }]);
+    expect(runImagePatchOf(ci)).toBe('local/oscar-run:ci');
+    const ingressPatch = ci.patches.find(p => p.target?.kind === 'Ingress');
+    expect(yaml.load(ingressPatch.patch)).toEqual([
+      { op: 'remove', path: '/metadata/annotations/traefik.ingress.kubernetes.io~1router.tls.certresolver' },
+    ]);
+    expect(workflowText).toContain('kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/ci/k3s');
+    // What Traefik does, checked on the real k3s.
+    for (const check of ["jsonpath='{.spec.externalTrafficPolicy}')\" = Local", 'test "$code" = 413', 'FROM auth_events',
+      'k3s secrets-encrypt status', 'probe-run-network.sh']) expect(steps).toContain(check);
   });
 });
