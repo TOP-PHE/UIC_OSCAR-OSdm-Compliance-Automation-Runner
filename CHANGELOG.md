@@ -121,6 +121,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`oscar-backup.sh` needs about the size of the data free, not three times
+  it.** Deployment script, tests and documentation only: no release; the
+  host's checkout gets it with the next release tag. The script copied the
+  data files and reports into `/tmp`, compressed the copy, then encrypted it,
+  so a backup needed about three times the size of `data/` free, on the disk
+  OSCAR itself writes to. Now only the database snapshot is copied; the data
+  files and reports, already encrypted at rest, are read in place and go
+  through tar and gpg straight into the archive (gpg no longer compresses what
+  gzip already did). Before writing anything the script checks there is room
+  for the snapshot and the archive and leaves `OSCAR_BACKUP_MIN_FREE_MB`
+  (2048) free, else it stops with "not enough free space" and the Admin
+  Dashboard shows a failed backup. The archive is written under a hidden
+  temporary name and renamed when complete, so a backup that stops leaves no
+  archive; a file changed while it is read (a run writing its report) no
+  longer stops it. The archive's layout is unchanged, so `oscar-restore.sh`
+  and `oscar-data.sh` read it as before. `backup-status.test.js` checks the
+  members of the archive, the refusal, and tar and gpg failing part-way.
+  Disaster Recovery (sections 4 and 5) and the Kubernetes guide (6a, step 1)
+  say how much space to have.
+
 - **The test suites no longer leave their temporary files behind on Windows,
   and `db-migration29.test.js` runs there** (#583). Tests only: no server or
   collection change, nothing to release.
