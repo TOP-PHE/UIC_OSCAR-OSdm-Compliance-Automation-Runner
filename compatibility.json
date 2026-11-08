@@ -4,6 +4,17 @@
   "current_release": "2026.529",
   "releases": [
     {
+      "release": "2026.530",
+      "date": "2026-11-08",
+      "server": "1.11.492",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.492: the run dispatcher reads a pod gone just after it was seen running (its deadline) as its Job says, 124, not as a refused run. With it, OSCAR on one VPS with k3s (guide, overlays/k3s, k3s/, a CI job on a real k3s). Listed, not released: current_release stays at 2026.529."
+      ]
+    },
+    {
       "release": "2026.529",
       "date": "2026-11-07",
       "server": "1.11.491",

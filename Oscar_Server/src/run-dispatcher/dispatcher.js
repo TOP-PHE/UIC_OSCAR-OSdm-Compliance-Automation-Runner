@@ -186,13 +186,16 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
     kube.patchSecret(run.name, J.ownedBy(job)).catch(() => {});
   }
 
+  // The pod may be gone by the time its log is asked (its deadline reached
+  // just after it was seen running): nothing more to read, and exitOf() then
+  // reads how it ended from the Job. Any other refusal still ends the run.
   function followLog(podName, send) {
-    return kube.followLog(podName, J.CONTAINER).then((stream) => new Promise((resolve) => {
+    return ignoreGone(kube.followLog(podName, J.CONTAINER).then((stream) => new Promise((resolve) => {
       stream.on('data', (chunk) => send({ t: 'out', d: chunk.toString('utf8') }));
       stream.on('end', resolve);
       stream.on('close', resolve);
       stream.on('error', resolve);
-    }));
+    })));
   }
 
   async function execute(run, send) {
