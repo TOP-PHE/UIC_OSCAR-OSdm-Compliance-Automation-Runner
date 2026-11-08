@@ -135,8 +135,16 @@ jobs:
           echo "::add-mask::$metrics"
           echo "BOOTSTRAP_TOKEN=$boot" >> "$GITHUB_ENV"
           echo "METRICS_TOKEN=$metrics" >> "$GITHUB_ENV"
+          # The keys the data move (oscar-data.sh, below) takes along, as a
+          # VPS's .env goes with its data.
+          key=$(openssl rand -hex 32)
+          jwt=$(openssl rand -hex 64)
+          echo "::add-mask::$key"
+          echo "::add-mask::$jwt"
+          echo "MOVED_ENCRYPTION_KEY=$key" >> "$GITHUB_ENV"
+          echo "MOVED_JWT_SECRET=$jwt" >> "$GITHUB_ENV"
           printf 'ENCRYPTION_KEY=%s\nJWT_SECRET=%s\nPLATFORM_BOOTSTRAP_TOKEN=%s\nMETRICS_TOKEN=%s\n' \
-            "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$boot" "$metrics" > "$RUNNER_TEMP/secrets.env"
+            "$key" "$jwt" "$boot" "$metrics" > "$RUNNER_TEMP/secrets.env"
           kubectl -n oscar create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
           rm "$RUNNER_TEMP/secrets.env"
           kubectl -n oscar create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
@@ -170,14 +178,16 @@ jobs:
             if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
             sleep 1
           done
-          OSCAR_URL=http://127.0.0.1:3001 OSCAR_Deploy/kubernetes/ci/smoke.sh
+          OSCAR_URL=http://127.0.0.1:3001 SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json" \
+            OSCAR_Deploy/kubernetes/ci/smoke.sh
 
       - name: Deploy the Kubernetes overlay (ci/kubernetes)
+        # With the first deployment's keys: the data moves here below.
         run: |
           kubectl create namespace oscar-k8s
           kubectl label namespace oscar-k8s pod-security.kubernetes.io/enforce=restricted
           printf 'ENCRYPTION_KEY=%s\nJWT_SECRET=%s\nMETRICS_TOKEN=%s\n' \
-            "$(openssl rand -hex 32)" "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > "$RUNNER_TEMP/secrets.env"
+            "$MOVED_ENCRYPTION_KEY" "$MOVED_JWT_SECRET" "$(openssl rand -hex 32)" > "$RUNNER_TEMP/secrets.env"
           kubectl -n oscar-k8s create secret generic oscar-secrets --from-env-file="$RUNNER_TEMP/secrets.env"
           rm "$RUNNER_TEMP/secrets.env"
           kubectl -n oscar-k8s create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
@@ -186,6 +196,45 @@ jobs:
           test "$(kubectl -n oscar-k8s exec deploy/oscar -c oscar -- id -u)" = 1000
           test "$(kubectl -n oscar-k8s exec deploy/oscar -c runner -- id -u)" = 1000
           kubectl -n oscar-k8s get ingress oscar
+
+      - name: The data moves from one deployment to another (oscar-data.sh)
+        # As from a VPS to a cluster: the first deployment's data (OpenShift's
+        # uid, group 0) saved, then loaded into the Kubernetes overlay's (uid
+        # 1000, fsGroup), which runs with the same keys.
+        run: |
+          set -euo pipefail
+          d=OSCAR_Deploy/kubernetes/oscar-data.sh
+          # save stops OSCAR's pod: its port-forward ends with it.
+          pkill -f 'port-forward service/oscar 3001:3001' || true
+          NAMESPACE=oscar "$d" save "$RUNNER_TEMP/moved"
+          jq -e '.users >= 2 and .companies >= 1 and .runs >= 1' "$RUNNER_TEMP/moved/manifest.json"
+          # A database with users is never overwritten without --replace, and
+          # OSCAR comes back as it was.
+          if NAMESPACE=oscar "$d" load "$RUNNER_TEMP/moved"; then echo "loaded over a database with users"; exit 1; fi
+          test "$(kubectl -n oscar get deployment oscar -o jsonpath='{.spec.replicas}')" = 1
+          # The first start made an empty database there: replaced without asking.
+          NAMESPACE=oscar-k8s "$d" load "$RUNNER_TEMP/moved"
+          test "$(kubectl -n oscar-k8s exec deploy/oscar -c oscar -- id -u)" = 1000
+          test -z "$(kubectl -n oscar-k8s get pods -l app.kubernetes.io/name=oscar-data-copy -o name)"
+
+          # The Test Manager signs in there and reads, decrypted, the data file
+          # and the run of the first deployment.
+          kubectl -n oscar-k8s port-forward service/oscar 3011:3001 > "$RUNNER_TEMP/port-forward-k8s.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3011/health; then break; fi
+            sleep 1
+          done
+          a="$RUNNER_TEMP/smoke-account.json"
+          jq '{email: .tm_email, password: .tm_password}' "$a" > "$RUNNER_TEMP/login.json"
+          token=$(curl -fsS -H 'Content-Type: application/json' --data-binary "@$RUNNER_TEMP/login.json" \
+            http://127.0.0.1:3011/v1/auth/login | jq -r .token)
+          rm "$RUNNER_TEMP/login.json"
+          echo "::add-mask::$token"
+          auth="Authorization: Bearer $token"
+          curl -fsS -H "$auth" http://127.0.0.1:3011/v1/company/datafile \
+            | jq -e --arg s "$(jq -r .scenario "$a")" 'any(.scenarios[]; .code == $s)'
+          curl -fsS -H "$auth" "http://127.0.0.1:3011/v1/runs/$(jq -r .run_id "$a")" | jq -e '.status == "COMPLETED"'
+          pkill -f 'port-forward service/oscar 3011:3001' || true
 
       - name: The OpenShift overlay renders
         # kind has no Route type to check it against; its content is pinned by

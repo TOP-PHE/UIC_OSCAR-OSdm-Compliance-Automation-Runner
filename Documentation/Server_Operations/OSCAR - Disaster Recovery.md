@@ -143,3 +143,9 @@ For a real failover you would instead point the production DNS at the new host.
 - The drill host is not `oscar.uic.org`; use a test hostname (or DNS failover
   for a real event), and keep production untouched (`oscar-restore.sh` refuses
   to overwrite a running `oscar` container without `--force`).
+- **Restoring onto a Kubernetes or OpenShift cluster** instead of a VPS: the
+  archive's `data/` is loaded into the cluster's volume with
+  `OSCAR_Deploy/kubernetes/oscar-data.sh load`, and its `.env` gives the
+  cluster's Secret its `ENCRYPTION_KEY` and `JWT_SECRET`
+  ([Kubernetes and OpenShift Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md),
+  section 6a, the move from a VPS).

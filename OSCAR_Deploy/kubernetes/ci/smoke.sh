@@ -19,6 +19,9 @@
 #   SCENARIO         optional, SIM_SALE_SEARCH_1ADT_38 by default
 #   OSCAR_NAMESPACE  optional, the namespace of deploy/oscar (oscar by default);
 #                    kubectl reads the Test Manager's activation link there
+#   SMOKE_ACCOUNT_FILE  optional: where to write the Test Manager's e-mail and
+#                    password, the scenario and the run, as JSON, for a later
+#                    step that reads them back (the data move, oscar-data.sh)
 set -euo pipefail
 OSCAR_NAMESPACE=${OSCAR_NAMESPACE:-oscar}
 
@@ -156,3 +159,7 @@ total=$(jq -r '.total // 0' <<< "$summary")
 if [ "$failed" != 0 ]; then show_log; fail "$failed of $total checks failed"; fi
 if [ "$total" -lt 20 ]; then show_log; fail "only $total checks: the scenario did not run through"; fi
 echo "OK: $scenario passed $total checks on the cluster"
+if [ -n "${SMOKE_ACCOUNT_FILE:-}" ]; then
+  jq -n --arg e "$tm_email" --arg p "$tm_password" --arg s "$scenario" --arg r "$run_id" \
+    '{tm_email: $e, tm_password: $p, scenario: $s, run_id: $r}' > "$SMOKE_ACCOUNT_FILE"
+fi

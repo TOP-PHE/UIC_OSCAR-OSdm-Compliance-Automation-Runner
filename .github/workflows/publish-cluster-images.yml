@@ -1,0 +1,152 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: Publish · cluster images to GHCR
+
+# On each release-YYYY.NNN tag on main, the two images a Kubernetes or
+# OpenShift cluster pulls (#1059, #1130), built by build-images.sh from that
+# tag, as a cluster's operator would build them:
+#   ghcr.io/<owner>/oscar:<release>      the server image + the collection and
+#                                        compatibility.json of the release
+#   ghcr.io/<owner>/oscar-run:<release>  one run in a pod of its own (pod mode)
+# Tagged with the release only: a cluster names the release it runs and moves
+# to the next one by changing that tag (guide, section 10). Nothing here
+# deploys anything, and nothing touches :stable, which the VPS follows
+# (promote-release.yml).
+#
+# workflow_dispatch publishes them for a release tagged before this workflow.
+on:
+  push:
+    tags:
+      - 'release-*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release-YYYY.NNN tag to publish the cluster images of'
+        required: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+concurrency:
+  group: publish-cluster-images
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build & push the bundle and run images
+    # kind, jq and Docker come with this image, as in ci-kubernetes.yml.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write          # push to GHCR with GITHUB_TOKEN, no other secret
+
+    steps:
+      - name: Resolve release tag
+        id: ref
+        # Values from the event go through the environment, never into the
+        # script text: a tag or an input is data, not shell.
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then TAG="$INPUT_TAG"; else TAG="${GITHUB_REF#refs/tags/}"; fi
+          # release-YYYY.NNN only: nothing else is a release, and the name
+          # becomes an image tag below.
+          if ! printf '%s' "$TAG" | grep -Eq '^release-[0-9]{4}\.[0-9]{1,6}$'; then
+            echo "::error::Not a release tag: refused."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout at release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ steps.ref.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The tag is on main, and is the release compatibility.json names
+        # A release is a commit main holds (reviewed and merged), never a tag
+        # put on another branch's commit; and the images carry the pair of
+        # that release, so /health says "tested".
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "refs/tags/$TAG" origin/main; then
+            echo "::error::$TAG is not on main: refused."
+            exit 1
+          fi
+          named="release-$(jq -r .current_release compatibility.json)"
+          if [ "$named" != "$TAG" ]; then
+            echo "::error::compatibility.json at $TAG names $named: refused."
+            exit 1
+          fi
+
+      - name: Image prefix
+        id: img
+        # GHCR refuses upper-case characters; the owner may be mixed-case.
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "prefix=ghcr.io/$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build (build-images.sh)
+        env:
+          PREFIX: ${{ steps.img.outputs.prefix }}
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: OSCAR_Deploy/kubernetes/build-images.sh "$PREFIX" "$TAG"
+
+      - name: The bundle answers /health as that release
+        env:
+          PREFIX: ${{ steps.img.outputs.prefix }}
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          docker run -d --name bundle-check \
+            -e ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+            -e COLLECTION_PATH=/collection -e BRU_CMD=/usr/local/bin/bru \
+            -e COMPATIBILITY_FILE=/app/compatibility.json -e HOME=/tmp \
+            -p 127.0.0.1:3101:3001 "$PREFIX/oscar:$TAG"
+          ok=""
+          for _ in $(seq 1 30); do
+            if curl -fsS -o "$RUNNER_TEMP/health.json" http://127.0.0.1:3101/health; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then docker logs bundle-check; exit 1; fi
+          docker rm -f bundle-check
+          jq -c '{status, server_version, collection_version, release_label, compatibility_status}' "$RUNNER_TEMP/health.json"
+          # The server and collection of this checkout, a pair compatibility.json lists.
+          jq -e --arg s "$(jq -r .version Oscar_Server/package.json)" --arg c "$(tr -d '[:space:]' < Bruno_Collection/VERSION)" \
+            '.checks.database.ok and .compatibility_status == "tested" and .server_version == $s and .collection_version == $c' "$RUNNER_TEMP/health.json"
+          docker run --rm --entrypoint bru "$PREFIX/oscar-run:$TAG" --version
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push
+        # Not oscar-server: promote-release.yml publishes that one.
+        env:
+          PREFIX: ${{ steps.img.outputs.prefix }}
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          docker push "$PREFIX/oscar:$TAG"
+          docker push "$PREFIX/oscar-run:$TAG"
+          {
+            echo "## Cluster images of $TAG"
+            echo ""
+            echo "- \`$PREFIX/oscar:$TAG\` (the cluster's image: \`images:\` of the overlay)"
+            echo "- \`$PREFIX/oscar-run:$TAG\` (pod mode: \`RUN_IMAGE\`)"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,13 +1,18 @@
 # OSCAR on Kubernetes and OpenShift
 
-One OSCAR pod on a cluster (#1059). The guide is
+One OSCAR pod on a cluster (#1059), and optionally each run in a pod of its
+own (#1130). The guide is
 [OSCAR - Kubernetes and OpenShift Deployment Guide](../../Documentation/Server_Operations/OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md).
 
 | Path | What it is |
 |---|---|
-| `build-images.sh` | builds the server image and the bundle (server + collection + `compatibility.json`) from a release checkout |
+| `build-images.sh` | builds the server image, the bundle (server + collection + `compatibility.json`) and the run image from a release checkout. Each release's bundle and run image are also on GHCR (`ghcr.io/top-phe/oscar`, `oscar-run`), published by `.github/workflows/publish-cluster-images.yml` with this script |
 | `Dockerfile.bundle` | the bundle |
+| `Dockerfile.run` | the run image: Bruno, the collection and the run pod's entrypoint (pod mode) |
+| `oscar-data.sh` | moves the database, data files and reports into the volume (`load`, from a VPS backup's `data/`) or out of it (`save`) |
 | `base/` | Deployment (one replica, `Recreate`; the server and the runner container), Service, volume, settings; `secrets.env.example` lists the Secret's keys (the runner's key is the Secret `oscar-runner`) |
 | `overlays/kubernetes/` | an Ingress (ingress-nginx), `fsGroup: 1000` |
 | `overlays/openshift/` | a Route; runs under the default `restricted-v2` SCC |
+| `runs/` | pod mode: the runs' namespace `oscar-runs`, its quota and network policy, the dispatcher's rights there |
+| `components/pod-runs/` | pod mode: the dispatcher, OSCAR's internal port and network policies, OSCAR's pod without its runner container |
 | `ci/` | what `.github/workflows/ci-kubernetes.yml` deploys on kind, and `smoke.sh` |

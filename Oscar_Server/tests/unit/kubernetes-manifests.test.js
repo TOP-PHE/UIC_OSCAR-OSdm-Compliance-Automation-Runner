@@ -552,3 +552,101 @@ function runImagePatchOf(k) {
   const patches = (k.patches || []).filter(p => p.patch).map(p => yaml.load(p.patch));
   return patches.find(p => p?.kind === 'ConfigMap' && p.metadata?.name === 'oscar-dispatcher-settings')?.data?.RUN_IMAGE;
 }
+
+// ── The images each release publishes, and moving the data ──────────────────
+const GUIDE = fs.readFileSync(path.join(REPO, 'Documentation/Server_Operations/OSCAR - Kubernetes and OpenShift Deployment Guide.md'), 'utf8');
+const guideSection = (heading) => {
+  const start = GUIDE.indexOf(`## ${heading}`);
+  return GUIDE.slice(start, GUIDE.indexOf('\n## ', start + 1));
+};
+
+describe('the cluster images of each release (publish-cluster-images.yml)', () => {
+  const text = fs.readFileSync(path.join(REPO, '.github/workflows/publish-cluster-images.yml'), 'utf8');
+  const wf = yaml.load(text);
+
+  test('it runs on a release tag, or by hand for an earlier one, with GITHUB_TOKEN only', () => {
+    expect(wf.on.push.tags).toEqual(['release-*']);
+    expect(Object.keys(wf.on.workflow_dispatch.inputs)).toEqual(['release_tag']);
+    expect(wf.jobs.publish.permissions).toEqual({ contents: 'read', packages: 'write' });
+    expect(wf.jobs.publish.environment).toBeUndefined();
+    expect([...text.matchAll(/secrets\.(\w+)/g)].map(m => m[1])).toEqual(['GITHUB_TOKEN']);
+  });
+
+  test('it takes the release tags promote-release.yml takes, on main only', () => {
+    const promote = fs.readFileSync(path.join(REPO, '.github/workflows/promote-release.yml'), 'utf8');
+    const pattern = (t) => /grep -Eq '([^']+)'/.exec(t)[1];
+    expect(pattern(text)).toBe(pattern(promote));
+    expect(text).toContain('git merge-base --is-ancestor "refs/tags/$TAG" origin/main');
+  });
+
+  test('it builds with build-images.sh and pushes the bundle and the run image, never the server image', () => {
+    expect(text).toContain('OSCAR_Deploy/kubernetes/build-images.sh "$PREFIX" "$TAG"');
+    expect([...text.matchAll(/docker push "\$PREFIX\/([a-z-]+):\$TAG"/g)].map(m => m[1])).toEqual(['oscar', 'oscar-run']);
+    const build = read('build-images.sh');
+    expect(build).toContain('-t "$prefix/oscar:$tag"');
+    expect(build).toContain('-t "$prefix/oscar-run:$tag"');
+  });
+
+  test('the overlays and the guide name what it publishes, for a release compatibility.json lists', () => {
+    const compat = JSON.parse(fs.readFileSync(path.join(REPO, 'compatibility.json'), 'utf8'));
+    const releases = new Set(compat.releases.map(r => `release-${r.release}`));
+    const tags = new Set();
+    for (const rel of ['overlays/kubernetes/kustomization.yaml', 'overlays/openshift/kustomization.yaml']) {
+      const img = load(rel).images[0];
+      expect(img.newName).toBe('ghcr.io/top-phe/oscar');
+      expect(releases.has(img.newTag)).toBe(true);
+      tags.add(img.newTag);
+    }
+    expect(tags.size).toBe(1);
+    const blocks = [...guideSection('10a.').matchAll(/```yaml\n([\s\S]*?)```/g)].map(m => yaml.load(m[1].replace(/^ {3}/gm, '')));
+    expect(runImagePatchOf(blocks.find(b => b?.components))).toBe(`ghcr.io/top-phe/oscar-run:${[...tags][0]}`);
+  });
+});
+
+describe('moving the data (oscar-data.sh)', () => {
+  const script = read('oscar-data.sh');
+  const setting = (name) => new RegExp(String.raw`^${name}=(\S+)`, 'm').exec(script)[1];
+
+  test('it moves what a VPS backup holds in data/', () => {
+    const backup = fs.readFileSync(path.join(REPO, 'OSCAR_Deploy/scripts/oscar-backup.sh'), 'utf8');
+    const items = /^ITEMS=\(([^)]*)\)/m.exec(script)[1].split(/\s+/).filter(Boolean);
+    expect(items).toEqual(['oscar.db', 'oscar.db-wal', 'datafiles', 'artifacts']);
+    expect(backup).toContain('$STAGE/data/oscar.db');
+    for (const dir of ['datafiles', 'artifacts']) expect(backup).toContain(`"$DATA_DIR/${dir}"`);
+  });
+
+  test('it copies into the volume where OSCAR\'s Deployment mounts it, in a pod like OSCAR\'s', () => {
+    expect(setting('DEPLOYMENT')).toBe(deployment.metadata.name);
+    expect(container.name).toBe('oscar');
+    expect(script).toContain('select(.name == "oscar")');
+    const mount = container.volumeMounts.find(m => m.mountPath === setting('DATA'));
+    expect(pod.volumes.find(v => v.name === mount.name).persistentVolumeClaim.claimName).toBe('oscar-data');
+    expect(script).toContain(`select(.name == "${mount.name}")`);
+    // OSCAR's security, user and groups, so that the files are the server's.
+    for (const key of ['securityContext: ($p.securityContext', 'securityContext: ($c.securityContext', 'image: $c.image']) expect(script).toContain(key);
+  });
+
+  test('its pod is not one OSCAR\'s Service or Deployment selects', () => {
+    const helper = setting('HELPER');
+    expect(Object.values(load('base/service.yaml').spec.selector)).not.toContain(helper);
+    expect(Object.values(deployment.spec.selector.matchLabels)).not.toContain(helper);
+    expect(script).toContain('"app.kubernetes.io/name": $name');
+  });
+
+  test('CI saves, refuses to load over users, loads, then reads the data back through the API', () => {
+    const workflow = fs.readFileSync(path.join(REPO, '.github/workflows/ci-kubernetes.yml'), 'utf8');
+    expect(workflow).toContain('NAMESPACE=oscar "$d" save "$RUNNER_TEMP/moved"');
+    expect(workflow).toContain('if NAMESPACE=oscar "$d" load "$RUNNER_TEMP/moved"; then');
+    expect(workflow).toContain('NAMESPACE=oscar-k8s "$d" load "$RUNNER_TEMP/moved"');
+    expect(workflow).toContain('SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json"');
+    expect(workflow).toContain('/v1/company/datafile');
+    expect(read('ci/smoke.sh')).toContain('> "$SMOKE_ACCOUNT_FILE"');
+  });
+
+  test('the guide opens a backup and loads its data/ folder', () => {
+    const move = guideSection('6a.');
+    expect(move).toContain('gpg --decrypt');
+    expect(move).toContain('OSCAR_Deploy/kubernetes/oscar-data.sh load oscar-move/data');
+    expect(move).toMatch(/grep -E '\^\(ENCRYPTION_KEY\|JWT_SECRET\|SMTP_PASS\)='/);
+  });
+});
