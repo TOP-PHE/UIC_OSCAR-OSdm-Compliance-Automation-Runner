@@ -248,6 +248,7 @@ if you need it.
 
 | What you see | Why, and what to do |
 |---|---|
+| Step 2 or 3 stops: *Could not resolve host: github.com*, or k3s's install says *Download failed* | The machine reached GitHub badly: its name lookup (`getent hosts github.com`) or GitHub itself ([githubstatus.com](https://www.githubstatus.com)). Run the same command again; if names keep failing, give the machine public resolvers (`DNS=1.1.1.1 9.9.9.9` in `/etc/systemd/resolved.conf.d/`, then `systemctl restart systemd-resolved`): k3s's pods use the machine's resolvers to find the providers too. |
 | The browser warns about Traefik's own certificate | Let's Encrypt did not give one yet. Check that the name points at the machine, port 443 is open, and the e-mail is not still `CHANGE-ME@example.org`. `sudo kubectl -n kube-system logs deploy/traefik \| grep -i acme` says why. Let's Encrypt refuses a name after five failures in an hour. |
 | Everyone is locked out of signing in after a few failed attempts | OSCAR sees one address for everyone. `sudo kubectl -n kube-system get service traefik -o jsonpath='{.spec.externalTrafficPolicy}'` must say `Local`: `traefik-config.yaml` was not in place, or was changed. |
 | A file over 50 MB is refused with 413 | On purpose, as on the VPS (`overlays/k3s/middleware.yaml`). |

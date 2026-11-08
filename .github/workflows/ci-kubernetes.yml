@@ -381,7 +381,14 @@ jobs:
           sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
           sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
           sudo cp OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
-          curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="$K3S_VERSION" sh -
+          # k3s comes from GitHub's releases: a download that times out there
+          # ("Download failed") is tried again, as the guide says to.
+          for attempt in 1 2 3; do
+            if curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="$K3S_VERSION" sh -; then break; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            echo "k3s install, attempt $attempt failed: again in 30 s"
+            sleep 30
+          done
           mkdir -p ~/.kube
           sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
           sudo chown "$(id -u):$(id -g)" ~/.kube/config
