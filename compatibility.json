@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.524",
+  "current_release": "2026.529",
   "releases": [
     {
       "release": "2026.529",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.491: run pods in Grafana and the alerts (oscar_run_pod_start_seconds, oscar_run_pods_ended_total by outcome; OscarRunPodsNotStarting, OscarRunDispatcherRefusing); news entry for option 4. Run isolation option 4 part 6 (#1130). Listed, not released: current_release stays until the option 4 parts are released together."
+        "Server 1.11.491: run pods in Grafana and the alerts (oscar_run_pod_start_seconds, oscar_run_pods_ended_total by outcome; OscarRunPodsNotStarting, OscarRunDispatcherRefusing); news entry for option 4. Run isolation option 4 part 6 (#1130).",
+        "Releases run isolation option 4 (#1130) as a whole: 2026.525 (1.11.487, internal port), 2026.526 (1.11.488, run image), 2026.527 (1.11.489, run dispatcher), 2026.528 (1.11.490, RUN_ISOLATION=pod) and this one. On the VPS (Docker, RUN_ISOLATION=isolated, no INTERNAL_PORT) nothing changes in how runs go; pod mode is for Kubernetes and OpenShift."
       ]
     },
     {
