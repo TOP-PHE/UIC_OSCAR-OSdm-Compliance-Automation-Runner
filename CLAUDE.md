@@ -3794,6 +3794,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     pinned `K3S_VERSION` (equal to the guide's, a test) on the runner and
     checks the redirect, the 413, the client address in `auth_events.ip`
     and the run pods' network.
+  - **Pod mode holds about one run per vCPU** (#1150, measured on the 6
+    vCPU k3s test machine with production's data): Bruno's start takes 0.4
+    to 0.7 CPU, then about 0.25, plus the pod's making and removal. 10 and
+    20 at once filled the CPUs; the server, never throttled, waited for a
+    CPU and answered `/health` late, so its probes took it out of service
+    and nearly restarted it. Since then the base Deployment's probes wait
+    minutes (readiness 15 s × 10, liveness 30 s × 10) and the server
+    requests a whole CPU (limit 2); `kubernetes-manifests.test.js` pins
+    both. A database moved from the VPS keeps the VPS's *Max Concurrent
+    Runs*: lower it on a cluster.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

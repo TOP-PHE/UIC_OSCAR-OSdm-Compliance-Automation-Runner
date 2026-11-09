@@ -125,7 +125,10 @@ The row *OSCAR host* of *OSCAR · Overview* shows them. How to read it:
 per CPU, as long as runs × 250 MB stays well under the memory available
 without runs: 24 on 6 CPUs and 11 GiB. 50 runs need about 12 CPUs and 16 to
 24 GiB. Above that the machine does no more work, it only shares it out
-more slowly.
+more slowly. **In pod mode** (Kubernetes, each run a pod) count about one
+run per vCPU instead: a run pod's start costs 0.4 to 0.7 CPU for a few
+seconds, and the node makes and removes a pod per run (#1150, measured on 6
+vCPU with k3s).
 
 ### Runs by company or provider (#1017)
 

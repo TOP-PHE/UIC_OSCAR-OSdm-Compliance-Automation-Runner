@@ -109,6 +109,21 @@ describe('the pod', () => {
     expect(server).toContain("const isLocalhost = host === 'localhost'");
   });
 
+  test('a busy server is waited for minutes before it leaves its Service or is restarted, and keeps a CPU (#1150)', () => {
+    // On a full machine /health answered after more than 10 s: with one
+    // replica, leaving the Service fails every page and a restart loses the
+    // runs in progress.
+    const cpus = (v) => (String(v).endsWith('m') ? Number.parseInt(v, 10) / 1000 : Number(v));
+    const ready = container.readinessProbe;
+    const live = container.livenessProbe;
+    expect(ready.timeoutSeconds).toBeGreaterThanOrEqual(15);
+    expect(ready.periodSeconds * ready.failureThreshold).toBeGreaterThanOrEqual(90);
+    expect(live.timeoutSeconds).toBeGreaterThanOrEqual(30);
+    expect(live.periodSeconds * live.failureThreshold).toBeGreaterThanOrEqual(300);
+    expect(cpus(container.resources.requests.cpu)).toBeGreaterThanOrEqual(1);
+    expect(cpus(container.resources.limits.cpu)).toBeGreaterThanOrEqual(cpus(container.resources.requests.cpu));
+  });
+
   test('the port is the image\'s', () => {
     expect(container.ports).toEqual([{ name: 'http', containerPort: 3001 }]);
     expect(dockerfile).toMatch(/^EXPOSE 3001$/m);

@@ -95,6 +95,11 @@ spec:
             timeoutSeconds: 5
             # Up to 5 minutes for the database migrations of a large database.
             failureThreshold: 60
+          # A busy machine answers /health late, not never (#1150: a batch
+          # filled 6 vCPU and /health took over 10 s). With one replica a
+          # failed readiness probe only takes OSCAR out of its Service, every
+          # page failing, and a failed liveness probe restarts it, losing the
+          # runs in progress: both wait minutes, not seconds.
           readinessProbe:
             httpGet:
               path: /health
@@ -103,8 +108,8 @@ spec:
                 - name: Host
                   value: localhost
             periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
+            timeoutSeconds: 15
+            failureThreshold: 10
           livenessProbe:
             httpGet:
               path: /health
@@ -113,15 +118,18 @@ spec:
                 - name: Host
                   value: localhost
             periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
-          # The server alone: the runs are the runner container's.
+            timeoutSeconds: 30
+            failureThreshold: 10
+          # The server alone: the runs are the runner container's, or pods of
+          # their own. A whole CPU requested keeps the server its share when
+          # the runs fill the machine (the kernel shares a full CPU by what
+          # each container requests); it uses about 0.25 at rest.
           resources:
             requests:
-              cpu: 250m
+              cpu: "1"
               memory: 512Mi
             limits:
-              cpu: "1"
+              cpu: "2"
               memory: 1Gi
           volumeMounts:
             # The database, data files and run reports.
