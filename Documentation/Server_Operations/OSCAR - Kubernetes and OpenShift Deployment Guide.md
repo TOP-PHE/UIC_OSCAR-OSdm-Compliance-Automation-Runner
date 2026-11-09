@@ -361,37 +361,46 @@ spec:
 ## 8. Monitoring
 
 `/metrics` answers Prometheus with `Authorization: Bearer <METRICS_TOKEN>`,
-and 404 to anything else. With the Prometheus Operator (OpenShift's user
-workload monitoring included):
+and 404 to anything else.
 
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: oscar
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: oscar
-  endpoints:
-    - port: http
-      path: /metrics
-      interval: 15s
-      authorization:
-        type: Bearer
-        credentials:
-          name: oscar-secrets
-          key: METRICS_TOKEN
+**A cluster with the Prometheus Operator** (OpenShift's user workload
+monitoring included): once its CRDs are there,
+
+```bash
+kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar
 ```
 
-The Grafana dashboards of the VPS are in
-[`OSCAR_Deploy/grafana/dashboards/`](../../OSCAR_Deploy/grafana/dashboards/)
-and import as they are; what each figure means is in
+gives, from [`monitoring/oscar`](../../OSCAR_Deploy/kubernetes/monitoring/oscar/):
+- the ServiceMonitor (namespace `oscar`): `/metrics` with `METRICS_TOKEN`,
+  as the VPS's jobs `oscar-server` and `osdm-simulator`, so their alerts and
+  dashboards work as they are;
+- the VPS's alerts as PrometheusRules (`prometheus-rules.yaml`, generated from
+  `OSCAR_Deploy/prometheus/alerts/` by `monitoring/generate-rules.js`), and two
+  for the run pods of pod mode (`cluster-rules.yaml`): one near its
+  `RUN_MEMORY_LIMIT`, one stopped for memory;
+- the dashboards as ConfigMaps labelled `grafana_dashboard: "1"` in namespace
+  `monitoring`, which a Grafana with the dashboard sidecar loads (otherwise
+  import the JSON files): the VPS's
+  ([`OSCAR_Deploy/grafana/dashboards/`](../../OSCAR_Deploy/grafana/dashboards/))
+  and *OSCAR · Kubernetes* (each run's memory and CPU, the runs stopped for
+  memory, the runs' quota, OSCAR's pods, the machine), which reads the
+  kubelet's and kube-state-metrics' figures.
+
+The namespaces `oscar` and `monitoring` are written in those files: another
+name means changing them. What each figure means is in
 [Metrics & Monitoring](metrics-and-monitoring.md). On a cluster the "host"
-figures are the node's, and the container's memory is the pod's.
+figures are the node's, the container's memory is the pod's, and in pod mode
+the *run processes* figures stay at 0 (each run is a pod: *OSCAR ·
+Kubernetes*).
+
+**One machine with k3s**: [OSCAR - k3s on one VPS](OSCAR%20-%20k3s%20on%20one%20VPS.md),
+section 8a, installs Prometheus, Alertmanager, Grafana (behind OSCAR's sign-in,
+as on the VPS) and Loki too (`monitoring/stack`).
 
 Logs are JSON on the container's output: your cluster's log collection takes
-them as they are.
+them as they are. A run pod's output is the run's log, test data that OSCAR
+keeps with the run, encrypted: leave namespace `oscar-runs` out of a log store
+that has no access control (`monitoring/stack/config.alloy` does).
 
 ## 9. Backups
 
@@ -566,11 +575,13 @@ Details to know:
 - A read-only root file system: the pod writes only to its volume and `/tmp`,
   but that is not yet proven for every path, so the setting stays off.
 - Grafana behind OSCAR's sign-in: on the VPS nginx asks OSCAR who you are
-  before showing Grafana (`auth_request`). On a cluster use your Grafana's
-  own sign-in.
+  before showing Grafana (`auth_request`). k3s's Traefik does the same
+  (`monitoring/stack/grafana-ingress.yaml`, a ForwardAuth on
+  `/v1/auth/sso-check`); on another cluster use your Grafana's own sign-in,
+  or your way in's equivalent.
 - Admin → Alerting's *Apply* writes an Alertmanager file on the VPS
   (`ALERTMANAGER_CONFIG_PATH`); on a cluster configure Alertmanager as your
-  cluster does.
+  cluster does (on k3s: the Secret `oscar-alertmanager`).
 
 ## 12. Troubleshooting
 

@@ -3794,6 +3794,30 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     pinned `K3S_VERSION` (equal to the guide's, a test) on the runner and
     checks the redirect, the 413, the client address in `auth_events.ip`
     and the run pods' network.
+  - **Monitoring on a cluster** (#1147, guide k3s section 8a).
+    `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
+    (pinned `version`; release name `kube-prometheus-stack`, so the
+    Services are `kube-prometheus-stack-grafana`, `…-prometheus`), Loki
+    (the VPS's image and `loki-config.yaml`, via `OSCAR_Deploy/loki/
+    kustomization.yaml`), Alloy (`config.alloy`, a Role in `oscar` only:
+    **never the run pods' logs**, a run's output is test data), Grafana at
+    `/grafana` behind a Traefik **ForwardAuth on `/v1/auth/sso-check`**:
+    Grafana's `auth.proxy.header_name` must be in the Middleware's
+    `authResponseHeaders` (Traefik then removes a visitor's own copy).
+    Network policies: only Traefik reaches Grafana, so its ServiceMonitor is
+    off. `monitoring/oscar` (any Prometheus Operator, applied once the CRDs
+    and the operator are up): ServiceMonitor relabelled to the VPS's jobs
+    `oscar-server` / `osdm-simulator`, **`prometheus-rules.yaml` generated
+    from `OSCAR_Deploy/prometheus/alerts/` by `monitoring/generate-rules.js`**
+    (a VPS alert change regenerates it, or the test fails), cluster rules on
+    `namespace="oscar-runs", container="run"` (pinned to `jobSpec.js`), and
+    dashboards as ConfigMaps without hash (`OSCAR_Deploy/grafana/
+    kustomization.yaml` lists every VPS dashboard; a new one goes there).
+    The k3s CI applies both and runs `ci/check-monitoring.sh`; a run of the
+    smoke scenario lasts less than the 15 s scrape, so it checks the run
+    memory figures on a run-shaped pod of its own. OSCAR's namespace `oscar`
+    is now also written in the Alloy Role, `config.alloy`, the ServiceMonitor
+    and the ForwardAuth address. Pinned by `kubernetes-monitoring.test.js`.
   - Not tested on a real OpenShift yet.
 
 ## 3. OSCAR/OSDM conventions & terminology

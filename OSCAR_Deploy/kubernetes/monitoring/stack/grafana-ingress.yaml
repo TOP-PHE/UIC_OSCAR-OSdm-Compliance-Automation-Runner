@@ -1,0 +1,62 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Grafana at https://<OSCAR's name>/grafana/, for OSCAR administrators only,
+# as on the VPS (nginx/oscar-metrics.conf.snippet): before each request
+# Traefik asks OSCAR's /v1/auth/sso-check with the visitor's session cookie.
+# A 200 (an administrator) gives Grafana the e-mail OSCAR answers, in
+# X-User-Email; any other answer goes back to the visitor and Grafana sees
+# nothing. Traefik removes an X-User-Email the visitor sent before it adds
+# OSCAR's. Sign in to OSCAR first (Admin → Dashboard has the links).
+#
+# The host is OSCAR's (overlays/k3s/ingress.yaml) and the middleware is named
+# <namespace>-<name>: this namespace is monitoring.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: oscar-sso
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: oscar-monitoring
+spec:
+  forwardAuth:
+    address: http://oscar.oscar.svc.cluster.local:3001/v1/auth/sso-check
+    # What OSCAR reads to know who it is; nothing else of the request.
+    authRequestHeaders:
+      - Cookie
+      - Authorization
+    authResponseHeaders:
+      - X-User-Email
+      - X-User-Role
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: oscar-monitoring
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: monitoring-oscar-sso@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: oscar.example.org
+      http:
+        paths:
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                # The chart's Grafana, named after its release
+                # (kube-prometheus-stack.yaml).
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80

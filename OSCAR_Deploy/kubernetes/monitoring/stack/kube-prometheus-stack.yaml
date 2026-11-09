@@ -1,0 +1,182 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Prometheus, Alertmanager, Grafana, node-exporter (the machine) and
+# kube-state-metrics (what Kubernetes knows of each pod and job), with their
+# operator: the kube-prometheus-stack chart, installed by k3s's own Helm
+# controller (no helm on the machine). The chart's version is pinned; a new
+# one is taken by changing it here and applying again.
+#
+# What changes from the VPS:
+# - OSCAR's figures are read by a ServiceMonitor (monitoring/oscar), the
+#   VPS's job names kept, so its dashboards and alerts work as they are.
+# - A run is a pod of oscar-runs: its memory and CPU are the kubelet's
+#   (cAdvisor), its end and the quota kube-state-metrics'. Dashboard
+#   "OSCAR · Kubernetes" (monitoring/oscar/dashboards).
+# - Grafana is at https://<name>/grafana/ behind Traefik, which asks OSCAR who
+#   is signed in (grafana-ingress.yaml), as nginx does on the VPS.
+# - Alertmanager reads its configuration from the Secret oscar-alertmanager,
+#   which you make (monitoring/alertmanager.yaml.example). Admin → Alerting's
+#   Apply writes a file on the VPS only.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: kube-prometheus-stack
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: oscar-monitoring
+spec:
+  repo: https://prometheus-community.github.io/helm-charts
+  chart: kube-prometheus-stack
+  version: 92.13.1
+  targetNamespace: monitoring
+  timeout: 600s
+  valuesContent: |-
+    # k3s runs the scheduler, the controller manager, the proxy and its
+    # datastore inside its own process: nothing answers where the chart would
+    # look, and their rules would only say so.
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
+    kubeEtcd:
+      enabled: false
+    windowsMonitoring:
+      enabled: false
+    defaultRules:
+      rules:
+        etcd: false
+        kubeControllerManager: false
+        kubeProxy: false
+        kubeSchedulerAlerting: false
+        kubeSchedulerRecording: false
+        windows: false
+
+    prometheus:
+      prometheusSpec:
+        # As on the VPS (OSCAR_Deploy/prometheus/prometheus.yml).
+        scrapeInterval: 15s
+        evaluationInterval: 15s
+        retention: 15d
+        retentionSize: 8GB
+        # Every ServiceMonitor and PrometheusRule of the cluster, OSCAR's
+        # included, not only the chart's own.
+        serviceMonitorSelectorNilUsesHelmValues: false
+        podMonitorSelectorNilUsesHelmValues: false
+        ruleSelectorNilUsesHelmValues: false
+        probeSelectorNilUsesHelmValues: false
+        scrapeConfigSelectorNilUsesHelmValues: false
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              accessModes: [ReadWriteOnce]
+              resources:
+                requests:
+                  storage: 10Gi
+
+    alertmanager:
+      alertmanagerSpec:
+        # Its configuration holds the mail server's password: a Secret you
+        # make, never a value in this file.
+        useExistingSecret: true
+        configSecret: oscar-alertmanager
+        resources:
+          requests:
+            cpu: 20m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+    # The machine's figures. Its port (9100) is on the host's network: the
+    # proxy in front of it answers only Prometheus's account, so the port
+    # gives nothing to the internet if the provider's firewall lets it through.
+    prometheus-node-exporter:
+      kubeRBACProxy:
+        enabled: true
+      prometheus:
+        monitor:
+          scheme: https
+          bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+          tlsConfig:
+            insecureSkipVerify: true
+
+    grafana:
+      # The VPS's Grafana (docker-compose.metrics.yml), in the image the
+      # chart uses.
+      image:
+        tag: 13.3.0-distroless
+        sha: 540b8afb775bf34aefce417e4329039daa5d44b6f2fbda6881397b1b247ca7df
+      # Grafana trusts the user header Traefik sets: only Traefik may reach
+      # it (network-policy.yaml), so Prometheus does not read its figures.
+      serviceMonitor:
+        enabled: false
+      # Users (made at their first visit) and their roles, as the VPS keeps
+      # them in a volume.
+      persistence:
+        enabled: true
+        size: 1Gi
+      # k3s's volumes are folders any user may write: nothing to chown, and
+      # no busybox image to pull for it.
+      initChownData:
+        enabled: false
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+      grafana.ini:
+        server:
+          domain: oscar.example.org
+          root_url: https://oscar.example.org/grafana/
+          serve_from_sub_path: true
+        # Signed in through OSCAR only: Traefik asks /v1/auth/sso-check,
+        # which answers administrators only, and passes on their e-mail.
+        auth.proxy:
+          enabled: true
+          header_name: X-User-Email
+          header_property: username
+          auto_sign_up: true
+          headers: Email:X-User-Email
+          enable_login_token: true
+        auth:
+          disable_login_form: true
+        auth.anonymous:
+          enabled: false
+        auth.basic:
+          enabled: false
+        users:
+          auto_assign_org: true
+          auto_assign_org_role: Viewer
+        analytics:
+          reporting_enabled: false
+          check_for_updates: false
+        date_formats:
+          default_timezone: browser
+      # The dashboards are ConfigMaps of this namespace (monitoring/oscar,
+      # OSCAR_Deploy/grafana): the sidecar looks here only.
+      sidecar:
+        dashboards:
+          searchNamespace: monitoring
+      # The datasource names the VPS's dashboards use: "prometheus" is the
+      # chart's own; "loki" is added here.
+      additionalDataSources:
+        - name: Loki
+          uid: loki
+          type: loki
+          access: proxy
+          url: http://loki.monitoring.svc.cluster.local:3100
+          isDefault: false
+          editable: false
