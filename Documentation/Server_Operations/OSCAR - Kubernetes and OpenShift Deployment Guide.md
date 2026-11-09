@@ -461,7 +461,11 @@ Pod mode adds three things to the cluster:
   serves the run's data file, the schema, the token refresh and the upload of
   the run's results, each with the run's secret, which is bound to that pod's
   address. The port has no page, no session and no other route. It is never
-  exposed by an Ingress or a Route.
+  exposed by an Ingress or a Route. Its Service, `oscar-internal`, keeps
+  OSCAR while its readiness probe fails (`publishNotReadyAddresses`): a server
+  slow to answer its probe, as under a large batch, makes a run pod wait
+  rather than refuses it. A run pod also sends its results again for about a
+  minute while the server cannot take them (1.11.493).
 
 Network policies say who reaches what:
 - a run pod reaches DNS, OSCAR's internal port and public addresses (the
@@ -588,6 +592,7 @@ Details to know:
 | Pod mode: the dispatcher stops at once, naming a setting, a secret or the database | `RUN_IMAGE` or `RUN_RESULTS_URL` is missing, or it was given the server's settings: it refuses to run beside them |
 | Pod mode: runs end as *the run's pod did not start* | `kubectl -n oscar-runs get events`: the run image cannot be pulled (`RUN_IMAGE`, the registry's credentials), the quota is full, or the pod is refused by the namespace's pod security |
 | Pod mode: runs stop at their first request, *Required scenario variable … is empty* | the run pod cannot reach the internal port: the network policies, or `RUN_SERVER_URL` does not name OSCAR's namespace |
+| Pod mode: runs read *Failed*, *No check was recorded*, and their log says `[run-pod] … not sent: fetch failed (ECONNREFUSED)` | the run pods could not reach the internal port at the end of the run. Under a large batch: `kubectl -n oscar get events` shows OSCAR's readiness probe failing (a server short of CPU); give the `oscar` container more CPU or lower *Max Concurrent Runs*. Check that `oscar-internal` has `publishNotReadyAddresses: true` (`kubectl -n oscar get svc oscar-internal -o yaml`; the manifests have it since November 2026: pull and apply the overlay again) |
 | The pod stays in `ImagePullBackOff` on `ghcr.io/top-phe/oscar` | the release named is not published yet (a few minutes after the release), or the tag is wrong: `release-` and the release, as in `compatibility.json` |
 | `oscar-data.sh load` stops: *the volume holds a database with N users* | nothing was changed and OSCAR runs as before. Loading over a database in use needs `--replace` |
 | `oscar-data.sh` stops: *the copy did not finish; OSCAR stays stopped* | the volume holds part of the data: run the same load again (it replaces it), then OSCAR starts |

@@ -665,6 +665,15 @@ After the Bruno process exits, if either flag was set, the runner writes the sen
 
 OAuth2 authentication failures are handled earlier: if the OAuth2 token request (`POST` to the token URL) returns a non-200 status, the run is immediately marked `FAILED` and the HTTP error response is stored in `error_message`.
 
+**A run that recorded no check is marked `FAILED` (`NO_CHECKS`, 1.11.493).** When Bruno
+ends with exit code 0 but no check of the run is stored, nothing was checked: its
+results never reached the server (a run in a pod of its own that could not send them),
+or the collection made no check (its data file or scenario could not be read). The
+run is then `FAILED`, its `error_message` is `NO_CHECKS` and its log says so. Before,
+such a run read `COMPLETED`. When the stored checks cannot be counted (the extraction
+itself failed), the status stays the one Bruno's exit code gives. A token error
+(`TOKEN_FORMAT_ERROR`, `TOKEN_AUTH_ERROR`) keeps its own sentinel.
+
 ### 10.3 Templates in Datafile Text
 
 Bruno fills in a double-brace template wherever a value is used: in a request body, a
@@ -751,8 +760,14 @@ Displayed when Bruno received an HTTP 401 from the remote API during test execut
 - Message: advises that the configured token is invalid or has expired.
 - Action button: links to the Company Profile page to update the token.
 
+### NO_CHECKS banner
+Displayed when the run ended without error but recorded no check (§10.2).
+- Title: *"No check was recorded — the run is marked failed"*
+- Message: nothing was checked; the execution log says why; run the scenario again, and tell the OSCAR administrator if it happens again.
+- No action button.
+
 ### OAuth2 failure banner
-Displayed when `error_message` contains neither sentinel but the run failed — typically an OAuth2 token fetch error. Shows the raw error message returned by the token endpoint.
+Displayed when `error_message` contains none of the sentinels above but the run failed — typically an OAuth2 token fetch error. Shows the raw error message returned by the token endpoint.
 
 All banners use a consistent orange warning style and are only shown once the run has a terminal status (`COMPLETED` or `FAILED`).
 

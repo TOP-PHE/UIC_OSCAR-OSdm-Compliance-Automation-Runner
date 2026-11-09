@@ -151,6 +151,12 @@ function getDecryptedEvents(runId) {
   return rows.map(r => ({ level: r.level, message: colDecrypt(r.message) }));
 }
 
+// The fake Bruno writes no results: unless a test says otherwise, the run
+// stored one check, as a real run does (a run with none ends FAILED).
+const structureResults = require('../../src/reports/structureResults');
+const extractSpy = jest.spyOn(structureResults, 'extractStructuredResults');
+beforeEach(() => { extractSpy.mockReturnValue({ suites: 1, requests: 1, assertions: 1 }); });
+
 beforeAll(() => {
   fs.mkdirSync(ENVS_DIR, { recursive: true });
   fs.mkdirSync(VAL_DIR, { recursive: true });
@@ -282,6 +288,53 @@ describe('executeRun — spawn happy paths', () => {
     expect(spawn).toHaveBeenCalledTimes(1); // no mergeReport.js on disk → single spawn
     const events = getDecryptedEvents(runId);
     expect(events.some(e => /No reportGenerator HTML found/i.test(e.message))).toBe(true);
+  });
+
+  // A run whose results never arrived, or that made no check, checked nothing.
+  async function runEndingWith(exitCode) {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    fakeProc.emit('close', exitCode);
+    await p;
+    return runId;
+  }
+
+  test('exit code 0 with no check stored is FAILED (NO_CHECKS), the reason in the log', async () => {
+    extractSpy.mockReturnValue({ suites: 0, requests: 0, assertions: 0 });
+    const runId = await runEndingWith(0);
+    const row = getRunRow(runId);
+    expect(row.status).toBe('FAILED');
+    expect(row.exit_code).toBe(0);
+    expect(row.error_message).toBe('NO_CHECKS');
+    const events = getDecryptedEvents(runId);
+    expect(events.some(e => e.level === 'error' && /No check was recorded for this run/.test(e.message))).toBe(true);
+    expect(events.some(e => /Run finished — status=FAILED exit=0/.test(e.message))).toBe(true);
+  });
+
+  test('checks that could not be read leave the run as Bruno ended it', async () => {
+    extractSpy.mockImplementation(() => { throw new Error('unreadable results'); });
+    const runId = await runEndingWith(0);
+    expect(getRunRow(runId).status).toBe('COMPLETED');
+    expect(getRunRow(runId).error_message).toBeNull();
+  });
+
+  test('the run page has a banner of its own for NO_CHECKS (not the OAuth2 one)', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../../public/run-detail.html'), 'utf8');
+    expect(page).toContain("const isNoChecks      = run.error_message === 'NO_CHECKS';");
+    expect(page).toMatch(/isOAuthError\s+= [^;]*!isNoChecks/);
+    expect(page).toContain('No check was recorded — the run is marked failed');
+  });
+
+  test('a failed Bruno with no check stored stays FAILED without NO_CHECKS', async () => {
+    extractSpy.mockReturnValue({ suites: 0, requests: 0, assertions: 0 });
+    const runId = await runEndingWith(1);
+    expect(getRunRow(runId).status).toBe('FAILED');
+    expect(getRunRow(runId).error_message).toBeNull();
   });
 
   test('FAILED on a non-zero exit code', async () => {

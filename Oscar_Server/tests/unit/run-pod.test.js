@@ -18,7 +18,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { randomUUID, randomBytes } = require('node:crypto');
-const { runPod, runInputs, RUN_CREDENTIALS, BASE_ENV } = require('../../src/run-pod/runPod');
+const { runPod, runInputs, reasonOf, RUN_CREDENTIALS, BASE_ENV, RETRY_DELAYS_MS } = require('../../src/run-pod/runPod');
 const L = require('../../src/run-pod/runLayout');
 const { RUN_ENV_KEYS } = require('../../src/worker/childEnv');
 
@@ -59,20 +59,21 @@ process.exit(Number(code));
 let server;
 let received = [];
 let answer = 201;
+let answers = [];                                             // answered first, one per request
 beforeAll(async () => {
   server = http.createServer((req, res) => {
     const chunks = [];
     req.on('data', (c) => chunks.push(c));
     req.on('end', () => {
       received.push({ method: req.method, url: req.url, secret: req.headers['x-oscar-run-secret'], body: Buffer.concat(chunks).toString() });
-      res.statusCode = answer;
+      res.statusCode = answers.length > 0 ? answers.shift() : answer;
       res.end('{}');
     });
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 });
 afterAll(() => new Promise((resolve) => server.close(resolve)));
-beforeEach(() => { received = []; answer = 201; });
+beforeEach(() => { received = []; answer = 201; answers = []; });
 
 const YML = 'name: OTST_acme_1a2b3c4d_Env\nvariables:\n  - name: api_base\n    value: "https://p.example/osdm"\n';
 function podEnv(over = {}) {
@@ -91,13 +92,17 @@ function podEnv(over = {}) {
   };
 }
 let n = 0;
-async function run(env, { exitCode = 0, linkTarget = '-' } = {}) {
+// The pauses between two sends of a result are recorded, not waited.
+let pausesTaken = [];
+beforeEach(() => { pausesTaken = []; });
+async function run(env, { exitCode = 0, linkTarget = '-', retryDelaysMs = [] } = {}) {
   n += 1;
   const workDir = path.join(root, `work-${n}`);
   const lines = [];
   const code = await runPod({
     env, collectionDir, workDir, bru: [process.execPath, fakeBru, String(exitCode), linkTarget],
     stdio: 'ignore', log: (l) => lines.push(l),
+    retryDelaysMs, sleep: async (ms) => { pausesTaken.push(ms); },
   });
   const read = (f) => (fs.existsSync(path.join(workDir, f)) ? JSON.parse(fs.readFileSync(path.join(workDir, f), 'utf8')) : null);
   return { code, workDir, lines, bru: read('bru-call.json'), merge: read('merge-call.json') };
@@ -161,6 +166,48 @@ describe('a run in its pod', () => {
     expect(lines.filter((l) => l.includes('not sent: HTTP 403'))).toHaveLength(3);
   });
 
+  test('a refusal is not sent again: only a server that cannot take it yet is', async () => {
+    answer = 403;
+    await run(podEnv(), { retryDelaysMs: [1000, 2000] });
+    expect(received).toHaveLength(3);
+    expect(pausesTaken).toEqual([]);
+  });
+
+  test('a server that answers 503 for a while gets the results once it takes them', async () => {
+    answers = [503, 502];
+    const { lines } = await run(podEnv(), { retryDelaysMs: [1000, 2000, 4000] });
+    expect(lines).toContain('[run-pod] bru ended with 0; 3 result file(s) sent');
+    expect(pausesTaken).toEqual([1000, 2000]);
+    expect(received).toHaveLength(5);                          // the first file twice more
+    expect(lines.some((l) => l.includes('not sent yet (HTTP 503); sent again in 1 s'))).toBe(true);
+  });
+
+  test('the pauses are the run\'s, not each file\'s: a server that stays away costs them once', async () => {
+    answer = 503;
+    const { lines } = await run(podEnv(), { retryDelaysMs: [1000, 2000] });
+    expect(pausesTaken).toEqual([1000, 2000]);
+    expect(received).toHaveLength(5);                          // 3 files, 2 sent again
+    expect(lines.filter((l) => /not sent: HTTP 503$/.test(l))).toHaveLength(3);
+    expect(lines).toContain('[run-pod] bru ended with 0; 0 result file(s) sent');
+  });
+
+  test('a server that cannot be reached is named with the reason, not only "fetch failed"', async () => {
+    const closed = http.createServer();
+    await new Promise((resolve) => closed.listen(0, '127.0.0.1', resolve));
+    const port = closed.address().port;
+    await new Promise((resolve) => closed.close(resolve));
+    const { lines } = await run(podEnv({ OSCAR_RESULTS_URL: `http://127.0.0.1:${port}/` }), { retryDelaysMs: [1000] });
+    expect(pausesTaken).toEqual([1000]);
+    expect(lines.filter((l) => l.endsWith('not sent: fetch failed (ECONNREFUSED)'))).toHaveLength(3);
+    expect(lines.some((l) => l.includes('not sent yet (fetch failed (ECONNREFUSED)); sent again in 1 s'))).toBe(true);
+  });
+
+  test('the default pauses last about a minute', () => {
+    const total = RETRY_DELAYS_MS.reduce((a, b) => a + b, 0);
+    expect(total).toBeGreaterThanOrEqual(45 * 1000);
+    expect(total).toBeLessThanOrEqual(90 * 1000);
+  });
+
   test('a link left in the results folder is not sent', async () => {
     const target = path.join(root, 'outside.html');
     fs.writeFileSync(target, 'outside');
@@ -197,6 +244,15 @@ describe('inputs', () => {
 
   test('the address is kept without trailing slashes', () => {
     expect(runInputs(podEnv({ OSCAR_RESULTS_URL: 'http://oscar-internal:3003///' })).resultsBase).toBe('http://oscar-internal:3003');
+  });
+});
+
+describe('why a send failed', () => {
+  test('the cause\'s code, else its message, else the error\'s', () => {
+    expect(reasonOf(new TypeError('fetch failed', { cause: Object.assign(new Error('connect'), { code: 'ENOTFOUND' }) })))
+      .toBe('fetch failed (ENOTFOUND)');
+    expect(reasonOf(new TypeError('fetch failed', { cause: new Error('other side closed') }))).toBe('fetch failed: other side closed');
+    expect(reasonOf(new Error('The operation was aborted due to timeout'))).toBe('The operation was aborted due to timeout');
   });
 });
 

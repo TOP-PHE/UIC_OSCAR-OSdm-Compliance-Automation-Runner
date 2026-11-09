@@ -26,8 +26,9 @@
  *
  * It copies the collection into its work folder, writes the environment file,
  * runs Bruno (whose output is the pod's log, which the dispatcher streams to
- * the server), runs mergeReport.js, sends the result files and ends with
- * Bruno's exit code. Node only: no dependency, nothing of the server.
+ * the server), runs mergeReport.js, sends the result files (again, for about a
+ * minute, while the server cannot take them) and ends with Bruno's exit code.
+ * Node only: no dependency, nothing of the server.
  */
 
 const fs = require('node:fs');
@@ -44,6 +45,11 @@ const BASE_ENV = Object.freeze(['PATH', 'HOME', 'LANG', 'TZ', 'NODE_ENV']);
 const MAX_RESULT_BYTES = 100 * 1024 * 1024;
 const MAX_ENV_YML_BYTES = 1024 * 1024;
 const SEND_TIMEOUT_MS = 60 * 1000;
+// A result the server cannot take yet (no connection, or 502/503/504) is sent
+// again after these pauses: about a minute in all, shared by every file of the
+// run, so a server that stays away costs one minute, not one per file.
+const RETRY_DELAYS_MS = Object.freeze([1000, 2000, 4000, 8000, 15000, 30000]);
+const RETRY_STATUSES = new Set([502, 503, 504]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ENV_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,199}$/;
@@ -155,8 +161,41 @@ async function readPlainFile(file) {
   }
 }
 
+/**
+ * Why a request did not reach the server, in words: fetch says only "fetch
+ * failed", its cause says why (ECONNREFUSED, ENOTFOUND, a timeout…).
+ */
+function reasonOf(err) {
+  const cause = err?.cause;
+  const code = cause?.code || cause?.errno;
+  if (code) return `${err.message} (${code})`;
+  if (cause?.message) return `${err.message}: ${cause.message}`;
+  return err?.message || String(err);
+}
+
+/**
+ * PUTs one result file, sending it again while the server cannot take it and
+ * the run's pauses last. Resolves with { status } or { failed: reason }.
+ */
+async function putResult(url, init, { name, fetchImpl, pauses, sleep, log }) {
+  for (;;) {
+    let reason;
+    try {
+      const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(SEND_TIMEOUT_MS) });
+      if (!RETRY_STATUSES.has(res.status)) return { status: res.status };
+      reason = `HTTP ${res.status}`;
+    } catch (err) {
+      reason = reasonOf(err);
+    }
+    const pause = pauses.shift();
+    if (pause === undefined) return { failed: reason };
+    log(`[run-pod] ${name} not sent yet (${reason}); sent again in ${pause / 1000} s`);
+    await sleep(pause);
+  }
+}
+
 /** Sends the run's result files to the server; returns how many went. */
-async function sendResults({ workDir, runId, resultsBase, secret, fetchImpl, log }) {
+async function sendResults({ workDir, runId, resultsBase, secret, fetchImpl, log, retryDelaysMs = RETRY_DELAYS_MS, sleep = defaultSleep }) {
   const reports = path.join(workDir, L.REPORTS_DIR);
   let names = [];
   try {
@@ -166,25 +205,30 @@ async function sendResults({ workDir, runId, resultsBase, secret, fetchImpl, log
     return 0;
   }
   let sent = 0;
+  const pauses = [...retryDelaysMs];
   for (const name of names.sort((a, b) => a.localeCompare(b))) {
     if (name === L.MERGE_RESULTS_NAME || L.resultNameProblem(name)) continue;
     const read = await readPlainFile(path.join(reports, name));
     if (read.why) { log(`[run-pod] ${name} not sent: ${read.why}`); continue; }
-    try {
-      const res = await fetchImpl(`${resultsBase}/v1/runs/${runId}/results/${encodeURIComponent(name)}`, {
-        method: 'PUT',
-        headers: { 'X-OSCAR-Run-Secret': secret, 'Content-Type': 'application/octet-stream' },
-        body: read.content,
-        redirect: 'manual',
-        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-      });
-      if (res.status === 201) { sent += 1; log(`[run-pod] sent ${name}`); }
-      else log(`[run-pod] ${name} not sent: HTTP ${res.status}`);
-    } catch (err) {
-      log(`[run-pod] ${name} not sent: ${err.message}`);
+    const out = await putResult(`${resultsBase}/v1/runs/${runId}/results/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: { 'X-OSCAR-Run-Secret': secret, 'Content-Type': 'application/octet-stream' },
+      body: read.content,
+      redirect: 'manual',
+    }, { name, fetchImpl, pauses, sleep, log });
+    if (out.status === 201) {
+      sent += 1;
+      log(`[run-pod] sent ${name}`);
+    } else {
+      const why = out.failed || 'HTTP ' + out.status;
+      log(`[run-pod] ${name} not sent: ${why}`);
     }
   }
   return sent;
+}
+
+function defaultSleep(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
 /**
@@ -201,6 +245,8 @@ async function runPod({
   fetchImpl = globalThis.fetch,
   stdio = ['ignore', 'inherit', 'inherit'],
   log = (line) => process.stderr.write(`${line}\n`),
+  retryDelaysMs = RETRY_DELAYS_MS,
+  sleep = defaultSleep,
 } = {}) {
   const input = runInputs(env);
   if (input.problem) {
@@ -225,9 +271,9 @@ async function runPod({
     if (mergeCode !== 0) log(`[run-pod] mergeReport.js ended with ${mergeCode}`);
   }
 
-  const sent = await sendResults({ workDir, runId, resultsBase, secret: env.OSCAR_RUN_SECRET, fetchImpl, log });
+  const sent = await sendResults({ workDir, runId, resultsBase, secret: env.OSCAR_RUN_SECRET, fetchImpl, log, retryDelaysMs, sleep });
   log(`[run-pod] bru ended with ${exitCode}; ${sent} result file(s) sent`);
   return exitCode;
 }
 
-module.exports = { runPod, runInputs, childEnv, RUN_CREDENTIALS, BASE_ENV };
+module.exports = { runPod, runInputs, childEnv, reasonOf, RUN_CREDENTIALS, BASE_ENV, RETRY_DELAYS_MS };

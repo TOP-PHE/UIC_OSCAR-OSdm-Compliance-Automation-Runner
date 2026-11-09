@@ -1528,9 +1528,11 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   }
 
   // 10e. Extract structured assertion results into DB
+  let checksStored = null;                       // null: not known (the extraction failed)
   try {
     const { extractStructuredResults } = require('../reports/structureResults');
     const stats = extractStructuredResults(runId, companyRow.id);
+    checksStored = stats.assertions;
     if (stats.assertions > 0) {
       logEvent(runId, 'info', `[runner] Stored ${stats.assertions} assertions across ${stats.suites} suites and ${stats.requests} requests.`);
     }
@@ -1538,11 +1540,16 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'error', `[runner] Failed to store structured results: ${err.message}`);
   }
 
+  // A run Bruno ended well but that left no check checked nothing: its results
+  // never reached the server (a run pod that could not send them), or the
+  // collection made no check (its data file was not read). It is not a pass.
+  const noChecks = exitCode === 0 && checksStored === 0;
+
   // 11. Update run record.
   // Guard with `AND status = 'RUNNING'`: if the run was emergency-stopped
   // (POST /v1/runs/stop-all set it to CANCELLED) while bru.cmd was being
   // killed, this write must NOT resurrect it to COMPLETED/FAILED.
-  const finalStatus = exitCode === 0 ? 'COMPLETED' : 'FAILED';
+  const finalStatus = exitCode === 0 && !noChecks ? 'COMPLETED' : 'FAILED';
   const finalUpd = dbRun(
     `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ? AND status = 'RUNNING'`,
     [finalStatus, exitCode, runId]
@@ -1571,6 +1578,10 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     } catch (err) {
       logEvent(runId, 'warn', `[runner] The refused token could not be dropped from the cache: ${err?.message ? err.message : err}`);
     }
+  } else if (noChecks) {
+    dbRun(`UPDATE runs SET error_message = 'NO_CHECKS' WHERE id = ?`, [runId]);
+    logEvent(runId, 'error',
+      '[runner] ⚠️ No check was recorded for this run, so it is marked failed: nothing was checked. Its results did not reach the server, or the collection made no check (its data file or scenario could not be read); the lines above say which.');
   }
 
   logEvent(runId, 'info', `[runner] Run finished — status=${finalStatus} exit=${exitCode}`);

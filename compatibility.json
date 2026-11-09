@@ -4,6 +4,17 @@
   "current_release": "2026.531",
   "releases": [
     {
+      "release": "2026.532",
+      "date": "2026-11-09",
+      "server": "1.11.493",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.493: a run that ends without error but recorded no check is FAILED (NO_CHECKS) instead of COMPLETED, with a banner of its own on the run page; in pod mode the run pod sends its result files again for about a minute while the server cannot take them, and logs why a send failed. With it, the internal Service publishes the server while its readiness probe fails (publishNotReadyAddresses). Listed, not released: current_release stays at 2026.531."
+      ]
+    },
+    {
       "release": "2026.531",
       "date": "2026-11-09",
       "server": "1.11.492",
