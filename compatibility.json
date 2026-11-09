@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.531",
+  "current_release": "2026.532",
   "releases": [
     {
       "release": "2026.532",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.493: a run that ends without error but recorded no check is FAILED (NO_CHECKS) instead of COMPLETED, with a banner of its own on the run page; in pod mode the run pod sends its result files again for about a minute while the server cannot take them, and logs why a send failed. With it, the internal Service publishes the server while its readiness probe fails (publishNotReadyAddresses). Listed, not released: current_release stays at 2026.531."
+        "Server 1.11.493: a run that ends without error but recorded no check is FAILED (NO_CHECKS) instead of COMPLETED, with a banner of its own on the run page; in pod mode the run pod sends its result files again for about a minute while the server cannot take them, and logs why a send failed. With it, the internal Service publishes the server while its readiness probe fails (publishNotReadyAddresses).",
+        "Released with it (deployment files, CI and documentation; no other server or collection change): monitoring for OSCAR on Kubernetes (#1148). On k3s, OSCAR_Deploy/kubernetes/monitoring/stack installs Prometheus, Alertmanager and Grafana (kube-prometheus-stack), Loki and Grafana Alloy, with Grafana at /grafana/ for OSCAR administrators only; monitoring/oscar gives any cluster with the Prometheus Operator the VPS's jobs, alerts and dashboards, plus the dashboard OSCAR · Kubernetes (each run pod's memory and CPU, runs stopped for memory) and two alerts on the run pods. On the VPS, the checkout moving to this tag changes one thing in Grafana: OSCAR · Logs lists the containers by their label alone (the dashboard reloads by itself)."
       ]
     },
     {
