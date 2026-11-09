@@ -1,0 +1,54 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Prometheus reads OSCAR's /metrics with the bearer token METRICS_TOKEN of
+# oscar-secrets (without it, /metrics answers 404), twice, as on the VPS
+# (OSCAR_Deploy/prometheus/prometheus.yml): OSCAR's own figures, and the OSDM
+# simulator's, which OSCAR relays (?source=simulator). The jobs keep the
+# VPS's names: its alerts and dashboards select them.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: oscar
+  namespace: oscar
+  labels:
+    app.kubernetes.io/name: oscar
+    app.kubernetes.io/part-of: oscar-monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oscar
+      app.kubernetes.io/component: server
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      authorization:
+        type: Bearer
+        credentials:
+          name: oscar-secrets
+          key: METRICS_TOKEN
+      relabelings:
+        - targetLabel: job
+          replacement: oscar-server
+        - targetLabel: service
+          replacement: oscar
+    - port: http
+      path: /metrics
+      params:
+        source: [simulator]
+      interval: 30s
+      authorization:
+        type: Bearer
+        credentials:
+          name: oscar-secrets
+          key: METRICS_TOKEN
+      relabelings:
+        - targetLabel: job
+          replacement: osdm-simulator
+        - targetLabel: service
+          replacement: osdm-simulator

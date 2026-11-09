@@ -30,6 +30,12 @@ on:
       - 'Oscar_Server/src/run-pod/**'
       - 'Oscar_Server/src/run-dispatcher/**'
       - 'Oscar_Server/src/utils/runAgentPeer.js'
+      # Monitoring on k3s (#1147): the VPS's dashboards, Loki configuration
+      # and alerts go to the cluster too, and Grafana's sign-in is OSCAR's.
+      - 'OSCAR_Deploy/grafana/**'
+      - 'OSCAR_Deploy/loki/**'
+      - 'OSCAR_Deploy/prometheus/alerts/**'
+      - 'Oscar_Server/src/api/routes/auth.js'
       - '.github/workflows/ci-kubernetes.yml'
   push:
     branches: [main]
@@ -45,6 +51,12 @@ on:
       - 'Oscar_Server/src/run-pod/**'
       - 'Oscar_Server/src/run-dispatcher/**'
       - 'Oscar_Server/src/utils/runAgentPeer.js'
+      # Monitoring on k3s (#1147): the VPS's dashboards, Loki configuration
+      # and alerts go to the cluster too, and Grafana's sign-in is OSCAR's.
+      - 'OSCAR_Deploy/grafana/**'
+      - 'OSCAR_Deploy/loki/**'
+      - 'OSCAR_Deploy/prometheus/alerts/**'
+      - 'Oscar_Server/src/api/routes/auth.js'
       - '.github/workflows/ci-kubernetes.yml'
   schedule:
     - cron: '23 5 * * 1'
@@ -342,7 +354,7 @@ jobs:
   k3s:
     name: k3s on one machine
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -454,6 +466,38 @@ jobs:
           test "$(kubectl -n oscar exec deploy/oscar -c oscar -- printenv RUN_ISOLATION)" = pod
           test "$(kubectl -n oscar exec deploy/oscar -c oscar -- id -u)" = 1000
 
+      - name: Monitoring as the guide installs it (monitoring/stack, monitoring/oscar)
+        run: |
+          set -euo pipefail
+          kubectl apply -f OSCAR_Deploy/kubernetes/monitoring/stack/namespace.yaml
+          # A configuration that mails nobody; the guide's is
+          # monitoring/alertmanager.yaml.example, filled in.
+          printf 'route:\n  receiver: oscar-ci\nreceivers:\n  - name: oscar-ci\n' > "$RUNNER_TEMP/alertmanager.yaml"
+          kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$RUNNER_TEMP/alertmanager.yaml"
+          kubectl apply -k OSCAR_Deploy/kubernetes/ci/k3s-monitoring
+          # k3s's Helm controller installs the chart (a job in kube-system),
+          # its CRDs first; OSCAR's part needs them, and the operator, which
+          # checks a PrometheusRule before it is stored.
+          for _ in $(seq 1 150); do
+            if kubectl get crd servicemonitors.monitoring.coreos.com prometheusrules.monitoring.coreos.com > /dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          kubectl wait --for condition=established crd/servicemonitors.monitoring.coreos.com crd/prometheusrules.monitoring.coreos.com --timeout=120s
+          ready() {
+            for _ in $(seq 1 150); do
+              if kubectl -n monitoring get "$1" > /dev/null 2>&1; then break; fi
+              sleep 2
+            done
+            kubectl -n monitoring rollout status "$1" --timeout=600s
+          }
+          ready deployment/kube-prometheus-stack-operator
+          kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar
+          for w in deployment/kube-prometheus-stack-kube-state-metrics daemonset/kube-prometheus-stack-prometheus-node-exporter \
+            deployment/kube-prometheus-stack-grafana statefulset/prometheus-kube-prometheus-stack-prometheus \
+            statefulset/alertmanager-kube-prometheus-stack-alertmanager statefulset/loki deployment/alloy; do
+            ready "$w"
+          done
+
       - name: A scenario in a pod of its own (ci/smoke.sh)
         run: |
           kubectl -n oscar port-forward service/oscar 3001:3001 > "$RUNNER_TEMP/port-forward.log" 2>&1 &
@@ -515,10 +559,19 @@ jobs:
           test "$($p probe-public oscar.oscar.svc.cluster.local 3001)" = closed
           test "$($p probe-dispatcher oscar-dispatcher.oscar.svc.cluster.local 3002)" = closed
 
+      - name: Monitoring, what it reads and who reaches it (ci/check-monitoring.sh)
+        run: SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json" OSCAR_Deploy/kubernetes/ci/check-monitoring.sh
+
       - name: What the cluster shows (on failure)
         if: failure()
         run: |
-          kubectl get pods -A -o wide 2>&1 | tail -n 40 || true
+          kubectl get pods -A -o wide 2>&1 | tail -n 60 || true
+          echo "=== monitoring"
+          kubectl -n kube-system logs job/helm-install-kube-prometheus-stack --tail=60 2>&1 || true
+          kubectl -n monitoring get all,pvc,networkpolicy,ingress,events 2>&1 | tail -n 80 || true
+          kubectl -n monitoring logs deploy/alloy --tail=60 2>&1 || true
+          kubectl -n monitoring logs statefulset/loki --tail=40 2>&1 || true
+          kubectl -n monitoring logs deploy/kube-prometheus-stack-grafana -c grafana --tail=60 2>&1 || true
           kubectl -n kube-system logs deployment/traefik --tail=100 2>&1 || true
           kubectl -n kube-system get helmcharts,helmchartconfigs,jobs 2>&1 || true
           echo "=== oscar-runs"

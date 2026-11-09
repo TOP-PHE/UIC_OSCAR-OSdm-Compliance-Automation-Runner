@@ -18,7 +18,9 @@ document on a fresh machine:
 - the same k3s version and files;
 - a scenario run on the OSDM simulator, in a pod of its own;
 - Traefik's redirect, body limit and client address;
-- what a run pod may reach.
+- what a run pod may reach;
+- the monitoring of section 8a: what Prometheus reads, the alerts, Grafana
+  behind OSCAR's sign-in, the logs in Loki, who reaches what.
 
 Only Let's Encrypt is left out: the CI machine has no public name.
 
@@ -32,6 +34,7 @@ Only Let's Encrypt is left out: the CI machine has no public name.
 | 6 | OSCAR |
 | 7 | First administrator, e-mail, parallel runs |
 | 8 | A test on the simulators |
+| 8a | Monitoring: Prometheus, Grafana, Loki |
 | 9 | Looking after it |
 | 10 | Removing it |
 | 11 | When something does not work |
@@ -220,6 +223,84 @@ sudo kubectl -n oscar-runs get pods
   section 6a of the
   [Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md).
 
+## 8a. Monitoring
+
+What the VPS's metrics overlay gives (`docker-compose.metrics.yml`), on this
+machine:
+- **Prometheus, Alertmanager and Grafana**: the chart kube-prometheus-stack 92.13.1,
+  which k3s's own Helm controller installs (no `helm` to install);
+- **Loki** for the logs, with the VPS's configuration, and **Grafana Alloy**
+  to send them there;
+- what OSCAR adds: the reading of `/metrics`, the VPS's alerts, and its
+  dashboards.
+
+It takes about 1.5 GB of memory. Prometheus keeps 15 days (8 GB at most);
+Loki keeps the logs without limit, as on the VPS.
+
+**1. Alertmanager's configuration.** It holds the mail server's password, so
+it is a Secret of your own. Fill in the mail server and the administrators'
+address, then:
+
+```bash
+cd /opt/oscar
+sudo kubectl apply -f OSCAR_Deploy/kubernetes/monitoring/stack/namespace.yaml
+cp OSCAR_Deploy/kubernetes/monitoring/alertmanager.yaml.example ~/alertmanager.yaml
+nano ~/alertmanager.yaml
+sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml"
+shred -u ~/alertmanager.yaml
+```
+
+**2. The stack**, in a copy of its own with your name (`monitoring/site`,
+which git leaves alone), as for OSCAR in step 6:
+
+```bash
+cp -r OSCAR_Deploy/kubernetes/monitoring/stack OSCAR_Deploy/kubernetes/monitoring/site
+HOST=oscar-test.example.org
+sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/monitoring/site/kube-prometheus-stack.yaml OSCAR_Deploy/kubernetes/monitoring/site/grafana-ingress.yaml
+sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site
+```
+
+**3. What OSCAR adds**, once the chart is in (a few minutes: the first loop
+waits for it):
+
+```bash
+until sudo kubectl -n monitoring get deployment kube-prometheus-stack-operator > /dev/null 2>&1; do sleep 5; done
+sudo kubectl -n monitoring rollout status deployment/kube-prometheus-stack-operator --timeout=600s
+sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar
+sudo kubectl -n monitoring get pods
+```
+
+**4. Grafana.** Sign in to OSCAR as an administrator, then Admin →
+*Dashboard* → *Grafana* (`https://oscar-test.example.org/grafana/`). As on
+the VPS, Traefik asks OSCAR who is signed in before each request, and only an
+administrator gets through. The dashboards:
+- *OSCAR · Overview*, *OSCAR · Logs*, *OSDM Simulator*: the VPS's;
+- *OSCAR · Kubernetes*: each run's memory and CPU, the runs stopped for
+  memory, the runs' quota, OSCAR's pods, the machine;
+- the chart's own *Kubernetes / …* dashboards, for any pod.
+
+What differs from the VPS:
+- **A run is a pod.** The *run processes* figures of *OSCAR · Overview* stay
+  at 0 here; *OSCAR · Kubernetes* has them. Prometheus reads every 15 s, so a
+  run shorter than that may not show.
+- **A run's own output is not in Loki.** It is test data, which OSCAR keeps
+  with the run, encrypted; Loki has no access control. Loki holds the logs of
+  OSCAR's pods (the server and the dispatcher).
+- **Alerts.** The VPS's, two more for the run pods (`OscarRunPodNearMemoryLimit`,
+  `OscarRunPodOutOfMemory`: raise `RUN_MEMORY_LIMIT`), and the chart's own
+  (a pod that does not start, the disk, the memory). Admin → *Alerting* →
+  *Apply* writes the VPS's file only: here the mail comes from the Secret. To
+  change it, edit a copy of the example again, then
+  `sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml" --dry-run=client -o yaml | sudo kubectl apply -f -`.
+- **Prometheus's and Alertmanager's pages are not published.** To look at
+  them: `sudo kubectl -n monitoring port-forward service/kube-prometheus-stack-prometheus 9090`
+  on the machine, `ssh -L 9090:localhost:9090 <machine>` from your PC, then
+  `http://localhost:9090`.
+- **Who reaches what.** Only Traefik reaches Grafana, and neither OSCAR's pods
+  nor the run pods reach Grafana, Prometheus, Alertmanager or Loki (network
+  policies). The machine's exporter listens on port 9100 of the host, and
+  answers Prometheus's account only.
+
 ## 9. Looking after it
 
 On a managed cluster the provider does part of this. Here it is yours.
@@ -231,7 +312,8 @@ On a managed cluster the provider does part of this. Here it is yours.
 | **k3s's own certificates** | they last a year | renewed when k3s starts within 90 days of their end: an update does it, otherwise `sudo systemctl restart k3s` once a year. |
 | **Backups** | as on the VPS | `sudo OSCAR_Deploy/kubernetes/oscar-data.sh save /root/oscar-save-$(date +%F)`: OSCAR stops for a minute, then the database, data files and reports are in that folder. Encrypt it and copy it off the machine. `ENCRYPTION_KEY` stays in your password manager. To restore: k3s, steps 4–6 with the same key, then `oscar-data.sh load <folder> --replace`. |
 | **Disk** | now and then | `df -h /var/lib/rancher`. Old images are removed only near 85 % full; `sudo k3s crictl rmi --prune` removes the unused ones. |
-| **Logs** | when something is wrong | `sudo kubectl -n oscar logs deploy/oscar`, `… logs deploy/oscar-dispatcher`, `sudo kubectl -n oscar-runs get events`, `sudo kubectl -n kube-system logs deploy/traefik`. |
+| **Logs** | when something is wrong | Grafana's *OSCAR · Logs* (section 8a), or `sudo kubectl -n oscar logs deploy/oscar`, `… logs deploy/oscar-dispatcher`, `sudo kubectl -n oscar-runs get events`, `sudo kubectl -n kube-system logs deploy/traefik`. |
+| **Monitoring** | after a `git pull` | `diff -r OSCAR_Deploy/kubernetes/monitoring/stack OSCAR_Deploy/kubernetes/monitoring/site` shows what moved besides your name (a new chart `version`, for instance): bring it into `monitoring/site`, then `sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site` and `sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar`. |
 
 `oscar-data.sh` runs as root here (`sudo`), so it uses k3s's `kubectl`.
 
@@ -256,3 +338,7 @@ if you need it.
 | Every run fails at once, *the runner agent could not be reached* | The dispatcher is not running: `sudo kubectl -n oscar logs deploy/oscar-dispatcher`. |
 | Runs of a large batch get 429 from the simulator | This machine's address is not trusted by the simulator (section 8). |
 | `kubectl`: *permission denied* on `/etc/rancher/k3s/k3s.yaml` | Use `sudo`: the kubeconfig is root's only, on purpose. |
+| `/grafana/` answers *restricted to administrators* (401) | Nobody is signed in to OSCAR in this browser, or not as an administrator: sign in to OSCAR first, then open Grafana. |
+| Step 3 of section 8a: *no matches for kind "ServiceMonitor"* | The chart was not in yet: its install is a job, `sudo kubectl -n kube-system logs job/helm-install-kube-prometheus-stack` says how far it got. Run step 3 again. |
+| Alertmanager's pod waits (*ContainerCreating*) | The Secret `oscar-alertmanager` is missing in `monitoring` (section 8a, step 1). |
+| *OSCAR · Kubernetes* shows no run | Runs are pods in pod mode only (`overlays/k3s`), and a run shorter than 15 s may come and go between two readings. |

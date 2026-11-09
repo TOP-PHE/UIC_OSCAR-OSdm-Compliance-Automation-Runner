@@ -1,0 +1,49 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Alerts a cluster adds to the VPS's (prometheus-rules.yaml): in pod mode each
+# run is a pod of oscar-runs, whose container is "run" (the dispatcher's
+# jobSpec.js), held to RUN_MEMORY_LIMIT (oscar-dispatcher-settings, 1Gi by
+# default). Its memory is the kubelet's (cAdvisor), its limit and end
+# kube-state-metrics'. The chart's own rules cover the rest (a pod that does
+# not start or restarts, the quota, the machine's memory and disk).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: oscar-cluster
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: oscar-monitoring
+spec:
+  groups:
+    - name: oscar.kubernetes
+      interval: 30s
+      rules:
+        - alert: OscarRunPodNearMemoryLimit
+          expr: |
+            max by (pod) (container_memory_working_set_bytes{namespace="oscar-runs", container="run"})
+              / on (pod)
+            max by (pod) (kube_pod_container_resource_limits{namespace="oscar-runs", container="run", resource="memory"})
+              > 0.9
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Run pod {{ $labels.pod }} uses {{ $value | humanizePercentage }} of its memory limit"
+            description: "A run has used over 90 % of RUN_MEMORY_LIMIT for a minute. Past the limit Kubernetes stops it and the run fails. Raise RUN_MEMORY_LIMIT in oscar-dispatcher-settings (the quota of oscar-runs too, runs/quota.yaml), or look at what the scenario asks (many offers, a large data file)."
+            runbook: "Documentation/Server_Operations/OSCAR - k3s on one VPS.md#8a-monitoring"
+
+        - alert: OscarRunPodOutOfMemory
+          # The pod is kept 5 minutes after its run (the Job's TTL), and so is
+          # this.
+          expr: max by (pod) (kube_pod_container_status_terminated_reason{namespace="oscar-runs", container="run", reason="OOMKilled"}) == 1
+          labels:
+            severity: warning
+          annotations:
+            summary: "Run pod {{ $labels.pod }} was stopped: out of memory"
+            description: "Kubernetes stopped a run at RUN_MEMORY_LIMIT; OSCAR shows that run as failed. Raise RUN_MEMORY_LIMIT in oscar-dispatcher-settings (and the quota of oscar-runs), then run the scenario again."
+            runbook: "Documentation/Server_Operations/OSCAR - k3s on one VPS.md#8a-monitoring"

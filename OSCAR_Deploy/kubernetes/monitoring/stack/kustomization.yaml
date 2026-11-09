@@ -1,0 +1,35 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# OSCAR's monitoring on k3s (#1147), what the VPS's docker-compose.metrics.yml
+# gives: Prometheus, Alertmanager and Grafana (kube-prometheus-stack, installed
+# by k3s's Helm controller), Loki for the logs and Grafana Alloy to send them.
+# Guide: "OSCAR - k3s on one VPS", section 8a.
+#   kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml=<file>
+#   kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site      (a copy of this folder)
+#   kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar     (once the chart's CRDs exist)
+# Before that, change oscar.example.org (kube-prometheus-stack.yaml, twice,
+# and grafana-ingress.yaml). OSCAR's namespace must exist: Alloy reads its
+# pods' logs. No namespace here: each file names its own.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - kube-prometheus-stack.yaml
+  # The VPS's Loki configuration, as a ConfigMap (OSCAR_Deploy/loki).
+  - ../../../loki
+  - loki.yaml
+  - alloy.yaml
+  - grafana-ingress.yaml
+  - network-policy.yaml
+
+configMapGenerator:
+  - name: alloy-config
+    namespace: monitoring
+    files:
+      - config.alloy

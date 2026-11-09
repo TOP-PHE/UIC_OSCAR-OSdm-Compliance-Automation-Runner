@@ -1,0 +1,57 @@
+// Copyright [2026] [International Union of Railways (UIC)]
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+
+// Grafana Alloy: the logs of OSCAR's pods (namespace oscar: the server and
+// the run dispatcher) to Loki, read through Kubernetes (pods/log), so Alloy
+// needs no folder of the machine. On the VPS, Promtail reads Docker's.
+//
+// Not the run pods' logs (namespace oscar-runs): a run's output is test data,
+// kept by OSCAR, encrypted, with the run; Loki has no access control.
+
+discovery.kubernetes "oscar" {
+  role = "pod"
+  namespaces {
+    names = ["oscar"]
+  }
+}
+
+discovery.relabel "oscar" {
+  targets = discovery.kubernetes.oscar.targets
+
+  // A container with two ports is two targets here; Alloy reads it once
+  // (one log reader per namespace, pod and container).
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_init"]
+    regex         = "true"
+    action        = "drop"
+  }
+  // The labels the VPS's "OSCAR · Logs" dashboard reads: container (oscar,
+  // dispatcher), with the namespace and pod.
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
+}
+
+loki.source.kubernetes "oscar" {
+  targets    = discovery.relabel.oscar.output
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+  }
+}

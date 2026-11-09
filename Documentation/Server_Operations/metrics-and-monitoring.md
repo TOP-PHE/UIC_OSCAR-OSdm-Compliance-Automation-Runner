@@ -166,6 +166,26 @@ namespace's quota is full, or its pod security refuses the pod) and
 `OscarRunDispatcherRefusing` (the dispatcher is down, refuses the server's
 key, or has as many runs as `RUN_DISPATCHER_MAX_RUNS`).
 
+### On Kubernetes (#1147)
+
+This page's stack is the VPS's (`docker-compose.metrics.yml`). On a cluster:
+- `OSCAR_Deploy/kubernetes/monitoring/oscar` gives a cluster's Prometheus
+  Operator the same jobs, alerts and dashboards (*OSCAR - Kubernetes and
+  OpenShift Deployment Guide*, section 8);
+- on one machine with k3s, `monitoring/stack` installs Prometheus,
+  Alertmanager, Grafana and Loki as well (*OSCAR - k3s on one VPS*, section
+  8a).
+
+In pod mode a run is a pod, which OSCAR's own process figures do not see.
+Its memory and CPU come from the kubelet (cAdvisor), its limit and end from
+kube-state-metrics, in the dashboard *OSCAR · Kubernetes*: each run pod's
+memory against `RUN_MEMORY_LIMIT`, its CPU, the runs stopped for memory, the
+quota of `oscar-runs`, OSCAR's pods and the machine. Two alerts there:
+`OscarRunPodNearMemoryLimit` (over 90 % of the limit for a minute) and
+`OscarRunPodOutOfMemory` (Kubernetes stopped a run at the limit; OSCAR shows
+it as failed). Prometheus reads every 15 s, so a run shorter than that may not
+show.
+
 ### The OSDM simulator (#1005)
 
 The simulator runs on a host of its own and is read **through OSCAR**: the
