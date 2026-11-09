@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.529",
+  "current_release": "2026.530",
   "releases": [
     {
       "release": "2026.530",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.492: the run dispatcher reads a pod gone just after it was seen running (its deadline) as its Job says, 124, not as a refused run. With it, OSCAR on one VPS with k3s (guide, overlays/k3s, k3s/, a CI job on a real k3s). Listed, not released: current_release stays at 2026.529."
+        "Server 1.11.492: the run dispatcher reads a pod gone just after it was seen running (its deadline) as its Job says, 124, not as a refused run. With it, OSCAR on one VPS with k3s (guide, overlays/k3s, k3s/, a CI job on a real k3s).",
+        "Released with it (deployment files, scripts and documentation; no other server or collection change): each release's cluster images on GHCR and the move of an OSCAR from a VPS to a cluster (oscar-data.sh, #1138); the copying pod of oscar-data.sh removed when the script ends (#1140); oscar-backup.sh needs about the size of the data free, not three times it, and checks that room before writing anything (#1141). On the VPS, the checkout moving to this tag brings the new backup script (the backup timer runs the checkout's copy); runs go as before (RUN_ISOLATION=isolated)."
       ]
     },
     {
