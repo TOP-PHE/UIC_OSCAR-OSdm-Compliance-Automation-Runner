@@ -80,8 +80,8 @@ run_pod() {
   kubectl -n oscar-runs run "$1" --image=local/oscar-run:ci --restart=Never \
     --labels=app.kubernetes.io/name=oscar-run --overrides="$overrides" > /dev/null
 }
-step "two pods shaped like runs: one holds 64 MB for two minutes, one goes past its limit"
-run_pod memory-probe 256Mi 'const keep = Buffer.alloc(64 * 1024 * 1024, 1); setTimeout(() => keep.length, 120000);'
+step "two pods shaped like runs: one holds 64 MB for five minutes, one goes past its limit"
+run_pod memory-probe 256Mi 'const keep = Buffer.alloc(64 * 1024 * 1024, 1); setTimeout(() => keep.length, 300000);'
 run_pod memory-hog 128Mi 'const kept = []; setInterval(() => kept.push(Buffer.alloc(16 * 1024 * 1024, 1)), 50);'
 
 step "Prometheus reads OSCAR, the simulator relay, the machine, the kubelet and kube-state-metrics"
@@ -142,8 +142,10 @@ for f in "$root/OSCAR_Deploy/grafana/dashboards/oscar-overview.json" "$root/OSCA
     e=${e//\$__range/1h}
     e=${e//\$__rate_interval/1m}
     e=${e//\$__interval/1m}
-    answer=$(query "$e") || { echo "Prometheus refused: $e" >&2; exit 1; }
-    if [[ "$f" == */oscar-kubernetes.json ]] && [ "$(jq '.data.result | length' <<< "$answer")" = 0 ]; then
+    query "$e" > /dev/null || { echo "Prometheus refused: $e" >&2; exit 1; }
+    # The cluster's dashboard must also have figures. A rate needs two
+    # readings of a pod, 15 s apart: the pods above may be younger than that.
+    if [[ "$f" == */oscar-kubernetes.json ]] && ! within 120 found "$e"; then
       echo "no answer: $e" >&2
       exit 1
     fi
