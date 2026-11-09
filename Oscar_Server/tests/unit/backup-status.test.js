@@ -148,27 +148,34 @@ describe('the host scripts write it', () => {
   });
 
   // oscar-backup.sh itself, with stub tools: the status is written when it
-  // succeeds and when it fails.
-  function stubTools(gpgFails) {
+  // succeeds and when it fails. The stub gpg writes what it reads from tar as
+  // it is, so the archive's members can be listed.
+  const realTar = hasBash ? spawnSync('bash', ['-c', 'command -v tar'], { encoding: 'utf8' }).stdout.trim() : '';
+  function stubTools({ gpgFails = false, tarExit = null } = {}) {
     const bin = path.join(root, 'bin');
     fs.mkdirSync(bin, { recursive: true });
     const write = (name, body) => { fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`); fs.chmodSync(path.join(bin, name), 0o755); };
     write('sqlite3', 'if [ "$2" != "${2#.backup}" ]; then f="${2#.backup }"; f="${f//\\\'/}"; : > "$f"; else echo 1; fi');
     write('docker', 'exit 1');
-    write('gpg', gpgFails ? 'exit 1' : 'out=""; while [ $# -gt 1 ]; do [ "$1" = "-o" ] && out="$2"; shift; done; cp "$1" "$out"');
+    write('gpg', gpgFails
+      ? 'out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done; head -c 10 > "$out"; exit 2'
+      : 'out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done; cat > "$out"');
     write('logger', 'exit 0');
+    if (tarExit !== null) write('tar', `"${realTar}" "$@"; exit ${tarExit}`);
     return bin;
   }
-  function runBackup(gpgFails) {
-    const bin = stubTools(gpgFails);
+  function runBackup(options, extraEnv = {}) {
+    const bin = stubTools(typeof options === 'boolean' ? { gpgFails: options } : options);
     fs.writeFileSync(path.join(data, 'oscar.db'), '');
     fs.writeFileSync(path.join(root, '.env'), 'ENCRYPTION_KEY=secret-key-value\n');
     fs.writeFileSync(path.join(root, 'pass'), 'secret-pass-value\n');
     return spawnSync('bash', [BACKUP_SH], {
-      env: { ...env(), PATH: `${bin}:${process.env.PATH}`, OSCAR_ENV_FILE: path.join(root, '.env'), OSCAR_BACKUP_PASSPHRASE_FILE: path.join(root, 'pass') },
+      env: { ...env(), PATH: `${bin}:${process.env.PATH}`, OSCAR_ENV_FILE: path.join(root, '.env'), OSCAR_BACKUP_PASSPHRASE_FILE: path.join(root, 'pass'), ...extraEnv },
       encoding: 'utf8',
     });
   }
+  const archives = () => fs.readdirSync(out).filter((f) => f.endsWith('.tar.gz.gpg'));
+  const members = (file) => execFileSync(realTar, ['-tzf', path.join(out, file)], { encoding: 'utf8' }).split('\n').filter(Boolean).sort();
 
   bashTest('oscar-backup.sh records a success', () => {
     const r = runBackup(false);
@@ -184,6 +191,48 @@ describe('the host scripts write it', () => {
     const r = runBackup(true);
     expect(r.status).not.toBe(0);
     expect(stored()).toMatchObject({ last_backup_ok: false, last_success_at: null });
+    // The half-written archive is gone: nothing in the folder looks like one.
+    expect(fs.readdirSync(out)).toEqual([]);
+  });
+
+  bashTest('the data files and reports are read in place, under data/ in the archive', () => {
+    fs.mkdirSync(path.join(data, 'datafiles'));
+    fs.mkdirSync(path.join(data, 'artifacts', 'run-1'), { recursive: true });
+    fs.writeFileSync(path.join(data, 'datafiles', 'acme-datafile.json'), 'x');
+    fs.writeFileSync(path.join(data, 'artifacts', 'run-1', 'report.html'), 'x');
+    const r = runBackup(false);
+    expect([r.status, r.stderr]).toEqual([0, '']);
+    const [archive] = archives();
+    expect(fs.readdirSync(out).sort()).toEqual([archive, `${archive}.sha256`]);
+    expect(members(archive)).toEqual(['.env', 'data/artifacts/', 'data/artifacts/run-1/', 'data/artifacts/run-1/report.html',
+      'data/datafiles/', 'data/datafiles/acme-datafile.json', 'data/oscar.db', 'manifest.json']);
+  });
+
+  bashTest('folders OSCAR has not made yet go in empty', () => {
+    const r = runBackup(false);
+    expect(r.status).toBe(0);
+    expect(members(archives()[0])).toEqual(['.env', 'data/artifacts/', 'data/datafiles/', 'data/oscar.db', 'manifest.json']);
+  });
+
+  bashTest('not enough free space: refused before anything is written', () => {
+    const r = runBackup(false, { OSCAR_BACKUP_MIN_FREE_MB: '999999999' });
+    expect(r.status).not.toBe(0);
+    expect(r.stdout).toContain('not enough free space');
+    expect(fs.readdirSync(out)).toEqual([]);
+    expect(stored()).toMatchObject({ last_backup_ok: false });
+    expect(runBackup(false, { OSCAR_BACKUP_MIN_FREE_MB: 'lots' }).stdout).toContain('must be a number');
+  });
+
+  bashTest('a file changed while tar read it still gives an archive; another tar error gives none', () => {
+    const changed = runBackup({ tarExit: 1 });
+    expect(changed.status).toBe(0);
+    expect(changed.stdout).toContain('changed while they were read');
+    expect(archives()).toHaveLength(1);
+    fs.rmSync(out, { recursive: true }); fs.mkdirSync(out);
+    const failed = runBackup({ tarExit: 2 });
+    expect(failed.status).not.toBe(0);
+    expect(failed.stdout).toContain('tar failed (exit 2)');
+    expect(fs.readdirSync(out)).toEqual([]);
   });
 });
 

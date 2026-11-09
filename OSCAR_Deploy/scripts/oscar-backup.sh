@@ -20,6 +20,16 @@
 # The tar is then symmetrically encrypted with GnuPG (AES-256). The passphrase
 # is read from a file and is NEVER written into the archive.
 #
+# SPACE. Only the database snapshot is copied first (in a temporary folder);
+# the data files and reports are read where they are and go through tar and
+# gpg straight into the archive. They are already encrypted, so the archive is
+# about as large as the data: the free space needed is about the data's size
+# plus the database's once more, plus OSCAR_BACKUP_MIN_FREE_MB left free. The
+# script checks that before it starts and refuses otherwise, rather than fill
+# the disk OSCAR writes to. The archive is written under a temporary name and
+# renamed when complete, so a backup that stops leaves nothing that looks like
+# an archive.
+#
 # SECURITY. The archive is self-contained (it holds .env, i.e. ENCRYPTION_KEY),
 # so it is a crown-jewel: its only protection is the GPG passphrase. Therefore:
 #   - keep the passphrase ONLY in a password manager (and in the 0600 pass file
@@ -38,6 +48,7 @@
 #   OSCAR_BACKUP_PASSPHRASE_FILE  0600 file holding the passphrase (REQUIRED)
 #   OSCAR_BACKUP_DIR           where to write archives        (default: ~/oscar-backups)
 #   OSCAR_BACKUP_KEEP          how many archives to retain    (default: 6)
+#   OSCAR_BACKUP_MIN_FREE_MB   free space to leave on the disk (default: 2048)
 #   OSCAR_DATA_DIR             host path of data/   (override auto-discovery)
 #   OSCAR_ENV_FILE             host path of .env    (override auto-discovery)
 set -euo pipefail
@@ -46,6 +57,7 @@ CONT="${OSCAR_CONTAINER:-oscar}"
 KEEP="${OSCAR_BACKUP_KEEP:-6}"
 OUT_DIR="${OSCAR_BACKUP_DIR:-$HOME/oscar-backups}"
 PASS_FILE="${OSCAR_BACKUP_PASSPHRASE_FILE:-}"
+MIN_FREE_MB="${OSCAR_BACKUP_MIN_FREE_MB:-2048}"
 
 log(){ printf '%s  %s\n' "$(date -Is)" "$*"; command -v logger >/dev/null 2>&1 && logger -t oscar-backup -- "$*" || true; }
 die(){ log "FAIL: $*"; exit 1; }
@@ -56,6 +68,7 @@ STATUS_SH="$(cd "$(dirname "$0")" && pwd)/oscar-backup-status.sh"
 DATA_DIR=""
 ARCHIVE=""
 STAGE=""
+PART=""
 record_status(){
   local rc="$1" what=backup-failed
   [ -x "$STATUS_SH" ] || return 0
@@ -67,7 +80,9 @@ record_status(){
     || log "note: the Admin Dashboard status was not written"
   return 0
 }
-trap 'rc=$?; [ -n "$STAGE" ] && rm -rf "$STAGE"; record_status "$rc"' EXIT
+trap 'rc=$?; [ -n "$STAGE" ] && rm -rf "$STAGE"; [ -n "$PART" ] && rm -f "$PART"; record_status "$rc"' EXIT
+
+case "$MIN_FREE_MB" in ''|*[!0-9]*) die "OSCAR_BACKUP_MIN_FREE_MB must be a number of MB" ;; esac
 
 command -v sqlite3 >/dev/null 2>&1 || die "sqlite3 not installed - run: sudo apt-get install -y sqlite3"
 command -v gpg     >/dev/null 2>&1 || die "gpg not installed - run: sudo apt-get install -y gnupg"
@@ -94,12 +109,39 @@ TS="$(date +%Y%m%d-%H%M%S)"
 STAGE="$(mktemp -d)"
 mkdir -p "$OUT_DIR" "$STAGE/data"
 
+# --- 0) room for it, before anything is written ------------------------------
+# The database once more in $STAGE, and an archive about as large as the data
+# (the data files and reports are ciphertext: gzip does not shrink them).
+kb_of(){ du -sk "$@" 2>/dev/null | awk '{ s += $1 } END { print s + 0 }'; }
+free_kb(){ df -Pk "$1" | awk 'NR == 2 { print $4 }'; }
+room_for(){
+  local dir="$1" need_kb="$2" have_kb
+  have_kb="$(free_kb "$dir")"
+  if [ $(( have_kb - need_kb )) -lt $(( MIN_FREE_MB * 1024 )) ]; then
+    die "not enough free space: the backup needs about $(( need_kb / 1024 )) MB on the disk of $dir and leaves $MIN_FREE_MB MB free there (OSCAR_BACKUP_MIN_FREE_MB); $(( have_kb / 1024 )) MB are free. Move older archives off this host, or write elsewhere (OSCAR_BACKUP_DIR for the archive, TMPDIR for the database copy). Nothing was written."
+  fi
+}
+FROM_DATA=()
+for d in datafiles artifacts; do
+  if [ -d "$DATA_DIR/$d" ]; then FROM_DATA+=("$d"); fi
+done
+log "measuring the data"
+db_kb="$(kb_of "$DATA_DIR"/oscar.db*)"
+files_kb=0
+for d in "${FROM_DATA[@]}"; do files_kb=$(( files_kb + $(kb_of "$DATA_DIR/$d") )); done
+if [ "$(stat -c %d "$STAGE")" = "$(stat -c %d "$OUT_DIR")" ]; then
+  room_for "$OUT_DIR" $(( 2 * db_kb + files_kb ))
+else
+  room_for "$STAGE" "$db_kb"
+  room_for "$OUT_DIR" $(( db_kb + files_kb ))
+fi
+
 # --- 1) consistent SQLite snapshot (online backup API) -----------------------
+log "database snapshot: about $(( db_kb / 1024 )) MB"
 sqlite3 "$DATA_DIR/oscar.db" ".backup '$STAGE/data/oscar.db'" || die "sqlite backup failed"
 
-# --- 2) encrypted-at-rest artefacts, copied verbatim (they are ciphertext) ---
-if [ -d "$DATA_DIR/datafiles" ]; then cp -a "$DATA_DIR/datafiles" "$STAGE/data/"; else mkdir -p "$STAGE/data/datafiles"; fi
-if [ -d "$DATA_DIR/artifacts" ]; then cp -a "$DATA_DIR/artifacts" "$STAGE/data/"; else mkdir -p "$STAGE/data/artifacts"; fi
+# --- 2) the data files and reports are read in place by tar (step 5): they
+#        are ciphertext already, and a copy would need their size again.
 
 # --- 3) .env (holds ENCRYPTION_KEY - archive is encrypted, see SECURITY) ------
 cp -a "$ENV_FILE" "$STAGE/.env"
@@ -116,11 +158,35 @@ health_ver="$(docker exec "$CONT" sh -c 'echo "${npm_package_version:-}"' 2>/dev
 printf '{\n  "created_at": "%s",\n  "release_tag": "%s",\n  "collection_version": "%s",\n  "schema_version": "%s",\n  "users": %s,\n  "companies": %s\n}\n' \
   "$(date -Is)" "$rel_tag" "$coll_ver" "$schema_ver" "$users" "$companies" > "$STAGE/manifest.json"
 
-# --- 5) tar + gpg (AES-256) --------------------------------------------------
-PLAIN="$STAGE/oscar-backup-$TS.tar.gz"
-tar -C "$STAGE" -czf "$PLAIN" data .env manifest.json
+# --- 5) tar + gpg (AES-256), streamed ----------------------------------------
+# The same layout as ever (data/oscar.db, data/datafiles/, data/artifacts/,
+# .env, manifest.json): the folders read in place are renamed under data/ in
+# the archive. A folder OSCAR has not made yet goes in empty.
+STAGED=(data/oscar.db .env manifest.json)
+for d in datafiles artifacts; do
+  if [ ! -d "$DATA_DIR/$d" ]; then mkdir -p "$STAGE/data/$d"; STAGED+=("data/$d"); fi
+done
+TAR_ARGS=(-C "$STAGE" "${STAGED[@]}")
+if [ "${#FROM_DATA[@]}" -gt 0 ]; then
+  TAR_ARGS+=(-C "$DATA_DIR" --transform 's,^\(datafiles\|artifacts\)\(/\|$\),data/\1\2,S' "${FROM_DATA[@]}")
+fi
+PART="$OUT_DIR/.oscar-backup-$TS.tar.gz.gpg.part"
+log "writing the archive: about $(( (db_kb + files_kb) / 1024 )) MB to read"
+# tar's own exit code is kept: 1 means a file changed while it was read (a run
+# writing its report), which leaves the rest of the archive whole.
+( umask 077
+  { tar_rc=0; tar -czf - "${TAR_ARGS[@]}" || tar_rc=$?; echo "$tar_rc" > "$STAGE/tar.rc"; } \
+    | gpg --batch --yes --symmetric --cipher-algo AES256 --compress-algo none --passphrase-file "$PASS_FILE" -o "$PART"
+) || die "the archive could not be written (gpg, or the disk)"
+tar_rc="$(cat "$STAGE/tar.rc" 2>/dev/null || echo unknown)"
+case "$tar_rc" in
+  0) ;;
+  1) log "note: some files changed while they were read (a run was writing); the archive holds them as they were read" ;;
+  *) die "tar failed (exit $tar_rc)" ;;
+esac
 ARCHIVE="$OUT_DIR/oscar-backup-$TS.tar.gz.gpg"
-gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase-file "$PASS_FILE" -o "$ARCHIVE" "$PLAIN"
+mv "$PART" "$ARCHIVE"
+PART=""
 chmod 600 "$ARCHIVE"
 sha256sum "$ARCHIVE" | awk '{print $1}' > "$ARCHIVE.sha256"
 log "backup OK: $(basename "$ARCHIVE")  size=$(du -h "$ARCHIVE" | cut -f1)  users=$users companies=$companies schema=$schema_ver release=$rel_tag"

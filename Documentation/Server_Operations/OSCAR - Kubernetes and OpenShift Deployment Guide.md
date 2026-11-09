@@ -235,7 +235,12 @@ OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass /opt/OSCAR/OSCAR_Deploy/script
 cd /opt/OSCAR/OSCAR_Deploy && docker compose --profile isolated stop oscar oscar-runner
 ```
 
-Copy the archive to the workstation (`scp`, as the script prints).
+Copy the archive to the workstation (`scp`, as the script prints). The backup
+needs about the size of the VPS's `data/` free on its disk (plus the database
+once more), and stops before writing anything when it is not there: check
+with `df -h` and `sudo du -sh` of the `data/` folder first, and move older
+archives off the VPS if needed ([Disaster Recovery](OSCAR%20-%20Disaster%20Recovery.md),
+section 5).
 
 **2. On the workstation: open the archive** in a folder you keep as safely
 as a backup (it holds the key and every account's password hash):

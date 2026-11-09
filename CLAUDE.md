@@ -3692,7 +3692,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `ENCRYPTION_KEY` and every tenant's data (#572), and
   `admin-backup-status.test.js` fails on any other backup path or method.
   `backup-status.test.js` runs `oscar-backup.sh` with stub `sqlite3`, `gpg`
-  and `docker` in `PATH`.
+  and `docker` in `PATH` (the stub gpg writes what tar sends, so the test
+  lists the archive's members). **A backup copies only the database first**
+  (2026-11-08): the data files and reports are read in place and streamed
+  through tar and gpg into a hidden `.part`, renamed when whole. The old
+  copy-then-compress-then-encrypt needed three times `data/`'s size (close to
+  60 GB free for 19 GB of data).
+  The script refuses before writing when the snapshot and archive would leave
+  less than `OSCAR_BACKUP_MIN_FREE_MB` free; tar's exit 1 (a file changed
+  while read) is accepted.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):

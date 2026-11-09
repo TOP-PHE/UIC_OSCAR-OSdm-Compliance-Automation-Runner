@@ -57,7 +57,11 @@ cd /opt/OSCAR/OSCAR_Deploy/scripts
 ./oscar-backup-schedule.sh status     # show the current timer
 ```
 
-Retention defaults to the newest **6** archives (`OSCAR_BACKUP_KEEP`).
+Retention defaults to the newest **6** archives (`OSCAR_BACKUP_KEEP`). An
+archive is about as large as OSCAR's `data/` folder (the reports and data files
+are already encrypted, so they do not compress): choose a number the host's
+disk holds next to OSCAR's own data and one more backup, or keep 1 and move
+each archive off the host.
 
 ## 5. Run a backup by hand (also: before a DR drill)
 
@@ -70,6 +74,19 @@ OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass \
 The script discovers the data dir and `.env` from the running container, takes a
 live-safe SQLite snapshot, writes the encrypted archive to `OSCAR_BACKUP_DIR`
 (default `~/oscar-backups`), prunes old ones, and prints the `scp` to pull it.
+
+**Free space.** Only the database snapshot is copied first (in `TMPDIR`, else
+`/tmp`); the data files and reports are read where they are and go through tar
+and gpg straight into the archive. The backup needs about the size of `data/`
+plus the database once more, and leaves `OSCAR_BACKUP_MIN_FREE_MB` (2048) free.
+It checks that before writing anything and stops with "not enough free space"
+otherwise, so it never fills the disk OSCAR writes to; the Admin Dashboard then
+shows a failed backup. Make room by moving older archives off the host, or
+point `OSCAR_BACKUP_DIR` (and `TMPDIR`) at another disk. The archive is written
+under a hidden temporary name and renamed when complete: a backup that stops
+half-way leaves no archive behind. Until November 2026 the script copied the
+data into `/tmp`, then compressed it, then encrypted it, which needed about
+three times the size of `data/`.
 
 ### The status on the Admin Dashboard (#572)
 
