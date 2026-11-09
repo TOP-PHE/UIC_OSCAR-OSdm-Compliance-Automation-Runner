@@ -254,7 +254,9 @@ Listed in `compatibility.json` (2026.532) without moving `current_release`.
   connection, or 502/503/504), after pauses of 1 to 30 seconds, about a
   minute for the whole run; a refusal (4xx) is not sent again. Its log now
   says why a send failed (`fetch failed (ECONNREFUSED)`), not only
-  `fetch failed`.
+  `fetch failed`. Sonar's two "`await` inside a loop" findings (S9382) on
+  `runPod.js` are left open on purpose: the files are sent one after the
+  other so that they share the minute of pauses, and a pause must be waited.
 
 ## [server-1.11.492] — 2026-11-08
 

@@ -216,8 +216,13 @@ async function sendResults({ workDir, runId, resultsBase, secret, fetchImpl, log
       body: read.content,
       redirect: 'manual',
     }, { name, fetchImpl, pauses, sleep, log });
-    if (out.status === 201) { sent += 1; log(`[run-pod] sent ${name}`); }
-    else log(`[run-pod] ${name} not sent: ${out.failed || `HTTP ${out.status}`}`);
+    if (out.status === 201) {
+      sent += 1;
+      log(`[run-pod] sent ${name}`);
+    } else {
+      const why = out.failed || 'HTTP ' + out.status;
+      log(`[run-pod] ${name} not sent: ${why}`);
+    }
   }
   return sent;
 }
