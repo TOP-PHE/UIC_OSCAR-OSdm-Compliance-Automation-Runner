@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.530",
+  "current_release": "2026.531",
   "releases": [
+    {
+      "release": "2026.531",
+      "date": "2026-11-09",
+      "server": "1.11.492",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Deployment images only (Dependabot; no server or collection change): Prometheus v3.15.1 to v3.16.0 (#1143), Watchtower 1.23.2 to 1.24.0 (#1144), Grafana 11.4.0 to 13.3.0 (#1110), in OSCAR_Deploy's compose files.",
+        "On the VPS these containers change only when they are recreated by hand (docker compose up -d); Watchtower updates the OSCAR containers only. Grafana 13 moves its dashboards and folders to a new storage at its first start, one way: copy its volume first. Its dashboards and data sources are provisioned from files and come back as they are."
+      ]
+    },
     {
       "release": "2026.530",
       "date": "2026-11-08",
