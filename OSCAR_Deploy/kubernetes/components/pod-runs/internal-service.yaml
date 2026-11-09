@@ -10,6 +10,12 @@ metadata:
     app.kubernetes.io/component: server-internal
 spec:
   type: ClusterIP
+  # The run pods reach the server here even while its readiness probe fails.
+  # The probe fails when the server is slow to answer /health, as under a
+  # large batch, and a Service without this then refuses every connection:
+  # the run pods lost their data file and their results. A slow server makes
+  # them wait instead. One replica: there is no other pod to send them to.
+  publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/name: oscar
   ports:

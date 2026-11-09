@@ -356,8 +356,9 @@ function updateStatus(run) {
   const existingBanner  = document.getElementById('auth-error-banner');
   const isFormatError   = run.error_message === 'TOKEN_FORMAT_ERROR';
   const isAuthError     = run.error_message === 'TOKEN_AUTH_ERROR';
-  const isOAuthError    = !isFormatError && !isAuthError && run.error_message && run.auth_mode_used === 'oauth2';
-  const showBanner      = isFormatError || isAuthError || isOAuthError;
+  const isNoChecks      = run.error_message === 'NO_CHECKS';
+  const isOAuthError    = !isFormatError && !isAuthError && !isNoChecks && run.error_message && run.auth_mode_used === 'oauth2';
+  const showBanner      = isFormatError || isAuthError || isNoChecks || isOAuthError;
 
   if (showBanner && !existingBanner) {
     const banner = document.createElement('div');
@@ -384,6 +385,16 @@ function updateStatus(run) {
             This usually means the token has expired or is incorrect.
           </div>
           <a href="/profile.html" class="auth-link">Update API Token →</a>
+        </div>`;
+    } else if (isNoChecks) {
+      banner.innerHTML = `
+        <div class="auth-icon">⚠️</div>
+        <div class="auth-body">
+          <div class="auth-title">No check was recorded — the run is marked failed</div>
+          <div class="auth-msg">
+            Bruno ended without error, but OSCAR received no check result for this run: nothing was checked.<br>
+            The execution log says why. Run the scenario again; if it happens again, tell your OSCAR administrator.
+          </div>
         </div>`;
     } else {
       banner.innerHTML = `

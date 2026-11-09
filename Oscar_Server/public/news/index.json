@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-09-no-checks-failed",
+    "date": "November 9, 2026",
+    "tag": "Bug Fix",
+    "title": "A run that checked nothing now reads failed",
+    "summary": "A run that ends without error but records no check is now marked failed, with a message saying so, instead of completed.",
+    "content": "Until now, a run could read Completed while nothing had been checked: its check results never reached OSCAR, or the collection could not read its data file or scenario and made no check. Such a run is now marked Failed, and its page shows the banner \"No check was recorded — the run is marked failed\". The execution log says what happened.\n\nIf you see it, run the scenario again. If it happens again, tell your OSCAR administrator. Runs that recorded their checks are not affected, and no other action is required."
+  },
+  {
     "id": "2026-11-07-run-pods",
     "date": "November 7, 2026",
     "tag": "Security",

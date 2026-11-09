@@ -441,6 +441,14 @@ describe('pod mode (option 4)', () => {
     expect(svc.spec.selector).toEqual({ 'app.kubernetes.io/name': 'oscar' });
   });
 
+  test('the run pods reach the server\'s internal port while it is slow to answer its probes', () => {
+    // A failed readiness probe takes the server out of a Service: under a
+    // large batch the run pods' calls were refused, and their results lost.
+    expect(byKind(compDocs, 'Service', 'oscar-internal').spec.publishNotReadyAddresses).toBe(true);
+    // The public Service keeps following readiness.
+    expect(load('base/service.yaml').spec.publishNotReadyAddresses).toBeUndefined();
+  });
+
   test('the dispatcher holds none of the server\'s settings, secrets or data', () => {
     expect(dPod.serviceAccountName).toBe('oscar-dispatcher');
     expect(byKind(compDocs, 'ServiceAccount', 'oscar-dispatcher').automountServiceAccountToken).toBe(true);

@@ -226,6 +226,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.493] — 2026-11-09
+
+Listed in `compatibility.json` (2026.532) without moving `current_release`.
+
+### Fixed
+
+- **A run that recorded no check is marked failed, not completed.** When
+  Bruno ended with exit code 0 but no check of the run was stored, the run
+  read *COMPLETED* with nothing checked. That happens when its results never
+  reach the server, or when the collection makes no check (its data file or
+  scenario could not be read). Such a run is now *FAILED*, with
+  `error_message` `NO_CHECKS`, a line in its log, and a banner of its own on
+  the run page (it would otherwise have shown as an OAuth2 failure). A
+  failed exit code, or checks that cannot be counted, leave the status as
+  before.
+- **Kubernetes and OpenShift, pod mode: results are no longer lost while the
+  server is slow** (#1130). A batch of 144 runs on a test cluster holding a
+  production-sized database left every run without its report or checks: the
+  server answered its health check too slowly, its readiness probe failed,
+  and the Service of the internal port refused the run pods' calls (for the
+  data file at the start, and for the results at the end). The internal
+  Service now publishes the server while its readiness probe fails
+  (`publishNotReadyAddresses`), so a run pod waits for a slow server instead
+  of being refused; the public Service still follows readiness. The run pod
+  also sends a result file again while the server cannot take it (no
+  connection, or 502/503/504), after pauses of 1 to 30 seconds, about a
+  minute for the whole run; a refusal (4xx) is not sent again. Its log now
+  says why a send failed (`fetch failed (ECONNREFUSED)`), not only
+  `fetch failed`.
+
 ## [server-1.11.492] — 2026-11-08
 
 Listed in `compatibility.json` (2026.530) without moving `current_release`.

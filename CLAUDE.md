@@ -1509,6 +1509,25 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   of `oscar-alerts.yml`, pinned by `run-pod-metrics.test.js`. A pod
   removed at its deadline before the dispatcher saw it running is read from
   the Job's conditions (`jobOutcome()`), else it read as never started.
+  **A slow server must not lose a batch's results** (1.11.493, first
+  restore of production data on the k3s test VPS, 2026-11-09). There, under
+  144 runs, the server answered `/health` too slowly. Its readiness probe
+  failed, and the `oscar-internal` Service refused every run pod's call,
+  both the data file and the results. Every run read COMPLETED with 0
+  checks. What changed:
+  - `oscar-internal` has `publishNotReadyAddresses: true`; the public
+    Service does not.
+  - `sendResults()` (`runPod.js`) sends a file again on no connection or
+    502/503/504, with `RETRY_DELAYS_MS` (about a minute) **shared by the
+    whole run**. A 4xx is not sent again. `reasonOf()` logs the fetch
+    cause.
+  - The runner marks exit 0 with no stored check `FAILED` / `NO_CHECKS`.
+    An extraction that throws leaves the status as Bruno's exit code gives
+    it. `run-detail.html` has its own banner for it: any other
+    `error_message` of an OAuth2 run reads as an OAuth2 failure, so a new
+    sentinel needs the same.
+  - `runner.test.js` stubs `extractStructuredResults` to one check by
+    default.
   **The server touches a run's working folder only through
   `worker/runFolder.js`** (#1124, 1.11.485): the run's processes write that
   folder, so nothing there is followed as a link. Reads open with
