@@ -41,8 +41,10 @@ Only Let's Encrypt is left out: the CI machine has no public name.
 
 ## 1. The machine, its name and its firewall
 
-- **Ubuntu 24.04 LTS.** 4 vCPU and 8 GB at least; 8 vCPU and 16 GB to run
-  about 20 scenarios at once. 40 GB of disk.
+- **Ubuntu 24.04 LTS.** 4 vCPU and 8 GB at least. Each run is a pod of its
+  own, which costs more CPU than a run on the VPS: count about one scenario
+  at a time per vCPU (section 7). 8 vCPU and 16 GB run about 8 at once; 20 at
+  once need about 20 vCPU. 40 GB of disk.
 - **Nothing else on ports 80 and 443**: no nginx, no OSCAR Docker stack on
   this machine.
 - **A DNS name** (an A record) pointing at the machine, *before* step 6: Let's
@@ -196,10 +198,17 @@ OSCAR by an e-mailed link, the first Test Manager of a company included:
 without e-mail, nobody but the administrator can sign in.
 
 **Parallel runs.** Admin → *Server Config* → *Max Concurrent Runs*.
-- One run takes about 0.25 CPU.
-- On one machine, about 2.5 per vCPU leaves room for k3s, Traefik and OSCAR:
-  20 on 8 vCPU.
-- The first start set it to 6.
+- Each run is a pod: Bruno takes 0.4 to 0.7 CPU while it starts (about 7 s
+  of CPU), then about 0.25; k3s and containerd add the work of making and
+  removing the pod.
+- **About one per vCPU**: 6 on 6 vCPU, 8 on 8. Measured on 6 vCPU (#1150):
+  20 and 10 at once filled the machine (up to 56 processes waiting for a
+  CPU), OSCAR answered its health check after more than 10 s and stopped
+  serving pages; 6 at once kept the load near 1.3 per CPU.
+- The first start set it to 6. **A database moved from the VPS keeps the
+  VPS's value** (section 6a of the Deployment Guide): set it again here.
+- Watch it in Grafana (section 8a), *OSCAR · Kubernetes*: *Load per CPU*
+  under about 1.5 and *CPU by run pod* tell whether to raise or lower it.
 
 ## 8. A test on the simulators
 
@@ -336,6 +345,7 @@ if you need it.
 | A file over 50 MB is refused with 413 | On purpose, as on the VPS (`overlays/k3s/middleware.yaml`). |
 | Runs end as *the run's pod did not start* | `sudo kubectl -n oscar-runs get events`: the run image cannot be pulled (`RUN_IMAGE`), or the quota is full. |
 | Every run fails at once, *the runner agent could not be reached* | The dispatcher is not running: `sudo kubectl -n oscar logs deploy/oscar-dispatcher`. |
+| During a large batch OSCAR's pages stop answering, or a second batch cannot be started | Too many runs at once for the machine's CPUs: OSCAR waits for a CPU and answers its health check late. `sudo kubectl -n oscar get events \| grep -i unhealthy` shows `Readiness probe failed … context deadline exceeded`. Lower *Max Concurrent Runs* to about one per vCPU (section 7). Manifests from before November 2026 took OSCAR out of service after 30 s of slow answers and restarted it after 90 s: pull and apply the overlay again. |
 | Runs of a large batch get 429 from the simulator | This machine's address is not trusted by the simulator (section 8). |
 | `kubectl`: *permission denied* on `/etc/rancher/k3s/k3s.yaml` | Use `sudo`: the kubeconfig is root's only, on purpose. |
 | `/grafana/` answers *restricted to administrators* (401) | Nobody is signed in to OSCAR in this browser, or not as an administrator: sign in to OSCAR first, then open Grafana. |
