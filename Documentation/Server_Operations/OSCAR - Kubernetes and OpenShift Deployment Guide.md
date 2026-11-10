@@ -476,6 +476,17 @@ Pod mode adds three things to the cluster:
   rather than refuses it. A run pod also sends its results again for about a
   minute while the server cannot take them (1.11.493).
 
+**How many runs at once.** A run pod costs more than a run in the `runner`
+container: Bruno takes 0.4 to 0.7 CPU while it starts (about 7 s of CPU),
+then about 0.25, and the node's kubelet and container runtime make and remove
+a pod per run. On one 6 vCPU machine (k3s, #1150), 10 and 20 at once filled
+the CPUs, and OSCAR answered its health check after more than 10 s; 6 at once
+held. Count about one run at a time per vCPU the run pods can use, and set
+*Max Concurrent Runs* from it (a database moved from a VPS keeps the VPS's
+value). The server requests a whole CPU, so it keeps its share when the runs
+fill a node, and its probes wait minutes before taking it out of its Service
+or restarting it.
+
 Network policies say who reaches what:
 - a run pod reaches DNS, OSCAR's internal port and public addresses (the
   providers), not the cluster's other services, not private or link-local

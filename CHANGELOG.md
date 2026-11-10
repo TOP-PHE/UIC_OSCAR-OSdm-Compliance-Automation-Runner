@@ -24,6 +24,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Section 3 reminds to run that check.
 
+- **Kubernetes: OSCAR stays in service under a large batch; about one run
+  per vCPU in pod mode** (#1150). Deployment files, tests and documentation
+  only. On the 6 vCPU k3s test machine, 20 and then 10 runs at once filled
+  the CPUs: the server, never throttled, waited for a CPU and answered
+  `/health` after more than 10 s, so its readiness probe took it out of its
+  Service (every page failed, a second batch could not be started) and its
+  liveness probe nearly restarted it, which loses the runs in progress. The
+  base Deployment's probes now wait minutes (readiness 15 s × 10, liveness
+  30 s × 10), and the server requests a whole CPU (limit 2), so it keeps its
+  share when the runs fill a node. The k3s guide's "about 2.5 runs per vCPU"
+  becomes about one (each run is a pod: Bruno's start takes 0.4 to 0.7 CPU,
+  then about 0.25, plus the pod's making and removal); the machine sizes, a
+  troubleshooting row, the Deployment Guide's pod mode section and *Metrics
+  & Monitoring* follow. A database moved from the VPS keeps the VPS's *Max
+  Concurrent Runs*, which the guides now say to lower.
+
 - **Monitoring for OSCAR on Kubernetes** (#1147). Deployment files, CI and
   documentation only. New `OSCAR_Deploy/kubernetes/monitoring/stack/` (k3s):
   the chart kube-prometheus-stack 92.13.1 (Prometheus, Alertmanager, Grafana,
