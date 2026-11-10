@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.532",
+  "current_release": "2026.533",
   "releases": [
     {
       "release": "2026.533",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.494: the Alertmanager configuration OSCAR writes from Server Config sends the Watchdog (an alert that always fires) and \"info\" alerts of a cluster's kube-prometheus-stack to no one; the VPS has none of them. With it, OSCAR on k3s from a backup, step by step (recovery or the move from the VPS: the release to run, the secrets, the data, the monitoring and the alerts' e-mail made from the restored Server Config). Listed, not released: current_release stays at 2026.532."
+        "Server 1.11.494: the Alertmanager configuration OSCAR writes from Server Config sends the Watchdog (an alert that always fires) and \"info\" alerts of a cluster's kube-prometheus-stack to no one; the VPS has none of them. With it, OSCAR on k3s from a backup, step by step (recovery or the move from the VPS: the release to run, the secrets, the data, the monitoring and the alerts' e-mail made from the restored Server Config).",
+        "Released with it (deployment files, tests and documentation; no other server or collection change): on Kubernetes the server's probes wait minutes before taking it out of service or restarting it, and it requests a whole CPU (limit 2), so a large batch no longer makes OSCAR's pages fail; the guides count about one run at a time per vCPU in pod mode (#1151). The k3s guide gives the firewall step by step, with a check from the PC (#1155). On the VPS nothing changes but the server image (1.11.494): its Alertmanager file only adds routes for alerts the VPS does not have."
       ]
     },
     {
