@@ -282,6 +282,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.494] — 2026-11-10
+
+Listed in `compatibility.json` (2026.533) without moving `current_release`.
+
+### Changed
+
+- **The Alertmanager configuration OSCAR writes from Server Config never
+  mails a cluster's Watchdog or "info" alerts.** On Kubernetes the
+  kube-prometheus-stack chart adds a Watchdog alert that always fires, and
+  alerts of severity `info` (a quota nearly full, CPU throttling): the file
+  `renderConfig()` writes now sends both to a receiver `null` that sends
+  nothing, as the cluster's `alertmanager.yaml.example` does
+  (`alertmanagerConfig.test.js` pins the two alike). The VPS has none of these
+  alerts, so its e-mails do not change.
+
+### Documentation
+
+- **OSCAR on k3s from a backup, step by step** (*OSCAR - k3s on one VPS*,
+  section 6a), for a recovery after the VPS is lost and for the move from the
+  VPS:
+  - open the archive on the machine;
+  - take the files and the images of the backup's release or a later one: the
+    k3s overlay in the files names an older one, and a database is never
+    loaded into an earlier release;
+  - make OSCAR's Secret with the backup's `ENCRYPTION_KEY` and `JWT_SECRET`;
+  - deploy without a first administrator, then `oscar-data.sh load`;
+  - set *Max Concurrent Runs*;
+  - set up the monitoring;
+  - check before anyone uses it;
+  - choose the name: the real one for a recovery, a test name while the VPS
+    runs, with what a copy of the production data reaches;
+  - clean up, and record the drill on the VPS.
+- **The alerts' e-mail moves with the database**: section 8a, step 1, now
+  makes Alertmanager's Secret from Admin → *Server Config*. The administrator
+  runs `renderConfig()` in OSCAR's container with `kubectl exec`, and the
+  server itself gets no right on the cluster. The example file stays the
+  other way. `kubernetes-monitoring.test.js` pins the guide's command to the
+  container's name, the image's path and the module's export.
+- The Deployment Guide's section 6a and *Disaster Recovery* point to it.
+
 ## [server-1.11.493] — 2026-11-09
 
 Listed in `compatibility.json` (2026.532) without moving `current_release`.

@@ -417,4 +417,20 @@ describe('the guide and the CI', () => {
   test('the guide names the chart version this folder pins', () => {
     expect(guide).toContain(`kube-prometheus-stack ${helmChart.spec.version}`);
   });
+
+  test('the guide makes Alertmanager\'s Secret from Server Config with the server\'s module, where the image puts it', () => {
+    // The restored database holds the VPS's mail server and recipients: the
+    // server's own renderConfig() writes the file, run by the administrator
+    // in OSCAR's container (the server gets no right on the cluster).
+    const m = /deploy\/oscar -c (\w+) -- node --no-warnings -e "console\.log = console\.error; process\.stdout\.write\(require\('\/app\/(src\/[^']+)'\)\.renderConfig\(\)\)"/.exec(guide);
+    expect(m).not.toBeNull();
+    const deployment = yaml.load(read('OSCAR_Deploy/kubernetes/base/deployment.yaml'));
+    expect(m[1]).toBe(deployment.spec.template.spec.containers[0].name);
+    const dockerfile = read('Oscar_Server/Dockerfile');
+    expect(dockerfile).toMatch(/^WORKDIR \/app$/m);
+    expect(dockerfile).toMatch(/^COPY src\/ src\/$/m);
+    expect(read(`Oscar_Server/${m[2]}.js`)).toMatch(/module\.exports = \{[^}]*\brenderConfig\b/);
+    // Then the Secret Alertmanager reads, by the name the chart is given.
+    expect(guide).toContain(`kubectl -n monitoring create secret generic ${values.alertmanager.alertmanagerSpec.configSecret} --from-file=alertmanager.yaml=`);
+  });
 });

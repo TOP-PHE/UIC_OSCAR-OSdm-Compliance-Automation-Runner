@@ -3828,6 +3828,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     memory figures on a run-shaped pod of its own. OSCAR's namespace `oscar`
     is now also written in the Alloy Role, `config.alloy`, the ServiceMonitor
     and the ForwardAuth address. Pinned by `kubernetes-monitoring.test.js`.
+    **Alertmanager's Secret is never written by the server** (maintainer,
+    2026-11-09: a Kubernetes right for the internet-facing server was
+    refused). Admin → *Alerting* → *Apply* writes the VPS's file only. On a
+    cluster the administrator makes the Secret from Server Config with
+    `kubectl exec … node -e "console.log = console.error; …renderConfig()"`
+    (k3s guide 8a step 1; `db.js` prints to stdout on load, hence the
+    redirect). Since 1.11.494 `renderConfig()` routes the chart's Watchdog
+    and `info` alerts to a `null` receiver, as the example file does.
+  - **OSCAR on k3s from a backup** (1.11.494, k3s guide section 6a): the
+    recovery and the move from the VPS. The k3s overlay in the repository
+    names an older release than production: a restore sets `newTag` and
+    `RUN_IMAGE` to the backup's `release_tag` (`manifest.json`) or later, and
+    checks out the same tag, never an earlier one.
   - Not tested on a real OpenShift yet.
 
 ## 3. OSCAR/OSDM conventions & terminology

@@ -32,6 +32,7 @@ Only Let's Encrypt is left out: the CI machine has no public name.
 | 4 | The runs' namespace |
 | 5 | OSCAR's namespace and secrets |
 | 6 | OSCAR |
+| 6a | Or: OSCAR from a backup (recovery, or the move from the VPS) |
 | 7 | First administrator, e-mail, parallel runs |
 | 8 | A test on the simulators |
 | 8a | Monitoring: Prometheus, Grafana, Loki |
@@ -213,7 +214,139 @@ curl -s "https://$HOST/health"
   certificate.
 - `/health` names the release and says `"compatibility_status": "tested"`.
 
+## 6a. Or: OSCAR from a backup (recovery, or the move from the VPS)
+
+To bring back an OSCAR that was lost, or to move the VPS's, from a backup
+([Disaster Recovery](OSCAR%20-%20Disaster%20Recovery.md)): do sections 1 to 4,
+then this section **instead of** sections 5 to 7. Everything that is in the
+database comes with it: companies, providers, users and their passwords,
+endpoints and credentials, Test Frameworks, findings, run history, and Admin
+→ *Server Config* (the mail server and the alert recipients included).
+
+**1. The backup on this machine.** Copy the archive here (`scp` from where it
+is kept), then open it in a folder only you can read: it holds the
+encryption key and every account's password hash. The passphrase is asked.
+
+```bash
+sudo apt-get install -y gnupg
+mkdir -m 700 ~/oscar-restore
+gpg --decrypt ~/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg | tar -xz -C ~/oscar-restore
+jq . ~/oscar-restore/manifest.json
+```
+
+`release_tag` is the release the backup was made with. **This machine runs
+that release or a later one, never an earlier one**: the first start migrates
+the database forward, and a migration is not undone.
+
+**2. The files of that release** (or a later one, the same in both commands):
+
+```bash
+cd /opt/oscar
+git fetch --tags origin
+git checkout release-YYYY.NNN
+```
+
+**3. OSCAR's secrets, with the backup's keys.** The same `ENCRYPTION_KEY`, or
+the stored credentials, data files and reports cannot be read; the same
+`JWT_SECRET`; a new `METRICS_TOKEN`; no `PLATFORM_BOOTSTRAP_TOKEN` (the
+administrators come with the database). If a value is between quotes in
+`.env`, remove them in `oscar-secrets.env` first.
+
+```bash
+cd /opt/oscar
+sudo kubectl create namespace oscar
+sudo kubectl label namespace oscar pod-security.kubernetes.io/enforce=restricted
+umask 077
+grep -E '^(ENCRYPTION_KEY|JWT_SECRET)=' ~/oscar-restore/.env > ~/oscar-secrets.env
+printf 'METRICS_TOKEN=%s\n' "$(openssl rand -hex 32)" >> ~/oscar-secrets.env
+sudo kubectl -n oscar create secret generic oscar-secrets --from-env-file="$HOME/oscar-secrets.env"
+sudo kubectl -n oscar create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
+shred -u ~/oscar-secrets.env
+```
+
+**4. OSCAR**, as in section 6, with the images of the release of step 2: the
+overlay in the files names an older one.
+
+```bash
+cd /opt/oscar
+cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
+HOST=oscar-test.example.org
+sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
+sed -i "s/release-[0-9]*\.[0-9]*/release-YYYY.NNN/" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+grep -n 'release-' OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
+sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
+```
+
+`grep` shows `newTag` and `RUN_IMAGE` both on that release. OSCAR starts with
+an empty database: **do not create an administrator**.
+
+**5. The data.** OSCAR stops for the copy, the database is checked against
+`manifest.json` (users, companies), then OSCAR starts again and migrates it:
+
+```bash
+cd /opt/oscar
+sudo OSCAR_Deploy/kubernetes/oscar-data.sh load ~/oscar-restore/data
+sudo kubectl -n oscar rollout status deployment/oscar --timeout=900s
+curl -s "https://$HOST/health"
+```
+
+`/health` names the release and says `"compatibility_status": "tested"`. A
+large database takes a few minutes to migrate at the first start. If the copy
+stops half-way, OSCAR stays stopped: run the load again.
+
+**6. Admin → *Server Config*.** Sign in with an administrator account of the
+backup.
+- **Max Concurrent Runs** is the VPS's: set it for this machine (section 7).
+- The mail server and the alert recipients are the VPS's: OSCAR's e-mails
+  (sign-in links, access requests) work at once, and their links name `$HOST`.
+- *Apply alerting config* writes the VPS's file only: on this machine the
+  alerts are configured in section 8a, from these same values.
+
+**7. Monitoring**: section 8a. At its step 1, make Alertmanager's
+configuration from *Server Config* (the first way there): the e-mail of the
+alerts is then the VPS's, with nothing typed again.
+
+**8. Check before anyone uses it.**
+- Sign in as a tester or Test Manager; open a company's Test Config (its data
+  file is read with the key).
+- Run one scenario on the simulator (the credentials are read with the key,
+  and a provider is reached).
+- In Grafana (section 8a), *OSCAR · Overview* shows the run.
+
+**9. The name and the addresses.**
+- **A real recovery:** point OSCAR's name (`oscar.uic.org`) at this machine,
+  and use it as `HOST` in steps 4 and 8a. Links already sent keep working.
+- **A test while the VPS still runs:** use a test name. This copy holds the
+  providers' real endpoints and the testers' credentials. A run here reaches
+  their systems from this machine's address: the providers that allow-list the
+  VPS refuse it. A provider that renews an OAuth token by rotating it may
+  sign the VPS out of it, until the tester saves the credentials there again.
+  The e-mails this copy sends go to the real users, with links to the test
+  name.
+- **The simulator** trusts the VPS's address only: add this machine's
+  ([OSCAR - OSDM Simulator](OSCAR%20-%20OSDM%20Simulator.md), section 7,
+  "Trusting the OSCAR server's address").
+
+**10. Clean up**, once the checks pass. The folder holds the key and every
+password hash:
+
+```bash
+rm -rf --one-file-system ~/oscar-restore
+```
+
+On the VPS, record the restore drill for the Admin Dashboard
+([Disaster Recovery](OSCAR%20-%20Disaster%20Recovery.md), section 5):
+`/opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup-status.sh drill`.
+
+**What does not come with a backup:** Prometheus's figures, Loki's logs and
+Grafana's users (made again at their first visit, as viewers), and the VPS's
+backup timer: this machine's backups are `oscar-data.sh save` (section 9).
+
 ## 7. First administrator, e-mail, parallel runs
+
+After section 6a, only *Parallel runs* below applies: the administrators and
+the mail server came with the backup.
 
 **First administrator.** With the bootstrap token from step 5 (password: at
 least 12 characters, upper and lower case, a digit):
@@ -270,11 +403,10 @@ without e-mail, nobody but the administrator can sign in.
 sudo kubectl -n oscar-runs get pods
 ```
 
-- **Do not load a copy of the production data here to run it.** It holds the
-  providers' real endpoints and the testers' credentials: the runs would go to
-  their systems from an address they do not know. Moving a VPS for good is
-  section 6a of the
-  [Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md).
+- **A copy of the production data (section 6a) runs against the providers'
+  real systems**: it holds their real endpoints and the testers' credentials,
+  and the runs would go to them from an address they do not know. Read step 9
+  of section 6a before running anything there.
 
 ## 8a. Monitoring
 
@@ -291,8 +423,34 @@ It takes about 1.5 GB of memory. Prometheus keeps 15 days (8 GB at most);
 Loki keeps the logs without limit, as on the VPS.
 
 **1. Alertmanager's configuration.** It holds the mail server's password, so
-it is a Secret of your own. Fill in the mail server and the administrators'
-address, then:
+it is a Secret of your own, made one of two ways.
+
+**From Admin → *Server Config***, when its *SMTP* and *Alerting* sections are
+filled in (always after section 6a: they are the VPS's). OSCAR writes the
+file from those values, as on the VPS, and you make it the Secret; the server
+itself gets no right on the cluster:
+
+```bash
+cd /opt/oscar
+sudo kubectl apply -f OSCAR_Deploy/kubernetes/monitoring/stack/namespace.yaml
+umask 077
+sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e "console.log = console.error; process.stdout.write(require('/app/src/utils/alertmanagerConfig').renderConfig())" > ~/alertmanager.yaml \
+  && sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml"
+shred -u ~/alertmanager.yaml
+```
+
+- "SMTP_HOST is empty" or "ALERT_RECIPIENTS is empty": fill that in Server
+  Config first (and nothing was created).
+- From server 1.11.494 the file sends the chart's Watchdog (an alert that
+  always fires) and its "info" alerts to no one; an earlier server's file
+  mails the Watchdog every 4 hours.
+- After a change in Server Config, run the same lines again, ending the
+  second command with `--dry-run=client -o yaml | sudo kubectl apply -f -`:
+  it replaces the Secret, and Alertmanager reads it again within a minute.
+  *Apply alerting config* on that page writes the VPS's file only.
+
+**Or by hand**, from the example: fill in the mail server and the
+administrators' address, then:
 
 ```bash
 cd /opt/oscar
@@ -363,7 +521,7 @@ On a managed cluster the provider does part of this. Here it is yours.
 | **A new OSCAR release** | when you choose | `git pull` (then `diff -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site` shows what moved besides your name), in `overlays/site/kustomization.yaml` set `newTag` and `RUN_IMAGE` to the release (its images are published a few minutes after it), then `sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site`. OSCAR stops while the new pod starts. Watchtower does not apply here. |
 | **A k3s update** | a patch about once a month, a new minor version about every 4 months (each is maintained about a year) | the install command of step 3 again, with the new `INSTALL_K3S_VERSION` (one minor version at a time). The settings stay. A minute without OSCAR. |
 | **k3s's own certificates** | they last a year | renewed when k3s starts within 90 days of their end: an update does it, otherwise `sudo systemctl restart k3s` once a year. |
-| **Backups** | as on the VPS | `sudo OSCAR_Deploy/kubernetes/oscar-data.sh save /root/oscar-save-$(date +%F)`: OSCAR stops for a minute, then the database, data files and reports are in that folder. Encrypt it and copy it off the machine. `ENCRYPTION_KEY` stays in your password manager. To restore: k3s, steps 4–6 with the same key, then `oscar-data.sh load <folder> --replace`. |
+| **Backups** | as on the VPS | `sudo OSCAR_Deploy/kubernetes/oscar-data.sh save /root/oscar-save-$(date +%F)`: OSCAR stops for a minute, then the database, data files and reports are in that folder. Encrypt it and copy it off the machine. `ENCRYPTION_KEY` stays in your password manager. To restore: section 6a from its step 2, with the key from your password manager (a saved folder has no `.env`) and `oscar-data.sh load <folder>`. |
 | **Disk** | now and then | `df -h /var/lib/rancher`. Old images are removed only near 85 % full; `sudo k3s crictl rmi --prune` removes the unused ones. |
 | **Logs** | when something is wrong | Grafana's *OSCAR · Logs* (section 8a), or `sudo kubectl -n oscar logs deploy/oscar`, `… logs deploy/oscar-dispatcher`, `sudo kubectl -n oscar-runs get events`, `sudo kubectl -n kube-system logs deploy/traefik`. |
 | **Monitoring** | after a `git pull` | `diff -r OSCAR_Deploy/kubernetes/monitoring/stack OSCAR_Deploy/kubernetes/monitoring/site` shows what moved besides your name (a new chart `version`, for instance): bring it into `monitoring/site`, then `sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site` and `sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar`. |
