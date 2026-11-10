@@ -108,12 +108,21 @@ route:
   group_interval:  5m
   repeat_interval: ${yq(repeatWarn)}
   routes:
+    # On Kubernetes the kube-prometheus-stack chart adds a Watchdog that
+    # always fires and "info" alerts: never mailed. The VPS has none of them.
+    - matchers:
+        - alertname =~ "Watchdog|InfoInhibitor"
+      receiver: 'null'
+    - matchers:
+        - severity = "info"
+      receiver: 'null'
     - matchers:
         - severity = "critical"
       receiver: oscar-admins
       repeat_interval: ${yq(repeatCrit)}
 
 receivers:
+  - name: 'null'
   - name: oscar-admins
     email_configs:
       - to: ${yq(recipientsList)}

@@ -116,6 +116,24 @@ describe('renderConfig — happy path', () => {
     expect(yaml).toContain('alertname = "OscarServerDown"');
     expect(yaml).toContain('severity = "warning"');
   });
+
+  // #1150: on Kubernetes the same file is made into Alertmanager's Secret
+  // (k3s guide, section 8a). The chart's Watchdog always fires and its
+  // "info" alerts are not for e-mail: both go to a receiver that sends
+  // nothing, as the cluster's example file says.
+  test('reads as YAML, and never mails the chart\'s Watchdog or "info" alerts', () => {
+    const jsYaml = require('js-yaml');
+    const cfg = jsYaml.load(am.renderConfig());
+    const routes = cfg.route.routes;
+    expect(routes[0]).toEqual({ matchers: ['alertname =~ "Watchdog|InfoInhibitor"'], receiver: 'null' });
+    expect(routes[1]).toEqual({ matchers: ['severity = "info"'], receiver: 'null' });
+    expect(routes[2]).toMatchObject({ matchers: ['severity = "critical"'], receiver: 'oscar-admins' });
+    expect(cfg.receivers.find(r => r.name === 'null')).toEqual({ name: 'null' });
+    expect(cfg.route.receiver).toBe('oscar-admins');
+    const example = jsYaml.load(fs.readFileSync(path.join(__dirname, '../../../OSCAR_Deploy/kubernetes/monitoring/alertmanager.yaml.example'), 'utf8'));
+    expect(routes.slice(0, 2)).toEqual(example.route.routes.slice(0, 2));
+    expect(cfg.inhibit_rules).toEqual(example.inhibit_rules);
+  });
 });
 
 describe('renderConfig — input cleanup', () => {

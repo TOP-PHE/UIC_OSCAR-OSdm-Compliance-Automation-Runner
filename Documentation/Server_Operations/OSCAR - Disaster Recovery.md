@@ -165,4 +165,8 @@ For a real failover you would instead point the production DNS at the new host.
   `OSCAR_Deploy/kubernetes/oscar-data.sh load`, and its `.env` gives the
   cluster's Secret its `ENCRYPTION_KEY` and `JWT_SECRET`
   ([Kubernetes and OpenShift Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md),
-  section 6a, the move from a VPS).
+  section 6a, the move from a VPS). On one machine with k3s,
+  [OSCAR - k3s on one VPS](OSCAR%20-%20k3s%20on%20one%20VPS.md), section 6a,
+  is the whole recovery step by step: the release to run, the secrets, the
+  data, the monitoring and the alerts' e-mail from the restored Server
+  Config, the checks and the name.

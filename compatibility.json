@@ -4,6 +4,17 @@
   "current_release": "2026.532",
   "releases": [
     {
+      "release": "2026.533",
+      "date": "2026-11-10",
+      "server": "1.11.494",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.494: the Alertmanager configuration OSCAR writes from Server Config sends the Watchdog (an alert that always fires) and \"info\" alerts of a cluster's kube-prometheus-stack to no one; the VPS has none of them. With it, OSCAR on k3s from a backup, step by step (recovery or the move from the VPS: the release to run, the secrets, the data, the monitoring and the alerts' e-mail made from the restored Server Config). Listed, not released: current_release stays at 2026.532."
+      ]
+    },
+    {
       "release": "2026.532",
       "date": "2026-11-09",
       "server": "1.11.493",
