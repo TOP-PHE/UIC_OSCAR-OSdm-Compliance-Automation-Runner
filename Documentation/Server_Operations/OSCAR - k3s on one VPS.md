@@ -46,6 +46,20 @@ Only Let's Encrypt is left out: the CI machine has no public name.
   **instead of** 5 to 7. Section 5 makes new keys, which cannot read a
   backup's data.
 
+**Your values.** The commands below need a few values of your own. In each
+block they are the **first lines, in capitals, marked `# ← yours`**: change
+them there, then paste the whole block. Nothing else in a block is to be
+changed (not even `oscar.example.org`, which a `sed` replaces for you). Each
+block sets them again, because a value is lost when the SSH session ends.
+
+| Value | What to put | Where to find it | Steps |
+|---|---|---|---|
+| `HOST` (`$HostName` in PowerShell) | the machine's DNS name, e.g. `oscar-test.example.org` | the A record of section 1, *The name* | 1, 6, 6a, 7, 8a |
+| `LE_EMAIL` | the e-mail Let's Encrypt writes to about the certificate | yours, or your team's | 3 |
+| `ARCHIVE` | the backup's file name, e.g. `oscar-backup-20261110-091500.tar.gz.gpg` | `ls ~/oscar-backups` on the VPS, or the folder that keeps the archives | 6a |
+| `RELEASE` | a release tag, e.g. `release-2026.533` | the backup's `release_tag` (6a step 1) or a later one ([releases](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/releases)) | 6a |
+| `ME` | your account on this machine: `root`, or the user you sign in with | how you connect with `ssh` | 6a |
+
 ## 1. The machine, its name and its firewall
 
 - **Ubuntu 24.04 LTS.** 4 vCPU and 8 GB at least. Each run is a pod of its
@@ -78,13 +92,13 @@ Encrypt and browsers would try IPv6 first. A new record takes a few minutes
 to be seen. Check it from your PC, in PowerShell:
 
 ```powershell
-Resolve-DnsName oscar-test.example.org -Type A
+$HostName = 'oscar-test.example.org'   # ← yours: the machine's DNS name
+Resolve-DnsName $HostName -Type A
 ```
 
 It must give the machine's address. **Everywhere below, `oscar-test.example.org`
-stands for your name**: in the firewall check, in `HOST=` (sections 6, 6a and
-8a), for the first administrator and in Grafana's address. Put yours each
-time. (`oscar.example.org`, without `-test`, is another thing: the name
+stands for your name**: in each `HOST=` (or `$HostName =`) line marked
+`# ← yours`, and in Grafana's address. Put yours each time. (`oscar.example.org`, without `-test`, is another thing: the name
 written in the deployment files, which section 6's `sed` replaces.)
 
 ### The firewall
@@ -119,10 +133,11 @@ server, GitHub, the image registries and Let's Encrypt from here.
 your machine's name. In PowerShell:
 
 ```powershell
-Test-NetConnection oscar-test.example.org -Port 443 -InformationLevel Quiet
-Test-NetConnection oscar-test.example.org -Port 6443 -InformationLevel Quiet
-Test-NetConnection oscar-test.example.org -Port 10250 -InformationLevel Quiet
-Test-NetConnection oscar-test.example.org -Port 9100 -InformationLevel Quiet
+$HostName = 'oscar-test.example.org'   # ← yours: the machine's DNS name
+Test-NetConnection $HostName -Port 443 -InformationLevel Quiet
+Test-NetConnection $HostName -Port 6443 -InformationLevel Quiet
+Test-NetConnection $HostName -Port 10250 -InformationLevel Quiet
+Test-NetConnection $HostName -Port 9100 -InformationLevel Quiet
 ```
 
 443 must answer `True`; 6443, 10250 and 9100 `False` (after a few seconds
@@ -181,16 +196,16 @@ On a machine that must use your organisation's own resolvers, ask its network
 team instead.
 
 Then put k3s's settings and Traefik's in place, and install the pinned k3s.
-Replace the e-mail address with the one Let's Encrypt writes to about your
-certificate:
+`LE_EMAIL` is the e-mail Let's Encrypt writes to about your certificate:
 
 ```bash
+LE_EMAIL=you@example.org        # ← yours: the e-mail for Let's Encrypt
 cd /opt/oscar
 sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
 sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
 if [ -f /etc/rancher/k3s/resolv.conf ]; then echo 'resolv-conf: /etc/rancher/k3s/resolv.conf' | sudo tee -a /etc/rancher/k3s/config.yaml; fi
 sudo cp OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
-sudo sed -i 's/CHANGE-ME@example.org/you@example.org/' /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+sudo sed -i "s/CHANGE-ME@example.org/$LE_EMAIL/" /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -
 ```
 
@@ -298,10 +313,11 @@ alone, so a later `git pull` never meets your changes), write your name in
 it, then deploy:
 
 ```bash
+HOST=oscar-test.example.org     # ← yours: the machine's DNS name
 cd /opt/oscar
 cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
-HOST=oscar-test.example.org
 sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
+grep -rn "example.org" OSCAR_Deploy/kubernetes/overlays/site
 sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
 sudo kubectl -n oscar rollout status deployment/oscar-dispatcher
 sudo kubectl -n oscar rollout status deployment/oscar
@@ -311,11 +327,11 @@ curl -s "https://$HOST/health"
 - **Change only the `HOST=` line**: your name (section 1, *The name*).
   `oscar.example.org` in the `sed` is not to be changed: it is the name
   written in the overlay's files (the Ingress's host, `APP_URL`,
-  `ALLOWED_REDIRECT_HOSTS`), and `sed` replaces it with `$HOST`. Before the
-  `apply`, `grep -rn example.org OSCAR_Deploy/kubernetes/overlays/site` prints
-  nothing.
-- `HOST` lasts as long as the SSH session: in a new one, type the `HOST=`
-  line again before a command that uses `$HOST`.
+  `ALLOWED_REDIRECT_HOSTS`), and `sed` replaces it with `$HOST`. The `grep`
+  prints nothing when every one was replaced.
+- `overlays/site` there already, from an earlier attempt: `cp` would put the
+  new copy inside it. Remove it first
+  (`rm -rf OSCAR_Deploy/kubernetes/overlays/site`).
 - [`overlays/k3s`](../../OSCAR_Deploy/kubernetes/overlays/k3s/) runs OSCAR in
   pod mode. Its images are the published ones of a release
   (`ghcr.io/top-phe/oscar` and `oscar-run`): `newTag` and `RUN_IMAGE` name the
@@ -348,25 +364,28 @@ section 5a, in full):
   much faster. On the VPS, as the user that runs the backups:
 
   ```bash
-  scp ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256 <user>@oscar-test.example.org:~/
+  ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: ls ~/oscar-backups
+  HOST=oscar-test.example.org                      # ← yours: this machine's DNS name
+  ME=root                                          # ← yours: your account on this machine
+  scp ~/oscar-backups/"$ARCHIVE" ~/oscar-backups/"$ARCHIVE".sha256 "$ME@$HOST":~/
   ```
-
-  `<user>` is your account on this machine.
 
 Check here that the copy is whole: the line must end with `OK` (`FAILED`:
 copy it again).
 
 ```bash
-echo "$(cat ~/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256)  $HOME/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg" | sha256sum -c -
+ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: the file copied here
+echo "$(cat ~/"$ARCHIVE".sha256)  $HOME/$ARCHIVE" | sha256sum -c -
 ```
 
 Then open it in a folder only you can read: it holds the encryption key and
 every account's password hash. The passphrase is asked.
 
 ```bash
+ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: the file copied here
 sudo apt-get install -y gnupg
 mkdir -m 700 ~/oscar-restore
-gpg --decrypt ~/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg | tar -xz -C ~/oscar-restore
+gpg --decrypt ~/"$ARCHIVE" | tar -xz -C ~/oscar-restore
 jq . ~/oscar-restore/manifest.json
 ```
 
@@ -374,13 +393,18 @@ jq . ~/oscar-restore/manifest.json
 that release or a later one, never an earlier one**: the first start migrates
 the database forward, and a migration is not undone.
 
-**2. The files of that release** (or a later one, the same in both commands):
+**2. The files of that release** (or a later one, the same in steps 2 and 4):
 
 ```bash
+RELEASE=release-YYYY.NNN        # ← yours: release_tag above, or a later release
 cd /opt/oscar
 git fetch --tags origin
-git checkout release-YYYY.NNN
+git checkout "$RELEASE"
 ```
+
+git answers *You are in 'detached HEAD' state*: normal, the files are pinned
+to that release and nothing is committed here. `git pull` does not work in
+that state: a later release is taken the same way (section 9).
 
 **3. OSCAR's secrets, with the backup's keys.** The same `ENCRYPTION_KEY`, or
 the stored credentials, data files and reports cannot be read; the same
@@ -417,33 +441,38 @@ two blocks again.
 overlay in the files names an older one.
 
 ```bash
+HOST=oscar-test.example.org     # ← yours: this machine's DNS name
+RELEASE=release-YYYY.NNN        # ← yours: the release of step 2
 cd /opt/oscar
+rm -rf OSCAR_Deploy/kubernetes/overlays/site
 cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
-HOST=oscar-test.example.org
 sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
-sed -i "s/release-[0-9]*\.[0-9]*/release-YYYY.NNN/" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
-grep -n 'release-' OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+sed -i "s/release-[0-9]*\.[0-9]*/$RELEASE/" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+grep -n "release-\|$HOST" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
 sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
 sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
 ```
 
-`HOST` and the first `sed` as in section 6 (change only the `HOST=` line; for
-a test while the VPS runs, a test name, step 9). `grep` shows `newTag` and
-`RUN_IMAGE` both on that release. OSCAR starts with an empty database: **do
-not create an administrator**.
-
-If section 6 was done here, `overlays/site` is there already and `cp` would
-put the new copy inside it: remove it first
-(`rm -rf OSCAR_Deploy/kubernetes/overlays/site`), then run the block.
+- `HOST` as in section 6 (for a test while the VPS runs, a test name, step 9).
+- The block starts again from the release's files (`rm -rf`, then `cp`), so
+  it can be run again after a mistake, and an `overlays/site` left by section
+  6 does not get in the way.
+- The `grep` shows your release twice (`newTag`, `RUN_IMAGE`) and your name
+  three times (`APP_URL`, `ALLOWED_REDIRECT_HOSTS`, the Ingress's host).
+  `YYYY` there means `RELEASE` was not changed: OSCAR then asks for an image
+  that does not exist, and the rollout waits (`0 of 1 updated replicas`,
+  then *exceeded its progress deadline*). Change the line and run the block
+  again.
+- OSCAR starts with an empty database: **do not create an administrator**.
 
 **5. The data.** OSCAR stops for the copy, the database is checked against
 `manifest.json` (users, companies), then OSCAR starts again and migrates it:
 
 ```bash
+HOST=oscar-test.example.org     # ← yours: this machine's DNS name
 cd /opt/oscar
 sudo OSCAR_Deploy/kubernetes/oscar-data.sh load ~/oscar-restore/data
 sudo kubectl -n oscar rollout status deployment/oscar --timeout=900s
-HOST=oscar-test.example.org
 curl -s "https://$HOST/health"
 ```
 
@@ -510,18 +539,27 @@ backup timer: this machine's backups are `oscar-data.sh save` (section 9).
 After section 6a, only *Parallel runs* below applies: the administrators and
 the mail server came with the backup.
 
-**First administrator.** With the bootstrap token from step 5 (password: at
-least 12 characters, upper and lower case, a digit):
+**First administrator.** With the bootstrap token from step 5. First the
+password, on its own (it is not shown, nor kept in the shell's history; at
+least 12 characters, upper and lower case, a digit). Paste this line alone,
+type the password, then Enter:
 
 ```bash
-curl -X POST https://oscar-test.example.org/v1/auth/bootstrap/platform-user \
-  -H 'Content-Type: application/json' \
-  -H 'X-Platform-Bootstrap-Token: PASTE_PLATFORM_BOOTSTRAP_TOKEN_HERE' \
-  -d '{
-    "email":    "you@example.org",
-    "password": "ChooseAStrongPasswordHere123!",
-    "role":     "administrator"
-  }'
+read -rs -p 'Administrator password: ' ADMIN_PASSWORD; echo
+```
+
+Then:
+
+```bash
+HOST=oscar-test.example.org                          # ← yours: the machine's DNS name
+BOOTSTRAP_TOKEN=PASTE_PLATFORM_BOOTSTRAP_TOKEN_HERE  # ← yours: PLATFORM_BOOTSTRAP_TOKEN of step 5
+ADMIN_EMAIL=you@example.org                          # ← yours: the administrator's e-mail
+jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email: $email, password: $password, role: "administrator"}' \
+  | curl -X POST "https://$HOST/v1/auth/bootstrap/platform-user" \
+      -H 'Content-Type: application/json' \
+      -H "X-Platform-Bootstrap-Token: $BOOTSTRAP_TOKEN" \
+      --data-binary @-
+unset ADMIN_PASSWORD BOOTSTRAP_TOKEN
 ```
 
 Then remove the token from the Secret, so it cannot be used again:
@@ -629,11 +667,18 @@ line; `oscar.example.org` is the name written in the stack's files (Grafana's
 domain, its address and its Ingress), which `sed` replaces:
 
 ```bash
+HOST=oscar-test.example.org     # ← yours: the machine's DNS name
+cd /opt/oscar
 cp -r OSCAR_Deploy/kubernetes/monitoring/stack OSCAR_Deploy/kubernetes/monitoring/site
-HOST=oscar-test.example.org
 sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/monitoring/site/kube-prometheus-stack.yaml OSCAR_Deploy/kubernetes/monitoring/site/grafana-ingress.yaml
+grep -rn "example.org" OSCAR_Deploy/kubernetes/monitoring/site
 sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site
 ```
+
+The `grep` prints nothing when every name was replaced. `monitoring/site`
+there already, from an earlier attempt: remove it first
+(`rm -rf OSCAR_Deploy/kubernetes/monitoring/site`), or `cp` puts the copy
+inside it.
 
 **3. What OSCAR adds**, once the chart is in (a few minutes: the first loop
 waits for it):
@@ -682,7 +727,7 @@ On a managed cluster the provider does part of this. Here it is yours.
 
 | What | When | How |
 |---|---|---|
-| **A new OSCAR release** | when you choose | `git pull` (then `diff -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site` shows what moved besides your name), in `overlays/site/kustomization.yaml` set `newTag` and `RUN_IMAGE` to the release (its images are published a few minutes after it), then `sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site`. OSCAR stops while the new pod starts. Watchtower does not apply here. |
+| **A new OSCAR release** | when you choose | `git pull`, or after 6a (the files on a release tag, *detached HEAD*) `git fetch --tags origin` then `git checkout release-YYYY.NNN` with the new release (then `diff -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site` shows what moved besides your name), in `overlays/site/kustomization.yaml` set `newTag` and `RUN_IMAGE` to the release (its images are published a few minutes after it), then `sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site`. OSCAR stops while the new pod starts. Watchtower does not apply here. |
 | **A k3s update** | a patch about once a month, a new minor version about every 4 months (each is maintained about a year) | the install command of step 3 again, with the new `INSTALL_K3S_VERSION` (one minor version at a time). The settings stay. A minute without OSCAR. |
 | **k3s's own certificates** | they last a year | renewed when k3s starts within 90 days of their end: an update does it, otherwise `sudo systemctl restart k3s` once a year. |
 | **Backups** | as on the VPS | `sudo OSCAR_Deploy/kubernetes/oscar-data.sh save /root/oscar-save-$(date +%F)`: OSCAR stops for a minute, then the database, data files and reports are in that folder. Encrypt it and copy it off the machine. `ENCRYPTION_KEY` stays in your password manager. To restore: section 6a from its step 2, with the key from your password manager (a saved folder has no `.env`) and `oscar-data.sh load <folder>`. |
