@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS: the firewall, step by step.** Documentation only. Section
+  1 of *OSCAR - k3s on one VPS* said in one line to allow only ports 22, 80
+  and 443 in the host's firewall. It now says:
+  - what each port is for, and that everything else is blocked: 6443 (k3s's
+    API), 10250 (the kubelet), 9100 (the machine's exporter);
+  - that outbound stays open;
+  - how to set it at Contabo, and its name at OVHcloud and Hetzner;
+  - why Ubuntu's ufw stays off;
+  - how to check it from the PC once k3s runs (`Test-NetConnection` on 443,
+    6443, 10250 and 9100, or `nc`).
+
+  Section 3 reminds to run that check.
+
 - **Monitoring for OSCAR on Kubernetes** (#1147). Deployment files, CI and
   documentation only. New `OSCAR_Deploy/kubernetes/monitoring/stack/` (k3s):
   the chart kube-prometheus-stack 92.13.1 (Prometheus, Alertmanager, Grafana,

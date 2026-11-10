@@ -47,15 +47,56 @@ Only Let's Encrypt is left out: the CI machine has no public name.
   this machine.
 - **A DNS name** (an A record) pointing at the machine, *before* step 6: Let's
   Encrypt checks it. Below it is `oscar-test.example.org`; use yours.
-- **The hosting provider's firewall: inbound 22, 80 and 443 only.** k3s's API
-  (6443) and its kubelet (10250) must not be reachable from the internet. k3s
-  recommends turning Ubuntu's own firewall off (`sudo ufw disable`): its rules
-  get in the way of the pods' traffic.
+- **A firewall in front of the machine: inbound 22, 80 and 443 only**, set
+  before section 3 (below).
 - The tools this document uses:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git jq openssl curl
 ```
+
+### The firewall
+
+Set it **before section 3**. From its first start k3s listens on every
+address: its API (port 6443) gives every right on the cluster to whoever
+holds a token, and its kubelet (10250) runs commands in the pods. Use the
+**hosting provider's firewall**, which filters the traffic before it reaches
+the machine:
+
+| Inbound | From | What for |
+|---|---|---|
+| TCP 22 | your own addresses if they are fixed, else anywhere | SSH |
+| TCP 80 | anywhere | http, which Traefik sends to https |
+| TCP 443 | anywhere | OSCAR and Grafana; Let's Encrypt checks the certificate there |
+| anything else | **blocked** | among them 6443 (k3s's API), 10250 (the kubelet), 9100 (the machine's exporter, section 8a) |
+
+Outbound stays open: OSCAR reaches the providers, the simulator, the mail
+server, GitHub, the image registries and Let's Encrypt from here.
+
+- **Contabo**: customer panel → *Network* → *Firewall* → create a firewall
+  with three inbound rules, TCP 22, 80 and 443, every other inbound traffic
+  blocked; then assign it to the VPS. Other hosts have the same under another
+  name (OVHcloud: the *Edge Network Firewall* of the machine's IP; Hetzner:
+  *Firewalls*).
+- **Ubuntu's own firewall stays off**: `sudo ufw disable`. k3s advises it,
+  because ufw's rules get in the way of the pods' traffic. If your host has no
+  firewall of its own, choose one that does: a firewall on the machine itself
+  must let the pods' networks through, which this guide does not cover.
+
+**Check it from your PC** once k3s and Traefik run (end of section 3), with
+your machine's name. In PowerShell:
+
+```powershell
+Test-NetConnection oscar-test.example.org -Port 443 -InformationLevel Quiet
+Test-NetConnection oscar-test.example.org -Port 6443 -InformationLevel Quiet
+Test-NetConnection oscar-test.example.org -Port 10250 -InformationLevel Quiet
+Test-NetConnection oscar-test.example.org -Port 9100 -InformationLevel Quiet
+```
+
+443 must answer `True`; 6443, 10250 and 9100 `False` (after a few seconds
+each). From Linux or macOS: `nc -zv -w 5 oscar-test.example.org 6443` must
+fail. A `True` on any of the last three: the firewall is not applied to this
+machine, or lets that port through.
 
 ## 2. The files
 
@@ -104,6 +145,9 @@ sudo kubectl -n kube-system rollout status deployment/traefik
 
 `kubectl` is k3s itself, which reads `/etc/rancher/k3s/k3s.yaml`. If another
 `kubectl` was already installed, write `sudo k3s kubectl` instead.
+
+Then check the firewall from your PC (section 1, *Check it from your PC*):
+443 open, 6443 and 10250 closed.
 
 **Why Traefik and not ingress-nginx:** the community ingress-nginx stopped
 being maintained in March 2026 (no more security fixes). Traefik is the one
