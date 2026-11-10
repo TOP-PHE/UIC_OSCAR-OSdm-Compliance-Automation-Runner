@@ -1378,6 +1378,47 @@ function configInputType(isSensitive, isNum) {
   return isNum ? 'number' : 'text';
 }
 
+// How Alertmanager gets the SMTP and Alerting values (#1175): 'file' on the
+// VPS (the Apply button writes its file), 'kubernetes' on a cluster, where
+// the administrator makes its Secret with the commands the server gives.
+let _alertingMode = 'file';
+
+// The SMTP section's note on Alertmanager.
+function smtpAlertingNote(mode) {
+  const how = mode === 'kubernetes'
+    ? 'once given to Alertmanager with the commands of the Alerting section below'
+    : 'after you click "Apply" in the Alerting section below';
+  return '💡 <strong>One SMTP for everything.</strong> These credentials are used by OSCAR for password-reset / email-verification emails AND by Alertmanager for admin alerts (' + how + '). One source of truth — no separate VPS file edits.';
+}
+
+// The Alerting section's opening line and its end: the Apply button, or on
+// Kubernetes the commands (escaped: they are shown, never run here).
+function alertingParts(mode, commands) {
+  if (mode === 'kubernetes') {
+    return {
+      intro: 'Saving these values does NOT push them to Alertmanager. On Kubernetes OSCAR does not write its configuration: it has no right on the cluster, on purpose.',
+      end: '<div style="font-size:12px;color:#546e7a;margin:14px 0 6px">After saving, give these values (and the SMTP ones) to Alertmanager on the machine, as root: the same lines the first time and after every change. Alertmanager reads them again within a minute. Guide <em>OSCAR - k3s on one VPS</em>, section 8a, step 1.</div>' +
+        '<pre id="alertmanager-commands" style="margin:0 0 14px;padding:12px;border-radius:6px;background:#eceff1;color:#263238;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere">' + esc(commands || '') + '</pre>'
+    };
+  }
+  return {
+    intro: 'Saving these values does NOT automatically push them to Alertmanager — that requires writing the YAML and reloading. Use the button below after editing.',
+    end: '<div style="margin:14px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+      '<button class="btn btn-primary" id="btn-apply-alertmanager" style="background:#bf360c">⚡ Apply alerting config to Alertmanager</button>' +
+      '<span style="font-size:12px;color:#78909c">Templates <code>alertmanager.yml</code> from these values, writes it to the shared volume, hot-reloads Alertmanager. No SSH, no VPS edits.</span>' +
+      '</div>' +
+      '<pre id="apply-alertmanager-result" style="margin-top:6px;padding:12px;border-radius:6px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;display:none"></pre>'
+  };
+}
+
+// What a successful save says about Alertmanager.
+function savedConfigMessage(mode) {
+  const next = mode === 'kubernetes'
+    ? 'For SMTP or Alerting changes, run the commands of the Alerting section on the machine.'
+    : 'For Alerting changes, click "Apply alerting config" below.';
+  return 'Configuration saved — changes take effect immediately. (' + next + ')';
+}
+
 async function loadConfig() {
   const res = await fetch('/v1/admin/config', { headers: authHeaders });
   if (!res.ok) { showMsg('Failed to load config', false); return; }
@@ -1386,6 +1427,7 @@ async function loadConfig() {
 
   // Server info cards
   const si = data.server_info;
+  _alertingMode = si.alerting_mode === 'kubernetes' ? 'kubernetes' : 'file';
   document.getElementById('server-info-grid').innerHTML = [
     { n: si.version, l: 'Version' },
     { n: si.node_version, l: 'Node.js' },
@@ -1441,17 +1483,14 @@ async function loadConfig() {
   }
   html += '<div style="font-size:13px;font-weight:700;color:#0090D4;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 10px;padding-top:14px;border-top:1px solid #eceff1">SMTP / Email Settings</div>';
   html += '<div style="font-size:12px;color:#78909c;margin-bottom:14px;padding:10px 14px;background:#f5fcff;border-left:3px solid #0090D4;border-radius:4px">' +
-    '💡 <strong>One SMTP for everything.</strong> These credentials are used by OSCAR for password-reset / email-verification emails AND by Alertmanager for admin alerts (after you click "Apply" in the Alerting section below). One source of truth — no separate VPS file edits.</div>';
+    smtpAlertingNote(_alertingMode) + '</div>';
   html += smtpKeys.map(configRow).join('');
   if (alertingKeys.length) {
+    const alerting = alertingParts(_alertingMode, si.alerting_commands);
     html += '<div style="font-size:13px;font-weight:700;color:#bf360c;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 10px;padding-top:14px;border-top:1px solid #eceff1">🔔 Alerting</div>';
-    html += '<div style="font-size:12px;color:#78909c;margin-bottom:14px">Saving these values does NOT automatically push them to Alertmanager — that requires writing the YAML and reloading. Use the button below after editing.</div>';
+    html += '<div style="font-size:12px;color:#78909c;margin-bottom:14px">' + alerting.intro + '</div>';
     html += alertingKeys.map(configRow).join('');
-    html += '<div style="margin:14px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
-      '<button class="btn btn-primary" id="btn-apply-alertmanager" style="background:#bf360c">⚡ Apply alerting config to Alertmanager</button>' +
-      '<span style="font-size:12px;color:#78909c">Templates <code>alertmanager.yml</code> from these values, writes it to the shared volume, hot-reloads Alertmanager. No SSH, no VPS edits.</span>' +
-      '</div>' +
-      '<pre id="apply-alertmanager-result" style="margin-top:6px;padding:12px;border-radius:6px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;display:none"></pre>';
+    html += alerting.end;
   }
   document.getElementById('config-form').innerHTML = html;
 
@@ -1535,7 +1574,7 @@ async function saveConfig() {
     const warnText = data.warnings.map(w => `${w.key}: ${w.message}`).join('\n\n');
     showMsg('Saved — but please review:\n\n' + warnText, false);
   } else {
-    showMsg('Configuration saved — changes take effect immediately. (For Alerting changes, click "Apply alerting config" below.)', true);
+    showMsg(savedConfigMessage(_alertingMode), true);
   }
   _configCache = data.config;
 }

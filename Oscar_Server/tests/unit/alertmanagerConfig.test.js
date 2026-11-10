@@ -264,7 +264,7 @@ describe('applyConfig — orchestration', () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true, status: 200, text: async () => ''
     });
-    const r = await am.applyConfig();
+    const r = await am.applyConfig({});
     expect(r.ok).toBe(true);
     expect(r.written).toBe(true);
     expect(r.reloaded).toBe(true);
@@ -277,7 +277,7 @@ describe('applyConfig — orchestration', () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false, status: 503, text: async () => 'service unavailable'
     });
-    const r = await am.applyConfig();
+    const r = await am.applyConfig({});
     expect(r.ok).toBe(false);
     expect(r.written).toBe(true);
     expect(r.reloaded).toBe(false);
@@ -288,7 +288,7 @@ describe('applyConfig — orchestration', () => {
   test('render fails (missing config) → ok=false, written=false, error surfaces the reason', async () => {
     clearConfig('SMTP_HOST');
     setConfig('SMTP_HOST', '');
-    const r = await am.applyConfig();
+    const r = await am.applyConfig({});
     expect(r.ok).toBe(false);
     expect(r.written).toBe(false);
     expect(r.reloaded).toBe(false);
@@ -300,7 +300,7 @@ describe('applyConfig — orchestration', () => {
     jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {
       throw new Error('EROFS: read-only file system');
     });
-    const r = await am.applyConfig();
+    const r = await am.applyConfig({});
     expect(r.ok).toBe(false);
     expect(r.written).toBe(false);
     expect(r.error).toMatch(/Could not write/);
@@ -311,8 +311,48 @@ describe('applyConfig — orchestration', () => {
     jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
     global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' });
-    const r = await am.applyConfig();
+    const r = await am.applyConfig({});
     expect(r.configPath).toBe(am.CONFIG_PATH);
     expect(r.reloadUrl).toBe(am.RELOAD_URL);
+  });
+});
+
+// ── #1175: on Kubernetes, nothing to write ────────────────────────────────────
+// Alertmanager's configuration is a Secret there, and the server has no right
+// on the cluster: the administrator runs the commands, which the guide gives too.
+
+describe('alertingMode', () => {
+  test('a Kubernetes pod without a file path named is "kubernetes"', () => {
+    expect(am.alertingMode({ KUBERNETES_SERVICE_HOST: '10.43.0.1' })).toBe('kubernetes');
+  });
+
+  test('the VPS, or a file path named wherever the server runs, is "file"', () => {
+    expect(am.alertingMode({})).toBe('file');
+    expect(am.alertingMode({ ALERTMANAGER_CONFIG_PATH: '/etc/oscar-managed/alertmanager.yml' })).toBe('file');
+    expect(am.alertingMode({ KUBERNETES_SERVICE_HOST: '10.43.0.1', ALERTMANAGER_CONFIG_PATH: '/x/alertmanager.yml' })).toBe('file');
+  });
+});
+
+describe('applyConfig — on Kubernetes', () => {
+  test('writes nothing, reloads nothing, and gives the commands instead', async () => {
+    const write = jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+    global.fetch = jest.fn();
+    const r = await am.applyConfig({ KUBERNETES_SERVICE_HOST: '10.43.0.1' });
+    expect(write).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ ok: false, mode: 'kubernetes', written: false, reloaded: false, configPath: null, reloadUrl: null });
+    expect(r.error).toBe(am.KUBERNETES_TEXT);
+    expect(r.commands).toBe(am.KUBERNETES_COMMANDS);
+  });
+
+  test('the commands make the Secret the chart reads from this module, the same the first time and after a change', () => {
+    const lines = am.KUBERNETES_COMMANDS.split('\n');
+    expect(lines[0]).toBe('umask 077');
+    expect(lines[1]).toContain("require('/app/src/utils/alertmanagerConfig').renderConfig()");
+    expect(lines[1].endsWith(' \\')).toBe(true);
+    // create … --dry-run | apply: creates the Secret, or replaces it.
+    expect(lines[2]).toMatch(/^ {2}&& sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager\.yaml="\$HOME\/alertmanager\.yaml" --dry-run=client -o yaml \| sudo kubectl apply -f -$/);
+    expect(lines[3]).toBe('shred -u ~/alertmanager.yaml');
+    expect(lines).toHaveLength(4);
   });
 });

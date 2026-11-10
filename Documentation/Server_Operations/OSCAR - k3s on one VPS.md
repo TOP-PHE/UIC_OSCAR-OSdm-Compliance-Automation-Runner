@@ -532,14 +532,18 @@ deployment "oscar" successfully rolled out
 **6. Admin → *Server Config*.** Sign in with an administrator account of the
 backup.
 - **Max Concurrent Runs** is the VPS's: set it for this machine (section 7).
-- The mail server and the alert recipients are the VPS's: OSCAR's e-mails
-  (sign-in links, access requests) work at once, and their links name `$HOST`.
-- *Apply alerting config* writes the VPS's file only: on this machine the
-  alerts are configured in section 8a, from these same values.
+- **SMTP and Alerting: nothing to change.** They are the VPS's: the mail
+  server, the alert recipients, how often an alert is sent again. OSCAR's
+  e-mails (sign-in links, access requests) work at once, and their links name
+  `$HOST`. Alertmanager gets the same values at step 7.
+- **Do not click *Apply alerting config***: it writes the VPS's file, which
+  nothing reads here. From server 1.11.495 the page shows, on this machine,
+  the commands of step 7 in its place.
 
-**7. Monitoring**: section 8a. At its step 1, make Alertmanager's
-configuration from *Server Config* (the first way there): the e-mail of the
-alerts is then the VPS's, with nothing typed again.
+**7. Monitoring**: section 8a, steps 1 to 5. Its step 1, *From Admin →
+Server Config*, gives Alertmanager the values of step 6: the same alerts, to
+the same people, as on the VPS, with nothing typed again. Its step 5 sends a
+test alert, which must reach them.
 
 **8. Check before anyone uses it.**
 - Sign in as a tester or Test Manager; open a company's Test Config (its data
@@ -547,6 +551,7 @@ alerts is then the VPS's, with nothing typed again.
 - Run one scenario on the simulator (the credentials are read with the key,
   and a provider is reached).
 - In Grafana (section 8a), *OSCAR · Overview* shows the run.
+- The test alert of section 8a, step 5, reached the alert recipients.
 
 **9. The name and the addresses.**
 - **A real recovery:** point OSCAR's name (`oscar.uic.org`) at this machine,
@@ -672,26 +677,35 @@ it is a Secret of your own, made one of two ways.
 **From Admin → *Server Config***, when its *SMTP* and *Alerting* sections are
 filled in (always after section 6a: they are the VPS's). OSCAR writes the
 file from those values, as on the VPS, and you make it the Secret; the server
-itself gets no right on the cluster:
+itself gets no right on the cluster. First the namespace:
 
 ```bash
 cd /opt/oscar
 sudo kubectl apply -f OSCAR_Deploy/kubernetes/monitoring/stack/namespace.yaml
+```
+
+Then the Secret. These lines are the same the first time and after every
+change of *SMTP* or *Alerting* in Server Config; from server 1.11.495 the page
+shows them too, at the end of its *Alerting* section:
+
+```bash
 umask 077
 sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e "console.log = console.error; process.stdout.write(require('/app/src/utils/alertmanagerConfig').renderConfig())" > ~/alertmanager.yaml \
-  && sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml"
+  && sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml" --dry-run=client -o yaml | sudo kubectl apply -f -
 shred -u ~/alertmanager.yaml
 ```
 
+- It prints `secret/oscar-alertmanager created` the first time, `configured`
+  after a change; Alertmanager reads a change within a minute. A Secret made
+  by an earlier version of this step gives, once, a warning about a missing
+  annotation: harmless.
 - "SMTP_HOST is empty" or "ALERT_RECIPIENTS is empty": fill that in Server
-  Config first (and nothing was created).
+  Config first (nothing was created).
 - From server 1.11.494 the file sends the chart's Watchdog (an alert that
   always fires) and its "info" alerts to no one; an earlier server's file
   mails the Watchdog every 4 hours.
-- After a change in Server Config, run the same lines again, ending the
-  second command with `--dry-run=client -o yaml | sudo kubectl apply -f -`:
-  it replaces the Secret, and Alertmanager reads it again within a minute.
-  *Apply alerting config* on that page writes the VPS's file only.
+- *Apply alerting config* on that page writes the VPS's file: never needed
+  here.
 
 **Or by hand**, from the example: fill in the mail server and the
 administrators' address, then:
@@ -752,9 +766,9 @@ What differs from the VPS:
   OSCAR's pods (the server and the dispatcher).
 - **Alerts.** The VPS's, two more for the run pods (`OscarRunPodNearMemoryLimit`,
   `OscarRunPodOutOfMemory`: raise `RUN_MEMORY_LIMIT`), and the chart's own
-  (a pod that does not start, the disk, the memory). Admin → *Alerting* →
-  *Apply* writes the VPS's file only: here the mail comes from the Secret. To
-  change it, edit a copy of the example again, then
+  (a pod that does not start, the disk, the memory). The mail comes from the
+  Secret of step 1: after a change in Server Config, run step 1's lines
+  again. A Secret made by hand: edit a copy of the example again, then
   `sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml" --dry-run=client -o yaml | sudo kubectl apply -f -`.
 - **Prometheus's and Alertmanager's pages are not published.** To look at
   them: `sudo kubectl -n monitoring port-forward service/kube-prometheus-stack-prometheus 9090`
@@ -764,6 +778,23 @@ What differs from the VPS:
   nor the run pods reach Grafana, Prometheus, Alertmanager or Loki (network
   policies). The machine's exporter listens on port 9100 of the host, and
   answers Prometheus's account only.
+
+**5. A test alert**, to see the e-mail arrive. Step 3's `get pods` must show
+`alertmanager-kube-prometheus-stack-alertmanager-0` `2/2 Running` first.
+
+```bash
+sudo kubectl -n monitoring exec statefulset/alertmanager-kube-prometheus-stack-alertmanager -c alertmanager -- amtool alert add alertname=OscarTestAlert severity=critical --annotation=summary='Test alert from this machine' --alertmanager.url=http://localhost:9093
+```
+
+- Within a minute every *Alert Recipient* of Server Config gets
+  `[OSCAR FIRING] OscarTestAlert`, and 5 to 10 minutes later
+  `[OSCAR RESOLVED] OscarTestAlert`.
+- No e-mail after 2 minutes:
+  `sudo kubectl -n monitoring logs statefulset/alertmanager-kube-prometheus-stack-alertmanager -c alertmanager --tail=20`
+  gives the mail server's answer (a wrong password, a sender the relay does
+  not accept, a recipient refused). Correct it in Server Config, run step 1's
+  lines again, wait a minute, then send the test alert again. *Send Test
+  Email* on that page checks the same mail server from OSCAR.
 
 ## 9. Looking after it
 

@@ -37,6 +37,34 @@ const { getConfig } = require('../db/db');
 const CONFIG_PATH = process.env.ALERTMANAGER_CONFIG_PATH || '/etc/oscar-managed/alertmanager.yml';
 const RELOAD_URL  = process.env.ALERTMANAGER_RELOAD_URL  || 'http://alertmanager:9093/-/reload';
 
+// On Kubernetes, Alertmanager's configuration is a Secret
+// (OSCAR_Deploy/kubernetes/monitoring), and the server has no right on the
+// cluster, on purpose: the administrator makes the Secret from these values
+// with these lines, the same the first time and after a change (#1175). The
+// k3s guide, section 8a step 1, gives the same lines
+// (kubernetes-monitoring.test.js pins them alike).
+const KUBERNETES_COMMANDS = [
+  'umask 077',
+  'sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e "console.log = console.error; process.stdout.write(require(\'/app/src/utils/alertmanagerConfig\').renderConfig())" > ~/alertmanager.yaml \\',
+  '  && sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml" --dry-run=client -o yaml | sudo kubectl apply -f -',
+  'shred -u ~/alertmanager.yaml'
+].join('\n');
+
+const KUBERNETES_TEXT = 'On Kubernetes, Alertmanager\'s configuration is a Secret, and OSCAR has no right on the cluster (on purpose): nothing was written. '
+  + 'Make the Secret from these values on the machine, as root, with the commands below (guide "OSCAR - k3s on one VPS", section 8a, step 1). '
+  + 'Alertmanager reads it again within a minute.';
+
+/**
+ * How Alertmanager gets its configuration here: 'file' (the VPS: a file on a
+ * shared volume, then a reload) or 'kubernetes' (a Secret the administrator
+ * makes). A file path named in the settings keeps the file, wherever the
+ * server runs; otherwise every Kubernetes pod has KUBERNETES_SERVICE_HOST.
+ */
+function alertingMode(env = process.env) {
+  if (env.ALERTMANAGER_CONFIG_PATH) return 'file';
+  return env.KUBERNETES_SERVICE_HOST ? 'kubernetes' : 'file';
+}
+
 /**
  * YAML scalar quoting — wraps in single quotes and escapes embedded single
  * quotes by doubling them (the YAML 1.2 escape rule for single-quoted scalars).
@@ -178,9 +206,10 @@ async function reload() {
  * so the admin UI can show the user exactly what happened (and what to
  * do if any step partially fails).
  */
-async function applyConfig() {
+async function applyConfig(env = process.env) {
   const out = {
     ok: false,
+    mode: 'file',
     written: false,
     reloaded: false,
     configPath: CONFIG_PATH,
@@ -189,6 +218,11 @@ async function applyConfig() {
     reloadBody: null,
     error: null
   };
+
+  // Nothing to write to and nothing to reload: say what to do instead.
+  if (alertingMode(env) === 'kubernetes') {
+    return { ...out, mode: 'kubernetes', configPath: null, reloadUrl: null, error: KUBERNETES_TEXT, commands: KUBERNETES_COMMANDS };
+  }
 
   let yaml;
   try { yaml = renderConfig(); }
@@ -216,6 +250,9 @@ module.exports = {
   writeConfig,
   reload,
   applyConfig,
+  alertingMode,
   CONFIG_PATH,
   RELOAD_URL,
+  KUBERNETES_COMMANDS,
+  KUBERNETES_TEXT,
 };

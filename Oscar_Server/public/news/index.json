@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-10-alerting-on-kubernetes",
+    "date": "November 10, 2026",
+    "tag": "Operations",
+    "title": "On Kubernetes, Server Config shows how alerts reach Alertmanager",
+    "summary": "For OSCAR administrators on a Kubernetes or OpenShift cluster: the Alerting section of Server Config now shows the commands that give its values to Alertmanager, instead of a button that only works on the VPS.",
+    "content": "On a cluster, Alertmanager reads its settings from a Kubernetes Secret, and OSCAR has no right on the cluster, on purpose. The \"Apply alerting config to Alertmanager\" button of Admin → Server Config could not work there: it writes a file that only the VPS installation reads.\n\nOn Kubernetes the Alerting section now shows, in place of the button, the commands an administrator runs on the machine after saving the SMTP or Alerting values. They are the same the first time and after every change. The guide \"OSCAR - k3s on one VPS\" gives them too (section 8a, step 1), with a test alert to check that the e-mail arrives.\n\nNothing changes on the VPS, and testers and Test Managers are not concerned. No action is required."
+  },
+  {
     "id": "2026-11-09-no-checks-failed",
     "date": "November 9, 2026",
     "tag": "Bug Fix",

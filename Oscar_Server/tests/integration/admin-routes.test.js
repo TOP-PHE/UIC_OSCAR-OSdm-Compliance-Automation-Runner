@@ -1296,6 +1296,48 @@ describe('POST /v1/admin/alertmanager/apply', () => {
       run(`INSERT INTO server_config (key, value) VALUES ('SMTP_HOST', ?)`, [priorHost.value]);
     }
   });
+
+  describe('on Kubernetes (#1175)', () => {
+    const am = require('../../src/utils/alertmanagerConfig');
+    let saved;
+    beforeEach(() => { saved = process.env.KUBERNETES_SERVICE_HOST; process.env.KUBERNETES_SERVICE_HOST = '10.43.0.1'; });
+    afterEach(() => {
+      if (saved === undefined) delete process.env.KUBERNETES_SERVICE_HOST;
+      else process.env.KUBERNETES_SERVICE_HOST = saved;
+    });
+
+    test('409, nothing written, and the commands to run instead', async () => {
+      const res = await request(app)
+        .post('/v1/admin/alertmanager/apply')
+        .set('Authorization', `Bearer ${makeToken('administrator')}`);
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ ok: false, mode: 'kubernetes', written: false, reloaded: false });
+      expect(res.body.commands).toBe(am.KUBERNETES_COMMANDS);
+    });
+
+    test('GET /v1/admin/config tells the page, with the commands', async () => {
+      const res = await request(app)
+        .get('/v1/admin/config')
+        .set('Authorization', `Bearer ${makeToken('administrator')}`);
+      expect(res.status).toBe(200);
+      expect(res.body.server_info.alerting_mode).toBe('kubernetes');
+      expect(res.body.server_info.alerting_commands).toBe(am.KUBERNETES_COMMANDS);
+    });
+  });
+
+  test('elsewhere GET /v1/admin/config says file, without commands', async () => {
+    const saved = process.env.KUBERNETES_SERVICE_HOST;
+    delete process.env.KUBERNETES_SERVICE_HOST;
+    try {
+      const res = await request(app)
+        .get('/v1/admin/config')
+        .set('Authorization', `Bearer ${makeToken('administrator')}`);
+      expect(res.body.server_info.alerting_mode).toBe('file');
+      expect(res.body.server_info.alerting_commands).toBeUndefined();
+    } finally {
+      if (saved !== undefined) process.env.KUBERNETES_SERVICE_HOST = saved;
+    }
+  });
 });
 
 // ── POST /v1/admin/test-email ─────────────────────────────────────────────────

@@ -413,6 +413,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.495] — 2026-11-10
+
+Listed in `compatibility.json` (2026.534) without moving `current_release`.
+
+### Changed
+
+- **On Kubernetes, Admin → *Server Config* shows how its alerting values
+  reach Alertmanager** (#1175). In the recovery drill on k3s, the restored
+  SMTP and Alerting values were there, and the page offered *⚡ Apply
+  alerting config to Alertmanager*, which writes a file on a shared volume
+  and reloads a host named `alertmanager`: neither exists on a cluster, where
+  Alertmanager reads a Secret and the server has no right on the cluster, on
+  purpose.
+  - `alertingMode()` (`utils/alertmanagerConfig.js`): `kubernetes` when
+    `KUBERNETES_SERVICE_HOST` is set (every pod has it) and no
+    `ALERTMANAGER_CONFIG_PATH` is named, else `file`, the VPS's way.
+  - `GET /v1/admin/config` gives it as `server_info.alerting_mode`, with
+    `alerting_commands` on Kubernetes: `KUBERNETES_COMMANDS`, the lines that
+    make Alertmanager's Secret from these values with `renderConfig()`, the
+    same the first time and after a change (`create … --dry-run=client -o
+    yaml | kubectl apply -f -`).
+  - The page shows those lines, escaped, where the button was, and its SMTP
+    note and save message point to them (`alertingParts()`,
+    `smtpAlertingNote()`, `savedConfigMessage()`, pinned by
+    `ui-scripts.test.js`). On the VPS the page is unchanged.
+  - `POST /v1/admin/alertmanager/apply` writes and reloads nothing there and
+    answers 409 with the same lines (a page loaded before this release still
+    shows the button).
+
+### Documentation
+
+- *OSCAR - k3s on one VPS*: 6a step 6 says the SMTP and Alerting values need
+  no change after a restore and not to click *Apply*; step 7 points to 8a
+  steps 1 to 5. Section 8a step 1 has one block for the first time and every
+  change, the page's own (`kubernetes-monitoring.test.js` pins the guide to
+  `KUBERNETES_COMMANDS`). New step 5: a test alert sent with `amtool` in
+  Alertmanager's pod, the e-mails it must give, and where to look when none
+  arrives. 6a step 8 checks it.
+- *Server Admin Guide* §14: the Apply step says what the page shows on
+  Kubernetes.
+
 ## [server-1.11.494] — 2026-11-10
 
 Listed in `compatibility.json` (2026.533) without moving `current_release`.

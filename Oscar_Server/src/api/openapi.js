@@ -368,6 +368,7 @@ module.exports = {
     },
     '/v1/admin/config': {
       get: { tags: ['Admin'], summary: 'Get server config + server info', security: [{ bearerAuth: [] }],
+        description: 'server_info.alerting_mode says how Alertmanager gets the alerting settings: file (a shared volume, the Apply button) or kubernetes (a Secret the administrator makes; server_info.alerting_commands gives the commands, #1175).',
         responses: { 200: { description: 'Current config and server info' } } },
       patch: { tags: ['Admin'], summary: 'Update one or more config values (takes effect immediately)', security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Updated config' }, 400: { description: 'Validation failed' } } },

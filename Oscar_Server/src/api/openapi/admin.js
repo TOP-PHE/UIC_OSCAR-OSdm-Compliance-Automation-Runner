@@ -128,8 +128,8 @@ module.exports = {
   },
   '/v1/admin/alertmanager/apply': {
     post: { tags, summary: 'Write the alerting configuration from the server settings and reload the alert service', security: bearer,
-      description: `${ADMIN} Built from the SMTP and alerting settings of the server configuration. Answers 200 whatever the outcome: { ok, written, reloaded, configPath, reloadUrl, reloadStatus, reloadBody, error }.`,
-      responses: { 200: { description: 'The outcome of each step' }, 401: r401, 403: r403, 429: r429 } },
+      description: `${ADMIN} Built from the SMTP and alerting settings of the server configuration. Answers 200 whatever the outcome: { ok, mode, written, reloaded, configPath, reloadUrl, reloadStatus, reloadBody, error }. On Kubernetes nothing is written: 409 with mode kubernetes and the commands that make Alertmanager's Secret (#1175).`,
+      responses: { 200: { description: 'The outcome of each step' }, 401: r401, 403: r403, 409: { description: 'On Kubernetes: nothing written, the commands to run instead' }, 429: r429 } },
   },
   '/v1/admin/test-email': {
     post: { tags, summary: 'Send a test e-mail with the current SMTP settings', security: bearer,

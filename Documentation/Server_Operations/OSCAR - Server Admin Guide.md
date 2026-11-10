@@ -806,6 +806,7 @@ curl -s http://127.0.0.1:9093/api/v2/status | head -20
 3. Click **Send test email** to confirm SMTP is healthy end-to-end (uses these credentials → if you get the test email, alerts will work too).
 4. Under **Alerting** — fill in `ALERT_RECIPIENTS` (comma-separated admin emails) and accept the default `1h` / `4h` re-page intervals. Click *Save*.
 5. Click **⚡ Apply alerting config to Alertmanager**. The button generates `alertmanager.yml` from the same SMTP credentials you set above, writes it to the shared docker volume, hot-reloads Alertmanager, and surfaces the verbatim result inline.
+   On Kubernetes (from server 1.11.495) the page shows no button but the commands that make Alertmanager's Secret from these values, to run on the machine: guide *OSCAR - k3s on one VPS*, section 8a, step 1.
 
 **Legacy cleanup (optional):** the v1.8.x host file
 `/opt/OSCAR/OSCAR_Deploy/alertmanager/alertmanager.yml` is no longer
