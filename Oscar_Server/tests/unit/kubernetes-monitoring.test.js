@@ -433,4 +433,17 @@ describe('the guide and the CI', () => {
     // Then the Secret Alertmanager reads, by the name the chart is given.
     expect(guide).toContain(`kubectl -n monitoring create secret generic ${values.alertmanager.alertmanagerSpec.configSecret} --from-file=alertmanager.yaml=`);
   });
+
+  test('the guide\'s lines are the ones Server Config shows on Kubernetes (#1175)', () => {
+    const { KUBERNETES_COMMANDS } = require('../../src/utils/alertmanagerConfig');
+    expect(guide).toContain('```bash\n' + KUBERNETES_COMMANDS + '\n```');
+  });
+
+  test('the test alert goes to the Alertmanager the chart makes, by the name the CI waits for', () => {
+    const m = /kubectl -n monitoring exec statefulset\/(\S+) -c alertmanager -- amtool alert add alertname=OscarTestAlert severity=critical /.exec(guide);
+    expect(m).not.toBeNull();
+    expect(read('.github/workflows/ci-kubernetes.yml')).toContain(`statefulset/${m[1]}`);
+    // A critical alert is mailed: the route the module writes sends it to the recipients.
+    expect(read('Oscar_Server/src/utils/alertmanagerConfig.js')).toMatch(/- severity = "critical"\n\s+receiver: oscar-admins/);
+  });
 });

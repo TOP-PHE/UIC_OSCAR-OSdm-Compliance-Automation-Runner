@@ -812,6 +812,34 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
       .toEqual(['password', 'password', 'number', 'text']);
   });
 
+  describe('admin.html — Alertmanager on Kubernetes (#1175)', () => {
+    const esc = require('../../public/js/esc.js').esc;
+    const alertingParts = loadFunction('admin.html', 'alertingParts', { esc });
+    const savedConfigMessage = loadFunction('admin.html', 'savedConfigMessage');
+    const smtpAlertingNote = loadFunction('admin.html', 'smtpAlertingNote');
+    const { KUBERNETES_COMMANDS } = require('../../src/utils/alertmanagerConfig');
+
+    test('on Kubernetes: no Apply button, the server\'s commands shown escaped', () => {
+      const k = alertingParts('kubernetes', KUBERNETES_COMMANDS);
+      expect(k.end).not.toContain('btn-apply-alertmanager');
+      expect(k.end).toContain('<pre id="alertmanager-commands"');
+      expect(k.end).toContain(esc(KUBERNETES_COMMANDS));
+      expect(alertingParts('kubernetes', '<b>x</b>').end).toContain('&lt;b&gt;x&lt;/b&gt;');
+      expect(k.intro).toMatch(/no right on the cluster/);
+      expect(smtpAlertingNote('kubernetes')).not.toContain('Apply');
+      expect(savedConfigMessage('kubernetes')).toMatch(/run the commands of the Alerting section/);
+    });
+
+    test('elsewhere: the Apply button and its result, as before', () => {
+      const f = alertingParts('file');
+      expect(f.end).toContain('id="btn-apply-alertmanager"');
+      expect(f.end).toContain('id="apply-alertmanager-result"');
+      expect(f.end).not.toContain('alertmanager-commands');
+      expect(smtpAlertingNote('file')).toContain('after you click "Apply"');
+      expect(savedConfigMessage('file')).toBe('Configuration saved — changes take effect immediately. (For Alerting changes, click "Apply alerting config" below.)');
+    });
+  });
+
   describe('compare.html diffErrorHtml', () => {
     const esc = require('../../public/js/esc.js').esc;   // S11: esc is shared now
     const diffErrorHtml = loadFunction('compare.html', 'diffErrorHtml', { esc });

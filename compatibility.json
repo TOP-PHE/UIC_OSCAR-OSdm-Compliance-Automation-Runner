@@ -4,6 +4,18 @@
   "current_release": "2026.533",
   "releases": [
     {
+      "release": "2026.534",
+      "date": "2026-11-10",
+      "server": "1.11.495",
+      "collection": "OTST_V2.0.254",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.495: on Kubernetes, Admin → Server Config shows no \"Apply alerting config\" button (it writes a file only the VPS reads) but the commands that give the SMTP and Alerting values to Alertmanager, as its Secret, on the machine; POST /v1/admin/alertmanager/apply writes nothing there and answers 409 with the same commands (#1175). The server still gets no right on the cluster. On the VPS nothing changes.",
+        "Released with it (documentation): the k3s guide says at 6a step 6 that SMTP and Alerting need no change after a restore, gives section 8a step 1 one block for the first time and every change, and ends 8a with a test alert that must reach the recipients (#1175); 6a step 5 says what the load prints and what to do for each message, and section 3 checks the Let's Encrypt e-mail before k3s is installed (#1173)."
+      ]
+    },
+    {
       "release": "2026.533",
       "date": "2026-11-10",
       "server": "1.11.494",

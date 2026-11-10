@@ -41,6 +41,7 @@ const { liveDatafilePath } = require('../../utils/datafileWrite');
 const { withDatafileLock } = require('../../utils/datafileLock');
 const path = require('node:path');
 const AccessRequests = require('../../utils/accessRequests');
+const alertmanagerConfig = require('../../utils/alertmanagerConfig');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
 const router = express.Router();
@@ -856,7 +857,11 @@ router.get('/config', (req, res) => {
     bru_cmd:         process.env.BRU_CMD || '',
     uptime_seconds:  Math.floor(process.uptime()),
     db_path:         'data/oscar.db',
+    // How Alertmanager gets these settings: on Kubernetes the page shows the
+    // commands instead of the Apply button (#1175).
+    alerting_mode:   alertmanagerConfig.alertingMode(),
   };
+  if (serverInfo.alerting_mode === 'kubernetes') serverInfo.alerting_commands = alertmanagerConfig.KUBERNETES_COMMANDS;
 
   return res.json({ config, server_info: serverInfo });
 });
@@ -958,9 +963,15 @@ router.patch('/config', (req, res) => {
 // hot-reload Alertmanager via its built-in /-/reload endpoint. No SSH or VPS
 // file edits needed. Surfaces the verbatim outcome of every step so admins
 // can self-diagnose if anything goes wrong.
-const alertmanagerConfig = require('../../utils/alertmanagerConfig');
+// On Kubernetes nothing is written: 409 with the commands that make
+// Alertmanager's Secret instead (#1175; a page from before it still shows the
+// button).
 router.post('/alertmanager/apply', async (req, res) => {
   const result = await alertmanagerConfig.applyConfig();
+  if (result.mode === 'kubernetes') {
+    auditLog(req.user.id, null, req.user.email, 'alertmanager_apply:kubernetes');
+    return res.status(409).json(result);
+  }
   auditLog(req.user.id, null, req.user.email,
     `alertmanager_apply:${result.ok ? 'ok' : 'failed'}:${result.error || ''}`);
   // 200 even on partial failure (file written, reload failed) — the response
