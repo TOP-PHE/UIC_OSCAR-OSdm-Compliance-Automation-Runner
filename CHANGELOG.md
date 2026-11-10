@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS: the pods get the public resolvers too** (#1159).
+  Documentation only. After #1157's change on the test machine, k3s still gave
+  CoreDNS the machine's whole list of resolvers, the two slow ones included,
+  and CoreDNS picks among them at random: every pod still asked them part of
+  the time. Section 3's slow case now also writes `/etc/rancher/k3s/resolv.conf`
+  (the two public resolvers only), the install names it in k3s's settings
+  (`resolv-conf`) when it exists, and a check lists the resolvers the pods
+  received. Section 11 gives the same fix on a machine already installed (the
+  line in `config.yaml`, then k3s and CoreDNS restarted). Section 3's check
+  after the install is now a table: for each command, the right answer (the
+  node `Ready`, Traefik rolled out, the seven pods `Running` or `Completed`)
+  and what each other answer means.
+
 - **k3s on one VPS: the machine's name lookups are checked before k3s is
   installed** (#1157). Documentation only. On the reinstalled test machine,
   k3s's node was ready but two of its images could not be downloaded
