@@ -317,9 +317,29 @@ database comes with it: companies, providers, users and their passwords,
 endpoints and credentials, Test Frameworks, findings, run history, and Admin
 → *Server Config* (the mail server and the alert recipients included).
 
-**1. The backup on this machine.** Copy the archive here (`scp` from where it
-is kept), then open it in a folder only you can read: it holds the
-encryption key and every account's password hash. The passphrase is asked.
+**1. The backup on this machine.** Copy the archive and its `.sha256` here
+([Disaster Recovery](OSCAR%20-%20Disaster%20Recovery.md#5a-the-archive-on-the-new-machine),
+section 5a, in full):
+- **a real disaster**: from where the archives are kept off the server (for
+  now the PC). A home upload is slow (hours for 17 GB): start it first.
+- **a drill, or the move, while the VPS still runs**: straight from the VPS,
+  much faster. On the VPS, as the user that runs the backups:
+
+  ```bash
+  scp ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256 <user>@oscar-test.example.org:~/
+  ```
+
+  `<user>` is your account on this machine.
+
+Check here that the copy is whole: the line must end with `OK` (`FAILED`:
+copy it again).
+
+```bash
+echo "$(cat ~/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256)  $HOME/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg" | sha256sum -c -
+```
+
+Then open it in a folder only you can read: it holds the encryption key and
+every account's password hash. The passphrase is asked.
 
 ```bash
 sudo apt-get install -y gnupg

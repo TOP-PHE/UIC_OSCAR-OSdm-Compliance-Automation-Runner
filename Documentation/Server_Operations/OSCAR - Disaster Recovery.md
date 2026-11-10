@@ -7,6 +7,16 @@ fronted by nginx, data bind-mounted under the compose directory).
 Scripts live in `OSCAR_Deploy/scripts/`:
 `oscar-backup.sh`, `oscar-restore.sh`, `oscar-backup-schedule.sh`.
 
+**Where to restore.** A backup is made on the Docker VPS (sections 3 to 5).
+It can be restored onto any of these, each by its own steps; all of them first
+need the archive on the new machine (section 5a):
+
+| Restore onto | Follow |
+|---|---|
+| a VPS with Docker, as production today | section 6 below |
+| one machine with k3s (Kubernetes) | [OSCAR - k3s on one VPS](OSCAR%20-%20k3s%20on%20one%20VPS.md), section 6a |
+| a Kubernetes or OpenShift cluster | [Kubernetes and OpenShift Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md), section 6a |
+
 ## 1. What a backup contains
 
 One self-contained, GPG-encrypted archive — `oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg` — holding:
@@ -166,6 +176,47 @@ afterwards:
 /opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup-status.sh show             # what the panel reads
 ```
 
+## 5a. The archive on the new machine
+
+Whatever the restore (section 6, or a k3s or cluster guide's 6a), the archive
+must first be on the machine that restores it, and whole. Take its `.sha256`
+with it: the backup writes one beside each archive.
+
+**A real disaster: from where the archives are kept.** The server is gone,
+so the copy comes from the off-host copy (section 2: for now the PC). From the
+PC, in PowerShell or a terminal, in the folder that keeps the archives:
+
+```powershell
+scp .\oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg .\oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256 <user>@<new-host>:~/
+```
+
+A home connection sends slowly: about 1.4 MB/s in November 2026, so some
+hours for a 17 GB archive. Start it first, and prepare the new machine
+meanwhile.
+
+**A drill, or a move, while the old server still runs: straight from it.**
+Much faster, server to server. On the old server, as the user that runs the
+backups:
+
+```bash
+scp ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256 <user>@<new-host>:~/
+```
+
+`scp` asks the new machine's password, or uses a key the old server holds.
+If the new machine accepts keys only: on the old server, `ssh-keygen -t
+ed25519` (if `~/.ssh/id_ed25519.pub` is not there yet), add that `.pub`
+line to the new machine's `~/.ssh/authorized_keys`, copy, then remove the
+line again.
+
+**Check that it is whole**, on the new machine (the `.sha256` holds the hash
+only):
+
+```bash
+echo "$(cat ~/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256)  $HOME/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg" | sha256sum -c -
+```
+
+It must end with `OK`. `FAILED`: the copy is incomplete, copy it again.
+
 ## 6. Restore / DR drill on a second VPS (target: under 5 minutes)
 
 **This section restores onto a VPS that runs OSCAR with Docker**, as
@@ -185,7 +236,7 @@ sudo usermod -aG docker "$USER"   # re-login after this
 umask 077; printf '%s' 'THE-SAME-BACKUP-PASSPHRASE' > ~/.oscar-backup-pass; chmod 600 ~/.oscar-backup-pass
 ```
 
-**Restore** (copy the archive to the drill host first, then):
+**Restore** (the archive on the drill host first, section 5a, then):
 ```bash
 OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass \
   ./oscar-restore.sh oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg --hostname drill.example.org
