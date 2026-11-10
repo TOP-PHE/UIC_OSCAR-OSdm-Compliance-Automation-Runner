@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS: the machine's name lookups are checked before k3s is
+  installed** (#1157). Documentation only. On the reinstalled test machine,
+  k3s's node was ready but two of its images could not be downloaded
+  (`lookup auth.docker.io: Try again`): the host's resolvers took 5 s for one
+  name. Traefik and its volume stayed `Pending`, nothing listened on 80 and
+  443, and the firewall check from the PC failed on 443. Section 3 now:
+  - checks a lookup's time first, and gives the machine public resolvers
+    (1.1.1.1, 9.9.9.9) when it is slow, with the commands written out;
+  - waits at most 5 minutes for Traefik and lists the pods, every one
+    `Running` or `Completed`.
+
+  Section 11 has a row for pods stuck in `ImagePullBackOff`: the event that
+  says why, the resolver change, and the CoreDNS restart (CoreDNS keeps the
+  resolvers it started with, and OSCAR's pods ask it).
+
 - **k3s on one VPS: the firewall, step by step.** Documentation only. Section
   1 of *OSCAR - k3s on one VPS* said in one line to allow only ports 22, 80
   and 443 in the host's firewall. It now says:
