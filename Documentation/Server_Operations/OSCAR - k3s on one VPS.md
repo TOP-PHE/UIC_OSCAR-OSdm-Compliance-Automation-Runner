@@ -195,17 +195,30 @@ the machine and the pods do not read the same list:
 On a machine that must use your organisation's own resolvers, ask its network
 team instead.
 
-Then put k3s's settings and Traefik's in place, and install the pinned k3s.
-`LE_EMAIL` is the e-mail Let's Encrypt writes to about your certificate:
+Then put Traefik's settings in place, with your e-mail. `LE_EMAIL` is the
+e-mail Let's Encrypt writes to about your certificate: yours, or your team's.
 
 ```bash
-LE_EMAIL=you@example.org        # ← yours: the e-mail for Let's Encrypt
+LE_EMAIL=CHANGE-ME              # ← yours: your real e-mail (never an example.org one)
 cd /opt/oscar
 sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
-sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
-if [ -f /etc/rancher/k3s/resolv.conf ]; then echo 'resolv-conf: /etc/rancher/k3s/resolv.conf' | sudo tee -a /etc/rancher/k3s/config.yaml; fi
 sudo cp OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
 sudo sed -i "s/CHANGE-ME@example.org/$LE_EMAIL/" /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+grep -n 'email:' /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+```
+
+The `grep` must show `email:` followed by your address. `CHANGE-ME`, or an
+address at `example.org` or `example.com`, there: change the `LE_EMAIL=` line
+and run the block again (it copies the file again first). Let's Encrypt
+refuses such an address, and nothing says so until the browser warns about
+Traefik's own certificate at section 6.
+
+Then k3s's settings, and the pinned k3s:
+
+```bash
+cd /opt/oscar
+sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
+if [ -f /etc/rancher/k3s/resolv.conf ]; then echo 'resolv-conf: /etc/rancher/k3s/resolv.conf' | sudo tee -a /etc/rancher/k3s/config.yaml; fi
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -
 ```
 
@@ -321,7 +334,7 @@ grep -rn "example.org" OSCAR_Deploy/kubernetes/overlays/site
 sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
 sudo kubectl -n oscar rollout status deployment/oscar-dispatcher
 sudo kubectl -n oscar rollout status deployment/oscar
-curl -s "https://$HOST/health"
+curl -sS -w '\nHTTP %{http_code}\n' "https://$HOST/health"
 ```
 
 - **Change only the `HOST=` line**: your name (section 1, *The name*).
@@ -338,7 +351,10 @@ curl -s "https://$HOST/health"
   same release.
 - The first `https` request can take a minute while Traefik obtains the
   certificate.
-- `/health` names the release and says `"compatibility_status": "tested"`.
+- `/health` names the release and says `"compatibility_status": "tested"`,
+  then `HTTP 200`. *SSL certificate problem: self-signed certificate* and
+  `HTTP 000`: OSCAR may be running, but Traefik has no certificate yet
+  (section 11, *Traefik's own certificate*).
 
 ## 6a. Or: OSCAR from a backup (recovery, or the move from the VPS)
 
@@ -466,24 +482,52 @@ sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
 - OSCAR starts with an empty database: **do not create an administrator**.
 
 **5. The data.** OSCAR stops for the copy, the database is checked against
-`manifest.json` (users, companies), then OSCAR starts again and migrates it:
+`manifest.json` (users, companies), then OSCAR starts again and migrates it.
+Leave OSCAR alone while the load runs (no `kubectl scale` or `rollout
+restart` from another window): the load stops it and starts it again itself.
 
 ```bash
 HOST=oscar-test.example.org     # ← yours: this machine's DNS name
 cd /opt/oscar
 sudo OSCAR_Deploy/kubernetes/oscar-data.sh load ~/oscar-restore/data
 sudo kubectl -n oscar rollout status deployment/oscar --timeout=900s
-curl -s "https://$HOST/health"
+sudo kubectl -n oscar get deployment oscar
+curl -sS -w '\nHTTP %{http_code}\n' "https://$HOST/health"
 ```
 
-`/health` names the release and says `"compatibility_status": "tested"`. A
-large database takes a few minutes to migrate at the first start. If the copy
-stops half-way, OSCAR stays stopped: run the load again.
+When it works, the load prints these lines in this order (the numbers are the
+backup's; the copy itself takes a while):
 
-The load refuses *the volume holds a database with N users* when the
-database there already has accounts (section 7 was done here, or a load
-already ran): nothing changed. Run it again with `--replace` at the end to
-overwrite it with the backup's.
+```
+── stopping OSCAR (namespace oscar)
+── starting the copying pod on oscar-data
+   replacing the volume's database (0 users)
+── removing the volume's data
+── copying /root/oscar-restore/data (oscar.db datafiles artifacts) to the volume
+   counts as in /root/oscar-restore/data/../manifest.json
+── loaded: {"users":44,"companies":44,"runs":17247,"schema_version":52}
+── starting OSCAR again (1 replica)
+deployment "oscar" successfully rolled out
+```
+
+- `replacing the volume's database (0 users)` is the empty database of step 4.
+- `counts as in …manifest.json`: the users and companies copied are the
+  backup's.
+- `get deployment oscar` says `READY 1/1`.
+- `/health` names the release of step 2, says `"compatibility_status":"tested"`
+  and `"ok":true` for every check, then `HTTP 200`. A large database takes a
+  few minutes to migrate at the first start.
+
+| What you see | Why, and what to do |
+|---|---|
+| *the volume holds a database with N users: nothing changed* | The database there already has accounts (section 7 was done here, or a load already ran). Run the load again with `--replace` at the end, to overwrite it with the backup's. |
+| *the copy did not finish; OSCAR stays stopped* | The copy stopped half-way: the SSH connection was lost, or the disk is full (`df -h /var/lib/rancher`). Run the load again; add `--replace` if it now refuses for users. |
+| *users: X in the volume, Y in …manifest.json* (or `companies`) | The folder is not that backup's data. Check the folder named in the load and the archive of step 1, then run the load again. |
+| *the database copied does not pass its check* | The database in the folder is damaged. Check the archive again (step 1, `sha256sum -c`), extract it again, then run the load again. |
+| *OSCAR is not ready yet* | The first start is still migrating the database: the `rollout status` that follows waits up to 15 minutes. Still not ready: `sudo kubectl -n oscar get pods` and `sudo kubectl -n oscar logs deploy/oscar --tail=50` say why. |
+| `get deployment oscar` says `0/0` | OSCAR was stopped after the load, by a `kubectl scale --replicas=0` from another window: `sudo kubectl -n oscar scale deployment oscar --replicas=1`, then the `rollout status`, `get deployment` and `curl` lines again. |
+| `curl`: *SSL certificate problem: self-signed certificate*, then `HTTP 000` | Traefik has no certificate yet; OSCAR may well be running. `curl -skS "https://$HOST/health"` asks OSCAR without checking the certificate (`-k`, for this test only): the JSON there means the data is in. Then the certificate: section 11, *Traefik's own certificate*. |
+| `curl`: *Could not resolve host*, or *Connection refused* | The name does not point at this machine yet, or port 443 is closed (section 1). |
 
 **6. Admin → *Server Config*.** Sign in with an administrator account of the
 backup.
@@ -553,7 +597,7 @@ Then:
 ```bash
 HOST=oscar-test.example.org                          # ← yours: the machine's DNS name
 BOOTSTRAP_TOKEN=PASTE_PLATFORM_BOOTSTRAP_TOKEN_HERE  # ← yours: PLATFORM_BOOTSTRAP_TOKEN of step 5
-ADMIN_EMAIL=you@example.org                          # ← yours: the administrator's e-mail
+ADMIN_EMAIL=CHANGE-ME                                # ← yours: the administrator's real e-mail (its sign-in links go there)
 jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email: $email, password: $password, role: "administrator"}' \
   | curl -X POST "https://$HOST/v1/auth/bootstrap/platform-user" \
       -H 'Content-Type: application/json' \
@@ -752,7 +796,7 @@ if you need it.
 |---|---|
 | Step 2 or 3 stops: *Could not resolve host: github.com*, or k3s's install says *Download failed* | The machine reached GitHub badly: its name lookup (`getent hosts github.com`) or GitHub itself ([githubstatus.com](https://www.githubstatus.com)). Run the same command again; if names keep failing, give the machine and the pods public resolvers (section 3, first step): k3s's pods find the providers through those resolvers too. |
 | After k3s's install, pods stay in `ImagePullBackOff` (`svclb-traefik`, `helper-pod-create-pvc-…`), Traefik and its volume `Pending`, and port 443 does not answer from your PC | k3s could not download those images. `sudo kubectl -n kube-system get events \| grep -i pull` says why. *lookup … Try again* or *i/o timeout*: the machine's resolvers are slow or down (`time getent hosts auth.docker.io` takes seconds); give the machine and the pods public resolvers (section 3, first step: both files). k3s is already installed, so name the pods' file in its settings yourself: add the line `resolv-conf: /etc/rancher/k3s/resolv.conf` to `/etc/rancher/k3s/config.yaml` if it is not there (`sudo grep resolv-conf /etc/rancher/k3s/config.yaml`), then `sudo systemctl restart k3s` and `sudo kubectl -n kube-system rollout restart deployment/coredns`: CoreDNS, which every pod asks, keeps the resolvers it started with. A minute later, section 3's last check lists no other address than `10.43.0.10`, `1.1.1.1` and `9.9.9.9`. *429 Too Many Requests*: Docker Hub's limit for this address; wait an hour. A pod waiting for its image tries again within 5 minutes. |
-| The browser warns about Traefik's own certificate | Let's Encrypt did not give one yet. Check that the name points at the machine, port 443 is open, and the e-mail is not still `CHANGE-ME@example.org`. `sudo kubectl -n kube-system logs deploy/traefik \| grep -i acme` says why. Let's Encrypt refuses a name after five failures in an hour. |
+| The browser warns about Traefik's own certificate (`curl`: *SSL certificate problem: self-signed certificate*) | Let's Encrypt did not give one yet. `sudo kubectl -n kube-system logs deploy/traefik \| grep -i acme \| tail -n 5` says why. *invalidContact … forbidden domain "example.org"* (or the e-mail is still `CHANGE-ME`): the e-mail of section 3 was not changed. Put yours in with `LE_EMAIL=` your address, then `sudo sed -i "s/^\( *email:\).*/\1 $LE_EMAIL/" /var/lib/rancher/k3s/server/manifests/traefik-config.yaml`; `grep -n 'email:'` on that file shows it, and k3s restarts Traefik within a minute. *tls: unrecognized name* right after Traefik restarted: Let's Encrypt's check reached the Traefik that was stopping. Make Traefik ask again without restarting it: `sudo kubectl -n oscar rollout restart deployment/oscar` (a minute without OSCAR), then `curl` again. Otherwise, check that the name points at the machine and port 443 is open (section 1). Let's Encrypt refuses a name after five failed checks in an hour. |
 | Everyone is locked out of signing in after a few failed attempts | OSCAR sees one address for everyone. `sudo kubectl -n kube-system get service traefik -o jsonpath='{.spec.externalTrafficPolicy}'` must say `Local`: `traefik-config.yaml` was not in place, or was changed. |
 | A file over 50 MB is refused with 413 | On purpose, as on the VPS (`overlays/k3s/middleware.yaml`). |
 | Runs end as *the run's pod did not start* | `sudo kubectl -n oscar-runs get events`: the run image cannot be pulled (`RUN_IMAGE`), or the quota is full. |

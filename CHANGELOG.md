@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS: what 6a step 5 shows when it works, what to do when it
+  does not, and no example e-mail for Let's Encrypt** (#1173). Documentation
+  only. In the recovery drill, section 3 took the guide's own example
+  `you@example.org`: Let's Encrypt refused it (`invalidContact`), and the
+  only sign, hours later, was step 5's `curl` failing on Traefik's
+  self-signed certificate.
+  - **Section 3 sets the e-mail in a block of its own, before k3s is
+    installed**, with a `grep` that shows it. Its placeholder, and section 7's
+    administrator e-mail, are `CHANGE-ME`, never an address that looks real.
+  - **6a step 5 lists what the load prints when it works**, asks for
+    `READY 1/1`, says to leave OSCAR alone while the load runs, and has a
+    table for each message: users already there, copy not finished, counts or
+    check not matching, not ready yet, `0/0`, self-signed certificate (with
+    `curl -k` to tell OSCAR from the certificate).
+  - **`curl` in sections 6 and 6a shows its error and the HTTP status**
+    (`-sS -w`): `curl -s` printed nothing when OSCAR was stopped.
+  - **Section 11's certificate row** gives the two Let's Encrypt messages met
+    and their fixes: the e-mail line corrected in `traefik-config.yaml`, and,
+    for *tls: unrecognized name* right after Traefik restarted, OSCAR's pod
+    restarted so that Traefik asks again.
+
 - **k3s on one VPS and Disaster Recovery: the values to change come first in
   each command** (#1171). Documentation only. During the recovery drill
   placeholders inside long command lines were missed in copy-paste: one run of
