@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS and Disaster Recovery: the values to change come first in
+  each command** (#1171). Documentation only. During the recovery drill
+  placeholders inside long command lines were missed in copy-paste: one run of
+  6a step 4 went through with `release-YYYY.NNN`, so OSCAR asked for an image
+  that does not exist and the rollout ran out of time. GitHub cannot colour
+  text inside a command block, so:
+  - **In every block that needs a value of your own, the values are the first
+    lines**, as variables in capitals marked `# ← yours`, and the rest of the
+    block uses them (`$HostName`, `$Archive` in PowerShell). Each block sets
+    them again, because they are lost with the SSH session.
+  - **Both documents open with a *Your values* table**: each value, what to
+    put and where to find it.
+  - **6a step 4 starts again from the release's files** (`rm -rf` then `cp`),
+    so it can be run again after a mistake, and says what `YYYY` in its
+    `grep` means.
+  - **Step 2 explains git's *detached HEAD***, and section 9 says how to take
+    a later release in that state.
+  - **Passwords and passphrases are typed when asked** (`read -s`), never
+    written into a command: section 7's first administrator, the backup
+    passphrase file.
+
 - **k3s on one VPS: the fork between a new OSCAR and a restore comes after
   section 4** (#1169). Documentation only. During the recovery drill section
   5 was done before 6a, as the page reads: it made new random keys, and 6a's

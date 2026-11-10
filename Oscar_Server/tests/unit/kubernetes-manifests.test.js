@@ -758,7 +758,9 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
       expect(doc).toContain(`sudo cp ${copy}`);
       expect(steps).toContain(`sudo cp ${copy}`);
     }
-    expect(doc).toContain("sed -i 's/CHANGE-ME@example.org/");
+    // The guide's e-mail is a value of the reader's, set first in the block (#1171).
+    expect(doc).toMatch(/^LE_EMAIL=\S+ +# ← yours/m);
+    expect(doc).toContain('sed -i "s/CHANGE-ME@example.org/$LE_EMAIL/"');
     expect(doc).toContain('kubectl apply -k OSCAR_Deploy/kubernetes/runs');
     expect(steps).toContain('kubectl apply -k OSCAR_Deploy/kubernetes/runs');
     expect(doc).toContain('cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site');

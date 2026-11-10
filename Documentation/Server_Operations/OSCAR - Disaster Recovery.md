@@ -17,6 +17,18 @@ need the archive on the new machine (section 5a):
 | one machine with k3s (Kubernetes) | [OSCAR - k3s on one VPS](OSCAR%20-%20k3s%20on%20one%20VPS.md), section 6a |
 | a Kubernetes or OpenShift cluster | [Kubernetes and OpenShift Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md), section 6a |
 
+**Your values.** In the commands below, the values to change are the **first
+lines of a block, in capitals, marked `# ← yours`** (`$Archive =` in
+PowerShell): change them there, then paste the whole block. Each block sets
+them again: a value is lost when the SSH session ends.
+
+| Value | What to put | Where to find it |
+|---|---|---|
+| `ARCHIVE` | the backup's file name, e.g. `oscar-backup-20261110-091500.tar.gz.gpg` | `ls ~/oscar-backups` on the host, or the folder that keeps the archives |
+| `FROM` / `TO` | your account and a machine's DNS name, e.g. `root@oscar-test.example.org` | how you connect to it with `ssh` |
+| `DRILL_HOST` | the drill host's DNS name | the A record you made for it |
+| the passphrase | never in a command: typed when asked (`read`, `gpg`) | your password manager |
+
 ## 1. What a backup contains
 
 One self-contained, GPG-encrypted archive — `oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg` — holding:
@@ -51,9 +63,14 @@ protection is the GPG passphrase. Therefore:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y sqlite3 gnupg
-# passphrase file (paste a long random passphrase; also store it in your password manager)
-umask 077; printf '%s' 'CHOOSE-A-LONG-RANDOM-PASSPHRASE' > ~/.oscar-backup-pass
-chmod 600 ~/.oscar-backup-pass
+```
+
+The passphrase file: choose a long random passphrase and store it in your
+password manager too. Paste this line alone, type the passphrase (it is not
+shown, nor kept in the shell's history), then Enter:
+
+```bash
+read -rs -p 'Backup passphrase: ' P; echo; (umask 077; printf '%s' "$P" > ~/.oscar-backup-pass); unset P
 ```
 
 ## 4. Choose the backup frequency
@@ -78,8 +95,7 @@ each archive off the host.
 ```bash
 OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass \
   /opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup.sh
-# then pull it to your PC (off-host):
-#   scp <user>@<host>:~/oscar-backups/oscar-backup-*.tar.gz.gpg .
+# then copy it off the host, to your PC: the scp the script prints at its end
 ```
 The script discovers the data dir and `.env` from the running container, takes a
 live-safe SQLite snapshot, writes the encrypted archive to `OSCAR_BACKUP_DIR`
@@ -117,20 +133,24 @@ ls -la ~/oscar-backups
 archives):
 
 ```powershell
-scp <user>@<host>:~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg .
+$Archive = 'oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg'   # ← yours: the older archive (ls above)
+$From = 'ubuntu@oscar.example.org'                     # ← yours: your account @ the host
+scp "${From}:~/oscar-backups/$Archive" .
 ```
 
 Then compare its SHA-256 with the one the backup wrote beside it. On the host:
 
 ```bash
-cat ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256
+ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: the older archive
+cat ~/oscar-backups/"$ARCHIVE".sha256
 ```
 
 On the PC, in the same folder (Linux or macOS: `sha256sum` and the file
 name):
 
 ```powershell
-(Get-FileHash .\oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg -Algorithm SHA256).Hash.ToLower()
+$Archive = 'oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg'   # ← yours: the older archive
+(Get-FileHash ".\$Archive" -Algorithm SHA256).Hash.ToLower()
 ```
 
 The two must be the same. If not, copy it again: the copy is incomplete.
@@ -138,7 +158,8 @@ The two must be the same. If not, copy it again: the copy is incomplete.
 **3. Only then, remove it from the host**, the archive and its `.sha256`:
 
 ```bash
-rm ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256
+ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: the older archive
+rm ~/oscar-backups/"$ARCHIVE" ~/oscar-backups/"$ARCHIVE".sha256
 ```
 
 A hidden `.oscar-backup-….part` that `ls -la` shows is what a backup that was
@@ -187,7 +208,9 @@ so the copy comes from the off-host copy (section 2: for now the PC). From the
 PC, in PowerShell or a terminal, in the folder that keeps the archives:
 
 ```powershell
-scp .\oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg .\oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256 <user>@<new-host>:~/
+$Archive = 'oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg'   # ← yours: the archive's file name
+$To = 'root@oscar-test.example.org'                    # ← yours: your account @ the new machine
+scp ".\$Archive" ".\$Archive.sha256" "${To}:~/"
 ```
 
 A home connection sends slowly: about 1.4 MB/s in November 2026, so some
@@ -199,7 +222,9 @@ Much faster, server to server. On the old server, as the user that runs the
 backups:
 
 ```bash
-scp ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256 <user>@<new-host>:~/
+ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: ls ~/oscar-backups
+TO=root@oscar-test.example.org                   # ← yours: your account @ the new machine
+scp ~/oscar-backups/"$ARCHIVE" ~/oscar-backups/"$ARCHIVE".sha256 "$TO":~/
 ```
 
 `scp` asks the new machine's password, or uses a key the old server holds.
@@ -212,7 +237,8 @@ line again.
 only):
 
 ```bash
-echo "$(cat ~/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256)  $HOME/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg" | sha256sum -c -
+ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: the file copied here
+echo "$(cat ~/"$ARCHIVE".sha256)  $HOME/$ARCHIVE" | sha256sum -c -
 ```
 
 It must end with `OK`. `FAILED`: the copy is incomplete, copy it again.
@@ -233,13 +259,21 @@ nothing of this section applies there:
 ```bash
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git gnupg curl
 sudo usermod -aG docker "$USER"   # re-login after this
-umask 077; printf '%s' 'THE-SAME-BACKUP-PASSPHRASE' > ~/.oscar-backup-pass; chmod 600 ~/.oscar-backup-pass
+```
+
+Then the backup's passphrase (the same as on the OSCAR host): paste this line
+alone, type it, then Enter.
+
+```bash
+read -rs -p 'Backup passphrase: ' P; echo; (umask 077; printf '%s' "$P" > ~/.oscar-backup-pass); unset P
 ```
 
 **Restore** (the archive on the drill host first, section 5a, then):
 ```bash
+ARCHIVE=oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg   # ← yours: the file copied here
+DRILL_HOST=drill.example.org                     # ← yours: the drill host's DNS name
 OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass \
-  ./oscar-restore.sh oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg --hostname drill.example.org
+  ./oscar-restore.sh "$ARCHIVE" --hostname "$DRILL_HOST"
 ```
 It decrypts, clones the monorepo at the archive's **release tag**, drops the
 restored `data/` + `.env` into the compose directory, adjusts
