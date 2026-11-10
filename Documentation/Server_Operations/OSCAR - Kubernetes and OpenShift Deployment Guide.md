@@ -311,7 +311,12 @@ stops half-way, OSCAR stays stopped: run the load again.
   simulator's rate limits (429).
 - Monitoring (section 8) and backups (section 9): the VPS's backup timer and
   Prometheus stay on the VPS. Once the cluster is in use, set the VPS's timer
-  to `on-demand` (`oscar-backup-schedule.sh`).
+  to `on-demand` (`oscar-backup-schedule.sh`). The alerts' e-mail moves with
+  the database: Admin → *Server Config* holds the VPS's mail server and alert
+  recipients, and OSCAR writes Alertmanager's configuration from them for the
+  cluster's Secret ([OSCAR - k3s on one VPS](OSCAR%20-%20k3s%20on%20one%20VPS.md),
+  section 8a, step 1). On one machine with k3s, that guide's section 6a is
+  this whole move, step by step.
 
 **8. Keep the VPS stopped, not removed,** until the cluster has run for a
 while. Going back is `docker compose up -d` there (in `/opt/OSCAR/OSCAR_Deploy`) and the
