@@ -81,12 +81,66 @@ and gpg straight into the archive. The backup needs about the size of `data/`
 plus the database once more, and leaves `OSCAR_BACKUP_MIN_FREE_MB` (2048) free.
 It checks that before writing anything and stops with "not enough free space"
 otherwise, so it never fills the disk OSCAR writes to; the Admin Dashboard then
-shows a failed backup. Make room by moving older archives off the host, or
-point `OSCAR_BACKUP_DIR` (and `TMPDIR`) at another disk. The archive is written
-under a hidden temporary name and renamed when complete: a backup that stops
-half-way leaves no archive behind. Until November 2026 the script copied the
-data into `/tmp`, then compressed it, then encrypted it, which needed about
-three times the size of `data/`.
+shows a failed backup. Make room as below. The archive is written under a
+hidden temporary name and renamed when complete: a backup that stops half-way
+leaves no archive behind. Until November 2026 the script copied the data into
+`/tmp`, then compressed it, then encrypted it, which needed about three times
+the size of `data/`.
+
+### "not enough free space": making room
+
+The message gives the MB the backup needs and the MB that are free. On a disk
+that holds `data/` and one archive, a second archive often does not fit (on
+production in November 2026: 22 GB of data, a 17 GB archive, 40 GB free): the
+previous archive must leave the host before the next backup. On the host, as
+the user that runs the backups:
+
+**1. What takes the space.**
+
+```bash
+df -h ~/oscar-backups /tmp
+ls -la ~/oscar-backups
+```
+
+**2. The older archive safe on your PC.** If it is not there yet, copy it
+(from your PC, in PowerShell or a terminal, in the folder that keeps the
+archives):
+
+```powershell
+scp <user>@<host>:~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg .
+```
+
+Then compare its SHA-256 with the one the backup wrote beside it. On the host:
+
+```bash
+cat ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256
+```
+
+On the PC, in the same folder (Linux or macOS: `sha256sum` and the file
+name):
+
+```powershell
+(Get-FileHash .\oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg -Algorithm SHA256).Hash.ToLower()
+```
+
+The two must be the same. If not, copy it again: the copy is incomplete.
+
+**3. Only then, remove it from the host**, the archive and its `.sha256`:
+
+```bash
+rm ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg ~/oscar-backups/oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg.sha256
+```
+
+A hidden `.oscar-backup-….part` that `ls -la` shows is what a backup that was
+killed left behind: remove it too, when no backup is running.
+
+**4. Run the backup again** (the command at the top of this section).
+
+**Still not enough room:** `docker system df` shows what Docker could give
+back (`docker image prune` removes the images left without a tag). Or write to
+another disk: `OSCAR_BACKUP_DIR` for the archive and `TMPDIR` for the database
+copy, both set in front of the command, for example
+`OSCAR_BACKUP_DIR=/mnt/backup TMPDIR=/mnt/backup OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass /opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup.sh`.
 
 ### The status on the Admin Dashboard (#572)
 

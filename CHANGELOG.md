@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Disaster Recovery: making room when a backup stops with "not enough free
+  space"** (#1163). Documentation only. A backup by hand on production
+  stopped there, and section 5 only said "move older archives off the host".
+  A new part of section 5 gives the steps: what takes the space; the older
+  archive copied to the PC and its SHA-256 compared with the `.sha256` the
+  backup wrote (PowerShell `Get-FileHash`); only then removed from the host,
+  with a `.part` a killed backup left; the backup run again; else Docker's
+  unused images or another disk (`OSCAR_BACKUP_DIR`, `TMPDIR`).
+
 - **k3s on one VPS: the DNS name, `HOST` and `oscar.example.org` explained**
   (#1161). Documentation only. During the recovery drill a reader asked which
   real name goes in `sed -i "s/oscar.example.org/$HOST/g"`: none.
