@@ -113,7 +113,32 @@ Every command below runs from `/opt/oscar`.
 
 ## 3. k3s
 
-Put k3s's settings and Traefik's in place first, then install the pinned k3s.
+**First, the machine's name lookups.** k3s downloads its images by name, and
+OSCAR's pods find the providers through the machine's resolvers. Some hosts'
+resolvers answer slowly: in November 2026, Contabo's took 5 s for one name,
+and k3s's image downloads failed. Check:
+
+```bash
+time getent hosts auth.docker.io
+```
+
+If `real` is over a second, or no address comes back, give the machine public
+resolvers before going on:
+
+```bash
+sudo mkdir -p /etc/systemd/resolved.conf.d
+sudo tee /etc/systemd/resolved.conf.d/public-dns.conf > /dev/null <<'EOF'
+[Resolve]
+DNS=1.1.1.1 9.9.9.9
+EOF
+sudo systemctl restart systemd-resolved
+time getent hosts auth.docker.io
+```
+
+The second lookup answers in a few hundredths of a second. On a machine that
+must use your organisation's own resolvers, ask its network team instead.
+
+Then put k3s's settings and Traefik's in place, and install the pinned k3s.
 Replace the e-mail address with the one Let's Encrypt writes to about your
 certificate:
 
@@ -143,8 +168,13 @@ Check (a minute or two after the install):
 
 ```bash
 sudo kubectl get nodes
-sudo kubectl -n kube-system rollout status deployment/traefik
+sudo kubectl -n kube-system rollout status deployment/traefik --timeout=5m
+sudo kubectl -n kube-system get pods
 ```
+
+Every pod is `Running` or `Completed`. A pod in `ImagePullBackOff`, or
+Traefik still `Pending`, means k3s could not download an image: see
+section 11.
 
 `kubectl` is k3s itself, which reads `/etc/rancher/k3s/k3s.yaml`. If another
 `kubectl` was already installed, write `sudo k3s kubectl` instead.
@@ -541,7 +571,8 @@ if you need it.
 
 | What you see | Why, and what to do |
 |---|---|
-| Step 2 or 3 stops: *Could not resolve host: github.com*, or k3s's install says *Download failed* | The machine reached GitHub badly: its name lookup (`getent hosts github.com`) or GitHub itself ([githubstatus.com](https://www.githubstatus.com)). Run the same command again; if names keep failing, give the machine public resolvers (`DNS=1.1.1.1 9.9.9.9` in `/etc/systemd/resolved.conf.d/`, then `systemctl restart systemd-resolved`): k3s's pods use the machine's resolvers to find the providers too. |
+| Step 2 or 3 stops: *Could not resolve host: github.com*, or k3s's install says *Download failed* | The machine reached GitHub badly: its name lookup (`getent hosts github.com`) or GitHub itself ([githubstatus.com](https://www.githubstatus.com)). Run the same command again; if names keep failing, give the machine public resolvers (section 3, first step): k3s's pods use the machine's resolvers to find the providers too. |
+| After k3s's install, pods stay in `ImagePullBackOff` (`svclb-traefik`, `helper-pod-create-pvc-…`), Traefik and its volume `Pending`, and port 443 does not answer from your PC | k3s could not download those images. `sudo kubectl -n kube-system get events \| grep -i pull` says why. *lookup … Try again* or *i/o timeout*: the machine's resolvers are slow or down (`time getent hosts auth.docker.io` takes seconds); give it public resolvers (section 3, first step), then `sudo kubectl -n kube-system rollout restart deployment/coredns`, because CoreDNS, which OSCAR's pods ask, keeps the resolvers it started with. *429 Too Many Requests*: Docker Hub's limit for this address; wait an hour. A pod waiting for its image tries again within 5 minutes. |
 | The browser warns about Traefik's own certificate | Let's Encrypt did not give one yet. Check that the name points at the machine, port 443 is open, and the e-mail is not still `CHANGE-ME@example.org`. `sudo kubectl -n kube-system logs deploy/traefik \| grep -i acme` says why. Let's Encrypt refuses a name after five failures in an hour. |
 | Everyone is locked out of signing in after a few failed attempts | OSCAR sees one address for everyone. `sudo kubectl -n kube-system get service traefik -o jsonpath='{.spec.externalTrafficPolicy}'` must say `Local`: `traefik-config.yaml` was not in place, or was changed. |
 | A file over 50 MB is refused with 413 | On purpose, as on the VPS (`overlays/k3s/middleware.yaml`). |
