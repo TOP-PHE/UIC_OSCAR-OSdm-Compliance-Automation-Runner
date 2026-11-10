@@ -168,9 +168,19 @@ afterwards:
 
 ## 6. Restore / DR drill on a second VPS (target: under 5 minutes)
 
-**Provision the drill host once** (fresh VPS):
+**This section restores onto a VPS that runs OSCAR with Docker**, as
+production does today. Restoring elsewhere is done by another guide, and
+nothing of this section applies there:
+- **one machine with k3s**: [OSCAR - k3s on one VPS](OSCAR%20-%20k3s%20on%20one%20VPS.md),
+  section 6a. Do not install Docker on a k3s machine: its network rules can
+  disturb the pods' traffic.
+- **a Kubernetes or OpenShift cluster**:
+  [Kubernetes and OpenShift Deployment Guide](OSCAR%20-%20Kubernetes%20and%20OpenShift%20Deployment%20Guide.md),
+  section 6a.
+
+**Provision the drill host once** (fresh VPS, Ubuntu):
 ```bash
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin git gnupg curl
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git gnupg curl
 sudo usermod -aG docker "$USER"   # re-login after this
 umask 077; printf '%s' 'THE-SAME-BACKUP-PASSPHRASE' > ~/.oscar-backup-pass; chmod 600 ~/.oscar-backup-pass
 ```

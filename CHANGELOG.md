@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Disaster Recovery: section 6 says it is the Docker restore; Ubuntu's
+  compose package** (#1165). Documentation only. During the recovery drill
+  section 6 was followed on the k3s machine: nothing at its start said it
+  restores onto a VPS with Docker, the k3s and cluster restores (their
+  section 6a) being named only at the end of the page. It now opens with
+  that, the two links, and "do not install Docker on a k3s machine". Its
+  install line, and the *Self-Hosted Quick Start*'s, asked for
+  `docker-compose-plugin`, which is in Docker's own apt repository only: on
+  Ubuntu 24.04 `apt-get` stopped and installed nothing. Both now ask for
+  Ubuntu's `docker-compose-v2`, as the simulator's guide does.
+
 - **Disaster Recovery: making room when a backup stops with "not enough free
   space"** (#1163). Documentation only. A backup by hand on production
   stopped there, and section 5 only said "move older archives off the host".

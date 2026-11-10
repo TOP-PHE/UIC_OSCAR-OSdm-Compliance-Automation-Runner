@@ -80,7 +80,7 @@ droplet, etc.) is enough.
 You need exactly four things installed on the VPS itself:
 
 ```bash
-sudo apt update && sudo apt install -y docker.io docker-compose-plugin nginx certbot python3-certbot-nginx git
+sudo apt update && sudo apt install -y docker.io docker-compose-v2 nginx certbot python3-certbot-nginx git
 ```
 
 That's it. **No Node, no npm, no Bruno on the host** — they're all inside
