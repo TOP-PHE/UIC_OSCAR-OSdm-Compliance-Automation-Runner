@@ -122,21 +122,34 @@ and k3s's image downloads failed. Check:
 time getent hosts auth.docker.io
 ```
 
-If `real` is over a second, or no address comes back, give the machine public
-resolvers before going on:
+If `real` is over a second, or no address comes back, give the machine and
+k3s's pods public resolvers before going on:
 
 ```bash
-sudo mkdir -p /etc/systemd/resolved.conf.d
+sudo mkdir -p /etc/systemd/resolved.conf.d /etc/rancher/k3s
 sudo tee /etc/systemd/resolved.conf.d/public-dns.conf > /dev/null <<'EOF'
 [Resolve]
 DNS=1.1.1.1 9.9.9.9
 EOF
 sudo systemctl restart systemd-resolved
+sudo tee /etc/rancher/k3s/resolv.conf > /dev/null <<'EOF'
+nameserver 1.1.1.1
+nameserver 9.9.9.9
+EOF
 time getent hosts auth.docker.io
 ```
 
-The second lookup answers in a few hundredths of a second. On a machine that
-must use your organisation's own resolvers, ask its network team instead.
+The second lookup answers in a few hundredths of a second. Two files, because
+the machine and the pods do not read the same list:
+- `public-dns.conf` is the machine's (k3s's image downloads). It puts the
+  public resolvers first; the host's own stay as a fallback.
+- `/etc/rancher/k3s/resolv.conf` is the pods'. k3s gives it to CoreDNS, which
+  every pod asks (OSCAR, the runs, the monitoring). Without it k3s gives
+  CoreDNS the machine's whole list, the slow resolvers included, and CoreDNS
+  picks among them at random. The install below names it in k3s's settings.
+
+On a machine that must use your organisation's own resolvers, ask its network
+team instead.
 
 Then put k3s's settings and Traefik's in place, and install the pinned k3s.
 Replace the e-mail address with the one Let's Encrypt writes to about your
@@ -146,10 +159,14 @@ certificate:
 cd /opt/oscar
 sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
 sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
+if [ -f /etc/rancher/k3s/resolv.conf ]; then echo 'resolv-conf: /etc/rancher/k3s/resolv.conf' | sudo tee -a /etc/rancher/k3s/config.yaml; fi
 sudo cp OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
 sudo sed -i 's/CHANGE-ME@example.org/you@example.org/' /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -
 ```
+
+The `if` line prints `resolv-conf: /etc/rancher/k3s/resolv.conf` when you
+wrote the pods' resolvers above, and nothing otherwise.
 
 What the two files do:
 - [`k3s/config.yaml`](../../OSCAR_Deploy/kubernetes/k3s/config.yaml): the
@@ -164,7 +181,8 @@ What the two files do:
     person;
   - a slow upload is waited for as long as on the VPS.
 
-Check (a minute or two after the install):
+Check, a minute or two after the install. Run the commands one at a time and
+compare each answer with the table:
 
 ```bash
 sudo kubectl get nodes
@@ -172,15 +190,30 @@ sudo kubectl -n kube-system rollout status deployment/traefik --timeout=5m
 sudo kubectl -n kube-system get pods
 ```
 
-Every pod is `Running` or `Completed`. A pod in `ImagePullBackOff`, or
-Traefik still `Pending`, means k3s could not download an image: see
-section 11.
+| Command | The right answer | Otherwise |
+|---|---|---|
+| `get nodes` | One line: the machine's name, `Ready`, `control-plane`, `v1.36.6+k3s1` | `NotReady`: k3s is still starting; ask again in a minute. Still `NotReady` after 5 minutes: `sudo journalctl -u k3s --since -10min \| tail -n 50` says why. *The connection to the server 127.0.0.1:6443 was refused*: k3s is not running, `sudo systemctl status k3s`. |
+| `rollout status … traefik` | `deployment "traefik" successfully rolled out` | *deployments.apps "traefik" not found*: k3s has not installed Traefik yet (its `helm-install-traefik` job); ask again in a minute. *timed out waiting*: the next command says which pod waits. |
+| `get pods` | Every pod `Running` (READY `1/1`, `2/2` for `svclb-traefik-…`) or `Completed` (the two `helm-install-traefik…` jobs). The list: `coredns`, `local-path-provisioner`, `metrics-server`, `svclb-traefik`, `traefik`, `helm-install-traefik`, `helm-install-traefik-crd`. A job may show `RESTARTS` 1 or 2: it waited for Traefik's resource types. | `ImagePullBackOff` or `ErrImagePull` (often `svclb-traefik` and a `helper-pod-create-pvc-…`), Traefik `Pending`: k3s could not download an image, see section 11. `CrashLoopBackOff` on `traefik`: `sudo kubectl -n kube-system logs deploy/traefik --tail=30` says why, usually a typo in `traefik-config.yaml`. |
+
+If you gave the pods public resolvers, check what they received:
+
+```bash
+sudo sh -c 'cat /var/lib/rancher/k3s/agent/containerd/io.containerd.grpc.v1.cri/sandboxes/*/resolv.conf' | grep nameserver | sort | uniq -c
+```
+
+Only `nameserver 10.43.0.10` (CoreDNS, which the pods ask), `nameserver
+1.1.1.1` and `nameserver 9.9.9.9` (CoreDNS's own) may appear, each with a
+count. Any other address is one of the host's resolvers: the `resolv-conf`
+line is missing from `/etc/rancher/k3s/config.yaml` (section 11).
 
 `kubectl` is k3s itself, which reads `/etc/rancher/k3s/k3s.yaml`. If another
 `kubectl` was already installed, write `sudo k3s kubectl` instead.
 
 Then check the firewall from your PC (section 1, *Check it from your PC*):
-443 open, 6443 and 10250 closed.
+443 must answer `True`; 6443, 10250 and 9100 `False`. 443 `False` while every
+pod above is right: the firewall does not let 443 through, or is not assigned
+to this machine yet.
 
 **Why Traefik and not ingress-nginx:** the community ingress-nginx stopped
 being maintained in March 2026 (no more security fixes). Traefik is the one
@@ -571,8 +604,8 @@ if you need it.
 
 | What you see | Why, and what to do |
 |---|---|
-| Step 2 or 3 stops: *Could not resolve host: github.com*, or k3s's install says *Download failed* | The machine reached GitHub badly: its name lookup (`getent hosts github.com`) or GitHub itself ([githubstatus.com](https://www.githubstatus.com)). Run the same command again; if names keep failing, give the machine public resolvers (section 3, first step): k3s's pods use the machine's resolvers to find the providers too. |
-| After k3s's install, pods stay in `ImagePullBackOff` (`svclb-traefik`, `helper-pod-create-pvc-…`), Traefik and its volume `Pending`, and port 443 does not answer from your PC | k3s could not download those images. `sudo kubectl -n kube-system get events \| grep -i pull` says why. *lookup … Try again* or *i/o timeout*: the machine's resolvers are slow or down (`time getent hosts auth.docker.io` takes seconds); give it public resolvers (section 3, first step), then `sudo kubectl -n kube-system rollout restart deployment/coredns`, because CoreDNS, which OSCAR's pods ask, keeps the resolvers it started with. *429 Too Many Requests*: Docker Hub's limit for this address; wait an hour. A pod waiting for its image tries again within 5 minutes. |
+| Step 2 or 3 stops: *Could not resolve host: github.com*, or k3s's install says *Download failed* | The machine reached GitHub badly: its name lookup (`getent hosts github.com`) or GitHub itself ([githubstatus.com](https://www.githubstatus.com)). Run the same command again; if names keep failing, give the machine and the pods public resolvers (section 3, first step): k3s's pods find the providers through those resolvers too. |
+| After k3s's install, pods stay in `ImagePullBackOff` (`svclb-traefik`, `helper-pod-create-pvc-…`), Traefik and its volume `Pending`, and port 443 does not answer from your PC | k3s could not download those images. `sudo kubectl -n kube-system get events \| grep -i pull` says why. *lookup … Try again* or *i/o timeout*: the machine's resolvers are slow or down (`time getent hosts auth.docker.io` takes seconds); give the machine and the pods public resolvers (section 3, first step: both files). k3s is already installed, so name the pods' file in its settings yourself: add the line `resolv-conf: /etc/rancher/k3s/resolv.conf` to `/etc/rancher/k3s/config.yaml` if it is not there (`sudo grep resolv-conf /etc/rancher/k3s/config.yaml`), then `sudo systemctl restart k3s` and `sudo kubectl -n kube-system rollout restart deployment/coredns`: CoreDNS, which every pod asks, keeps the resolvers it started with. A minute later, section 3's last check lists no other address than `10.43.0.10`, `1.1.1.1` and `9.9.9.9`. *429 Too Many Requests*: Docker Hub's limit for this address; wait an hour. A pod waiting for its image tries again within 5 minutes. |
 | The browser warns about Traefik's own certificate | Let's Encrypt did not give one yet. Check that the name points at the machine, port 443 is open, and the e-mail is not still `CHANGE-ME@example.org`. `sudo kubectl -n kube-system logs deploy/traefik \| grep -i acme` says why. Let's Encrypt refuses a name after five failures in an hour. |
 | Everyone is locked out of signing in after a few failed attempts | OSCAR sees one address for everyone. `sudo kubectl -n kube-system get service traefik -o jsonpath='{.spec.externalTrafficPolicy}'` must say `Local`: `traefik-config.yaml` was not in place, or was changed. |
 | A file over 50 MB is refused with 413 | On purpose, as on the VPS (`overlays/k3s/middleware.yaml`). |
