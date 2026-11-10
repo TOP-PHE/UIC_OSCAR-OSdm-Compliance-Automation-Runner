@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS: the DNS name, `HOST` and `oscar.example.org` explained**
+  (#1161). Documentation only. During the recovery drill a reader asked which
+  real name goes in `sed -i "s/oscar.example.org/$HOST/g"`: none.
+  - Section 1 has a part *The name*: the A record to make at the domain's DNS
+    host (the machine's IPv4 address, no AAAA while the firewall lets only
+    IPv4 through), a check from the PC (`Resolve-DnsName`), and that
+    `oscar-test.example.org` stands for that name everywhere in the guide.
+  - Sections 6, 6a and 8a say to change only the `HOST=` line:
+    `oscar.example.org` is the name written in the deployment files, which
+    `sed` replaces; a `grep` shows nothing of it is left.
+  - `HOST` lasts as long as the SSH session: 6a's step 5 sets it again.
+
 - **k3s on one VPS: the pods get the public resolvers too** (#1159).
   Documentation only. After #1157's change on the test machine, k3s still gave
   CoreDNS the machine's whole list of resolvers, the two slow ones included,

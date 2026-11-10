@@ -48,8 +48,7 @@ Only Let's Encrypt is left out: the CI machine has no public name.
   once need about 20 vCPU. 40 GB of disk.
 - **Nothing else on ports 80 and 443**: no nginx, no OSCAR Docker stack on
   this machine.
-- **A DNS name** (an A record) pointing at the machine, *before* step 6: Let's
-  Encrypt checks it. Below it is `oscar-test.example.org`; use yours.
+- **A DNS name pointing at the machine**, before section 6 (below).
 - **A firewall in front of the machine: inbound 22, 80 and 443 only**, set
   before section 3 (below).
 - The tools this document uses:
@@ -57,6 +56,30 @@ Only Let's Encrypt is left out: the CI machine has no public name.
 ```bash
 sudo apt-get update && sudo apt-get install -y git jq openssl curl
 ```
+
+### The name
+
+OSCAR is reached by a name of your own (for example `oscar-test.example.org`),
+which Let's Encrypt checks before it gives the certificate. Make it at the DNS
+host of your domain (the registrar, or wherever the domain's records are kept):
+
+| Type | Name | Value |
+|---|---|---|
+| A | `oscar-test` (the part before your domain) | the machine's IPv4 address, from the hosting provider's panel |
+
+No AAAA record (IPv6) while the firewall lets only IPv4 through: Let's
+Encrypt and browsers would try IPv6 first. A new record takes a few minutes
+to be seen. Check it from your PC, in PowerShell:
+
+```powershell
+Resolve-DnsName oscar-test.example.org -Type A
+```
+
+It must give the machine's address. **Everywhere below, `oscar-test.example.org`
+stands for your name**: in the firewall check, in `HOST=` (sections 6, 6a and
+8a), for the first administrator and in Grafana's address. Put yours each
+time. (`oscar.example.org`, without `-test`, is another thing: the name
+written in the deployment files, which section 6's `sed` replaces.)
 
 ### The firewall
 
@@ -269,6 +292,14 @@ sudo kubectl -n oscar rollout status deployment/oscar
 curl -s "https://$HOST/health"
 ```
 
+- **Change only the `HOST=` line**: your name (section 1, *The name*).
+  `oscar.example.org` in the `sed` is not to be changed: it is the name
+  written in the overlay's files (the Ingress's host, `APP_URL`,
+  `ALLOWED_REDIRECT_HOSTS`), and `sed` replaces it with `$HOST`. Before the
+  `apply`, `grep -rn example.org OSCAR_Deploy/kubernetes/overlays/site` prints
+  nothing.
+- `HOST` lasts as long as the SSH session: in a new one, type the `HOST=`
+  line again before a command that uses `$HOST`.
 - [`overlays/k3s`](../../OSCAR_Deploy/kubernetes/overlays/k3s/) runs OSCAR in
   pod mode. Its images are the published ones of a release
   (`ghcr.io/top-phe/oscar` and `oscar-run`): `newTag` and `RUN_IMAGE` name the
@@ -341,8 +372,10 @@ sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
 sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
 ```
 
-`grep` shows `newTag` and `RUN_IMAGE` both on that release. OSCAR starts with
-an empty database: **do not create an administrator**.
+`HOST` and the first `sed` as in section 6 (change only the `HOST=` line; for
+a test while the VPS runs, a test name, step 9). `grep` shows `newTag` and
+`RUN_IMAGE` both on that release. OSCAR starts with an empty database: **do
+not create an administrator**.
 
 **5. The data.** OSCAR stops for the copy, the database is checked against
 `manifest.json` (users, companies), then OSCAR starts again and migrates it:
@@ -351,6 +384,7 @@ an empty database: **do not create an administrator**.
 cd /opt/oscar
 sudo OSCAR_Deploy/kubernetes/oscar-data.sh load ~/oscar-restore/data
 sudo kubectl -n oscar rollout status deployment/oscar --timeout=900s
+HOST=oscar-test.example.org
 curl -s "https://$HOST/health"
 ```
 
@@ -379,7 +413,8 @@ alerts is then the VPS's, with nothing typed again.
 
 **9. The name and the addresses.**
 - **A real recovery:** point OSCAR's name (`oscar.uic.org`) at this machine,
-  and use it as `HOST` in steps 4 and 8a. Links already sent keep working.
+  and use it as `HOST` in steps 4 and 5 and in section 8a. Links already sent
+  keep working.
 - **A test while the VPS still runs:** use a test name. This copy holds the
   providers' real endpoints and the testers' credentials. A run here reaches
   their systems from this machine's address: the providers that allow-list the
@@ -525,7 +560,9 @@ shred -u ~/alertmanager.yaml
 ```
 
 **2. The stack**, in a copy of its own with your name (`monitoring/site`,
-which git leaves alone), as for OSCAR in step 6:
+which git leaves alone), as for OSCAR in section 6: change only the `HOST=`
+line; `oscar.example.org` is the name written in the stack's files (Grafana's
+domain, its address and its Ingress), which `sed` replaces:
 
 ```bash
 cp -r OSCAR_Deploy/kubernetes/monitoring/stack OSCAR_Deploy/kubernetes/monitoring/site
