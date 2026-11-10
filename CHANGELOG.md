@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Disaster Recovery: where to restore, and the archive on the new
+  machine** (#1167). Documentation only.
+  - The top of *OSCAR - Disaster Recovery* says where a backup can be
+    restored: a Docker VPS (section 6), one machine with k3s (the k3s guide,
+    6a), a cluster (the cluster guide, 6a).
+  - A new section 5a gives the copy to the new machine. In a real disaster
+    the old server is gone: from where the archives are kept off-host (a home
+    upload takes hours for a 17 GB archive). In a drill or a move: straight
+    from the old server, much faster, with what to do when the new machine
+    takes SSH keys only. Then a check that the copy is whole, with the
+    `.sha256` the backup writes beside each archive (`sha256sum -c`).
+  - Section 6 and the k3s guide's 6a step 1 point to it; 6a gives both ways
+    and the check in short.
+
 - **Disaster Recovery: section 6 says it is the Docker restore; Ubuntu's
   compose package** (#1165). Documentation only. During the recovery drill
   section 6 was followed on the k3s machine: nothing at its start said it
