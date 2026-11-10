@@ -30,15 +30,21 @@ Only Let's Encrypt is left out: the CI machine has no public name.
 | 2 | The files |
 | 3 | k3s |
 | 4 | The runs' namespace |
-| 5 | OSCAR's namespace and secrets |
-| 6 | OSCAR |
+| 5 | A new OSCAR: its namespace and secrets |
+| 6 | A new OSCAR |
 | 6a | Or: OSCAR from a backup (recovery, or the move from the VPS) |
-| 7 | First administrator, e-mail, parallel runs |
+| 7 | A new OSCAR: first administrator, e-mail, parallel runs |
 | 8 | A test on the simulators |
 | 8a | Monitoring: Prometheus, Grafana, Loki |
 | 9 | Looking after it |
 | 10 | Removing it |
 | 11 | When something does not work |
+
+**After step 4 the way forks:**
+- **a new OSCAR**, with an empty database: 5, 6, 7, then 8 and 8a;
+- **OSCAR from a backup** (a recovery, or the move from the VPS): 6a
+  **instead of** 5 to 7. Section 5 makes new keys, which cannot read a
+  backup's data.
 
 ## 1. The machine, its name and its firewall
 
@@ -252,7 +258,17 @@ cd /opt/oscar
 sudo kubectl apply -k OSCAR_Deploy/kubernetes/runs
 ```
 
+**Now choose:** a new OSCAR, go on with section 5. OSCAR from a backup (a
+recovery, or the move from the VPS), go to
+[section 6a](#6a-or-oscar-from-a-backup-recovery-or-the-move-from-the-vps)
+now, and skip sections 5 to 7.
+
 ## 5. OSCAR's namespace and secrets
+
+**A new OSCAR only.** From a backup, go to
+[section 6a](#6a-or-oscar-from-a-backup-recovery-or-the-move-from-the-vps):
+the keys made here are new, and cannot read the backup's credentials, data
+files and reports.
 
 ```bash
 cd /opt/oscar
@@ -317,6 +333,12 @@ database comes with it: companies, providers, users and their passwords,
 endpoints and credentials, Test Frameworks, findings, run history, and Admin
 → *Server Config* (the mail server and the alert recipients included).
 
+**Sections 5, 6 or 7 done already on this machine?** Nothing to undo:
+- step 3 replaces section 5's keys with the backup's (the keys you kept from
+  section 5 are no longer used);
+- step 4 says what to do with the `overlays/site` folder of section 6;
+- step 5 replaces the database, an administrator made in section 7 included.
+
 **1. The backup on this machine.** Copy the archive and its `.sha256` here
 ([Disaster Recovery](OSCAR%20-%20Disaster%20Recovery.md#5a-the-archive-on-the-new-machine),
 section 5a, in full):
@@ -363,20 +385,33 @@ git checkout release-YYYY.NNN
 **3. OSCAR's secrets, with the backup's keys.** The same `ENCRYPTION_KEY`, or
 the stored credentials, data files and reports cannot be read; the same
 `JWT_SECRET`; a new `METRICS_TOKEN`; no `PLATFORM_BOOTSTRAP_TOKEN` (the
-administrators come with the database). If a value is between quotes in
-`.env`, remove them in `oscar-secrets.env` first.
+administrators come with the database). The namespace and `oscar-runner` are
+made only when missing, and `oscar-secrets` is replaced if section 5 made one:
 
 ```bash
 cd /opt/oscar
-sudo kubectl create namespace oscar
-sudo kubectl label namespace oscar pod-security.kubernetes.io/enforce=restricted
+sudo kubectl get namespace oscar > /dev/null 2>&1 || sudo kubectl create namespace oscar
+sudo kubectl label namespace oscar pod-security.kubernetes.io/enforce=restricted --overwrite
 umask 077
 grep -E '^(ENCRYPTION_KEY|JWT_SECRET)=' ~/oscar-restore/.env > ~/oscar-secrets.env
 printf 'METRICS_TOKEN=%s\n' "$(openssl rand -hex 32)" >> ~/oscar-secrets.env
+sudo kubectl -n oscar delete secret oscar-secrets --ignore-not-found
 sudo kubectl -n oscar create secret generic oscar-secrets --from-env-file="$HOME/oscar-secrets.env"
-sudo kubectl -n oscar create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
+sudo kubectl -n oscar get secret oscar-runner > /dev/null 2>&1 || sudo kubectl -n oscar create secret generic oscar-runner --from-literal=RUN_AGENT_TOKEN="$(openssl rand -hex 32)"
 shred -u ~/oscar-secrets.env
 ```
+
+Check that OSCAR has the backup's key, without showing it: the two lines must
+be the same.
+
+```bash
+sudo kubectl -n oscar get secret oscar-secrets -o jsonpath='{.data.ENCRYPTION_KEY}' | base64 -d | sha256sum
+grep '^ENCRYPTION_KEY=' ~/oscar-restore/.env | cut -d= -f2- | tr -d "\"'\n" | sha256sum
+```
+
+Different: the values are between quotes in `~/oscar-restore/.env`. Remove the
+quotes around `ENCRYPTION_KEY` and `JWT_SECRET` there (`nano`), then run the
+two blocks again.
 
 **4. OSCAR**, as in section 6, with the images of the release of step 2: the
 overlay in the files names an older one.
@@ -397,6 +432,10 @@ a test while the VPS runs, a test name, step 9). `grep` shows `newTag` and
 `RUN_IMAGE` both on that release. OSCAR starts with an empty database: **do
 not create an administrator**.
 
+If section 6 was done here, `overlays/site` is there already and `cp` would
+put the new copy inside it: remove it first
+(`rm -rf OSCAR_Deploy/kubernetes/overlays/site`), then run the block.
+
 **5. The data.** OSCAR stops for the copy, the database is checked against
 `manifest.json` (users, companies), then OSCAR starts again and migrates it:
 
@@ -411,6 +450,11 @@ curl -s "https://$HOST/health"
 `/health` names the release and says `"compatibility_status": "tested"`. A
 large database takes a few minutes to migrate at the first start. If the copy
 stops half-way, OSCAR stays stopped: run the load again.
+
+The load refuses *the volume holds a database with N users* when the
+database there already has accounts (section 7 was done here, or a load
+already ran): nothing changed. Run it again with `--replace` at the end to
+overwrite it with the backup's.
 
 **6. Admin → *Server Config*.** Sign in with an administrator account of the
 backup.

@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS: the fork between a new OSCAR and a restore comes after
+  section 4** (#1169). Documentation only. During the recovery drill section
+  5 was done before 6a, as the page reads: it made new random keys, and 6a's
+  step 3 then failed (`oscar-secrets` already exists), with OSCAR left on keys
+  that cannot read the backup.
+  - The steps table, the end of section 4 and the start of section 5 say it:
+    a new OSCAR, 5 to 7; from a backup, 6a instead.
+  - 6a says what happens when 5, 6 or 7 were done already. Step 3 makes the
+    namespace and `oscar-runner` only when missing, and replaces
+    `oscar-secrets` with the backup's keys. It then checks that the stored
+    `ENCRYPTION_KEY` is the backup's (the sha256 of both, quotes left out of
+    `.env`'s).
+  - Step 4 says to remove an `overlays/site` that section 6 left. Step 5 says
+    `--replace` when the database there already has accounts.
+
 - **Disaster Recovery: where to restore, and the archive on the new
   machine** (#1167). Documentation only.
   - The top of *OSCAR - Disaster Recovery* says where a backup can be
