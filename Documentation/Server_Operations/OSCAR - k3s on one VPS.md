@@ -531,7 +531,8 @@ deployment "oscar" successfully rolled out
 
 **6. Admin → *Server Config*.** Sign in with an administrator account of the
 backup.
-- **Max Concurrent Runs** is the VPS's: set it for this machine (section 7).
+- **Max Concurrent Runs** is the VPS's: set it for this machine (section 7,
+  *Parallel runs* only: the rest of section 7 is for a new OSCAR).
 - **SMTP and Alerting: nothing to change.** They are the VPS's: the mail
   server, the alert recipients, how often an alert is sent again. OSCAR's
   e-mails (sign-in links, access requests) work at once, and their links name
@@ -585,13 +586,23 @@ backup timer: this machine's backups are `oscar-data.sh save` (section 9).
 
 ## 7. First administrator, e-mail, parallel runs
 
-After section 6a, only *Parallel runs* below applies: the administrators and
-the mail server came with the backup.
+| Paragraph | After section 6 (a new OSCAR) | After section 6a (from a backup) |
+|---|---|---|
+| First administrator | Do it | **Skip it**: the administrators came with the backup |
+| E-mail | Do it | **Skip it**: the mail server came with the backup |
+| Parallel runs | Do it | Do it (6a step 6) |
 
-**First administrator.** With the bootstrap token from step 5. First the
-password, on its own (it is not shown, nor kept in the shell's history; at
-least 12 characters, upper and lower case, a digit). Paste this line alone,
-type the password, then Enter:
+**First administrator (a new OSCAR only).** The first account of OSCAR's web
+pages, with the *administrator* role: the person who signs in to OSCAR and
+manages its companies and users. It is not a Kubernetes account: the cluster
+needs none, root runs `sudo kubectl`. It is made with the bootstrap token of
+step 5. After section 6a there is no such token (6a step 3 leaves it out):
+this call would answer `HTTP 503`, there is nothing to remove, and you sign in
+with an administrator of the backup.
+
+First the password, on its own (it is not shown, nor kept in the shell's
+history; at least 12 characters, upper and lower case, a digit). Paste this
+line alone, type the password, then Enter:
 
 ```bash
 read -rs -p 'Administrator password: ' ADMIN_PASSWORD; echo
@@ -604,12 +615,21 @@ HOST=oscar-test.example.org                          # ← yours: the machine's 
 BOOTSTRAP_TOKEN=PASTE_PLATFORM_BOOTSTRAP_TOKEN_HERE  # ← yours: PLATFORM_BOOTSTRAP_TOKEN of step 5
 ADMIN_EMAIL=CHANGE-ME                                # ← yours: the administrator's real e-mail (its sign-in links go there)
 jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email: $email, password: $password, role: "administrator"}' \
-  | curl -X POST "https://$HOST/v1/auth/bootstrap/platform-user" \
+  | curl -sS -w '\nHTTP %{http_code}\n' -X POST "https://$HOST/v1/auth/bootstrap/platform-user" \
       -H 'Content-Type: application/json' \
       -H "X-Platform-Bootstrap-Token: $BOOTSTRAP_TOKEN" \
       --data-binary @-
 unset ADMIN_PASSWORD BOOTSTRAP_TOKEN
 ```
+
+- `HTTP 201` and the account (`"role":"administrator"`): it is made. Sign in
+  with it at `https://$HOST`.
+- `HTTP 400`: the e-mail or the password does not meet the rules; the answer
+  says which. Type the password again and rerun.
+- `HTTP 409`: that e-mail already has an account.
+- `HTTP 401`: the token is not the one of step 5.
+- `HTTP 503`: the Secret holds no bootstrap token (always the case after
+  section 6a).
 
 Then remove the token from the Secret, so it cannot be used again:
 
@@ -619,7 +639,8 @@ sudo kubectl -n oscar patch secret oscar-secrets --type=json \
 sudo kubectl -n oscar rollout restart deployment/oscar
 ```
 
-**E-mail.** Set the SMTP server in Admin → *Server Config*. People get into
+**E-mail (a new OSCAR only).** Set the SMTP server in Admin → *Server
+Config*. People get into
 OSCAR by an e-mailed link, the first Test Manager of a company included:
 without e-mail, nobody but the administrator can sign in.
 
