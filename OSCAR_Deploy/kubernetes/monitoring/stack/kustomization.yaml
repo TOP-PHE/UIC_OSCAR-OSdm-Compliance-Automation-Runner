@@ -12,8 +12,10 @@
 #   kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml=<file>
 #   kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site      (a copy of this folder)
 #   kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar     (once the chart's CRDs exist)
-# Before that, change oscar.example.org (kube-prometheus-stack.yaml, twice,
-# and grafana-ingress.yaml). OSCAR's namespace must exist: Alloy reads its
+# Before that, put the machine's DNS name in place of the placeholder host
+# (kube-prometheus-stack.yaml, twice, and grafana-ingress.yaml): the guide's
+# sed. Never write that placeholder in a comment: the guide's grep, after the
+# sed, must print nothing. OSCAR's namespace must exist: Alloy reads its
 # pods' logs. No namespace here: each file names its own.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
