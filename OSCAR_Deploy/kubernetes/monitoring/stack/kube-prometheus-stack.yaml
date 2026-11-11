@@ -143,13 +143,15 @@ spec:
           root_url: https://oscar.example.org/grafana/
           serve_from_sub_path: true
         # Signed in through OSCAR only: Traefik asks /v1/auth/sso-check,
-        # which answers administrators only, and passes on their e-mail.
+        # which answers administrators only, and passes on their e-mail and
+        # their role in Grafana (Editor, set at each sign-in, so Explore is
+        # theirs; #1193). Without Role here everyone stays a Viewer.
         auth.proxy:
           enabled: true
           header_name: X-User-Email
           header_property: username
           auto_sign_up: true
-          headers: Email:X-User-Email
+          headers: Email:X-User-Email Role:X-User-Role
           enable_login_token: true
         auth:
           disable_login_form: true

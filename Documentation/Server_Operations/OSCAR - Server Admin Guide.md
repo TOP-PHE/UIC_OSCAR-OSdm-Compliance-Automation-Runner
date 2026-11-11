@@ -734,6 +734,8 @@ A **Rotate JWT Secret** button is available too — generates a fresh secret, in
 
 All three are gated by **OSCAR SSO** — your OSCAR admin login auto-signs you in. No separate Grafana/Prometheus passwords. Non-admin accounts see a 401 if they try to navigate there.
 
+In Grafana, every OSCAR administrator is an **Editor** (from server 1.11.497, #1193): dashboards and **Explore** (left menu), where PromQL and LogQL queries run, but not Grafana's own administration. The role comes from OSCAR at each sign-in, so a role set by hand in Grafana is replaced at the next one. Before 1.11.497 everyone was a Viewer, without Explore.
+
 These tiles are **opt-in**. They light up only if the operator brought the metrics overlay up:
 
 ```bash

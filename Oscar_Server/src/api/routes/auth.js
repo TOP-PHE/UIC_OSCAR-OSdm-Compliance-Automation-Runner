@@ -521,6 +521,7 @@ router.post('/logout', requireAuth, (req, res) => {
 //   - Reads the oscar_session cookie or Authorization: Bearer header
 //   - Validates the JWT (same path as requireAuth)
 //   - If user.role === 'administrator' → 200 + X-User-Email + X-User-Role
+//     (X-User-Role is Grafana's role for that user, GRAFANA_ROLE below)
 //   - Else (no token, expired, wrong role) → 401
 //
 // nginx receives the 200/401 from this call and decides whether to allow
@@ -549,6 +550,13 @@ const ssoCheckLimiter = rateLimit({
   legacyHeaders: false,
   message: { status: 429, title: 'Too Many Requests', detail: 'SSO check rate limit exceeded.' }
 });
+// The role Grafana gives an OSCAR administrator, read from X-User-Role (#1193).
+// Grafana's auth proxy takes it only when it is one of Grafana's roles
+// (Viewer, Editor, Admin) and sets it at each sign-in; any other word is
+// ignored, which is how "administrator" left everyone a Viewer, without
+// Explore. Editor gives Explore and dashboards to edit, not Grafana's own
+// administration. Only an administrator's session gets this far.
+const GRAFANA_ROLE = 'Editor';
 router.get('/sso-check', ssoCheckLimiter, requireAuth, (req, res) => {
   const role = normalizeRole(req.user?.role);
   if (role !== 'administrator') {
@@ -561,7 +569,7 @@ router.get('/sso-check', ssoCheckLimiter, requireAuth, (req, res) => {
   return res
     .set('Cache-Control', 'no-store')
     .set('X-User-Email', req.user.email || '')
-    .set('X-User-Role',  role)
+    .set('X-User-Role',  GRAFANA_ROLE)
     .json({ ok: true });
 });
 

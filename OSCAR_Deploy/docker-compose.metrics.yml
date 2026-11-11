@@ -127,15 +127,18 @@ services:
       GF_AUTH_PROXY_HEADER_PROPERTY:         'username'
       GF_AUTH_PROXY_AUTO_SIGN_UP:            'true'
       # Map the X-User-Email header back into the Grafana user record so
-      # avatars / share emails / alert recipients resolve.
+      # avatars / share emails / alert recipients resolve. X-User-Role is the
+      # user's Grafana role, set at each sign-in: OSCAR's sso-check answers
+      # Editor from server 1.11.497 (#1193; before, "administrator", which
+      # Grafana ignores, so everyone stayed a Viewer, without Explore).
       GF_AUTH_PROXY_HEADERS:                 'Email:X-User-Email Role:X-User-Role'
       GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN:      'true'
       # Disable basic auth + anonymous + login form — only the proxy header gets in.
       GF_AUTH_ANONYMOUS_ENABLED:             'false'
       GF_AUTH_BASIC_ENABLED:                 'false'
       GF_AUTH_DISABLE_LOGIN_FORM:            'true'
-      # New users created via auth.proxy default to Viewer. Promote individuals
-      # to Editor / Admin in the Grafana UI as needed.
+      # The role of a user the header gives no valid role. A role set by hand
+      # in Grafana's UI is replaced by X-User-Role at the next sign-in.
       GF_USERS_AUTO_ASSIGN_ORG:              'true'
       GF_USERS_AUTO_ASSIGN_ORG_ROLE:         'Viewer'
       # Don't phone home or check for new versions

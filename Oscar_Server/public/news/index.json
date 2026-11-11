@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-grafana-explore-for-administrators",
+    "date": "November 11, 2026",
+    "tag": "Operations",
+    "title": "Grafana: Explore for OSCAR administrators",
+    "summary": "For OSCAR administrators: Grafana now opens with the Editor role, so its Explore page, where Prometheus and Loki queries run, is in the left menu.",
+    "content": "Grafana gave everyone who signs in through OSCAR the Viewer role, which has no Explore. OSCAR now tells Grafana to give its administrators the Editor role, at each sign-in: Explore and dashboards to edit, but not Grafana's own administration. A role set by hand in Grafana is replaced at the next sign-in.\n\nOn a Kubernetes cluster the Admin Dashboard's Prometheus card opens Explore, which now works. Only administrators reach Grafana: testers and Test Managers are not concerned. No action is required on the VPS; on a k3s machine, the monitoring is applied again with the next release (k3s guide, section 9)."
+  },
+  {
     "id": "2026-11-11-monitoring-on-kubernetes",
     "date": "November 11, 2026",
     "tag": "Operations",
