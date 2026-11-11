@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS, 8a step 1: needed before step 2, and commands, not the
+  page's button** (#1181). Documentation only. In the recovery drill step 1
+  read as optional after a restore (the alerting values came with the
+  backup) and, from its title *From Admin → Server Config*, as a click on
+  *Apply alerting config*.
+  - Step 1 opens with *Needed, before step 2*: a backup brings Server
+    Config's values, never the Secret `oscar-alertmanager`, and the stack's
+    Alertmanager stays at *ContainerCreating* without it.
+  - The first way is *With Server Config's values*: two command blocks run
+    as root on the machine, never the page's button.
+  - 6a step 7 says step 1 comes first and uses the new name.
+
 - **k3s on one VPS, section 7: the first administrator is OSCAR's, and only
   for a new OSCAR** (#1177). Documentation only. In the recovery drill, 6a
   step 6 sent the reader to section 7, which starts with *First

@@ -541,10 +541,12 @@ backup.
   nothing reads here. From server 1.11.495 the page shows, on this machine,
   the commands of step 7 in its place.
 
-**7. Monitoring**: section 8a, steps 1 to 5. Its step 1, *From Admin →
-Server Config*, gives Alertmanager the values of step 6: the same alerts, to
-the same people, as on the VPS, with nothing typed again. Its step 5 sends a
-test alert, which must reach them.
+**7. Monitoring**: section 8a, steps 1 to 5, step 1 first (the stack's
+Alertmanager does not start without it). Its step 1, *With Server Config's
+values* (two command blocks on this machine, not the page's button), gives
+Alertmanager the values of step 6: the same alerts, to the same people, as on
+the VPS, with nothing typed again. Its step 5 sends a test alert, which must
+reach them.
 
 **8. Check before anyone uses it.**
 - Sign in as a tester or Test Manager; open a company's Test Config (its data
@@ -692,13 +694,20 @@ machine:
 It takes about 1.5 GB of memory. Prometheus keeps 15 days (8 GB at most);
 Loki keeps the logs without limit, as on the VPS.
 
-**1. Alertmanager's configuration.** It holds the mail server's password, so
-it is a Secret of your own, made one of two ways.
+**1. Alertmanager's configuration. Needed, before step 2.** Alertmanager
+reads its configuration only from the Secret `oscar-alertmanager` in this
+cluster. A backup brings Server Config's values, never that Secret: without
+it, step 2's Alertmanager stays at *ContainerCreating* and no alert is sent.
+The Secret holds the mail server's password, so you make it yourself, on this
+machine, one of two ways: *With Server Config's values* (always after section
+6a) or *By hand*.
 
-**From Admin → *Server Config***, when its *SMTP* and *Alerting* sections are
-filled in (always after section 6a: they are the VPS's). OSCAR writes the
-file from those values, as on the VPS, and you make it the Secret; the server
-itself gets no right on the cluster. First the namespace:
+**With Server Config's values**, when its *SMTP* and *Alerting* sections are
+filled in (always after section 6a: they are the VPS's). Two command blocks,
+run here as root, and never the page's *Apply alerting config* button, which
+writes the VPS's file. OSCAR writes the file from those values, as on the
+VPS, and you make it the Secret; the server itself gets no right on the
+cluster. First the namespace:
 
 ```bash
 cd /opt/oscar
