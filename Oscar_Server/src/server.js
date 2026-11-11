@@ -511,10 +511,17 @@ const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
     return res.status(500).send('Decryption failed: ' + err.message);
   }
   if (runCompanyId !== null) {
-    plaintext = withTripCalendars(withFrameworkWarnings(plaintext, company.id), company.id);
+    // Timed as the run's work on the server's thread (#1205): it runs once
+    // per run, synchronously, over the whole data file.
+    const decrypted = plaintext;
+    const copy = metrics.timeRunWork('datafile_copy', () => {
+      const made = withTripCalendars(withFrameworkWarnings(decrypted, company.id), company.id);
+      return { made, holdsTemplates: runCopyHoldsTemplates(made) };
+    });
+    plaintext = copy.made;
     // The copy adds values of the Test Framework and the Test Data: like the
     // stored file (checked before the run started), it must hold no "{{".
-    if (runCopyHoldsTemplates(plaintext)) {
+    if (copy.holdsTemplates) {
       log.warn({ companyId: company.id }, 'run datafile: the run copy holds a template, not served');
       return res.status(409).send('The data file of this run holds "{{" and is not served.');
     }
@@ -654,6 +661,9 @@ function internalRunCaller(req, runId) {
 const internalApp = express();
 internalApp.disable('x-powered-by');
 internalApp.set('trust proxy', false);
+// The run pods' calls in the request metric, listener "internal" (#1205):
+// before, nothing measured them.
+internalApp.use(metrics.httpDurationMiddlewareFor('internal'));
 internalApp.get('/data/:filename', runCallLimiter, runDatafileHandler({ runCaller: internalRunCaller, allowSession: false }));
 internalApp.get('/json_validator/datafile.schema.json', runCallLimiter, sendDatafileSchema);
 internalApp.post('/v1/runs/:runId/refresh-access-token', runCallLimiter, refreshAccessTokenHandler({ runCaller: internalRunCaller }));

@@ -15,7 +15,8 @@ Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
 
 **OSCAR · Overview** — runtime metrics:
 - Active runs / queue depth (current snapshot)
-- HTTP request rate and P95 latency
+- HTTP request rate and P95 latency (pages and API: the run pods' calls
+  are left out, #1205)
 - HTTP latency percentiles (p50/p95/p99) over time
 - HTTP requests per second by status code (find error spikes)
 - Bruno runs completed/sec by status (COMPLETED / FAILED)
@@ -27,13 +28,21 @@ Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
   with their memory
 - Row *Runs by company or provider* (#1017): runs going and waiting, runs
   ended per minute, and requests to the provider per second
+- Row *OSCAR's thread: what each run costs it* (#1205): the share of the
+  server's one thread taken by the work done for each run, how long requests
+  waited for the thread, the slowest addresses, one run's work (see
+  *OSCAR's thread* below)
 
 Which address is slow: Grafana → **Explore** → Prometheus, the 99th
-percentile by method and route over the last 5 minutes:
+percentile by listener, method and route over the last 5 minutes:
 
 ```
-histogram_quantile(0.99, sum by (le, method, route) (rate(oscar_http_request_duration_seconds_bucket[5m])))
+histogram_quantile(0.99, sum by (le, listener, method, route) (rate(oscar_http_request_duration_seconds_bucket[5m])))
 ```
+
+`listener` (from server 1.11.502, #1205) is `public` for the pages and the
+API, `internal` for the run pods' calls (`INTERNAL_PORT`: a run's data
+file, its results, its token renewed), which nothing measured before.
 
 `route` is the address's pattern with its router's path (`/v1/runs`,
 `/v1/runs/:id`, `/v1/company/datafile`; from server 1.11.499, #1196, before
@@ -161,6 +170,35 @@ No metric names a user: an e-mail would be personal data in Prometheus, and
 the series would grow with every user. *Admin → Server Activity → Runs in
 Progress* lists runs going and waiting by user and company or provider. A
 company renamed keeps its old name in the labels until OSCAR restarts.
+
+### OSCAR's thread (#1205)
+
+OSCAR's server answers every page on one thread. Work done for a run on
+that thread makes every page wait while it lasts, with the CPU, memory and
+disk far from their limits (on the k3s test machine, four providers'
+batches at once made pages take more than 10 s). From server 1.11.502, that
+work is measured where it runs:
+
+- `oscar_run_work_seconds{work}`, a histogram, one observation per run and
+  kind: `datafile_copy` (the run's copy of the data file, with the Test
+  Framework's warnings and the trips' calendars, made each time a run asks
+  for its data file) and `results_store` (the run's checks, steps and
+  requests read from Bruno's results and stored);
+- `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: every
+  line of a run's log is an encrypted insert, counted and timed in total.
+
+The row *OSCAR's thread* of *OSCAR · Overview* reads them:
+
+| Panel | How to read it |
+|---|---|
+| Share of the thread taken by run work | Seconds of work a second, by kind. Near 100 % in all, every page waits behind the runs. |
+| Event loop: how long requests waited | The worst wait and the 99th percentile since the last reading. Seconds here are seconds every page waited. |
+| Slowest addresses (99th percentile) | The ten slowest, with their listener. Slow everywhere at once is the thread; one address alone is that address. |
+| One run's work (95th percentile) | How long one run's copy or results take, and log lines a second. |
+
+The alert `OscarEventLoopLag` reads the same 99th percentile. **Until
+1.11.502 it could never fire**: it read a `_bucket` series that prom-client
+does not write (the event loop's lag is a set of gauges).
 
 ### Run pods (#1130)
 

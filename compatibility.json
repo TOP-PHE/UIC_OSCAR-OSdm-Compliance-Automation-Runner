@@ -4,6 +4,18 @@
   "current_release": "2026.540",
   "releases": [
     {
+      "release": "2026.541",
+      "date": "2026-11-11",
+      "server": "1.11.502",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.502: what each run costs the server's one thread is measured (#1205): oscar_run_work_seconds{work} times each run's data file copy (datafile_copy) and its results stored (results_store), oscar_run_log_lines_total and oscar_run_log_seconds_total its log lines; oscar_http_request_duration_seconds has a listener label, internal for the run pods' calls (INTERNAL_PORT), measured nowhere before, and buckets up to 60 s. OSCAR · Overview gets a row OSCAR's thread; its HTTP panels leave the run pods' calls out.",
+        "The alert OscarEventLoopLag reads the event loop's 99th percentile gauge: it read a _bucket series prom-client does not write, so it could never fire. Released with it (deployment files): the alert rule, its cluster copy (prometheus-rules.yaml) and the dashboard."
+      ]
+    },
+    {
       "release": "2026.540",
       "date": "2026-11-11",
       "server": "1.11.501",

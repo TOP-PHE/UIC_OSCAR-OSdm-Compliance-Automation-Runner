@@ -772,7 +772,7 @@ OSCAR ships a self-healing + paging stack so production incidents get caught and
 | `OscarSmtpDegraded` | warning | Any SMTP failure in last 10 min | Check SMTP creds in Server Config tab. Use **Send test email** to reproduce. |
 | `OscarLoginAttackBurst` | warning | >50 failed logins in 5 min | Possible brute force / credential stuffing. Check Server Activity for source IP, block at firewall. |
 | `OscarHighMemory` | warning | RSS >1 GB for 15 min | Likely a leak. Snapshot heap before restarting if you want to investigate. |
-| `OscarEventLoopLag` | warning | p99 lag >200 ms for 10 min | Heavy synchronous work — usually a giant report-builder query. Check active runs. |
+| `OscarEventLoopLag` | warning | p99 lag >200 ms for 10 min (could not fire before server 1.11.502, #1205) | Heavy synchronous work: many runs at once, or a giant report-builder query. Grafana → *OSCAR · Overview* → row *OSCAR's thread* says which; lower *Max Concurrent Runs* if it is the runs. |
 
 Rule definitions live in `OSCAR_Deploy/prometheus/alerts/oscar-alerts.yml`. Edit, then `docker exec oscar-prometheus kill -HUP 1` to reload without restart.
 

@@ -167,6 +167,8 @@ function logEvent(runId, level, message, meta) {
     return;
   }
   if (lineCount > MAX_LOG_LINES_PER_RUN) return;  // drop silently after cap
+  // Each line stored is counted, with its time on the server's thread (#1205).
+  const started = process.hrtime.bigint();
   try {
     const {
       category, phase, suite_name, request_name, http_status,
@@ -189,6 +191,10 @@ function logEvent(runId, level, message, meta) {
        scenario_name || null]
     );
   } catch (_) { /* never block execution on log errors */ }
+  try {
+    metrics.runLogLines.inc();
+    metrics.runLogSeconds.inc(Number(process.hrtime.bigint() - started) / 1e9);
+  } catch { /* a metric never stops a log line */ }
 }
 
 // "at fn (file:line:col)" stack frame. The two alternatives are the two ways the
@@ -1531,7 +1537,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   let checksStored = null;                       // null: not known (the extraction failed)
   try {
     const { extractStructuredResults } = require('../reports/structureResults');
-    const stats = extractStructuredResults(runId, companyRow.id);
+    // Synchronous, on the server's thread: timed as the run's work (#1205).
+    const stats = metrics.timeRunWork('results_store', () => extractStructuredResults(runId, companyRow.id));
     checksStored = stats.assertions;
     if (stats.assertions > 0) {
       logEvent(runId, 'info', `[runner] Stored ${stats.assertions} assertions across ${stats.suites} suites and ${stats.requests} requests.`);
