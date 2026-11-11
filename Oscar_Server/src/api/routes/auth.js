@@ -522,9 +522,14 @@ router.post('/logout', requireAuth, (req, res) => {
 //   - Validates the JWT (same path as requireAuth)
 //   - If user.role === 'administrator' → 200 + X-User-Email + X-User-Role
 //     (X-User-Role is Grafana's role for that user, GRAFANA_ROLE below)
-//   - Else (no token, expired, wrong role) → 401
+//   - No session, or an ended one → 401 (requireAuth): the proxy sends the
+//     browser to the sign-in page (nginx's @sso_login, Traefik's
+//     authSigninURL)
+//   - A session, but not an administrator's → 403 (#1199): signing in again
+//     would not help, and a redirect to the sign-in page would bring the
+//     same person back here in a loop
 //
-// nginx receives the 200/401 from this call and decides whether to allow
+// nginx receives the 200/401/403 from this call and decides whether to allow
 // the proxy_pass through. On 200 it forwards the X-User-Email back to
 // the upstream (Grafana) as X-WEBAUTH-USER, which Grafana's auth.proxy
 // module accepts as the authenticated identity (auto-creates the user
@@ -560,8 +565,8 @@ const GRAFANA_ROLE = 'Editor';
 router.get('/sso-check', ssoCheckLimiter, requireAuth, (req, res) => {
   const role = normalizeRole(req.user?.role);
   if (role !== 'administrator') {
-    return res.status(401).set('Cache-Control', 'no-store').json({
-      status: 401, title: 'Unauthorized',
+    return res.status(403).set('Cache-Control', 'no-store').json({
+      status: 403, title: 'Forbidden',
       detail: 'SSO into the admin observability stack is restricted to administrators.'
     });
   }

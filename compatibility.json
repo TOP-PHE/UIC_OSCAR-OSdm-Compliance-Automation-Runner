@@ -4,6 +4,18 @@
   "current_release": "2026.538",
   "releases": [
     {
+      "release": "2026.539",
+      "date": "2026-11-11",
+      "server": "1.11.500",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.500: after signing in, the sign-in page goes back to Grafana or Prometheus when their sign-in check sent the browser there (?next=, only those two, as fixed addresses of the site); GET /v1/auth/sso-check answers 403, not 401, to a session that is not an administrator's, so it is not sent to sign in again in a loop (#1199).",
+        "Released with it (deployment files): on Kubernetes, Traefik sends a visitor with no session, or an ended one, to OSCAR's sign-in page (forwardAuth authSigninURL, Traefik 3.7), as nginx does on the VPS; it showed OSCAR's 401 as JSON."
+      ]
+    },
+    {
       "release": "2026.538",
       "date": "2026-11-11",
       "server": "1.11.499",

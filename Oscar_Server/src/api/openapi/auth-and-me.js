@@ -42,8 +42,8 @@ module.exports = {
   },
   '/v1/auth/sso-check': {
     get: { tags: ['Auth'], summary: 'Is the session an administrator\'s? (for the reverse proxy)', security: bearer,
-      description: 'Asked by the reverse proxy before it lets a request through to the monitoring tools. An administrator\'s session answers 200 { ok: true } with the X-User-Email and X-User-Role headers, X-User-Role being the role Grafana gives that user (Editor: Explore included, #1193); any other session, or none, 401. Not cached. At most 600 checks in 5 minutes per address.',
-      responses: { 200: { description: 'An administrator' }, 401: { description: 'No session, or not an administrator' }, 429: { description: 'Too many checks' } } },
+      description: 'Asked by the reverse proxy before it lets a request through to the monitoring tools. An administrator\'s session answers 200 { ok: true } with the X-User-Email and X-User-Role headers, X-User-Role being the role Grafana gives that user (Editor: Explore included, #1193); no session, or an ended one, 401 (the proxy then sends the browser to the sign-in page); a session that is not an administrator\'s, 403 (#1199). Not cached. At most 600 checks in 5 minutes per address.',
+      responses: { 200: { description: 'An administrator' }, 401: { description: 'No session, or an ended one' }, 403: { description: 'A session, not an administrator\'s' }, 429: { description: 'Too many checks' } } },
   },
   '/v1/auth/bootstrap/platform-user': {
     post: { tags: ['Auth'], summary: 'Create an administrator or certifier with the server\'s bootstrap token', security: open,

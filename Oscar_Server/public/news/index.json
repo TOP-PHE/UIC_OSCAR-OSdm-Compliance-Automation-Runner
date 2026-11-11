@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-grafana-sign-in-again",
+    "date": "November 11, 2026",
+    "tag": "Operations",
+    "title": "Grafana: signing in again brings you back to it",
+    "summary": "For OSCAR administrators: when your OSCAR session has ended, opening Grafana leads to OSCAR's sign-in page, and from there back to Grafana.",
+    "content": "An OSCAR session lasts 8 hours. When it had ended, opening Grafana on a Kubernetes installation showed a short technical message instead of the sign-in page, and on any installation the sign-in page then opened the home page instead of Grafana.\n\nNow an ended session leads to OSCAR's sign-in page, and once signed in you are back in Grafana (or Prometheus on the VPS). A signed-in user who is not an administrator is shown \"Forbidden\" instead of the sign-in page.\n\nTesters and Test Managers are not otherwise concerned. No action is required."
+  },
+  {
     "id": "2026-11-11-grafana-explore-for-administrators",
     "date": "November 11, 2026",
     "tag": "Operations",
