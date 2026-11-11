@@ -491,6 +491,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.499] — 2026-11-11
+
+Listed in `compatibility.json` (2026.538) without moving `current_release`.
+
+### Changed
+
+- **The HTTP metric names the whole route** (#1196). In the recovery drill,
+  the 99th percentile by route under 15 runs named the slowest route `/`, at
+  up to 4.75 s: `httpDurationMiddleware` labelled a request with
+  `req.route.path`, the path inside its router, so `/` was the root of every
+  router (`GET` and `POST /v1/runs`, `GET /v1/company`, the providers', the
+  users', `/v1/me/credentials`).
+  - `routeLabel()` (`utils/metrics.js`): the router's mount path and the
+    route's pattern (`/v1/runs`, `/v1/runs/:id`, `/v1/company/datafile`).
+    `server.js` mounts every router on a fixed path, so no id gets in; a test
+    keeps it so.
+  - Without a route: the router's path when a router stopped the request
+    (401, 429), the file's path for a static file served (2xx, 304), else
+    `unmatched`. A request no route matched was labelled with its own
+    address, so every address a scanner tried made a label.
+  - `metrics-route-label.test.js` runs the real middleware in an Express app
+    laid out as `server.js` (an answer given later included), and fails on
+    the old label.
+  - No dashboard or alert filters on `route`. *metrics-and-monitoring.md*
+    gives the query by method and route, and says what *Errors only* counts
+    since #1187.
+
+---
+
 ## [server-1.11.498] — 2026-11-11
 
 Listed in `compatibility.json` (2026.537) without moving `current_release`.

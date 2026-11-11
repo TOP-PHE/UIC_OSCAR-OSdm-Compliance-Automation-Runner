@@ -28,8 +28,21 @@ Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
 - Row *Runs by company or provider* (#1017): runs going and waiting, runs
   ended per minute, and requests to the provider per second
 
+Which address is slow: Grafana → **Explore** → Prometheus, the 99th
+percentile by method and route over the last 5 minutes:
+
+```
+histogram_quantile(0.99, sum by (le, method, route) (rate(oscar_http_request_duration_seconds_bucket[5m])))
+```
+
+`route` is the address's pattern with its router's path (`/v1/runs`,
+`/v1/runs/:id`, `/v1/company/datafile`; from server 1.11.499, #1196, before
+which the root of every router read `/`), a static file its own path, any
+other address `unmatched`.
+
 **OSCAR · Logs** — centralised log aggregation:
-- Errors-only view (regex-matches ERROR / FATAL / PANIC)
+- Errors-only view: OSCAR's lines at level error or fatal, and other lines
+  holding error, fatal or panic as a word of their own (#1187)
 - Full live tail (5s refresh) with substring search box
 - Per-container filter (variable dropdown)
 - Log rate timeseries by container
