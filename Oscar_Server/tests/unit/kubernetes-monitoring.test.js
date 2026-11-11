@@ -193,6 +193,20 @@ describe('Grafana behind OSCAR\'s sign-in (Traefik ForwardAuth)', () => {
     expect(grafanaIni.users.auto_assign_org_role).toBe(compose.services.grafana.environment.GF_USERS_AUTO_ASSIGN_ORG_ROLE);
   });
 
+  test('an ended session goes to OSCAR\'s sign-in page, then back to Grafana, as on the VPS (#1199)', () => {
+    // Traefik 3.7's authSigninURL: a 401 from the check becomes a 302 there.
+    // A path, so the same host and nothing for the guide's sed to replace.
+    const signin = middleware.spec.forwardAuth.authSigninURL;
+    expect(signin).toBe('/index.html?next=/grafana/');
+    expect(grafanaIni.server.root_url).toMatch(/\/grafana\/$/);
+    // The VPS's nginx sends a 401 to the same page with the same parameter.
+    expect(read('OSCAR_Deploy/nginx/oscar-metrics.conf.snippet')).toContain('return 302 /index.html?next=$request_uri;');
+    // The page follows it back to Grafana (ui-scripts.test.js runs the function).
+    expect(read('Oscar_Server/public/index.html')).toContain("nextAfterSignIn(window.location.search) || '/welcome.html'");
+    // k3s ships a Traefik that has the field: 3.7.15 with the release the guide pins.
+    expect(guide).toMatch(/INSTALL_K3S_VERSION=v1\.(3[6-9]|[4-9]\d)\./);
+  });
+
   test('OSCAR\'s administrators are Grafana Editors, on the cluster and on the VPS (#1193)', () => {
     // Grafana's auth proxy takes the Role header only when it is one of its
     // own roles, and sets it at each sign-in (getRoles(), IsValid()); any

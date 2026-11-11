@@ -32,6 +32,12 @@ spec:
     authResponseHeaders:
       - X-User-Email
       - X-User-Role
+    # No session, or an ended one (8 h): OSCAR answers 401, and Traefik sends
+    # the browser to OSCAR's sign-in page, which comes back to Grafana once
+    # signed in, as nginx's @sso_login does on the VPS (#1199). Without it the
+    # visitor saw OSCAR's 401 as JSON. A path: same host, nothing to replace.
+    # Traefik 3.7 and later (k3s v1.36.6 ships 3.7.15).
+    authSigninURL: /index.html?next=/grafana/
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

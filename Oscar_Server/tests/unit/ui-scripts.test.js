@@ -840,6 +840,30 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     });
   });
 
+  describe('index.html — back to Grafana or Prometheus once signed in (#1199)', () => {
+    const nextAfterSignIn = loadFunction('index.html', 'nextAfterSignIn', { URLSearchParams });
+    const page = read('index.html');
+
+    test('the two tools, as fixed addresses of this site', () => {
+      expect(nextAfterSignIn('?next=/grafana/')).toBe('/grafana/');
+      expect(nextAfterSignIn('?next=%2Fgrafana%2Fd%2Foscar-logs%3Fx%3D1')).toBe('/grafana/');
+      expect(nextAfterSignIn('?next=/prometheus/graph')).toBe('/prometheus/');
+    });
+
+    test('nothing else: another site, another page, nothing', () => {
+      for (const s of ['', '?next=', '?next=/welcome.html', '?next=//evil.example/grafana/',
+        '?next=https://evil.example/grafana/', '?next=javascript:alert(1)', '?next=/grafanax/',
+        '?next=%5C%5Cevil.example%2Fgrafana%2F', '?other=/grafana/']) {
+        expect([s, nextAfterSignIn(s)]).toEqual([s, null]);
+      }
+    });
+
+    test('a sign-in check\'s redirect shows the form instead of jumping to the home page', () => {
+      expect(page).toContain("window.location.href = nextAfterSignIn(window.location.search) || '/welcome.html';");
+      expect(page).toContain("if (localStorage.getItem('oscar_user') && !nextAfterSignIn(window.location.search)) {");
+    });
+  });
+
   describe('admin-dashboard.html — the Prometheus card on Kubernetes (#1187)', () => {
     const prometheusCardFor = loadFunction('admin-dashboard.html', 'prometheusCardFor');
     const page = read('admin-dashboard.html');

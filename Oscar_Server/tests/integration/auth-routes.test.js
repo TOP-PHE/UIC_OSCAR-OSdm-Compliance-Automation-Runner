@@ -274,9 +274,12 @@ describe('authenticated endpoints', () => {
     expect(res.body.logged_out).toBe(true);
   });
 
-  test('GET /sso-check 401 for a non-administrator', async () => {
+  test('GET /sso-check 403 for a non-administrator, 401 without a session (#1199)', async () => {
+    // 401 sends the browser to the sign-in page (nginx, Traefik); a session
+    // that is not an administrator's is refused without it, or it would loop.
     const res = await request(app).get('/v1/auth/sso-check').set('Authorization', `Bearer ${sessionToken(meUser)}`);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
+    expect((await request(app).get('/v1/auth/sso-check')).status).toBe(401);
   });
 
   test('GET /sso-check 200 for an administrator, echoing identity headers', async () => {

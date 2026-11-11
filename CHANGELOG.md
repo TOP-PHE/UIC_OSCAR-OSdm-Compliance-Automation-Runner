@@ -491,6 +491,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.500] — 2026-11-11
+
+Listed in `compatibility.json` (2026.539) without moving `current_release`.
+
+### Changed
+
+- **An ended session in front of Grafana opens the sign-in page, then
+  Grafana** (#1199). In the recovery drill, after OSCAR's 8-hour session
+  ended, opening Grafana on k3s showed OSCAR's answer as JSON
+  (`{"status":401,…,"detail":"Missing Bearer token."}`): Traefik's
+  forwardAuth hands the check's 401 to the browser, where the VPS's nginx
+  sends it to `@sso_login` (`302 /index.html?next=$request_uri`). And the
+  sign-in page ignored `next` on both.
+  - Kubernetes: the `oscar-sso` Middleware has `authSigninURL:
+    /index.html?next=/grafana/` (Traefik 3.7.0 and later; k3s v1.36.6 ships
+    3.7.15, and its Middleware CRD has the field). A path: same host,
+    nothing for the guide's `sed`.
+  - `index.html`: `nextAfterSignIn()` follows `next` when it is a page of
+    Grafana or Prometheus, and only as the fixed `/grafana/` or
+    `/prometheus/`, so a link cannot send someone signing in elsewhere. With
+    such a `next` the page shows the form instead of jumping to the home page
+    on what the browser remembers.
+  - `GET /v1/auth/sso-check` answers **403** to a session that is not an
+    administrator's (it was 401). Both proxies send only a 401 to the sign-in
+    page: a signed-in Test Manager would have gone round between Grafana and
+    the sign-in page. On the VPS, such a visitor now sees nginx's 403 instead
+    of the sign-in page.
+  - `check-monitoring.sh` (the k3s CI) expects the redirect without a session
+    and 403 for a Test Manager; `ui-scripts.test.js` runs
+    `nextAfterSignIn()`; `auth-routes.test.js` the 403 and the 401;
+    `kubernetes-monitoring.test.js` the Middleware's field. The k3s guide's
+    8a step 4 says what an ended session does.
+
+---
+
 ## [server-1.11.499] — 2026-11-11
 
 Listed in `compatibility.json` (2026.538) without moving `current_release`.

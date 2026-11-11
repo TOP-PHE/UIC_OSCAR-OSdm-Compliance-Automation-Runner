@@ -161,6 +161,20 @@ function showError(msg) {
   el.style.display = 'block';
 }
 
+// Where to go once signed in (#1199). The sign-in check in front of Grafana
+// and Prometheus sends the browser here with ?next= (Traefik's authSigninURL
+// on k3s, nginx's @sso_login on the VPS). Only those two tools are followed,
+// and only as fixed addresses of this site: a link cannot send someone
+// signing in anywhere else. null: the home page, as before.
+function nextAfterSignIn(search) {
+  let next = null;
+  try { next = new URLSearchParams(search).get('next'); } catch { return null; }
+  if (typeof next !== 'string') return null;
+  if (next.startsWith('/grafana/')) return '/grafana/';
+  if (next.startsWith('/prometheus/')) return '/prometheus/';
+  return null;
+}
+
 // One-shot session-expired notice. Set by the global fetch interceptor in
 // nav.js when an authenticated API call returns 401 — picked up here on
 // the next page load and surfaced as an inline notice above the login form.
@@ -194,7 +208,7 @@ async function doLogin(e) {
     if (data.token) localStorage.setItem('oscar_token', data.token);
     localStorage.setItem('oscar_company', JSON.stringify(data.company));
     localStorage.setItem('oscar_user', JSON.stringify(data.user));
-    window.location.href = '/welcome.html';
+    window.location.href = nextAfterSignIn(window.location.search) || '/welcome.html';
   } catch(err) { console.error('Sign-in failed:', err); showError('Server unreachable. Is OSCAR running?'); }
   finally { btn.disabled = false; btn.textContent = 'Sign In'; }
 }
@@ -239,8 +253,10 @@ document.getElementById('tab-register').addEventListener('click', () => showTab(
 document.getElementById('login').addEventListener('submit', doLogin);
 document.getElementById('register-form').addEventListener('submit', doRegister);
 
-// If already logged in, go straight to the welcome page
-if (localStorage.getItem('oscar_user')) {
+// If already logged in, go straight to the welcome page. Not when a sign-in
+// check sent the browser here (?next=): its session has ended, whatever this
+// browser remembers, and going through the home page would lose ?next= (#1199).
+if (localStorage.getItem('oscar_user') && !nextAfterSignIn(window.location.search)) {
   window.location.href = '/welcome.html';
 }
 </script>

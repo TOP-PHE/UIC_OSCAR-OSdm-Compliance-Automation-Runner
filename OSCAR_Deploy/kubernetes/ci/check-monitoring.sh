@@ -163,15 +163,19 @@ sign_in() {
 admin=$(jq -r .admin_email "$SMOKE_ACCOUNT_FILE")
 sign_in "$admin" "$(jq -r .admin_password "$SMOKE_ACCOUNT_FILE")" "$work/admin.jar"
 sign_in "$(jq -r .tm_email "$SMOKE_ACCOUNT_FILE")" "$(jq -r .tm_password "$SMOKE_ACCOUNT_FILE")" "$work/tm.jar"
+# No session: Traefik sends the browser to OSCAR's sign-in page (authSigninURL, #1199).
+signin_of() { curl -sk -o /dev/null -w '%{redirect_url}' --resolve "$host:443:$NODE_IP" "$@"; }
 code=$(grafana "https://$host/grafana/api/health")
-echo "nobody signed in: $code"
-test "$code" = 401
+echo "nobody signed in: $code, to $(signin_of "https://$host/grafana/api/health")"
+test "$code" = 302
+test "$(signin_of "https://$host/grafana/api/health")" = "https://$host/index.html?next=/grafana/"
 code=$(grafana -H "X-User-Email: $admin" "https://$host/grafana/api/user")
 echo "an administrator's e-mail, sent by hand: $code"
-test "$code" = 401
+test "$code" = 302
+# Signed in, not an administrator: refused, never sent to sign in again.
 code=$(grafana -b "$work/tm.jar" "https://$host/grafana/api/user")
 echo "a Test Manager, signed in: $code"
-test "$code" = 401
+test "$code" = 403
 code=$(grafana -b "$work/admin.jar" -H 'X-User-Email: someone-else@example.org' "https://$host/grafana/api/user")
 echo "an administrator, signed in, sending another e-mail: $code"
 test "$code" = 200

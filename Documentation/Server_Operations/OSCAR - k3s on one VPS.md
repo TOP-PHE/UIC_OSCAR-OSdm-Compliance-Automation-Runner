@@ -830,7 +830,10 @@ sudo kubectl -n monitoring get pods
 **4. Grafana.** Sign in to OSCAR as an administrator, then Admin →
 *Dashboard* → *Grafana* (`https://oscar-test.example.org/grafana/`). As on
 the VPS, Traefik asks OSCAR who is signed in before each request, and only an
-administrator gets through. The dashboards:
+administrator gets through. Not signed in, or the session ended (it lasts
+8 hours): Traefik opens OSCAR's sign-in page, which comes back to Grafana
+once signed in. Signed in, but not an administrator: *Forbidden* (#1199;
+before, OSCAR's answer showed as `{"status":401,…}`). The dashboards:
 - *OSCAR · Overview*, *OSCAR · Logs*, *OSDM Simulator*: the VPS's;
 - *OSCAR · Kubernetes*: each run's memory and CPU, the runs stopped for
   memory, the runs' quota, OSCAR's pods, the machine;
