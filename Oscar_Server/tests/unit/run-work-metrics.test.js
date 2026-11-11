@@ -35,7 +35,8 @@ const exprsOf = (dashboard) => dashboard.panels.flatMap((p) => (p.targets || [])
 const OWN = /\boscar_(?:node|http|run_work|run_log)_[a-z0-9_]+/g;
 
 async function typesWritten() {
-  return new Map((await metrics.register.getMetricsAsJSON()).map((f) => [f.name, f.type]));
+  // prom-client types `type` as its MetricType enum: its values are these words.
+  return new Map((await metrics.register.getMetricsAsJSON()).map((f) => [f.name, String(f.type)]));
 }
 
 // Every series an expression reads, by name and by the series it asks for.
