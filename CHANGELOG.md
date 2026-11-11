@@ -59,6 +59,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     for *tls: unrecognized name* right after Traefik restarted, OSCAR's pod
     restarted so that Traefik asks again.
 
+- **k3s on one VPS, 8a step 1: what the Secret block prints, apart from what
+  to do** (#1179). Documentation only. In the recovery drill the bullet
+  *"SMTP_HOST is empty" … fill that in Server Config first* read as a step,
+  though Server Config came filled in with the backup.
+  - What it prints when it works (`created`, then `configured`), and that
+    after section 6a it works the first time.
+  - A table *If it prints instead*: the annotation warning, an empty mail
+    server or recipient list (a new OSCAR only), the `monitoring` namespace
+    missing, OSCAR not running.
+  - The Watchdog and *Apply alerting config* notes under *Good to know*.
+
 - **k3s on one VPS and Disaster Recovery: the values to change come first in
   each command** (#1171). Documentation only. During the recovery drill
   placeholders inside long command lines were missed in copy-paste: one run of

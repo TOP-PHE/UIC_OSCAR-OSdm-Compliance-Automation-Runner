@@ -725,17 +725,25 @@ sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e "conso
 shred -u ~/alertmanager.yaml
 ```
 
-- It prints `secret/oscar-alertmanager created` the first time, `configured`
-  after a change; Alertmanager reads a change within a minute. A Secret made
-  by an earlier version of this step gives, once, a warning about a missing
-  annotation: harmless.
-- "SMTP_HOST is empty" or "ALERT_RECIPIENTS is empty": fill that in Server
-  Config first (nothing was created).
+When it works, it prints `secret/oscar-alertmanager created` the first time
+and `secret/oscar-alertmanager configured` after a change. Alertmanager reads
+a change within a minute. After section 6a it works the first time: the mail
+server and the recipients came with the backup.
+
+| If it prints instead | What it means, what to do |
+|---|---|
+| A warning about a missing annotation, then `configured` | The Secret was made by an earlier version of this step. Harmless, shown once. |
+| `SMTP_HOST is empty` or `ALERT_RECIPIENTS is empty` | Server Config has no mail server or no alert recipient yet: a new OSCAR only, never after 6a. Fill it in, save, then run the block again. Nothing was created. |
+| `namespaces "monitoring" not found` | The namespace block above was not run. Run it, then this block again. |
+| `deployments.apps "oscar" not found`, or `container not found` | OSCAR is not running. `sudo kubectl -n oscar get pods` must show `1/1` first. |
+
+Good to know:
 - From server 1.11.494 the file sends the chart's Watchdog (an alert that
   always fires) and its "info" alerts to no one; an earlier server's file
   mails the Watchdog every 4 hours.
 - *Apply alerting config* on that page writes the VPS's file: never needed
-  here.
+  here, and never clicked (from server 1.11.495 the page shows this block in
+  its place).
 
 **Or by hand**, from the example: fill in the mail server and the
 administrators' address, then:
