@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS, section 9: a new OSCAR release in three blocks, with
+  their checks** (#1190). Documentation only. In the recovery drill the move
+  of the test machine to release 2026.535 was one table cell: `git pull` or a
+  tag checkout, a `diff`, `newTag` and `RUN_IMAGE` set by hand, an apply; no
+  wait for the pod, no check of the version, nothing on the monitoring.
+  - *What is yours in OSCAR's overlay*: the `diff -r` before it is made again.
+  - *OSCAR, on the new release*: the tag, the overlay made again from the
+    release's own (as 6a step 4), the rollout wait and `/health`; a checkout
+    that followed `main` moves to the tag the same way. What `ImagePullBackOff`
+    means (images not published yet, or a wrong release).
+  - *The monitoring of the same release*: 8a steps 2 and 3 again; the
+    Alertmanager Secret stays.
+  - The table keeps the other tasks; its release and monitoring rows point to
+    the blocks.
+
 - **k3s on one VPS, 8a step 1: a check first, then what to do for each
   result** (#1183). Documentation only. In the recovery drill the Secret was
   already made; the reader opened `~/alertmanager.yaml`, found it empty, and

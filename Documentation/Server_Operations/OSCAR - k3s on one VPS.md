@@ -420,7 +420,8 @@ git checkout "$RELEASE"
 
 git answers *You are in 'detached HEAD' state*: normal, the files are pinned
 to that release and nothing is committed here. `git pull` does not work in
-that state: a later release is taken the same way (section 9).
+that state: a later release is taken the same way (section 9, *A new OSCAR
+release*).
 
 **3. OSCAR's secrets, with the backup's keys.** The same `ENCRYPTION_KEY`, or
 the stored credentials, data files and reports cannot be read; the same
@@ -877,15 +878,91 @@ sudo kubectl -n monitoring exec statefulset/alertmanager-kube-prometheus-stack-a
 
 On a managed cluster the provider does part of this. Here it is yours.
 
+### A new OSCAR release
+
+When you choose, with no run going: OSCAR stops while its new pod starts,
+about a minute. Watchtower does not apply here. The files and the images of
+one release, then the monitoring of the same release. Each block starts again
+from the release's own files, as 6a step 4 does, so a change in them comes
+along by itself, and a block can be run again after a mistake.
+
+**1. What is yours in OSCAR's overlay**, before it is made again:
+
+```bash
+cd /opt/oscar
+diff -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
+```
+
+It shows your name and the release, nothing else. Any other line is a change
+of yours: make it again in `overlays/site` after the next block, then run its
+`apply` again.
+
+**2. OSCAR, on the new release:**
+
+```bash
+HOST=oscar-test.example.org     # ← yours: this machine's DNS name
+RELEASE=release-YYYY.NNN        # ← yours: the release to move to
+cd /opt/oscar
+git fetch --tags origin
+git checkout "$RELEASE"
+rm -rf OSCAR_Deploy/kubernetes/overlays/site
+cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
+sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
+sed -i "s/release-[0-9]*\.[0-9]*/$RELEASE/" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+grep -n "release-\|$HOST" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
+sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
+sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
+curl -sS -w '\nHTTP %{http_code}\n' "https://$HOST/health"
+```
+
+- `RELEASE`: a tag of the
+  [releases](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/releases).
+  Its images are published a few minutes after it (GitHub Actions,
+  *Publish · cluster images to GHCR*).
+- `git checkout` says *detached HEAD*: normal. A checkout that followed `main`
+  (sections 2 to 6) moves to the tag the same way, and takes its releases by
+  tag from then on.
+- The `grep` shows your release twice (`newTag`, `RUN_IMAGE`) and your name
+  three times, as in 6a step 4. `YYYY` there means `RELEASE` was not changed.
+- `rollout status` ends with *successfully rolled out*. *0 of 1 updated
+  replicas*, then *exceeded its progress deadline*, with `ImagePullBackOff` in
+  `sudo kubectl -n oscar get pods`: the release's images are not published
+  yet, or `RELEASE` is wrong. Once they are, the pod starts by itself: run
+  `rollout status` again.
+- `/health` names the new release and says `"compatibility_status":
+  "tested"`, then `HTTP 200`.
+
+**3. The monitoring of the same release**, once section 8a is done (8a steps
+2 and 3 again, from the release's files):
+
+```bash
+HOST=oscar-test.example.org     # ← yours: this machine's DNS name
+cd /opt/oscar
+rm -rf OSCAR_Deploy/kubernetes/monitoring/site
+cp -r OSCAR_Deploy/kubernetes/monitoring/stack OSCAR_Deploy/kubernetes/monitoring/site
+sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/monitoring/site/kube-prometheus-stack.yaml OSCAR_Deploy/kubernetes/monitoring/site/grafana-ingress.yaml
+grep -rn "example.org" OSCAR_Deploy/kubernetes/monitoring/site
+sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site
+sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar
+```
+
+- The `grep` prints nothing.
+- What did not move prints `unchanged`. A new chart `version` is installed by
+  k3s within minutes; new dashboards and alert rules come with
+  `monitoring/oscar`.
+- Alertmanager's Secret is not in these files: it stays as 8a step 1 made it.
+
+### The rest
+
 | What | When | How |
 |---|---|---|
-| **A new OSCAR release** | when you choose | `git pull`, or after 6a (the files on a release tag, *detached HEAD*) `git fetch --tags origin` then `git checkout release-YYYY.NNN` with the new release (then `diff -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site` shows what moved besides your name), in `overlays/site/kustomization.yaml` set `newTag` and `RUN_IMAGE` to the release (its images are published a few minutes after it), then `sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site`. OSCAR stops while the new pod starts. Watchtower does not apply here. |
+| **A new OSCAR release** | when you choose | the three blocks above. |
 | **A k3s update** | a patch about once a month, a new minor version about every 4 months (each is maintained about a year) | the install command of step 3 again, with the new `INSTALL_K3S_VERSION` (one minor version at a time). The settings stay. A minute without OSCAR. |
 | **k3s's own certificates** | they last a year | renewed when k3s starts within 90 days of their end: an update does it, otherwise `sudo systemctl restart k3s` once a year. |
 | **Backups** | as on the VPS | `sudo OSCAR_Deploy/kubernetes/oscar-data.sh save /root/oscar-save-$(date +%F)`: OSCAR stops for a minute, then the database, data files and reports are in that folder. Encrypt it and copy it off the machine. `ENCRYPTION_KEY` stays in your password manager. To restore: section 6a from its step 2, with the key from your password manager (a saved folder has no `.env`) and `oscar-data.sh load <folder>`. |
 | **Disk** | now and then | `df -h /var/lib/rancher`. Old images are removed only near 85 % full; `sudo k3s crictl rmi --prune` removes the unused ones. |
 | **Logs** | when something is wrong | Grafana's *OSCAR · Logs* (section 8a), or `sudo kubectl -n oscar logs deploy/oscar`, `… logs deploy/oscar-dispatcher`, `sudo kubectl -n oscar-runs get events`, `sudo kubectl -n kube-system logs deploy/traefik`. |
-| **Monitoring** | after a `git pull` | `diff -r OSCAR_Deploy/kubernetes/monitoring/stack OSCAR_Deploy/kubernetes/monitoring/site` shows what moved besides your name (a new chart `version`, for instance): bring it into `monitoring/site`, then `sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/site` and `sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar`. |
+| **Monitoring** | with each release | the third block above. |
 
 `oscar-data.sh` runs as root here (`sudo`), so it uses k3s's `kubectl`.
 
