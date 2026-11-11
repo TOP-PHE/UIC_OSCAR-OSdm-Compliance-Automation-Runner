@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS, 8a step 1: a check first, then what to do for each
+  result** (#1183). Documentation only. In the recovery drill the Secret was
+  already made; the reader opened `~/alertmanager.yaml`, found it empty, and
+  wondered whether to run *By hand* too.
+  - *Is it there?*: `kubectl -n monitoring get secret oscar-alertmanager`,
+    and a table: there (see what it holds, then step 2; make it again after a
+    change in Server Config) or not found (*With Server Config's values* when
+    Server Config has a mail server, always after 6a, else *By hand*).
+  - *What it holds*: the Secret's file without `smtp_auth_password`.
+  - `~/alertmanager.yaml` is temporary: the block deletes it.
+  - *By hand* is instead of the first way, never after it; its
+    `already exists` is explained.
+  - 6a step 7 says step 1 starts with that check.
+
 - **k3s on one VPS, 8a step 1: needed before step 2, and commands, not the
   page's button** (#1181). Documentation only. In the recovery drill step 1
   read as optional after a restore (the alerting values came with the
