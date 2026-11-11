@@ -284,7 +284,8 @@ describe('authenticated endpoints', () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
     expect(res.headers['x-user-email']).toBe(adminUser.email);
-    expect(res.headers['x-user-role']).toBe('administrator');
+    // Grafana's role for the user: one of Grafana's words, or Grafana ignores it (#1193).
+    expect(res.headers['x-user-role']).toBe('Editor');
   });
 });
 

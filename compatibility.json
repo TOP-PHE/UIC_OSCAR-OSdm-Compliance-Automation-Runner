@@ -4,6 +4,17 @@
   "current_release": "2026.536",
   "releases": [
     {
+      "release": "2026.537",
+      "date": "2026-11-11",
+      "server": "1.11.498",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.498: OSCAR's administrators are Grafana Editors, so Explore is theirs (#1193). GET /v1/auth/sso-check answers X-User-Role: Editor, a Grafana role, which Grafana sets at each sign-in; it answered \"administrator\", which Grafana ignores, so everyone stayed a Viewer and the Prometheus card of 1.11.496 led to a page they could not use. On the VPS this takes effect with the server image (Grafana and nginx already read the header); on Kubernetes the stack's Grafana maps the header too (OSCAR_Deploy). A role set by hand in Grafana is replaced at the next sign-in."
+      ]
+    },
+    {
       "release": "2026.536",
       "date": "2026-11-11",
       "server": "1.11.497",

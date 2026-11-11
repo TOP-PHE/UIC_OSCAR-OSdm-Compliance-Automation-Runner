@@ -184,12 +184,32 @@ describe('Grafana behind OSCAR\'s sign-in (Traefik ForwardAuth)', () => {
     // Traefik removes a header of authResponseHeaders the visitor sent before
     // it adds OSCAR's: the visitor cannot choose it.
     expect(middleware.spec.forwardAuth.authResponseHeaders).toContain(proxy.header_name);
-    expect(proxy.headers).toBe(`Email:${proxy.header_name}`);
+    expect(proxy.headers).toBe(`Email:${proxy.header_name} Role:X-User-Role`);
+    expect(middleware.spec.forwardAuth.authResponseHeaders).toContain('X-User-Role');
     expect(grafanaIni.auth.disable_login_form).toBe(true);
     expect(grafanaIni['auth.anonymous'].enabled).toBe(false);
     expect(grafanaIni['auth.basic'].enabled).toBe(false);
     // As on the VPS.
     expect(grafanaIni.users.auto_assign_org_role).toBe(compose.services.grafana.environment.GF_USERS_AUTO_ASSIGN_ORG_ROLE);
+  });
+
+  test('OSCAR\'s administrators are Grafana Editors, on the cluster and on the VPS (#1193)', () => {
+    // Grafana's auth proxy takes the Role header only when it is one of its
+    // own roles, and sets it at each sign-in (getRoles(), IsValid()); any
+    // other word is ignored and the user stays at auto_assign_org_role, a
+    // Viewer, who has no Explore. sso-check answers that header.
+    const authRoute = read('Oscar_Server/src/api/routes/auth.js');
+    const role = /^const GRAFANA_ROLE = '(\w+)';$/m.exec(authRoute);
+    expect(role).not.toBeNull();
+    expect(role[1]).toBe('Editor');
+    expect(['Viewer', 'Editor', 'Admin']).toContain(role[1]);
+    expect(authRoute).toContain(".set('X-User-Role',  GRAFANA_ROLE)");
+    // The cluster maps it (above). The VPS: Grafana maps it, nginx passes it on
+    // from OSCAR's answer and sets it itself, so a visitor cannot choose it.
+    expect(compose.services.grafana.environment.GF_AUTH_PROXY_HEADERS.split(' ')).toContain('Role:X-User-Role');
+    const nginx = read('OSCAR_Deploy/nginx/oscar-metrics.conf.snippet');
+    expect(nginx).toMatch(/auth_request_set\s+\$sso_role\s+\$upstream_http_x_user_role;/);
+    expect(nginx).toMatch(/proxy_set_header\s+X-User-Role\s+\$sso_role;/);
   });
 
   test('only Traefik reaches Grafana; Prometheus does not read it', () => {

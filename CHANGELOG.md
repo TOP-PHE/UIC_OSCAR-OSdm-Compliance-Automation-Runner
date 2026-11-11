@@ -491,6 +491,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.498] — 2026-11-11
+
+Listed in `compatibility.json` (2026.537) without moving `current_release`.
+
+### Changed
+
+- **OSCAR's administrators are Grafana Editors: Explore is theirs** (#1193).
+  In the recovery drill Grafana's menu had no Explore, and the Prometheus
+  card of 1.11.496, which opens Explore on Kubernetes, led to a page the
+  administrator could not use. Grafana's auth proxy takes the `Role` header
+  only when it is one of its own roles (`Viewer`, `Editor`, `Admin`) and sets
+  it at each sign-in (`getRoles()` in Grafana's `authn/clients`); `sso-check`
+  answered `X-User-Role: administrator`, which it ignores, so every user
+  stayed at `auto_assign_org_role`, a Viewer.
+  - `GET /v1/auth/sso-check` answers `X-User-Role: Editor` (`GRAFANA_ROLE` in
+    `auth.js`): Explore and dashboards to edit, not Grafana's own
+    administration. Only an administrator's session gets the 200.
+  - VPS: nothing else to change. Grafana already maps `Role:X-User-Role` and
+    nginx sets the header from OSCAR's answer; it takes effect with the
+    server image, at each user's next sign-in.
+  - Kubernetes: the stack's `grafana.ini` maps `Role:X-User-Role` too
+    (Traefik already forwarded the header); apply `monitoring/site` again.
+  - A role set by hand in Grafana is replaced at the next sign-in.
+  - `kubernetes-monitoring.test.js` pins the role to a Grafana role and its
+    mapping on both, `auth-routes.test.js` the header.
+
+---
+
 ## [server-1.11.497] / [collection-OTST_V2.0.255] — 2026-11-11
 
 Release 2026.536.

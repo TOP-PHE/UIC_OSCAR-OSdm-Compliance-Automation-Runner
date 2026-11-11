@@ -594,7 +594,8 @@ On the VPS, record the restore drill for the Admin Dashboard
 `/opt/OSCAR/OSCAR_Deploy/scripts/oscar-backup-status.sh drill`.
 
 **What does not come with a backup:** Prometheus's figures, Loki's logs and
-Grafana's users (made again at their first visit, as viewers), and the VPS's
+Grafana's users (made again at their first visit, as Editors from server
+1.11.498: Explore included; as Viewers before, without it), and the VPS's
 backup timer: this machine's backups are `oscar-data.sh save` (section 9).
 
 ## 7. First administrator, e-mail, parallel runs
