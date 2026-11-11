@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     as root on the machine, never the page's button.
   - 6a step 7 says step 1 comes first and uses the new name.
 
+- **k3s on one VPS, 8a step 2: the grep prints nothing, as the guide says**
+  (#1185). No version bump: a comment and a test. In the recovery drill the
+  grep after the `sed` printed one line, a comment of the monitoring stack's
+  `kustomization.yaml` that wrote the placeholder host name; the guide says
+  it prints nothing when every name was replaced.
+  - The comment no longer writes that name, and says why.
+  - `kubernetes-monitoring.test.js` reads the guide's own `sed` and `grep`
+    lines, applies the `sed` to the files it names in the stack folder, and
+    fails when the `grep` would still find the name (checked against the old
+    comment).
+
 - **k3s on one VPS, section 7: the first administrator is OSCAR's, and only
   for a new OSCAR** (#1177). Documentation only. In the recovery drill, 6a
   step 6 sent the reader to section 7, which starts with *First

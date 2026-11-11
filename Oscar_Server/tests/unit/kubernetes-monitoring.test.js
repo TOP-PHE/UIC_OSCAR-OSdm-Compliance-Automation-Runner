@@ -414,6 +414,29 @@ describe('the guide and the CI', () => {
     }
   });
 
+  test('after the guide\'s sed, its grep finds the placeholder name nowhere in the copy (#1185)', () => {
+    // 8a step 2 copies this folder, runs sed on the files it names, then says
+    // the grep "prints nothing when every name was replaced". A comment that
+    // wrote the name once made it print a line in the recovery drill.
+    const sed = /^sed -i "s\/(oscar\.example\.org)\/\$HOST\/g" (OSCAR_Deploy\/kubernetes\/monitoring\/site\/.+)$/m.exec(guide);
+    expect(sed).not.toBeNull();
+    const grep = /^grep -rn "([^"]+)" OSCAR_Deploy\/kubernetes\/monitoring\/site$/m.exec(guide);
+    expect(grep).not.toBeNull();
+    const edited = sed[2].trim().split(/\s+/).map(p => path.posix.relative('OSCAR_Deploy/kubernetes/monitoring/site', p));
+    expect(edited.length).toBeGreaterThan(0);
+    const stackDir = path.join(MON, 'stack');
+    const files = fs.readdirSync(stackDir, { recursive: true })
+      .map(f => String(f).split(path.sep).join('/'))
+      .filter(f => fs.statSync(path.join(stackDir, f)).isFile());
+    for (const f of edited) expect(files).toContain(f);
+    const left = files.filter((f) => {
+      let text = fs.readFileSync(path.join(stackDir, f), 'utf8');
+      if (edited.includes(f)) text = text.replaceAll(sed[1], 'oscar-test.machine.invalid');
+      return text.includes(grep[1]);
+    });
+    expect(left).toEqual([]);
+  });
+
   test('the guide names the chart version this folder pins', () => {
     expect(guide).toContain(`kube-prometheus-stack ${helmChart.spec.version}`);
   });
