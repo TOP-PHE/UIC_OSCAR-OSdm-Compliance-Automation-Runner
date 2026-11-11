@@ -133,13 +133,35 @@ const smtpSends = new promClient.Counter({
 
 // ─── Express middleware to record HTTP duration ──────────────────────────────
 // Records every response. Uses res.on('finish') so 404s / errors / streamed
-// responses are all captured. The `route` label uses Express's matched route
-// pattern (e.g. "/v1/runs/:id") instead of req.url, so high-cardinality IDs
-// don't blow up the metrics cardinality.
+// responses are all captured.
+
+/**
+ * The `route` label (#1196): the router's mount path and the matched route's
+ * pattern ("/v1/runs", "/v1/runs/:id", "/v1/company/datafile"), never the
+ * address asked, so ids do not make a label each. The route's pattern alone
+ * read "/" for the root of every router (the run list, a batch, the company,
+ * the providers…), and the mount paths are fixed (server.js mounts no
+ * router on a path with a parameter). Without a route: the router's path
+ * when a router stopped the request (401, 429), the file's path for a static
+ * file served, else "unmatched", so an address a scanner tries is not a
+ * label of its own.
+ */
+function routeLabel(req, statusCode) {
+  const base = req.baseUrl || '';
+  const routePath = req.route?.path;
+  if (routePath !== undefined) {
+    const pattern = String(routePath);
+    return base && pattern === '/' ? base : base + pattern;
+  }
+  if (base) return base;
+  if ((statusCode < 300 || statusCode === 304) && req.path) return req.path;
+  return 'unmatched';
+}
+
 function httpDurationMiddleware(req, res, next) {
   const endTimer = httpDuration.startTimer();
   res.on('finish', () => {
-    const route = req.route?.path || req.baseUrl || req.path || 'unknown';
+    const route = routeLabel(req, res.statusCode);
     endTimer({
       method:      req.method,
       route,
@@ -152,6 +174,7 @@ function httpDurationMiddleware(req, res, next) {
 module.exports = {
   register,
   httpDurationMiddleware,
+  routeLabel,
   runsTotal,
   queueDepth,
   activeRuns,

@@ -4,6 +4,17 @@
   "current_release": "2026.537",
   "releases": [
     {
+      "release": "2026.538",
+      "date": "2026-11-11",
+      "server": "1.11.499",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.499: the route label of oscar_http_request_duration_seconds is the router's path and the route's pattern (/v1/runs, /v1/runs/:id, /v1/company/datafile), so a query by route says which address is slow; it was the pattern alone, and the root of every router read \"/\" (#1196). An address no route matches is \"unmatched\", not a label of its own. No dashboard or alert filters on the label."
+      ]
+    },
+    {
       "release": "2026.537",
       "date": "2026-11-11",
       "server": "1.11.498",
