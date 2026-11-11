@@ -75,7 +75,7 @@ h1{color:#0090D4;font-size:24px;margin-bottom:8px}
       <div class="card-cta">Open Grafana →</div>
     </a>
 
-    <a href="/prometheus/" target="_blank" rel="noopener" class="card prometheus">
+    <a id="prometheus-card" href="/prometheus/" target="_blank" rel="noopener" class="card prometheus">
       <div class="card-icon">🔍</div>
       <div class="card-title">Prometheus</div>
       <div class="card-desc">
@@ -255,6 +255,35 @@ function secRender(body, events) {
     .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
     .then(function (r) { secRender(body, r.events || []); })
     .catch(function (e) { body.replaceChildren(drText('p', 'dr-note', 'The list could not be loaded (' + e.message + ').')); });
+})();
+// The Prometheus card where the server runs (GET /v1/admin/deployment, #1187):
+// on Kubernetes Prometheus's own page is not published, on purpose; its
+// queries run in Grafana's Explore. null keeps the card as it is (the VPS).
+function prometheusCardFor(kind) {
+  if (kind !== 'kubernetes') return null;
+  return {
+    href: '/grafana/explore',
+    title: 'Prometheus, in Grafana',
+    desc: 'On Kubernetes Prometheus\'s own page is not published. Its PromQL queries run in Grafana → Explore, data source Prometheus; the query up lists the scrape targets.',
+    cta: 'Open Explore →'
+  };
+}
+(function () {
+  var user = {};
+  try { user = JSON.parse(localStorage.getItem('oscar_user') || '{}') || {}; } catch (_e) { user = {}; }
+  if (user.role !== 'administrator') return;
+  fetch('/v1/admin/deployment')
+    .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .then(function (d) {
+      var card = prometheusCardFor(d.kind);
+      if (!card) return;
+      var a = document.getElementById('prometheus-card');
+      a.href = card.href;
+      a.querySelector('.card-title').textContent = card.title;
+      a.querySelector('.card-desc').textContent = card.desc;
+      a.querySelector('.card-cta').textContent = card.cta;
+    })
+    .catch(function () { /* the card stays as it is */ });
 })();
 </script>
 </body>

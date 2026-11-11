@@ -729,8 +729,8 @@ A **Rotate JWT Secret** button is available too — generates a fresh secret, in
 | Tile | Backed by | What it shows |
 |---|---|---|
 | **Grafana** | grafana/grafana | Live operational dashboards — HTTP latency, run throughput, queue depth, process resources. Pre-provisioned **OSCAR · Overview** dashboard. |
-| **Prometheus** | prom/prometheus | Raw metrics database. Useful for ad-hoc PromQL, scrape-target health (`/prometheus/targets`), confirming alert state under `/prometheus/alerts`. |
-| **Logs (Loki)** | grafana/loki + grafana/promtail | Centralised log aggregation across OSCAR + Bruno workers. Pre-provisioned **OSCAR · Logs** dashboard with errors-only view, full live tail, per-container filter. |
+| **Prometheus** | prom/prometheus | Raw metrics database. Useful for ad-hoc PromQL, scrape-target health (`/prometheus/targets`), confirming alert state under `/prometheus/alerts`. On Kubernetes Prometheus's own page is not published: the tile reads *Prometheus, in Grafana* and opens Grafana → Explore, where the same queries run (#1187). |
+| **Logs (Loki)** | grafana/loki + grafana/promtail | Centralised log aggregation across OSCAR + Bruno workers. Pre-provisioned **OSCAR · Logs** dashboard with errors-only view, full live tail, per-container filter. *Errors* are OSCAR's lines at level error or fatal, and other lines holding error, fatal or panic as a word of their own (#1187). |
 
 All three are gated by **OSCAR SSO** — your OSCAR admin login auto-signs you in. No separate Grafana/Prometheus passwords. Non-admin accounts see a 401 if they try to navigate there.
 

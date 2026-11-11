@@ -361,6 +361,11 @@ module.exports = {
         description: 'What the host backup scripts recorded in data/backup-status.json: last backup (date, size, ok), frequency, next run, retention, archives present, last restore drill, and warnings. state is none (no backup recorded yet), unreadable, or reported. No route creates, schedules or downloads a backup.',
         responses: { 200: { description: 'The status' }, 403: { description: 'Administrators only' }, 429: { description: 'Too many reads' } } },
     },
+    '/v1/admin/deployment': {
+      get: { tags: ['Admin'], summary: 'Where the server runs (#1187)', security: [{ bearerAuth: [] }],
+        description: '{ kind }: kubernetes (the pod has KUBERNETES_SERVICE_HOST) or docker (the VPS). The Admin Dashboard points by it: on Kubernetes Prometheus\'s own page is not published, its queries run in Grafana\'s Explore.',
+        responses: { 200: { description: '{ kind }' }, 403: { description: 'Administrators only' } } },
+    },
     '/v1/admin/security-events': {
       get: { tags: ['Admin'], summary: 'Intrusion attempts met by runs', security: [{ bearerAuth: [] }],
         description: 'One row per run that met an answer meant to attack OSCAR: company or provider, kind (template, script, redirect), step, when, who started the run, and when and by whom the endpoint was resumed. Never the answer.',

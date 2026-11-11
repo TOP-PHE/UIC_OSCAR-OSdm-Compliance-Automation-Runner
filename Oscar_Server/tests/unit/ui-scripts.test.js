@@ -840,6 +840,29 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     });
   });
 
+  describe('admin-dashboard.html — the Prometheus card on Kubernetes (#1187)', () => {
+    const prometheusCardFor = loadFunction('admin-dashboard.html', 'prometheusCardFor');
+    const page = read('admin-dashboard.html');
+
+    test('on Kubernetes the card opens Grafana\'s Explore, under the path Grafana is served at', () => {
+      const card = prometheusCardFor('kubernetes');
+      expect(card.href).toBe('/grafana/explore');
+      expect(card.title).toMatch(/Prometheus/);
+      expect(card.desc).toMatch(/not published/);
+      // The k3s Grafana answers under /grafana/ (its root_url), as the Grafana card says.
+      expect(page).toContain('<a href="/grafana/"');
+      const stack = fs.readFileSync(path.join(__dirname, '../../../OSCAR_Deploy/kubernetes/monitoring/stack/kube-prometheus-stack.yaml'), 'utf8');
+      expect(stack).toMatch(/root_url: https:\/\/[^/\s]+\/grafana\//);
+    });
+
+    test('elsewhere the card stays as it is, and the page changes the one card it names', () => {
+      expect(prometheusCardFor('docker')).toBeNull();
+      expect(prometheusCardFor(undefined)).toBeNull();
+      expect(page).toContain('<a id="prometheus-card" href="/prometheus/"');
+      expect(page).toContain("fetch('/v1/admin/deployment')");
+    });
+  });
+
   describe('compare.html diffErrorHtml', () => {
     const esc = require('../../public/js/esc.js').esc;   // S11: esc is shared now
     const diffErrorHtml = loadFunction('compare.html', 'diffErrorHtml', { esc });

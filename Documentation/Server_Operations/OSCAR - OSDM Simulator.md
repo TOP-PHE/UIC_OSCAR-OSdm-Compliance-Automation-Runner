@@ -403,7 +403,10 @@ change is a line of `deploy/data/audit.log`, with the OSCAR administrator who
 asked. The API is called by the OSCAR server only: to keep it to that server,
 fill in the `allow` / `deny` lines of the `/admin/` location in the nginx site
 with the OSCAR server's address (a site set up before 0.51.0 has no such
-location; add the block of `nginx-osdm-simulator.conf.example`). By hand, from
+location; add the block of `nginx-osdm-simulator.conf.example`). They go
+*inside* `location /admin/ { … }`: above it, as the example showed them until
+#1187, they close the whole site to every other address. Another OSCAR server
+later: section 7, *Another OSCAR server*. By hand, from
 the host, with the key in `KEY`:
 
 ```bash
@@ -553,6 +556,57 @@ commas in `SIM_TRUSTED_ADDRESSES`, and one line each in the `geo` block. The
 simulator's own limit for them is `SIM_TRUSTED_REQUESTS_PER_MINUTE` (default
 30000). Only IP addresses are accepted: the simulator does not start with a
 host name in the list.
+
+**Another OSCAR server** (#1187): a test machine, a recovery drill, or the
+machine OSCAR moves to, while the first one keeps its place. The simulator
+knows the first server's address in three places, and the new one needs all
+three: the `allow` lines of `/admin/` (where the site has them: without it,
+OSCAR's log says *The simulator answered 403* every 30 s and Admin → OSDM
+Simulator is refused; the runs are not concerned), the `geo` block and
+`SIM_TRUSTED_ADDRESSES` (without them, from about a dozen runs at once, 429s).
+Each line goes next to the first address, never in its place: a second
+`SIM_TRUSTED_ADDRESSES` line would replace the first. The lines can be run
+again, and change nothing the second time. As root on this host, with no run
+going (`docker compose up -d` restarts the simulator):
+
+```bash
+OSCAR_IP=203.0.113.20       # ← yours: the other OSCAR server's public address
+F=/etc/nginx/sites-available/osdm-simulator
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+# 1. nginx: next to the first address, in the administration's allow lines
+#    (where the site has them) and in the trusted zone.
+grep -q "^ *allow $OSCAR_IP;" $F || sed -i "0,/^\( *\)allow .*;/s//&\n\1allow $OSCAR_IP;/" $F
+grep -q "^ *$OSCAR_IP 1;" $F || sed -i "/^geo \$osdm_trusted {/a\    $OSCAR_IP 1;" $F
+grep -n "location \|allow \|deny \| 1;" $F
+nginx -t && systemctl reload nginx
+# 2. The simulator: the address added to its list, never a second line.
+grep -q "^SIM_TRUSTED_ADDRESSES=" .env || echo "SIM_TRUSTED_ADDRESSES=$OSCAR_IP" >> .env
+grep -q "^SIM_TRUSTED_ADDRESSES=.*\b$OSCAR_IP\b" .env || sed -i "s/^SIM_TRUSTED_ADDRESSES=.*/&,$OSCAR_IP/" .env
+docker compose up -d
+docker compose exec osdm-simulator printenv SIM_TRUSTED_ADDRESSES
+```
+
+- The `grep -n` shows both addresses in the `geo` block and, where the site
+  has them, on two `allow` lines **after** `location /admin/ {`. `allow` lines
+  before it close the whole site to every other address: move them inside
+  that location, then `nginx -t && systemctl reload nginx`.
+- `printenv` shows both addresses, separated by a comma.
+- On the new OSCAR server, its log stops saying *The simulator answered 403*
+  within a minute, and Admin → OSDM Simulator lists the accounts.
+
+When that server is gone, the same place, with its address:
+
+```bash
+OSCAR_IP=203.0.113.20       # ← yours: the address to remove
+F=/etc/nginx/sites-available/osdm-simulator
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+sed -i "/^ *allow $OSCAR_IP;/d; /^ *$OSCAR_IP 1;/d" $F
+grep -n "location \|allow \|deny \| 1;" $F
+nginx -t && systemctl reload nginx
+sed -i "/^SIM_TRUSTED_ADDRESSES=/{s/,$OSCAR_IP\(,\|$\)/\1/; s/=$OSCAR_IP,/=/}" .env
+docker compose up -d
+docker compose exec osdm-simulator printenv SIM_TRUSTED_ADDRESSES
+```
 
 After a test, `docker compose logs --since 1h | grep -c ' 429 '` counts the
 simulator's refusals; nginx's are in `/var/log/nginx/error.log` ("limiting
