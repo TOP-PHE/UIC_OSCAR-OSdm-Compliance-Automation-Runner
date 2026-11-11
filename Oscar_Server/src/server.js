@@ -394,11 +394,13 @@ function withFrameworkWarnings(plaintext, companyId) {
     const skipped = require('./utils/undeclaredSteps').withoutUndeclaredPassengerUpdate(datafile, framework);
     // #899: and the invalid purchaser probe in the booking where the purchaser goes only there.
     const probed = require('./utils/undeclaredSteps').withPurchaserProbeAtBooking(datafile, framework);
+    // #1117: and no coach layout read where the framework declares no seat map.
+    const unmapped = require('./utils/undeclaredSteps').withoutUndeclaredCoachLayouts(datafile, framework);
     // #889: and each declared card's reduction rate on the passengers' cards.
     const rated = require('./utils/reductionCards').withCardRates(datafile, framework);
     // #227: and what the framework declares to the offer request options scenarios.
     const discovering = require('./utils/offerOptionDiscovery').withOfferOptionDeclarations(datafile, framework);
-    if (annotated + versioned + formed + skipped + probed + rated + discovering === 0) return plaintext;
+    if (annotated + versioned + formed + skipped + probed + unmapped + rated + discovering === 0) return plaintext;
     return Buffer.from(JSON.stringify(datafile), 'utf8');
   } catch (err) {
     log.warn({ errMsg: err.message, companyId }, 'run datafile: framework warnings not added');

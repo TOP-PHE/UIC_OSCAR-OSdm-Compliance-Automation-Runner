@@ -150,6 +150,11 @@ request:
           var _isPurchaserPost  = _rn.includes('post booking purchaser');
           var _isPurchaserStep  = _isPurchaserGet || _isPurchaserPatch || _isPurchaserPost;
           var _isReturnOffer    = _rn.includes('return offer');
+          // #1117: the coach layouts ("01. GET Coach", "02. GET Coach By Id")
+          // describe a seat map's coaches; nothing else reads them. Skipped
+          // when OSCAR's copy says the Test Framework declares no seat map.
+          var _isCoachLayout    = _rn.includes('get coach');
+          var _coachLayoutsSkip = String(bru.getEnvVar('__coachLayoutsSkip')) === 'true';
           // #603: 06b reads the fulfillments 06 listed, 14b waits for a refund
           // receipt: both only when a script sent there.
           var _isFulfillmentRead = _rn.includes('get fulfillment');
@@ -218,7 +223,8 @@ request:
             _skipReason = bru.getEnvVar('access_token')
               ? 'access token already provided by OSCAR (server-side OAuth from API Config) — manual vendor token requests never run on OSCAR'
               : 'vendor token request for a different sandbox (env "' + _sandbox + '") — runs only in standalone Bruno with the matching vendor env';
-          } else if (_isOfferPlaceMap && !_runPlaceMap)                  { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
+          } else if (_isCoachLayout && _coachLayoutsSkip)                { _skipReason = 'coach layouts not read: the Test Framework declares no seat map (Seat Selection)'; }
+            else if (_isOfferPlaceMap && !_runPlaceMap)                  { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
             else if (_isOfferPlaceMap && bru.getEnvVar('bookingId'))      { _skipReason = 'offer-context place map is pre-booking only (booking already created)'; }
             else if (_isPostBookingPlaceMap && (!_runAddReservation || _addLaterForm)) { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
             else if (_isPostBookingPlaceMap && !bru.getEnvVar('bookingId')) { _skipReason = 'post-booking place map needs a booking first'; }
@@ -335,7 +341,7 @@ request:
                 "patchDateOfBirth", "patchFirstName", "patchLastName",
                 "patchEmail", "patchPhoneNumber", "patchGender",
                 // Place selection
-                "placeSelectionMode", "__placeMapAtOfferFailed", "__postBookingPlaceMapDone",
+                "placeSelectionMode", "__placeMapAtOfferFailed", "__postBookingPlaceMapDone", "__coachLayoutsSkip",
                 "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
                 "reservationId", "reservationIds", "tripLegCoverage",
                 "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",

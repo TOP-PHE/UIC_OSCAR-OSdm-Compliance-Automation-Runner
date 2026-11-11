@@ -572,7 +572,7 @@ anything — it defines the menu that scenario authoring is limited to.
 |---|---|---|
 | **Distribution** | 🧭 *Distribution* (`distributionModes`) | **Product‑based**, **fare‑based**, or both (issue #936). A framework that names none is product‑based. The scenario catalogue offers only the reference scenarios of the modes ticked, and a scenario of another mode runs with a warning. The last mode cannot be unticked. |
 | **Ticket types** | `rail.ticketTypes` | `IRT`, `NRT_OPTIONAL_RESERVATION`, … Declaring a reservation‑bearing type is what makes **place selection** available to scenarios. |
-| **Graphical seat map?** | **Seat Selection** → *“Does the system offer a graphical seat map?”* (`placeSelection.seatMap`) | Tick if travellers can pick a specific seat. Off ⇒ scenarios cannot pick seats at all. |
+| **Graphical seat map?** | **Seat Selection** → *“Does the system offer a graphical seat map?”* (`placeSelection.seatMap`) | Tick if travellers can pick a specific seat. Off ⇒ scenarios cannot pick seats at all, and runs do not read the coach layouts (`GET /coach-layouts` or `/coach-deck-layouts`, then one layout by id), which only describe a seat map's coaches: the run log says *coach layouts not read* (issue #1117). |
 | **Supported seat‑selection modes** | the pills revealed under the box (`placeSelection.supportedModes`) | Tick **🪑 Seat map at offer** and/or **➕ Add reservation to a booking** — declare the one(s) this vendor actually supports. A scenario's mode picker (§4.6) offers **exactly** these and nothing else. |
 | **Offer criteria** | `offerCriteria.{serviceClasses, travelClasses, requestedOfferParts, flexibilities, offerMode, currency}` | The allowed values a scenario's offer search may use. |
 | **Fulfillment** | `fulfillment.{media, types}` | Allowed fulfilment media/types (e.g. `PDF_A4` / `ETICKET`). |
@@ -592,7 +592,10 @@ sets** you define here (the **🚆 Train Resources** section). A train set is:
 
 - a **route** — **Label** (short display name, e.g. *"Sqills IC BAS/AMS"*),
   **Operator Code** (`urn:uic:rics:NNNN`), **Origin / Destination station URN**,
-  and optional **Product category** (ref / name / short name);
+  and optional **Product category** (ref / name / short name). The operator and
+  the stations take any URN: UIC's (`urn:uic:rics:…`, `urn:uic:stn:…`) or the
+  provider's own scheme, such as `urn:x_bileto:code:…` or `urn:x_cze:cisjr:…`
+  (issue #1116);
 - a **Services (timetable)** — one or more individual departures that run that
   route, each with a **vehicle number** and **departure / arrival** times;
 - **Operating days** — set‑level (applies to every service in the set);

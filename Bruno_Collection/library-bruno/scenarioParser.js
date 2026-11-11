@@ -102,8 +102,16 @@ module.exports = {
   tripDateFor,
   productCategoryOf,
   arrivalAfterDeparture,
-  declaredOptionsOf
+  declaredOptionsOf,
+  coachLayoutsSkipped
 };
+
+// #1117: are the coach layouts left out of this run? OSCAR's copy of the data
+// file marks each scenario `__seatMapDeclared: false` when the provider's Test
+// Framework declares no seat map. No mark (a standalone run): read as before.
+function coachLayoutsSkipped(scenario) {
+  return scenario?.__seatMapDeclared === false;
+}
 
 // Which passengers step 03 updates: "MAIN" (the first only) when the scenario
 // says so, else "ALL".
@@ -197,7 +205,7 @@ function resetScenarioEnvVars() {
     "salesFlow_patchPassengers", "salesFlow_placeSelection",
     "salesFlow_addAncillary",   "salesFlow_getBooking", "salesFlow_deleteAncillary",
     // Place selection
-    "placeSelectionMode", "__placeMapAtOfferFailed", "__postBookingPlaceMapDone",
+    "placeSelectionMode", "__placeMapAtOfferFailed", "__postBookingPlaceMapDone", "__coachLayoutsSkip",
     "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
     "reservationId", "reservationIds", "tripLegCoverage",
     // Fulfillment
@@ -1033,6 +1041,11 @@ function parseScenarioData(jsonData) {
       // or ADD_TO_BOOKING (reservation added to an existing booking). Chosen per
       // scenario from the framework-authorised set; null when not applicable.
       bru.setEnvVar("placeSelectionMode", ["", "null"].includes(scenario.placeSelectionMode) ? null : scenario.placeSelectionMode);
+
+      // #1117: the run filter skips 01/02 GET Coach (the coach layouts, read
+      // after this, at the scenario's start) where the framework declares no
+      // seat map.
+      bru.setEnvVar("__coachLayoutsSkip", coachLayoutsSkipped(scenario) ? "true" : "false");
 
       // ── Expired-flow auto-expansion: build the per-scenario queue (PR B) ──
       // When 2+ expired-X timers are armed on this scenario, OSCAR runs the

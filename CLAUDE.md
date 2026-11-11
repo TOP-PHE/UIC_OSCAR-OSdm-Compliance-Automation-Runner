@@ -843,6 +843,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the
     collection's `[WARNING]` never reached a run log.
+  - **Coach layouts follow the seat map** (#1117, 1.11.497 /
+    OTST_V2.0.255): the run's copy marks each scenario `__seatMapDeclared:
+    false` unless the framework's `placeSelection.seatMap` is true
+    (`withoutUndeclaredCoachLayouts()`, `undeclaredSteps.js`); the parser sets
+    `__coachLayoutsSkip` (`coachLayoutsSkipped()`) and the run filter skips
+    `01. GET Coach` / `02. GET Coach By Id`. Nothing else reads them. No
+    framework or a standalone run: read. The simulator references declare a
+    seat map (pinned by `coach-layouts-seat-map.test.js`, which also runs the
+    filter block of `opencollection.yml` in a `vm`).
 - **Known-deviation baseline (#398).** Per-company "Test Findings & Open
   Points" register (`finding`/`finding_comment`): a threaded conformance
   dialogue, not a bug tracker — OSCAR opens a finding (observation + spec
@@ -972,7 +981,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (lazily wired via a single delegated `focusin` listener on
   `[data-place-lookup]`) drives a typeahead on every origin/destination URN
   field — selecting fills the field with the place's URN; manual typing
-  still always works, this is a pure assist.
+  still always works, this is a pure assist. **Train Details takes any URN**
+  as stations and operator (#1116, `isUrnRef()` in `scenarios.js`): OSDM's
+  `StopPlaceRef` and `CompanyRef` are plain strings, and providers use
+  schemes of their own (`urn:x_cze:cisjr:…`, `urn:x_bileto:code:…`).
 - **A session follows the stored user** (1.11.455). `sessionUser()`
   (`middleware/auth.js`) reads the user at each request: missing, not
   `active`, another role or company than the token's, or a token signed
