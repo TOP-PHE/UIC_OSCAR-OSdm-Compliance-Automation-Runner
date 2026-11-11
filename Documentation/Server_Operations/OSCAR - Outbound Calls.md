@@ -55,8 +55,8 @@ step's script (`bru.sendRequest`).
 | Method | Path | Sent by |
 |---|---|---|
 | GET | `/versions` | File |
-| GET | `/coach-deck-layouts` (3.8 and later) or `/coach-layouts` | File |
-| GET | `/coach-deck-layouts/{layoutId}` or `/coach-layouts/{layoutId}` | File |
+| GET | `/coach-deck-layouts` (3.8 and later) or `/coach-layouts`; only when the Test Framework declares a seat map (#1117) | File |
+| GET | `/coach-deck-layouts/{layoutId}` or `/coach-layouts/{layoutId}`; same condition | File |
 | GET | `/passenger-categories` | File |
 | GET | `/promotion-codes` | File |
 | GET | `/reduction-cards` | File |

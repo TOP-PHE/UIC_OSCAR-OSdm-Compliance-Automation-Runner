@@ -23,6 +23,9 @@
  * passenger only where that is all the provider takes: one provider answered
  * 400 BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE for the second passenger. A
  * late purchaser is the point of its scenario, so that one is only warned.
+ *
+ * And one read the run leaves out (#1117), absent = not declared:
+ *   placeSelection.seatMap: true  the coach layouts are read
  */
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -101,7 +104,29 @@ function withPurchaserProbeAtBooking(datafile, framework) {
   return count;
 }
 
+/** Does the framework declare a graphical seat map (Seat Selection)? Absent = no, as the page reads it. */
+const seatMapDeclared = (framework) => framework?.placeSelection?.seatMap === true;
+
+/**
+ * #1117: the run's copy for a provider whose framework declares no seat map.
+ * The coach layouts (GET /coach-layouts or /coach-deck-layouts, then one by
+ * id) describe the coaches of a seat map, and no other step of a run reads
+ * them; such a provider was still reported on them in every scenario. Each
+ * scenario gets `__seatMapDeclared: false`, and the collection skips the two
+ * reads. Changes `datafile`; returns how many scenarios changed.
+ */
+function withoutUndeclaredCoachLayouts(datafile, framework) {
+  if (seatMapDeclared(framework) || !Array.isArray(datafile?.scenarios)) return 0;
+  let count = 0;
+  for (const sc of datafile.scenarios) {
+    if (!isObj(sc) || sc.__seatMapDeclared === false) continue;
+    sc.__seatMapDeclared = false;
+    count += 1;
+  }
+  return count;
+}
+
 module.exports = {
   updatesPassengers, purchaserAfterBooking, mainPassengerOnly, undeclaredStepWarnings, withoutUndeclaredPassengerUpdate,
-  withPurchaserProbeAtBooking,
+  withPurchaserProbeAtBooking, seatMapDeclared, withoutUndeclaredCoachLayouts,
 };

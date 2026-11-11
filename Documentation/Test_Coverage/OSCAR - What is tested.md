@@ -119,7 +119,7 @@ WARNING.
 |---|---|---|
 | Access token | the provider's token endpoint | a token is obtained |
 | 00 | `GET /versions` | the answer is a list of versions; the version the data file names is one of them (a soft check: a mismatch is reported, not failed) |
-| 01–10 (system information) | `GET /coach-(deck-)layouts`, `/passenger-categories`, `/promotion-codes`, `/reduction-cards`, `/zones`, `/products`, `/products/{id}`, `/product-tags` | optional reads: a `501`, a `404` or `OPERATION_NOT_PERMITTED` is "not implemented by this provider" (a passing INFO row); an answer is checked against the OSDM schema of its version |
+| 01–10 (system information) | `GET /coach-(deck-)layouts`, `/passenger-categories`, `/promotion-codes`, `/reduction-cards`, `/zones`, `/products`, `/products/{id}`, `/product-tags` | optional reads: a `501`, a `404` or `OPERATION_NOT_PERMITTED` is "not implemented by this provider" (a passing INFO row); an answer is checked against the OSDM schema of its version. The coach layouts are read only when the Test Framework declares a seat map (#1117) |
 
 ### Sale
 

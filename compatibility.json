@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.535",
+  "current_release": "2026.536",
   "releases": [
+    {
+      "release": "2026.536",
+      "date": "2026-11-11",
+      "server": "1.11.497",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.497 / collection OTST_V2.0.255: a run reads the coach layouts (GET /coach-layouts or /coach-deck-layouts, then one by id) only when the Test Framework declares a seat map (Seat Selection, placeSelection.seatMap); a provider without one was reported on them in every scenario. The run copy marks each scenario __seatMapDeclared false and the run filter skips the two reads, saying why. The simulator references declare a seat map: their runs are unchanged, and so is a standalone run (#1117).",
+        "Test Data, Train Details: the operator and the origin and destination take any URN, UIC's or the provider's own scheme (urn:x_bileto:code:…, urn:x_cze:cisjr:…); only urn:<scheme>:stn:… and urn:uic:rics:<digits> were accepted, which refused even OSDM's own example urn:uic:rics:1185:000011 (#1116)."
+      ]
+    },
     {
       "release": "2026.535",
       "date": "2026-11-11",

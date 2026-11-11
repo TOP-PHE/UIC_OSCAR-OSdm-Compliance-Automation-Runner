@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-coach-layouts-and-provider-urns",
+    "date": "November 11, 2026",
+    "tag": "Bug Fix",
+    "title": "Coach layouts follow the seat map; Train Details takes the provider's URNs",
+    "summary": "A run reads the coach layouts only when the Test Framework declares a seat map, and Test Data accepts any URN as station and operator, including a provider's own scheme.",
+    "content": "Every scenario read the provider's coach layouts (GET /coach-layouts, or /coach-deck-layouts from OSDM 3.8, then one layout by id), and the report checked them, even for a provider that offers no seat map. A coach layout only describes the coaches of a seat map. A run now reads them only when the Test Framework declares one: Test Framework → Seat Selection, \"Does the system offer a graphical seat map?\". Otherwise the run log says \"coach layouts not read\" and the report has no coach checks.\n\nIn Test Data, Train Details refused stations and operators written in a provider's own scheme, such as urn:x_cze:cisjr:… or urn:x_bileto:code:…, and even OSDM's own operator example urn:uic:rics:1185:000011. The origin, the destination and the operator now take any URN.\n\nIf your provider offers a seat map, check that the box is ticked in the Test Framework, or the coach layouts will no longer be tested. No other action is required."
+  },
+  {
     "id": "2026-11-11-monitoring-on-kubernetes",
     "date": "November 11, 2026",
     "tag": "Operations",

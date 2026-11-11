@@ -491,6 +491,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.497] / [collection-OTST_V2.0.255] — 2026-11-11
+
+Release 2026.536.
+
+### Fixed
+
+- **The coach layouts are read only when the Test Framework declares a seat
+  map** (#1117). Every scenario read `GET /coach-layouts` (or
+  `/coach-deck-layouts` from 3.8) and one layout by id, and the report
+  checked them, though a coach layout only describes the coaches of a seat
+  map and no other step reads it. A provider declaring no seat map (Test
+  Framework → Seat Selection, *Does the system offer a graphical seat map?*,
+  `placeSelection.seatMap`) was reported on them in every scenario.
+  - The run's copy of the data file marks each scenario
+    `__seatMapDeclared: false` when the framework does not declare one
+    (`withoutUndeclaredCoachLayouts()`, `utils/undeclaredSteps.js`, beside the
+    #809 passenger update; absent = not declared, as the page reads it).
+  - The parser turns the mark into `__coachLayoutsSkip`
+    (`coachLayoutsSkipped()`, in both reset lists), and the run filter skips
+    `01. GET Coach` and `02. GET Coach By Id`: *coach layouts not read: the
+    Test Framework declares no seat map (Seat Selection)*.
+  - No framework, or a standalone run: read as before. The six simulator
+    references declare a seat map (a test pins it), so their runs and the
+    catalogue's check counts do not move.
+  - `coach-layouts-seat-map.test.js` runs the filter block of
+    `opencollection.yml` itself in a sandbox; `server.test.js` reads the run's
+    copy through `/data`. Both fail with the rule removed.
+
+- **Train Details takes any URN as operator and stations** (#1116). Test
+  Data refused `urn:x_cze:cisjr:<id>` as a station ("Must be a station URN")
+  and `urn:x_bileto:code:<id>` as an operator: it took
+  `urn:<scheme>:stn:<id>` and `urn:uic:rics:<digits>` only, which also
+  refused OSDM's own `CompanyRef` example, `urn:uic:rics:1185:000011`. OSDM's
+  `StopPlaceRef` and `CompanyRef` are plain strings. `isUrnRef()`
+  (`scenarios.js`, top level): `urn:`, a scheme, `:`, then anything without a
+  space; linear time. The hints say "a URN, e.g. urn:uic:rics:NNNN". The
+  collection sends the references as stored, so nothing else changes.
+
+---
+
 ## [server-1.11.496] — 2026-11-11
 
 Listed in `compatibility.json` (2026.535) without moving `current_release`.
