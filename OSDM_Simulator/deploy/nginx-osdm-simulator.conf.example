@@ -51,10 +51,12 @@ server {
     }
 
     # The administration API (#930). Its one caller is the OSCAR server; to
-    # keep it to that server, uncomment and put the OSCAR server's address:
-    #   allow 203.0.113.10;
-    #   deny  all;
+    # keep it to that server, uncomment the two lines inside the location and
+    # put the OSCAR server's address. Above "location", they would close the
+    # whole site to every other address (#1187).
     location /admin/ {
+        # allow 203.0.113.10;
+        # deny  all;
         limit_req zone=osdm_simulator_admin burst=20 nodelay;
         limit_req_status 429;
         client_max_body_size 8k;

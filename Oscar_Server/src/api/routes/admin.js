@@ -20,6 +20,7 @@
  * GET    /v1/admin/ai-access-requests    — Test Managers' requests for the AI analysis (#801)
  * POST   /v1/admin/ai-access-requests/:id/approve|refuse|revoke
  * GET    /v1/admin/backup-status         — disaster-recovery status, read only (#572)
+ * GET    /v1/admin/deployment            — where the server runs: kubernetes or docker (#1187)
  */
 
 const express = require('express');
@@ -42,6 +43,7 @@ const { withDatafileLock } = require('../../utils/datafileLock');
 const path = require('node:path');
 const AccessRequests = require('../../utils/accessRequests');
 const alertmanagerConfig = require('../../utils/alertmanagerConfig');
+const { deploymentKind } = require('../../utils/deployment');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
 const router = express.Router();
@@ -539,6 +541,11 @@ const backupStatusLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many status reads. Wait a minute.' }
 });
 router.get('/backup-status', backupStatusLimiter, (req, res) => res.json(readBackupStatus()));
+
+// ── GET /v1/admin/deployment (#1187) ─────────────────────────────────────────
+// Where this server runs, so the Admin Dashboard points at what is published
+// there: on Kubernetes Prometheus's page is not, Grafana's Explore is.
+router.get('/deployment', (req, res) => res.json({ kind: deploymentKind() }));
 
 // ── GET /v1/admin/security-events ────────────────────────────────────────────
 // The intrusion attempts runs met (utils/intrusion.js): company, kind, step,

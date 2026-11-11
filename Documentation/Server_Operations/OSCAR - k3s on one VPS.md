@@ -568,9 +568,14 @@ reach them.
   sign the VPS out of it, until the tester saves the credentials there again.
   The e-mails this copy sends go to the real users, with links to the test
   name.
-- **The simulator** trusts the VPS's address only: add this machine's
-  ([OSCAR - OSDM Simulator](OSCAR%20-%20OSDM%20Simulator.md), section 7,
-  "Trusting the OSCAR server's address").
+- **The simulator** knows the VPS's address only, on its host, in three
+  places: its administration's `allow` lines, its trusted zone and its
+  `SIM_TRUSTED_ADDRESSES`. Add this machine's address next to the VPS's, in
+  all three ([OSCAR - OSDM Simulator](OSCAR%20-%20OSDM%20Simulator.md),
+  section 7, *Another OSCAR server*; the VPS keeps its place). Without it,
+  OSCAR's log here says *The simulator answered 403* every 30 s (its figures
+  in Grafana and Admin → OSDM Simulator are refused), and from about a dozen
+  runs at once some meet 429s. A test machine's address is removed at step 10.
 
 **10. Clean up**, once the checks pass. The folder holds the key and every
 password hash:
@@ -578,6 +583,10 @@ password hash:
 ```bash
 rm -rf --one-file-system ~/oscar-restore
 ```
+
+A test machine that goes away: remove its address on the simulator's host
+([OSCAR - OSDM Simulator](OSCAR%20-%20OSDM%20Simulator.md), section 7, the
+end of *Another OSCAR server*).
 
 On the VPS, record the restore drill for the Admin Dashboard
 ([Disaster Recovery](OSCAR%20-%20Disaster%20Recovery.md), section 5):

@@ -1340,6 +1340,36 @@ describe('POST /v1/admin/alertmanager/apply', () => {
   });
 });
 
+// ── GET /v1/admin/deployment (#1187) ──────────────────────────────────────────
+
+describe('GET /v1/admin/deployment', () => {
+  const { deploymentKind } = require('../../src/utils/deployment');
+  let saved;
+  beforeEach(() => { saved = process.env.KUBERNETES_SERVICE_HOST; });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.KUBERNETES_SERVICE_HOST;
+    else process.env.KUBERNETES_SERVICE_HOST = saved;
+  });
+
+  test('kubernetes in a pod, docker elsewhere', async () => {
+    process.env.KUBERNETES_SERVICE_HOST = '10.43.0.1';
+    const k = await request(app).get('/v1/admin/deployment').set('Authorization', `Bearer ${makeToken('administrator')}`);
+    expect([k.status, k.body]).toEqual([200, { kind: 'kubernetes' }]);
+    delete process.env.KUBERNETES_SERVICE_HOST;
+    const d = await request(app).get('/v1/admin/deployment').set('Authorization', `Bearer ${makeToken('administrator')}`);
+    expect([d.status, d.body]).toEqual([200, { kind: 'docker' }]);
+    expect(deploymentKind({ KUBERNETES_SERVICE_HOST: '' })).toBe('docker');
+  });
+
+  test('administrators only', async () => {
+    expect((await request(app).get('/v1/admin/deployment')).status).toBe(401);
+    for (const role of ['test_manager', 'certification_user']) {
+      const res = await request(app).get('/v1/admin/deployment').set('Authorization', `Bearer ${makeToken(role)}`);
+      expect([role, res.status]).toEqual([role, 403]);
+    }
+  });
+});
+
 // ── POST /v1/admin/test-email ─────────────────────────────────────────────────
 
 describe('POST /v1/admin/test-email', () => {

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-monitoring-on-kubernetes",
+    "date": "November 11, 2026",
+    "tag": "Operations",
+    "title": "Monitoring on Kubernetes: the Prometheus card, the error count",
+    "summary": "For OSCAR administrators: on a Kubernetes cluster the Admin Dashboard's Prometheus card opens Grafana's Explore, and the OSCAR · Logs dashboard no longer counts scenario names as errors.",
+    "content": "On a Kubernetes or OpenShift cluster, Prometheus's own page is not published, on purpose. The Prometheus card of the Admin Dashboard now opens Grafana → Explore there, where the same queries run with the Prometheus data source. On the VPS the card opens Prometheus as before.\n\nThe OSCAR · Logs dashboard counted every line holding the word \"error\", including ordinary lines naming scenarios whose code holds ERROR. Its error panels now count OSCAR's lines at level error or fatal, and other lines holding error, fatal or panic as a word of their own. The count of errors therefore drops: that is expected.\n\nTesters and Test Managers are not concerned. No action is required."
+  },
+  {
     "id": "2026-11-10-alerting-on-kubernetes",
     "date": "November 10, 2026",
     "tag": "Operations",

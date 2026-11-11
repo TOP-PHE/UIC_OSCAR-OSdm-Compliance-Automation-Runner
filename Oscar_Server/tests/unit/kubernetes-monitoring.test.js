@@ -292,6 +292,35 @@ describe('the logs: Loki and Alloy', () => {
     const config = deployment.spec.template.spec.volumes.find(v => v.name === 'config').configMap.name;
     expect(stack.configMapGenerator).toEqual([{ name: config, namespace: 'monitoring', files: ['config.alloy'] }]);
   });
+
+  test('the logs dashboard counts OSCAR\'s errors by level, never a word in a scenario code (#1187)', () => {
+    // The recovery drill read 13.8K "errors": info lines naming scenarios such
+    // as SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_312. The two error panels share
+    // one filter: OSCAR's (pino) lines below level 50 out, then level 50 or 60,
+    // or the word error / fatal / panic in any other line. Loki's RE2 and
+    // JavaScript read these constructs alike ((?i) taken as the i flag).
+    const logs = JSON.parse(read('OSCAR_Deploy/grafana/dashboards/oscar-logs.json'));
+    const filters = ['Errors in range', 'Errors only'].map((title) => {
+      const expr = logs.panels.find(p => p.title === title).targets[0].expr;
+      const m = /!~ `([^`]+)` \|~ `\(\?i\)([^`]+)`/.exec(expr);
+      expect([title, m]).not.toEqual([title, null]);
+      return m.slice(1);
+    });
+    expect(filters[1]).toEqual(filters[0]);
+    const [below, wanted] = [new RegExp(filters[0][0]), new RegExp(filters[0][1], 'i')];
+    const isError = (line) => !below.test(line) && wanted.test(line);
+    const lines = {
+      '{"level":30,"module":"queue","scenario":"SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_312","msg":"Job completed"}': false,
+      '{"level":40,"module":"simulator-metrics","err":"The simulator answered 403.","msg":"The simulator did not answer its metrics"}': false,
+      '{"level":40,"error":"boom","msg":"a warning that names an error"}': false,
+      '{"level":50,"module":"runner","msg":"Run failed"}': true,
+      '{"level":60,"msg":"Going down"}': true,
+      'time="2026-11-11T07:00:00Z" level=error msg="Unable to update container"': true,
+      'level=info msg="SIM_WRONG_FARE_ERROR_38 done"': false,
+      'Error: connect ECONNREFUSED 10.43.0.10:443': true,
+    };
+    for (const [line, expected] of Object.entries(lines)) expect([line, isError(line)]).toEqual([line, expected]);
+  });
 });
 
 describe('what OSCAR adds (monitoring/oscar)', () => {

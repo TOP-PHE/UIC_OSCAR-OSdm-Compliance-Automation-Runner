@@ -14,7 +14,7 @@
       "id": 99,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
-        "content": "## How to use\n\n- **Container** dropdown (top right) picks one or more OSCAR containers. Default is `oscar` (the main app).\n- **Search** box does substring filter (case-sensitive). Empty = show everything.\n- **Time range** (top right) — bump up for incident triage.\n- The two panels below show errors-only and the full live tail. They reload automatically every 5 seconds.\n\nFor ad-hoc queries see Grafana → **Explore** (top-left menu) → choose Loki → write LogQL like `{container=\"oscar\"} |= \"ERROR\"` or `{container=\"oscar\", stream=\"stderr\"}`.",
+        "content": "## How to use\n\n- **Container** dropdown (top right) picks one or more OSCAR containers. Default is `oscar` (the main app).\n- **Search** box does substring filter (case-sensitive). Empty = show everything.\n- **Time range** (top right) — bump up for incident triage.\n- The two panels below show errors-only and the full live tail. They reload automatically every 5 seconds.\n- **Errors** are OSCAR's lines at level error or fatal (`\"level\":50` or `60`), and the other lines that hold the word error, fatal or panic. OSCAR's info and warning lines never count, even when a scenario code holds ERROR (#1187).\n\nFor ad-hoc queries see Grafana → **Explore** (top-left menu) → choose Loki → write LogQL like `{container=\"oscar\"} | json | level >= 50` or `{container=\"oscar\", stream=\"stderr\"}`.",
         "mode": "markdown"
       },
       "pluginVersion": "11.4.0",
@@ -29,7 +29,7 @@
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.4.0",
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "sum(count_over_time({container=~\"$container\", container!~\"oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager\"} |~ \"(?i)error|fatal|panic\" [$__range]))", "queryType": "range", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "sum(count_over_time({container=~\"$container\", container!~\"oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager\"} !~ `\"level\":(10|20|30|40)[,}]` |~ `(?i)\"level\":(50|60)[,}]|\\b(error|fatal|panic)\\b` [$__range]))", "queryType": "range", "refId": "A" }
       ],
       "title": "Errors in range",
       "type": "stat"
@@ -74,7 +74,7 @@
         "wrapLogMessage": true
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{container=~\"$container\", container!~\"oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager\"} |~ \"(?i)error|fatal|panic\"", "queryType": "range", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{container=~\"$container\", container!~\"oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager\"} !~ `\"level\":(10|20|30|40)[,}]` |~ `(?i)\"level\":(50|60)[,}]|\\b(error|fatal|panic)\\b`", "queryType": "range", "refId": "A" }
       ],
       "title": "Errors only",
       "type": "logs"

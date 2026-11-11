@@ -476,6 +476,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.496] — 2026-11-11
+
+Listed in `compatibility.json` (2026.535) without moving `current_release`.
+
+### Changed
+
+- **What the recovery drill showed in monitoring** (#1187).
+  - **On Kubernetes, the Admin Dashboard's Prometheus card opens Grafana's
+    Explore.** Prometheus's own page is not published on a cluster, on purpose
+    (k3s guide, section 8a), so the card's `/prometheus/` led nowhere. New
+    route `GET /v1/admin/deployment` (`kind`: kubernetes, when the pod has
+    `KUBERNETES_SERVICE_HOST`, else docker; `utils/deployment.js`); the page
+    changes the card's link and text only on Kubernetes
+    (`prometheusCardFor()`, pinned by `ui-scripts.test.js`). On the VPS
+    nothing changes.
+  - **OSCAR · Logs counts errors by level.** *Errors in range* read 13.8K on
+    the drill machine: its two error panels counted every line holding the
+    word error, and info lines name scenarios such as
+    `SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_312`. Now OSCAR's lines below level
+    50 are left out, and a line counts at level 50 or 60, or with the word
+    error, fatal or panic on its own (never inside a scenario code).
+    `kubernetes-monitoring.test.js` runs the filter over sample lines. The
+    dashboard is the VPS's and the cluster's.
+  - **Another OSCAR server on the simulator.** OSCAR's log on the drill
+    machine said *The simulator answered 403* every 30 s: nginx on the
+    simulator's host lets only the VPS reach `/admin/`. *OSCAR - OSDM
+    Simulator*, section 7, *Another OSCAR server*, adds an address next to the
+    first in its three places (the `/admin/` `allow` lines, the trusted zone,
+    `SIM_TRUSTED_ADDRESSES`: a second line there would replace the first) and
+    removes it; the lines were run twice and back on a copy of the site. The
+    nginx example puts its commented `allow` / `deny` lines inside `location
+    /admin/`: above it, uncommented, they closed the whole site. The k3s
+    guide's 6a step 9 points there, and step 10 removes a test machine's
+    address.
+
+---
+
 ## [server-1.11.495] — 2026-11-10
 
 Listed in `compatibility.json` (2026.534) without moving `current_release`.
