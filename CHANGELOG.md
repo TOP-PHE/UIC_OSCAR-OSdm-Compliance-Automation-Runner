@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **k3s on one VPS, section 7: the first administrator is OSCAR's, and only
+  for a new OSCAR** (#1177). Documentation only. In the recovery drill, 6a
+  step 6 sent the reader to section 7, which starts with *First
+  administrator*: it read as a Kubernetes account, or as a step a restore
+  needs too.
+  - A table at the top of section 7 says, for each paragraph, what to do
+    after section 6 and after section 6a (first administrator and e-mail:
+    skip them after a restore).
+  - *First administrator (a new OSCAR only)* says it is an OSCAR web account
+    with the administrator role, that the cluster needs none, and that after
+    6a the call answers 503 (6a step 3 makes no bootstrap token).
+  - The call prints its status, and each answer (201, 400, 409, 401, 503) is
+    explained.
+  - 6a step 6 points at *Parallel runs* only.
+
 - **k3s on one VPS: what 6a step 5 shows when it works, what to do when it
   does not, and no example e-mail for Let's Encrypt** (#1173). Documentation
   only. In the recovery drill, section 3 took the guide's own example
