@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.533",
+  "current_release": "2026.535",
   "releases": [
     {
       "release": "2026.535",
@@ -12,7 +12,8 @@
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "Server 1.11.496: on Kubernetes, the Admin Dashboard's Prometheus card opens Grafana's Explore, where Prometheus's queries run: Prometheus's own page is not published on a cluster, on purpose (#1187). GET /v1/admin/deployment says where the server runs (kubernetes or docker). On the VPS nothing changes.",
-        "Released with it (deployment files and documentation): OSCAR · Logs counts OSCAR's errors by level (error, fatal) and no longer counts info lines whose scenario code holds ERROR; the simulator guide adds or removes another OSCAR server's address in its three places (the /admin/ allow lines, the trusted zone, SIM_TRUSTED_ADDRESSES), and its nginx example puts the allow lines inside the /admin/ location, where they no longer close the whole site (#1187). The k3s guide's 8a and 6a steps from the recovery drill (#1177, #1179, #1181, #1183, #1185)."
+        "Released with it (deployment files and documentation): OSCAR · Logs counts OSCAR's errors by level (error, fatal) and no longer counts info lines whose scenario code holds ERROR; the simulator guide adds or removes another OSCAR server's address in its three places (the /admin/ allow lines, the trusted zone, SIM_TRUSTED_ADDRESSES), and its nginx example puts the allow lines inside the /admin/ location, where they no longer close the whole site (#1187). The k3s guide's 8a and 6a steps from the recovery drill (#1177, #1179, #1181, #1183, #1185).",
+        "Also released here, never released on its own: 2026.534, server 1.11.495. On Kubernetes, Admin → Server Config shows the commands that give its SMTP and Alerting values to Alertmanager as its Secret, in place of the Apply button (#1175)."
       ]
     },
     {
