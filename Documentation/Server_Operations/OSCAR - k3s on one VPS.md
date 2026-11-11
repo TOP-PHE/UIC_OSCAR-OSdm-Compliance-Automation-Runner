@@ -542,8 +542,9 @@ backup.
   the commands of step 7 in its place.
 
 **7. Monitoring**: section 8a, steps 1 to 5, step 1 first (the stack's
-Alertmanager does not start without it). Its step 1, *With Server Config's
-values* (two command blocks on this machine, not the page's button), gives
+Alertmanager does not start without it). Its step 1 starts with a check of
+the Secret; after this section the Secret is made *With Server Config's
+values* (two command blocks on this machine, not the page's button), which gives
 Alertmanager the values of step 6: the same alerts, to the same people, as on
 the VPS, with nothing typed again. Its step 5 sends a test alert, which must
 reach them.
@@ -699,8 +700,28 @@ reads its configuration only from the Secret `oscar-alertmanager` in this
 cluster. A backup brings Server Config's values, never that Secret: without
 it, step 2's Alertmanager stays at *ContainerCreating* and no alert is sent.
 The Secret holds the mail server's password, so you make it yourself, on this
-machine, one of two ways: *With Server Config's values* (always after section
-6a) or *By hand*.
+machine. First see whether it is there; the table says what to do next.
+
+**Is it there?**
+
+```bash
+sudo kubectl -n monitoring get secret oscar-alertmanager
+```
+
+| It prints | What to do |
+|---|---|
+| `oscar-alertmanager   Opaque   1   …` | It is there. See what it holds (just below). With your mail server and recipients, step 1 is done: go to step 2. After a change of *SMTP* or *Alerting* in Server Config, or if it holds other values, make it again *With Server Config's values* (that replaces it). |
+| `Error from server (NotFound): secrets "oscar-alertmanager" not found`, or `namespaces "monitoring" not found` | It is not there. Make it *With Server Config's values* when Server Config's *SMTP* and *Alerting* sections are filled in (always after section 6a), else *By hand*. Then check again. |
+
+**What it holds**, without the mail server's password:
+
+```bash
+sudo kubectl -n monitoring get secret oscar-alertmanager -o jsonpath='{.data.alertmanager\.yaml}' | base64 -d | grep -v smtp_auth_password
+```
+
+`smtp_smarthost` is the mail server and its port, and `to:` the recipients:
+Server Config's values (Admin → *Server Config*), or what was typed in the
+example for a Secret made *By hand*.
 
 **With Server Config's values**, when its *SMTP* and *Alerting* sections are
 filled in (always after section 6a: they are the VPS's). Two command blocks,
@@ -730,6 +751,10 @@ and `secret/oscar-alertmanager configured` after a change. Alertmanager reads
 a change within a minute. After section 6a it works the first time: the mail
 server and the recipients came with the backup.
 
+`~/alertmanager.yaml` is a temporary file: the block's last line deletes it,
+so afterwards it is not there (nano opens it empty). The configuration lives
+in the Secret: *Is it there?* and *What it holds* above show it.
+
 | If it prints instead | What it means, what to do |
 |---|---|
 | A warning about a missing annotation, then `configured` | The Secret was made by an earlier version of this step. Harmless, shown once. |
@@ -745,8 +770,9 @@ Good to know:
   here, and never clicked (from server 1.11.495 the page shows this block in
   its place).
 
-**Or by hand**, from the example: fill in the mail server and the
-administrators' address, then:
+**By hand**, *instead of* the way above, never after it: when Server Config
+has no mail server. Fill in the mail server and the administrators' address
+in the example, then:
 
 ```bash
 cd /opt/oscar
@@ -756,6 +782,10 @@ nano ~/alertmanager.yaml
 sudo kubectl -n monitoring create secret generic oscar-alertmanager --from-file=alertmanager.yaml="$HOME/alertmanager.yaml"
 shred -u ~/alertmanager.yaml
 ```
+
+It prints `secret/oscar-alertmanager created`. *already exists* means the
+Secret is there already (*Is it there?* above): this block does not replace
+it.
 
 **2. The stack**, in a copy of its own with your name (`monitoring/site`,
 which git leaves alone), as for OSCAR in section 6: change only the `HOST=`
