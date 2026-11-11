@@ -4,6 +4,17 @@
   "current_release": "2026.539",
   "releases": [
     {
+      "release": "2026.540",
+      "date": "2026-11-11",
+      "server": "1.11.501",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.501: the count of each latest run's failed checks (the Run page's counts, the coverage) reads an index on run_assertions(run_id, passed) instead of every check's whole row; it replaces the index on run_id alone (migration 53, #1202). The Run page's counts took 9 s while runs were going on production's data, 0.5 s otherwise. The first start after the update builds the index over every stored check: on production, a minute or two."
+      ]
+    },
+    {
       "release": "2026.539",
       "date": "2026-11-11",
       "server": "1.11.500",

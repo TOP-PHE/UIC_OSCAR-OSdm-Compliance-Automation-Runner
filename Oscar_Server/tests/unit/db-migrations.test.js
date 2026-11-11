@@ -252,6 +252,44 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
       d.close();
     }
   });
+
+  // #1202: the Run page's counts read each latest run's failed checks. With
+  // (run_id) alone every check's whole row was read; (run_id, passed) answers
+  // the count from the index, and replaces the old one on an existing DB.
+  test('run_assertions(run_id, passed) replaces (run_id) and covers the count of failed checks (migration 53)', () => {
+    const dbFile = tempDbPath();
+    bootDbAgainst(dbFile);
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec(`DROP INDEX idx_run_assertions_run_passed;
+              CREATE INDEX idx_run_assertions_run ON run_assertions(run_id);
+              DELETE FROM schema_version WHERE version >= 53;`);
+      d.close();
+    }
+    bootDbAgainst(dbFile);
+    const d = new DatabaseSync(dbFile);
+    try {
+      const indexes = d.prepare("SELECT name FROM pragma_index_list('run_assertions')").all().map(r => r.name);
+      expect(indexes).toContain('idx_run_assertions_run_passed');
+      expect(indexes).not.toContain('idx_run_assertions_run');
+      expect(d.prepare("SELECT name FROM pragma_index_info('idx_run_assertions_run_passed')").all().map(r => r.name))
+        .toEqual(['run_id', 'passed']);
+      // The counts of runCandidates.js and company-coverage.js, as they write them.
+      for (const columns of ['run_id, SUM(CASE WHEN passed = 1 THEN 0 ELSE 1 END) AS failed',
+        'run_id, COUNT(*) AS total, SUM(CASE WHEN passed = 1 THEN 0 ELSE 1 END) AS failed']) {
+        const plan = d.prepare(`EXPLAIN QUERY PLAN SELECT ${columns}
+                                  FROM run_assertions WHERE run_id IN (?, ?) GROUP BY run_id`).all('a', 'b')
+          .map(r => r.detail).join(' | ');
+        expect([columns, plan]).toEqual([columns, expect.stringContaining('COVERING INDEX idx_run_assertions_run_passed')]);
+      }
+    } finally {
+      d.close();
+    }
+    const countQuery = 'SUM(CASE WHEN passed = 1 THEN 0 ELSE 1 END) AS failed\n                           FROM run_assertions WHERE run_id IN (${marks}) GROUP BY run_id';
+    for (const file of ['api/helpers/runCandidates.js', 'api/routes/company-coverage.js']) {
+      expect([file, fs.readFileSync(path.resolve(__dirname, '../../src', file), 'utf8').includes(countQuery)]).toEqual([file, true]);
+    }
+  });
 });
 
 function readExtraHeaders(dbFile) {

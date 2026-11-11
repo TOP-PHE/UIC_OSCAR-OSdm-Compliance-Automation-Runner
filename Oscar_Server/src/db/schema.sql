@@ -396,7 +396,9 @@ CREATE TABLE IF NOT EXISTS run_assertions (
   parameterized   INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_run_assertions_run       ON run_assertions(run_id);
+-- run_id first: every read and cascade by run uses it; passed second, so a
+-- count of a run's failed checks reads the index only (#1202, migration 53).
+CREATE INDEX IF NOT EXISTS idx_run_assertions_run_passed ON run_assertions(run_id, passed);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_request   ON run_assertions(request_id);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_company   ON run_assertions(company_id);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_key       ON run_assertions(company_id, assertion_key);
