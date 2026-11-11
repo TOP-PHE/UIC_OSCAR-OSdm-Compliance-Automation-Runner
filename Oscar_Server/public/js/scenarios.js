@@ -3306,7 +3306,7 @@ function buildTripSection(idx, sc, trip) {
       ${buildTripTimeField(tIdx, 'trip.startDatetime', 'Departure <span class="param-hint">HH:MM:SS±HH:MM — date added automatically</span>', t.startDatetime, '07:00:00+02:00')}
       ${buildTripTimeField(tIdx, 'trip.endDatetime',   'Arrival <span class="param-hint">HH:MM:SS±HH:MM</span>',   t.endDatetime,   '09:00:00+02:00')}
       ${buildTripTextField(tIdx, 'trip.vehicleNumber', 'Vehicle # <span class="param-hint">Train number</span>', t.vehicleNumber, '')}
-      ${buildTripTextField(tIdx, 'trip.operatorCode',  'Operator Code <span class="param-hint">urn:uic:rics:NNNN</span>', t.operatorCode,  'urn:uic:rics:...')}
+      ${buildTripTextField(tIdx, 'trip.operatorCode',  'Operator Code <span class="param-hint">a URN, e.g. urn:uic:rics:NNNN</span>', t.operatorCode,  'urn:uic:rics:...')}
     </div>
     ${buildTripSearchCriteriaPanel(tIdx, trip)}`;
   }
@@ -5861,7 +5861,7 @@ function buildTrainDetailHTML(tidx) {
           <span class="field-error" id="tf-${esc(tidx)}-label-err"></span>
         </div>
         <div class="param-field">
-          <label class="param-label">Operator Code <span class="param-hint">(urn:uic:rics:NNNN)</span></label>
+          <label class="param-label">Operator Code <span class="param-hint">(a URN, e.g. urn:uic:rics:NNNN)</span></label>
           <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="operatorCode" value="${esc(d.operatorCode || '')}" placeholder="urn:uic:rics:1184">
           <span class="field-error" id="tf-${esc(tidx)}-operatorCode-err"></span>
         </div>
@@ -6023,21 +6023,25 @@ function readTrainDetailFields(tidx) {
   };
 }
 
+// #1116: a stop place or operator of Test Data is any URN. OSDM's
+// StopPlaceRef and CompanyRef are plain strings: UIC's urn:uic:stn and
+// urn:uic:rics (OSDM's own example is urn:uic:rics:1185:000011), or a
+// provider's scheme (urn:x_bileto:stn:<uuid>, urn:x_cze:cisjr:<id>,
+// urn:x_bileto:code:<id>). Only stn and rics were accepted before.
+function isUrnRef(v) {
+  return /^urn:[a-z0-9][\w-]*:\S+$/i.test(String(v));
+}
+
 function wizValidateTrain(tidx) {
-  // Station refs are not always UIC codes: some sandboxes use vendor-specific
-  // schemes (e.g. Bileto returns urn:x_bileto:stn:<uuid>). Accept any
-  // urn:<scheme>:stn:<id> so discovered/real refs validate (#161 follow-up).
-  const URN_RE  = /^urn:[a-z0-9_]+:stn:[a-z0-9_.-]+$/i;
-  const RICS_RE = /^urn:uic:rics:\d+$/i;
   const TIME_RE = /^\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/;
   const detail = document.getElementById('train-detail-' + tidx);
   if (!detail) return false;
-  const urnMsg = 'Must be a station URN, e.g. urn:uic:stn:8400058 (or a vendor ref like urn:x_bileto:stn:…).';
+  const urnMsg = 'Must be a URN: urn:uic:stn:8400058, or the provider scheme urn:<scheme>:<type>:<id> (e.g. urn:x_bileto:stn:…).';
   const checks = [
     { tfield: 'label',          test: v => v.length > 0,            msg: 'Label is required.' },
-    { tfield: 'originURN',      test: v => !v || URN_RE.test(v),   msg: urnMsg },
-    { tfield: 'destinationURN', test: v => !v || URN_RE.test(v),   msg: urnMsg },
-    { tfield: 'operatorCode',   test: v => !v || RICS_RE.test(v),  msg: 'Must be urn:uic:rics:NNNN (e.g. urn:uic:rics:1184) or leave empty.' }
+    { tfield: 'originURN',      test: v => !v || isUrnRef(v),      msg: urnMsg },
+    { tfield: 'destinationURN', test: v => !v || isUrnRef(v),      msg: urnMsg },
+    { tfield: 'operatorCode',   test: v => !v || isUrnRef(v),      msg: 'Must be a URN: urn:uic:rics:1184, or the provider scheme urn:<scheme>:<type>:<id> (e.g. urn:x_bileto:code:…), or leave empty.' }
   ];
   // Clear previous state (route fields + services)
   checks.forEach(c => {

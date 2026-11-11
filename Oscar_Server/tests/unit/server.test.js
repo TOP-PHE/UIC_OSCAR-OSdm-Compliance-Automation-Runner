@@ -483,6 +483,33 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #1117: and no coach layout read where the framework declares no seat map.
+  test.each([
+    ['declares no seat map', { placeSelection: { seatMap: false, supportedModes: [] } }, [false, false]],
+    ['says nothing of a seat map', { passengerUpdate: true }, [false, false]],
+    ['declares a seat map', { placeSelection: { seatMap: true, supportedModes: ['SEATMAP_AT_OFFER'] } }, [undefined, undefined]],
+  ])('a run\'s copy marks the coach layouts as not read when the framework %s', async (_label, framework, expected) => {
+    const { companyId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [uuidv4(), companyId, colEncrypt(JSON.stringify(framework))]);
+    const stored = JSON.stringify({ scenarios: [{ code: 'A' }, { code: 'B', placeSelectionMode: 'SEATMAP_AT_OFFER' }] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.body.scenarios.map((s) => s.__seatMapDeclared)).toEqual(expected);
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // #889: and each declared card's reduction rate on the passengers' cards.
   test('a run\'s copy writes the declared reduction rates on the passengers\' cards', async () => {
     const { companyId, slug } = seedCompanyUser();
