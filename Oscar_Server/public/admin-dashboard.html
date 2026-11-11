@@ -273,7 +273,10 @@ function prometheusCardFor(kind) {
   try { user = JSON.parse(localStorage.getItem('oscar_user') || '{}') || {}; } catch (_e) { user = {}; }
   if (user.role !== 'administrator') return;
   fetch('/v1/admin/deployment')
-    .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .then(function (res) {
+      if (!res.ok) { throw new Error('HTTP ' + res.status); }
+      return res.json();
+    })
     .then(function (d) {
       var card = prometheusCardFor(d.kind);
       if (!card) return;
