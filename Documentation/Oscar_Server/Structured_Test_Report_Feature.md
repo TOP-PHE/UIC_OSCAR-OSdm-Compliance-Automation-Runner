@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS run_assertions (
   parameterized   INTEGER NOT NULL DEFAULT 0,  -- 1 if assertion name contains dynamic values
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_run_assertions_run       ON run_assertions(run_id);
+CREATE INDEX IF NOT EXISTS idx_run_assertions_run_passed ON run_assertions(run_id, passed);  -- (run_id) until migration 53, #1202
 CREATE INDEX IF NOT EXISTS idx_run_assertions_request   ON run_assertions(request_id);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_company   ON run_assertions(company_id);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_key       ON run_assertions(company_id, assertion_key);

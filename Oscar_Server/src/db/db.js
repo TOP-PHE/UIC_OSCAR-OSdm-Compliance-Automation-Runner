@@ -1055,6 +1055,17 @@ const MIGRATIONS = [
       // many runs held the server for minutes.
       db.exec('CREATE INDEX IF NOT EXISTS idx_run_assertions_suite ON run_assertions(suite_id)');
   }},
+  { version: 53, name: 'run-assertions-run-passed-index', up: () => {
+      // The Run page's counts (and the coverage) count each latest run's
+      // failed checks: with (run_id) alone every check's whole row was read,
+      // 9 s while runs were going on production's data (#1202). The index on
+      // (run_id, passed) answers that count by itself, and it starts with
+      // run_id, so it replaces the old one: the table keeps as many indexes
+      // to update at each write. schema.sql creates it at start; this removes
+      // the old one, once.
+      db.exec('CREATE INDEX IF NOT EXISTS idx_run_assertions_run_passed ON run_assertions(run_id, passed)');
+      db.exec('DROP INDEX IF EXISTS idx_run_assertions_run');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

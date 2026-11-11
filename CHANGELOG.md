@@ -491,6 +491,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.501] — 2026-11-11
+
+Listed in `compatibility.json` (2026.540) without moving `current_release`.
+
+### Changed
+
+- **The count of a run's failed checks reads an index, not the checks**
+  (#1202). On the k3s test machine with production's data (7.6 GB), the Run
+  page's counts (`POST /v1/runs/preview`) took 0.5 s with no run going and
+  9.3 s (99th percentile) while a batch of 15 ran, the pod not restarted in
+  between. They count each scenario's latest run's failed checks
+  (`latestRunStates()`, `runCandidates.js`; the coverage the same way,
+  `company-coverage.js`), and with an index on `run_id` alone every check's
+  whole row was read, its name and error message included, for one column.
+  - `run_assertions(run_id, passed)` covers that count: the database reads
+    the index only. It starts with `run_id`, so it replaces
+    `idx_run_assertions_run` (reads and cascades by run keep an index, and
+    the table keeps as many indexes to update at each write).
+  - `schema.sql` creates it at start; migration 53 removes the old one. **The
+    first start after the update builds it over every stored check**: on
+    production, a minute or two before OSCAR answers (the VPS's container
+    waits; on Kubernetes the probes wait minutes since #1151).
+  - `db-migrations.test.js` turns a database back to the old index, boots it,
+    and checks the old index is gone, the new one is `(run_id, passed)` and
+    both counts' plans read `COVERING INDEX`; it also pins the count's text
+    in both files. It fails without the change.
+
+---
+
 ## [server-1.11.500] — 2026-11-11
 
 Listed in `compatibility.json` (2026.539) without moving `current_release`.
