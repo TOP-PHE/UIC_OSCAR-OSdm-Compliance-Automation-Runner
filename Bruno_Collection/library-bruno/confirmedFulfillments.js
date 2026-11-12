@@ -32,13 +32,22 @@ function idsOf(fulfillments) {
   return list(fulfillments).map((f) => f?.id).filter((id) => typeof id === 'string' && id !== '');
 }
 
-/** What OSCAR keeps of each fulfilment of the confirmation: its id, status and the parts it names. */
+/**
+ * What OSCAR keeps of each fulfilment of the confirmation: its id, status, the
+ * parts it names and (#1208, OSDM 3.11) the fares its billing references name
+ * by their accounting reference.
+ */
 function keptOf(fulfillments) {
-  return list(fulfillments).filter((f) => typeof f?.id === 'string' && f.id !== '').map((f) => ({
-    id: f.id,
-    status: f.status ?? null,
-    bookingParts: list(f.bookingParts).map((p) => p?.id).filter((id) => typeof id === 'string').map((id) => ({ id })),
-  }));
+  return list(fulfillments).filter((f) => typeof f?.id === 'string' && f.id !== '').map((f) => {
+    const kept = {
+      id: f.id,
+      status: f.status ?? null,
+      bookingParts: list(f.bookingParts).map((p) => p?.id).filter((id) => typeof id === 'string').map((id) => ({ id })),
+    };
+    const references = list(f.billingReferences).filter((r) => r?.accountingRef && typeof r.accountingRef === 'object').map((r) => ({ accountingRef: r.accountingRef }));
+    if (references.length > 0) kept.billingReferences = references;
+    return kept;
+  });
 }
 
 const LIST_CHECK = 'The booking read after the confirmation lists the fulfilments the confirmation gave';

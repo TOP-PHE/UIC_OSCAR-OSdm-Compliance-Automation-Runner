@@ -32,7 +32,7 @@ const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { buildOfferCollection } = require('./offers');
 const variants = require('./variants');
-const { currencyOf } = require('./bookings');
+const { currencyOf, heldIdsOf } = require('./bookings');
 const afterSales = require('./afterSales');
 
 const MAX_FULFILLMENT_IDS = 20;
@@ -73,7 +73,7 @@ function namedFulfillments(booking, ids) {
 
 // The parts a set of fulfillments holds.
 function partsHeldBy(booking, fulfillments) {
-  const ids = new Set(fulfillments.flatMap((f) => f.bookingParts.map((p) => p.id)));
+  const ids = new Set(fulfillments.flatMap(heldIdsOf));
   return partsOf(booking).filter((part) => ids.has(part.id));
 }
 

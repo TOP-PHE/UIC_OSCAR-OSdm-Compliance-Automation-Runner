@@ -183,7 +183,7 @@ work is measured where it runs:
   kind: `datafile_copy` (the run's copy of the data file, with the Test
   Framework's warnings and the trips' calendars, made each time a run asks
   for its data file) and `results_store` (the run's checks, steps and
-  requests read from Bruno's results and stored; from 1.11.504 in slices,
+  requests read from Bruno's results and stored; from 1.11.505 in slices,
   and only the slices' time is counted, not the waits between them);
 - `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: every
   line of a run's log, counted, and the time it took in total (its
@@ -214,7 +214,7 @@ first).
 **The second reading** (all six simulated providers at once, server
 1.11.503, #1214): pages answered in 10–100 ms, log lines took 15 % of the
 thread, and storing each run's results 34 %, 2.2 to 3 s a run in one block.
-From server 1.11.504 the results are stored in slices of about 20 ms, other
+From server 1.11.505 the results are stored in slices of about 20 ms, other
 requests served between them; the longest block left is the results file
 decrypted and read (about 0.1 s for 9 MB of results, measured on one
 machine).

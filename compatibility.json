@@ -1,17 +1,28 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.542",
+  "current_release": "2026.543",
   "releases": [
+    {
+      "release": "2026.544",
+      "date": "2026-11-12",
+      "server": "1.11.505",
+      "collection": "OTST_V2.0.256",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.505: a run's results are stored in slices (#1214). With all six simulated providers at once on the k3s test machine (release 2026.542), storing one run's results took 34 % of the server's thread and held it 2.2 s at the 95th percentile, up to 3 s, in one block. The results file is now read off the thread, then the requests are stored in slices of about 20 ms, each in its own transaction, other requests served between two slices; statements are prepared once a run. The same rows are stored (compared on 139 and 279 requests); the longest block measured locally went from 1.8–2.9 s to 78–122 ms (the file's decryption and parsing), the thread's total time down by a third or more. A slice that fails removes what the run stored. oscar_run_work_seconds{work=\"results_store\"} counts the slices' time, not the waits between them."
+      ]
+    },
     {
       "release": "2026.543",
       "date": "2026-11-12",
       "server": "1.11.504",
-      "collection": "OTST_V2.0.255",
+      "collection": "OTST_V2.0.256",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.504: a run's results are stored in slices (#1214). With all six simulated providers at once on the k3s test machine (release 2026.542), storing one run's results took 34 % of the server's thread and held it 2.2 s at the 95th percentile, up to 3 s, in one block. The results file is now read off the thread, then the requests are stored in slices of about 20 ms, each in its own transaction, other requests served between two slices; statements are prepared once a run. The same rows are stored (compared on 139 and 279 requests); the longest block measured locally went from 1.8–2.9 s to 78–122 ms (the file's decryption and parsing), the thread's total time down by a third or more. A slice that fails removes what the run stored. oscar_run_work_seconds{work=\"results_store\"} counts the slices' time, not the waits between them."
+        "Server 1.11.504, collection OTST_V2.0.256 (simulator 0.65.0): a fare fulfilment need not name its fares as booking parts (#1208, #1209; OSDM 3.x can be read either way, and the OSDM community is asked). A fare fulfilment that names no fare in bookingParts no longer fails F3 and F5: which fares a fulfilment holds is read from those it names, from OSDM 3.11 its billingReferences, else the fare fulfilment naming none; the fare refund and its scope check (R5) read the same. A fare named as a booking part is told in an INFO line (F7, and R6 in a refund offer's breakdown), never graded. The simulator's fare fulfilment names no fare, carries billingReferences from 3.11, and a fare refund offer's breakdown names no fare. From a provider's review of the fare tests."
       ]
     },
     {
