@@ -367,8 +367,8 @@ router.post('/', runSubmitLimiter, (req, res) => {
   }
 
   const createdRuns = all(
-    `SELECT id, status, scenario_code, batch_id, queued_at FROM runs WHERE batch_id = ? ORDER BY queued_at ASC`,
-    [batchId]
+    `SELECT id, status, scenario_code, batch_id, queued_at FROM runs WHERE company_id = ? AND batch_id = ? ORDER BY +queued_at ASC`,
+    [targetCompanyId, batchId]
   );
   return res.status(202).json({ batch_id: batchId, parallel: true, concurrent_limit: concurrentLimit, runs: createdRuns });
 });
@@ -418,26 +418,12 @@ router.get('/', refuseBadCursor, (req, res) => {
   }
 
   const isPlatform = isPlatformRole(req.user.role);
+  const certifierList = isPlatform && !req.companyId;
   let rows, total, listed;
 
-  // Aggregate subquery fragments reused by both branches below.
-  // LEFT JOINs avoid N+1 correlated subqueries (one scan per run row).
-  const agg = `
-       LEFT JOIN (
-         SELECT run_id, COUNT(*) AS artifact_count
-         FROM   run_artifacts
-         GROUP  BY run_id
-       ) ra ON ra.run_id = r.id
-       LEFT JOIN (
-         SELECT run_id,
-                COUNT(*)                              AS scenario_count,
-                GROUP_CONCAT(DISTINCT scenario_name)  AS scenario_names
-         FROM   run_suites
-         WHERE  scenario_name IS NOT NULL
-         GROUP  BY run_id
-       ) rs ON rs.run_id = r.id`;
-
-  if (isPlatform && !req.companyId) {
+  // The runs are read from `runs` alone; their counts are added afterwards
+  // for the rows read only (withRunCounts(), #1227).
+  if (certifierList) {
     // Certifier list: per-run share gate (v1.10.0, issue #60). The
     // certifier sees ONLY runs the test_manager has explicitly shared.
     // v1.11.15: the company-wide kill-switch was removed — per-report
@@ -451,13 +437,10 @@ router.get('/', refuseBadCursor, (req, res) => {
               r.auth_mode_used, r.api_base_used, r.env_name_used,
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.deleted_by, r.previous_status, r.batch_id, r.scenario_code,
-              u.email AS submitted_by,
-              COALESCE(ra.artifact_count, 0) AS artifact_count,
-              COALESCE(rs.scenario_count,  0) AS scenario_count,
-              rs.scenario_names
+              u.email AS submitted_by
        FROM runs r
        JOIN users u ON u.id = r.user_id
-       JOIN companies c ON c.id = r.company_id${agg}
+       JOIN companies c ON c.id = r.company_id
        WHERE r.status != 'DELETED' ${certifierFilter}`,
       params: []
     };
@@ -490,14 +473,10 @@ router.get('/', refuseBadCursor, (req, res) => {
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.user_id, r.deleted_by, r.batch_id, r.scenario_code,
               r.shared_with_certifier_at, r.shared_with_certifier_by,
-              (SELECT MAX(sh.shared_at) FROM run_share sh WHERE sh.run_id = r.id AND sh.revoked_at IS NULL) AS shared_with_operator_at,
-              u.email AS submitted_by,
-              COALESCE(ra.artifact_count, 0) AS artifact_count,
-              COALESCE(rs.scenario_count,  0) AS scenario_count,
-              rs.scenario_names
+              u.email AS submitted_by
        FROM runs r
        JOIN users u ON u.id = r.user_id
-       JOIN companies c ON c.id = r.company_id${agg}
+       JOIN companies c ON c.id = r.company_id
        WHERE r.company_id = ?${ownScope} AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
       params: isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
     };
@@ -516,6 +495,7 @@ router.get('/', refuseBadCursor, (req, res) => {
   // under the same rule as the page.
   const nextBefore = nextCursorOf(rows, limit);
   if (req.query.whole_batches === '1') rows = withWholeBatches(rows, listed);
+  rows = withRunCounts(rows, { operatorShares: !certifierList });
   rows = withBatchLabels(rows);
 
   return res.json({ total: total.n, limit, offset, runs: rows, next_before: nextBefore });
@@ -541,6 +521,39 @@ function nextCursorOf(rows, limit) {
   return { at: last.queued_at, id: last.id };
 }
 
+// What each run of the list shows besides its own row: its reports, its
+// scenarios and, for a company's list, when it was last shared with the
+// company that operates the provider. Read for the rows read only (#1227):
+// joined as aggregates, they were computed over every run of the database at
+// each call, 0.5 to 1 s of the server's thread every 3 s while a dashboard
+// watched a batch.
+function withRunCounts(rows, { operatorShares }) {
+  if (rows.length === 0) return rows;
+  const counts = new Map(rows.map(r => [r.id, operatorShares
+    ? { artifact_count: 0, scenario_count: 0, scenario_names: null, shared_with_operator_at: null }
+    : { artifact_count: 0, scenario_count: 0, scenario_names: null }]));
+  const ids = [...counts.keys()];
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const marks = chunk.map(() => '?').join(', ');
+    for (const a of all(`SELECT run_id, COUNT(*) AS n FROM run_artifacts
+                          WHERE run_id IN (${marks}) GROUP BY run_id`, chunk)) {
+      counts.get(a.run_id).artifact_count = a.n;
+    }
+    for (const s of all(`SELECT run_id, COUNT(*) AS n, GROUP_CONCAT(DISTINCT scenario_name) AS names
+                           FROM run_suites
+                          WHERE scenario_name IS NOT NULL AND run_id IN (${marks}) GROUP BY run_id`, chunk)) {
+      Object.assign(counts.get(s.run_id), { scenario_count: s.n, scenario_names: s.names });
+    }
+    if (!operatorShares) continue;
+    for (const h of all(`SELECT run_id, MAX(shared_at) AS at FROM run_share
+                          WHERE revoked_at IS NULL AND run_id IN (${marks}) GROUP BY run_id`, chunk)) {
+      counts.get(h.run_id).shared_with_operator_at = h.at;
+    }
+  }
+  return rows.map(r => ({ ...r, ...counts.get(r.id) }));
+}
+
 // #1029 PR 3: each run of a batch chosen at launch carries what it was
 // chosen by, in words (runFilters.selectionLabel()); null otherwise.
 function withBatchLabels(rows) {
@@ -564,8 +577,12 @@ function withWholeBatches(rows, listed) {
   const batchIds = [...new Set(rows.map(r => r.batch_id).filter(Boolean))];
   if (batchIds.length === 0) return rows;
   const marks = batchIds.map(() => '?').join(', ');
+  // `+r.queued_at`: ordered by the column itself, SQLite would walk every run
+  // of the company in date order to find the batches' runs; ordered by an
+  // expression, it reads them through the (company_id, batch_id) index and
+  // sorts those few (#1227).
   const others = all(`${listed.sql} AND r.batch_id IN (${marks})
-       ORDER BY r.queued_at DESC
+       ORDER BY +r.queued_at DESC
        LIMIT ?`, [...listed.params, ...batchIds, WHOLE_BATCH_ROWS]);
   const seen = new Set(rows.map(r => r.id));
   const added = others.filter(r => !seen.has(r.id));

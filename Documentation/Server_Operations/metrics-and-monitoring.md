@@ -262,6 +262,26 @@ transactions, a crash of OSCAR alone cannot
 `[db] SQLite ready → … (synchronous NORMAL)`. A `PRAGMA synchronous` asked
 on a connection of its own reads that connection's mode, not the server's.
 
+**The sixth reading** (the same, server 1.11.508, #1227):
+- **Commits:** a COMMIT took 0.7 ms at the median (7 ms before) and about
+  100 ms at the 99th percentile. 18 to 56 in 5 minutes took over 0.1 s
+  (28 to 85 before).
+- **Storing the results:** 14.5 % of the thread, 1.5 s a run.
+- **The waits did not move:** requests still waited 0.5 to 1 s at almost
+  every reading, and 4.5 s when the batch started.
+- **The garbage collector** explained a few of the waits only: at most 6
+  pauses over 0.1 s in 5 minutes, and under 3 % of the thread.
+
+So a CPU profile of the server was taken during a batch. The thread was
+busy 31 % of the time. A third of that went to the Dashboard's list of
+runs, which the page asks for every 3 seconds while a batch is going: 14 s
+of 120, in blocks of 0.5 to 1 s. Each call counted every run's reports and
+scenarios in the whole database, then kept the 100 of the page.
+
+From server 1.11.509, the list reads its page first, then counts for the
+runs it shows only. Two indexes find the newest runs of a company and the
+runs of a batch.
+
 ### Run pods (#1130)
 
 With `RUN_ISOLATION=pod` (Kubernetes or OpenShift, each run in a pod of its
