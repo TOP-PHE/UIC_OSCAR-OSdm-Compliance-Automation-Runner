@@ -150,7 +150,7 @@ describe('a fare refund on the provider\'s answers', () => {
     expect(JSON.parse(env.__bookingFulfillmentIds)).toEqual(ids);
     expect(JSON.parse(env.__fareRefundFulfillments).map((f) => f.fulfillmentId)).toEqual(ids);
     expect(mockRecorded.filter((r) => !r.endsWith(': ok'))).toEqual([]);
-    expect(mockRecorded).toContain('[fares F5] Every booked fare is in a fulfilment (bookingParts): ok');
+    expect(mockRecorded).toContain('[fares F5] Every booked fare is in a fare fulfilment: ok');
     expect(mockLogs.filter((l) => l.startsWith(`[WARNING] ${C.LIST_CHECK} — it lists no fulfilment`))).toHaveLength(1);
   });
 
@@ -162,7 +162,7 @@ describe('a fare refund on the provider\'s answers', () => {
     expect(next).not.toBe('10. POST Refund Offers');
     expect(stopped).toBe(true);
     expect(mockRecorded.filter((r) => !r.endsWith(': ok'))).toEqual([
-      '[fares F5] Every booked fare is in a fulfilment (bookingParts): fares in no fulfilment: neither the booking nor the confirmation lists a fulfilment',
+      '[fares F5] Every booked fare is in a fare fulfilment: fares no fulfilment holds (named in none, billed by none, and no fare fulfilment naming no fare to hold them): neither the booking nor the confirmation lists a fulfilment',
       expect.stringMatching(/^A fulfilment to name in the refund offer request: neither the confirmation/),
     ]);
   });
@@ -232,6 +232,42 @@ describe('step 14 on a booking read listing no fulfilment', () => {
     withBrunoExpect(() => refunds.checkRefundScopeOnBooking(booking));
     expect(mockRecorded).toEqual([]);
     expect(mockLogs).toContain('[INFO] Refund scope: neither the booking nor the confirmation lists a fulfilment — the part-level scope check is skipped.');
+  });
+});
+
+// #1208: in OSDM 3.x a fare fulfilment names no fare in bookingParts; its
+// fares are still held to its refund.
+describe('step 14 on a fare fulfilment that names no fare', () => {
+  const booking = (status) => ({
+    fulfillments: [{ id: 'FUL', status: 'REFUNDED' }],
+    bookedOffers: [{ fares: [{ id: 'fare-1', status }], admissions: [], reservations: [] }],
+  });
+
+  realTest('a refunded fare is checked as refunded, through the fulfilment that names none', () => {
+    env.__refundedFulfillmentIds = JSON.stringify(['FUL']);
+    withBrunoExpect(() => refunds.checkRefundScopeOnBooking(booking('REFUNDED')));
+    expect(mockRecorded).toEqual([
+      'Fulfillment FUL is REFUNDED (held by the confirmed refund offer) - status: REFUNDED: ok',
+      'Booked fare fare-1 is REFUNDED - status: REFUNDED: ok',
+    ]);
+    mockRecorded = [];
+    withBrunoExpect(() => refunds.checkRefundScopeOnBooking(booking('FULFILLED')));
+    expect(mockRecorded[1]).toMatch(/^Booked fare fare-1 is REFUNDED - status: FULFILLED: /);
+    expect(mockRecorded[1]).not.toMatch(/: ok$/);
+  });
+
+  realTest('two fulfilments sharing the fares, one refunded: the fares are not checked, one INFO line says why', () => {
+    const shared = { fulfillments: [{ id: 'F1', status: 'REFUNDED' }, { id: 'F2', status: 'FULFILLED' }], bookedOffers: [{ fares: [{ id: 'fare-1', status: 'REFUNDED' }], admissions: [], reservations: [] }] };
+    env.__refundedFulfillmentIds = JSON.stringify(['F1']);
+    withBrunoExpect(() => refunds.checkRefundScopeOnBooking(shared));
+    expect(mockRecorded.filter((r) => r.startsWith('Booked fare'))).toEqual([]);
+    expect(mockLogs.filter((l) => l.startsWith('[INFO] Refund scope: the refund holds only some of the fulfilments that name no fare'))).toHaveLength(1);
+  });
+
+  realTest('the fulfilments kept from the confirmation keep their billing references (OSDM 3.11)', () => {
+    const ref = { accountingCompany: 'urn:x:c', accountingIds: ['A1'] };
+    C.keepConfirmation({ fulfillments: [{ id: 'F1', status: 'FULFILLED', billingReferences: [{ accountingRef: ref, price: { amount: 1, currency: 'EUR' } }] }] });
+    expect(C.confirmedFulfillments()).toEqual([{ id: 'F1', status: 'FULFILLED', bookingParts: [], billingReferences: [{ accountingRef: ref }] }]);
   });
 });
 

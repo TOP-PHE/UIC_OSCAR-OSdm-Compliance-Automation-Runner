@@ -351,9 +351,30 @@ function isScopedRefundOnBooking(booking) {
   return refunded.length > 0 && ids.some((id) => !refunded.includes(id));
 }
 
+// #1208: the fares the refunded fulfillments hold. OSDM 3.x names no fare in
+// bookingParts (a fare is not a booking part), so fareFulfillments.js reads
+// them; `partly` when the refund holds only some of the fulfillments that
+// share their fares, whose state then cannot be told.
+function _refundedFareScope(booking, fulfillments, refunded) {
+  const offers = Array.isArray(booking?.bookedOffers) ? booking.bookedOffers : [];
+  const fares = offers.flatMap((o) => (Array.isArray(o?.fares) ? o.fares : []));
+  if (fares.length === 0) return { ids: new Set(), partly: false, fareFulfillmentIds: new Set() };
+  const reservations = offers.flatMap((o) => (Array.isArray(o?.reservations) ? o.reservations : []));
+  const reservationIds = reservations.filter((r) => r?.distributionMode === "FARE_MODE").map((r) => r.id);
+  const productIds = offers.flatMap((o) => [
+    ...(Array.isArray(o?.admissions) ? o.admissions : []),
+    ...reservations.filter((r) => r?.distributionMode !== "FARE_MODE"),
+    ...(Array.isArray(o?.ancillaries) ? o.ancillaries : []),
+  ]).map((p) => p?.id).filter(Boolean);
+  const fareFulfillments = require("./fareFulfillments.js");
+  const holdings = fareFulfillments.fareHoldings({ fares, fulfillments, reservationIds, productIds });
+  const { fareIds, partly } = fareFulfillments.faresHeldBy(holdings, refunded);
+  return { ids: new Set(fareIds), partly, fareFulfillmentIds: new Set(holdings.fareFulfillments) };
+}
+
 // F2 (step 14): each fulfillment the confirmed refund offers held is REFUNDED,
-// and so are its booking parts (fares included, #907); every other fulfillment
-// and part is not.
+// and so are its booking parts and fares (#907, #1208); every other
+// fulfillment and part is not.
 function checkRefundScopeOnBooking(booking) {
   const refunded = _readJson("__refundedFulfillmentIds", []);
   if (refunded.length === 0) {
@@ -369,12 +390,14 @@ function checkRefundScopeOnBooking(booking) {
   if (fromConfirmation && fulfillments.length > 0) {
     validationLogger(`[WARNING] Refund scope: the booking read after the refund lists no fulfilment, so the REFUNDED state of ${fulfillments.map((f) => f.id).join(", ")} cannot be read from it; the booked parts are checked through the fulfilments the confirmation gave (OSDM does not require Booking.fulfillments).`);
   }
+  const fareScope = _refundedFareScope(booking, fulfillments, refunded);
   fulfillments.forEach((f) => {
     if (!f) return;
     const isRefunded = refunded.includes(f.id);
     if (isRefunded) {
       if (Array.isArray(f.bookingParts)) f.bookingParts.forEach((bp) => bp && refundedPartIds.add(bp.id));
-      else partsKnown = false;
+      // #1208: a fare fulfilment may name no booking part; its fares are read above.
+      else if (!fareScope.fareFulfillmentIds.has(f.id)) partsKnown = false;
     }
     if (fromConfirmation) return;
     test(`Fulfillment ${f.id} ${isRefunded ? "is REFUNDED (held by the confirmed refund offer)" : "is not REFUNDED (left out of the refund)"} - status: ${f.status}`, () => {
@@ -388,12 +411,16 @@ function checkRefundScopeOnBooking(booking) {
       : "[INFO] Refund scope: neither the booking nor the confirmation lists a fulfilment — the part-level scope check is skipped.");
     return;
   }
-  // #907: a booked fare is a booking part too (R5 of a fare refund).
+  if (fareScope.partly) {
+    validationLogger("[INFO] Refund scope: the refund holds only some of the fulfilments that name no fare and so share their fares (OSDM 3.x) — the fares' REFUNDED state is not checked.");
+  }
+  // #907: a booked fare is refunded with its fulfilment too (R5 of a fare refund).
   (booking.bookedOffers || []).forEach((bo) => {
     ["admissions", "reservations", "ancillaries", "fares"].forEach((kind) => {
       (bo && Array.isArray(bo[kind]) ? bo[kind] : []).forEach((part) => {
         if (!part?.id) return;
-        const inScope = refundedPartIds.has(part.id);
+        if (kind === "fares" && fareScope.partly) return;
+        const inScope = refundedPartIds.has(part.id) || fareScope.ids.has(part.id);
         test(`Booked ${kind.slice(0, -1)} ${part.id} ${inScope ? "is REFUNDED" : "is not REFUNDED (left out of the refund)"} - status: ${part.status}`, () => {
           if (inScope) expect(part.status).to.eql("REFUNDED");
           else expect(part.status, `booking part ${part.id} was not part of the refund`).to.not.eql("REFUNDED");

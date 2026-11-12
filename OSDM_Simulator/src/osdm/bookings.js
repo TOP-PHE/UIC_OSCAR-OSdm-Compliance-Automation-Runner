@@ -128,6 +128,19 @@ const partsOf = (booking) => [...productPartsOf(booking), ...faresOf(booking), .
 const priceOf = (part) => part.price || (Array.isArray(part.prices) ? part.prices[0] : undefined);
 // #906: a fulfilment of fares only, which OSDM gives no document, control number or issuer.
 const FARE_FULFILLMENT = Symbol('fare fulfillment');
+// #1209: the ids of every part a fulfilment holds, fares included. OSDM 3.x
+// names booking parts only in `bookingParts` (a fare is not one), so the
+// simulator keeps what it needs on a hidden property.
+const HELD = Symbol('parts held');
+const holding = (fulfillment, ids) => Object.defineProperty(fulfillment, HELD, { value: ids, writable: true });
+/** The ids of the parts a fulfilment holds: the hidden list, else what it names. */
+const heldIdsOf = (fulfillment) => fulfillment?.[HELD] || (Array.isArray(fulfillment?.bookingParts) ? fulfillment.bookingParts.map((p) => p.id) : []);
+// OSDM 3.11 adds Fulfillment.billingReferences, the fare approach's link to a fare.
+const BILLING_REFERENCES_FROM = 311;
+const rankOf = (version) => {
+  const [major, minor] = String(version || '').split('.').map((x) => Number.parseInt(x, 10) || 0);
+  return major * 100 + minor;
+};
 
 // A booked fare, made from a fare of the offer (#906): the same fare, PREBOOKED,
 // naming the booking's passengers. A Fare has no creation or deadline member.
@@ -317,7 +330,7 @@ function confirmBooking(booking, provider, nowMs) {
   let groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
   if (variants.has(booking, 'per-passenger')) groups = variants.groupsByPassenger(admissions);
   else if (ticketing.of(booking)) groups = ticketing.groupsOf(admissions, ticketing.of(booking));
-  booking.fulfillments = groups.filter((group) => group.length > 0).map((group) => ({
+  booking.fulfillments = groups.filter((group) => group.length > 0).map((group) => holding({
     id: `${provider.idPrefix}-FUL-${randomId()}`,
     status: 'FULFILLED',
     bookingRef: booking.id,
@@ -326,11 +339,10 @@ function confirmBooking(booking, provider, nowMs) {
     controlNumber: String(crypto.randomInt(1000000000, 9999999999)),
     issuer: provider.carrier.ref,
     bookingParts: group.map((a) => ({ id: a.id, summary: a.summary })),
-  }));
+  }, group.map((a) => a.id)));
   // #603: the documents of the media asked for, when the provider issues them.
   if (provider.documents) issueDocuments(booking, provider, [...booking.fulfillments]);
-  const fareParts = [...fares, ...fareReservations];
-  if (fareParts.length > 0) booking.fulfillments.push(fareFulfillmentOf(booking, fareParts, provider, confirmedOn));
+  if (fares.length + fareReservations.length > 0) booking.fulfillments.push(fareFulfillmentOf(booking, { fares, fareReservations }, provider, confirmedOn));
   variants.shapeIssuedFulfillments(booking);
   return booking.fulfillments;
 }
@@ -339,19 +351,31 @@ function confirmBooking(booking, provider, nowMs) {
  * #906: the fulfilment of a booking's fares, a confirmation: OSDM (processes,
  * "Remarks on the Booking Process with Fares") gives it no document, control
  * number, issuer, continuous-service usage or links, and a fulfilment holds
- * fares or products, never both. The distributor builds the ticket. Two wrong
- * variants: a fare left out of `bookingParts`, a PDF ticket attached.
+ * fares or products, never both. The distributor builds the ticket.
+ *
+ * #1209: in OSDM 3.x a fare is not a booking part (`BookingPartReference`
+ * refers to a reservation, admission, ancillary or fee; a fare is one from
+ * OSDM 4), so `bookingParts` names the fare reservations only, and nothing
+ * when there is none. From 3.11 `billingReferences` names each fare by its
+ * accounting reference and price. Two wrong variants: the fares named as
+ * booking parts, as some providers do, with one left out; a PDF ticket
+ * attached.
  */
-function fareFulfillmentOf(booking, fares, provider, confirmedOn) {
+function fareFulfillmentOf(booking, { fares, fareReservations }, provider, confirmedOn) {
   const fulfillment = {
     id: `${provider.idPrefix}-FUL-${randomId()}`,
     status: 'FULFILLED',
     bookingRef: booking.id,
     createdOn: confirmedOn,
-    bookingParts: fares.map((fare) => ({ id: fare.id })),
   };
+  const named = variants.has(booking, 'fare-not-in-fulfillment') ? [...fares.slice(0, -1), ...fareReservations] : fareReservations;
+  if (named.length > 0) fulfillment.bookingParts = named.map((part) => ({ id: part.id }));
+  const billed = variants.has(booking, 'fare-not-in-fulfillment') ? fares.slice(0, -1) : fares;
+  if (rankOf(provider.osdmVersion) >= BILLING_REFERENCES_FROM) {
+    fulfillment.billingReferences = billed.filter((fare) => fare.accountingRef).map((fare) => ({ accountingRef: structuredClone(fare.accountingRef), price: { ...priceOf(fare) } }));
+  }
   Object.defineProperty(fulfillment, FARE_FULFILLMENT, { value: true });
-  if (variants.has(booking, 'fare-not-in-fulfillment')) fulfillment.bookingParts.pop();
+  holding(fulfillment, [...fares, ...fareReservations].map((part) => part.id));
   if (variants.has(booking, 'fare-fulfillment-document')) attachTicket(booking, fulfillment, provider);
   return fulfillment;
 }
@@ -452,4 +476,4 @@ function exchangedBookedOffer(booking, entry, nowMs) {
   return bookedOffer;
 }
 
-module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf, currencyOf, partsOf, priceOf };
+module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf, currencyOf, partsOf, priceOf, heldIdsOf };

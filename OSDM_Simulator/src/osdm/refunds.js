@@ -32,7 +32,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { noteRefund } = require('./documents');
-const { lifetimeOf, currencyOf, partsOf, priceOf } = require('./bookings');
+const { lifetimeOf, currencyOf, partsOf, priceOf, heldIdsOf } = require('./bookings');
 const variants = require('./variants');
 const ticketing = require('./ticketing');
 const afterSales = require('./afterSales');
@@ -47,6 +47,8 @@ const randomId = () => crypto.randomBytes(8).toString('hex');
 
 // Every part of a booking, reservations (#601) and fares (#907) included.
 const admissionsOf = partsOf;
+// #1209: the ids of the parts a refund offer refunds, fares included.
+const REFUNDED_PARTS = Symbol('parts refunded');
 const price = (amount, currency) => ({ amount, currency, scale: 2 });
 const isFare = (part) => Array.isArray(part.prices);
 const modelsOf = (fare) => (fare.combinationConstraint || []).map((c) => c.model);
@@ -135,29 +137,37 @@ function refuseScopedRefund(body, booking) {
 }
 
 function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs, scoped = null, statedFee = null) {
-  const partIds = new Set(scoped || fulfillment.bookingParts.map((p) => p.id));
+  const partIds = new Set(scoped || heldIdsOf(fulfillment));
   const parts = admissionsOf(booking).filter((a) => partIds.has(a.id));
   let items = parts.map((part) => ({ part, ...refundOfPart(part, !!overruleCode, booking, nowMs) }));
   if (statedFee !== null && !overruleCode && takesStatedFee(parts, booking)) items = withStatedFee(items, statedFee);
   const sum = (key) => items.reduce((total, item) => total + item[key], 0);
-  return {
+  // #1209: a fare is not a booking part in OSDM 3.x, so the breakdown leaves
+  // fares out (and is left out when only fares are refunded); the parts the
+  // offer refunds are kept on a hidden property.
+  const breakdown = items.filter((item) => !isFare(item.part)).map((item) => ({
+    refundFee: price(item.fee, currencyOf(booking, provider)),
+    refundableAmount: price(item.refundable, currencyOf(booking, provider)),
+    bookingParts: [{ id: item.part.id, summary: item.part.summary }],
+  }));
+  const held = { id: fulfillment.id, status: fulfillment.status, bookingRef: booking.id, createdOn: fulfillment.createdOn };
+  if (Array.isArray(fulfillment.bookingParts)) held.bookingParts = fulfillment.bookingParts;
+  if (Array.isArray(fulfillment.billingReferences)) held.billingReferences = fulfillment.billingReferences;
+  const offer = {
     id: `${provider.idPrefix}-RFO-${randomId()}`,
     summary: `Refund of ${fulfillment.summary || fulfillment.id}`,
     createdOn: new Date(nowMs).toISOString(),
     validFrom: new Date(nowMs).toISOString(),
     validUntil: new Date(nowMs + lifetimeOf(booking, REFUND_OFFER_LIFETIME_MS)).toISOString(),
     status: 'PROPOSED',
-    fulfillments: [{ id: fulfillment.id, status: fulfillment.status, bookingRef: booking.id, createdOn: fulfillment.createdOn, bookingParts: fulfillment.bookingParts }],
+    fulfillments: [held],
     refundFee: price(sum('fee'), currencyOf(booking, provider)),
     // #611: one cent off its breakdown in the wrong-refund-amount variant.
     refundableAmount: price(sum('refundable') + (variants.has(booking, 'wrong-refund-amount') ? 1 : 0), currencyOf(booking, provider)),
-    refundOfferBreakdown: items.map((item) => ({
-      refundFee: price(item.fee, currencyOf(booking, provider)),
-      refundableAmount: price(item.refundable, currencyOf(booking, provider)),
-      bookingParts: [{ id: item.part.id, summary: item.part.summary }],
-    })),
+    ...(breakdown.length > 0 ? { refundOfferBreakdown: breakdown } : {}),
     ...(overruleCode ? { appliedOverruleCode: overruleCode } : {}),
   };
+  return Object.defineProperty(offer, REFUNDED_PARTS, { value: items.map((item) => item.part.id) });
 }
 
 // An overrule code is text the request gave; it is only ever sent back in JSON.
@@ -188,7 +198,7 @@ function createRefundOffers(booking, body, provider, nowMs) {
   const specs = Array.isArray(body.refundSpecifications) ? body.refundSpecifications : [];
   const offers = requestedFulfillments(booking, body).map((f) => {
     const spec = specs.find((s) => s?.fulfillmentId === f.id) || (specs.length === 1 && !specs[0]?.fulfillmentId ? specs[0] : null);
-    const scoped = spec ? variants.scopedPartIds(booking, f, spec, admissionsOf(booking)) : null;
+    const scoped = spec ? variants.scopedPartIds(booking, heldIdsOf(f), spec, admissionsOf(booking)) : null;
     if (scoped?.length === 0) throw bad(`the refund specification names no part of fulfillment ${f.id}`);
     return buildRefundOffer(booking, f, overruleCode, provider, nowMs, scoped, statedFeeOf(spec, booking, provider));
   });
@@ -223,14 +233,14 @@ function confirmRefundOffer(booking, refundOfferId, body, provider, nowMs) {
   }
   // The parts the offer refunds: all of its fulfillment, or those a scoped
   // refund named (#611); the fulfillment is refunded once all its parts are.
-  const refunded = new Set(offer.refundOfferBreakdown.flatMap((b) => b.bookingParts.map((p) => p.id)));
+  const refunded = new Set(offer[REFUNDED_PARTS] || (offer.refundOfferBreakdown || []).flatMap((b) => b.bookingParts.map((p) => p.id)));
   for (const part of admissionsOf(booking)) {
     if (refunded.has(part.id)) part.status = 'REFUNDED';
   }
   for (const held of offer.fulfillments) {
     const fulfillment = booking.fulfillments.find((f) => f.id === held.id);
     const statusOf = new Map(admissionsOf(booking).map((p) => [p.id, p.status]));
-    if (fulfillment.bookingParts.every((p) => statusOf.get(p.id) === 'REFUNDED')) fulfillment.status = 'REFUNDED';
+    if (heldIdsOf(fulfillment).every((id) => statusOf.get(id) === 'REFUNDED')) fulfillment.status = 'REFUNDED';
     held.status = fulfillment.status;
   }
   offer.status = 'CONFIRMED';
