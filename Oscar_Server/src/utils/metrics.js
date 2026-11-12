@@ -86,14 +86,24 @@ const runLogSeconds = new promClient.Counter({
 // Each COMMIT of transaction() (db.js), timed on the server's thread: the
 // results slices and the run log batches (their commits are part of
 // results_store and of the log lines' time above), and the other
-// transactions. With SQLite's default synchronous mode it waits for the
-// disk, and now and then copies the journal into the database file. A
+// transactions. With synchronous FULL each one waits for the disk; with
+// NORMAL (the default since #1224) only the one that copies the journal into
+// the database file (a checkpoint) does. A
 // statement written alone, outside a transaction, commits too and is not
 // counted. 0.1 is a bound: the dashboard counts the commits above it.
 const dbCommitSeconds = new promClient.Histogram({
   name: 'oscar_db_commit_seconds',
   help: "Time of each database COMMIT of a transaction, on the server's thread",
   buckets: [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  registers: [register]
+});
+
+// The server connection's synchronous mode (#1224), set by server.js at start:
+// 1 NORMAL (the default), 2 FULL (OSCAR_DB_SYNCHRONOUS=FULL). A PRAGMA asked
+// on a connection of its own reads that connection's mode, not the server's.
+const dbSynchronous = new promClient.Gauge({
+  name: 'oscar_db_synchronous',
+  help: "SQLite's synchronous mode on the server's connection: 0 off, 1 normal, 2 full, 3 extra",
   registers: [register]
 });
 
@@ -269,6 +279,7 @@ module.exports = {
   runLogLines,
   runLogSeconds,
   dbCommitSeconds,
+  dbSynchronous,
   timeRunWork,
   runWorkClock,
   runsTotal,

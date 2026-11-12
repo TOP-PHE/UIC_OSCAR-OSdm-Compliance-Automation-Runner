@@ -196,7 +196,9 @@ work is measured where it runs:
   database COMMIT of a transaction, on the thread. Every results slice and
   every batch of log lines ends with one, so their time is part of
   `results_store` and of the log lines'. A statement written alone, outside
-  a transaction, commits too and is not counted.
+  a transaction, commits too and is not counted;
+- `oscar_db_synchronous`, a gauge (from 1.11.508, #1224): the server
+  connection's synchronous mode, 1 NORMAL or 2 FULL.
 
 The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 
@@ -240,18 +242,25 @@ say whether that block is the one left.
 not the block left, 16 to 21 ms a run for files of 285 to 473 KB. Storing
 the results took 22 % of the thread, 1.8 s a run (95th percentile), and
 requests still waited 0.3 to 1 s at almost every reading. Each slice ends
-with a COMMIT, which its 20 ms do not count. OSCAR does not set SQLite's
-`synchronous`, and the server's connection reads 2 (FULL): in WAL mode
-each COMMIT waits for the disk, and the one that takes the journal past
-1,000 pages also copies them into the database file. From server 1.11.507
-each COMMIT's time is measured. To read the mode on a server:
+with a COMMIT, which its 20 ms do not count. OSCAR did not set SQLite's
+`synchronous`, so the server's connection used SQLite's default, 2 (FULL):
+in WAL mode each COMMIT waits for the disk, and the one that takes the
+journal past 1,000 pages also copies them into the database file. From
+server 1.11.507 each COMMIT's time is measured.
 
-```bash
-sudo kubectl -n oscar exec deploy/oscar -c oscar -- node -e "const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('/app/data/oscar.db',{readOnly:true});console.log(d.prepare('PRAGMA synchronous').get())"
-```
-
-On the VPS, `docker exec oscar` in place of `sudo kubectl -n oscar exec
-deploy/oscar -c oscar --`.
+**The fifth reading** (the same, server 1.11.507, #1224): a COMMIT took
+7 ms at the median, 150 to 240 ms at the 99th percentile, and COMMITs took
+10 to 24 % of the thread during a batch. 28 to 85 in 5 minutes took over
+0.1 s, 1 to 2 over 0.5 s. From server 1.11.508 the server's connection uses
+`synchronous = NORMAL`: a COMMIT waits for the disk only when it copies the
+journal into the database file (a checkpoint). The database stays safe from
+corruption; a power loss or a crash of the machine can roll back the last
+transactions, a crash of OSCAR alone cannot
+([SQLite](https://www.sqlite.org/pragma.html#pragma_synchronous)).
+`OSCAR_DB_SYNCHRONOUS=FULL` keeps the old behaviour. The mode in use is
+`oscar_db_synchronous` (1 NORMAL, 2 FULL; *Explore*) and the start-up line
+`[db] SQLite ready → … (synchronous NORMAL)`. A `PRAGMA synchronous` asked
+on a connection of its own reads that connection's mode, not the server's.
 
 ### Run pods (#1130)
 

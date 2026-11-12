@@ -29,12 +29,35 @@ const SCHEMA_SQL = path.resolve(__dirname, 'schema.sql');
 const DB_PARENT = path.dirname(DB_PATH);
 if (!fs.existsSync(DB_PARENT)) fs.mkdirSync(DB_PARENT, { recursive: true });
 
+// ── When a COMMIT waits for the disk (#1224) ─────────────────────────────────
+// SQLite's default, FULL, makes every COMMIT wait for the journal to reach the
+// disk: 7 ms a COMMIT and 10 to 24 % of the server's one thread during a batch
+// on the k3s test machine (#1221). In WAL mode (schema.sql), NORMAL syncs the
+// journal at each checkpoint only. The database stays safe from corruption; a
+// power loss or a system crash, not a crash of OSCAR alone, can roll back the
+// last transactions. OSCAR_DB_SYNCHRONOUS=FULL keeps the old behaviour. Not
+// in another journal mode: there NORMAL could corrupt the file on a power loss.
+// Read before the database is opened: a wrong value stops the start first.
+function synchronousSetting(value) {
+  if (value === undefined || value === '') return 'NORMAL';
+  const mode = String(value).trim().toUpperCase();
+  if (mode === 'NORMAL' || mode === 'FULL') return mode;
+  throw new Error(`OSCAR_DB_SYNCHRONOUS must be NORMAL or FULL, not "${value}"`);
+}
+
+const SYNCHRONOUS = synchronousSetting(process.env.OSCAR_DB_SYNCHRONOUS);
+
 // ── Open database ─────────────────────────────────────────────────────────────
 const db = new DatabaseSync(DB_PATH);
 
 // Apply schema (idempotent — all statements use IF NOT EXISTS)
 const schema = fs.readFileSync(SCHEMA_SQL, 'utf8');
 db.exec(schema);
+
+if (db.prepare('PRAGMA journal_mode').get().journal_mode === 'wal') {
+  db.exec(SYNCHRONOUS === 'FULL' ? 'PRAGMA synchronous = FULL' : 'PRAGMA synchronous = NORMAL');
+}
+const SYNCHRONOUS_NAMES = ['OFF', 'NORMAL', 'FULL', 'EXTRA'];
 
 // ── Versioned migrations ──────────────────────────────────────────────────────
 // Each migration declares its version + a short name + an `up` function. The
@@ -1138,7 +1161,7 @@ function _safeAlter(sql) {
   }
 })();
 
-console.log(`[db] SQLite ready → ${DB_PATH}`);
+console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]})`);
 
 // ── Encryption helpers ────────────────────────────────────────────────────────
 const ALGO = 'aes-256-gcm';
@@ -1253,11 +1276,11 @@ function transaction(fn) {
   }
 }
 
-// The COMMIT runs on the server's one thread and is timed (#1221). OSCAR does
-// not set `synchronous`, so in WAL mode SQLite waits for the journal to reach
-// the disk at each COMMIT, and the COMMIT that takes the journal past 1,000
-// pages also copies them into the database file (a checkpoint). A failed
-// COMMIT is timed too. The histogram is loaded at the first commit, not with
+// The COMMIT runs on the server's one thread and is timed (#1221). With
+// synchronous FULL (OSCAR_DB_SYNCHRONOUS, #1224) each one waits for the
+// journal to reach the disk; with NORMAL, the default, only the COMMIT that
+// takes the journal past 1,000 pages does, as it also copies them into the
+// database file (a checkpoint). A failed COMMIT is timed too. The histogram is loaded at the first commit, not with
 // this file: scripts that only read the database need no metrics.
 let commitSeconds = null;
 
@@ -1273,4 +1296,4 @@ function timedCommit() {
   }
 }
 
-module.exports = { db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig };
+module.exports = { db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig, synchronousSetting };
