@@ -2656,17 +2656,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   44): no failed check, one O8 WARNING; on the collection before 1.11.461
   it failed O8 and stopped at 01. OSDM 3.6 requires `serviceBrandCode` in a
   train link: the simulator's own codes (901, 902).
-  **In OSDM 3.x a fare is not a booking part** (#1208 / #1209, 1.11.504 /
-  OTST_V2.0.256, simulator 0.65.0, from a provider's review):
-  `BookingPartReference` "can refer to reservation, admission, ancillary or
-  fee" (a fare is one from OSDM 4). **Which fares a fulfilment holds is
+  **A fare fulfilment need not name its fares as booking parts** (#1208 /
+  #1209, 1.11.504 / OTST_V2.0.256, simulator 0.65.0, from a provider's
+  review). OSDM 3.x reads both ways: `BookingPartReference` "can refer to
+  reservation, admission, ancillary or fee" (a fare is one from OSDM 4), yet
+  a fulfilment "refers to … offer parts or a fare"; one provider names no
+  fare, another names its fares, and the OSDM community is asked. **Which fares a fulfilment holds is
   `fareFulfillments.js` `fareHoldings()`**, the one reading for F3/F5,
   the fare refund (`fareFulfillmentsOf()`) and R5: fares it names all the
   same (a real provider gives one fulfilment per fare naming it), from 3.11
   `billingReferences` (accounting company + an accounting id in common),
   else the fare fulfilment naming none (several such: `shared`, compared
-  together or not at all). F3 no longer fails "names none"; F7 / R6 warn of
-  a fare named as a booking part. A fare reservation is a reservation, so a
+  together or not at all). F3 no longer fails "names none"; F7 / R6 are
+  INFO lines (`namedFaresNote()`) when a fare is named as a booking part,
+  never graded until OSDM answers (maintainer, 2026-11-12: a warning would
+  take one provider's side). A fare reservation is a reservation, so a
   booking part: `fulfillmentChecks()` needs `reservationIds` to tell it from
   a fare. Simulator: the fare fulfilment names fare reservations only,
   `billingReferences` from 3.11 (`rankOf(provider.osdmVersion)`, since

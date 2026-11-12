@@ -9,13 +9,15 @@ http://www.apache.org/licenses/LICENSE-2.0
 /**
  * fareFulfillments.js — which fares a fulfilment holds (#1208).
  *
- * In OSDM 3.x a fare is not a booking part: `Fulfillment.bookingParts` holds
+ * OSDM 3.x can be read two ways: `Fulfillment.bookingParts` holds
  * `BookingPartReference` items, which "can refer to reservation, admission,
- * ancillary or fee"; a fare is a booking part from OSDM 4 only. So a
- * fulfilment of fares names no fare there. What says which fares it holds:
+ * ancillary or fee", while a fulfilment "refers to services of one or
+ * multiple offer parts or a fare". One provider names no fare there, another
+ * names its fares; the OSDM community is asked (a fare is a booking part from
+ * OSDM 4). What says which fares a fulfilment holds:
  *
- *   1. the fares it names in `bookingParts` all the same (some providers do,
- *      one fulfilment per fare for example);
+ *   1. the fares it names in `bookingParts` (one provider gives one
+ *      fulfilment per fare, naming it);
  *   2. from OSDM 3.11, its `billingReferences`: a fare whose `accountingRef`
  *      has the same accounting company and an accounting id in common;
  *   3. the fares named by neither: those of the fare fulfilment that names no
@@ -138,7 +140,23 @@ function faresHeldBy(holdings, ids) {
   return { fareIds: own, partly: true };
 }
 
-/** The checks' sentence of the OSDM 3.x rule, for messages. */
-const NOT_A_BOOKING_PART = 'OSDM 3.x: a BookingPartReference refers to a reservation, admission, ancillary or fee; a fare is a booking part from OSDM 4';
+// OSDM 3.x can be read both ways, and the OSDM community is asked which: its
+// BookingPartReference names a reservation, admission, ancillary or fee, its
+// Fulfillment refers to "offer parts or a fare". A fare is a booking part
+// from OSDM 4. Until it answers, naming a fare is told, never graded.
+const NAMED_AS_PARTS = 'OSDM 3.x describes a booking part reference as a reservation, admission, ancillary or fee, and a fulfilment as referring to offer parts or a fare; OSCAR reads both until the OSDM community says which (a fare is a booking part from OSDM 4)';
+const MAX_LISTED = 5;
 
-module.exports = { namedIdsOf, billsFare, isFareFulfillment, fareHoldings, faresHeldBy, NOT_A_BOOKING_PART };
+/**
+ * #1208: an INFO line naming the fares named as booking parts (`places`), or
+ * null when there is none. `id` is the check's (F7 in a fulfilment, R6 in a
+ * refund offer's breakdown).
+ */
+function namedFaresNote(id, places) {
+  const all = list(places);
+  if (all.length === 0) return null;
+  const more = all.length > MAX_LISTED ? ` and ${all.length - MAX_LISTED} more` : '';
+  return { id, level: 'INFO', title: '', ok: true, message: `fares named as booking parts: ${all.slice(0, MAX_LISTED).join('; ')}${more}. ${NAMED_AS_PARTS}.` };
+}
+
+module.exports = { namedIdsOf, billsFare, isFareFulfillment, fareHoldings, faresHeldBy, namedFaresNote, NAMED_AS_PARTS };

@@ -23,8 +23,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   R5  after the confirmation, the fares and their fulfilment are
  *       REFUNDED, every other fulfilment unchanged                        14  FAIL
  *       (refunds.js checkRefundScopeOnBooking(), which reads fares too)
- *   R6  a refund offer's breakdown names no fare as a booking part
- *       (OSDM 3.x: a fare is not one, #1208)                              10  WARNING
+ *   R6  a fare named as a booking part in a refund offer's breakdown
+ *       (OSDM 3.x, open, #1208)                                          10  INFO
  *
  * Sources (#907): osdm.io, constructing products from fares, "Handling After
  * Sales": in the clustering model the distributor calculates the fee and,
@@ -266,12 +266,12 @@ function refundOfferChecks(refundOffers, fulfillments, { asked = [], sent = {}, 
   if (Object.keys(sent).length > 0) {
     checks.push(check('R4', 'FAIL', 'CLUSTERING: each refund offer\'s fee is the refundFee OSCAR sent (osdm.io: the provider uses the amount the client states)', of('fee'), 'fees other than the one sent'));
   }
-  // #1208: a fare reservation is a booking part, a fare is not (OSDM 3.x).
+  // #1208: a fare named in a breakdown is told, never graded, until OSDM says
+  // whether a fare is a booking part in 3.x (a fare reservation is one).
   const fareIds = new Set(list(fulfillments).flatMap((f) => list(f.fares)).filter((fare) => !fare.reservation && fare.id != null).map((fare) => fare.id));
-  checks.push(check('R6', 'WARNING', 'A refund offer\'s breakdown names no fare as a booking part (refundOfferBreakdown[].bookingParts)',
-    offers.flatMap((offer) => list(offer.refundOfferBreakdown).flatMap((item) => fareFulfillments.namedIdsOf(item)).filter((id) => fareIds.has(id))
-      .map((id) => `refund offer ${offer.id} names fare ${id}`)),
-    `fares named as booking parts (${fareFulfillments.NOT_A_BOOKING_PART})`));
+  const named = fareFulfillments.namedFaresNote('R6', offers.flatMap((offer) => list(offer.refundOfferBreakdown)
+    .flatMap((item) => fareFulfillments.namedIdsOf(item)).filter((id) => fareIds.has(id)).map((id) => `refund offer ${offer.id} names fare ${id}`)));
+  if (named) checks.push(named);
   return [...checks, ...of('note')];
 }
 

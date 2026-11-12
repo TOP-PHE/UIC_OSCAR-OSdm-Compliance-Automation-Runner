@@ -68,7 +68,7 @@ describe('the fare refund on the simulator\'s answers', () => {
     const { offers, checks } = refund(s);
     expect(offers).toHaveLength(1);
     expect(offers[0].refundFee.amount).toBe(Math.round(s.offer.fares[0].prices[0].amount * 0.25));
-    expect(ids(checks)).toEqual(['R1 FAIL', 'R2 FAIL', 'R6 WARNING']);
+    expect(ids(checks)).toEqual(['R1 FAIL', 'R2 FAIL']);
     expect(failing(checks)).toEqual([]);
   });
 
@@ -76,7 +76,7 @@ describe('the fare refund on the simulator\'s answers', () => {
     const s = sale({ cluster: 'FULL_FLEX' });
     const stated = refund(s, { fee: 250 });
     expect(stated.offers[0].refundFee.amount).toBe(250);
-    expect(ids(stated.checks)).toEqual(['R1 FAIL', 'R2 FAIL', 'R4 FAIL', 'R6 WARNING']);
+    expect(ids(stated.checks)).toEqual(['R1 FAIL', 'R2 FAIL', 'R4 FAIL']);
     expect(failing(stated.checks)).toEqual([]);
     const ignored = refund(sale({ cluster: 'FULL_FLEX', lastName: 'Simvariant-Fare-Ignores-Refund-Fee' }), { fee: 250 });
     expect(failing(ignored.checks)).toEqual(['R4 FAIL']);
@@ -87,7 +87,7 @@ describe('the fare refund on the simulator\'s answers', () => {
     expect(fareRefund.feeRuleOf(s.kept[0].fares)).toBe('COMBINING');
     const right = refund(s);
     expect(right.offers[0].refundFee.amount).toBe(Math.round(s.offer.fares[0].prices[0].amount / 10));
-    expect(ids(right.checks)).toEqual(['R1 FAIL', 'R2 FAIL', 'R3 FAIL', 'R6 WARNING']);
+    expect(ids(right.checks)).toEqual(['R1 FAIL', 'R2 FAIL', 'R3 FAIL']);
     expect(failing(right.checks)).toEqual([]);
     const wrong = refund(sale({ start: '0000087', lastName: 'Simvariant-Fare-Wrong-Combining-Fee' }));
     expect(failing(wrong.checks)).toEqual(['R3 FAIL']);

@@ -30,12 +30,12 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   F5  every booked fare is in a fare fulfilment (the booking's, else
  *       the confirmation's: confirmedFulfillments.js, #1045)            07 FAIL
  *   F6  the fulfilment-step attributes are the offer's                07 WARNING
- *   F7  no fare named as a booking part (OSDM 3.x)             06 06b 07 WARNING
+ *   F7  a fare named as a booking part (OSDM 3.x, open)        06 06b 07 INFO
  *
- * #1208: in OSDM 3.x a fare is not a booking part, so a fare fulfilment need
- * not, and should not, name its fares in `bookingParts`; which fares it holds
- * is read by fareFulfillments.js (named all the same, billing references
- * from 3.11, else the fare fulfilment naming none).
+ * #1208: OSDM 3.x can be read with or without a fare in `bookingParts` (the
+ * OSDM community is asked), so a fare fulfilment need not name its fares
+ * there; which fares it holds is read by fareFulfillments.js (named, billing
+ * references from 3.11, else the fare fulfilment naming none).
  *
  * Sources and levels are in #906 and #242 (D3 for F2). A fare REFUND scenario
  * goes on from 07 to the refund (#907, fareRefund.js); any other ends there.
@@ -266,9 +266,8 @@ function fulfillmentChecks(fulfillments, { fareIds = [], productIds = [], reserv
     check('F4', 'FAIL', 'No fulfilment holds both fares and product booking parts (OSDM processes)',
       all.filter((f) => named(f).some((id) => fares.has(id)) && named(f).some((id) => products.has(id))).map(at),
       'fulfilments mixing fares and products'),
-    check('F7', 'WARNING', 'A fare fulfilment names no fare as a booking part (Fulfillment.bookingParts)',
-      ofFares.flatMap((f) => named(f).filter((id) => fares.has(id) && !reservations.has(id)).map((id) => `${at(f)} names fare ${id}`)),
-      `fares named as booking parts (${fareFulfillments.NOT_A_BOOKING_PART})`),
+    // #1208: told, never graded, until OSDM says whether a fare is a booking part in 3.x.
+    ...[fareFulfillments.namedFaresNote('F7', ofFares.flatMap((f) => named(f).filter((id) => fares.has(id) && !reservations.has(id)).map((id) => `${at(f)} names fare ${id}`)))].filter(Boolean),
     // #255 V6: fulfilment parts, when there are some.
     ...[fareReservations.fulfillmentPartsNote(ofFares)].filter(Boolean),
   ];

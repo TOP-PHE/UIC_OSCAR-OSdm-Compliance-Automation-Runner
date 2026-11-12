@@ -351,9 +351,9 @@ function isScopedRefundOnBooking(booking) {
   return refunded.length > 0 && ids.some((id) => !refunded.includes(id));
 }
 
-// #1208: the fares the refunded fulfillments hold. OSDM 3.x names no fare in
-// bookingParts (a fare is not a booking part), so fareFulfillments.js reads
-// them; `partly` when the refund holds only some of the fulfillments that
+// #1208: the fares the refunded fulfillments hold. A fare fulfilment may name
+// no fare in bookingParts (OSDM 3.x is read both ways), so fareFulfillments.js
+// reads them; `partly` when the refund holds only some of the fulfillments that
 // share their fares, whose state then cannot be told.
 function _refundedFareScope(booking, fulfillments, refunded) {
   const offers = Array.isArray(booking?.bookedOffers) ? booking.bookedOffers : [];

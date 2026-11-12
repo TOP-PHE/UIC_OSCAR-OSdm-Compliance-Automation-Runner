@@ -60,11 +60,13 @@ describe('the fare sale on the simulator\'s answers', () => {
     expect(fulfillments).toHaveLength(1);
   });
 
-  // #1208: the variant names the fares as booking parts, as some providers do (OSDM 3.x: a fare is not one), and leaves one out.
-  test('the fares named as booking parts, one left out, warn F7 and fail F5 only; a PDF ticket gives F2 warnings only', () => {
+  // #1208: the variant names the fares as booking parts, as some providers do, and leaves one out: F7 says so (INFO, OSDM 3.x is read both ways).
+  test('the fares named as booking parts, one left out: an F7 INFO line, and F5 fails only; a PDF ticket gives F2 warnings only', () => {
     const left = sale({ lastName: 'Simvariant-Fare-Not-In-Fulfillment' });
-    expect(failing(fareBooking.fulfillmentChecks(left.fulfillments, idsOf(left.booked)))).toEqual(['F7 WARNING']);
-    expect(failing(fareBooking.confirmedBookingChecks(left.confirmed, left.offer))).toEqual(['F5 FAIL', 'F7 WARNING']);
+    const checks = fareBooking.fulfillmentChecks(left.fulfillments, idsOf(left.booked));
+    expect(failing(checks)).toEqual([]);
+    expect(checks.find((c) => c.id === 'F7')).toMatchObject({ level: 'INFO', ok: true });
+    expect(failing(fareBooking.confirmedBookingChecks(left.confirmed, left.offer))).toEqual(['F5 FAIL']);
     const ticket = sale({ lastName: 'Simvariant-Fare-Fulfillment-Document' });
     expect(failing(fareBooking.fulfillmentChecks(ticket.fulfillments, { ...idsOf(ticket.booked), documents: ticket.confirmed.fulfillmentDocuments })))
       .toEqual(['F2 WARNING', 'F2 WARNING']);
@@ -114,15 +116,19 @@ describe('the fare sale on hand-made answers', () => {
     for (const [member, value] of [['controlNumber', '123'], ['issuer', 'urn:x'], ['continuousServiceUsage', {}], ['_links', [{ rel: 'self' }]]]) {
       expect(changed((f) => { f[member] = value; })).toEqual(['F2 WARNING']);
     }
-    // #1208: OSDM 3.x names no fare in bookingParts: naming none is right, naming one a WARNING.
+    // #1208: OSDM 3.x is read with or without a fare in bookingParts: naming none passes, naming one is an F7 INFO line.
     expect(fulfillments[0].bookingParts).toBeUndefined();
     expect(changed((f) => { f.bookingParts = []; })).toEqual([]);
     expect(changed((f) => { f.bookingParts = [{ id: 'NOT-A-PART' }]; })).toEqual(['F3 FAIL']);
-    expect(changed((f) => { f.bookingParts = [{ id: ids.fareIds[0] }]; })).toEqual(['F7 WARNING']);
+    expect(changed((f) => { f.bookingParts = [{ id: ids.fareIds[0] }]; })).toEqual([]);
+    const named = structuredClone(fulfillments);
+    named[0].bookingParts = [{ id: ids.fareIds[0] }];
+    expect(fareBooking.fulfillmentChecks(named, ids).find((c) => c.id === 'F7').message).toContain(`names fare ${ids.fareIds[0]}`);
+    expect(fareBooking.fulfillmentChecks(fulfillments, ids).find((c) => c.id === 'F7')).toBeUndefined();
     expect(failing(fareBooking.fulfillmentChecks(fulfillments, { ...ids, productIds: ['ADM-1'] }))).toEqual([]);
     const mixed = structuredClone(fulfillments);
     mixed[0].bookingParts = [{ id: ids.fareIds[0] }, { id: 'ADM-1' }];
-    expect(failing(fareBooking.fulfillmentChecks(mixed, { ...ids, productIds: ['ADM-1'] }))).toEqual(['F4 FAIL', 'F7 WARNING']);
+    expect(failing(fareBooking.fulfillmentChecks(mixed, { ...ids, productIds: ['ADM-1'] }))).toEqual(['F4 FAIL']);
     // A fulfilment naming a product part only is not a fare fulfilment: its parts are not graded here.
     const product = structuredClone(fulfillments);
     product[0].bookingParts = [{ id: 'ADM-1' }];

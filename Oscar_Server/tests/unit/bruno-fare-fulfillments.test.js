@@ -107,13 +107,13 @@ describe('the fare refund reads the same holdings', () => {
     ]);
   });
 
-  test("R6 warns of a fare named in a refund offer's breakdown, never of a fare reservation (a booking part)", () => {
+  test("R6 tells of a fare named in a refund offer's breakdown (INFO), never of a fare reservation (a booking part)", () => {
     const withPlace = { bookedOffers: [{ fares: [fare('fare-1', 1000)], reservations: [{ id: 'PL', distributionMode: 'FARE_MODE', price: { amount: 300, currency: 'EUR' } }], admissions: [] }], fulfillments: [{ id: 'FUL', bookingParts: [{ id: 'PL' }] }] };
     const held = fareRefund.fareFulfillmentsOf(withPlace);
     const offer = (parts) => ({ id: 'RO', fulfillments: [{ id: 'FUL' }], refundableAmount: { amount: 1300, currency: 'EUR' }, refundFee: { amount: 0, currency: 'EUR' }, refundOfferBreakdown: parts.map((id) => ({ bookingParts: [{ id }] })) });
     const r6 = (parts) => fareRefund.refundOfferChecks([offer(parts)], held, { asked: ['FUL'] }).find((c) => c.id === 'R6');
-    expect(r6(['PL']).ok).toBe(true);
-    expect(r6(['fare-1', 'PL'])).toMatchObject({ level: 'WARNING', ok: false });
+    expect(r6(['PL'])).toBeUndefined();
+    expect(r6(['fare-1', 'PL'])).toMatchObject({ level: 'INFO', ok: true });
     expect(r6(['fare-1', 'PL']).message).toContain('refund offer RO names fare fare-1');
   });
 

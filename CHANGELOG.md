@@ -493,9 +493,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.504] / [collection-OTST_V2.0.256] — 2026-11-12
 
-Issue #1208, with #1209 (part of #1045), release 2026.543. Simulator 0.65.0. In OSDM 3.x a fare is not a booking part.
+Issue #1208, with #1209 (part of #1045), release 2026.543. Simulator 0.65.0. A fare fulfilment need not name its fares as booking parts.
 
-A provider's review of the fare tests: `Fulfillment.bookingParts` holds `BookingPartReference` items, which in OSDM 3.x "can refer to reservation, admission, ancillary or fee"; a fare becomes a booking part in OSDM 4 only. OSCAR expected every fare to be named there, and the simulator named them.
+A provider's review of the fare tests: `Fulfillment.bookingParts` holds `BookingPartReference` items, which in OSDM 3.x "can refer to reservation, admission, ancillary or fee"; a fare becomes a booking part in OSDM 4. OSCAR expected every fare to be named there, and the simulator named them. Another provider names its fares there, reading a fulfilment as referring to "offer parts or a fare": OSDM 3.x can be read two ways, and the OSDM community is asked which holds. OSCAR now accepts both and grades neither.
 
 ### Fixed
 - **Which fares a fulfilment holds** (`library-bruno/fareFulfillments.js`, pure): the fares it names in `bookingParts` all the same (some providers do, one fulfilment per fare for example); from OSDM 3.11 its `billingReferences` (same accounting company and an accounting id in common with the fare's `accountingRef`); else the fare fulfilment that names no fare, or shared by several such fulfilments. A fare fulfilment names a fare, carries billing references, or names no product booking part.
@@ -504,11 +504,11 @@ A provider's review of the fare tests: `Fulfillment.bookingParts` holds `Booking
 - The fulfilments kept from the confirmation (#1045) keep their `billingReferences`.
 
 ### Added
-- **F7** (WARNING): a fare fulfilment names a fare as a booking part. **R6** (WARNING): a refund offer's breakdown names a fare as a booking part. Both log lines, so no scenario's number of checks moved.
+- **F7** (INFO): a fare fulfilment names a fare as a booking part. **R6** (INFO): a refund offer's breakdown names a fare as a booking part. Told, never graded, until the OSDM community answers (maintainer, 2026-11-12); log lines, so no scenario's number of checks moved.
 
 ### Simulator 0.65.0
 - The fare fulfilment names no fare in `bookingParts`: only the fare reservations (#255), which are reservations, and no `bookingParts` when there is none. From OSDM 3.11 (zeta) it carries `billingReferences`, one per fare: its `accountingRef` and price. A fare refund offer's breakdown names booking parts only, and is left out when only fares are refunded. The parts each fulfilment and refund offer holds are kept on hidden properties (`heldIdsOf()`), so refunds, exchanges and the scoped refund variants work as before.
-- Variant `fare-not-in-fulfillment` names the fares in `bookingParts`, as some providers do, and leaves the last one out: OSCAR warns F7 and fails F5. `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*` say so.
+- Variant `fare-not-in-fulfillment` names the fares in `bookingParts`, as some providers do, and leaves the last one out: OSCAR tells F7 (INFO) and fails F5. `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*` say so.
 
 ### Changed
 - A welcome-page news entry; *OSCAR - What is tested* and *OSCAR - OSDM Simulator scenarios*; the simulator references (regenerated: the data file's descriptions moved).

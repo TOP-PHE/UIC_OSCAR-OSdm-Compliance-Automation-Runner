@@ -142,7 +142,8 @@ function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs, s
   let items = parts.map((part) => ({ part, ...refundOfPart(part, !!overruleCode, booking, nowMs) }));
   if (statedFee !== null && !overruleCode && takesStatedFee(parts, booking)) items = withStatedFee(items, statedFee);
   const sum = (key) => items.reduce((total, item) => total + item[key], 0);
-  // #1209: a fare is not a booking part in OSDM 3.x, so the breakdown leaves
+  // #1209: OSDM 3.x names reservations, admissions, ancillaries and fees as
+  // booking parts, not fares (asked to the OSDM community), so the breakdown leaves
   // fares out (and is left out when only fares are refunded); the parts the
   // offer refunds are kept on a hidden property.
   const breakdown = items.filter((item) => !isFare(item.part)).map((item) => ({

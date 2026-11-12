@@ -353,10 +353,11 @@ function confirmBooking(booking, provider, nowMs) {
  * number, issuer, continuous-service usage or links, and a fulfilment holds
  * fares or products, never both. The distributor builds the ticket.
  *
- * #1209: in OSDM 3.x a fare is not a booking part (`BookingPartReference`
- * refers to a reservation, admission, ancillary or fee; a fare is one from
- * OSDM 4), so `bookingParts` names the fare reservations only, and nothing
- * when there is none. From 3.11 `billingReferences` names each fare by its
+ * #1209: OSDM 3.x's `BookingPartReference` refers to a reservation,
+ * admission, ancillary or fee (a fare is a booking part from OSDM 4), so
+ * `bookingParts` names the fare reservations only, and nothing when there is
+ * none. Whether a fare may be named there is asked to the OSDM community;
+ * OSCAR reads both forms. From 3.11 `billingReferences` names each fare by its
  * accounting reference and price. Two wrong variants: the fares named as
  * booking parts, as some providers do, with one left out; a PDF ticket
  * attached.

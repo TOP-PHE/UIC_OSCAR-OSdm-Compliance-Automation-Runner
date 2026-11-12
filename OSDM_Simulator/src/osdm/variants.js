@@ -44,8 +44,8 @@
  *   wrong-exchange-keeps-trip the exchange offers are for the booking's own
  *                           trip, whatever trip the request asks for (#959)
  *   fare-not-in-fulfillment the fare fulfilment names the fares in its
- *                           bookingParts, as some providers do (a fare is
- *                           not a booking part in OSDM 3.x, #1209), and
+ *                           bookingParts, as some providers do (OSDM 3.x
+ *                           can be read either way, #1209), and
  *                           leaves the last one out (#906)
  *   fare-fulfillment-document the fare fulfilment carries a PDF ticket, which
  *                           OSDM gives a fare fulfilment none of (#906)
