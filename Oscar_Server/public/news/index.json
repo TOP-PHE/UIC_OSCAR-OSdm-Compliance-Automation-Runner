@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-12-run-list-reads-its-page",
+    "date": "November 12, 2026",
+    "tag": "Improvement",
+    "title": "An open Dashboard no longer slows OSCAR during a batch",
+    "summary": "The Dashboard's list of runs now counts each run's reports and scenarios for the runs it shows only. With many runs going, pages no longer wait up to a second behind it.",
+    "content": "While a batch is going, the Dashboard refreshes its list of runs every three seconds. Each refresh counted the reports and scenarios of every run ever stored, then showed a hundred of them. With a large history, that held the server for half a second to a second each time, and every other page waited behind it.\n\nThe list now reads the runs it shows first, then counts for those only. On a test history of 120,000 runs, the Dashboard's refresh takes 0.15 s instead of about 13 s.\n\nThe Dashboard shows the same runs, counts and batches as before.\n\nNo action is required."
+  },
+  {
     "id": "2026-11-12-fare-not-a-booking-part",
     "date": "November 12, 2026",
     "tag": "Fixed",

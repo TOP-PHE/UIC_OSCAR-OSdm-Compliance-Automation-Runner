@@ -1089,6 +1089,20 @@ const MIGRATIONS = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_run_assertions_run_passed ON run_assertions(run_id, passed)');
       db.exec('DROP INDEX IF EXISTS idx_run_assertions_run');
   }},
+  { version: 54, name: 'runs-list-indexes', up: () => {
+      // The Dashboard's list of runs (#1227): its page is the company's
+      // newest runs, and with (company_id) alone every run of the company was
+      // read and sorted; its whole batches read `batch_id IN (…)`, which no
+      // index held. Here, not in schema.sql: batch_id is a column migration 4
+      // adds, and schema.sql runs before the migrations. A database marked
+      // past migration 4 without that column (the upgrade tests build one)
+      // gets it first; on any other the ALTER is a duplicate, and ignored.
+      // status and user_id ride along: the list's total and a tester's page
+      // are then read from the index alone, without a row a run.
+      _safeAlter('ALTER TABLE runs ADD COLUMN batch_id TEXT');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_runs_company_queued ON runs(company_id, queued_at, id, status, user_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_runs_company_batch ON runs(company_id, batch_id)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

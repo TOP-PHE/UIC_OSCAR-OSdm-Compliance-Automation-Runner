@@ -491,6 +491,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.509] — 2026-11-12
+
+Listed in `compatibility.json` (2026.548) without moving `current_release`.
+
+### Fixed
+
+- **The Dashboard's list of runs no longer holds the server's thread during
+  a batch** (#1227). With 1.11.508 on the k3s test machine:
+  - a COMMIT took 0.7 ms at the median;
+  - requests still waited 0.5 to 1 s at almost every reading;
+  - the garbage collector explained few of those waits (at most 6 pauses
+    over 0.1 s in 5 minutes, under 3 % of the thread).
+
+  A CPU profile of the server during a batch showed where the time went.
+  `GET /v1/runs?limit=100&whole_batches=1`, which the Dashboard asks for
+  every 3 s while a batch is active, took 14 s of 120, in blocks of 0.5 to
+  1 s. Its counts (`artifact_count`, `scenario_count`, `scenario_names`)
+  were `LEFT JOIN`s of aggregates over the whole `run_artifacts` and
+  `run_suites` tables, computed at each call. `runs` had no index for a
+  company's newest runs nor for a batch's.
+  - The page and the whole batches are read from `runs` alone (users and
+    companies still joined). `withRunCounts()` then adds:
+    - the counts;
+    - for a company's list, the operator share date;
+
+    for the rows read only, by `run_id IN (…)` in chunks of 500. The answer
+    is the same, field by field; a certifier's list still carries no
+    operator share date.
+  - Migration 54 adds two indexes:
+    - `runs(company_id, queued_at, id, status, user_id)` for the page. The
+      list's total and a tester's page are read from this index alone.
+    - `runs(company_id, batch_id)` for the whole batches, which are ordered
+      by `+r.queued_at` so that SQLite uses this index.
+
+    The runs a launch creates are read back by company and batch.
+  - On a synthetic database of 120,000 runs (96,000 in one company, 8 suites
+    and 2 reports each), the Dashboard's call (a page of 100 and its whole
+    batches, 576 runs) went from about 13 s to 0.15 s:
+    - the page: 6.1 s → 6 ms;
+    - the whole batches: 4.8 s → 3 ms;
+    - the total: 0.12 → 0.06 s (it still reads every run of the company,
+      from the index alone);
+    - the counts of the 576 runs: 40 ms.
+
+    The Run page's preview (`latestRunStates()`) went from 0.9 to 0.2 s
+    with the same index.
+  - `runs-list-counts.test.js` compares the answer with the old query's
+    (Test Manager, tester, certifier, with whole batches) and reads the plan
+    of every query the list prepares: no `SCAN`, no `MATERIALIZE`.
+    Mutation-checked: with the old route the two plan tests fail and the
+    five answer tests pass.
+  - News entry *An open Dashboard no longer slows OSCAR during a batch*;
+    the sixth reading in *metrics and monitoring*.
+
+---
+
 ## [server-1.11.508] — 2026-11-12
 
 Listed in `compatibility.json` (2026.547) without moving `current_release`.

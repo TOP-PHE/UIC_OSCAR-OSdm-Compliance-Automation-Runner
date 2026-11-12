@@ -1146,6 +1146,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   row, taken before `whole_batches` adds rows. The Dashboard's *Show older
   batches* keeps the pages read in `olderRuns` and merges them under each
   refresh (`mergeRunPages()`).
+  **The list reads `runs` alone; each run's counts are added for the rows
+  read** (#1227, 1.11.509): `withRunCounts()` (reports, scenarios, the
+  operator share date for a company's list only) by `run_id IN (…)` in
+  chunks. Joined as `LEFT JOIN (SELECT … GROUP BY run_id)`, they aggregated
+  the whole `run_suites` and `run_artifacts` at each call: on production's
+  data the Dashboard, which asks every 3 s during a batch, held the
+  server's thread 0.5 to 1 s each time (a CPU profile of the server found
+  it). **Never join an aggregate over a whole table to a page of rows.**
+  Migration 54: `runs(company_id, queued_at, id, status, user_id)` for the
+  page (the total and a tester's page read from the index alone),
+  `runs(company_id, batch_id)` for whole batches, which order by
+  `+r.queued_at` (by the column, SQLite walked the company's runs in date
+  order instead of using the batch index). `runs-list-counts.test.js`
+  compares the answer with the old query's and reads every query's plan
+  (no `SCAN`, no `MATERIALIZE`).
 - **A batch is chosen at launch** (#1029, PR 1 = 1.11.431). `POST /v1/runs`
   takes `selection: { base, categories, groups, forms, lastRun }`; without it
   the run list runs, as before (every other caller, the API key's included).
@@ -3890,6 +3905,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     database is opened (a wrong value stops the start). The mode in use is
     `oscar_db_synchronous`, set by `server.js`: a `PRAGMA synchronous` on a
     connection of its own reads that connection's, not the server's.
+    With it (2026.547) a COMMIT's median fell from 7 to 0.7 ms, but requests
+    still waited 0.5–1 s and the GC explained a few of those only. A CPU
+    profile of the server during a batch (its inspector opened through
+    `kubectl exec`, on the test machine only) named the Dashboard's
+    `GET /v1/runs`: 14 s of 120, fixed by #1227 (1.11.509, the bullet on
+    pages of runs). **When the metrics stop explaining a wait, profile the
+    thread** before adding another metric.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the
