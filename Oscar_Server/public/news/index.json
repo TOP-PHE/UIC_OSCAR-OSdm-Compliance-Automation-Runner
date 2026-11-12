@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-12-fare-not-a-booking-part",
+    "date": "November 12, 2026",
+    "tag": "Fixed",
+    "title": "A fare fulfilment no longer has to name its fares as booking parts",
+    "summary": "OSDM 3.x can be read with or without the fares named in a fulfilment's booking parts: OSCAR now accepts both, reads which fares a fulfilment holds in each form, and only tells when a fare is named.",
+    "content": "A provider reviewing the fare tests pointed out that in OSDM 3.x a fulfilment's bookingParts are described as reservations, admissions, ancillaries and fees, not fares; fares become booking parts in OSDM 4. Another provider names its fares there, since a fulfilment is described as referring to \"offer parts or a fare\". The OSDM community is asked which reading holds. OSCAR expected every fare to be named, so a provider following the first reading failed two checks on every fare sale, and its fare refund was not checked.\n\nOSCAR now accepts both: it reads which fares a fulfilment holds from the fares it names, from OSDM 3.11 its billing references, else the fare fulfilment that names no fare. The fare refund checks read the same way. A fare named as a booking part is only told, in an information line, until the OSDM community answers.\n\nThe simulator follows the first reading: its fare fulfilment names no fare, and carries billing references from OSDM 3.11. Nothing to change in your scenarios: run the fare scenarios again."
+  },
+  {
     "id": "2026-11-12-run-log-lines-together",
     "date": "November 12, 2026",
     "tag": "Improvement",

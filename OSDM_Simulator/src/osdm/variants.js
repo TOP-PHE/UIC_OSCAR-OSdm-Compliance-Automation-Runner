@@ -43,8 +43,10 @@
  *   wrong-exchange-amount   amountToBePaid one cent off its identity
  *   wrong-exchange-keeps-trip the exchange offers are for the booking's own
  *                           trip, whatever trip the request asks for (#959)
- *   fare-not-in-fulfillment the fare fulfilment leaves the last fare out of
- *                           its bookingParts (#906)
+ *   fare-not-in-fulfillment the fare fulfilment names the fares in its
+ *                           bookingParts, as some providers do (OSDM 3.x
+ *                           can be read either way, #1209), and
+ *                           leaves the last one out (#906)
  *   fare-fulfillment-document the fare fulfilment carries a PDF ticket, which
  *                           OSDM gives a fare fulfilment none of (#906)
  *   fare-wrong-combining-fee the refund of a COMBINING fare takes the fee of
@@ -148,9 +150,12 @@ function bookingAsRead(booking) {
   return has(booking, 'booking-without-fulfillments') ? { ...booking, fulfillments: [] } : booking;
 }
 
-/** The ids of the parts a refund specification names, within one fulfillment, or null when it names none. */
-function scopedPartIds(booking, fulfillment, spec, parts) {
-  const held = new Set(fulfillment.bookingParts.map((p) => p.id));
+/**
+ * The ids of the parts a refund specification names, within one fulfillment
+ * (`heldIds`, the parts it holds), or null when it names none.
+ */
+function scopedPartIds(booking, heldIds, spec, parts) {
+  const held = new Set(heldIds);
   const byPart = Array.isArray(spec?.bookingPartIds) ? spec.bookingPartIds.filter((id) => typeof id === 'string') : [];
   const byPassenger = Array.isArray(spec?.passengerIds) ? spec.passengerIds.filter((id) => typeof id === 'string') : [];
   if (byPart.length === 0 && byPassenger.length === 0) return null;

@@ -491,6 +491,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.504] / [collection-OTST_V2.0.256] — 2026-11-12
+
+Issue #1208, with #1209 (part of #1045), release 2026.543. Simulator 0.65.0. A fare fulfilment need not name its fares as booking parts.
+
+A provider's review of the fare tests: `Fulfillment.bookingParts` holds `BookingPartReference` items, which in OSDM 3.x "can refer to reservation, admission, ancillary or fee"; a fare becomes a booking part in OSDM 4. OSCAR expected every fare to be named there, and the simulator named them. Another provider names its fares there, reading a fulfilment as referring to "offer parts or a fare": OSDM 3.x can be read two ways, and the OSDM community is asked which holds. OSCAR now accepts both and grades neither.
+
+### Fixed
+- **Which fares a fulfilment holds** (`library-bruno/fareFulfillments.js`, pure): the fares it names in `bookingParts` all the same (some providers do, one fulfilment per fare for example); from OSDM 3.11 its `billingReferences` (same accounting company and an accounting id in common with the fare's `accountingRef`); else the fare fulfilment that names no fare, or shared by several such fulfilments. A fare fulfilment names a fare, carries billing references, or names no product booking part.
+- **F3** no longer fails a fare fulfilment that names no booking part; it fails one naming a part that is not of the booking. **F5** is "every booked fare is in a fare fulfilment", read as above.
+- **The fare refund** (`fareFulfillmentsOf()`, R1 to R4) and **R5** (`checkRefundScopeOnBooking()`) read the same holdings. A refunded fare fulfilment naming no booking part no longer skips the part-level check. Fulfilments that share their fares are compared together; a refund of only some of them leaves the fares unchecked, with one INFO line.
+- The fulfilments kept from the confirmation (#1045) keep their `billingReferences`.
+
+### Added
+- **F7** (INFO): a fare fulfilment names a fare as a booking part. **R6** (INFO): a refund offer's breakdown names a fare as a booking part. Told, never graded, until the OSDM community answers (maintainer, 2026-11-12); log lines, so no scenario's number of checks moved.
+
+### Simulator 0.65.0
+- The fare fulfilment names no fare in `bookingParts`: only the fare reservations (#255), which are reservations, and no `bookingParts` when there is none. From OSDM 3.11 (zeta) it carries `billingReferences`, one per fare: its `accountingRef` and price. A fare refund offer's breakdown names booking parts only, and is left out when only fares are refunded. The parts each fulfilment and refund offer holds are kept on hidden properties (`heldIdsOf()`), so refunds, exchanges and the scoped refund variants work as before.
+- Variant `fare-not-in-fulfillment` names the fares in `bookingParts`, as some providers do, and leaves the last one out: OSCAR tells F7 (INFO) and fails F5. `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*` say so.
+
+### Changed
+- A welcome-page news entry; *OSCAR - What is tested* and *OSCAR - OSDM Simulator scenarios*; the simulator references (regenerated: the data file's descriptions moved).
+- The catalogue's `checks` of the five fare refund entries, 3 fewer each (`OTST_FARE_REFUND_1ADT` 178, `_SRCH_1ADT` 178, `_TRIPIDS_1ADT` 185, `_FEE_1ADT` 179, `_COMBINING_1ADT` 178), and their rows in *OSCAR - What is tested*.
+
+### Checked
+- Replay of the 94 fare scenarios of gamma (3.8) and zeta (3.12), `main` and this branch: 76 give the same checks once F3 and F5 are renamed. The 18 fare refunds give 3 checks fewer, all "Refund offer[0] breakdown[0] is valid": the simulator gives no breakdown for fares any more. Results are the same, `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*` still failing F5 only. A first recording showed that two fares of one tariff share an accounting id, so one billing reference matched both and hid the fare left out on zeta: a billing reference now names one fare.
+- `bruno-fare-fulfillments.test.js` (new): each form of holding, the shared case, the fare refund on each form, R6. `bruno-confirmed-fulfillments.test.js`: R5 on a fare fulfilment naming none, the shared case, the billing references kept. Putting back the old R5 or F5 reading fails them.
+- Simulator `fares.test.js`: the fare fulfilment on every provider (billing references on zeta only), the refund offer without breakdown, the bicycle place named alone.
+- Server `npm run lint`, full `npx jest`: 6,047 passed; the Windows-only failures (`/metrics`, the runner agent, MCP end-to-end, the answer-threats timing) as on `main`. Simulator `npm test` and lint: everything passes but the Windows-only file-mode test.
+
+---
+
 ## [server-1.11.503] — 2026-11-12
 
 Listed in `compatibility.json` (2026.542) without moving `current_release`.

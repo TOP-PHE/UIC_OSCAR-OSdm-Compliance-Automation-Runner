@@ -1119,7 +1119,7 @@
     {
       "code": "OTST_FARE_REFUND_1ADT",
       "source": "SIM_FARE_REFUND_1ADT_38",
-      "checks": 181,
+      "checks": 178,
       "purpose": "Fare sale refunded in full, no fee stated: the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
       "capability": "fares.refund",
       "needs": {
@@ -1132,7 +1132,7 @@
     {
       "code": "OTST_FARE_REFUND_SRCH_1ADT",
       "source": "SIM_FARE_REFUND_SRCH_1ADT_38",
-      "checks": 181,
+      "checks": 178,
       "purpose": "Fare sale by search criteria refunded in full, no fee stated: fares asked for the whole trip, the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
       "capability": "fares.refund",
       "needs": {
@@ -1144,7 +1144,7 @@
     {
       "code": "OTST_FARE_REFUND_TRIPIDS_1ADT",
       "source": "SIM_FARE_REFUND_TRIPIDS_1ADT_38",
-      "checks": 188,
+      "checks": 185,
       "purpose": "Fare sale by trip id refunded in full, no fee stated: POST /trips-collection, the fares of the trip chosen by its id, then the refund offer for the fare fulfilment checked against the fare's conditions, confirmed, the fare and its fulfilment REFUNDED.",
       "capability": "fares.refund",
       "needs": {
@@ -1156,7 +1156,7 @@
     {
       "code": "OTST_FARE_REFUND_FEE_1ADT",
       "source": "SIM_FARE_REFUND_FEE_1ADT_38",
-      "checks": 182,
+      "checks": 179,
       "purpose": "Fare sale refunded in full with a refund fee stated by OSCAR (RefundSpecification.refundFee, OSDM 3.8): the refund offer keeps the fee stated, CLUSTERING fares.",
       "capability": "fares.refund",
       "needs": {
@@ -1169,7 +1169,7 @@
     {
       "code": "OTST_FARE_REFUND_COMBINING_1ADT",
       "source": "SIM_FARE_REFUND_COMBINING_1ADT_38",
-      "checks": 181,
+      "checks": 178,
       "combinationModel": "COMBINING",
       "purpose": "Fare sale of fares combined by COMBINING, refunded in full: the fee is the fare's own, from its refund conditions at the time of the refund offer.",
       "capability": "fares.refund",

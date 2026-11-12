@@ -255,7 +255,7 @@ test('a fare offer is booked and confirmed, on every provider, in its version\'s
   t.after(() => sim.close());
   const section = { startPlace: station('0000001'), endPlace: station('0000002') };
   const asked = { requestedSections: [section], offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'] } };
-  for (const provider of ['alpha', 'beta', 'gamma', 'delta']) {
+  for (const provider of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
     const token = await tokenFor(sim.base, provider, SECRETS[provider][0]);
     const offers = (await call(sim.base, token, 'POST', `/${provider}/offers`, offerRequest(asked))).body;
     const offer = fareOffers(offers)[0];
@@ -276,8 +276,11 @@ test('a fare offer is booked and confirmed, on every provider, in its version\'s
     assert.equal(confirmed.status, 200, provider);
     const [fulfillment] = confirmed.body.fulfillments;
     assert.equal(confirmed.body.fulfillments.length, 1, provider);
-    assert.deepEqual(Object.keys(fulfillment).sort(), ['bookingParts', 'bookingRef', 'createdOn', 'id', 'status'], provider);
-    assert.deepEqual(fulfillment.bookingParts, [{ id: offer.fares[0].id }], provider);
+    // #1209: OSDM 3.x names no fare in bookingParts (a fare is not a booking
+    // part); from 3.11 billingReferences names it by its accounting reference.
+    const billed = provider === 'zeta';
+    assert.deepEqual(Object.keys(fulfillment).sort(), [...(billed ? ['billingReferences'] : []), 'bookingRef', 'createdOn', 'id', 'status'], provider);
+    if (billed) assert.deepEqual(fulfillment.billingReferences, [{ accountingRef: offer.fares[0].accountingRef, price: offer.fares[0].prices[0] }], provider);
     assert.equal(confirmed.body.fulfillmentDocuments, undefined, provider);
     const read = (await call(sim.base, token, 'GET', `/${provider}/bookings/${booking.id}`)).body.booking;
     assert.deepEqual(read.bookedOffers[0].fares.map((f) => f.status), ['FULFILLED'], provider);
@@ -287,7 +290,7 @@ test('a fare offer is booked and confirmed, on every provider, in its version\'s
   }
 });
 
-test('the two wrong fare fulfilments: a fare left out of bookingParts, a PDF ticket attached (#906)', async (t) => {
+test('the two wrong fare fulfilments: the fares named as booking parts with one left out (#1209), a PDF ticket attached (#906)', async (t) => {
   const { SECRETS, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
   const sim = await startSimulator();
   t.after(() => sim.close());
@@ -343,7 +346,9 @@ test('a fare is refunded by its own after-sales conditions, then REFUNDED with i
     assert.equal(asked.body.refundOffers.length, 1, provider);
     assert.equal(refundOffer.refundFee.amount, Math.round(price * 0.25), provider);
     assert.equal(refundOffer.refundableAmount.amount + refundOffer.refundFee.amount, price, provider);
-    assert.deepEqual(refundOffer.refundOfferBreakdown.map((b) => b.bookingParts.map((p) => p.id)), [[fare.id]], provider);
+    // #1209: the breakdown names booking parts only; a fare is not one in OSDM 3.x.
+    assert.equal(refundOffer.refundOfferBreakdown, undefined, provider);
+    assert.equal(refundOffer.fulfillments[0].bookingParts, undefined, provider);
     const confirmed = await call(sim.base, token, 'PATCH', `/${provider}/bookings/${booking.id}/refund-offers/${refundOffer.id}`, { status: 'CONFIRMED' });
     assert.equal(confirmed.status, 200, provider);
     const read = (await call(sim.base, token, 'GET', `/${provider}/bookings/${booking.id}`)).body.booking;
@@ -471,7 +476,8 @@ test('a bicycle place is booked when selected, confirmed with the fares in one f
     const confirmed = await call(sim.base, token, 'POST', `/${provider}/bookings/${booked.body.booking.id}/fulfillments`, {});
     assert.equal(confirmed.status, 200, provider);
     assert.equal(confirmed.body.fulfillments.length, 1, provider);
-    assert.deepEqual(confirmed.body.fulfillments[0].bookingParts.map((p) => p.id).sort(), [offer.fares[0].id, place.id].sort(), provider);
+    // #1209: the bicycle place is a reservation, so a booking part; the fare is not.
+    assert.deepEqual(confirmed.body.fulfillments[0].bookingParts.map((p) => p.id), [place.id], provider);
     assert.equal(confirmed.body.fulfillments[0].controlNumber, undefined, provider);
     const read = (await call(sim.base, token, 'GET', `/${provider}/bookings/${booked.body.booking.id}`)).body.booking;
     assert.equal(read.bookedOffers[0].reservations[0].status, 'FULFILLED', provider);

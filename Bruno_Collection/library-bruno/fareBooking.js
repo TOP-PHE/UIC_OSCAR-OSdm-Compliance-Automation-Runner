@@ -25,11 +25,17 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   F1  a fare fulfilment is CONFIRMED or FULFILLED            06 06b 07 FAIL
  *   F2  no document, control number, issuer, continuous-service
  *       usage or links on a fare fulfilment                    06 06b 07 WARNING
- *   F3  a fare fulfilment names the parts it covers            06 06b 07 FAIL
+ *   F3  a fare fulfilment names only parts of this booking     06 06b 07 FAIL
  *   F4  no fulfilment holds both fares and product parts       06 06b 07 FAIL
- *   F5  every booked fare is in a fulfilment (the booking's, else
+ *   F5  every booked fare is in a fare fulfilment (the booking's, else
  *       the confirmation's: confirmedFulfillments.js, #1045)            07 FAIL
  *   F6  the fulfilment-step attributes are the offer's                07 WARNING
+ *   F7  a fare named as a booking part (OSDM 3.x, open)        06 06b 07 INFO
+ *
+ * #1208: OSDM 3.x can be read with or without a fare in `bookingParts` (the
+ * OSDM community is asked), so a fare fulfilment need not name its fares
+ * there; which fares it holds is read by fareFulfillments.js (named, billing
+ * references from 3.11, else the fare fulfilment naming none).
  *
  * Sources and levels are in #906 and #242 (D3 for F2). A fare REFUND scenario
  * goes on from 07 to the refund (#907, fareRefund.js); any other ends there.
@@ -42,6 +48,7 @@ http://www.apache.org/licenses/LICENSE-2.0
 const { sameStopPlace } = require('./returnJourney.js');
 const { missingFareMembers, isFareSale } = require('./fares.js');
 const fareReservations = require('./fareReservations.js');
+const fareFulfillments = require('./fareFulfillments.js');
 
 // OSDM processes: the fulfilment statuses of fares after a confirmation.
 const FARE_FULFILLMENT_STATUSES = ['CONFIRMED', 'FULFILLED'];
@@ -228,18 +235,19 @@ function fareChecksOfBooking(booking, offer, stage) {
 
 /**
  * The checks of the fulfilments of a fare sale (06, 06b, 07). `fareIds` and
- * `productIds` are the booking's part ids; a fulfilment that names a fare, or
- * names no part, is a fare fulfilment (every fulfilment, when no fare id is
- * known). `documents` are the documents the answer carries beside the
+ * `productIds` are the booking's part ids (`fareIds` its fares and fare
+ * reservations, `reservationIds` the latter); a fare fulfilment is one
+ * fareFulfillments.isFareFulfillment() says is (every fulfilment, when no fare
+ * id is known). `documents` are the documents the answer carries beside the
  * fulfilments.
  */
-function fulfillmentChecks(fulfillments, { fareIds = [], productIds = [], documents = [] } = {}) {
+function fulfillmentChecks(fulfillments, { fareIds = [], productIds = [], reservationIds = [], documents = [] } = {}) {
   const all = list(fulfillments);
   const fares = new Set(list(fareIds));
   const products = new Set(list(productIds));
-  const named = (f) => list(f.bookingParts).map((p) => p.id).filter(Boolean);
-  // A fulfilment that names no part cannot be told apart: in a booking of fares it is taken as one of them.
-  const ofFares = all.filter((f) => fares.size === 0 || named(f).length === 0 || named(f).some((id) => fares.has(id)));
+  const reservations = new Set(list(reservationIds));
+  const named = fareFulfillments.namedIdsOf;
+  const ofFares = all.filter((f) => fares.size === 0 || fareFulfillments.isFareFulfillment(f, { fareIds: [...fares], productIds: [...products] }));
   const at = (f) => `fulfillment ${f.id ?? '?'}`;
   return [
     check('F1', 'FAIL', `Each fare fulfilment is ${FARE_FULFILLMENT_STATUSES.join(' or ')}`,
@@ -250,17 +258,16 @@ function fulfillmentChecks(fulfillments, { fareIds = [], productIds = [], docume
       ofFares.filter((f) => present(f[member])).map(at), `${member} present`)),
     check('F2', 'WARNING', 'No document comes with the fare fulfilments (the distributor builds the ticket)',
       ofFares.length > 0 && list(documents).length > 0 ? [`${list(documents).length} document(s)`] : [], 'documents in the answer'),
-    check('F3', 'FAIL', 'Each fare fulfilment names the booking parts it covers (Fulfillment.bookingParts)',
-      ofFares.flatMap((f) => {
-        const ids = named(f);
-        if (ids.length === 0) return [`${at(f)} names none`];
-        if (fares.size + products.size === 0) return [];
-        return ids.filter((id) => !fares.has(id) && !products.has(id)).map((id) => `${at(f)} names ${id}, which is no part of the booking`);
-      }),
-      'booking parts not named, or unknown'),
+    // #1208: naming none is right for fares in OSDM 3.x; an id that is no part of the booking is not.
+    check('F3', 'FAIL', 'Each fare fulfilment names only parts of this booking (Fulfillment.bookingParts)',
+      fares.size + products.size === 0 ? [] : ofFares.flatMap((f) => named(f).filter((id) => !fares.has(id) && !products.has(id))
+        .map((id) => `${at(f)} names ${id}, which is no part of the booking`)),
+      'unknown booking parts'),
     check('F4', 'FAIL', 'No fulfilment holds both fares and product booking parts (OSDM processes)',
       all.filter((f) => named(f).some((id) => fares.has(id)) && named(f).some((id) => products.has(id))).map(at),
       'fulfilments mixing fares and products'),
+    // #1208: told, never graded, until OSDM says whether a fare is a booking part in 3.x.
+    ...[fareFulfillments.namedFaresNote('F7', ofFares.flatMap((f) => named(f).filter((id) => fares.has(id) && !reservations.has(id)).map((id) => `${at(f)} names fare ${id}`)))].filter(Boolean),
     // #255 V6: fulfilment parts, when there are some.
     ...[fareReservations.fulfillmentPartsNote(ofFares)].filter(Boolean),
   ];
@@ -285,13 +292,16 @@ function confirmedBookingChecks(booking, offer, fulfilled = booking?.fulfillment
   const booked = bookedFaresOf(booking);
   const fulfillments = list(booking?.fulfillments);
   const inUse = list(fulfilled);
-  const inFulfillments = new Set(inUse.flatMap((f) => list(f.bookingParts).map((p) => p?.id)));
+  const reservationIds = fareReservations.fareReservationIdsOf(booking, offer);
+  const productIds = productPartIdsOf(booking, offer);
+  // #1208: which fares each fulfilment holds, read as OSDM 3.x allows.
+  const { unheld } = fareFulfillments.fareHoldings({ fares: booked.map(({ fare }) => fare), fulfillments: inUse, reservationIds, productIds });
   return [
     ...bookingChecks(booking, offer, 'confirmed'),
-    ...fulfillmentChecks(fulfillments, { fareIds: farePartIdsOf(booking, offer), productIds: productPartIdsOf(booking, offer), documents: booking?.fulfillmentDocuments }),
-    check('F5', 'FAIL', 'Every booked fare is in a fulfilment (bookingParts)',
-      inUse.length === 0 ? ['neither the booking nor the confirmation lists a fulfilment'] : booked.filter(({ fare }) => !inFulfillments.has(fare.id)).map(({ fare, path }) => `${path} (${fare.id})`),
-      'fares in no fulfilment'),
+    ...fulfillmentChecks(fulfillments, { fareIds: farePartIdsOf(booking, offer), productIds, reservationIds, documents: booking?.fulfillmentDocuments }),
+    check('F5', 'FAIL', 'Every booked fare is in a fare fulfilment',
+      inUse.length === 0 ? ['neither the booking nor the confirmation lists a fulfilment'] : booked.filter(({ fare }) => unheld.includes(fare.id)).map(({ fare, path }) => `${path} (${fare.id})`),
+      'fares no fulfilment holds (named in none, billed by none, and no fare fulfilment naming no fare to hold them)'),
     ...[fareReservations.inFulfillmentCheck(booking, offer)].filter(Boolean),
     attributesCheck(booking, offer),
   ];
@@ -359,7 +369,7 @@ function checkFareFulfillmentStep(body) {
   test('[fares F1] The confirmation gives the fare fulfilment (fulfillments)', () => {
     if (fulfillments.length === 0) throw new Error('POST /fulfillments gave no fulfilment');
   });
-  recordFareChecks(fulfillmentChecks(fulfillments, { fareIds: readJson('__fareIds', []), productIds: readJson('__fareProductIds', []), documents: body?.fulfillmentDocuments }));
+  recordFareChecks(fulfillmentChecks(fulfillments, { fareIds: readJson('__fareIds', []), productIds: readJson('__fareProductIds', []), reservationIds: readJson('__fareReservationIds', []), documents: body?.fulfillmentDocuments }));
   return true;
 }
 
@@ -373,7 +383,7 @@ function fulfillmentReadChecks(body, id) {
   const same = check('F1', 'FAIL', 'GET /fulfillments/{id} gives the fulfilment asked', isObject(fulfillment) && fulfillment.id === id ? [] : [`asked ${id}, got ${isObject(fulfillment) ? fulfillment.id : 'none'}`],
     'another fulfilment, or none');
   if (!isObject(fulfillment)) return [same];
-  return [same, ...fulfillmentChecks([fulfillment], { fareIds: readJson('__fareIds', []), productIds: readJson('__fareProductIds', []), documents: body?.fulfillmentDocuments })];
+  return [same, ...fulfillmentChecks([fulfillment], { fareIds: readJson('__fareIds', []), productIds: readJson('__fareProductIds', []), reservationIds: readJson('__fareReservationIds', []), documents: body?.fulfillmentDocuments })];
 }
 
 /** Step 07's after-response, for a fare sale: checks the confirmed booking, then goes on to the refund (#907) or ends the scenario. */
