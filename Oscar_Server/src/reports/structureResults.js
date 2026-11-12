@@ -624,12 +624,18 @@ function removeStored(runId) {
  * Extract structured results from a completed run, in slices (#1214).
  * @param {string} runId   - Run UUID
  * @param {string} companyId - Company UUID
- * @param {{ timeSlice?: (fn: Function) => any, sliceMs?: number }} [options]
- *   timeSlice runs each block of work on the thread (the runner times them
- *   as the run's work); sliceMs is a slice's time (tests: 0, one request each)
+ * @param {object} [options]
+ * @param {(fn: Function) => any} [options.timeRead] runs the one block that
+ *   decrypts, parses and plans the results file (#1218)
+ * @param {(fn: Function) => any} [options.timeSlice] runs each slice; the
+ *   runner times both as the run's work, apart
+ * @param {(bytes: number) => void} [options.onFileRead] the file's size
+ * @param {number} [options.sliceMs] a slice's time (tests: 0, one request each)
  * @returns {Promise<{ suites: number, requests: number, assertions: number }>}
  */
-async function extractStructuredResults(runId, companyId, { timeSlice = (fn) => fn(), sliceMs = SLICE_MS } = {}) {
+async function extractStructuredResults(runId, companyId, {
+  timeRead = (fn) => fn(), timeSlice = (fn) => fn(), onFileRead = () => {}, sliceMs = SLICE_MS,
+} = {}) {
   // Inline path-traversal guard (Sonar S6549). The same regex lives in
   // src/utils/paths.js for defence in depth, but Sonar's per-function
   // analyzer needs to see the validation here, in the same function as
@@ -643,7 +649,8 @@ async function extractStructuredResults(runId, companyId, { timeSlice = (fn) => 
   // Read off the thread; decrypted, parsed and planned in one block.
   const { decryptBuffer } = require('../utils/at-rest');
   const stored = await fs.promises.readFile(jsonPath);
-  const plan = timeSlice(() => planOf(runId, companyId, decryptBuffer(stored).toString('utf8')));
+  onFileRead(stored.length);
+  const plan = timeRead(() => planOf(runId, companyId, decryptBuffer(stored).toString('utf8')));
   if (!plan) return noResults();
 
   let next = 0;

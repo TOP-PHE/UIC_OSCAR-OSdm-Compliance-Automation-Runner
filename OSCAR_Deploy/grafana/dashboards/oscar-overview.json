@@ -1058,7 +1058,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "How long one run's work takes on the thread (95th percentile over 15 minutes), and how many log lines runs store a second.",
+      "description": "How long one run's work takes on the thread (95th percentile over 15 minutes), and how many log lines runs store a second. results_read is one block a run (the results file decrypted and read, #1218): its line is that block's length.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "log lines a second" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 92 },
       "id": 33,
@@ -1068,6 +1068,20 @@
         { "expr": "rate(oscar_run_log_lines_total[1m])", "legendFormat": "log lines a second", "refId": "B" }
       ],
       "title": "One run's work (95th percentile), and log lines a second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "How big a run's Bruno results file is (median and 95th percentile over 15 minutes). The server decrypts and reads it in one block, results_read in One run's work, before storing it in slices (#1218): a bigger file, a longer block.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 100 },
+      "id": 34,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le) (rate(oscar_run_results_bytes_bucket[15m])))", "legendFormat": "median", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(oscar_run_results_bytes_bucket[15m])))", "legendFormat": "95th percentile", "refId": "B" }
+      ],
+      "title": "A run's results file (size)",
       "type": "timeseries"
     }
   ],

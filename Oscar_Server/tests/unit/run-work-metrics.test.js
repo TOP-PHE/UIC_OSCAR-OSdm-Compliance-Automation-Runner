@@ -62,8 +62,9 @@ describe('the metrics of run work (#1205)', () => {
     expect(types.get('oscar_run_work_seconds')).toBe('histogram');
     expect(types.get('oscar_run_log_lines_total')).toBe('counter');
     expect(types.get('oscar_run_log_seconds_total')).toBe('counter');
+    expect(types.get('oscar_run_results_bytes')).toBe('histogram');
     expect(metrics.runWork.labelNames).toEqual(['work']);
-    expect(metrics.RUN_WORK_KINDS).toEqual(['datafile_copy', 'results_store']);
+    expect(metrics.RUN_WORK_KINDS).toEqual(['datafile_copy', 'results_read', 'results_store']);
   });
 
   test('timeRunWork() gives the work\'s result and counts it once, failed or not', async () => {
@@ -80,7 +81,11 @@ describe('the metrics of run work (#1205)', () => {
     expect(timed).toEqual([...metrics.RUN_WORK_KINDS].sort());
     expect(server).toMatch(/timeRunWork\('datafile_copy', \(\) => \{\s+const made = withTripCalendars\(withFrameworkWarnings\(/);
     // In slices since #1214: each slice timed, the sum observed once, failed or not.
-    expect(runner).toMatch(/const clock = metrics\.runWorkClock\('results_store'\);\s+let stats;\s+try \{\s+stats = await extractStructuredResults\(runId, companyRow\.id, \{ timeSlice: clock\.time \}\);\s+\} finally \{\s+clock\.done\(\);/);
+    // The file's read is one block of its own since #1218, observed when there
+    // was a file, with the file's size.
+    expect(runner).toMatch(/const read = metrics\.runWorkClock\('results_read'\);\s+const store = metrics\.runWorkClock\('results_store'\);/);
+    expect(runner).toMatch(/timeRead: read\.time,\s+timeSlice: store\.time,\s+onFileRead: \(bytes\) => \{ fileRead = true; metrics\.runResultsBytes\.observe\(bytes\); \},/);
+    expect(runner).toMatch(/\} finally \{\s+if \(fileRead\) read\.done\(\);\s+store\.done\(\);\s+\}/);
     const logEvent = runner.slice(runner.indexOf('function logEvent('), runner.indexOf('\n}\n', runner.indexOf('function logEvent(')));
     expect(logEvent).toContain('metrics.runLogLines.inc()');
     expect(logEvent).toContain('metrics.runLogSeconds.inc(');
@@ -131,7 +136,8 @@ describe('what the dashboard and the alerts read', () => {
     const after = overview.panels.filter((p) => p.gridPos.y > row.gridPos.y);
     const exprs = exprsOf({ panels: after }).join('\n');
     for (const name of ['oscar_run_work_seconds_sum', 'oscar_run_work_seconds_bucket', 'oscar_run_log_seconds_total',
-      'oscar_run_log_lines_total', 'oscar_node_nodejs_eventloop_lag_max_seconds', 'oscar_node_nodejs_eventloop_lag_p99_seconds']) {
+      'oscar_run_log_lines_total', 'oscar_node_nodejs_eventloop_lag_max_seconds', 'oscar_node_nodejs_eventloop_lag_p99_seconds',
+      'oscar_run_results_bytes_bucket']) {
       expect(exprs).toContain(name);
     }
     expect(exprs).toMatch(/sum by \(le, listener, method, route\) \(rate\(oscar_http_request_duration_seconds_bucket/);

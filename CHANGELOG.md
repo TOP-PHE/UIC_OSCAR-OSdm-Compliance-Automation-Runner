@@ -491,6 +491,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.506] — 2026-11-12
+
+Listed in `compatibility.json` (2026.545) without moving `current_release`.
+
+### Added
+
+- **The reading of a run's results file is measured on its own** (#1218).
+  With 2026.544 on the k3s test machine (all six simulated providers at
+  once), the slices of #1214 took the waits down from 7.3 s to 3.1 s at
+  most. Requests still waited 1.6 to 3.1 s, and `/dashboard.html` read
+  about 1 s at the 99th percentile. Before its slices,
+  `extractStructuredResults()` decrypts, parses and plans the results file
+  in one block, counted inside `results_store`, so its length could not be
+  seen; nor could the file's size.
+  - A new kind of run work: `oscar_run_work_seconds{work="results_read"}`,
+    that block alone. It is observed once per run that has a results file,
+    so its percentiles are the block's length. `extractStructuredResults()`
+    takes `timeRead` and `onFileRead(bytes)` next to `timeSlice`.
+  - `oscar_run_results_bytes`, a histogram: each run's results file, as
+    stored.
+  - *OSCAR · Overview*, row *OSCAR's thread*: a panel *A run's results file
+    (size)*, with its median and 95th percentile. `results_read` shows in
+    *One run's work* and *Share of the thread taken by run work* by itself.
+  - Mutation-checked: each of these defects fails a test:
+    - the read counted as a slice;
+    - the size not given;
+    - the read observed for a run without a file.
+
+---
+
 ## [server-1.11.505] — 2026-11-12
 
 Listed in `compatibility.json` (2026.544) without moving `current_release`.

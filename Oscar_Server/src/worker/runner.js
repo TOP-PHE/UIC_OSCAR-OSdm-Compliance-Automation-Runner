@@ -1557,13 +1557,22 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   try {
     const { extractStructuredResults } = require('../reports/structureResults');
     // Stored in slices, other requests served between them (#1214); each
-    // slice's time on the server's thread is the run's work (#1205).
-    const clock = metrics.runWorkClock('results_store');
+    // slice's time on the server's thread is the run's work (#1205). The file
+    // decrypted, parsed and planned before them is one block, timed apart as
+    // results_read when there is a file, with its size (#1218).
+    const read = metrics.runWorkClock('results_read');
+    const store = metrics.runWorkClock('results_store');
+    let fileRead = false;
     let stats;
     try {
-      stats = await extractStructuredResults(runId, companyRow.id, { timeSlice: clock.time });
+      stats = await extractStructuredResults(runId, companyRow.id, {
+        timeRead: read.time,
+        timeSlice: store.time,
+        onFileRead: (bytes) => { fileRead = true; metrics.runResultsBytes.observe(bytes); },
+      });
     } finally {
-      clock.done();
+      if (fileRead) read.done();
+      store.done();
     }
     checksStored = stats.assertions;
     if (stats.assertions > 0) {
