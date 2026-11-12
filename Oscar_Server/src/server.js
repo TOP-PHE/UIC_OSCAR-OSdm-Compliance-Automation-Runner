@@ -126,6 +126,12 @@ try {
   log.error({ err: e.message }, 'Startup data file renaming threw (non-fatal)');
 }
 
+// The database connection's synchronous mode (#1224): read once, it does not
+// change while the server runs.
+try {
+  metricsForQueue.dbSynchronous.set(dbGet('PRAGMA synchronous').synchronous);
+} catch (_e) { /* never let metric collection crash the server */ }
+
 // Periodically refresh queue depth + active-runs gauges from the queue's
 // own state. Every 5s — well below Prometheus's typical 15s scrape interval,
 // so a scrape never sees a totally stale value.

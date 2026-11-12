@@ -491,6 +491,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.508] — 2026-11-12
+
+Listed in `compatibility.json` (2026.547) without moving `current_release`.
+
+### Changed
+
+- **A database COMMIT no longer waits for the disk: SQLite runs with
+  `synchronous = NORMAL`** (#1224, maintainer's decision). What #1221
+  measured on the k3s test machine (2026.546, all six simulated providers
+  at once, a copy of production's 10 GB database): a COMMIT took 7 ms at
+  the median and 150 to 240 ms at the 99th percentile, and COMMITs took 10
+  to 24 % of the server's thread during a batch. OSCAR never set
+  `synchronous`, so the connection used SQLite's default, FULL: in WAL mode
+  every COMMIT waited for the journal to reach the disk.
+  - `db.js` sets `PRAGMA synchronous = NORMAL` on the server's connection
+    when the database is in WAL mode (always, from `schema.sql`). The
+    journal is synced at each checkpoint, not at each COMMIT. Per SQLite's
+    documentation the database stays safe from corruption; a power loss or
+    a crash of the machine can roll back the last transactions, a crash of
+    OSCAR alone cannot. In another journal mode nothing is set: there
+    NORMAL could corrupt the file on a power loss.
+  - `OSCAR_DB_SYNCHRONOUS=FULL` keeps the old behaviour. The setting is
+    read before the database is opened, and a value other than NORMAL or
+    FULL stops the start. Documented in both `.env.example` files.
+  - The mode in use: `oscar_db_synchronous` (a gauge, 1 NORMAL, 2 FULL) and
+    the start-up line `[db] SQLite ready → … (synchronous NORMAL)`. A
+    `PRAGMA synchronous` asked on a connection of its own reads that
+    connection's mode, not the server's: the command given for it in
+    *metrics and monitoring* is replaced.
+  - The *Database commits* panel says whether the COMMITs over 0.1 s, the
+    checkpoints most likely, remain. Moving those off the thread would be a
+    later step.
+  - Mutation-checked: without the PRAGMA, three tests fail.
+
+---
+
 ## [server-1.11.507] — 2026-11-12
 
 Listed in `compatibility.json` (2026.546) without moving `current_release`.

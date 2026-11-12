@@ -155,6 +155,12 @@ describe('GET /metrics', () => {
     expect(res.text).toMatch(/\noscar_run_processes \d+\n/);
   });
 
+  test('#1224: the database connection\'s synchronous mode is written, NORMAL (1) by default', async () => {
+    const res = await request(app).get('/metrics');
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/\noscar_db_synchronous 1\n/);
+  });
+
   test('#1005: ?source=simulator answers the simulator gauges in Prometheus text; another source is 404', async () => {
     require('../../src/services/simulatorMetrics').forgetCache();
     const res = await request(app).get('/metrics?source=simulator');

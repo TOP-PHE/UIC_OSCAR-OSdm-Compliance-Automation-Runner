@@ -4,6 +4,17 @@
   "current_release": "2026.546",
   "releases": [
     {
+      "release": "2026.547",
+      "date": "2026-11-12",
+      "server": "1.11.508",
+      "collection": "OTST_V2.0.256",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.508: a database COMMIT no longer waits for the disk (#1224). On the k3s test machine (2026.546, all six simulated providers at once), a COMMIT took 7 ms at the median and COMMITs took 10 to 24 % of the server's thread during a batch: OSCAR never set SQLite's synchronous, so every COMMIT waited for the journal to reach the disk (FULL). The server's connection now uses synchronous = NORMAL in WAL mode: the journal is synced at each checkpoint only; the database stays safe from corruption, and a power loss or a crash of the machine can roll back the last transactions (a crash of OSCAR alone cannot). OSCAR_DB_SYNCHRONOUS=FULL keeps the old behaviour; any value other than NORMAL or FULL stops the start. The mode in use is oscar_db_synchronous and the start-up line. Released with it (deployment files): the panel description in OSCAR · Overview and OSCAR_Deploy/.env.example."
+      ]
+    },
+    {
       "release": "2026.546",
       "date": "2026-11-12",
       "server": "1.11.507",

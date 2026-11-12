@@ -163,7 +163,7 @@ You should see:
 
 ```
 [db] schema up to date (version 14)
-[db] SQLite ready → /app/data/oscar.db
+[db] SQLite ready → /app/data/oscar.db (synchronous NORMAL)
 Server↔collection combination is a tested release
 OSCAR — OSDM Conformance Automation Runner started
 ```

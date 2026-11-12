@@ -3880,10 +3880,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     still took 1.8 s a run and requests waited 0.3–1 s: **each COMMIT of
     `transaction()` is timed since #1221 (1.11.507)**,
     `oscar_db_commit_seconds` (`timedCommit()`, the histogram required at
-    the first commit). OSCAR never sets `synchronous`, which reads 2
-    (FULL): each COMMIT waits for the disk, and now and then checkpoints.
-    Commit through `transaction()`: a test refuses a COMMIT in any file but
-    `db.js`.
+    the first commit). Commit through `transaction()`: a test refuses a
+    COMMIT in any file but `db.js`. SQLite's default, FULL, made each
+    COMMIT wait for the disk: 7 ms each, 10–24 % of the thread during a
+    batch. **Since #1224 (1.11.508) the server's connection uses
+    `synchronous = NORMAL`** in WAL mode only (maintainer's decision: a
+    power loss can roll back the last transactions, never corrupt the
+    file); `OSCAR_DB_SYNCHRONOUS=FULL` keeps the old way, read before the
+    database is opened (a wrong value stops the start). The mode in use is
+    `oscar_db_synchronous`, set by `server.js`: a `PRAGMA synchronous` on a
+    connection of its own reads that connection's, not the server's.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the
