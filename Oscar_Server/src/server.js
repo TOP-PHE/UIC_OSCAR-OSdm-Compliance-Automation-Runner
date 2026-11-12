@@ -132,6 +132,16 @@ try {
   metricsForQueue.dbSynchronous.set(dbGet('PRAGMA synchronous').synchronous);
 } catch (_e) { /* never let metric collection crash the server */ }
 
+// The database's checkpoints in a thread of their own (#1230): a COMMIT no
+// longer copies the write-ahead log into the database file on this thread.
+// OSCAR_DB_CHECKPOINTS=inline keeps them in the COMMITs; if the thread cannot
+// start, they stay there.
+try {
+  require('./db/db').startCheckpointThread();
+} catch (e) {
+  log.error({ err: e.message }, 'The checkpoint thread did not start: the COMMITs checkpoint, as before');
+}
+
 // Periodically refresh queue depth + active-runs gauges from the queue's
 // own state. Every 5s — well below Prometheus's typical 15s scrape interval,
 // so a scrape never sees a totally stale value.

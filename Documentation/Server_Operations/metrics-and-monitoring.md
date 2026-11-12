@@ -198,7 +198,16 @@ work is measured where it runs:
   `results_store` and of the log lines'. A statement written alone, outside
   a transaction, commits too and is not counted;
 - `oscar_db_synchronous`, a gauge (from 1.11.508, #1224): the server
-  connection's synchronous mode, 1 NORMAL or 2 FULL.
+  connection's synchronous mode, 1 NORMAL or 2 FULL;
+- from 1.11.510 (#1230), the checkpoints of the thread that runs them:
+  - `oscar_db_checkpoint_seconds`, a histogram: each checkpoint's time, off
+    the server's thread;
+  - `oscar_db_wal_frames` and `oscar_db_wal_frames_not_copied`, gauges: the
+    write-ahead log's size at the last checkpoint and what it could not copy
+    (pages a reader still used), in frames of one page;
+  - `oscar_db_checkpoint_thread`, a gauge: 1 while that thread checkpoints,
+    0 when the server's connection does in its COMMITs
+    (`OSCAR_DB_CHECKPOINTS=inline`, or the thread stopped).
 
 The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 
@@ -210,6 +219,7 @@ The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 | One run's work (95th percentile) | How long one run's copy or results take, and log lines a second. `results_read` is one block: its line is the longest the thread waits for it. |
 | A run's results file (size) | The median and 95th percentile of the results files read. A bigger file, a longer `results_read`. |
 | Database commits | How long a COMMIT holds the thread (median, 99th percentile), and how many took over 0.1 s in 5 minutes. Each of those is a wait for every page. |
+| Database checkpoints, in a thread of their own | How long a checkpoint takes (99th percentile), off the server's thread, and the log's size and what was not copied, in frames. A log that keeps growing means the checkpoints do not keep up. |
 
 The alert `OscarEventLoopLag` reads the same 99th percentile. **Until
 1.11.502 it could never fire**: it read a `_bucket` series that prom-client
@@ -281,6 +291,30 @@ scenarios in the whole database, then kept the 100 of the page.
 From server 1.11.509, the list reads its page first, then counts for the
 runs it shows only. Two indexes find the newest runs of a company and the
 runs of a batch.
+
+**The seventh reading** (the same, server 1.11.509, #1230):
+- **Requests waited less:** 0.2 to 0.5 s at most readings, up to 1.3 s
+  (0.5 to 1 s before), and 303 ms at most at the 99th percentile (674 ms).
+- **The profile:** the thread was busy 21 % of the time (31 %). 17
+  stretches of 200 ms or more had no pause (43); the longest took 0.5 s
+  (1.4 s). The list of runs took 0.1 s of 120.
+
+Read millisecond by millisecond, those stretches held:
+- **COMMITs that ran a checkpoint**, 90 to 261 ms each. SQLite's automatic
+  checkpoint runs inside the COMMIT that takes the write-ahead log past
+  1,000 pages. That COMMIT copies the log into the database file and waits
+  for the disk, on the server's thread. About 28 COMMITs in 5 minutes took
+  over 0.1 s.
+- **Result slices** of 47 to 84 ms instead of 20.
+
+From server 1.11.510 a thread of its own checkpoints, with a connection of
+its own, every second. It runs a passive checkpoint, which never blocks a
+reader or a writer, and the server's connection no longer checkpoints in its
+COMMITs (`PRAGMA wal_autocheckpoint = 0`). If that thread fails, ends or
+reports nothing for a minute, the server's connection checkpoints by itself
+again, so the log never grows without bound. `OSCAR_DB_CHECKPOINTS=inline`
+keeps the old way. The start-up line says which:
+`[db] SQLite ready → … (synchronous NORMAL, checkpoints thread)`.
 
 ### Run pods (#1130)
 

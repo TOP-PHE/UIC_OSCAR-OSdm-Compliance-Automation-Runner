@@ -163,9 +163,10 @@ You should see:
 
 ```
 [db] schema up to date (version 14)
-[db] SQLite ready → /app/data/oscar.db (synchronous NORMAL)
+[db] SQLite ready → /app/data/oscar.db (synchronous NORMAL, checkpoints thread)
 Server↔collection combination is a tested release
 OSCAR — OSDM Conformance Automation Runner started
+[db] checkpoints run in a thread of their own
 ```
 
 If you see `Server↔collection combination is not in compatibility.json`,

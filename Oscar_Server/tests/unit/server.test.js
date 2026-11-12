@@ -161,6 +161,14 @@ describe('GET /metrics', () => {
     expect(res.text).toMatch(/\noscar_db_synchronous 1\n/);
   });
 
+  test('#1230: the checkpoint thread\'s metrics are written', async () => {
+    const res = await request(app).get('/metrics');
+    expect(res.status).toBe(200);
+    for (const name of ['oscar_db_checkpoint_seconds', 'oscar_db_wal_frames', 'oscar_db_wal_frames_not_copied', 'oscar_db_checkpoint_thread']) {
+      expect(res.text).toContain(`# TYPE ${name} `);
+    }
+  });
+
   test('#1005: ?source=simulator answers the simulator gauges in Prometheus text; another source is 404', async () => {
     require('../../src/services/simulatorMetrics').forgetCache();
     const res = await request(app).get('/metrics?source=simulator');

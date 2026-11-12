@@ -1086,7 +1086,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "How long each database COMMIT of a transaction holds the thread (median and 99th percentile over 5 minutes), and how many took over 0.1 s in 5 minutes (#1221). The results slices and the log line batches end with one: their time is part of results_store and of the log lines'. With synchronous FULL each COMMIT waits for the disk; with NORMAL, the default since server 1.11.508 (#1224), only the one that copies the journal into the database file (a checkpoint) does.",
+      "description": "How long each database COMMIT of a transaction holds the thread (median and 99th percentile over 5 minutes), and how many took over 0.1 s in 5 minutes (#1221). The results slices and the log line batches end with one: their time is part of results_store and of the log lines'. With synchronous FULL each COMMIT waits for the disk; with NORMAL, the default since server 1.11.508 (#1224), only the one that copies the journal into the database file (a checkpoint) does. Since server 1.11.510 (#1230) a thread of its own checkpoints, and a COMMIT over 0.1 s should be rare; with OSCAR_DB_CHECKPOINTS=inline, or when that thread stopped (oscar_db_checkpoint_thread 0), the COMMITs checkpoint again.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "over 0.1 s, in 5 minutes" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 100 },
       "id": 35,
@@ -1097,6 +1097,21 @@
         { "expr": "sum(increase(oscar_db_commit_seconds_count[5m])) - sum(increase(oscar_db_commit_seconds_bucket{le=\"0.1\"}[5m]))", "legendFormat": "over 0.1 s, in 5 minutes", "refId": "C" }
       ],
       "title": "Database commits: time each holds the thread",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "The checkpoints of the database, in a thread of their own since server 1.11.510 (#1230): each copies the write-ahead log into the database file, off the server's thread. The time of one (99th percentile over 5 minutes), the log's size at the last one and what it could not copy (pages a reader still used), in frames of one page. A log that keeps growing means the checkpoints do not keep up. oscar_db_checkpoint_thread (Explore) is 1 while the thread checkpoints, 0 when the server's connection does it in its COMMITs.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byRegexp", "options": "frames" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 108 },
+      "id": 36,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(oscar_db_checkpoint_seconds_bucket[5m])))", "legendFormat": "a checkpoint, 99th percentile", "refId": "A" },
+        { "expr": "max(oscar_db_wal_frames)", "legendFormat": "log, frames (right y-axis)", "refId": "B" },
+        { "expr": "max(oscar_db_wal_frames_not_copied)", "legendFormat": "not copied, frames (right y-axis)", "refId": "C" }
+      ],
+      "title": "Database checkpoints, in a thread of their own",
       "type": "timeseries"
     }
   ],
