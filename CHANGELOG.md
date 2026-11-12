@@ -535,6 +535,10 @@ Listed in `compatibility.json` (2026.544) without moving `current_release`.
     - the file read on the thread;
     - a failed slice's time not counted;
     - the runner observing only on success.
+  - Left open on purpose: Sonar S9382 ("`await` inside a loop") on the
+    loop of `extractStructuredResults()`. The slices must run one after
+    another, and that `await` is what lets other requests through between
+    them.
 
 ---
 
