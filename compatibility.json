@@ -1,17 +1,28 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.542",
+  "current_release": "2026.543",
   "releases": [
     {
-      "release": "2026.542",
+      "release": "2026.543",
       "date": "2026-11-12",
-      "server": "1.11.503",
+      "server": "1.11.504",
       "collection": "OTST_V2.0.256",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.503, collection OTST_V2.0.256 (simulator 0.65.0): in OSDM 3.x a fare is not a booking part (#1208, #1209). A fare fulfilment that names no fare in bookingParts no longer fails F3 and F5: which fares a fulfilment holds is read from those it names, from OSDM 3.11 its billingReferences, else the fare fulfilment naming none; the fare refund and its scope check (R5) read the same. A fare named as a booking part is a WARNING (F7, and R6 in a refund offer's breakdown). The simulator's fare fulfilment names no fare, carries billingReferences from 3.11, and a fare refund offer's breakdown names no fare. From a provider's review of the fare tests."
+        "Server 1.11.504, collection OTST_V2.0.256 (simulator 0.65.0): in OSDM 3.x a fare is not a booking part (#1208, #1209). A fare fulfilment that names no fare in bookingParts no longer fails F3 and F5: which fares a fulfilment holds is read from those it names, from OSDM 3.11 its billingReferences, else the fare fulfilment naming none; the fare refund and its scope check (R5) read the same. A fare named as a booking part is a WARNING (F7, and R6 in a refund offer's breakdown). The simulator's fare fulfilment names no fare, carries billingReferences from 3.11, and a fare refund offer's breakdown names no fare. From a provider's review of the fare tests."
+      ]
+    },
+    {
+      "release": "2026.542",
+      "date": "2026-11-12",
+      "server": "1.11.503",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.503: run log lines are written together (#1210). Each line was its own INSERT, so its own SQLite transaction waiting for the disk: with 15 runs going on the k3s test machine, log lines took half of the server's thread and up to 85 %, and requests waited up to 6.8 s (#1205's row OSCAR's thread). logEvent() now queues them (worker/runLog.js) and they are written in one transaction every 200 ms: 0.07 ms a line instead of 1.8 measured. Every status the runner writes, the end of executeRun() and the live log route write the waiting lines first."
       ]
     },
     {

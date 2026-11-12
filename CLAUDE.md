@@ -2656,7 +2656,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   44): no failed check, one O8 WARNING; on the collection before 1.11.461
   it failed O8 and stopped at 01. OSDM 3.6 requires `serviceBrandCode` in a
   train link: the simulator's own codes (901, 902).
-  **In OSDM 3.x a fare is not a booking part** (#1208 / #1209, 1.11.503 /
+  **In OSDM 3.x a fare is not a booking part** (#1208 / #1209, 1.11.504 /
   OTST_V2.0.256, simulator 0.65.0, from a provider's review):
   `BookingPartReference` "can refer to reservation, admission, ancillary or
   fee" (a fare is one from OSDM 4). **Which fares a fulfilment holds is
@@ -3840,6 +3840,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     requests a whole CPU (limit 2); `kubernetes-manifests.test.js` pins
     both. A database moved from the VPS keeps the VPS's *Max Concurrent
     Runs*: lower it on a cluster.
+  - **What a run costs the server's one thread is measured** (#1205,
+    1.11.502): `oscar_run_work_seconds{work}`, `oscar_run_log_*`, the HTTP
+    metric's `listener` (`internal` = the run pods' calls), row *OSCAR's
+    thread* of *OSCAR · Overview*. A new piece of synchronous work done per
+    run gets its `timeRunWork()` kind. The first reading (15 runs, k3s):
+    log lines took half the thread and up to 85 %, requests waited up to
+    6.8 s. **Run log lines are written together since #1210 (1.11.503)**:
+    `logEvent()` queues them (`worker/runLog.js`, the only writer of
+    `run_events`, a test), one transaction every 200 ms; one INSERT a line
+    was one commit waiting for the disk, 1.8 ms against 0.07 measured. The
+    runner writes every status through `writeRunStatus()` (lines first),
+    `executeRun()` writes them in a `finally`, and the live log route calls
+    `flushRunLogs()` before it reads: **a new reader of a running run's
+    log does the same**. A batch that fails falls back to one line at a
+    time; inside a caller's transaction the lines join it (BEGIN stays
+    outside the `try`, so a ROLLBACK never undoes the caller's work).
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

@@ -48,6 +48,7 @@ const { resolveRunList, visibleCodes } = require('../../utils/datafileOwnership'
 const { getRunSelection } = require('../../utils/runSelections');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const runner = require('../../worker/runner');
+const { flushRunLogs } = require('../../worker/runLog');
 const RF = require('../../utils/runFilters');
 const { facetsFor } = require('../helpers/runCandidates');
 
@@ -1011,6 +1012,10 @@ router.get('/:id', (req, res) => {
 router.get('/:id/logs', (req, res) => {
   const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
+
+  // The lines still waiting to be written are written first (#1210), so a
+  // running run's log shows every line logged until now.
+  flushRunLogs();
 
   const since  = req.query.since_id ? Number.parseInt(req.query.since_id, 10) : 0;
 

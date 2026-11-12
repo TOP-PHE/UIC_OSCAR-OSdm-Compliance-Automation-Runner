@@ -740,6 +740,20 @@ describe('GET /v1/runs/:id/logs', () => {
     expect(res.status).toBe(200);
     expect(res.body.events.length).toBeGreaterThanOrEqual(2);
   });
+
+  // #1210: the runner's lines wait up to 200 ms before they are written; the
+  // live log writes them first, so a running run shows every line logged.
+  test('200 shows a line still waiting to be written', async () => {
+    const { queueRunLogLine, waitingRunLogLines } = require('../../src/worker/runLog');
+    queueRunLogLine([covRunFull, new Date().toISOString(), 'info', colEncrypt('still waiting'),
+      null, null, null, null, null, 'log', null, null, null]);
+    expect(waitingRunLogLines()).toBe(1);
+    const token = covToken('company_user', covUserId);
+    const res = await request(app).get(`/v1/runs/${covRunFull}/logs`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.events.some(e => e.message === 'still waiting')).toBe(true);
+    expect(waitingRunLogLines()).toBe(0);
+  });
 });
 
 describe('GET /v1/runs/:id/assertions', () => {
