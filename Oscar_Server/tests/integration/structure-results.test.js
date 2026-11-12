@@ -184,8 +184,8 @@ describe('extractStructuredResults', () => {
     try { fs.rmSync(artifactDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
   });
 
-  test('returns { suites, requests, assertions } counts (auth request skipped)', () => {
-    const out = extractStructuredResults(runId, companyId);
+  test('returns { suites, requests, assertions } counts (auth request skipped)', async () => {
+    const out = await extractStructuredResults(runId, companyId);
     // Auth/token request is skipped, so only the two real requests are counted.
     expect(out.suites).toBe(1);
     expect(out.requests).toBe(2);
@@ -237,12 +237,12 @@ describe('extractStructuredResults', () => {
     expect(failed).toBe(1);
   });
 
-  test('non-UUID runId short-circuits to zero counts (no DB touch)', () => {
-    expect(extractStructuredResults('not-a-uuid', companyId)).toEqual({ suites: 0, requests: 0, assertions: 0 });
+  test('non-UUID runId short-circuits to zero counts (no DB touch)', async () => {
+    expect(await extractStructuredResults('not-a-uuid', companyId)).toEqual({ suites: 0, requests: 0, assertions: 0 });
   });
 
-  test('valid UUID with no artifact file → zero counts', () => {
-    expect(extractStructuredResults(uuidv4(), companyId)).toEqual({ suites: 0, requests: 0, assertions: 0 });
+  test('valid UUID with no artifact file → zero counts', async () => {
+    expect(await extractStructuredResults(uuidv4(), companyId)).toEqual({ suites: 0, requests: 0, assertions: 0 });
   });
 });
 
@@ -296,8 +296,8 @@ describe('extractStructuredResults — dedicated-header credential redaction (NE
     try { fs.rmSync(artifactDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
   });
 
-  test('a tenant-named header carrying the token is stored masked; diagnostic headers stay', () => {
-    extractStructuredResults(runId, companyId);
+  test('a tenant-named header carrying the token is stored masked; diagnostic headers stay', async () => {
+    await extractStructuredResults(runId, companyId);
     const row = get(`SELECT request_headers FROM run_requests WHERE run_id = ? AND request_name = 'GET Offers'`, [runId]);
     const headers = colDecrypt(row.request_headers);
     expect(headers).not.toContain(TOKEN);          // the secret is gone, even under a tenant name

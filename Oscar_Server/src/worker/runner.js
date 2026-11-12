@@ -1556,8 +1556,15 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   let checksStored = null;                       // null: not known (the extraction failed)
   try {
     const { extractStructuredResults } = require('../reports/structureResults');
-    // Synchronous, on the server's thread: timed as the run's work (#1205).
-    const stats = metrics.timeRunWork('results_store', () => extractStructuredResults(runId, companyRow.id));
+    // Stored in slices, other requests served between them (#1214); each
+    // slice's time on the server's thread is the run's work (#1205).
+    const clock = metrics.runWorkClock('results_store');
+    let stats;
+    try {
+      stats = await extractStructuredResults(runId, companyRow.id, { timeSlice: clock.time });
+    } finally {
+      clock.done();
+    }
     checksStored = stats.assertions;
     if (stats.assertions > 0) {
       logEvent(runId, 'info', `[runner] Stored ${stats.assertions} assertions across ${stats.suites} suites and ${stats.requests} requests.`);

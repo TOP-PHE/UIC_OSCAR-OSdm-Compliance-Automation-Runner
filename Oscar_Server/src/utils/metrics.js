@@ -83,6 +83,26 @@ function timeRunWork(kind, fn) {
   }
 }
 
+// Run work done in slices, with other requests served between them (#1214):
+// `time(fn)` runs one slice and adds its time, `done()` observes the sum once
+// as the run's work. The waits between slices are not the thread's work.
+function runWorkClock(kind) {
+  let spent = 0n;
+  return {
+    time(fn) {
+      const started = process.hrtime.bigint();
+      try {
+        return fn();
+      } finally {
+        spent += process.hrtime.bigint() - started;
+      }
+    },
+    done() {
+      runWork.observe({ work: kind }, Number(spent) / 1e9);
+    },
+  };
+}
+
 // ─── Bruno run lifecycle ─────────────────────────────────────────────────────
 // Counter incremented when a run transitions to a terminal status. Don't
 // double-count when a job re-enters the queue or restarts on failure.
@@ -224,6 +244,7 @@ module.exports = {
   runLogLines,
   runLogSeconds,
   timeRunWork,
+  runWorkClock,
   runsTotal,
   queueDepth,
   activeRuns,

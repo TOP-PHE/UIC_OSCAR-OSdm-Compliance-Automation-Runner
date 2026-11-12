@@ -76,10 +76,11 @@ describe('the metrics of run work (#1205)', () => {
   test('the server times each kind where it runs, and every log line', () => {
     const server = read('Oscar_Server/src/server.js');
     const runner = read('Oscar_Server/src/worker/runner.js');
-    const timed = [...`${server}\n${runner}`.matchAll(/timeRunWork\('([a-z_]+)'/g)].map((m) => m[1]).sort();
+    const timed = [...`${server}\n${runner}`.matchAll(/(?:timeRunWork|runWorkClock)\('([a-z_]+)'/g)].map((m) => m[1]).sort();
     expect(timed).toEqual([...metrics.RUN_WORK_KINDS].sort());
     expect(server).toMatch(/timeRunWork\('datafile_copy', \(\) => \{\s+const made = withTripCalendars\(withFrameworkWarnings\(/);
-    expect(runner).toMatch(/timeRunWork\('results_store', \(\) => extractStructuredResults\(/);
+    // In slices since #1214: each slice timed, the sum observed once, failed or not.
+    expect(runner).toMatch(/const clock = metrics\.runWorkClock\('results_store'\);\s+let stats;\s+try \{\s+stats = await extractStructuredResults\(runId, companyRow\.id, \{ timeSlice: clock\.time \}\);\s+\} finally \{\s+clock\.done\(\);/);
     const logEvent = runner.slice(runner.indexOf('function logEvent('), runner.indexOf('\n}\n', runner.indexOf('function logEvent(')));
     expect(logEvent).toContain('metrics.runLogLines.inc()');
     expect(logEvent).toContain('metrics.runLogSeconds.inc(');
