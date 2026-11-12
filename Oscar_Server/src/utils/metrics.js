@@ -37,13 +37,51 @@ promClient.collectDefaultMetrics({
 // One Histogram covers latency, request count (= sample count), and error
 // rate (filter by status_code label). Buckets sized to OSCAR's expected
 // distribution: most API calls are <100ms, anything over 5s is unusual.
+// `listener` (#1205): `public` (pages, API) or `internal` (the run pods' calls,
+// INTERNAL_PORT). 30 and 60 s since the recovery drill read "10" for requests
+// that waited longer: the last bucket was the most it could say.
 const httpDuration = new promClient.Histogram({
   name: 'oscar_http_request_duration_seconds',
-  help: 'HTTP request duration in seconds, by method/route/status_code',
-  labelNames: ['method', 'route', 'status_code'],
-  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+  help: 'HTTP request duration in seconds, by listener/method/route/status_code',
+  labelNames: ['listener', 'method', 'route', 'status_code'],
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60],
   registers: [register]
 });
+
+// ─── What a run costs the server's one thread (#1205) ────────────────────────
+// Synchronous work done for each run, timed where it runs. Its rate (seconds
+// a second) is the share of the thread it takes: when the shares add up to
+// about 1, every page waits behind them.
+const RUN_WORK_KINDS = ['datafile_copy', 'results_store'];
+const runWork = new promClient.Histogram({
+  name: 'oscar_run_work_seconds',
+  help: "Synchronous work for a run on the server's thread, by kind: its data file copy, its results stored",
+  labelNames: ['work'],
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
+  registers: [register]
+});
+// Every line of a run's log is an encrypted insert: counted and timed in total,
+// a histogram per line would be too many observations for what it tells.
+const runLogLines = new promClient.Counter({
+  name: 'oscar_run_log_lines_total',
+  help: 'Lines of runs\' logs stored',
+  registers: [register]
+});
+const runLogSeconds = new promClient.Counter({
+  name: 'oscar_run_log_seconds_total',
+  help: "Time spent storing runs' log lines, on the server's thread",
+  registers: [register]
+});
+
+/** Times `fn` (synchronous) as run work of `kind`, and gives its result. */
+function timeRunWork(kind, fn) {
+  const end = runWork.startTimer({ work: kind });
+  try {
+    return fn();
+  } finally {
+    end();
+  }
+}
 
 // ─── Bruno run lifecycle ─────────────────────────────────────────────────────
 // Counter incremented when a run transitions to a terminal status. Don't
@@ -158,23 +196,34 @@ function routeLabel(req, statusCode) {
   return 'unmatched';
 }
 
-function httpDurationMiddleware(req, res, next) {
-  const endTimer = httpDuration.startTimer();
-  res.on('finish', () => {
-    const route = routeLabel(req, res.statusCode);
-    endTimer({
-      method:      req.method,
-      route,
-      status_code: String(res.statusCode)
+/** The middleware for one listener: `public` (the app) or `internal` (#1205). */
+function httpDurationMiddlewareFor(listener) {
+  return function httpDurationMiddleware(req, res, next) {
+    const endTimer = httpDuration.startTimer();
+    res.on('finish', () => {
+      const route = routeLabel(req, res.statusCode);
+      endTimer({
+        listener,
+        method:      req.method,
+        route,
+        status_code: String(res.statusCode)
+      });
     });
-  });
-  next();
+    next();
+  };
 }
+const httpDurationMiddleware = httpDurationMiddlewareFor('public');
 
 module.exports = {
   register,
   httpDurationMiddleware,
+  httpDurationMiddlewareFor,
   routeLabel,
+  RUN_WORK_KINDS,
+  runWork,
+  runLogLines,
+  runLogSeconds,
+  timeRunWork,
   runsTotal,
   queueDepth,
   activeRuns,

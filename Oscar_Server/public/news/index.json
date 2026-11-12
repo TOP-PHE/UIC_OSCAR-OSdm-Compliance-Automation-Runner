@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-11-oscar-thread-measured",
+    "date": "November 11, 2026",
+    "tag": "Operations",
+    "title": "Monitoring: what the runs cost the server",
+    "summary": "For OSCAR administrators: a new row of the OSCAR · Overview dashboard shows how much of the server's time goes to the work done for each run, and the event-loop alert works.",
+    "content": "OSCAR's server answers every page on one thread. When many runs go on at once, the work it does for each of them (its copy of the data file, its results stored, its log lines) can make every page wait, with the processor, memory and disk far from their limits.\n\nThe OSCAR · Overview dashboard now has a row OSCAR's thread: the share of the server's time each kind of run work takes, how long requests waited, the slowest addresses (pages and API apart from the run pods' calls) and how long one run's work takes. The HTTP panels above it now count pages and API only.\n\nThe alert OscarEventLoopLag could never fire: it read a figure the server does not write. It now reads the right one, so it may fire when many runs go on at once. Lowering Max Concurrent Runs is then the first thing to try.\n\nTesters and Test Managers are not concerned. No action is required."
+  },
+  {
     "id": "2026-11-11-grafana-sign-in-again",
     "date": "November 11, 2026",
     "tag": "Operations",

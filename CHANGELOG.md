@@ -491,6 +491,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.502] — 2026-11-11
+
+Listed in `compatibility.json` (2026.541) without moving `current_release`.
+
+### Added
+
+- **What each run costs the server's one thread is measured** (#1205). On
+  the k3s test machine with production's data, four providers' batches at
+  once made pages take more than 10 s, while the CPU (316m of 2), memory
+  (410 MB of 1 GiB, no pressure) and disk (3–8 % iowait) were far from their
+  limits. The server answers every page on one thread, and the work it does
+  for each run on that thread was measured nowhere; nor were the run pods'
+  calls (`INTERNAL_PORT`). Measure first, then change what the figures name.
+  - `oscar_run_work_seconds{work}`, a histogram (`timeRunWork()`,
+    `utils/metrics.js`): `datafile_copy`, the run's copy of the data file in
+    `runDatafileHandler()` (`withFrameworkWarnings()`, `withTripCalendars()`,
+    the template check: parsed and written again each time, for every run),
+    and `results_store`, `extractStructuredResults()` in the runner.
+  - `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: each line
+    of a run's log is an encrypted insert (`logEvent()`), counted and timed
+    in total; a histogram per line would be too many observations.
+  - `oscar_http_request_duration_seconds` has a `listener` label: `public`
+    (the app) or `internal` (`internalApp`, measured from its first route,
+    `httpDurationMiddlewareFor()`). Its buckets go to 30 and 60 s: requests
+    that waited longer read "10".
+  - *OSCAR · Overview*: row *OSCAR's thread* (the share of the thread each
+    kind of run work takes, the event loop's worst and 99th percentile wait,
+    the ten slowest addresses by listener, one run's work), and the four
+    HTTP panels read `listener!="internal"` (pages and API, as before the
+    internal port was measured).
+
+### Fixed
+
+- **`OscarEventLoopLag` could never fire.** It read
+  `histogram_quantile(0.99, rate(oscar_node_nodejs_eventloop_lag_seconds_bucket[5m]))`,
+  and prom-client writes the event loop's lag as gauges, with no `_bucket`
+  series. It reads `oscar_node_nodejs_eventloop_lag_p99_seconds > 0.2` now,
+  on the VPS and in the cluster's `prometheus-rules.yaml` (regenerated).
+  The name checks of the other metric tests strip `_bucket` and found the
+  gauge of the same name: `run-work-metrics.test.js` checks that every
+  `oscar_node_*`, `oscar_http_*` and run-work series a dashboard or alert
+  reads is written, and a `_bucket` / `_sum` / `_count` only of a histogram.
+  It fails on the old alert, on the internal port not measured, on an HTTP
+  panel counting the run pods' calls and on log lines not counted.
+
+---
+
 ## [server-1.11.501] — 2026-11-11
 
 Listed in `compatibility.json` (2026.540) without moving `current_release`.

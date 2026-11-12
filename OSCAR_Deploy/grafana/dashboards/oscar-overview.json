@@ -48,8 +48,8 @@
       "id": 3,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.4.0",
-      "targets": [{ "expr": "sum(rate(oscar_http_request_duration_seconds_count[5m]))", "refId": "A" }],
-      "title": "HTTP request rate",
+      "targets": [{ "expr": "sum(rate(oscar_http_request_duration_seconds_count{listener!=\"internal\"}[5m]))", "refId": "A" }],
+      "title": "HTTP request rate (pages and API)",
       "type": "stat"
     },
     {
@@ -59,8 +59,8 @@
       "id": 4,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.4.0",
-      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(oscar_http_request_duration_seconds_bucket[5m])) by (le))", "refId": "A" }],
-      "title": "HTTP P95 latency",
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(oscar_http_request_duration_seconds_bucket{listener!=\"internal\"}[5m])) by (le))", "refId": "A" }],
+      "title": "HTTP P95 latency (pages and API)",
       "type": "stat"
     },
     {
@@ -70,11 +70,11 @@
       "id": 5,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(oscar_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
-        { "expr": "histogram_quantile(0.95, sum(rate(oscar_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "B" },
-        { "expr": "histogram_quantile(0.99, sum(rate(oscar_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99", "refId": "C" }
+        { "expr": "histogram_quantile(0.50, sum(rate(oscar_http_request_duration_seconds_bucket{listener!=\"internal\"}[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(oscar_http_request_duration_seconds_bucket{listener!=\"internal\"}[5m])) by (le))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(oscar_http_request_duration_seconds_bucket{listener!=\"internal\"}[5m])) by (le))", "legendFormat": "p99", "refId": "C" }
       ],
-      "title": "HTTP latency percentiles",
+      "title": "HTTP latency percentiles (pages and API)",
       "type": "timeseries"
     },
     {
@@ -84,9 +84,9 @@
       "id": 6,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "expr": "sum by (status_code) (rate(oscar_http_request_duration_seconds_count[5m]))", "legendFormat": "{{status_code}}", "refId": "A" }
+        { "expr": "sum by (status_code) (rate(oscar_http_request_duration_seconds_count{listener!=\"internal\"}[5m]))", "legendFormat": "{{status_code}}", "refId": "A" }
       ],
-      "title": "HTTP requests/sec by status code",
+      "title": "HTTP requests/sec by status code (pages and API)",
       "type": "timeseries"
     },
     {
@@ -1005,6 +1005,69 @@
         }
       ],
       "title": "Run pods ended in 15 minutes, by outcome",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 83 },
+      "id": 29,
+      "panels": [],
+      "title": "OSCAR's thread: what each run costs it (#1205)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Share of the server's one thread taken, a second, by the work done for each run: its data file copy, its results stored, its log lines. Near 100 % in all, every page waits behind them.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true, "stacking": { "mode": "normal" } }, "unit": "percentunit" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 84 },
+      "id": 30,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (work) (rate(oscar_run_work_seconds_sum[1m]))", "legendFormat": "{{work}}", "refId": "A" },
+        { "expr": "rate(oscar_run_log_seconds_total[1m])", "legendFormat": "log lines", "refId": "B" }
+      ],
+      "title": "Share of the thread taken by run work, by kind",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "How long a request waited before the server's thread could start on it: the worst, and the 99th percentile, since the last reading. Seconds here mean every page waited that long.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 84 },
+      "id": 31,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "oscar_node_nodejs_eventloop_lag_max_seconds", "legendFormat": "worst wait", "refId": "A" },
+        { "expr": "oscar_node_nodejs_eventloop_lag_p99_seconds", "legendFormat": "99th percentile", "refId": "B" }
+      ],
+      "title": "Event loop: how long requests waited for the thread",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "The ten slowest addresses over 5 minutes (99th percentile), with the listener: public (pages, API) or internal (the run pods' calls). A long wait everywhere at once is the thread; one address alone is that address.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 92 },
+      "id": 32,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "topk(10, histogram_quantile(0.99, sum by (le, listener, method, route) (rate(oscar_http_request_duration_seconds_bucket[5m]))))", "legendFormat": "{{listener}} {{method}} {{route}}", "refId": "A" }
+      ],
+      "title": "Slowest addresses (99th percentile), by listener and route",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "How long one run's work takes on the thread (95th percentile over 15 minutes), and how many log lines runs store a second.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "log lines a second" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 92 },
+      "id": 33,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, work) (rate(oscar_run_work_seconds_bucket[15m])))", "legendFormat": "{{work}}", "refId": "A" },
+        { "expr": "rate(oscar_run_log_lines_total[1m])", "legendFormat": "log lines a second", "refId": "B" }
+      ],
+      "title": "One run's work (95th percentile), and log lines a second",
       "type": "timeseries"
     }
   ],
