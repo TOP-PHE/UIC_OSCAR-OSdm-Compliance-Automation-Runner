@@ -493,7 +493,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.504] / [collection-OTST_V2.0.256] — 2026-11-12
 
-Issues #1208 and #1209 (part of #1045), release 2026.543. Simulator 0.65.0. In OSDM 3.x a fare is not a booking part.
+Issue #1208, with #1209 (part of #1045), release 2026.543. Simulator 0.65.0. In OSDM 3.x a fare is not a booking part.
 
 A provider's review of the fare tests: `Fulfillment.bookingParts` holds `BookingPartReference` items, which in OSDM 3.x "can refer to reservation, admission, ancillary or fee"; a fare becomes a booking part in OSDM 4 only. OSCAR expected every fare to be named there, and the simulator named them.
 
