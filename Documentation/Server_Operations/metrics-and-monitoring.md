@@ -182,9 +182,13 @@ work is measured where it runs:
 - `oscar_run_work_seconds{work}`, a histogram, one observation per run and
   kind: `datafile_copy` (the run's copy of the data file, with the Test
   Framework's warnings and the trips' calendars, made each time a run asks
-  for its data file) and `results_store` (the run's checks, steps and
-  requests read from Bruno's results and stored; from 1.11.505 in slices,
-  and only the slices' time is counted, not the waits between them);
+  for its data file), `results_read` (from 1.11.506: the run's Bruno
+  results file decrypted, parsed and planned, one block, observed only
+  for a run that has the file) and `results_store` (the run's checks,
+  steps and requests stored; from 1.11.505 in slices, and only the slices'
+  time is counted, not the waits between them);
+- `oscar_run_results_bytes`, a histogram (from 1.11.506): the size of each
+  run's results file, as stored;
 - `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: every
   line of a run's log, counted, and the time it took in total (its
   encryption, and its share of the write that stores it).
@@ -196,7 +200,8 @@ The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 | Share of the thread taken by run work | Seconds of work a second, by kind. Near 100 % in all, every page waits behind the runs. |
 | Event loop: how long requests waited | The worst wait and the 99th percentile since the last reading. Seconds here are seconds every page waited. |
 | Slowest addresses (99th percentile) | The ten slowest, with their listener. Slow everywhere at once is the thread; one address alone is that address. |
-| One run's work (95th percentile) | How long one run's copy or results take, and log lines a second. |
+| One run's work (95th percentile) | How long one run's copy or results take, and log lines a second. `results_read` is one block: its line is the longest the thread waits for it. |
+| A run's results file (size) | The median and 95th percentile of the results files read. A bigger file, a longer `results_read`. |
 
 The alert `OscarEventLoopLag` reads the same 99th percentile. **Until
 1.11.502 it could never fire**: it read a `_bucket` series that prom-client
@@ -218,6 +223,12 @@ From server 1.11.505 the results are stored in slices of about 20 ms, other
 requests served between them; the longest block left is the results file
 decrypted and read (about 0.1 s for 9 MB of results, measured on one
 machine).
+
+**The third reading** (the same, server 1.11.505, #1218): the waits fell
+from 7.3 s to 3.1 s at most, but requests still waited 1.6 to 3 s, with
+storing the results at 32 % of the thread. From server 1.11.506 the file's
+read is its own kind, `results_read`, with the file's size beside it: they
+say whether that block is the one left.
 
 ### Run pods (#1130)
 

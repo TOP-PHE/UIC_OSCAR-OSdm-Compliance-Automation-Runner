@@ -3871,6 +3871,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     added, the sum observed once), never `timeRunWork()` around an `await`,
     which would count the waits. Proved identical to `main`'s rows on
     synthetic results; tests pass `sliceMs: 0` for one request a slice.
+    With it the waits fell from 7.3 to 3.1 s at most, not below 1.6 s, so
+    `planOf()`'s block is timed apart since #1218 (1.11.506): kind
+    `results_read` (`timeRead`, observed only when `onFileRead` saw a file)
+    and `oscar_run_results_bytes`. If it is the block left, the next step
+    is a worker thread for the read and the rows, the inserts staying on
+    the main thread.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

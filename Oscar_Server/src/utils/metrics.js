@@ -52,12 +52,21 @@ const httpDuration = new promClient.Histogram({
 // Synchronous work done for each run, timed where it runs. Its rate (seconds
 // a second) is the share of the thread it takes: when the shares add up to
 // about 1, every page waits behind them.
-const RUN_WORK_KINDS = ['datafile_copy', 'results_store'];
+// results_read (#1218) is the results file decrypted, parsed and planned, one
+// block a run before the slices of results_store: its length is that block's.
+const RUN_WORK_KINDS = ['datafile_copy', 'results_read', 'results_store'];
 const runWork = new promClient.Histogram({
   name: 'oscar_run_work_seconds',
-  help: "Synchronous work for a run on the server's thread, by kind: its data file copy, its results stored",
+  help: "Synchronous work for a run on the server's thread, by kind: its data file copy, its results file read, its results stored",
   labelNames: ['work'],
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
+  registers: [register]
+});
+// How big a run's Bruno results file is (#1218): what results_read reads.
+const runResultsBytes = new promClient.Histogram({
+  name: 'oscar_run_results_bytes',
+  help: "Size of a run's Bruno results file, as stored, read by the server",
+  buckets: [1e5, 5e5, 1e6, 2e6, 5e6, 1e7, 2e7, 5e7, 1e8, 2e8],
   registers: [register]
 });
 // Every line of a run's log is an encrypted insert: counted and timed in total,
@@ -241,6 +250,7 @@ module.exports = {
   routeLabel,
   RUN_WORK_KINDS,
   runWork,
+  runResultsBytes,
   runLogLines,
   runLogSeconds,
   timeRunWork,

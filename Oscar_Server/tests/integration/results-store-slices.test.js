@@ -71,12 +71,21 @@ describe('a run\'s results are stored in slices (#1214)', () => {
     expect(SLICE_MS).toBe(20);
   });
 
-  test('each slice is one block of its own: the plan, then the requests', async () => {
+  test('the file is read in one block of its own (#1218), then each slice is one', async () => {
     const runId = seededRun(6);
-    let blocks = 0;
-    const out = await extractStructuredResults(runId, companyId, { sliceMs: 0, timeSlice: (fn) => { blocks++; return fn(); } });
+    let reads = 0;
+    let slices = 0;
+    let size = null;
+    const out = await extractStructuredResults(runId, companyId, {
+      sliceMs: 0,
+      timeRead: (fn) => { reads++; return fn(); },
+      timeSlice: (fn) => { slices++; return fn(); },
+      onFileRead: (bytes) => { size = bytes; },
+    });
     expect(out).toEqual({ suites: 2, requests: 6, assertions: 12 });
-    expect(blocks).toBe(1 + 6);
+    expect(reads).toBe(1);
+    expect(slices).toBe(6);
+    expect(size).toBe(fs.statSync(path.join(ARTIFACTS_DIR, runId, '.bru_results.json')).size);
     expect(countOf('run_requests', runId)).toBe(6);
     const suites = all('SELECT suite_name, total, passed, failed FROM run_suites WHERE run_id = ? ORDER BY suite_name', [runId]);
     expect(suites).toEqual([
@@ -140,6 +149,19 @@ describe('a run\'s results are stored in slices (#1214)', () => {
     const fn = src.slice(src.indexOf('async function extractStructuredResults('));
     expect(fn).toContain('await fs.promises.readFile(jsonPath)');
     expect(fn).not.toMatch(/readFileSync|decryptFromFile\(/);
+  });
+
+  test('a run without a results file reads nothing: no read block, no size (#1218)', async () => {
+    const runId = uuidv4();
+    let reads = 0;
+    let size = null;
+    const out = await extractStructuredResults(runId, companyId, {
+      timeRead: (fn) => { reads++; return fn(); },
+      onFileRead: (bytes) => { size = bytes; },
+    });
+    expect(out).toEqual({ suites: 0, requests: 0, assertions: 0 });
+    expect(reads).toBe(0);
+    expect(size).toBeNull();
   });
 });
 

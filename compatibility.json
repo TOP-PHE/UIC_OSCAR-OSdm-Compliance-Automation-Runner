@@ -4,6 +4,17 @@
   "current_release": "2026.544",
   "releases": [
     {
+      "release": "2026.545",
+      "date": "2026-11-12",
+      "server": "1.11.506",
+      "collection": "OTST_V2.0.256",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.506: the reading of a run's results file is measured on its own (#1218). With 2026.544 on the k3s test machine, requests still waited 1.6 to 3.1 s for the server's thread, and the one block before the results' slices (the file decrypted, parsed and planned) was counted inside results_store, so its length could not be seen. It is now its own kind of run work, oscar_run_work_seconds{work=\"results_read\"}, one observation a run with a results file, and oscar_run_results_bytes (a histogram) gives each run's results file size. OSCAR · Overview, row OSCAR's thread: a panel A run's results file (size); results_read shows in One run's work. Released with it (deployment files): the dashboard."
+      ]
+    },
+    {
       "release": "2026.544",
       "date": "2026-11-12",
       "server": "1.11.505",
