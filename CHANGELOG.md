@@ -491,6 +491,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.510] — 2026-11-12
+
+Listed in `compatibility.json` (2026.549) without moving `current_release`.
+
+### Changed
+
+- **The database's checkpoints run in a thread of their own** (#1230). A CPU
+  profile of the server on the k3s test machine (2026.548, all six simulated
+  providers at once, a copy of production's 10 GB database) read the longest
+  stretches without a pause millisecond by millisecond. They held COMMITs
+  that ran a checkpoint, 90 to 261 ms each. SQLite's automatic checkpoint
+  runs inside the COMMIT that takes the write-ahead log past 1,000 pages:
+  that COMMIT copies the log into the database file and waits for the disk,
+  on the server's thread. About 28 COMMITs in 5 minutes took over 0.1 s.
+  - `server.js` calls `startCheckpointThread()` (`db.js`). It starts a
+    worker thread (`checkpointWorker.js`, `node:` modules only) whose own
+    connection runs `PRAGMA wal_checkpoint(PASSIVE)` every second. A
+    passive checkpoint never blocks a reader or a writer.
+  - Only once that thread is ready, the server's connection stops
+    checkpointing in its COMMITs (`PRAGMA wal_autocheckpoint = 0`).
+  - If the thread fails, ends or reports nothing for 60 s, it is given up:
+    the server's connection checkpoints in its COMMITs again (1,000 pages,
+    SQLite's default), and a line says why. The log never grows without
+    bound.
+  - Scripts and tests that only load `db.js` keep checkpointing in their
+    COMMITs.
+  - `OSCAR_DB_CHECKPOINTS=inline` keeps the old way; `thread` is the
+    default; anything else stops the start, before the database is opened.
+    Documented in both `.env.example` files. The start-up line ends
+    `(synchronous NORMAL, checkpoints thread)`.
+  - Metrics:
+    - `oscar_db_checkpoint_seconds` (a histogram);
+    - `oscar_db_wal_frames` and `oscar_db_wal_frames_not_copied` (the log's
+      size at the last checkpoint and what it could not copy);
+    - `oscar_db_checkpoint_thread` (1 while the thread checkpoints).
+  - *OSCAR · Overview*, row *OSCAR's thread*: a panel *Database checkpoints,
+    in a thread of their own*; the *Database commits* panel's description
+    says what changed.
+  - On this machine, 4,000 transactions of 10 pages, paced like a server's
+    slices:
+    - COMMITs at the 99th percentile: 23 ms → 1 ms;
+    - COMMITs over 10 ms: 49 → 2 to 5 (about 40 checkpoints when the
+      COMMITs do them).
+  - `db-checkpoints.test.js`:
+    - once the thread is ready, the log holds every page written (no COMMIT
+      copied it);
+    - the thread copies it and the metrics say so;
+    - a thread that ends or goes silent gives the checkpoints back;
+    - stopped, the thread closes its connection, so the files can be
+      removed.
+
+    Mutation-checked: without the PRAGMA that turns the COMMITs'
+    checkpoints off, two tests fail; without the one that gives them back,
+    three.
+  - The seventh reading in *metrics and monitoring*, the start-up line in
+    the installation guide.
+
+---
+
 ## [server-1.11.509] — 2026-11-12
 
 Listed in `compatibility.json` (2026.548) without moving `current_release`.

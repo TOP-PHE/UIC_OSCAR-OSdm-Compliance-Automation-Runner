@@ -47,6 +47,18 @@ function synchronousSetting(value) {
 
 const SYNCHRONOUS = synchronousSetting(process.env.OSCAR_DB_SYNCHRONOUS);
 
+// Where the checkpoints run (#1230, startCheckpointThread() below): `thread`,
+// the default, or `inline` (inside the COMMITs, as before). Read here too, so
+// a wrong value stops the start before the database is opened.
+function checkpointsSetting(value) {
+  if (value === undefined || value === '') return 'thread';
+  const mode = String(value).trim().toLowerCase();
+  if (mode === 'thread' || mode === 'inline') return mode;
+  throw new Error(`OSCAR_DB_CHECKPOINTS must be thread or inline, not "${value}"`);
+}
+
+const CHECKPOINTS = checkpointsSetting(process.env.OSCAR_DB_CHECKPOINTS);
+
 // ── Open database ─────────────────────────────────────────────────────────────
 const db = new DatabaseSync(DB_PATH);
 
@@ -1175,7 +1187,7 @@ function _safeAlter(sql) {
   }
 })();
 
-console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]})`);
+console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]}, checkpoints ${CHECKPOINTS})`);
 
 // ── Encryption helpers ────────────────────────────────────────────────────────
 const ALGO = 'aes-256-gcm';
@@ -1294,8 +1306,10 @@ function transaction(fn) {
 // synchronous FULL (OSCAR_DB_SYNCHRONOUS, #1224) each one waits for the
 // journal to reach the disk; with NORMAL, the default, only the COMMIT that
 // takes the journal past 1,000 pages does, as it also copies them into the
-// database file (a checkpoint). A failed COMMIT is timed too. The histogram is loaded at the first commit, not with
-// this file: scripts that only read the database need no metrics.
+// database file (a checkpoint), unless a thread of its own checkpoints
+// (#1230, below). A failed COMMIT is timed too. The histogram is loaded at the
+// first commit, not with this file: scripts that only read the database need
+// no metrics.
 let commitSeconds = null;
 
 function timedCommit() {
@@ -1310,4 +1324,125 @@ function timedCommit() {
   }
 }
 
-module.exports = { db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig, synchronousSetting };
+// ── Checkpoints in a thread of their own (#1230) ─────────────────────────────
+// SQLite's automatic checkpoint runs inside the COMMIT that takes the
+// write-ahead log past 1,000 pages: that COMMIT copies the log into the
+// database file and waits for the disk, 0.1 to 0.26 s on the server's one
+// thread (k3s test machine, 2026.548). startCheckpointThread() (server.js)
+// turns it off on this connection once a worker thread, with a connection of
+// its own, checkpoints every second (checkpointWorker.js): a passive
+// checkpoint never blocks a reader or a writer. When that thread fails, ends
+// or reports nothing for `staleMs`, this connection checkpoints by itself
+// again (checkpointsInline()), so the log never grows without bound. Scripts
+// and tests that only load this file keep checkpointing in their COMMITs.
+let checkpointer = null;
+
+function checkpointMetric(name) {
+  try {
+    return require('../utils/metrics')[name];
+  } catch {
+    return null;
+  }
+}
+
+function setCheckpointThreadGauge(on) {
+  try { checkpointMetric('dbCheckpointThread')?.set(on ? 1 : 0); } catch { /* a metric never stops the database */ }
+}
+
+function onCheckpointMessage(state, msg) {
+  if (checkpointer !== state) return;
+  state.lastSeen = Date.now();
+  if (msg?.type === 'ready') {
+    db.exec('PRAGMA wal_autocheckpoint = 0');
+    state.running = true;
+    setCheckpointThreadGauge(true);
+    console.log('[db] checkpoints run in a thread of their own');
+    return;
+  }
+  if (msg?.type !== 'checkpoint') return;
+  const log = Number(msg.log);
+  const copied = Number(msg.checkpointed);
+  state.count += 1;
+  state.last = { seconds: Number(msg.seconds), log, checkpointed: copied, busy: Number(msg.busy) };
+  try {
+    checkpointMetric('dbCheckpointSeconds')?.observe(state.last.seconds);
+    checkpointMetric('dbWalFrames')?.set(Math.max(log, 0));
+    checkpointMetric('dbWalFramesNotCopied')?.set(Math.max(log - copied, 0));
+  } catch { /* a metric never stops the database */ }
+}
+
+// The thread is let go: this connection checkpoints in its COMMITs again,
+// SQLite's default of 1,000 pages.
+function release(state) {
+  checkpointer = null;
+  state.stopping = true;
+  clearInterval(state.watchdog);
+  try { db.exec('PRAGMA wal_autocheckpoint = 1000'); } catch { /* the connection is closed */ }
+  setCheckpointThreadGauge(false);
+}
+
+// The thread failed, ended or went silent: it is given up for good.
+function checkpointsInline(state, reason) {
+  if (checkpointer !== state) return;
+  release(state);
+  if (!state.exited) state.worker.terminate().catch(() => { /* already gone */ });
+  console.error(`[db] ${reason}: the server's connection checkpoints by itself again`);
+}
+
+/**
+ * Starts the checkpoint thread (OSCAR_DB_CHECKPOINTS=thread, the default, in
+ * WAL mode). Gives the Worker, or null when the COMMITs keep checkpointing.
+ */
+function startCheckpointThread({ intervalMs = 1000, staleMs = 60000 } = {}) {
+  if (checkpointer) return checkpointer.worker;
+  if (CHECKPOINTS !== 'thread') return null;
+  if (db.prepare('PRAGMA journal_mode').get().journal_mode !== 'wal') return null;
+  const { Worker } = require('node:worker_threads');
+  const worker = new Worker(path.join(__dirname, 'checkpointWorker.js'), { workerData: { dbPath: DB_PATH, intervalMs } });
+  const state = { worker, running: false, stopping: false, exited: false, lastSeen: Date.now(), last: null, count: 0, watchdog: null };
+  checkpointer = state;
+  worker.unref();
+  worker.on('message', (msg) => onCheckpointMessage(state, msg));
+  worker.on('error', (err) => checkpointsInline(state, `the checkpoint thread failed (${err.message})`));
+  worker.on('exit', (code) => {
+    state.exited = true;
+    if (!state.stopping) checkpointsInline(state, `the checkpoint thread ended (code ${code})`);
+  });
+  state.watchdog = setInterval(() => {
+    if (Date.now() - state.lastSeen > staleMs) {
+      checkpointsInline(state, `the checkpoint thread reported nothing for ${staleMs / 1000} s`);
+    }
+  }, Math.max(Math.min(staleMs / 4, 15000), 10));
+  state.watchdog.unref();
+  return worker;
+}
+
+/**
+ * Stops the checkpoint thread (tests): it closes its connection and ends, and
+ * the COMMITs checkpoint again. Resolves when the thread has ended.
+ */
+function stopCheckpointThread() {
+  const state = checkpointer;
+  if (!state) return Promise.resolve();
+  release(state);
+  if (state.exited) return Promise.resolve();
+  return new Promise((resolve) => {
+    const late = setTimeout(() => state.worker.terminate().catch(() => { /* already gone */ }), 5000);
+    state.worker.once('exit', () => {
+      clearTimeout(late);
+      resolve();
+    });
+    state.worker.postMessage({ type: 'stop' });
+  });
+}
+
+/** Where the checkpoints run now, for the tests and a diagnosis. */
+function checkpointState() {
+  const state = checkpointer;
+  return { mode: CHECKPOINTS, running: Boolean(state?.running), count: state?.count ?? 0, last: state?.last ?? null };
+}
+
+module.exports = {
+  db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig, synchronousSetting,
+  checkpointsSetting, startCheckpointThread, stopCheckpointThread, checkpointState,
+};

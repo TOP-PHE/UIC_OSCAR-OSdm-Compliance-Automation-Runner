@@ -107,6 +107,34 @@ const dbSynchronous = new promClient.Gauge({
   registers: [register]
 });
 
+// The checkpoints of the thread of their own (#1230, db.js
+// startCheckpointThread()): the time of each, off the server's thread; the
+// write-ahead log's size at the last one and what it could not copy (pages a
+// reader still used), in frames of one page; and whether that thread
+// checkpoints (1) or the server's connection does in its COMMITs (0:
+// OSCAR_DB_CHECKPOINTS=inline, or the thread stopped).
+const dbCheckpointSeconds = new promClient.Histogram({
+  name: 'oscar_db_checkpoint_seconds',
+  help: "Time of each passive checkpoint of the database's checkpoint thread (not the server's thread)",
+  buckets: [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  registers: [register]
+});
+const dbWalFrames = new promClient.Gauge({
+  name: 'oscar_db_wal_frames',
+  help: 'Frames (pages) in the write-ahead log at the last checkpoint of the checkpoint thread',
+  registers: [register]
+});
+const dbWalFramesNotCopied = new promClient.Gauge({
+  name: 'oscar_db_wal_frames_not_copied',
+  help: 'Frames of the write-ahead log that the last checkpoint could not copy into the database file',
+  registers: [register]
+});
+const dbCheckpointThread = new promClient.Gauge({
+  name: 'oscar_db_checkpoint_thread',
+  help: "1 while a thread of its own checkpoints the database, 0 when the server's connection does in its COMMITs",
+  registers: [register]
+});
+
 /** Times `fn` (synchronous) as run work of `kind`, and gives its result. */
 function timeRunWork(kind, fn) {
   const end = runWork.startTimer({ work: kind });
@@ -280,6 +308,10 @@ module.exports = {
   runLogSeconds,
   dbCommitSeconds,
   dbSynchronous,
+  dbCheckpointSeconds,
+  dbWalFrames,
+  dbWalFramesNotCopied,
+  dbCheckpointThread,
   timeRunWork,
   runWorkClock,
   runsTotal,

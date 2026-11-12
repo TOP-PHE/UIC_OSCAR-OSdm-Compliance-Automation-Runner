@@ -3912,6 +3912,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `GET /v1/runs`: 14 s of 120, fixed by #1227 (1.11.509, the bullet on
     pages of runs). **When the metrics stop explaining a wait, profile the
     thread** before adding another metric.
+    The next profile (2026.548) showed COMMITs that checkpoint, 90–261 ms
+    each. **Since #1230 (1.11.510) a thread of its own checkpoints**:
+    `startCheckpointThread()` (`db.js`, called by `server.js` only, so
+    scripts and tests that load `db.js` keep SQLite's own checkpoints)
+    starts `checkpointWorker.js` (only `node:` modules), whose connection
+    runs `PRAGMA wal_checkpoint(PASSIVE)` every second. Only once it is
+    ready does the server's connection set `wal_autocheckpoint = 0`. A
+    thread that fails, ends or is silent for 60 s is given up for good
+    (`checkpointsInline()`): `wal_autocheckpoint = 1000` again, gauge
+    `oscar_db_checkpoint_thread` 0, and the log never grows without bound.
+    `OSCAR_DB_CHECKPOINTS=inline` keeps the old way. A wrong value stops
+    the start before the database opens. `stopCheckpointThread()` (tests)
+    lets the thread close its connection: Windows cannot remove a file
+    still open.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

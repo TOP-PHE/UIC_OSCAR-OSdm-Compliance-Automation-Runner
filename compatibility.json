@@ -4,6 +4,17 @@
   "current_release": "2026.548",
   "releases": [
     {
+      "release": "2026.549",
+      "date": "2026-11-12",
+      "server": "1.11.510",
+      "collection": "OTST_V2.0.256",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.510: the database's checkpoints run in a thread of their own (#1230). A CPU profile of the server on the k3s test machine (2026.548, all six simulated providers at once) showed COMMITs that ran a checkpoint, 90 to 261 ms each, on the server's thread: SQLite's automatic checkpoint runs inside the COMMIT that takes the write-ahead log past 1,000 pages. A worker thread with its own connection now runs PRAGMA wal_checkpoint(PASSIVE) every second, and once it is ready the server's connection stops checkpointing in its COMMITs (wal_autocheckpoint = 0). If that thread fails, ends or reports nothing for 60 s, the COMMITs checkpoint again, so the log never grows without bound. OSCAR_DB_CHECKPOINTS=inline keeps the old way; anything but thread or inline stops the start. Metrics oscar_db_checkpoint_seconds, oscar_db_wal_frames, oscar_db_wal_frames_not_copied, oscar_db_checkpoint_thread; a panel in OSCAR · Overview. Released with it (deployment files): the dashboard and OSCAR_Deploy/.env.example."
+      ]
+    },
+    {
       "release": "2026.548",
       "date": "2026-11-12",
       "server": "1.11.509",
