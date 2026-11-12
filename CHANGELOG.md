@@ -491,6 +491,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.505] — 2026-11-12
+
+Listed in `compatibility.json` (2026.544) without moving `current_release`.
+
+### Changed
+
+- **A run's results are stored in slices** (#1214). With release 2026.542 on
+  the k3s test machine, all six simulated providers' batches ran at once and
+  pages answered in 10–100 ms. Storing each run's results was then the
+  largest work on the server's thread: 34 % of it (40 % at most), and 2.2 s
+  at the 95th percentile, up to 3 s, in one block per run. Requests still
+  waited up to 1.9 s, and once 7.3 s. `extractStructuredResults()` decrypted
+  the file, parsed it and stored every suite, request and check in one
+  synchronous transaction, preparing each statement again for every row.
+  - The file is read with `fs.promises.readFile`. It is decrypted, parsed and
+    planned in one block (`planOf()`).
+  - The requests are stored in slices of about 20 ms (`SLICE_MS`,
+    `storeSlice()`), each in its own transaction. Other requests are served
+    between two slices (`setImmediate`).
+  - The five statements are prepared once a run.
+  - A slice that fails removes what the run stored (`removeStored()`): the
+    results stay all or nothing, as before.
+  - The function is `async`; the runner awaits it. `metrics.runWorkClock()`
+    adds each slice's time and observes the sum once, failed or not, as
+    `oscar_run_work_seconds{work="results_store"}`. The waits between slices
+    are not counted.
+  - **Same rows, measured locally.** `main`'s function and the new one
+    stored identical suites, requests and checks on synthetic Bruno results:
+    139 requests and 1,888 checks (4.2 MB), and 279 requests and 3,955
+    checks (8.8 MB). The ids were compared by position and the encrypted
+    columns decrypted.
+
+    | Requests | Before, one block | Now, longest block (file decrypted and parsed) | Now, total on the thread |
+    |---|---|---|---|
+    | 139 (4.2 MB) | 0.6–1.8 s | 54–78 ms | 0.3–0.6 s |
+    | 279 (8.8 MB) | 2.9 s | 122 ms | 1.8 s |
+  - Mutation-checked: each of these defects fails a test:
+    - no yield between slices;
+    - one slice for everything;
+    - a failed slice leaving what was stored;
+    - statements prepared once a row;
+    - the file read on the thread;
+    - a failed slice's time not counted;
+    - the runner observing only on success.
+  - Left open on purpose: Sonar S9382 ("`await` inside a loop") on the
+    loop of `extractStructuredResults()`. The slices must run one after
+    another, and that `await` is what lets other requests through between
+    them.
+
+---
+
 ## [server-1.11.504] / [collection-OTST_V2.0.256] — 2026-11-12
 
 Issue #1208, with #1209 (part of #1045), release 2026.543. Simulator 0.65.0. A fare fulfilment need not name its fares as booking parts.

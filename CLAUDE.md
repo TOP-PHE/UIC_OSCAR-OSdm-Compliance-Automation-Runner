@@ -3860,6 +3860,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     log does the same**. A batch that fails falls back to one line at a
     time; inside a caller's transaction the lines join it (BEGIN stays
     outside the `try`, so a ROLLBACK never undoes the caller's work).
+    **A run's results are stored in slices since #1214 (1.11.505)**: with
+    six providers at once they took 34 % of the thread, 2.2–3 s a run in one
+    block. `extractStructuredResults()` is `async`: the file is read off the
+    thread, `planOf()` decrypts, parses and plans in one block, then
+    `storeSlice()` stores requests for about `SLICE_MS` (20) per
+    transaction, `setImmediate` between slices; statements are prepared once
+    a run, and a failed slice calls `removeStored()` (all or nothing). Work
+    done in slices is timed with `metrics.runWorkClock(kind)` (each slice
+    added, the sum observed once), never `timeRunWork()` around an `await`,
+    which would count the waits. Proved identical to `main`'s rows on
+    synthetic results; tests pass `sliceMs: 0` for one request a slice.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

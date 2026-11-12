@@ -183,7 +183,8 @@ work is measured where it runs:
   kind: `datafile_copy` (the run's copy of the data file, with the Test
   Framework's warnings and the trips' calendars, made each time a run asks
   for its data file) and `results_store` (the run's checks, steps and
-  requests read from Bruno's results and stored);
+  requests read from Bruno's results and stored; from 1.11.505 in slices,
+  and only the slices' time is counted, not the waits between them);
 - `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: every
   line of a run's log, counted, and the time it took in total (its
   encryption, and its share of the write that stores it).
@@ -209,6 +210,14 @@ of every run are written together, every 0.2 s: about 0.07 ms a line
 instead of 1.8 measured on one machine. A running run's log on its page
 still shows every line at once (the page's request writes the waiting lines
 first).
+
+**The second reading** (all six simulated providers at once, server
+1.11.503, #1214): pages answered in 10–100 ms, log lines took 15 % of the
+thread, and storing each run's results 34 %, 2.2 to 3 s a run in one block.
+From server 1.11.505 the results are stored in slices of about 20 ms, other
+requests served between them; the longest block left is the results file
+decrypted and read (about 0.1 s for 9 MB of results, measured on one
+machine).
 
 ### Run pods (#1130)
 
