@@ -491,6 +491,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.507] — 2026-11-12
+
+Listed in `compatibility.json` (2026.546) without moving `current_release`.
+
+### Added
+
+- **How long each database COMMIT holds the server's thread is measured**
+  (#1221). With 2026.545 on the k3s test machine (all six simulated
+  providers at once), reading a run's results file took 16 to 21 ms a run:
+  not the block left. Storing the results still took 22 % of the thread and
+  1.8 s a run at the 95th percentile, and requests waited 0.3 to 1 s at
+  almost every reading. Each results slice and each batch of log lines ends
+  with a COMMIT, which the slices' 20 ms do not count. OSCAR does not set
+  SQLite's `synchronous`, and the server's connection reads 2 (FULL): in
+  WAL mode each COMMIT waits for the disk, and the one that takes the
+  journal past 1,000 pages also copies them into the database file.
+  - `oscar_db_commit_seconds`, a histogram: each COMMIT of `transaction()`
+    (`db.js`, `timedCommit()`), a failed one too. A statement written alone,
+    outside a transaction, commits too and is not counted. The histogram is
+    loaded at the first commit, so a script that only reads the database
+    loads no metrics.
+  - The run log batches go through `transaction()`, with the same behaviour
+    (BEGIN outside the `try`; inside a caller's transaction the lines join
+    it). No other file runs a COMMIT (a test).
+  - *OSCAR · Overview*, row *OSCAR's thread*: a panel *Database commits:
+    time each holds the thread*, with the median, the 99th percentile and
+    the commits over 0.1 s in 5 minutes.
+  - Nothing else changes. What to change once the figures are in
+    (`synchronous = NORMAL`, or the checkpoints off the thread) is decided
+    then.
+  - Mutation-checked: with the COMMIT no longer timed, five tests fail.
+
+---
+
 ## [server-1.11.506] — 2026-11-12
 
 Listed in `compatibility.json` (2026.545) without moving `current_release`.

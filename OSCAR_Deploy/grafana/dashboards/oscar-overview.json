@@ -1083,6 +1083,21 @@
       ],
       "title": "A run's results file (size)",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "How long each database COMMIT of a transaction holds the thread (median and 99th percentile over 5 minutes), and how many took over 0.1 s in 5 minutes (#1221). The results slices and the log line batches end with one: their time is part of results_store and of the log lines'. With SQLite's default synchronous mode a COMMIT waits for the disk, and now and then copies the journal into the database file.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "over 0.1 s, in 5 minutes" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 100 },
+      "id": 35,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le) (rate(oscar_db_commit_seconds_bucket[5m])))", "legendFormat": "median", "refId": "A" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(oscar_db_commit_seconds_bucket[5m])))", "legendFormat": "99th percentile", "refId": "B" },
+        { "expr": "sum(increase(oscar_db_commit_seconds_count[5m])) - sum(increase(oscar_db_commit_seconds_bucket{le=\"0.1\"}[5m]))", "legendFormat": "over 0.1 s, in 5 minutes", "refId": "C" }
+      ],
+      "title": "Database commits: time each holds the thread",
+      "type": "timeseries"
     }
   ],
   "preload": false,

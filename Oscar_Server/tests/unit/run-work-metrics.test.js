@@ -32,7 +32,7 @@ const exprsOf = (dashboard) => dashboard.panels.flatMap((p) => (p.targets || [])
 // The metrics of the server's own registry: the process, HTTP and run
 // metrics. The host's lines and the simulator's relay are written apart,
 // and pinned by host-metrics.test.js and simulator-monitoring-config.test.js.
-const OWN = /\boscar_(?:node|http|run_work|run_log)_[a-z0-9_]+/g;
+const OWN = /\boscar_(?:node|http|run_work|run_log|db)_[a-z0-9_]+/g;
 
 async function typesWritten() {
   // prom-client types `type` as its MetricType enum: its values are these words.
@@ -137,7 +137,7 @@ describe('what the dashboard and the alerts read', () => {
     const exprs = exprsOf({ panels: after }).join('\n');
     for (const name of ['oscar_run_work_seconds_sum', 'oscar_run_work_seconds_bucket', 'oscar_run_log_seconds_total',
       'oscar_run_log_lines_total', 'oscar_node_nodejs_eventloop_lag_max_seconds', 'oscar_node_nodejs_eventloop_lag_p99_seconds',
-      'oscar_run_results_bytes_bucket']) {
+      'oscar_run_results_bytes_bucket', 'oscar_db_commit_seconds_bucket', 'oscar_db_commit_seconds_count']) {
       expect(exprs).toContain(name);
     }
     expect(exprs).toMatch(/sum by \(le, listener, method, route\) \(rate\(oscar_http_request_duration_seconds_bucket/);

@@ -82,6 +82,21 @@ const runLogSeconds = new promClient.Counter({
   registers: [register]
 });
 
+// ─── The database's commits (#1221) ──────────────────────────────────────────
+// Each COMMIT of transaction() (db.js), timed on the server's thread: the
+// results slices and the run log batches (their commits are part of
+// results_store and of the log lines' time above), and the other
+// transactions. With SQLite's default synchronous mode it waits for the
+// disk, and now and then copies the journal into the database file. A
+// statement written alone, outside a transaction, commits too and is not
+// counted. 0.1 is a bound: the dashboard counts the commits above it.
+const dbCommitSeconds = new promClient.Histogram({
+  name: 'oscar_db_commit_seconds',
+  help: "Time of each database COMMIT of a transaction, on the server's thread",
+  buckets: [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  registers: [register]
+});
+
 /** Times `fn` (synchronous) as run work of `kind`, and gives its result. */
 function timeRunWork(kind, fn) {
   const end = runWork.startTimer({ work: kind });
@@ -253,6 +268,7 @@ module.exports = {
   runResultsBytes,
   runLogLines,
   runLogSeconds,
+  dbCommitSeconds,
   timeRunWork,
   runWorkClock,
   runsTotal,
