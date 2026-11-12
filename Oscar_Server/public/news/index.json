@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-12-run-log-lines-together",
+    "date": "November 12, 2026",
+    "tag": "Improvement",
+    "title": "Pages stay quick while many runs go on",
+    "summary": "OSCAR writes the log lines of the runs together instead of one by one: with many runs going at once, pages no longer wait several seconds behind them.",
+    "content": "With many runs going at once, OSCAR's pages could take several seconds to answer. The new monitoring of the server showed why: writing the runs' log lines one by one took half of the server's time, and up to 85 %.\n\nOSCAR now writes the log lines of all runs together, five times a second. Each line costs the server about twenty-five times less.\n\nA run's page still shows its log as it goes, every line at once. Nothing changes in what a run checks or in its results.\n\nNo action is required."
+  },
+  {
     "id": "2026-11-11-oscar-thread-measured",
     "date": "November 11, 2026",
     "tag": "Operations",

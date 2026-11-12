@@ -37,6 +37,7 @@ const {
 } = require('../run-pod/runLayout');
 const { listRunResults, readRunResult, removeRunResults } = require('../utils/runResults');
 const metrics = require('../utils/metrics');
+const { queueRunLogLine, flushRunLogs } = require('./runLog');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken, dropCachedToken } = require('./access-token');
 const { credentialsFor } = require('../utils/testerCredentials');
@@ -154,20 +155,24 @@ async function fsExists(p) {
 // "2026-06-10T07:42:13.123Z" — same UTC storage convention, ms included.
 // Old rows keep the second-precision format; the dashboard slice degrades
 // gracefully on them (shows HH:MM:SS).
+//
+// The line is queued and written with the others (runLog.js, #1210): one
+// INSERT a line held the server's thread about 2 ms each.
 function logEvent(runId, level, message, meta) {
   const lineCount = _incrementAndCheck(runId);
   if (lineCount === MAX_LOG_LINES_PER_RUN + 1) {
     // Emit one final warning and then start dropping
     try {
-      dbRun(
-        `INSERT INTO run_events (run_id, ts, level, message, event_kind) VALUES (?, ?, ?, ?, ?)`,
-        [runId, new Date().toISOString(), 'warn', colEncrypt(`[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`), 'log']
-      );
+      queueRunLogLine([
+        runId, new Date().toISOString(), 'warn', colEncrypt(`[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`),
+        null, null, null, null, null, 'log', null, null, null,
+      ]);
     } catch (_) { /* swallow */ }
     return;
   }
   if (lineCount > MAX_LOG_LINES_PER_RUN) return;  // drop silently after cap
-  // Each line stored is counted, with its time on the server's thread (#1205).
+  // Each line stored is counted, with its time on the server's thread (#1205):
+  // its encryption here, its share of the write in flushRunLogs().
   const started = process.hrtime.bigint();
   try {
     const {
@@ -178,11 +183,7 @@ function logEvent(runId, level, message, meta) {
     // body — metadata columns like category/phase/suite_name/http_status
     // remain plaintext so the structured-log filtering UI keeps working
     // without per-row decrypt/comparison cost).
-    dbRun(
-      `INSERT INTO run_events (run_id, ts, level, message,
-         category, phase, suite_name, request_name, http_status,
-         event_kind, attempt_index, attempt_total, scenario_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    queueRunLogLine(
       [runId, new Date().toISOString(), level, colEncrypt(String(message).slice(0, 4000)),
        category || null, phase || null, suite_name || null, request_name || null, http_status || null,
        event_kind || 'log',
@@ -195,6 +196,14 @@ function logEvent(runId, level, message, meta) {
     metrics.runLogLines.inc();
     metrics.runLogSeconds.inc(Number(process.hrtime.bigint() - started) / 1e9);
   } catch { /* a metric never stops a log line */ }
+}
+
+// A run's status is written after every line logged before it (#1210): a
+// reader that sees the run ended finds its whole log. Every status the runner
+// writes goes through here.
+function writeRunStatus(sql, params) {
+  flushRunLogs();
+  return dbRun(sql, params);
 }
 
 // "at fn (file:line:col)" stack frame. The two alternatives are the two ways the
@@ -1068,7 +1077,17 @@ function refusedRunScope(runRow, companyId, userId) {
 }
 
 // ── Main execution function ────────────────────────────────────────────────────
-async function executeRun({ runId, companyId, userId, scenarioOverride }) {
+// Every line the run logged is written before its caller goes on, however it
+// ended (#1210): the queue, the tests and every report read them afterwards.
+async function executeRun(job) {
+  try {
+    return await runSteps(job);
+  } finally {
+    flushRunLogs();
+  }
+}
+
+async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   // 1. Load run + company + user from DB. The OSDM credentials (auth_mode,
   //    OAuth fields, bearer token, token cache) are the user's for THIS
   //    company (#540: tester_credentials, per user and company). The company
@@ -1084,7 +1103,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   if (!userRow)               throw new Error('User row not found for run — cannot resolve credentials.');
 
   // Mark as RUNNING
-  dbRun(
+  writeRunStatus(
     `UPDATE runs SET status = 'RUNNING', started_at = datetime('now') WHERE id = ?`,
     [runId]
   );
@@ -1111,7 +1130,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     || refusedFrameworkText(companyId)
     || await refusedOsdmVersion(companyRow.datafile_path, scenarioOverride, companyId);
   if (refusal) {
-    dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);
+    writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);
     logEvent(runId, 'error', `[runner] ${refusal}`);
     return { exitCode: 1, error: refusal };
   }
@@ -1130,7 +1149,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // The run's error and log are read by the company: no secret, no quoted
     // token answer in them (tokenErrors.js).
     const reason = tokenErrorText(err, userRow);
-    dbRun(
+    writeRunStatus(
       `UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`,
       [reason, runId]
     );
@@ -1171,7 +1190,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const datafilePath = companyRow.datafile_path;
   if (!datafilePath || !(await fsExists(datafilePath))) {
     const msg = 'No data file uploaded. Upload a data file in your company profile before running.';
-    dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
+    writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
     logEvent(runId, 'error', `[runner] ${msg}`);
     return { exitCode: 1, error: msg };
   }
@@ -1194,7 +1213,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     } catch (err) {
       // Refuse, never throw: a thrown executeRun leaves the run unmarked.
       const msg = `The run's working folder could not be made: ${err.message}`;
-      dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
+      writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
       logEvent(runId, 'error', `[runner] ${msg}`);
       await cleanupWorkspace(runId);
       return { exitCode: 1, error: msg };
@@ -1271,7 +1290,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml${forScenario}`);
     } catch (err) {
       const msg = `Failed to write env file: ${err.message}`;
-      dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
+      writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
       logEvent(runId, 'error', `[runner] ${msg}`);
       return { exitCode: 1, error: msg };
     }
@@ -1557,7 +1576,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // (POST /v1/runs/stop-all set it to CANCELLED) while bru.cmd was being
   // killed, this write must NOT resurrect it to COMPLETED/FAILED.
   const finalStatus = exitCode === 0 && !noChecks ? 'COMPLETED' : 'FAILED';
-  const finalUpd = dbRun(
+  const finalUpd = writeRunStatus(
     `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ? AND status = 'RUNNING'`,
     [finalStatus, exitCode, runId]
   );

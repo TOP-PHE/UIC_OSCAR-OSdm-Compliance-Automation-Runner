@@ -491,6 +491,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.503] — 2026-11-12
+
+Listed in `compatibility.json` (2026.542) without moving `current_release`.
+
+### Changed
+
+- **Run log lines are written together** (#1210). The first reading of
+  #1205's row *OSCAR's thread*, on the k3s test machine with three
+  providers' batches (15 runs going, about 300 waiting): log lines took
+  48.5 % of the server's thread and up to 85.5 %, about 180 a second at
+  2.7 ms each, and requests waited for the thread up to 6.8 s. The run pods'
+  own calls waited too (up to 28 s for a token, 22 s to send results). Each
+  line was its own `INSERT`, so its own SQLite transaction, which waits for
+  the disk. Measured on 2,000 lines: encryption 0.06 ms a line, one INSERT a
+  line 1.81 ms, the same lines in one transaction 0.07 ms, encryption
+  included.
+  - `logEvent()` queues the line (`worker/runLog.js`, `queueRunLogLine()`),
+    and `flushRunLogs()` writes every waiting line, of every run, in one
+    transaction every 200 ms. `runLog.js` is the only writer of
+    `run_events` (`run-log-batches.test.js` scans `src/`).
+  - Nothing reads a run's log without its last lines: every status the
+    runner writes goes through `writeRunStatus()`, which writes the lines
+    first; `executeRun()` writes them in a `finally`, however the run ended;
+    `GET /v1/runs/:id/logs` writes them before it reads, so the run page's
+    live log shows every line logged until then.
+  - A batch that cannot be written (a line of a run deleted meanwhile) falls
+    back to one line at a time, each on its own, as before. Inside a caller's
+    transaction the lines join it: `BEGIN` stays outside the `try`, so the
+    `ROLLBACK` never undoes the caller's work.
+  - `oscar_run_log_seconds_total` counts each line's encryption and the
+    batch's write.
+  - A server stopped between two writes loses at most 0.2 s of lines; its
+    running runs are marked failed at the next start, as before.
+  - Mutation-checked: one INSERT a line again, no fallback, `BEGIN` inside
+    the `try`, no timer, the live log reading first, a status written before
+    the lines and `executeRun()` ending without writing them each fail a
+    test.
+
+---
+
 ## [server-1.11.502] — 2026-11-11
 
 Listed in `compatibility.json` (2026.541) without moving `current_release`.

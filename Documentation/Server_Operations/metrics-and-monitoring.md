@@ -185,7 +185,8 @@ work is measured where it runs:
   for its data file) and `results_store` (the run's checks, steps and
   requests read from Bruno's results and stored);
 - `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: every
-  line of a run's log is an encrypted insert, counted and timed in total.
+  line of a run's log, counted, and the time it took in total (its
+  encryption, and its share of the write that stores it).
 
 The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 
@@ -199,6 +200,15 @@ The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 The alert `OscarEventLoopLag` reads the same 99th percentile. **Until
 1.11.502 it could never fire**: it read a `_bucket` series that prom-client
 does not write (the event loop's lag is a set of gauges).
+
+**What the first reading showed** (k3s test machine, 15 runs going, #1210):
+log lines took half of the thread and up to 85 %, about 180 a second at
+2.7 ms each, and requests waited up to 6.8 s. Each line was written alone,
+so each was a write that waits for the disk. From server 1.11.503 the lines
+of every run are written together, every 0.2 s: about 0.07 ms a line
+instead of 1.8 measured on one machine. A running run's log on its page
+still shows every line at once (the page's request writes the waiting lines
+first).
 
 ### Run pods (#1130)
 

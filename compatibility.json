@@ -4,6 +4,17 @@
   "current_release": "2026.541",
   "releases": [
     {
+      "release": "2026.542",
+      "date": "2026-11-12",
+      "server": "1.11.503",
+      "collection": "OTST_V2.0.255",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.503: run log lines are written together (#1210). Each line was its own INSERT, so its own SQLite transaction waiting for the disk: with 15 runs going on the k3s test machine, log lines took half of the server's thread and up to 85 %, and requests waited up to 6.8 s (#1205's row OSCAR's thread). logEvent() now queues them (worker/runLog.js) and they are written in one transaction every 200 ms: 0.07 ms a line instead of 1.8 measured. Every status the runner writes, the end of executeRun() and the live log route write the waiting lines first."
+      ]
+    },
+    {
       "release": "2026.541",
       "date": "2026-11-11",
       "server": "1.11.502",
