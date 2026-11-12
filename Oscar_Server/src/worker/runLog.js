@@ -49,20 +49,16 @@ function queueRunLogLine(values) {
   }
 }
 
-// All the waiting lines in one transaction. BEGIN is outside the try: when it
-// fails (a caller already inside a transaction), nothing of the caller's is
-// rolled back, and the lines are written one by one inside it, as before.
+// All the waiting lines in one transaction, through transaction(), which
+// times its COMMIT (#1221). Its BEGIN is outside the try: when it fails (a
+// caller already inside a transaction), nothing of the caller's is rolled
+// back, and the lines are written one by one inside it, as before.
 function writeTogether(rows) {
-  const db = database();
-  const insert = db.prepare(INSERT_SQL);
-  db.exec('BEGIN');
-  try {
+  const store = require('../db/db');
+  const insert = store.db.prepare(INSERT_SQL);
+  store.transaction(() => {
     for (const row of rows) insert.run(...row);
-    db.exec('COMMIT');
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
+  });
 }
 
 // One line at a time, each on its own: a line that cannot be written (its run

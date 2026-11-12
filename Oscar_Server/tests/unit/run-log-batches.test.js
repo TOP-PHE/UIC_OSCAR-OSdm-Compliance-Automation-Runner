@@ -107,6 +107,20 @@ describe('the lines wait, then are written together (#1210)', () => {
     expect(await logSecondsTotal()).toBeGreaterThan(before);
   });
 
+  test('their COMMIT is timed with the other transactions\' (#1221)', async () => {
+    const runId = newRun();
+    const commits = async () => {
+      const json = await metrics.dbCommitSeconds.get();
+      const count = json.values.find((v) => v.metricName === 'oscar_db_commit_seconds_count');
+      return count ? count.value : 0;
+    };
+    const before = await commits();
+    for (let i = 0; i < 3; i++) queueRunLogLine(line(runId, `committed ${i}`));
+    flushRunLogs();
+    expect(await commits()).toBe(before + 1);
+    expect(messagesOf(runId)).toEqual(['committed 0', 'committed 1', 'committed 2']);
+  });
+
   test('an undefined value is stored as null', () => {
     const runId = newRun();
     queueRunLogLine(line(runId, 'no category', { category: undefined }));

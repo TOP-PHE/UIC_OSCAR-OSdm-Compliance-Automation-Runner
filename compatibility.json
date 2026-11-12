@@ -4,6 +4,17 @@
   "current_release": "2026.545",
   "releases": [
     {
+      "release": "2026.546",
+      "date": "2026-11-12",
+      "server": "1.11.507",
+      "collection": "OTST_V2.0.256",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.507: how long each database COMMIT holds the server's thread is measured (#1221). With 2026.545 on the k3s test machine, reading a run's results file took 16 to 21 ms a run, but storing the results still took 1.8 s a run (95th percentile) and requests waited 0.3 to 1 s at almost every reading. Each results slice and each batch of log lines ends with a COMMIT, which the slices' 20 ms do not count, and the server's connection reads synchronous = 2 (FULL): each COMMIT waits for the disk. oscar_db_commit_seconds (a histogram) times each COMMIT of transaction(); the run log batches go through it. OSCAR · Overview, row OSCAR's thread: a panel Database commits. Nothing else changes. Released with it (deployment files): the dashboard."
+      ]
+    },
+    {
       "release": "2026.545",
       "date": "2026-11-12",
       "server": "1.11.506",

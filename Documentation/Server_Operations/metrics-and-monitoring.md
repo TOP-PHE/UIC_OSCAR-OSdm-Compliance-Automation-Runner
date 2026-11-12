@@ -191,7 +191,12 @@ work is measured where it runs:
   run's results file, as stored;
 - `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: every
   line of a run's log, counted, and the time it took in total (its
-  encryption, and its share of the write that stores it).
+  encryption, and its share of the write that stores it);
+- `oscar_db_commit_seconds`, a histogram (from 1.11.507, #1221): each
+  database COMMIT of a transaction, on the thread. Every results slice and
+  every batch of log lines ends with one, so their time is part of
+  `results_store` and of the log lines'. A statement written alone, outside
+  a transaction, commits too and is not counted.
 
 The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 
@@ -202,6 +207,7 @@ The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 | Slowest addresses (99th percentile) | The ten slowest, with their listener. Slow everywhere at once is the thread; one address alone is that address. |
 | One run's work (95th percentile) | How long one run's copy or results take, and log lines a second. `results_read` is one block: its line is the longest the thread waits for it. |
 | A run's results file (size) | The median and 95th percentile of the results files read. A bigger file, a longer `results_read`. |
+| Database commits | How long a COMMIT holds the thread (median, 99th percentile), and how many took over 0.1 s in 5 minutes. Each of those is a wait for every page. |
 
 The alert `OscarEventLoopLag` reads the same 99th percentile. **Until
 1.11.502 it could never fire**: it read a `_bucket` series that prom-client
@@ -229,6 +235,23 @@ from 7.3 s to 3.1 s at most, but requests still waited 1.6 to 3 s, with
 storing the results at 32 % of the thread. From server 1.11.506 the file's
 read is its own kind, `results_read`, with the file's size beside it: they
 say whether that block is the one left.
+
+**The fourth reading** (the same, server 1.11.506, #1221): that read is
+not the block left, 16 to 21 ms a run for files of 285 to 473 KB. Storing
+the results took 22 % of the thread, 1.8 s a run (95th percentile), and
+requests still waited 0.3 to 1 s at almost every reading. Each slice ends
+with a COMMIT, which its 20 ms do not count. OSCAR does not set SQLite's
+`synchronous`, and the server's connection reads 2 (FULL): in WAL mode
+each COMMIT waits for the disk, and the one that takes the journal past
+1,000 pages also copies them into the database file. From server 1.11.507
+each COMMIT's time is measured. To read the mode on a server:
+
+```bash
+sudo kubectl -n oscar exec deploy/oscar -c oscar -- node -e "const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('/app/data/oscar.db',{readOnly:true});console.log(d.prepare('PRAGMA synchronous').get())"
+```
+
+On the VPS, `docker exec oscar` in place of `sudo kubectl -n oscar exec
+deploy/oscar -c oscar --`.
 
 ### Run pods (#1130)
 

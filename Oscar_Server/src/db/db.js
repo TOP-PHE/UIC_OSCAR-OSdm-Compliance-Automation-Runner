@@ -1240,14 +1240,36 @@ function getConfig(key, defaultValue) {
 }
 
 // ── Transaction helper ────────────────────────────────────────────────────────
+// BEGIN is outside the try: when it fails (a caller already inside a
+// transaction), nothing of the caller's is rolled back.
 function transaction(fn) {
   db.exec('BEGIN');
   try {
     fn();
-    db.exec('COMMIT');
+    timedCommit();
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
+  }
+}
+
+// The COMMIT runs on the server's one thread and is timed (#1221). OSCAR does
+// not set `synchronous`, so in WAL mode SQLite waits for the journal to reach
+// the disk at each COMMIT, and the COMMIT that takes the journal past 1,000
+// pages also copies them into the database file (a checkpoint). A failed
+// COMMIT is timed too. The histogram is loaded at the first commit, not with
+// this file: scripts that only read the database need no metrics.
+let commitSeconds = null;
+
+function timedCommit() {
+  const started = process.hrtime.bigint();
+  try {
+    db.exec('COMMIT');
+  } finally {
+    try {
+      commitSeconds ??= require('../utils/metrics').dbCommitSeconds;
+      commitSeconds.observe(Number(process.hrtime.bigint() - started) / 1e9);
+    } catch { /* a metric never stops a commit */ }
   }
 }
 

@@ -3876,7 +3876,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `results_read` (`timeRead`, observed only when `onFileRead` saw a file)
     and `oscar_run_results_bytes`. If it is the block left, the next step
     is a worker thread for the read and the rows, the inserts staying on
-    the main thread.
+    the main thread. It was not (2026.545: 16–21 ms a run), but storing
+    still took 1.8 s a run and requests waited 0.3–1 s: **each COMMIT of
+    `transaction()` is timed since #1221 (1.11.507)**,
+    `oscar_db_commit_seconds` (`timedCommit()`, the histogram required at
+    the first commit). OSCAR never sets `synchronous`, which reads 2
+    (FULL): each COMMIT waits for the disk, and now and then checkpoints.
+    Commit through `transaction()`: a test refuses a COMMIT in any file but
+    `db.js`.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the
