@@ -69,13 +69,9 @@ function isFareFulfillment(fulfillment, { fareIds = [], productIds = [] } = {}) 
  *   namedAsParts      'fulfillment X names fare Y' for each fare named as a
  *                     booking part (OSDM 3.x: not one).
  */
-function fareHoldings({ fares = [], fulfillments = [], reservationIds = [], productIds = [] } = {}) {
-  const booked = list(fares).filter((f) => typeof f?.id === 'string');
-  const fareIds = new Set(booked.map((f) => f.id));
-  const all = list(fulfillments).filter((f) => typeof f?.id === 'string');
-  const kinds = { fareIds: [...fareIds, ...list(reservationIds)], productIds };
-  const ofFares = all.filter((f) => isFareFulfillment(f, kinds));
-  const holderOf = new Map();
+// The fares the fulfilments name in `bookingParts`: each one's holder (the
+// first naming it), and a sentence per naming.
+function namedHolders(ofFares, fareIds, holderOf) {
   const namedAsParts = [];
   for (const f of ofFares) {
     for (const id of namedIdsOf(f).filter((x) => fareIds.has(x))) {
@@ -83,10 +79,14 @@ function fareHoldings({ fares = [], fulfillments = [], reservationIds = [], prod
       if (!holderOf.has(id)) holderOf.set(id, f.id);
     }
   }
-  // One billing reference names one fare: two passengers' fares of one tariff
-  // share an accounting id. A reference counts first for a fare its own
-  // fulfilment names, else takes one no fulfilment holds yet; of those, one
-  // of its own price first.
+  return namedAsParts;
+}
+
+// One billing reference names one fare: two passengers' fares of one tariff
+// share an accounting id. A reference counts first for a fare its own
+// fulfilment names, else takes one no fulfilment holds yet; of those, one of
+// its own price first.
+function billedHolders(ofFares, booked, holderOf) {
   for (const f of ofFares) {
     const counted = new Set();
     const pick = (pool, reference) => {
@@ -100,6 +100,17 @@ function fareHoldings({ fares = [], fulfillments = [], reservationIds = [], prod
       holderOf.set(fare.id, f.id);
     }
   }
+}
+
+function fareHoldings({ fares = [], fulfillments = [], reservationIds = [], productIds = [] } = {}) {
+  const booked = list(fares).filter((f) => typeof f?.id === 'string');
+  const fareIds = new Set(booked.map((f) => f.id));
+  const all = list(fulfillments).filter((f) => typeof f?.id === 'string');
+  const kinds = { fareIds: [...fareIds, ...list(reservationIds)], productIds };
+  const ofFares = all.filter((f) => isFareFulfillment(f, kinds));
+  const holderOf = new Map();
+  const namedAsParts = namedHolders(ofFares, fareIds, holderOf);
+  billedHolders(ofFares, booked, holderOf);
   const byFulfillment = Object.fromEntries(ofFares.map((f) => [f.id, []]));
   for (const [fareId, holder] of holderOf) byFulfillment[holder].push(fareId);
   const rest = booked.map((f) => f.id).filter((id) => !holderOf.has(id));
