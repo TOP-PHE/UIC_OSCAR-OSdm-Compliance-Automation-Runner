@@ -38,6 +38,8 @@ patches:
   # The volume (k3s's local-path, a folder of the machine) written by the
   # image's uid.
   - path: data-volume-group.yaml
+  # 3 GiB for the server: its database stays in the kernel's cache.
+  - path: server-memory.yaml
   # The run image of the same release. A patch, not a configMapGenerator
   # merge: the component makes this ConfigMap after the overlay's generators.
   - patch: |-
