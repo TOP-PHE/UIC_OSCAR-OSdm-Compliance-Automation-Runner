@@ -498,6 +498,47 @@ function verifiedRunCompany(req, runId, runCaller) {
   return companyId !== null && runCaller(req, runId) ? companyId : null;
 }
 
+// Who may read a company's data file at GET /data: the status that refuses
+// (a key of DENIAL_TEXT), or null.
+// (a) The Bruno subprocess of a live run: a per-run secret the runner issued,
+//     bound to that run's company (tracker S8-loopback). A run may only read
+//     its own company's file — a secret for company A asking for company B's
+//     slug gets 404 (no disclosure).
+// (b) No run secret: a signed-in Test Manager of the owning company
+//     (datafileSessionDenial), where `allowSession` (the public port only).
+//     No page calls this path; it is only reached directly, and no certifier /
+//     admin path exists — they consume reports through /v1/runs with the
+//     per-run share gate.
+function runDatafileDenial(req, company, runCompanyId, allowSession) {
+  if (runCompanyId !== null) return runCompanyId === company.id ? null : 404;
+  if (!allowSession) return 403;
+  return datafileSessionDenial(req, company);
+}
+
+// The run's copy of the data file, timed as the run's work on the server's
+// thread (#1205): made once per version of the data file, the Test Framework
+// and the Test Data, then served from memory to the runs after it (#1235).
+// { body } to serve, else { status, text } to answer.
+function runCopyAnswer(company, filePath, decryptFromFile) {
+  let kept;
+  try {
+    kept = metrics.timeRunWork('datafile_copy', () => runDatafile.runCopy(company.id, runCopyVersion(company.id, filePath), () => {
+      const body = withTripCalendars(withFrameworkWarnings(decryptFromFile(filePath), company.id), company.id);
+      return { body, holdsTemplates: runCopyHoldsTemplates(body) };
+    }));
+  } catch (err) {
+    return { status: 500, text: 'Decryption failed: ' + err.message };
+  }
+  try { metrics.runDatafileReads.inc({ use: 'copy', from: kept.from }); } catch { /* a metric never stops a run */ }
+  // The copy adds values of the Test Framework and the Test Data: like the
+  // stored file (checked before the run started), it must hold no "{{".
+  if (kept.copy.holdsTemplates) {
+    log.warn({ companyId: company.id }, 'run datafile: the run copy holds a template, not served');
+    return { status: 409, text: 'The data file of this run holds "{{" and is not served.' };
+  }
+  return { body: kept.copy.body };
+}
+
 // GET /data/:filename, on the public port and on the internal one (#1130).
 // `runCaller(req, runId)` says whether a run's secret is taken from where the
 // request comes from; `allowSession` whether a signed-in Test Manager may
@@ -511,24 +552,11 @@ const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
   const company = dbGet('SELECT id, slug, parent_id FROM companies WHERE slug = ?', [slug]);
   if (!company) return res.status(404).send('Not found');
 
-  // (a) The Bruno subprocess of a live run: a per-run secret the runner issued,
-  //     bound to that run's company (tracker S8-loopback). A run may only read
-  //     its own company's file — a secret for company A asking for company B's
-  //     slug gets 404 (no disclosure). The runId travels in a header because
-  //     this route is keyed on the slug, not the run.
+  // The runId travels in a header because this route is keyed on the slug,
+  // not the run.
   const runCompanyId = verifiedRunCompany(req, req.get('X-OSCAR-Run-Id'), runCaller);
-  if (runCompanyId !== null) {
-    if (runCompanyId !== company.id) return res.status(404).send('Not found');
-  } else if (!allowSession) {
-    return res.status(403).send(DENIAL_TEXT[403]);
-  } else {
-    // (b) No run secret: fall back to a signed-in Test Manager of the owning
-    //     company (datafileSessionDenial). No page calls this path; it is only
-    //     reached directly, and no certifier / admin path exists — they consume
-    //     reports through /v1/runs with the per-run share gate.
-    const denied = datafileSessionDenial(req, company);
-    if (denied) return res.status(denied).send(DENIAL_TEXT[denied]);
-  }
+  const denied = runDatafileDenial(req, company, runCompanyId, allowSession);
+  if (denied) return res.status(denied).send(DENIAL_TEXT[denied]);
 
   // Resolve, traversal-guard, decrypt, send.
   // The datafile is encrypted at rest (Phase 2 of issue #60). Bruno on the
@@ -550,26 +578,9 @@ const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
       return res.status(500).send('Decryption failed: ' + err.message);
     }
   } else {
-    // The run's copy, timed as the run's work on the server's thread (#1205).
-    // Made once per version of the data file, the Test Framework and the Test
-    // Data, then served from memory to the runs after it (#1235).
-    let kept;
-    try {
-      kept = metrics.timeRunWork('datafile_copy', () => runDatafile.runCopy(company.id, runCopyVersion(company.id, filePath), () => {
-        const body = withTripCalendars(withFrameworkWarnings(decryptFromFile(filePath), company.id), company.id);
-        return { body, holdsTemplates: runCopyHoldsTemplates(body) };
-      }));
-    } catch (err) {
-      return res.status(500).send('Decryption failed: ' + err.message);
-    }
-    try { metrics.runDatafileReads.inc({ use: 'copy', from: kept.from }); } catch { /* a metric never stops a run */ }
-    plaintext = kept.copy.body;
-    // The copy adds values of the Test Framework and the Test Data: like the
-    // stored file (checked before the run started), it must hold no "{{".
-    if (kept.copy.holdsTemplates) {
-      log.warn({ companyId: company.id }, 'run datafile: the run copy holds a template, not served');
-      return res.status(409).send('The data file of this run holds "{{" and is not served.');
-    }
+    const answer = runCopyAnswer(company, filePath, decryptFromFile);
+    if (answer.status) return res.status(answer.status).send(answer.text);
+    plaintext = answer.body;
   }
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', String(plaintext.length));

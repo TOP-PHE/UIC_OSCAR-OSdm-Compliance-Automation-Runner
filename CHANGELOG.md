@@ -491,6 +491,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.514] — 2026-11-13
+
+Listed in `compatibility.json` (2026.553) without moving `current_release`.
+
+### Changed
+
+- **The scenario catalogue is read once per version of its files** (#1236,
+  an action of the review #1233).
+  - Every preview of the Run page and every launch read two files with a
+    synchronous read on the server's thread, about 15 ms a call:
+    - the scenario catalogue;
+    - the simulator's data file (1.7 MB), though they use only the
+      catalogue's entries.
+  - `collectionJson()` (`api/helpers/catalogueSource.js`) now keeps each
+    file of the collection parsed while its size, times (to the
+    nanosecond) and inode are the same.
+  - The collection is still refreshed without a restart: each call looks
+    at the file, and a changed one is read again. The file is opened once,
+    and its version and text are read from what was opened, so a file
+    replaced in between is never kept under the other's version (CodeQL
+    `js/file-system-race`).
+  - What is kept is **frozen**. The readers work on copies, and one that
+    wrote into it would throw instead of changing what the next one reads.
+  - `catalogueEntries()` gives the catalogue's entries alone. The Run
+    page's facets (`facetsFor()`), the coverage report and the AI analysis
+    read them; the AI analysis had a reader of its own.
+  - `catalogue-source-kept.test.js` covers:
+    - a second read reads no file;
+    - a changed or replaced file is read again;
+    - the kept values are frozen;
+    - the facets never read the simulator's data file;
+    - the entries equal the file's;
+    - an unreadable file falls back to the repository copy, and none at all
+      is a 503.
+
+    Mutation-checked: a file kept whatever its version, values not frozen,
+    or the facets reading both files, each fail a test.
+  - The routes that read it (Copy scenarios, the provider checklist, the
+    coverage report, the AI analysis) pass their tests on the frozen values.
+
+### Fixed
+
+- **`GET /data/:filename` below Sonar's complexity limit** (S3776, 21 for
+  15, reported on PR #1249). The handler is split into
+  `runDatafileDenial()` (who may read the file: a run of that company, else
+  a signed-in Test Manager on the public port) and `runCopyAnswer()` (the
+  run's copy of #1235). The answers are the same, refusals included.
+  Mutation-checked: a run reading another company's file, a session without
+  a check, or a session on the internal port, each fail a test.
+
+---
+
 ## [server-1.11.513] — 2026-11-13
 
 Listed in `compatibility.json` (2026.552) without moving `current_release`.

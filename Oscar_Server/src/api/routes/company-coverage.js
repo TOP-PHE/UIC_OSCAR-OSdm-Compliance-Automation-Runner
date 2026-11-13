@@ -31,7 +31,7 @@ const { all, get, colDecrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
-const { readDatafile, readCatalogue, Refusal } = require('../helpers/catalogueSource');
+const { readDatafile, catalogueEntries: keptCatalogueEntries, Refusal } = require('../helpers/catalogueSource');
 const { frameworkConfigOf } = require('../helpers/configurationStore');
 const { viewForTester } = require('../../utils/datafileOwnership');
 const { getRunSelection } = require('../../utils/runSelections');
@@ -222,8 +222,7 @@ function offerOptionsOf(datafile, runs) {
 
 function catalogueEntries() {
   try {
-    const entries = readCatalogue().catalogue?.entries;
-    return Array.isArray(entries) ? entries : [];
+    return keptCatalogueEntries();
   } catch (err) {
     log.warn({ err: err.message }, 'scenario catalogue not readable for the coverage report');
     return [];

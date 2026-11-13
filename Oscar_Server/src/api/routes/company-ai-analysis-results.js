@@ -43,7 +43,6 @@
 
 const express = require('express');
 const fs = require('node:fs');
-const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 const { get, all, run, colDecrypt, colEncrypt } = require('../../db/db');
@@ -64,6 +63,7 @@ const M = require('../../utils/aiModels');
 const FD = require('../../utils/faultDetection');
 const DL = require('../../utils/aiAnalysisDownload');
 const { annotateDatafile } = require('../../utils/frameworkGating');
+const { catalogueEntries: keptCatalogueEntries } = require('../helpers/catalogueSource');
 const log = require('../../utils/logger').child({ module: 'company-ai-analysis-results' });
 
 const router = express.Router();
@@ -115,19 +115,14 @@ function frameworkOf(companyId) {
 }
 
 // The scenario catalogue's entries (#827: their purpose), from the collection
-// the runs use, else the repository's copy; none when neither can be read.
+// the runs use, else the repository's copy, kept while the file is the same
+// (#1236); none when neither can be read.
 function catalogueEntries() {
-  const candidates = [
-    path.join(path.resolve(process.env.COLLECTION_PATH || '/collection'), 'data_base', 'scenario_catalogue.json'),
-    path.resolve(__dirname, '../../../../Bruno_Collection/data_base/scenario_catalogue.json'),
-  ];
-  for (const file of candidates) {
-    try {
-      const entries = JSON.parse(fs.readFileSync(file, 'utf8')).entries;
-      if (Array.isArray(entries)) return entries;
-    } catch { /* the next copy */ }
+  try {
+    return keptCatalogueEntries();
+  } catch {
+    return [];
   }
-  return [];
 }
 
 // What the provider's checklist tells the model (#827), or null when none is imported.

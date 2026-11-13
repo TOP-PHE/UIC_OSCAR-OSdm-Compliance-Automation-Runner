@@ -3955,6 +3955,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the right axis is matched by its legend's exact name, and a legend
     never says "(right y-axis)"**: Grafana adds it, and a `byRegexp` matcher
     was not applied (`run-work-metrics.test.js`).
+    **#1236 (1.11.514): the catalogue is read once per version.**
+    `collectionJson()` (`catalogueSource.js`) keeps each file of the
+    collection parsed and **frozen** while its `fileVersion()` is the same
+    (the collection is refreshed without a restart, so it is looked at each
+    call). The Run page's facets (`facetsFor()`), the coverage report and
+    the AI analysis read `catalogueEntries()`, never the simulator's data
+    file (1.7 MB, about 15 ms a call before). Every reader works on copies
+    (`catalogueDatafile()` clones): a new one that writes into what it is
+    given throws (`catalogue-source-kept.test.js`).
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

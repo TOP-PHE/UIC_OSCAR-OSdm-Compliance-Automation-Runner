@@ -60,7 +60,8 @@ function latestRunStates(companyId, user) {
 function facetsFor(companyId, datafile, codes, user) {
   let entries = [];
   try {
-    entries = require('./catalogueSource').readCatalogue().catalogue?.entries || [];
+    // The catalogue alone, kept while its file is the same (#1236).
+    entries = require('./catalogueSource').catalogueEntries();
   } catch {
     // Without the catalogue, a scenario's capability is derived from its fields.
   }
