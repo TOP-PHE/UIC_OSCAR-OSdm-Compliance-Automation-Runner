@@ -150,6 +150,16 @@ const dbSlowStatements = new promClient.Counter({
   registers: [register]
 });
 
+// The data file as the runs read it (#1235, utils/runDatafile.js): for the
+// runner's checks or for the run's copy (`use`), read from the file now or
+// kept in memory since (`from`). Mostly `memory` in a batch.
+const runDatafileReads = new promClient.Counter({
+  name: 'oscar_run_datafile_reads_total',
+  help: "The data file read for a run's checks or its copy, from the file or kept in memory",
+  labelNames: ['use', 'from'],
+  registers: [register]
+});
+
 /** Times `fn` (synchronous) as run work of `kind`, and gives its result. */
 function timeRunWork(kind, fn) {
   const end = runWork.startTimer({ work: kind });
@@ -329,6 +339,7 @@ module.exports = {
   dbCheckpointThread,
   dbStatementSeconds,
   dbSlowStatements,
+  runDatafileReads,
   timeRunWork,
   runWorkClock,
   runsTotal,

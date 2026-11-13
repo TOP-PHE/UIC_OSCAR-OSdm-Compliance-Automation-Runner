@@ -214,7 +214,13 @@ work is measured where it runs:
     server's thread;
   - `oscar_db_slow_statements_total`, a counter: those of
     `OSCAR_DB_SLOW_MS` (50 by default) or more. Each of those is also
-    logged (below).
+    logged (below);
+- `oscar_run_datafile_reads_total{use, from}`, a counter (from 1.11.513,
+  #1235): the data file read for a run's checks (`use="checks"`) or its copy
+  (`use="copy"`), from the file now (`from="file"`) or kept in memory since
+  (`from="memory"`). In a batch it is mostly `memory`: a run's copy is made
+  once per version of the data file, the Test Framework and the Test Data,
+  and `datafile_copy` then takes about a millisecond.
 
 The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 

@@ -173,6 +173,7 @@ setInterval(() => {
 // Prometheus container in the same Docker network can scrape it. On a cluster
 // (no nginx), METRICS_TOKEN makes the endpoint ask for a bearer token (#1059).
 const metrics = require('./utils/metrics');
+const runDatafile = require('./utils/runDatafile');
 const hostMetrics = require('./utils/hostMetrics');
 const simulatorMetrics = require('./services/simulatorMetrics');
 
@@ -453,6 +454,20 @@ function withTripCalendars(plaintext, companyId) {
   }
 }
 
+// What a run's copy is made of (#1235): the data file's version on disk, the
+// Test Framework as stored and the Test Data trains withTripCalendars() reads.
+// Stored values are encrypted with a new nonce at each save, so any save of
+// either makes a new copy.
+function runCopyVersion(companyId, filePath) {
+  const hash = crypto.createHash('sha256')
+    .update(runDatafile.fileVersion(require('node:fs').statSync(filePath, { bigint: true })));
+  hash.update('\0').update(dbGet('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId])?.config ?? '');
+  for (const r of dbAll(`SELECT id, label, data FROM test_resources WHERE company_id = ? AND resource_type = 'TRAIN' ORDER BY id`, [companyId])) {
+    hash.update('\0').update(String(r.id)).update('\0').update(String(r.label ?? '')).update('\0').update(String(r.data ?? ''));
+  }
+  return hash.digest('hex');
+}
+
 function runCopyHoldsTemplates(plaintext) {
   try {
     const { templatesInDatafile } = require('./utils/datafileTemplates');
@@ -526,25 +541,32 @@ const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
   }
   const fs = require('node:fs');
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
+  const { decryptFromFile } = require('./utils/at-rest');
   let plaintext;
-  try {
-    const { decryptFromFile } = require('./utils/at-rest');
-    plaintext = decryptFromFile(filePath);
-  } catch (err) {
-    return res.status(500).send('Decryption failed: ' + err.message);
-  }
-  if (runCompanyId !== null) {
-    // Timed as the run's work on the server's thread (#1205): it runs once
-    // per run, synchronously, over the whole data file.
-    const decrypted = plaintext;
-    const copy = metrics.timeRunWork('datafile_copy', () => {
-      const made = withTripCalendars(withFrameworkWarnings(decrypted, company.id), company.id);
-      return { made, holdsTemplates: runCopyHoldsTemplates(made) };
-    });
-    plaintext = copy.made;
+  if (runCompanyId === null) {
+    try {
+      plaintext = decryptFromFile(filePath);
+    } catch (err) {
+      return res.status(500).send('Decryption failed: ' + err.message);
+    }
+  } else {
+    // The run's copy, timed as the run's work on the server's thread (#1205).
+    // Made once per version of the data file, the Test Framework and the Test
+    // Data, then served from memory to the runs after it (#1235).
+    let kept;
+    try {
+      kept = metrics.timeRunWork('datafile_copy', () => runDatafile.runCopy(company.id, runCopyVersion(company.id, filePath), () => {
+        const body = withTripCalendars(withFrameworkWarnings(decryptFromFile(filePath), company.id), company.id);
+        return { body, holdsTemplates: runCopyHoldsTemplates(body) };
+      }));
+    } catch (err) {
+      return res.status(500).send('Decryption failed: ' + err.message);
+    }
+    try { metrics.runDatafileReads.inc({ use: 'copy', from: kept.from }); } catch { /* a metric never stops a run */ }
+    plaintext = kept.copy.body;
     // The copy adds values of the Test Framework and the Test Data: like the
     // stored file (checked before the run started), it must hold no "{{".
-    if (copy.holdsTemplates) {
+    if (kept.copy.holdsTemplates) {
       log.warn({ companyId: company.id }, 'run datafile: the run copy holds a template, not served');
       return res.status(409).send('The data file of this run holds "{{" and is not served.');
     }

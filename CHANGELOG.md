@@ -491,6 +491,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.513] — 2026-11-13
+
+Listed in `compatibility.json` (2026.552) without moving `current_release`.
+
+### Changed
+
+- **The data file is read once per version, not up to seven times a run**
+  (#1235, an action of the review #1233). At each run's start the server's
+  thread decrypted and parsed the company's data file four times for the
+  runner's checks (timeout, templates, OSDM version, the run's versions),
+  then once more for `GET /data`, which made the run's copy (framework
+  warnings, trip calendars, the template check). On the simulator's data
+  file (1.7 MB) that was about 150 ms a run, and every run of a batch read
+  the same file.
+  - `utils/runDatafile.js`:
+    - `forChecks(path)`: the parsed file for the runner's four checks, read
+      once per version of the file (size, modification and change times to
+      the nanosecond, inode), shared by the runs that start together, and
+      **frozen**: the checks only read it, and one that wrote into it would
+      throw instead of changing what the next run reads;
+    - `runCopy(companyId, version, make)`: the run's copy, made once per
+      version of its inputs. The version (`runCopyVersion()` in
+      `server.js`) hashes the file's version, the stored Test Framework and
+      the Test Data's trains: a change to any of them makes a new copy.
+    - At most 32 of each, the least recently used dropped first. A copy is
+      kept per company, under the company the run's secret was issued for.
+  - A copy that holds `{{` is still refused (409), kept or made.
+  - A data file that cannot be read is read again at the next run, not kept
+    as failed.
+  - A page reading the data file (a session, not a run) reads it as before.
+  - Metric `oscar_run_datafile_reads_total{use, from}`: `use` is `checks` or
+    `copy`, `from` is `file` or `memory`. `datafile_copy` in *OSCAR's
+    thread* then takes about a millisecond when kept.
+  - `run-datafile-copy.test.js` covers:
+    - the same copy served from memory, counted;
+    - a new data file, framework or train making a new copy;
+    - one copy per company;
+    - a copy holding `{{` refused even when kept;
+    - the checks' file frozen, shared and read again once changed;
+    - an unreadable file read again;
+    - the bound of 32.
+
+    Mutation-checked: a copy kept whatever its version, or a file not
+    frozen, each fail a test.
+
+### Fixed
+
+- ***OSCAR · Overview*: the series of the right axis** (panels of #1230 and
+  #1234). Grafana did not apply the regular expression that moved the WAL
+  frames to the right axis, so frames were read on the minutes' axis; and two
+  legends said "(right y-axis)", which Grafana adds by itself, so the axis
+  was named twice. Each series is now matched by its legend's exact name.
+  `run-work-metrics.test.js` checks every dashboard: no `byRegexp` matcher,
+  no legend naming the axis, every `byName` a legend of its panel.
+
+---
+
 ## [server-1.11.512] / [collection-OTST_V2.0.257] — 2026-11-13
 
 Issue #1215 (after #1208 and #1209, part of #1045), release 2026.551. Simulator 0.66.0. The link between a fulfilment and its fares, as the OSDM experts settled it.
