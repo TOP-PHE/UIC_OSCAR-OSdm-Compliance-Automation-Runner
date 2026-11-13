@@ -532,7 +532,12 @@ Listed in `compatibility.json` (2026.555) without moving `current_release`.
   - A call keeps its own counts, so another request evicting the kept ones
     between two slices cannot change its answer.
   - `latestRunStates()` and `facetsFor()` are async, and so are the preview
-    and the launch (`POST /v1/runs/preview`, `POST /v1/runs`).
+    (`POST /v1/runs/preview`) and the part of the launch that writes the batch
+    (`queueBatch()` in `runs.js`, after the checks; the route returns its
+    promise, which Express 5 passes to the error handler on a rejection).
+  - Both reads go through one helper, `inSlices()`. Its one `await` in a
+    loop (Sonar S9382) is left open on purpose: the waits must come one after
+    the other, which is what the rule asks to avoid.
 - `run-candidates-latest.test.js`: the slices' sizes, and a task of the
   event loop that runs between the first and second slice and between the
   second and third, for both reads. Mutation-checked: a slice of 500 runs or

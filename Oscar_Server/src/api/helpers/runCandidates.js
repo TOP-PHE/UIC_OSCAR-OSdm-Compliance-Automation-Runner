@@ -52,6 +52,19 @@ const RUNS_PER_SLICE = 50;
 const CODES_PER_SLICE = 100;
 const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
 
+// Reads `items` `size` at a time with `read(slice)` and gives every row read,
+// the thread free between two slices. The waits are the point, one after the
+// other: Sonar's S9382 (no await in a loop) is about awaits that could run
+// at once, which these must not.
+async function inSlices(items, size, read) {
+  const rows = [];
+  for (let i = 0; i < items.length; i += size) {
+    if (i > 0) await nextTurn();
+    rows.push(...read(items.slice(i, i + size)));
+  }
+  return rows;
+}
+
 async function failedChecksOf(ids) {
   // This call's own counts: another request may evict the kept ones while
   // this one waits between two slices.
@@ -60,20 +73,16 @@ async function failedChecksOf(ids) {
     if (failedByRun.has(id)) counts.set(id, failedByRun.get(id));
   }
   const missing = [...new Set(ids.filter((id) => !counts.has(id)))];
-  for (let i = 0; i < missing.length; i += RUNS_PER_SLICE) {
-    if (i > 0) await nextTurn();
-    const chunk = missing.slice(i, i + RUNS_PER_SLICE);
+  const rows = await inSlices(missing, RUNS_PER_SLICE, (chunk) => {
     const marks = chunk.map(() => '?').join(',');
-    const counted = new Map();
-    for (const c of all(`SELECT run_id, SUM(CASE WHEN passed = 1 THEN 0 ELSE 1 END) AS failed
-                           FROM run_assertions WHERE run_id IN (${marks}) GROUP BY run_id`, chunk)) {
-      counted.set(c.run_id, Number(c.failed) || 0);
-    }
-    for (const id of chunk) {
-      const failed = counted.get(id) || 0;
-      counts.set(id, failed);
-      failedByRun.set(id, failed);
-    }
+    return all(`SELECT run_id, SUM(CASE WHEN passed = 1 THEN 0 ELSE 1 END) AS failed
+                           FROM run_assertions WHERE run_id IN (${marks}) GROUP BY run_id`, chunk);
+  });
+  const counted = new Map(rows.map((c) => [c.run_id, Number(c.failed) || 0]));
+  for (const id of missing) {
+    const failed = counted.get(id) || 0;
+    counts.set(id, failed);
+    failedByRun.set(id, failed);
   }
   while (failedByRun.size > MAX_KEPT_COUNTS) failedByRun.delete(failedByRun.keys().next().value);
   return counts;
@@ -82,11 +91,8 @@ async function failedChecksOf(ids) {
 async function latestRunsOfCodes(companyId, user, asked) {
   // Among the runs `user` may read: a tester's own (1.11.477).
   const scope = runScopeSql(user, 'x');
-  const rows = [];
-  for (let i = 0; i < asked.length; i += CODES_PER_SLICE) {
-    if (i > 0) await nextTurn();
-    rows.push(...all(latestRunsSql(scope.sql), [JSON.stringify(asked.slice(i, i + CODES_PER_SLICE)), companyId, ...scope.params]));
-  }
+  const rows = await inSlices(asked, CODES_PER_SLICE,
+    (codes) => all(latestRunsSql(scope.sql), [JSON.stringify(codes), companyId, ...scope.params]));
   return latestRunsOf(rows);
 }
 

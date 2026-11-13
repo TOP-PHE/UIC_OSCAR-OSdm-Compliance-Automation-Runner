@@ -244,8 +244,68 @@ router.post('/preview', runPreviewLimiter, async (req, res) => {
   return res.json({ selection, ...preview, seen: seenCodes(req, datafile).length, runList: runListOf(req, datafile, targetCompanyId).length });
 });
 
+// The batch of a launch, once the company, the credentials and the data file
+// are checked: its codes, its runs written and queued. Async because the
+// facets read the company's runs in slices (#1256); Express 5 passes a
+// rejection of the promise the route returns to the error handler.
+async function queueBatch(req, res, { company, targetCompanyId, user, datafile, concurrentLimit }) {
+  // The run list, or what the selection keeps (#1029). PR-03: a code is
+  // whatever JSON was stored, and only text can be a run's scenario. An object
+  // or a list cannot be written to the runs table: the insert threw and the
+  // whole batch answered 500, so one tester's scenario stopped the Test
+  // Manager's "ALL". Anything that is not text is left out.
+  const scenarioList = (await launchCodes(req, datafile, targetCompanyId)).filter(code => typeof code === 'string' && code !== '');
+
+  if (scenarioList.length === 0) {
+    const detail = req.body?.selection === undefined
+      ? 'No scenarios to run. Check scenariosToRun in your data file.'
+      : 'No scenario of the data file fits this selection.';
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail });
+  }
+
+  const batchId = uuidv4();
+  const runs = [];
+
+  transaction(() => {
+    for (const code of scenarioList) {
+      const runId = uuidv4();
+      dbRun(
+        `INSERT INTO runs (id, company_id, user_id, status, auth_mode_used, api_base_used, datafile_hash_used, env_name_used, batch_id, scenario_code)
+         VALUES (?, ?, ?, 'QUEUED', ?, ?, ?, ?, ?, ?)`,
+        [runId, targetCompanyId, req.user.id, user.auth_mode, company.api_base, company.datafile_hash || null,
+         `OTST_${company.slug}_Env`, batchId, code]
+      );
+      runs.push({ runId, code });
+    }
+    // #1029 PR 3: what the batch was chosen by, for the dashboard to say it.
+    if (req.body?.selection !== undefined) {
+      dbRun('INSERT INTO run_batch (batch_id, company_id, selection) VALUES (?, ?, ?)',
+        [batchId, targetCompanyId, JSON.stringify(RF.withDefaults(req.body.selection))]);
+    }
+  });
+
+  // Enqueue all jobs (queue will respect concurrentLimit)
+  for (const { runId, code } of runs) {
+    queue.enqueue({
+      runId,
+      companyId:        targetCompanyId,
+      scenarioOverride: code,
+      concurrentLimit,
+      batchId,
+      scenarioCode:     code,
+      userId:           req.user.id
+    });
+  }
+
+  const createdRuns = all(
+    `SELECT id, status, scenario_code, batch_id, queued_at FROM runs WHERE company_id = ? AND batch_id = ? ORDER BY +queued_at ASC`,
+    [targetCompanyId, batchId]
+  );
+  return res.status(202).json({ batch_id: batchId, parallel: true, concurrent_limit: concurrentLimit, runs: createdRuns });
+}
+
 // ── POST /v1/runs ─────────────────────────────────────────────────────────────
-router.post('/', runSubmitLimiter, async (req, res) => {
+router.post('/', runSubmitLimiter, (req, res) => {
   const launch = launchCompany(req);
   if (launch.refusal) return res.status(launch.refusal[0]).json(launch.refusal[1]);
   const { company, targetCompanyId } = launch;
@@ -319,59 +379,7 @@ router.post('/', runSubmitLimiter, async (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Could not parse data file: ' + err.message });
   }
 
-  // The run list, or what the selection keeps (#1029). PR-03: a code is
-  // whatever JSON was stored, and only text can be a run's scenario. An object
-  // or a list cannot be written to the runs table: the insert threw and the
-  // whole batch answered 500, so one tester's scenario stopped the Test
-  // Manager's "ALL". Anything that is not text is left out.
-  const scenarioList = (await launchCodes(req, datafile, targetCompanyId)).filter(code => typeof code === 'string' && code !== '');
-
-  if (scenarioList.length === 0) {
-    const detail = req.body?.selection === undefined
-      ? 'No scenarios to run. Check scenariosToRun in your data file.'
-      : 'No scenario of the data file fits this selection.';
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail });
-  }
-
-  const batchId = uuidv4();
-  const runs = [];
-
-  transaction(() => {
-    for (const code of scenarioList) {
-      const runId = uuidv4();
-      dbRun(
-        `INSERT INTO runs (id, company_id, user_id, status, auth_mode_used, api_base_used, datafile_hash_used, env_name_used, batch_id, scenario_code)
-         VALUES (?, ?, ?, 'QUEUED', ?, ?, ?, ?, ?, ?)`,
-        [runId, targetCompanyId, req.user.id, user.auth_mode, company.api_base, company.datafile_hash || null,
-         `OTST_${company.slug}_Env`, batchId, code]
-      );
-      runs.push({ runId, code });
-    }
-    // #1029 PR 3: what the batch was chosen by, for the dashboard to say it.
-    if (req.body?.selection !== undefined) {
-      dbRun('INSERT INTO run_batch (batch_id, company_id, selection) VALUES (?, ?, ?)',
-        [batchId, targetCompanyId, JSON.stringify(RF.withDefaults(req.body.selection))]);
-    }
-  });
-
-  // Enqueue all jobs (queue will respect concurrentLimit)
-  for (const { runId, code } of runs) {
-    queue.enqueue({
-      runId,
-      companyId:        targetCompanyId,
-      scenarioOverride: code,
-      concurrentLimit,
-      batchId,
-      scenarioCode:     code,
-      userId:           req.user.id
-    });
-  }
-
-  const createdRuns = all(
-    `SELECT id, status, scenario_code, batch_id, queued_at FROM runs WHERE company_id = ? AND batch_id = ? ORDER BY +queued_at ASC`,
-    [targetCompanyId, batchId]
-  );
-  return res.status(202).json({ batch_id: batchId, parallel: true, concurrent_limit: concurrentLimit, runs: createdRuns });
+  return queueBatch(req, res, { company, targetCompanyId, user, datafile, concurrentLimit });
 });
 
 // ── GET /v1/runs ──────────────────────────────────────────────────────────────
