@@ -3981,7 +3981,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the runner stores them before the final status, and nothing else writes
     `run_assertions`; a new writer of a finished run's checks must drop
     that cache. `run-candidates-latest.test.js` compares with the old
-    reading on 400 drawn runs.
+    reading on 400 drawn runs. **#1256 (1.11.516): read in slices.** After
+    a restart, the first count of a company (up to 500 runs, cold disk)
+    held the thread 1.1 to 1.6 s: both reads now go 50 runs / 100 codes a
+    slice with `setImmediate` between, so `latestRunStates()`,
+    `facetsFor()`, the preview and the launch are async. A call keeps its
+    own counts (another request may evict the cache between its slices).
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

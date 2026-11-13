@@ -43,20 +43,51 @@ function latestRunsSql(scopeSql) {
 const MAX_KEPT_COUNTS = 50000;
 const failedByRun = new Map();
 
-function failedChecksOf(ids) {
-  const missing = ids.filter((id) => !failedByRun.has(id));
-  for (let i = 0; i < missing.length; i += 500) {
-    const chunk = missing.slice(i, i + 500);
+// #1256: both reads go in slices, the thread free between them. After a
+// restart, the first preview or launch of a company counted up to 500 runs in
+// one statement: 1.1 to 1.6 s of disk reads on the k3s test machine, during
+// which the server answered nothing. The total is the same; each slice is
+// short, and other requests are answered between two.
+const RUNS_PER_SLICE = 50;
+const CODES_PER_SLICE = 100;
+const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
+
+async function failedChecksOf(ids) {
+  // This call's own counts: another request may evict the kept ones while
+  // this one waits between two slices.
+  const counts = new Map();
+  for (const id of ids) {
+    if (failedByRun.has(id)) counts.set(id, failedByRun.get(id));
+  }
+  const missing = [...new Set(ids.filter((id) => !counts.has(id)))];
+  for (let i = 0; i < missing.length; i += RUNS_PER_SLICE) {
+    if (i > 0) await nextTurn();
+    const chunk = missing.slice(i, i + RUNS_PER_SLICE);
     const marks = chunk.map(() => '?').join(',');
     const counted = new Map();
     for (const c of all(`SELECT run_id, SUM(CASE WHEN passed = 1 THEN 0 ELSE 1 END) AS failed
                            FROM run_assertions WHERE run_id IN (${marks}) GROUP BY run_id`, chunk)) {
       counted.set(c.run_id, Number(c.failed) || 0);
     }
-    for (const id of chunk) failedByRun.set(id, counted.get(id) || 0);
+    for (const id of chunk) {
+      const failed = counted.get(id) || 0;
+      counts.set(id, failed);
+      failedByRun.set(id, failed);
+    }
   }
   while (failedByRun.size > MAX_KEPT_COUNTS) failedByRun.delete(failedByRun.keys().next().value);
-  return new Map(ids.map((id) => [id, failedByRun.get(id) ?? 0]));
+  return counts;
+}
+
+async function latestRunsOfCodes(companyId, user, asked) {
+  // Among the runs `user` may read: a tester's own (1.11.477).
+  const scope = runScopeSql(user, 'x');
+  const rows = [];
+  for (let i = 0; i < asked.length; i += CODES_PER_SLICE) {
+    if (i > 0) await nextTurn();
+    rows.push(...all(latestRunsSql(scope.sql), [JSON.stringify(asked.slice(i, i + CODES_PER_SLICE)), companyId, ...scope.params]));
+  }
+  return latestRunsOf(rows);
 }
 
 /**
@@ -64,13 +95,11 @@ function failedChecksOf(ids) {
  * of its failed checks: { code: { status, failed, collection_version,
  * scenario_hash } }. A code is looked up as text, as an object key reads it.
  */
-function latestRunStates(companyId, user, codes) {
+async function latestRunStates(companyId, user, codes) {
   const asked = [...new Set((Array.isArray(codes) ? codes : []).map(String))];
   if (asked.length === 0) return {};
-  // Among the runs `user` may read: a tester's own (1.11.477).
-  const scope = runScopeSql(user, 'x');
-  const latest = latestRunsOf(all(latestRunsSql(scope.sql), [JSON.stringify(asked), companyId, ...scope.params]));
-  const failed = failedChecksOf(Object.values(latest).map((r) => r.id));
+  const latest = await latestRunsOfCodes(companyId, user, asked);
+  const failed = await failedChecksOf(Object.values(latest).map((r) => r.id));
   const out = {};
   for (const [code, run] of Object.entries(latest)) {
     out[code] = { status: run.status, failed: failed.get(run.id), collection_version: run.collection_version, scenario_hash: run.scenario_hash };
@@ -79,7 +108,7 @@ function latestRunStates(companyId, user, codes) {
 }
 
 /** The facets of `codes` in the data file, for the company's runs. */
-function facetsFor(companyId, datafile, codes, user) {
+async function facetsFor(companyId, datafile, codes, user) {
   let entries = [];
   try {
     // The catalogue alone, kept while its file is the same (#1236).
@@ -87,7 +116,7 @@ function facetsFor(companyId, datafile, codes, user) {
   } catch {
     // Without the catalogue, a scenario's capability is derived from its fields.
   }
-  return RF.facetsOf(codes, { datafile, entries, runs: latestRunStates(companyId, user, codes), collectionVersion: currentCollectionVersion() });
+  return RF.facetsOf(codes, { datafile, entries, runs: await latestRunStates(companyId, user, codes), collectionVersion: currentCollectionVersion() });
 }
 
-module.exports = { latestRunStates, facetsFor, latestRunsSql, MAX_KEPT_COUNTS };
+module.exports = { latestRunStates, facetsFor, latestRunsSql, MAX_KEPT_COUNTS, RUNS_PER_SLICE, CODES_PER_SLICE };
