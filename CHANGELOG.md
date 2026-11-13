@@ -421,6 +421,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **k3s on one VPS: the server may take 3 GiB** (#1254). No version bump: a
+  deployment file, the guide, a test; it comes with the next release tag.
+  The test machine's database, moved from the VPS, is 10 GB. SQLite reads it
+  through the kernel's page cache, which counts in the container's memory, so
+  at the base's 1 GiB most of it stayed on disk. The same batch at 1 GiB, then
+  at 3 GiB: storing a run's results at the start of a batch went from about
+  2.5–3 s to 1.1 s, and its share of the server's thread from 35–45 % to
+  20–30 %. The limit was raised by hand, and every `apply -k` (so every
+  release) set it back.
+  - `overlays/k3s/server-memory.yaml` raises the oscar container's memory
+    limit to 3Gi; its request and CPU stay the base's. The base, and so the
+    Kubernetes and OpenShift overlays, keep 1Gi.
+  - The k3s guide says it in section 1, with the monitoring's 1.5 GB.
+  - `kubernetes-manifests.test.js` pins the patch: the memory limit alone,
+    named by the overlay, nothing the section 9 `sed` or `grep` would meet.
+
 - **Monitoring images updated** (`docker-compose.metrics.yml`, four
   Dependabot updates in one change; deployment files only, nothing to
   release): Prometheus v3.1.0 → v3.15.1, Alertmanager v0.27.0 → v0.34.2,

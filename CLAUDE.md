@@ -3862,7 +3862,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     minutes (readiness 15 s × 10, liveness 30 s × 10) and the server
     requests a whole CPU (limit 2); `kubernetes-manifests.test.js` pins
     both. A database moved from the VPS keeps the VPS's *Max Concurrent
-    Runs*: lower it on a cluster.
+    Runs*: lower it on a cluster. **The k3s overlay gives the server 3 GiB**
+    (#1254, `overlays/k3s/server-memory.yaml`; the base keeps 1Gi): SQLite
+    reads the database through the kernel's page cache, counted in the
+    container's memory, and at 1 GiB a 10 GB database stayed on disk
+    (results stored 2 to 3 times slower at a batch's start). A limit raised
+    with `kubectl set resources` is undone by the next `apply -k`: change
+    the overlay instead.
   - **What a run costs the server's one thread is measured** (#1205,
     1.11.502): `oscar_run_work_seconds{work}`, `oscar_run_log_*`, the HTTP
     metric's `listener` (`internal` = the run pods' calls), row *OSCAR's

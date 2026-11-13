@@ -66,6 +66,12 @@ block sets them again, because a value is lost when the SSH session ends.
   own, which costs more CPU than a run on the VPS: count about one scenario
   at a time per vCPU (section 7). 8 vCPU and 16 GB run about 8 at once; 20 at
   once need about 20 vCPU. 40 GB of disk.
+- **OSCAR's server may take 3 GiB of memory** (the overlay's
+  `server-memory.yaml`, #1254): the kernel keeps the pages of its database
+  there, so a large database (one moved from the VPS) is read from memory,
+  not from the disk. With 1 GiB, a 10 GB database made storing a run's
+  results 2 to 3 times slower at the start of a batch. The monitoring takes
+  about 1.5 GB more (section 8a).
 - **Nothing else on ports 80 and 443**: no nginx, no OSCAR Docker stack on
   this machine.
 - **A DNS name pointing at the machine**, before section 6 (below).

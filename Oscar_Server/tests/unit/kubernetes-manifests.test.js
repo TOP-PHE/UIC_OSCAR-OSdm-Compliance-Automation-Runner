@@ -742,6 +742,22 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
     expect(load('overlays/k3s/data-volume-group.yaml')).toEqual(load('overlays/kubernetes/data-volume-group.yaml'));
   });
 
+  test('the server may take 3 GiB there, so its database stays in the kernel\'s cache (#1254)', () => {
+    // At 1 GiB a 10 GB database stayed mostly on disk, and every apply -k (so
+    // every release) undid a limit raised by hand.
+    expect(overlay.patches).toEqual(expect.arrayContaining([{ path: 'server-memory.yaml' }]));
+    const patch = load('overlays/k3s/server-memory.yaml');
+    expect(patch.kind).toBe('Deployment');
+    expect(patch.metadata).toEqual({ name: 'oscar' });
+    // The memory limit alone: the request and the CPU stay the base's.
+    expect(container.name).toBe('oscar');
+    expect(patch.spec.template.spec.containers).toEqual([{ name: container.name, resources: { limits: { memory: '3Gi' } } }]);
+    expect(container.resources.limits.memory).toBe('1Gi');
+    // Nothing in it that the guide's sed and grep of section 9 would meet.
+    expect(read('overlays/k3s/server-memory.yaml')).not.toMatch(/release-|example\.org/);
+    expect(doc).toContain('`server-memory.yaml`');
+  });
+
   test('k3s keeps the kubeconfig root\'s and encrypts Secrets', () => {
     expect(k3sConfig).toEqual({ 'write-kubeconfig-mode': '0600', 'secrets-encryption': true });
   });
