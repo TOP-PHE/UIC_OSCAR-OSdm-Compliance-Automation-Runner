@@ -8,15 +8,14 @@
 'use strict';
 
 /**
- * bruno-fare-fulfillments.test.js — which fares a fulfilment holds (#1208).
+ * bruno-fare-fulfillments.test.js — which fares a fulfilment holds (#1208, #1215).
  *
- * A provider's review: in OSDM 3.x a fare is not a booking part
- * (`BookingPartReference` refers to a reservation, admission, ancillary or
- * fee), so a fare fulfilment names no fare in `bookingParts`. OSCAR read the
- * fares only from there. The forms read now, each seen or allowed: the fares
- * named all the same (a provider gives one fulfilment per fare, each naming
- * its fare), the billing references of OSDM 3.11, and the fare fulfilment that
- * names none (the simulator, as OSDM 3.x says).
+ * A fulfilment links to a fare through `bookingParts[].id`, and the link is
+ * usually not needed (OSDM experts, UnionInternationalCheminsdeFer/OSDM#1699).
+ * OSCAR read the fares only from there. The forms read now, each seen or
+ * allowed: the fares named (a provider gives one fulfilment per fare, each
+ * naming its fare; the simulator one for all), the billing references of OSDM
+ * 3.11, and the fare fulfilment that names none.
  */
 
 const path = require('node:path');
@@ -29,15 +28,14 @@ const acc = (id, company = 'urn:x:company:1') => ({ accountingCompany: company, 
 const FARES = [{ id: 'fare-1', accountingRef: acc('A1') }, { id: 'fare-2', accountingRef: acc('A2') }];
 
 describe('fareHoldings: who holds which fare', () => {
-  test('one fulfilment naming no fare, as OSDM 3.x says: it holds every fare, nothing is named as a part', () => {
+  test('one fulfilment naming no fare (the link is usually not needed): it holds every fare', () => {
     const h = F.fareHoldings({ fares: FARES, fulfillments: [{ id: 'FUL' }] });
-    expect(h).toEqual({ fareFulfillments: ['FUL'], byFulfillment: { FUL: ['fare-1', 'fare-2'] }, shared: null, unheld: [], namedAsParts: [] });
+    expect(h).toEqual({ fareFulfillments: ['FUL'], byFulfillment: { FUL: ['fare-1', 'fare-2'] }, shared: null, unheld: [] });
   });
 
-  test('a fulfilment per fare, each naming its fare: held as named, and both named as parts', () => {
+  test('a fulfilment per fare, each naming its fare: held as named', () => {
     const h = F.fareHoldings({ fares: FARES, fulfillments: [{ id: 'F1', bookingParts: [{ id: 'fare-1' }] }, { id: 'F2', bookingParts: [{ id: 'fare-2' }] }] });
     expect(h.byFulfillment).toEqual({ F1: ['fare-1'], F2: ['fare-2'] });
-    expect(h.namedAsParts).toEqual(['fulfillment F1 names fare fare-1', 'fulfillment F2 names fare fare-2']);
     expect(h.unheld).toEqual([]);
   });
 
@@ -76,7 +74,7 @@ describe('fareHoldings: who holds which fare', () => {
 
   test('a fulfilment naming only a fare reservation (a booking part) is a fare fulfilment and holds the fares', () => {
     const h = F.fareHoldings({ fares: FARES, fulfillments: [{ id: 'FUL', bookingParts: [{ id: 'PLACE-1' }] }], reservationIds: ['PLACE-1'] });
-    expect(h).toMatchObject({ fareFulfillments: ['FUL'], byFulfillment: { FUL: ['fare-1', 'fare-2'] }, namedAsParts: [] });
+    expect(h).toMatchObject({ fareFulfillments: ['FUL'], byFulfillment: { FUL: ['fare-1', 'fare-2'] }, shared: null, unheld: [] });
   });
 });
 
@@ -107,14 +105,15 @@ describe('the fare refund reads the same holdings', () => {
     ]);
   });
 
-  test("R6 tells of a fare named in a refund offer's breakdown (INFO), never of a fare reservation (a booking part)", () => {
+  test("a refund offer's breakdown may name the fares as well as a fare reservation: nothing failed, nothing told (OSDM#1699)", () => {
     const withPlace = { bookedOffers: [{ fares: [fare('fare-1', 1000)], reservations: [{ id: 'PL', distributionMode: 'FARE_MODE', price: { amount: 300, currency: 'EUR' } }], admissions: [] }], fulfillments: [{ id: 'FUL', bookingParts: [{ id: 'PL' }] }] };
     const held = fareRefund.fareFulfillmentsOf(withPlace);
     const offer = (parts) => ({ id: 'RO', fulfillments: [{ id: 'FUL' }], refundableAmount: { amount: 1300, currency: 'EUR' }, refundFee: { amount: 0, currency: 'EUR' }, refundOfferBreakdown: parts.map((id) => ({ bookingParts: [{ id }] })) });
-    const r6 = (parts) => fareRefund.refundOfferChecks([offer(parts)], held, { asked: ['FUL'] }).find((c) => c.id === 'R6');
-    expect(r6(['PL'])).toBeUndefined();
-    expect(r6(['fare-1', 'PL'])).toMatchObject({ level: 'INFO', ok: true });
-    expect(r6(['fare-1', 'PL']).message).toContain('refund offer RO names fare fare-1');
+    const checks = (parts) => fareRefund.refundOfferChecks([offer(parts)], held, { asked: ['FUL'] });
+    for (const parts of [['PL'], ['fare-1', 'PL']]) {
+      expect(checks(parts).filter((c) => !c.ok)).toEqual([]);
+      expect(checks(parts).filter((c) => c.level === 'INFO')).toEqual([]);
+    }
   });
 
   test('a fulfilment per fare, each naming its fare (the earlier form) still works', () => {

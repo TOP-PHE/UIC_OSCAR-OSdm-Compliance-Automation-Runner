@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.550",
+  "current_release": "2026.551",
   "releases": [
+    {
+      "release": "2026.551",
+      "date": "2026-11-13",
+      "server": "1.11.512",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.512, collection OTST_V2.0.257 (simulator 0.66.0): the link from a fulfilment to its fares, as the OSDM experts settled it (UnionInternationalCheminsdeFer/OSDM#1699; #1215, after #1208/#1209). Fulfillment.bookingParts[].id may name a fare, and the link is usually not needed. OSCAR already accepted both; the INFO lines F7 (a fare named in a fulfilment) and R6 (in a refund offer's breakdown), kept until OSDM answered, are removed. The simulator names its fares in the fare fulfilment and in a fare refund offer's breakdown again, with billingReferences from OSDM 3.11; the five fare refund entries of the catalogue get their breakdown check back (3 checks more each)."
+      ]
+    },
     {
       "release": "2026.550",
       "date": "2026-11-13",

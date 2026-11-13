@@ -352,7 +352,7 @@ function isScopedRefundOnBooking(booking) {
 }
 
 // #1208: the fares the refunded fulfillments hold. A fare fulfilment may name
-// no fare in bookingParts (OSDM 3.x is read both ways), so fareFulfillments.js
+// no fare in bookingParts (OSDM#1699: the link is usually not needed), so fareFulfillments.js
 // reads them; `partly` when the refund holds only some of the fulfillments that
 // share their fares, whose state then cannot be told.
 function _refundedFareScope(booking, fulfillments, refunded) {
@@ -412,7 +412,7 @@ function checkRefundScopeOnBooking(booking) {
     return;
   }
   if (fareScope.partly) {
-    validationLogger("[INFO] Refund scope: the refund holds only some of the fulfilments that name no fare and so share their fares (OSDM 3.x) — the fares' REFUNDED state is not checked.");
+    validationLogger("[INFO] Refund scope: the refund holds only some of the fulfilments that name no fare and so share their fares — the fares' REFUNDED state is not checked.");
   }
   // #907: a booked fare is refunded with its fulfilment too (R5 of a fare refund).
   (booking.bookedOffers || []).forEach((bo) => {

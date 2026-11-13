@@ -68,6 +68,7 @@ describe('the fare refund on the simulator\'s answers', () => {
     const { offers, checks } = refund(s);
     expect(offers).toHaveLength(1);
     expect(offers[0].refundFee.amount).toBe(Math.round(s.offer.fares[0].prices[0].amount * 0.25));
+    // #1215: the simulator names the fare in the breakdown (OSDM#1699): nothing more is checked or told.
     expect(ids(checks)).toEqual(['R1 FAIL', 'R2 FAIL']);
     expect(failing(checks)).toEqual([]);
   });

@@ -128,9 +128,9 @@ const partsOf = (booking) => [...productPartsOf(booking), ...faresOf(booking), .
 const priceOf = (part) => part.price || (Array.isArray(part.prices) ? part.prices[0] : undefined);
 // #906: a fulfilment of fares only, which OSDM gives no document, control number or issuer.
 const FARE_FULFILLMENT = Symbol('fare fulfillment');
-// #1209: the ids of every part a fulfilment holds, fares included. OSDM 3.x
-// names booking parts only in `bookingParts` (a fare is not one), so the
-// simulator keeps what it needs on a hidden property.
+// #1209: the ids of every part a fulfilment holds, fares included, kept on a
+// hidden property: a wrong variant leaves a fare out of `bookingParts`, and
+// the refunds and exchanges must still find it.
 const HELD = Symbol('parts held');
 const holding = (fulfillment, ids) => Object.defineProperty(fulfillment, HELD, { value: ids, writable: true });
 /** The ids of the parts a fulfilment holds: the hidden list, else what it names. */
@@ -353,13 +353,11 @@ function confirmBooking(booking, provider, nowMs) {
  * number, issuer, continuous-service usage or links, and a fulfilment holds
  * fares or products, never both. The distributor builds the ticket.
  *
- * #1209: OSDM 3.x's `BookingPartReference` refers to a reservation,
- * admission, ancillary or fee (a fare is a booking part from OSDM 4), so
- * `bookingParts` names the fare reservations only, and nothing when there is
- * none. Whether a fare may be named there is asked to the OSDM community;
- * OSCAR reads both forms. From 3.11 `billingReferences` names each fare by its
- * accounting reference and price. Two wrong variants: the fares named as
- * booking parts, as some providers do, with one left out; a PDF ticket
+ * #1215: the fulfilment names its fares in `bookingParts`, the link from a
+ * fulfilment to a fare (OSDM experts, UnionInternationalCheminsdeFer/OSDM#1699;
+ * OSCAR reads a fulfilment naming no fare too, the link being usually not
+ * needed). From 3.11 `billingReferences` names each fare by its accounting
+ * reference and price. Two wrong variants: a fare left out, a PDF ticket
  * attached.
  */
 function fareFulfillmentOf(booking, { fares, fareReservations }, provider, confirmedOn) {
@@ -369,9 +367,9 @@ function fareFulfillmentOf(booking, { fares, fareReservations }, provider, confi
     bookingRef: booking.id,
     createdOn: confirmedOn,
   };
-  const named = variants.has(booking, 'fare-not-in-fulfillment') ? [...fares.slice(0, -1), ...fareReservations] : fareReservations;
-  if (named.length > 0) fulfillment.bookingParts = named.map((part) => ({ id: part.id }));
-  const billed = variants.has(booking, 'fare-not-in-fulfillment') ? fares.slice(0, -1) : fares;
+  const leftOut = variants.has(booking, 'fare-not-in-fulfillment');
+  fulfillment.bookingParts = [...(leftOut ? fares.slice(0, -1) : fares), ...fareReservations].map((part) => ({ id: part.id }));
+  const billed = leftOut ? fares.slice(0, -1) : fares;
   if (rankOf(provider.osdmVersion) >= BILLING_REFERENCES_FROM) {
     fulfillment.billingReferences = billed.filter((fare) => fare.accountingRef).map((fare) => ({ accountingRef: structuredClone(fare.accountingRef), price: { ...priceOf(fare) } }));
   }

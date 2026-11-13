@@ -137,8 +137,8 @@ describe('the booking and fulfilment on the simulator\'s answers', () => {
     const reservationId = booked.bookedOffers[0].reservations[0].id;
     expect(fareBooking.productPartIdsOf(booked, offer)).not.toContain(reservationId);
     expect(fareBooking.farePartIdsOf(booked, offer)).toContain(reservationId);
-    // #1208: the place is a reservation, a booking part named as such; only a fare named so is warned (F7).
-    expect(fulfillments[0].bookingParts.map((p) => p.id)).toEqual([reservationId]);
+    // #1215: the fulfilment names the fare (OSDM#1699) and the place, a reservation.
+    expect(fulfillments[0].bookingParts.map((p) => p.id).sort()).toEqual([...booked.bookedOffers[0].fares.map((f) => f.id), reservationId].sort());
     expect(failing(fareBooking.fulfillmentChecks(fulfillments, { fareIds: fareBooking.farePartIdsOf(booked, offer), productIds: fareBooking.productPartIdsOf(booked, offer), reservationIds: [reservationId] }))).toEqual([]);
     const final = fareBooking.confirmedBookingChecks(confirmed, offer);
     expect(failing(final)).toEqual([]);
