@@ -4,6 +4,17 @@
   "current_release": "2026.552",
   "releases": [
     {
+      "release": "2026.554",
+      "date": "2026-11-13",
+      "server": "1.11.515",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.515: the Run page's preview and every launch read the latest run of each scenario asked, not the company's newest 20,000 runs (#1246, part of the review #1233; named by the slow statement log at the start of a batch). One statement, one seek of the index by company and scenario per code (INDEXED BY: the planner took the index by queue date, which walks every run of the company for a scenario never run). The failed checks of a finished run never change: they are counted once and kept in memory, so run_assertions is read only for runs finished since. The facets are the same."
+      ]
+    },
+    {
       "release": "2026.553",
       "date": "2026-11-13",
       "server": "1.11.514",
