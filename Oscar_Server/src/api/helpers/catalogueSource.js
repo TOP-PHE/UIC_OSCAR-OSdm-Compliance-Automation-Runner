@@ -18,6 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { get } = require('../../db/db');
 const { decryptFromFileAsync } = require('../../utils/at-rest');
+const { fileVersion, deepFreeze } = require('../../utils/runDatafile');
 const TripApply = require('../../../public/js/trip-apply');
 const log = require('../../utils/logger').child({ module: 'catalogue-source' });
 
@@ -40,21 +41,50 @@ async function readDatafile(companyId) {
   throw new Refusal(409, 'A data file involved in the copy cannot be read. Ask your Test Manager to check it.');
 }
 
+// #1236: a file of the collection is parsed once per version of it (size,
+// times to the nanosecond, inode), not at each call: the Run page's preview
+// and every launch read the catalogue, and the copy routes the simulator's
+// data file (1.7 MB) too. The collection is refreshed without a restart, so
+// the file is looked at each time and read again once it changed. What is
+// kept is frozen: a caller that wrote into it would change what the next
+// one reads, and throws instead (they all work on copies).
+const MAX_KEPT_FILES = 8;
+const keptFiles = new Map();
+
+function keptJson(file) {
+  const version = fileVersion(fs.statSync(file, { bigint: true }));
+  const kept = keptFiles.get(file);
+  if (kept?.version === version) return kept.value;
+  const value = deepFreeze(JSON.parse(fs.readFileSync(file, 'utf8')));
+  keptFiles.delete(file);
+  keptFiles.set(file, { version, value });
+  while (keptFiles.size > MAX_KEPT_FILES) keptFiles.delete(keptFiles.keys().next().value);
+  return value;
+}
+
 // A file of the collection the runs use (COLLECTION_PATH), else the
-// repository's copy, as the data file schema is read.
+// repository's copy, as the data file schema is read. Frozen (#1236).
 function collectionJson(...parts) {
   const candidates = [
     path.join(path.resolve(process.env.COLLECTION_PATH || '/collection'), ...parts),
     path.resolve(__dirname, '../../../../Bruno_Collection', ...parts),
   ];
   for (const file of candidates) {
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* the next copy */ }
+    try { return keptJson(file); } catch { /* the next copy */ }
   }
   throw new Refusal(503, 'The scenario catalogue cannot be read on this server.');
 }
 
 function readCatalogue() {
   return { catalogue: collectionJson('data_base', 'scenario_catalogue.json'), simulator: collectionJson('data_base', 'simulator_datafile.json') };
+}
+
+// The catalogue's entries alone, without the simulator's data file (#1236):
+// what the Run page's facets and the coverage report read. [] when the file
+// holds none; a Refusal when it cannot be read.
+function catalogueEntries() {
+  const entries = collectionJson('data_base', 'scenario_catalogue.json').entries;
+  return Array.isArray(entries) ? entries : [];
 }
 
 // Trains and journeys, as the person choosing sees them.
@@ -74,4 +104,4 @@ function testDataChoices(resources) {
   return { trains, journeys };
 }
 
-module.exports = { Refusal, readDatafile, collectionJson, readCatalogue, testDataChoices };
+module.exports = { Refusal, readDatafile, collectionJson, readCatalogue, catalogueEntries, testDataChoices };

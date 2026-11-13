@@ -4,6 +4,17 @@
   "current_release": "2026.552",
   "releases": [
     {
+      "release": "2026.553",
+      "date": "2026-11-13",
+      "server": "1.11.514",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.514: the scenario catalogue is read once per version of its files (#1236, part of the review #1233). The Run page's preview and every launch read the catalogue and the simulator's data file (1.7 MB) with a synchronous read on the server's thread, about 15 ms a call; they now keep each file of the collection parsed and frozen while it is the same (size, times, inode), and the Run page's facets, the coverage report and the AI analysis read the catalogue's entries alone. The collection is still refreshed without a restart: a changed file is read again. Also: GET /data/:filename is split into two functions (who may read the file, the run's copy), with the same answers, below Sonar's complexity limit (S3776)."
+      ]
+    },
+    {
       "release": "2026.552",
       "date": "2026-11-13",
       "server": "1.11.513",
