@@ -4,6 +4,17 @@
   "current_release": "2026.549",
   "releases": [
     {
+      "release": "2026.550",
+      "date": "2026-11-13",
+      "server": "1.11.511",
+      "collection": "OTST_V2.0.256",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.511: the slow database statements are logged (#1234, first action of the review #1233). Seven rounds of measurement on the k3s test machine found the statements that held the server's thread one by one. Every statement of the database helpers all/get/run is now timed (oscar_db_statement_seconds), and one of OSCAR_DB_SLOW_MS (50 ms by default) or more is counted (oscar_db_slow_statements_total) and logged as \"slow database statement\" with its time, its SQL (lists of ? shortened, never its values) and the place in OSCAR's code that ran it. A wrong OSCAR_DB_SLOW_MS stops the start. OSCAR · Overview: a panel Database statements: the slow ones; OSCAR · Logs: a panel Slow database statements. Released with it (deployment files): both dashboards and OSCAR_Deploy/.env.example."
+      ]
+    },
+    {
       "release": "2026.549",
       "date": "2026-11-12",
       "server": "1.11.510",

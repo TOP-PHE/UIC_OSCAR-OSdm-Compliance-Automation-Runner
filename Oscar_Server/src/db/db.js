@@ -59,6 +59,19 @@ function checkpointsSetting(value) {
 
 const CHECKPOINTS = checkpointsSetting(process.env.OSCAR_DB_CHECKPOINTS);
 
+// From how many milliseconds a statement of all/get/run is logged as slow
+// (#1234, observeStatements() below): 50 by default, a whole number from 1
+// to 60000. Read here too, so a wrong value stops the start first.
+function slowStatementSetting(value) {
+  if (value === undefined || value === '') return 50;
+  const text = String(value).trim();
+  const ms = /^\d{1,5}$/.test(text) ? Number(text) : Number.NaN;
+  if (ms >= 1 && ms <= 60000) return ms;
+  throw new Error(`OSCAR_DB_SLOW_MS must be a whole number of milliseconds from 1 to 60000, not "${value}"`);
+}
+
+const SLOW_MS = slowStatementSetting(process.env.OSCAR_DB_SLOW_MS);
+
 // ── Open database ─────────────────────────────────────────────────────────────
 const db = new DatabaseSync(DB_PATH);
 
@@ -1224,15 +1237,75 @@ function decrypt(encoded) {
 
 // ── Generic query helpers ─────────────────────────────────────────────────────
 function all(sql, params = []) {
-  return db.prepare(sql).all(...params);
+  return timed(sql, () => db.prepare(sql).all(...params));
 }
 
 function get(sql, params = []) {
-  return db.prepare(sql).get(...params);
+  return timed(sql, () => db.prepare(sql).get(...params));
 }
 
 function run(sql, params = []) {
-  return db.prepare(sql).run(...params);
+  return timed(sql, () => db.prepare(sql).run(...params));
+}
+
+// ── Slow statements (#1234) ───────────────────────────────────────────────────
+// Each statement of all/get/run holds the server's one thread for its whole
+// time, and nothing said which one did: 7 rounds of measurement on the k3s
+// test machine found them one by one. Once server.js asks for it
+// (observeStatements()), each one's time goes into a histogram, and one of
+// OSCAR_DB_SLOW_MS or more is counted and logged with its SQL (lists of ?
+// shortened) and the place in OSCAR's code that ran it. Never its values:
+// they are passed apart from the SQL. Scripts and tests that only load this
+// file time nothing. Statements a module prepares itself (the results slices,
+// the run log batches) are timed as run work already.
+let statementObserver = null;
+
+/** `{ seconds, slow, log }`: a histogram, a counter and a logger; null stops. */
+function observeStatements(observer) {
+  statementObserver = observer || null;
+}
+
+function timed(sql, fn) {
+  const observer = statementObserver;
+  if (!observer) return fn();
+  const started = process.hrtime.bigint();
+  try {
+    return fn();
+  } finally {
+    noteStatement(observer, sql, Number(process.hrtime.bigint() - started) / 1e6);
+  }
+}
+
+function noteStatement(observer, sql, ms) {
+  try {
+    observer.seconds?.observe(ms / 1000);
+    if (ms < SLOW_MS) return;
+    observer.slow?.inc();
+    observer.log?.warn({ ms: Math.round(ms), sql: sqlShape(sql), from: callerOf(new Error('where').stack) }, 'slow database statement');
+  } catch { /* a metric or a log line never stops a statement */ }
+}
+
+// The SQL on one line, a list of ? as one, 400 characters at most.
+function sqlShape(sql) {
+  const flat = String(sql).replaceAll(/\s+/g, ' ').trim().replaceAll(/\?(?: ?, ?\?)+/g, '?…');
+  return flat.length > 400 ? `${flat.slice(0, 400)}…` : flat;
+}
+
+// The first frame of the stack outside this file: "src/api/routes/runs.js:385".
+const SERVER_ROOT = path.resolve(__dirname, '../..');
+
+function callerOf(stack) {
+  for (const line of String(stack).split('\n').slice(1)) {
+    const text = line.trim();
+    const open = text.lastIndexOf('(');
+    const where = open >= 0 ? text.slice(open + 1).replace(/\)$/, '') : text.replace(/^at /, '');
+    const parts = where.split(':');
+    if (parts.length < 3) continue;
+    const file = parts.slice(0, -2).join(':');
+    if (file === __filename || file.startsWith('node:')) continue;
+    return `${path.relative(SERVER_ROOT, file).split(path.sep).join('/')}:${parts.at(-2)}`;
+  }
+  return null;
 }
 
 // ── At-rest column encryption (Phase 2 of issue #60, v1.11.0) ───────────────
@@ -1445,4 +1518,5 @@ function checkpointState() {
 module.exports = {
   db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig, synchronousSetting,
   checkpointsSetting, startCheckpointThread, stopCheckpointThread, checkpointState,
+  slowStatementSetting, observeStatements, sqlShape, callerOf,
 };

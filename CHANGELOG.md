@@ -491,6 +491,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.511] — 2026-11-13
+
+Listed in `compatibility.json` (2026.550) without moving `current_release`.
+
+### Added
+
+- **The slow database statements are logged** (#1234, the first action of
+  the review #1233). Since #1205 the server's waits were found one
+  measurement at a time, 7 rounds on the k3s test machine: nothing said
+  which statement held the thread.
+  - Every statement of the database helpers `all`, `get` and `run` (most of
+    OSCAR's statements) is timed once `server.js` asks for it
+    (`observeStatements()` in `db.js`). Scripts and tests that only load
+    `db.js` time nothing.
+  - Metrics: `oscar_db_statement_seconds` (a histogram) and
+    `oscar_db_slow_statements_total` (those of `OSCAR_DB_SLOW_MS` or more,
+    50 ms by default).
+  - Each slow statement writes one warning line, `slow database statement`,
+    with:
+    - `ms`, its time;
+    - `sql`, its SQL on one line (lists of `?` shortened, 400 characters at
+      most). **Never its values**: they are passed apart from the SQL;
+    - `from`, the place in OSCAR's code that ran it.
+  - A metric or a log line that fails never stops a statement.
+  - `OSCAR_DB_SLOW_MS`: a whole number from 1 to 60000; anything else stops
+    the start, before the database is opened. Documented in both
+    `.env.example` files.
+  - *OSCAR · Overview*, row *OSCAR's thread*: a panel *Database statements:
+    the slow ones*. *OSCAR · Logs*: a panel *Slow database statements*.
+  - *Metrics and monitoring* says how to read them, with the Loki query that
+    counts them by place.
+  - `db-slow-statements.test.js` covers:
+    - a slow statement counted and logged with its SQL and place, without
+      the secret passed as its value;
+    - a quick one measured, not logged;
+    - a failed one timed and its error kept;
+    - a logger that throws;
+    - the threshold's values.
+
+    Mutation-checked: a slow statement never logged, or its values put in
+    the line, each fail a test. `server.test.js`: `/metrics` counts the
+    statements of its requests.
+  - `db-checkpoints.test.js` (#1230) gives its waits 20 s and its tests 60:
+    run within the whole suite on a loaded machine, the file once took 26 s
+    instead of 4 and failed on Jest's 10 s.
+
+---
+
 ## [server-1.11.510] — 2026-11-12
 
 Listed in `compatibility.json` (2026.549) without moving `current_release`.

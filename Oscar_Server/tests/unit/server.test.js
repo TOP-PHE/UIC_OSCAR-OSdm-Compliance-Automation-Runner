@@ -169,6 +169,15 @@ describe('GET /metrics', () => {
     }
   });
 
+  test('#1234: the server times the database helpers\' statements', async () => {
+    const res = await request(app).get('/metrics');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('# TYPE oscar_db_slow_statements_total counter');
+    // The statements the requests above ran are counted.
+    const count = /\noscar_db_statement_seconds_count (\d+)/.exec(res.text);
+    expect(Number(count?.[1])).toBeGreaterThan(0);
+  });
+
   test('#1005: ?source=simulator answers the simulator gauges in Prometheus text; another source is 404', async () => {
     require('../../src/services/simulatorMetrics').forgetCache();
     const res = await request(app).get('/metrics?source=simulator');
