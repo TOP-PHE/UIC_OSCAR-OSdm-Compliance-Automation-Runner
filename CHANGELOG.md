@@ -491,6 +491,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.515] — 2026-11-13
+
+Listed in `compatibility.json` (2026.554) without moving `current_release`.
+
+### Changed
+
+- **The Run page's preview and every launch read the latest run of each
+  scenario asked** (#1246, an action of the review #1233). The slow
+  statement log (#1234) named both reads at the start of a batch, each over
+  50 ms, about a dozen times a minute with six providers. Before, they:
+  - read the company's newest 20,000 finished runs to keep the latest of
+    each scenario;
+  - then counted the failed checks of those runs over `run_assertions`.
+- `latestRunStates()` (`api/helpers/runCandidates.js`):
+  - **One statement.** The codes of the selection go as one JSON list
+    (`json_each`), with one seek per code in the index by company and
+    scenario. `INDEXED BY` names that index: the planner chose the one by
+    queue date, which gives the order but not the scenario, so a scenario
+    never run walked every run of the company.
+  - **The failed checks of a finished run are counted once and kept**
+    (50,000 runs at most). They never change: the runner stores them before
+    it writes the run's final status, and nothing else writes them. So
+    `run_assertions` is read only for the runs finished since.
+- The facets are the same: the same last result, failed checks, collection
+  version and "to run again". A scenario whose latest run is older than the
+  company's newest 20,000 now shows that run, as "whatever their age"
+  always meant.
+- `run-candidates-latest.test.js` covers:
+  - the old reading's answer, for a Test Manager, a tester and a
+    certifier, on 400 drawn runs: two companies, every status, runs queued
+    in the same second, five authors;
+  - the query plan: one seek per code, no walk of the runs;
+  - a second reading that reads no check;
+  - a run finished since, counted alone;
+  - a run without checks;
+  - a run still going.
+
+  Mutation-checked: each of these fails a test:
+  - the index left to the planner;
+  - ties ordered the other way;
+  - no scope for a tester;
+  - unfinished runs counted;
+  - counts not kept.
+
+---
+
 ## [server-1.11.514] — 2026-11-13
 
 Listed in `compatibility.json` (2026.553) without moving `current_release`.

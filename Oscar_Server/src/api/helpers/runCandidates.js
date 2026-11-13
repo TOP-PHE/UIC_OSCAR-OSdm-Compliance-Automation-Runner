@@ -19,39 +19,61 @@ const { currentCollectionVersion } = require('../../utils/versionInfo');
 const RF = require('../../utils/runFilters');
 const { runScopeSql } = require('./run-access');
 
-// The runs read for "last run": the newest of the company, whatever their age.
-const MAX_RUNS = 20000;
+// #1246: the latest finished run of each scenario asked, one seek of
+// idx_runs_company_scenario per code (the codes are passed as one JSON list),
+// in the order the runs list uses: queued first, then id. Until 1.11.515 the
+// company's newest 20,000 finished runs were read to keep the first of each
+// code, at every preview of the Run page and every launch. INDEXED BY: left
+// to itself, the planner walks idx_runs_company_queued, which gives the order
+// but not the code, through every run of the company for a code never run.
+function latestRunsSql(scopeSql) {
+  return `SELECT c.value AS scenario_code, r.id, r.status, r.collection_version, r.scenario_hash
+            FROM json_each(?) AS c
+            JOIN runs AS r ON r.id = (
+              SELECT x.id FROM runs AS x INDEXED BY idx_runs_company_scenario
+               WHERE x.company_id = ? AND x.scenario_code = c.value
+                 AND x.status IN ('COMPLETED', 'FAILED')${scopeSql}
+               ORDER BY x.queued_at DESC, x.id DESC
+               LIMIT 1)`;
+}
 
-/**
- * The latest finished run of each scenario code of the company, with the
- * number of its failed checks: { code: { status, failed, collection_version,
- * scenario_hash } }.
- */
-function latestRunStates(companyId, user) {
-  // Among the runs `user` may read: a tester's own (1.11.477).
-  const scope = runScopeSql(user, '');
-  const rows = all(
-    `SELECT id, scenario_code, status, collection_version, scenario_hash
-       FROM runs
-      WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED')${scope.sql}
-      ORDER BY queued_at DESC, id DESC
-      LIMIT ${MAX_RUNS}`,
-    [companyId, ...scope.params]
-  );
-  const latest = latestRunsOf(rows);
-  const ids = Object.values(latest).map((r) => r.id);
-  const failed = new Map();
-  for (let i = 0; i < ids.length; i += 500) {
-    const chunk = ids.slice(i, i + 500);
+// #1246: the failed checks of a finished run never change (the runner stores
+// them before it writes the run's final status, and nothing else writes
+// run_assertions), so they are counted once per run and kept.
+const MAX_KEPT_COUNTS = 50000;
+const failedByRun = new Map();
+
+function failedChecksOf(ids) {
+  const missing = ids.filter((id) => !failedByRun.has(id));
+  for (let i = 0; i < missing.length; i += 500) {
+    const chunk = missing.slice(i, i + 500);
     const marks = chunk.map(() => '?').join(',');
+    const counted = new Map();
     for (const c of all(`SELECT run_id, SUM(CASE WHEN passed = 1 THEN 0 ELSE 1 END) AS failed
                            FROM run_assertions WHERE run_id IN (${marks}) GROUP BY run_id`, chunk)) {
-      failed.set(c.run_id, Number(c.failed) || 0);
+      counted.set(c.run_id, Number(c.failed) || 0);
     }
+    for (const id of chunk) failedByRun.set(id, counted.get(id) || 0);
   }
+  while (failedByRun.size > MAX_KEPT_COUNTS) failedByRun.delete(failedByRun.keys().next().value);
+  return new Map(ids.map((id) => [id, failedByRun.get(id) ?? 0]));
+}
+
+/**
+ * The latest finished run of each of `codes` in the company, with the number
+ * of its failed checks: { code: { status, failed, collection_version,
+ * scenario_hash } }. A code is looked up as text, as an object key reads it.
+ */
+function latestRunStates(companyId, user, codes) {
+  const asked = [...new Set((Array.isArray(codes) ? codes : []).map(String))];
+  if (asked.length === 0) return {};
+  // Among the runs `user` may read: a tester's own (1.11.477).
+  const scope = runScopeSql(user, 'x');
+  const latest = latestRunsOf(all(latestRunsSql(scope.sql), [JSON.stringify(asked), companyId, ...scope.params]));
+  const failed = failedChecksOf(Object.values(latest).map((r) => r.id));
   const out = {};
   for (const [code, run] of Object.entries(latest)) {
-    out[code] = { status: run.status, failed: failed.get(run.id) || 0, collection_version: run.collection_version, scenario_hash: run.scenario_hash };
+    out[code] = { status: run.status, failed: failed.get(run.id), collection_version: run.collection_version, scenario_hash: run.scenario_hash };
   }
   return out;
 }
@@ -65,7 +87,7 @@ function facetsFor(companyId, datafile, codes, user) {
   } catch {
     // Without the catalogue, a scenario's capability is derived from its fields.
   }
-  return RF.facetsOf(codes, { datafile, entries, runs: latestRunStates(companyId, user), collectionVersion: currentCollectionVersion() });
+  return RF.facetsOf(codes, { datafile, entries, runs: latestRunStates(companyId, user, codes), collectionVersion: currentCollectionVersion() });
 }
 
-module.exports = { latestRunStates, facetsFor };
+module.exports = { latestRunStates, facetsFor, latestRunsSql, MAX_KEPT_COUNTS };

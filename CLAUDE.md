@@ -3964,6 +3964,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     file (1.7 MB, about 15 ms a call before). Every reader works on copies
     (`catalogueDatafile()` clones): a new one that writes into what it is
     given throws (`catalogue-source-kept.test.js`).
+    **#1246 (1.11.515): the latest run of each scenario asked.**
+    `latestRunStates(companyId, user, codes)` (`runCandidates.js`) is one
+    statement: the codes as one `json_each(?)` list, a correlated
+    `LIMIT 1` per code **`INDEXED BY idx_runs_company_scenario`**. Left to
+    itself the planner took `idx_runs_company_queued` (it gives the order),
+    which walks every run of the company for a code never run: when an
+    index gives the ORDER BY but not the equality, check the plan. The
+    failed checks of a finished run are counted once and kept (50,000 runs):
+    the runner stores them before the final status, and nothing else writes
+    `run_assertions`; a new writer of a finished run's checks must drop
+    that cache. `run-candidates-latest.test.js` compares with the old
+    reading on 400 drawn runs.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the
