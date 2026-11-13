@@ -78,6 +78,13 @@ process.env.JWT_SECRET = jwtRow.value;
 // ── Attach queue event listeners ──────────────────────────────────────────────
 const queue = require('./worker/queue');
 const metricsForQueue = require('./utils/metrics');
+// Every statement of the database helpers timed from here on, the slow ones
+// logged with their SQL and their place in the code (#1234).
+require('./db/db').observeStatements({
+  seconds: metricsForQueue.dbStatementSeconds,
+  slow: metricsForQueue.dbSlowStatements,
+  log,
+});
 const companyRunMetrics = require('./utils/companyRunMetrics');
 const companyLabels = companyRunMetrics.labelCache((id) => dbGet(companyRunMetrics.COMPANY_ROW_SQL, [id]));
 // #1017: a run that ended counts for its company, with the requests it stored.

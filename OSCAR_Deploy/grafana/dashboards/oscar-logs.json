@@ -98,6 +98,18 @@
       ],
       "title": "All logs (filtered by search box)",
       "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "description": "Database statements of the server's helpers all/get/run that took OSCAR_DB_SLOW_MS (50 ms by default) or more (#1234): the time (ms), the SQL with its lists of ? shortened, never its values, and the place in OSCAR's code that ran it (from). A statement that holds the thread holds every page and every run's call.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 36 },
+      "id": 6,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{container=\"oscar\"} |= \"slow database statement\" | json | line_format \"{{.ms}} ms  {{.from}}  {{.sql}}\"", "queryType": "range", "refId": "A" }
+      ],
+      "title": "Slow database statements",
+      "type": "logs"
     }
   ],
   "preload": false,

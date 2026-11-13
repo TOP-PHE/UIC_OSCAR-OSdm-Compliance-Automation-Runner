@@ -22,6 +22,11 @@ const { checkpointsSetting } = require('../../src/db/db');
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oscar-ckpt-'));
 const booted = [];
 
+// A worker thread starts, writes and checkpoints: on a machine running the
+// whole suite this file once took 26 s instead of 4, and a test of several
+// waits ran past Jest's 10 s. Each wait has 20 s, each test 60.
+jest.setTimeout(60000);
+
 afterAll(async () => {
   for (const m of booted) {
     await m.stopCheckpointThread();
@@ -52,7 +57,7 @@ function boot(setting, name) {
   return fresh;
 }
 
-async function until(condition, ms = 10000) {
+async function until(condition, ms = 20000) {
   const end = Date.now() + ms;
   while (!condition()) {
     if (Date.now() > end) throw new Error('timed out');

@@ -135,6 +135,21 @@ const dbCheckpointThread = new promClient.Gauge({
   registers: [register]
 });
 
+// Every statement of db.js's all/get/run, on the server's thread (#1234): its
+// time, and how many took OSCAR_DB_SLOW_MS or more (each also logged, with its
+// SQL and the place that ran it, as "slow database statement").
+const dbStatementSeconds = new promClient.Histogram({
+  name: 'oscar_db_statement_seconds',
+  help: "Time of each database statement of the helpers all/get/run, on the server's thread",
+  buckets: [0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  registers: [register]
+});
+const dbSlowStatements = new promClient.Counter({
+  name: 'oscar_db_slow_statements_total',
+  help: 'Database statements of the helpers all/get/run that took OSCAR_DB_SLOW_MS or more (each one logged)',
+  registers: [register]
+});
+
 /** Times `fn` (synchronous) as run work of `kind`, and gives its result. */
 function timeRunWork(kind, fn) {
   const end = runWork.startTimer({ work: kind });
@@ -312,6 +327,8 @@ module.exports = {
   dbWalFrames,
   dbWalFramesNotCopied,
   dbCheckpointThread,
+  dbStatementSeconds,
+  dbSlowStatements,
   timeRunWork,
   runWorkClock,
   runsTotal,

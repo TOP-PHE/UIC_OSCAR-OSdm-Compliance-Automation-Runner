@@ -3926,6 +3926,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the start before the database opens. `stopCheckpointThread()` (tests)
     lets the thread close its connection: Windows cannot remove a file
     still open.
+    **The review of #1233** (2026-11-13) read the database access instead
+    of measuring one more round; its plan is #1234–#1243, in order.
+    **#1234 (1.11.511): slow statements are logged.** `all`/`get`/`run`
+    go through `timed()` once `server.js` calls `observeStatements({
+    seconds, slow, log })` (scripts and tests time nothing): histogram
+    `oscar_db_statement_seconds`, counter `oscar_db_slow_statements_total`,
+    and from `OSCAR_DB_SLOW_MS` (50) a warning `slow database statement`
+    with `ms`, `sql` (`sqlShape()`: one line, `?` lists shortened) and
+    `from` (`callerOf()`: the first frame outside `db.js`). **Never the
+    values**: a test passes a secret and looks for it. A metric or a log
+    line never stops a statement. *OSCAR · Logs* lists them.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

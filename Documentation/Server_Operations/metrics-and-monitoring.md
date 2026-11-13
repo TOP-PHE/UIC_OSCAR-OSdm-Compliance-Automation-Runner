@@ -207,7 +207,14 @@ work is measured where it runs:
     (pages a reader still used), in frames of one page;
   - `oscar_db_checkpoint_thread`, a gauge: 1 while that thread checkpoints,
     0 when the server's connection does in its COMMITs
-    (`OSCAR_DB_CHECKPOINTS=inline`, or the thread stopped).
+    (`OSCAR_DB_CHECKPOINTS=inline`, or the thread stopped);
+- from 1.11.511 (#1234), every statement of the database helpers `all`,
+  `get` and `run` (most of OSCAR's statements):
+  - `oscar_db_statement_seconds`, a histogram: each one's time on the
+    server's thread;
+  - `oscar_db_slow_statements_total`, a counter: those of
+    `OSCAR_DB_SLOW_MS` (50 by default) or more. Each of those is also
+    logged (below).
 
 The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 
@@ -220,6 +227,26 @@ The row *OSCAR's thread* of *OSCAR · Overview* reads them:
 | A run's results file (size) | The median and 95th percentile of the results files read. A bigger file, a longer `results_read`. |
 | Database commits | How long a COMMIT holds the thread (median, 99th percentile), and how many took over 0.1 s in 5 minutes. Each of those is a wait for every page. |
 | Database checkpoints, in a thread of their own | How long a checkpoint takes (99th percentile), off the server's thread, and the log's size and what was not copied, in frames. A log that keeps growing means the checkpoints do not keep up. |
+| Database statements: the slow ones | Every statement of `all`/`get`/`run` (median, 99th percentile), and how many took `OSCAR_DB_SLOW_MS` or more in 5 minutes. Which ones they were: *OSCAR · Logs*, panel *Slow database statements*. |
+
+**Which statements are slow** (#1234). Each statement of `OSCAR_DB_SLOW_MS`
+or more writes one warning line, `slow database statement`, with:
+- `ms`, its time;
+- `sql`, its SQL on one line, lists of `?` shortened, 400 characters at
+  most. **Never its values**: they are passed apart from the SQL;
+- `from`, the place in OSCAR's code that ran it, such as
+  `src/api/routes/runs.js:385`.
+
+*OSCAR · Logs* lists them in the panel *Slow database statements*. To count
+them by place over the last hour, in *Explore* (Loki):
+
+```
+sum by (from) (count_over_time({container="oscar"} |= "slow database statement" | json [1h]))
+```
+
+The statements a module prepares itself are not in it: the results slices
+(`results_store`) and the run log batches (`log lines`) have their own
+metrics.
 
 The alert `OscarEventLoopLag` reads the same 99th percentile. **Until
 1.11.502 it could never fire**: it read a `_bucket` series that prom-client
