@@ -491,6 +491,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.512] / [collection-OTST_V2.0.257] — 2026-11-13
+
+Issue #1215 (after #1208 and #1209, part of #1045), release 2026.551. Simulator 0.66.0. The link between a fulfilment and its fares, as the OSDM experts settled it.
+
+#1208 / #1209 (1.11.504, simulator 0.65.0) read OSDM 3.x both ways: `BookingPartReference` "can refer to reservation, admission, ancillary or fee", yet a fulfilment "refers to … offer parts or a fare". OSCAR stopped requiring a fare in `Fulfillment.bookingParts`, told in an INFO line when one was named, and the simulator named none. The OSDM experts answered in [UnionInternationalCheminsdeFer/OSDM#1699](https://github.com/UnionInternationalCheminsdeFer/OSDM/issues/1699) (2026-11-13): `bookingParts[].id` may name a fare, the description saying so from a new version (no backport); the link is usually not needed, a fare fulfilment being usually empty; the fare is confirmed on the booking id.
+
+### Removed
+- **F7** (a fare named as a booking part in a fulfilment) and **R6** (in a refund offer's breakdown), the INFO lines kept until OSDM answered (`fareFulfillments.namedFaresNote()`, `NAMED_AS_PARTS`, `fareHoldings().namedAsParts`). Log lines, so no scenario's number of checks moved because of them. `fulfillmentChecks()` no longer takes `reservationIds`, which only F7 read.
+
+### Changed
+- The texts that said "the OSDM community is asked" (`fareFulfillments.js`, `fareBooking.js`, `fareRefund.js`, `refunds.js`, two INFO lines on shared fare fulfilments) cite OSDM#1699. F3, F5, the fare refund (R1 to R4) and R5 read the fulfilments as before. The header of `fareRefund.js` gives R3 as a failure, as it is since #1055.
+- The catalogue's `checks` of the five fare refund entries, 3 more each, as before #1209 (`OTST_FARE_REFUND_1ADT` 181, `_SRCH_1ADT` 181, `_TRIPIDS_1ADT` 188, `_FEE_1ADT` 182, `_COMBINING_1ADT` 181), and their rows in *OSCAR - What is tested*, whose steps 06 and 10 no longer name F7 and R6.
+- A welcome-page news entry; *OSCAR - OSDM Simulator scenarios* and the data file's descriptions of `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*`, which move every simulator reference's version (a company following one reads "not up to date" until it updates).
+
+### Simulator 0.66.0
+- The fare fulfilment names its fares in `bookingParts` again, with the fare reservations; from OSDM 3.11 (zeta) it keeps `billingReferences`. A fare refund offer's `refundOfferBreakdown` names the fares again.
+- Variant `fare-not-in-fulfillment` leaves the last fare out of `bookingParts` (and of `billingReferences`): F5 still fails. `SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*` say so.
+- The hidden properties of #1209 stay (`heldIdsOf()`, `REFUNDED_PARTS`): the variant leaves a fare out, and refunds and exchanges must still find it.
+
+### Checked
+- Replay of the 94 fare scenarios of gamma (3.8) and zeta (3.12), `main` and this branch: 76 give the same checks. The 18 fare refunds give 3 checks more, all "Refund offer[0] breakdown[0] is valid" and passing, as before #1209; failures are the same (`SIM_WRONG_FARE_NOT_IN_FULFILLMENT_*` still fails F5 only). `replay.js catalogue` agrees with the five fare refund entries.
+- `bruno-fare-fulfillments.test.js`, `bruno-fare-booking.test.js`, `bruno-fare-refund.test.js`, `bruno-fare-reservations.test.js`: the simulator's new answers, no F7 or R6 line, a fulfilment naming none still passing; a breakdown naming the fares and a fare reservation fails nothing and tells nothing.
+- Simulator `fares.test.js`: the fare named in the fulfilment on every provider (billing references on zeta only), the refund offer's breakdown naming the fare, the bicycle place named with the fare.
+- - Server `npm run lint`, full `npx jest`: 6,120 passed; the Windows-only failures (`/metrics`, the runner agent, MCP end-to-end, the answer-threats timing) as on `main`. Simulator `npm test` and lint: everything passes but the Windows-only file-mode test.
+
+---
+
 ## [server-1.11.511] — 2026-11-13
 
 Listed in `compatibility.json` (2026.550) without moving `current_release`.

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-13-fare-fulfilment-link-settled",
+    "date": "November 13, 2026",
+    "tag": "Improvement",
+    "title": "The link between a fulfilment and its fares, as OSDM settled it",
+    "summary": "The OSDM experts answered the question of 12 November: a fulfilment may name its fares in its booking parts, and need not. OSCAR stops telling either way, and the simulator names its fares again.",
+    "content": "On 12 November OSCAR stopped failing a fare fulfilment that names no fare in its booking parts, because OSDM 3.x could be read either way, and told in an information line when a fare was named. The question went to the OSDM community. The OSDM experts have answered (OSDM issue 1699): a fulfilment links to a fare through the id of its booking parts, which the description will say from a new OSDM version, and the link is usually not needed, a fare fulfilment being usually empty.\n\nOSCAR keeps reading both forms, and no longer tells when a fare is named: the information lines F7 (in a fulfilment) and R6 (in a refund offer's breakdown) are gone. A fulfilment naming some of the fares and leaving one out still fails F5.\n\nThe simulator names its fares again, in the fare fulfilment and in a fare refund offer's breakdown, and keeps its billing references from OSDM 3.11. Its fare refund scenarios check the breakdown again. Nothing to change in your scenarios."
+  },
+  {
     "id": "2026-11-12-run-list-reads-its-page",
     "date": "November 12, 2026",
     "tag": "Improvement",

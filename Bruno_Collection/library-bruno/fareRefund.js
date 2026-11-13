@@ -17,14 +17,12 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   R1  the refund offers cover the fare fulfilments asked              10  FAIL
  *   R2  refundableAmount + refundFee = the price of the fares refunded   10  FAIL
  *   R3  COMBINING: the fee is the one the fares' after-sales
- *       conditions give at the time of the refund offer                  10  WARNING
+ *       conditions give at the time of the refund offer (#1055)          10  FAIL
  *   R4  CLUSTERING, the fee the provider's (isProviderFee): the fee
  *       OSCAR sent (fareRefundFee) is the refund offer's fee              10  FAIL
  *   R5  after the confirmation, the fares and their fulfilment are
  *       REFUNDED, every other fulfilment unchanged                        14  FAIL
  *       (refunds.js checkRefundScopeOnBooking(), which reads fares too)
- *   R6  a fare named as a booking part in a refund offer's breakdown
- *       (OSDM 3.x, open, #1208)                                          10  INFO
  *
  * Sources (#907): osdm.io, constructing products from fares, "Handling After
  * Sales": in the clustering model the distributor calculates the fee and,
@@ -82,8 +80,9 @@ const reservationAsFare = (r) => ({ id: r.id, prices: isObject(r.price) ? [r.pri
  * The fare fulfilments of a confirmed booking: [{ fulfillmentId, fares,
  * sharedWith? }], one per fulfilment holding a booked fare or fare
  * reservation (#255), each fare as fareSummary() gives it. #1208: which fares
- * a fulfilment holds is read by fareFulfillments.js (OSDM 3.x names no fare
- * in `bookingParts`); the fare reservations are booking parts, named as such.
+ * a fulfilment holds is read by fareFulfillments.js (a fulfilment may name
+ * its fares in `bookingParts` or none, OSDM#1699); the fare reservations are
+ * booking parts, named as such.
  * Fulfilments that share their fares carry them all and `sharedWith`, the
  * ids of the fulfilments sharing them.
  */
@@ -230,7 +229,7 @@ function offerFindings(offer, byId, sent, nowMs) {
   // #1208: fulfilments sharing their fares are compared together, or not at all.
   const sharers = [...new Set(known.flatMap((f) => list(f.sharedWith)))];
   if (sharers.some((id) => !ids.includes(id))) {
-    return { note: info('R2', `refund offer ${offer.id} holds only some of the fulfilments ${sharers.join(', ')}, which name no fare (OSDM 3.x) and so share their fares: its amounts are not compared with the fares`) };
+    return { note: info('R2', `refund offer ${offer.id} holds only some of the fulfilments ${sharers.join(', ')}, which name no fare and so share their fares: its amounts are not compared with the fares`) };
   }
   const seen = new Set();
   const fares = known.flatMap((f) => f.fares).filter((fare) => fare.id == null || (!seen.has(fare.id) && seen.add(fare.id)));
@@ -266,12 +265,6 @@ function refundOfferChecks(refundOffers, fulfillments, { asked = [], sent = {}, 
   if (Object.keys(sent).length > 0) {
     checks.push(check('R4', 'FAIL', 'CLUSTERING: each refund offer\'s fee is the refundFee OSCAR sent (osdm.io: the provider uses the amount the client states)', of('fee'), 'fees other than the one sent'));
   }
-  // #1208: a fare named in a breakdown is told, never graded, until OSDM says
-  // whether a fare is a booking part in 3.x (a fare reservation is one).
-  const fareIds = new Set(list(fulfillments).flatMap((f) => list(f.fares)).filter((fare) => !fare.reservation && fare.id != null).map((fare) => fare.id));
-  const named = fareFulfillments.namedFaresNote('R6', offers.flatMap((offer) => list(offer.refundOfferBreakdown)
-    .flatMap((item) => fareFulfillments.namedIdsOf(item)).filter((id) => fareIds.has(id)).map((id) => `refund offer ${offer.id} names fare ${id}`)));
-  if (named) checks.push(named);
   return [...checks, ...of('note')];
 }
 

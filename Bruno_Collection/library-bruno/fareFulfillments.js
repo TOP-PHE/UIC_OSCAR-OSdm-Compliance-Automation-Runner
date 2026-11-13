@@ -7,14 +7,14 @@ http://www.apache.org/licenses/LICENSE-2.0
 'use strict';
 
 /**
- * fareFulfillments.js — which fares a fulfilment holds (#1208).
+ * fareFulfillments.js — which fares a fulfilment holds (#1208, #1215).
  *
- * OSDM 3.x can be read two ways: `Fulfillment.bookingParts` holds
- * `BookingPartReference` items, which "can refer to reservation, admission,
- * ancillary or fee", while a fulfilment "refers to services of one or
- * multiple offer parts or a fare". One provider names no fare there, another
- * names its fares; the OSDM community is asked (a fare is a booking part from
- * OSDM 4). What says which fares a fulfilment holds:
+ * A fulfilment links to a fare through `Fulfillment.bookingParts[].id`
+ * (OSDM experts, UnionInternationalCheminsdeFer/OSDM#1699, 2026-11-13: the
+ * description says so from a new version, with no backport; a fare is a
+ * booking part in OSDM 4). The link is usually not needed, a fare fulfilment
+ * being usually empty, so a fare fulfilment naming no fare is right too. What
+ * says which fares a fulfilment holds:
  *
  *   1. the fares it names in `bookingParts` (one provider gives one
  *      fulfilment per fare, naming it);
@@ -67,21 +67,16 @@ function isFareFulfillment(fulfillment, { fareIds = [], productIds = [] } = {}) 
  *   byFulfillment     { fulfilment id: [fare ids] } for the fares known to be its;
  *   shared            { fulfillmentIds, fareIds } when several fare fulfilments
  *                     name no fare and share the rest, else null;
- *   unheld            the fares no fulfilment holds;
- *   namedAsParts      'fulfillment X names fare Y' for each fare named as a
- *                     booking part (OSDM 3.x: not one).
+ *   unheld            the fares no fulfilment holds.
  */
 // The fares the fulfilments name in `bookingParts`: each one's holder (the
-// first naming it), and a sentence per naming.
+// first naming it).
 function namedHolders(ofFares, fareIds, holderOf) {
-  const namedAsParts = [];
   for (const f of ofFares) {
     for (const id of namedIdsOf(f).filter((x) => fareIds.has(x))) {
-      namedAsParts.push(`fulfillment ${f.id} names fare ${id}`);
       if (!holderOf.has(id)) holderOf.set(id, f.id);
     }
   }
-  return namedAsParts;
 }
 
 // One billing reference names one fare: two passengers' fares of one tariff
@@ -111,7 +106,7 @@ function fareHoldings({ fares = [], fulfillments = [], reservationIds = [], prod
   const kinds = { fareIds: [...fareIds, ...list(reservationIds)], productIds };
   const ofFares = all.filter((f) => isFareFulfillment(f, kinds));
   const holderOf = new Map();
-  const namedAsParts = namedHolders(ofFares, fareIds, holderOf);
+  namedHolders(ofFares, fareIds, holderOf);
   billedHolders(ofFares, booked, holderOf);
   const byFulfillment = Object.fromEntries(ofFares.map((f) => [f.id, []]));
   for (const [fareId, holder] of holderOf) byFulfillment[holder].push(fareId);
@@ -122,7 +117,7 @@ function fareHoldings({ fares = [], fulfillments = [], reservationIds = [], prod
   if (rest.length > 0 && open.length === 1) byFulfillment[open[0]].push(...rest);
   else if (rest.length > 0 && open.length > 1) shared = { fulfillmentIds: open, fareIds: rest };
   else unheld = rest;
-  return { fareFulfillments: ofFares.map((f) => f.id), byFulfillment, shared, unheld, namedAsParts };
+  return { fareFulfillments: ofFares.map((f) => f.id), byFulfillment, shared, unheld };
 }
 
 /**
@@ -140,23 +135,4 @@ function faresHeldBy(holdings, ids) {
   return { fareIds: own, partly: true };
 }
 
-// OSDM 3.x can be read both ways, and the OSDM community is asked which: its
-// BookingPartReference names a reservation, admission, ancillary or fee, its
-// Fulfillment refers to "offer parts or a fare". A fare is a booking part
-// from OSDM 4. Until it answers, naming a fare is told, never graded.
-const NAMED_AS_PARTS = 'OSDM 3.x describes a booking part reference as a reservation, admission, ancillary or fee, and a fulfilment as referring to offer parts or a fare; OSCAR reads both until the OSDM community says which (a fare is a booking part from OSDM 4)';
-const MAX_LISTED = 5;
-
-/**
- * #1208: an INFO line naming the fares named as booking parts (`places`), or
- * null when there is none. `id` is the check's (F7 in a fulfilment, R6 in a
- * refund offer's breakdown).
- */
-function namedFaresNote(id, places) {
-  const all = list(places);
-  if (all.length === 0) return null;
-  const more = all.length > MAX_LISTED ? ` and ${all.length - MAX_LISTED} more` : '';
-  return { id, level: 'INFO', title: '', ok: true, message: `fares named as booking parts: ${all.slice(0, MAX_LISTED).join('; ')}${more}. ${NAMED_AS_PARTS}.` };
-}
-
-module.exports = { namedIdsOf, billsFare, isFareFulfillment, fareHoldings, faresHeldBy, namedFaresNote, NAMED_AS_PARTS };
+module.exports = { namedIdsOf, billsFare, isFareFulfillment, fareHoldings, faresHeldBy };

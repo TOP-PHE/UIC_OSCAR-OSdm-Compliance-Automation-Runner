@@ -235,8 +235,8 @@ describe('step 14 on a booking read listing no fulfilment', () => {
   });
 });
 
-// #1208: in OSDM 3.x a fare fulfilment names no fare in bookingParts; its
-// fares are still held to its refund.
+// #1208: a fare fulfilment may name no fare in bookingParts (OSDM#1699: the
+// link is usually not needed); its fares are still held to its refund.
 describe('step 14 on a fare fulfilment that names no fare', () => {
   const booking = (status) => ({
     fulfillments: [{ id: 'FUL', status: 'REFUNDED' }],
