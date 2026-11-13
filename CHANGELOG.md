@@ -508,7 +508,10 @@ Listed in `compatibility.json` (2026.553) without moving `current_release`.
     file of the collection parsed while its size, times (to the
     nanosecond) and inode are the same.
   - The collection is still refreshed without a restart: each call looks
-    at the file, and a changed one is read again.
+    at the file, and a changed one is read again. The file is opened once,
+    and its version and text are read from what was opened, so a file
+    replaced in between is never kept under the other's version (CodeQL
+    `js/file-system-race`).
   - What is kept is **frozen**. The readers work on copies, and one that
     wrote into it would throw instead of changing what the next one reads.
   - `catalogueEntries()` gives the catalogue's entries alone. The Run

@@ -51,15 +51,22 @@ async function readDatafile(companyId) {
 const MAX_KEPT_FILES = 8;
 const keptFiles = new Map();
 
+// The file is opened once and its version and text read from what was opened,
+// so a file replaced in between is never kept under the other's version.
 function keptJson(file) {
-  const version = fileVersion(fs.statSync(file, { bigint: true }));
-  const kept = keptFiles.get(file);
-  if (kept?.version === version) return kept.value;
-  const value = deepFreeze(JSON.parse(fs.readFileSync(file, 'utf8')));
-  keptFiles.delete(file);
-  keptFiles.set(file, { version, value });
-  while (keptFiles.size > MAX_KEPT_FILES) keptFiles.delete(keptFiles.keys().next().value);
-  return value;
+  const fd = fs.openSync(file, 'r');
+  try {
+    const version = fileVersion(fs.fstatSync(fd, { bigint: true }));
+    const kept = keptFiles.get(file);
+    if (kept?.version === version) return kept.value;
+    const value = deepFreeze(JSON.parse(fs.readFileSync(fd, 'utf8')));
+    keptFiles.delete(file);
+    keptFiles.set(file, { version, value });
+    while (keptFiles.size > MAX_KEPT_FILES) keptFiles.delete(keptFiles.keys().next().value);
+    return value;
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 // A file of the collection the runs use (COLLECTION_PATH), else the

@@ -44,13 +44,26 @@ function writeBoth(entries = [{ code: 'OTST_A', source: 'SIM_A' }]) {
   writeJson('scenario_catalogue.json', { entries });
   writeJson('simulator_datafile.json', { scenarios: [{ code: 'SIM_A' }] });
 }
-// The files of `root` read with readFileSync while `fn` runs.
+// The files of `root` read with readFileSync while `fn` runs, by name or
+// by the descriptor openSync gave for them (named when read: a closed
+// descriptor's number is given again).
 function filesReadBy(fn) {
-  const spy = jest.spyOn(fs, 'readFileSync');
+  const opened = new Map();
+  const read = [];
+  const { openSync, readFileSync } = fs;
+  const open = jest.spyOn(fs, 'openSync').mockImplementation((file, ...rest) => {
+    const fd = openSync(file, ...rest);
+    opened.set(fd, String(file));
+    return fd;
+  });
+  const spy = jest.spyOn(fs, 'readFileSync').mockImplementation((file, ...rest) => {
+    read.push(typeof file === 'number' ? opened.get(file) : String(file));
+    return readFileSync(file, ...rest);
+  });
   fn();
-  const read = spy.mock.calls.map(([file]) => String(file)).filter((file) => file.startsWith(root));
   spy.mockRestore();
-  return read.map((file) => path.basename(file));
+  open.mockRestore();
+  return read.filter((file) => file?.startsWith(root)).map((file) => path.basename(file));
 }
 
 describe('the catalogue kept while its file is the same (#1236)', () => {
@@ -118,10 +131,10 @@ describe('the catalogue kept while its file is the same (#1236)', () => {
   test('a collection file that cannot be read falls back to the repository copy; none at all is a 503', () => {
     fs.writeFileSync(fileOf('scenario_catalogue.json'), '{ not json');
     expect(CS.catalogueEntries().length).toBeGreaterThan(0);
-    const statSync = fs.statSync;
-    jest.spyOn(fs, 'statSync').mockImplementation((file, ...rest) => {
+    const openSync = fs.openSync;
+    jest.spyOn(fs, 'openSync').mockImplementation((file, ...rest) => {
       if (String(file).endsWith('scenario_catalogue.json')) throw Object.assign(new Error('gone'), { code: 'ENOENT' });
-      return statSync(file, ...rest);
+      return openSync(file, ...rest);
     });
     expect(() => CS.catalogueEntries()).toThrow(expect.objectContaining({ status: 503 }));
   });
