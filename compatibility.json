@@ -4,6 +4,17 @@
   "current_release": "2026.551",
   "releases": [
     {
+      "release": "2026.552",
+      "date": "2026-11-13",
+      "server": "1.11.513",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.513: the data file is read once per version, not up to seven times a run (#1235, part of the review #1233). The runner's four checks (run timeout, templates, OSDM version, scenario hash) share one parsed copy of the file, frozen and kept while the file is the same; GET /data/:filename makes a run's copy (framework warnings, trip calendars, template check) once per version of the data file, the Test Framework and the Test Data, then serves it from memory. On the simulator's data file (1.7 MB) a run's start decrypted, parsed and rewrote it for about 150 ms; kept, the copy takes about a millisecond. Metric oscar_run_datafile_reads_total{use, from}. Also: the right-axis series of the panels Database checkpoints and Database statements are matched by their legend's name, so frames no longer read as minutes and the axis is not named twice. Released with it (deployment files): the dashboard."
+      ]
+    },
+    {
       "release": "2026.551",
       "date": "2026-11-13",
       "server": "1.11.512",

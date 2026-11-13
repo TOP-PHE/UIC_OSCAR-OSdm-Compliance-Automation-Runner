@@ -27,7 +27,8 @@ const fs          = require('node:fs');
 const { launch, launchRun, launcherProblem, isolationMode } = require('./launcher');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require('../db/db');
-const { encryptToFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
+const { encryptToFileAsync } = require('../utils/at-rest');
+const runDatafile = require('../utils/runDatafile');
 const {
   readRunFile, writeRunFile, removeRunFile, listRunFolder, makeRunFolder,
   copyIntoRunFolder, copyFileIntoRunFolder,
@@ -497,10 +498,9 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
     // the wait at the default 10 min RUN_TIMEOUT_MS.
     //
     // decryptFromFileAsync handles BOTH the encrypted form AND legacy plaintext
-    // datafiles (it detects the OSCAR1 magic header). Same pattern as the
-    // /v1/runs POST handler in api/routes/runs.js.
-    const buf = await decryptFromFileAsync(datafilePath);
-    const data = JSON.parse(buf.toString('utf8'));
+    // datafiles (it detects the OSCAR1 magic header). Since #1235 it is read
+    // through datafileForChecks(), once per version of the file.
+    const data = await datafileForChecks(datafilePath);
     const scenarios     = Array.isArray(data.scenarios) ? data.scenarios : [];
     scenariosConsidered = scenarios.length;
     const scenariosToRun = data.scenariosToRun;
@@ -626,12 +626,21 @@ function refusedScenarioCode(code) {
 // A datafile that is missing is left to the step that already reports it. One
 // that is there but cannot be read refuses the run: starting it would mean
 // starting it unchecked.
+// The data file as the run's checks read it (#1235): parsed and frozen, read
+// once per version of the file and shared by the runs that start meanwhile.
+// Each check only reads it.
+async function datafileForChecks(datafilePath) {
+  const { value, from } = await runDatafile.forChecks(datafilePath);
+  try { metrics.runDatafileReads.inc({ use: 'checks', from }); } catch { /* a metric never stops a run */ }
+  return value;
+}
+
 async function refusedDatafileText(datafilePath, runner) {
   if (!datafilePath || !(await fsExists(datafilePath))) return null;
   // The check is inside the `try` on purpose: a run whose executeRun throws is
   // never marked FAILED, so whatever goes wrong here has to end as a refusal.
   try {
-    const datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+    const datafile = await datafileForChecks(datafilePath);
     return runRefusal(templatesForRunner(datafile, runner));
   } catch {
     return 'The data file could not be read, so it could not be checked and the run was not started. Try again; if it happens again, ask your Test Manager to check the data file.';
@@ -657,7 +666,7 @@ function refusedFrameworkText(companyId) {
 async function refusedOsdmVersion(datafilePath, scenarioCode, companyId) {
   if (!datafilePath || !scenarioCode || !(await fsExists(datafilePath))) return null;
   try {
-    const datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+    const datafile = await datafileForChecks(datafilePath);
     const fwRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
     let framework = {};
     try { framework = fwRow?.config ? JSON.parse(colDecrypt(fwRow.config)) : {}; } catch { framework = {}; }
@@ -675,7 +684,7 @@ async function recordRunVersions(runId, datafilePath, scenarioCode) {
     const { currentCollectionVersion, serverVersion } = require('../utils/versionInfo');
     let hash = null;
     if (datafilePath && scenarioCode && await fsExists(datafilePath)) {
-      const datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+      const datafile = await datafileForChecks(datafilePath);
       const scenario = (Array.isArray(datafile?.scenarios) ? datafile.scenarios : []).find((s) => s && s.code === scenarioCode);
       hash = require('../utils/frameworkCoverage').scenarioHash(scenario);
     }

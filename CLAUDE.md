@@ -3941,6 +3941,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `from` (`callerOf()`: the first frame outside `db.js`). **Never the
     values**: a test passes a secret and looks for it. A metric or a log
     line never stops a statement. *OSCAR · Logs* lists them.
+    **#1235 (1.11.513): the data file is read once per version.** The
+    runner's four checks share `runDatafile.forChecks(path)`: parsed once
+    per version of the file (`fileVersion()`: size, mtime and ctime in ns,
+    inode), **frozen** (a check that writes into it throws, so the checks
+    stay readers), and shared by the runs starting together (the promise is
+    kept). `GET /data` with a run's secret serves `runDatafile.runCopy()`,
+    keyed by company and `runCopyVersion()` (the file's version, the stored
+    framework and the TRAIN rows, hashed: a save re-encrypts, so any save
+    makes a new copy). 32 entries of each, least recent dropped. A new input
+    of the run's copy must go into `runCopyVersion()`. Metric
+    `oscar_run_datafile_reads_total{use, from}`. **A Grafana series put on
+    the right axis is matched by its legend's exact name, and a legend
+    never says "(right y-axis)"**: Grafana adds it, and a `byRegexp` matcher
+    was not applied (`run-work-metrics.test.js`).
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

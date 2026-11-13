@@ -79,7 +79,8 @@ describe('the metrics of run work (#1205)', () => {
     const runner = read('Oscar_Server/src/worker/runner.js');
     const timed = [...`${server}\n${runner}`.matchAll(/(?:timeRunWork|runWorkClock)\('([a-z_]+)'/g)].map((m) => m[1]).sort();
     expect(timed).toEqual([...metrics.RUN_WORK_KINDS].sort());
-    expect(server).toMatch(/timeRunWork\('datafile_copy', \(\) => \{\s+const made = withTripCalendars\(withFrameworkWarnings\(/);
+    // Made once per version of its inputs since #1235, timed whether made or kept.
+    expect(server).toMatch(/timeRunWork\('datafile_copy', \(\) => runDatafile\.runCopy\(company\.id, runCopyVersion\(company\.id, filePath\), \(\) => \{\s+const body = withTripCalendars\(withFrameworkWarnings\(/);
     // In slices since #1214: each slice timed, the sum observed once, failed or not.
     // The file's read is one block of its own since #1218, observed when there
     // was a file, with the file's size.
@@ -178,5 +179,28 @@ describe('what the dashboard and the alerts read', () => {
     const cluster = yaml.loadAll(read('OSCAR_Deploy/kubernetes/monitoring/oscar/prometheus-rules.yaml'))
       .filter(Boolean).map((d) => rule(d.spec)).find(Boolean);
     expect(cluster.expr).toBe(vps.expr);
+  });
+
+  // #1235: the panels of #1230 and #1234 put their series on the right axis by
+  // a regular expression that Grafana did not apply, or by a name that held
+  // "(right y-axis)", which Grafana adds to the legend by itself: frames read
+  // as minutes, and the axis named twice.
+  test('a series moved to the right axis is named by its own legend, which never names the axis', () => {
+    const wrong = [];
+    for (const file of fs.readdirSync(path.join(ROOT, DASHBOARDS)).filter((f) => f.endsWith('.json'))) {
+      const dashboard = JSON.parse(read(`${DASHBOARDS}/${file}`));
+      for (const panel of dashboard.panels.flatMap((p) => [p, ...(p.panels || [])])) {
+        const legends = (panel.targets || []).map((t) => t.legendFormat).filter(Boolean);
+        for (const legend of legends) if (/right y-axis/.test(legend)) wrong.push(`${file} ${panel.title}: legend "${legend}"`);
+        for (const { matcher } of panel.fieldConfig?.overrides || []) {
+          if (matcher?.id === 'byRegexp') wrong.push(`${file} ${panel.title}: matched by a regular expression`);
+          const templated = legends.some((l) => l.includes('{{'));
+          if (matcher?.id === 'byName' && !templated && !legends.includes(matcher.options)) {
+            wrong.push(`${file} ${panel.title}: "${matcher.options}" is no legend of the panel`);
+          }
+        }
+      }
+    }
+    expect(wrong).toEqual([]);
   });
 });

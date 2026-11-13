@@ -1102,14 +1102,14 @@
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "The checkpoints of the database, in a thread of their own since server 1.11.510 (#1230): each copies the write-ahead log into the database file, off the server's thread. The time of one (99th percentile over 5 minutes), the log's size at the last one and what it could not copy (pages a reader still used), in frames of one page. A log that keeps growing means the checkpoints do not keep up. oscar_db_checkpoint_thread (Explore) is 1 while the thread checkpoints, 0 when the server's connection does it in its COMMITs.",
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byRegexp", "options": "frames" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "log, frames" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] }, { "matcher": { "id": "byName", "options": "not copied, frames" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 108 },
       "id": 36,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
         { "expr": "histogram_quantile(0.99, sum by (le) (rate(oscar_db_checkpoint_seconds_bucket[5m])))", "legendFormat": "a checkpoint, 99th percentile", "refId": "A" },
-        { "expr": "max(oscar_db_wal_frames)", "legendFormat": "log, frames (right y-axis)", "refId": "B" },
-        { "expr": "max(oscar_db_wal_frames_not_copied)", "legendFormat": "not copied, frames (right y-axis)", "refId": "C" }
+        { "expr": "max(oscar_db_wal_frames)", "legendFormat": "log, frames", "refId": "B" },
+        { "expr": "max(oscar_db_wal_frames_not_copied)", "legendFormat": "not copied, frames", "refId": "C" }
       ],
       "title": "Database checkpoints, in a thread of their own",
       "type": "timeseries"
@@ -1117,14 +1117,14 @@
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "Every statement of the database helpers all/get/run, on the server's thread (#1234): the median and 99th percentile over 5 minutes, and how many took OSCAR_DB_SLOW_MS (50 ms by default) or more in 5 minutes. Each of those is logged as \"slow database statement\" with its SQL and the place in the code that ran it: OSCAR · Logs, panel Slow database statements.",
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "slow, in 5 minutes (right y-axis)" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "slow, in 5 minutes" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 108 },
       "id": 37,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
         { "expr": "histogram_quantile(0.5, sum by (le) (rate(oscar_db_statement_seconds_bucket[5m])))", "legendFormat": "median", "refId": "A" },
         { "expr": "histogram_quantile(0.99, sum by (le) (rate(oscar_db_statement_seconds_bucket[5m])))", "legendFormat": "99th percentile", "refId": "B" },
-        { "expr": "sum(increase(oscar_db_slow_statements_total[5m]))", "legendFormat": "slow, in 5 minutes (right y-axis)", "refId": "C" }
+        { "expr": "sum(increase(oscar_db_slow_statements_total[5m]))", "legendFormat": "slow, in 5 minutes", "refId": "C" }
       ],
       "title": "Database statements: the slow ones",
       "type": "timeseries"
