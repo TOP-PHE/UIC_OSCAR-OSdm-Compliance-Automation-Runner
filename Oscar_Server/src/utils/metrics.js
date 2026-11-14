@@ -151,6 +151,22 @@ const dbCheckpointThread = new promClient.Gauge({
   registers: [register]
 });
 
+// The database's statistics (#1238, db.js onStatistics()): each table the
+// checkpoint thread analyzed, off the server's thread, and each run of
+// PRAGMA optimize there (`done`, or `failed`: logged with its reason).
+const dbAnalyzeSeconds = new promClient.Histogram({
+  name: 'oscar_db_analyze_seconds',
+  help: "Time to analyze one table for SQLite's statistics, in the checkpoint thread (not the server's thread)",
+  buckets: [0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  registers: [register]
+});
+const dbOptimizeRuns = new promClient.Counter({
+  name: 'oscar_db_optimize_runs_total',
+  help: "Runs of SQLite's PRAGMA optimize in the checkpoint thread, done or failed",
+  labelNames: ['outcome'],
+  registers: [register]
+});
+
 // Every statement of db.js's all/get/run, on the server's thread (#1234): its
 // time, and how many took OSCAR_DB_SLOW_MS or more (each also logged, with its
 // SQL and the place that ran it, as "slow database statement").
@@ -352,6 +368,8 @@ module.exports = {
   dbMemoryBytes,
   dbTempStore,
   dbCheckpointSeconds,
+  dbAnalyzeSeconds,
+  dbOptimizeRuns,
   dbWalFrames,
   dbWalFramesNotCopied,
   dbCheckpointThread,

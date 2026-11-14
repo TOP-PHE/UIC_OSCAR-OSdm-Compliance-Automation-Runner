@@ -59,6 +59,20 @@ function checkpointsSetting(value) {
 
 const CHECKPOINTS = checkpointsSetting(process.env.OSCAR_DB_CHECKPOINTS);
 
+// The database's statistics (#1238, the checkpoint thread below): `daily`,
+// the default, has the checkpoint thread run SQLite's PRAGMA optimize a
+// minute after the start and then once a day; `off` never. Without the
+// thread (OSCAR_DB_CHECKPOINTS=inline) there is none either: it must never
+// run on the server's thread. Read here, so a wrong value stops the start.
+function optimizeSetting(value) {
+  if (value === undefined || value === '') return 'daily';
+  const mode = String(value).trim().toLowerCase();
+  if (mode === 'daily' || mode === 'off') return mode;
+  throw new Error(`OSCAR_DB_OPTIMIZE must be daily or off, not "${value}"`);
+}
+
+const OPTIMIZE = optimizeSetting(process.env.OSCAR_DB_OPTIMIZE);
+
 // From how many milliseconds a statement of all/get/run is logged as slow
 // (#1234, observeStatements() below): 50 by default, a whole number from 1
 // to 60000. Read here too, so a wrong value stops the start first.
@@ -111,7 +125,12 @@ const MMAP_MB = mmapSetting(process.env.OSCAR_DB_MMAP_MB);
 const TEMP_STORE = tempStoreSetting(process.env.OSCAR_DB_TEMP_STORE);
 
 // ── Open database ─────────────────────────────────────────────────────────────
-const db = new DatabaseSync(DB_PATH);
+// The busy timeout (#1238): another connection may hold the write lock for a
+// moment, the checkpoint thread's when it analyzes a table. A write here then
+// waits, up to 5 s, instead of failing with "database is locked". Without that
+// other writer, nothing ever waits.
+const BUSY_TIMEOUT_MS = 5000;
+const db = new DatabaseSync(DB_PATH, { timeout: BUSY_TIMEOUT_MS });
 
 // The PRAGMAs take no bound value: their text holds whole numbers checked
 // above, never the setting's own text.
@@ -1269,7 +1288,7 @@ function _safeAlter(sql) {
 })();
 
 const STARTED_WITH = memorySettings();
-console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]}, checkpoints ${CHECKPOINTS}, cache ${megabytes(STARTED_WITH.cacheBytes)}, memory map ${megabytes(STARTED_WITH.mmapBytes)}, temporary storage ${TEMP_STORE_NAMES[STARTED_WITH.tempStore]})`);
+console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]}, checkpoints ${CHECKPOINTS}, statistics ${CHECKPOINTS === 'thread' ? OPTIMIZE : 'off'}, cache ${megabytes(STARTED_WITH.cacheBytes)}, memory map ${megabytes(STARTED_WITH.mmapBytes)}, temporary storage ${TEMP_STORE_NAMES[STARTED_WITH.tempStore]})`);
 
 // ── Encryption helpers ────────────────────────────────────────────────────────
 const ALGO = 'aes-256-gcm';
@@ -1501,6 +1520,10 @@ function onCheckpointMessage(state, msg) {
     console.log('[db] checkpoints run in a thread of their own');
     return;
   }
+  if (msg?.type === 'optimized') {
+    onStatistics(state, msg);
+    return;
+  }
   if (msg?.type !== 'checkpoint') return;
   const log = Number(msg.log);
   const copied = Number(msg.checkpointed);
@@ -1511,6 +1534,48 @@ function onCheckpointMessage(state, msg) {
     checkpointMetric('dbWalFrames')?.set(Math.max(log, 0));
     checkpointMetric('dbWalFramesNotCopied')?.set(Math.max(log - copied, 0));
   } catch { /* a metric never stops the database */ }
+}
+
+// The thread analyzed the tables SQLite said would benefit (#1238). SQLite
+// reads the statistics when a connection reads the schema. Another
+// connection's ANALYZE changes rows of sqlite_stat1, not the schema (only the
+// first one ever creates that table), so this connection would keep the
+// statistics it read at the start (checked: its plans stayed the same while a
+// new connection's changed). It reads them again with ANALYZE sqlite_schema,
+// about a millisecond. Logged with the tables' names, never a value of theirs.
+function onStatistics(state, msg) {
+  const tables = Array.isArray(msg.tables) ? msg.tables : [];
+  let reloadMs = null;
+  let error = msg.error ? String(msg.error) : null;
+  if (tables.length > 0) {
+    const started = process.hrtime.bigint();
+    try {
+      db.exec('ANALYZE sqlite_schema');
+      reloadMs = Number(process.hrtime.bigint() - started) / 1e6;
+    } catch (e) {
+      error = error || `the statistics were not read again (${e.message})`;
+    }
+  }
+  state.statistics = {
+    at: new Date().toISOString(),
+    seconds: Number(msg.seconds),
+    tables: tables.map((t) => String(t.name)),
+    reloadMs,
+    error,
+  };
+  try {
+    for (const t of tables) checkpointMetric('dbAnalyzeSeconds')?.observe(Number(t.seconds));
+    checkpointMetric('dbOptimizeRuns')?.inc({ outcome: error ? 'failed' : 'done' });
+  } catch { /* a metric never stops the database */ }
+  const names = state.statistics.tables.join(', ');
+  const took = `${state.statistics.seconds.toFixed(1)} s`;
+  if (error) {
+    console.error(`[db] statistics: ${tables.length} tables analyzed in ${took} (${names}), then: ${error}`);
+  } else if (tables.length > 0) {
+    console.log(`[db] statistics: ${tables.length} tables analyzed in ${took} (${names}), read again in ${reloadMs.toFixed(1)} ms`);
+  } else {
+    console.log('[db] statistics: no table needed them again');
+  }
 }
 
 // The thread is let go: this connection checkpoints in its COMMITs again,
@@ -1534,14 +1599,25 @@ function checkpointsInline(state, reason) {
 /**
  * Starts the checkpoint thread (OSCAR_DB_CHECKPOINTS=thread, the default, in
  * WAL mode). Gives the Worker, or null when the COMMITs keep checkpointing.
+ * With OSCAR_DB_OPTIMIZE=daily (the default) the same thread updates SQLite's
+ * statistics `optimizeDelayMs` after the start, then every
+ * `optimizeEveryMs`, pausing `optimizePauseMs` after each table (#1238).
  */
-function startCheckpointThread({ intervalMs = 1000, staleMs = 60000 } = {}) {
+function startCheckpointThread({
+  intervalMs = 1000, staleMs = 60000,
+  optimizeDelayMs = 60000, optimizeEveryMs = 24 * 3600 * 1000, optimizePauseMs = 250,
+} = {}) {
   if (checkpointer) return checkpointer.worker;
   if (CHECKPOINTS !== 'thread') return null;
   if (db.prepare('PRAGMA journal_mode').get().journal_mode !== 'wal') return null;
   const { Worker } = require('node:worker_threads');
-  const worker = new Worker(path.join(__dirname, 'checkpointWorker.js'), { workerData: { dbPath: DB_PATH, intervalMs } });
-  const state = { worker, running: false, stopping: false, exited: false, lastSeen: Date.now(), last: null, count: 0, watchdog: null };
+  const worker = new Worker(path.join(__dirname, 'checkpointWorker.js'), {
+    workerData: {
+      dbPath: DB_PATH, intervalMs, busyMs: BUSY_TIMEOUT_MS,
+      optimize: OPTIMIZE === 'daily', optimizeDelayMs, optimizeEveryMs, optimizePauseMs,
+    },
+  });
+  const state = { worker, running: false, stopping: false, exited: false, lastSeen: Date.now(), last: null, count: 0, watchdog: null, statistics: null };
   checkpointer = state;
   worker.unref();
   worker.on('message', (msg) => onCheckpointMessage(state, msg));
@@ -1581,12 +1657,15 @@ function stopCheckpointThread() {
 /** Where the checkpoints run now, for the tests and a diagnosis. */
 function checkpointState() {
   const state = checkpointer;
-  return { mode: CHECKPOINTS, running: Boolean(state?.running), count: state?.count ?? 0, last: state?.last ?? null };
+  return {
+    mode: CHECKPOINTS, running: Boolean(state?.running), count: state?.count ?? 0, last: state?.last ?? null,
+    optimize: OPTIMIZE, statistics: state?.statistics ?? null,
+  };
 }
 
 module.exports = {
   db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig, synchronousSetting,
   checkpointsSetting, startCheckpointThread, stopCheckpointThread, checkpointState,
   slowStatementSetting, observeStatements, sqlShape, callerOf,
-  cacheSetting, mmapSetting, tempStoreSetting, memorySettings,
+  cacheSetting, mmapSetting, tempStoreSetting, memorySettings, optimizeSetting,
 };

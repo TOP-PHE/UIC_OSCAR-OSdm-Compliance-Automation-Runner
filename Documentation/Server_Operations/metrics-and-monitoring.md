@@ -205,6 +205,11 @@ work is measured where it runs:
     and the memory map (`use="mmap"`), in bytes;
   - `oscar_db_temp_store`, a gauge: where temporary sorts and groupings go,
     as SQLite numbers it (1 files, 2 memory);
+- from 1.11.518 (#1238), SQLite's statistics (below, *SQLite's statistics*):
+  - `oscar_db_analyze_seconds`, a histogram: each table analyzed, in the
+    checkpoint thread, not the server's;
+  - `oscar_db_optimize_runs_total{outcome}`, a counter: each run, `done` or
+    `failed`;
 - from 1.11.510 (#1230), the checkpoints of the thread that runs them:
   - `oscar_db_checkpoint_seconds`, a histogram: each checkpoint's time, off
     the server's thread;
@@ -377,6 +382,47 @@ To compare before and after on one machine, run one batch with
 `OSCAR_DB_CACHE_MB=2`, `OSCAR_DB_MMAP_MB=0` and `OSCAR_DB_TEMP_STORE=FILE`
 (SQLite's defaults), one without them, and read the row *OSCAR's thread* and
 the slow statements of each.
+
+**SQLite's statistics** (#1238, server 1.11.518). SQLite chooses an index
+from statistics that `ANALYZE` writes into `sqlite_stat1`. `ANALYZE` had
+never run on OSCAR's database, so the planner guessed how many rows an index
+gives, and a query could walk every run of a company instead of using the
+index of its batch (#1227).
+
+- **When.** With `OSCAR_DB_OPTIMIZE=daily` (the default), the checkpoint
+  thread runs SQLite's `PRAGMA optimize` a minute after the start, then once
+  a day: the advice of [SQLite](https://www.sqlite.org/pragma.html#pragma_optimize)
+  for a connection that stays open. It analyzes only the tables that have no
+  statistics yet, or whose number of rows changed tenfold since.
+- **Never on the server's thread.** The thread analyzes one table at a time,
+  with an analysis limit of 1,000 rows per index, and pauses a quarter of a
+  second after each. An analysis holds the database's write lock while it
+  runs, and the server's connection waits for it (up to 5 s, its busy
+  timeout) instead of failing.
+- **The server's plans follow.** A connection reads the statistics when it
+  reads the schema, and another connection's `ANALYZE` does not make it read
+  them again. So the server's connection runs `ANALYZE sqlite_schema` after
+  each run that analyzed a table: about a millisecond.
+- **What it says.** One line per run, with the tables' names:
+  `[db] statistics: 12 tables analyzed in 3.4 s (runs, run_assertions, …),
+  read again in 0.8 ms`, or `no table needed them again`. A failure is an
+  error line and `oscar_db_optimize_runs_total{outcome="failed"}`; the next
+  run is the next day.
+- **To check a change of plan.** Statistics change the plans of every query.
+  Compare the slow statements of one batch before the first run and one
+  after (*OSCAR · Logs*, *Slow database statements*).
+- **If a query became slower.** Set `OSCAR_DB_OPTIMIZE=off`, remove the
+  statistics, then restart OSCAR. On a cluster:
+
+```bash
+sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync('/app/data/oscar.db', { timeout: 5000 }); db.exec('DELETE FROM sqlite_stat1'); console.log('statistics removed')"
+```
+
+  On the VPS, the same `node` command with `docker exec oscar` in place of
+  `sudo kubectl -n oscar exec deploy/oscar -c oscar --`. Then name the slow
+  statement in an issue: the fix is in the query (`INDEXED BY`, or `+` in
+  front of a column, as #1227 and #1246 did), and the statistics can come
+  back.
 
 ### Run pods (#1130)
 

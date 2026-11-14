@@ -3999,6 +3999,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     line and the gauges `oscar_db_memory_bytes{use}` / `oscar_db_temp_store`.
     The checkpoint thread's connection keeps the defaults. To be measured on
     the test machine (one batch with the three set to SQLite's defaults).
+    **#1238 (1.11.518): statistics.** The checkpoint thread runs
+    `PRAGMA optimize(0x10003)` (lists only), then each `ANALYZE "main"."t"`
+    alone (`analysis_limit` 1000, 250 ms pause), a minute after the start and
+    daily; `OSCAR_DB_OPTIMIZE=off` stops it. **The server's connection has a
+    busy timeout of 5 s** (`new DatabaseSync(…, { timeout })`; Node's
+    default 0 failed a write at once while another connection held the
+    lock). **Another connection's ANALYZE is not seen** once
+    `sqlite_stat1` exists (rows change, the schema does not), so
+    `onStatistics()` runs `ANALYZE sqlite_schema`; `EXPLAIN QUERY PLAN`
+    alone never looks at the schema version, so a plan test runs a real
+    query first. An error of the statistics never ends the thread.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the
