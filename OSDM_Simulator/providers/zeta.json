@@ -222,5 +222,17 @@
       "urn:uic:stn:0000070": "870",
       "urn:uic:stn:0000089": "889"
     }
+  },
+  "nonTrip": {
+    "places": [
+      { "id": "urn:uic:stn:0000040", "name": "Simtown Central" },
+      { "id": "urn:uic:stn:0000041", "name": "Simtown Airport" },
+      { "id": "urn:uic:stn:0000042", "name": "Simtown North" }
+    ],
+    "zones": [
+      { "id": "SIM-CITY", "name": "Simtown city", "zoneId": 100, "places": ["urn:uic:stn:0000040", "urn:uic:stn:0000041"] },
+      { "id": "SIM-NORTH", "name": "Simtown north", "zoneId": 101, "places": ["urn:uic:stn:0000042"] }
+    ],
+    "withoutValidityFrom": "urn:uic:stn:0000042"
   }
 }

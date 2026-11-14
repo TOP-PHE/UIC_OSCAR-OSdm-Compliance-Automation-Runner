@@ -259,6 +259,8 @@ function trainOfLeg(leg) {
 }
 
 const legsOfTrip = trip => (trip?.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length ? trip.legs : [trip?.trip || {}]);
+// #1258: a request without a trip names no train.
+const hasTrain = trip => trip?.tripType !== 'NON_TRIP';
 const trainKey = d => [d.originURN, d.destinationURN, d.productCategoryRef, ...(d.services[0] ? [d.services[0].vehicleNumber, d.services[0].departureTime, d.services[0].arrivalTime] : [])].join('|');
 const stationOf = urn => String(urn || '').slice(String(urn || '').lastIndexOf(':') + 1);
 
@@ -271,7 +273,7 @@ function testResourcesFromDatafile(datafile) {
   const trains = [];
   const byKey = new Map();
   const journeys = [];
-  for (const trip of Array.isArray(datafile?.tripRequirements) ? datafile.tripRequirements : []) {
+  for (const trip of (Array.isArray(datafile?.tripRequirements) ? datafile.tripRequirements : []).filter(hasTrain)) {
     const legs = legsOfTrip(trip).map((leg) => {
       const data = trainOfLeg(leg);
       const key = trainKey(data);
@@ -386,6 +388,17 @@ function checkFaresAgainstProfile(provider, framework, profile) {
   }
 }
 
+// #1258: the checklist does not ask yet whether offers are sold without a
+// trip. A simulated provider whose profile sells so (`nonTrip`) declares both
+// non-trip forms, after those the checklist ticks.
+function withNonTripForms(framework, profile) {
+  if (!profile?.nonTrip || !Array.isArray(framework.offerRequestForms)) return;
+  const { NON_TRIP_REQUEST_FORMS } = require('./frameworkGating');
+  for (const form of NON_TRIP_REQUEST_FORMS) {
+    if (!framework.offerRequestForms.includes(form)) framework.offerRequestForms.push(form);
+  }
+}
+
 /** The reference of one provider, as stored in the repository. */
 function buildReference({ provider, profile, answers, datafile }) {
   if (!PROVIDERS.includes(provider)) throw new Error(`Unknown simulated provider ${provider}.`);
@@ -401,6 +414,7 @@ function buildReference({ provider, profile, answers, datafile }) {
   // #938: the distribution modes (A1.3) and the fares (chapter F) are the
   // checklist's; the profile only checks them, as it checks the version.
   checkFaresAgainstProfile(provider, framework, profile);
+  withNonTripForms(framework, profile);
   // Last, where 1.11.388 wrote it: the stored text, and so its version, stays.
   const { fares } = framework;
   delete framework.fares;

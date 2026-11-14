@@ -263,9 +263,10 @@ file; it never replaces existing ones.
    untick it. A return scenario whose model is not declared still runs, with a
    `[WARNING]` naming the model.
 5. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
-   200, the nine optional information requests answer 501 and are reported as
-   "not implemented by this provider" (on `gamma`, `GET /reduction-cards` and
-   `GET /products` answer 200), and no check fails. The warnings each
+   200, the optional information requests the simulator does not provide
+   answer 501 and are reported as "not implemented by this provider" (on
+   `gamma`, `GET /reduction-cards`, `GET /products` and, since simulator
+   0.67.0, `GET /zones` answer 200), and no check fails. The warnings each
    scenario shows are listed in the catalogue.
 
 The same data file runs without OSCAR too, with Bruno on a PC: see

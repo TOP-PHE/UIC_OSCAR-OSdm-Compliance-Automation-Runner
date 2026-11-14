@@ -100,6 +100,19 @@ function nestDocuments(value, docs) {
   for (const child of Object.values(value)) nestDocuments(child, docs);
 }
 
+// #1258: below 3.7 an admission holds one regional validity, the member that
+// 3.7 deprecated for the list.
+const ADMISSIONS = new Set(['AdmissionOfferPart', 'Admission']);
+function singleRegionalValidity(value) {
+  if (Array.isArray(value)) { value.forEach(singleRegionalValidity); return; }
+  if (!isObject(value)) return;
+  if (ADMISSIONS.has(value.objectType) && Array.isArray(value.regionalValidities)) {
+    if (value.regionalValidities.length > 0) value.regionalValidity = value.regionalValidities[0];
+    delete value.regionalValidities;
+  }
+  for (const child of Object.values(value)) singleRegionalValidity(child);
+}
+
 function removeNames(value, names) {
   if (Array.isArray(value)) { value.forEach((item) => removeNames(item, names)); return; }
   if (!isObject(value)) return;
@@ -118,6 +131,7 @@ function shapeAnswer(body, version) {
   for (const rule of ABSENT_BELOW) {
     if (rank(version) < rank(rule.below)) removeNames(out, rule.names);
   }
+  if (rank(version) < rank('3.7')) singleRegionalValidity(out);
   return out;
 }
 

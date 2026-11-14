@@ -471,6 +471,17 @@ Fare offers for a requested section (fares phase 1a). The trip is trip 24, a spe
 | `SIM_WRONG_FARE_DATES_OFFSET_38` | One adult on trip 42, the section from 0000064. Deliberately wrong. | Valid travel dates at +01:00 with `utcOffset` 0. | A WARNING of check O19 at 01; no failed check: only warnings, so the fare is booked and confirmed. |
 | `SIM_WRONG_FARE_COVERED_LEG_38` | One adult on trip 43, the section from 0000065. Deliberately wrong. | The offer's covered section ends on a leg the trip does not have. | A WARNING of check O20 at 01; no failed check: only warnings, so the fare is booked and confirmed. |
 
+### Offers without a trip (#1258)
+
+The offer request names no trip: `nonTripSearchCriteria` asks offers valid between stop places (`StopPlaceRef` only, of the Place kinds) or in a zone. Every provider sells so (`nonTrip` in its profile): the stop places 0000040 (Simtown Central), 0000041 (Simtown Airport) and 0000042 (Simtown North), answered by `GET /places` and `POST /places`, and the zones `SIM-CITY` (0000040, 0000041) and `SIM-NORTH` (0000042), answered by `GET /zones`. A non-trip offer is valid for a day from `validFrom`; an address, a point of interest or a NUTS code is refused (400).
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_NONTRIP_PLACES_1ADT_38` | One adult on trip 45: offers asked between 0000040 and 0000041, no trip sent; booked, passenger details updated, fulfilled. | No trip; per tariff and class an offer whose admission has no trip coverage, a `regionalValidities` route through the two stations (the single `regionalValidity` in OSDM 3.6) and a `regionalValiditySummary`. The booked admission keeps its validity. | No failed check and no warning: no trip, no trip coverage, a validity naming both stop places at 01, and the same of the booking at 02, 05 and 07. |
+| `SIM_NONTRIP_PLACES_LOOKUP_1ADT_38` | As `SIM_NONTRIP_PLACES_1ADT_38` on trip 46, which names no stop place but a name: step 01 asks `POST /places` for “Simtown” (type STOP) and takes the first two. | Stop places 0000040 and 0000041 (and 0000042, not used), then the offers between the first two. | No failed check: the place lookup's checks, then those of `SIM_NONTRIP_PLACES_1ADT_38`. |
+| `SIM_NONTRIP_ZONES_1ADT_38` | One adult on trip 47, by zones and none named: step 01 asks `GET /zones` and takes the first zone, its id and carrier as given. | Zone `SIM-CITY` of the provider's carrier, then offers whose admissions are valid in a `Zone` of that carrier. | No failed check and no warning. |
+| `SIM_WRONG_NONTRIP_NO_VALIDITY_1ADT_38` | One adult on trip 48, from 0000042 (`nonTrip.withoutValidityFrom`). Deliberately wrong. | Admissions without `regionalValidities` and without `regionalValiditySummary`. | Fails “each admission says where it is valid” at 01, 02, 05 and 07 (4 failed checks), with a WARNING for the missing summary at 01. |
+
 ### Deliberately wrong answers (#611)
 
 Each of these makes one validator family fail on purpose, so that its FAIL path runs. They are not in the data file's run list. The offer one uses the trip from station `0000098` (`variants.wrongOffersFrom`); the others a passenger list naming the variant.

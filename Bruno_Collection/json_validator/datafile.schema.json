@@ -718,7 +718,8 @@
             "type": "string",
             "enum": [
               "SEARCH",
-              "SPECIFICATION"
+              "SPECIFICATION",
+              "NON_TRIP"
             ]
           },
           "departureDay": {
@@ -742,6 +743,30 @@
               "description": { "type": "string" }
             },
             "required": ["origin", "destination", "startDatetime"]
+          },
+          "nonTrip": {
+            "type": "object",
+            "description": "For NON_TRIP trips (#1258): offers without a trip, valid between stop places or in zones (nonTripSearchCriteria).",
+            "properties": {
+              "by": { "type": "string", "enum": ["PLACES", "ZONES"], "description": "Stop places (StopPlaceRef only) or zones." },
+              "places": { "type": "array", "description": "Two or more stop places (URN or UIC code); empty to take them from POST /places by placeLookup.", "items": { "type": "string" } },
+              "placeLookup": { "type": ["string", "null"], "description": "A name to look the stop places up with (POST /places, type STOP)." },
+              "zones": {
+                "type": "array",
+                "description": "Zones by id and carrier; empty to take the first of GET /zones.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "carrier": { "type": "string" }
+                  },
+                  "required": ["id", "carrier"]
+                }
+              },
+              "validFrom": { "type": ["string", "null"], "description": "Start of the validity (supports %TRIP_DATE%); default the trip date at midnight." },
+              "description": { "type": "string" }
+            },
+            "required": ["by"]
           },
           "legs": {
             "type": "array",
