@@ -3987,6 +3987,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     slice (`inSlices()`) with `setImmediate` between, so `latestRunStates()`,
     `facetsFor()`, the preview and the launch's `queueBatch()` are async. A call keeps its
     own counts (another request may evict the cache between its slices).
+    **#1237 (1.11.517): SQLite's memory.** The server's connection sets
+    `cache_size` 64 MB, `mmap_size` 256 MB and `temp_store = MEMORY` before
+    the schema (SQLite's defaults: 2 MB, no map, files);
+    `OSCAR_DB_CACHE_MB` (2–1024), `OSCAR_DB_MMAP_MB` (0–2047: Node's SQLite
+    caps the map at `0x7fff0000`) and `OSCAR_DB_TEMP_STORE` (MEMORY/FILE),
+    read before the database opens. A PRAGMA takes no bound value: its text
+    holds a checked `Number`, never the setting's text (`db-memory.test.js`
+    counts two such PRAGMAs). `memorySettings()` reads what the connection
+    uses (a `:memory:` database has no `mmap_size` row) for the start-up
+    line and the gauges `oscar_db_memory_bytes{use}` / `oscar_db_temp_store`.
+    The checkpoint thread's connection keeps the defaults. To be measured on
+    the test machine (one batch with the three set to SQLite's defaults).
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

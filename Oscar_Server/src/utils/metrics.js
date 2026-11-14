@@ -107,6 +107,22 @@ const dbSynchronous = new promClient.Gauge({
   registers: [register]
 });
 
+// SQLite's memory on the server's connection (#1237), set by server.js at
+// start from the connection itself: the page cache and the memory map in
+// bytes (`use`), and where temporary sorts and groupings go, as SQLite
+// numbers it (0 its build's default, files here; 1 files; 2 memory).
+const dbMemoryBytes = new promClient.Gauge({
+  name: 'oscar_db_memory_bytes',
+  help: "SQLite's page cache (use=cache) and memory map (use=mmap) on the server's connection, in bytes",
+  labelNames: ['use'],
+  registers: [register]
+});
+const dbTempStore = new promClient.Gauge({
+  name: 'oscar_db_temp_store',
+  help: "Where SQLite keeps temporary sorts and groupings on the server's connection: 0 default (files), 1 files, 2 memory",
+  registers: [register]
+});
+
 // The checkpoints of the thread of their own (#1230, db.js
 // startCheckpointThread()): the time of each, off the server's thread; the
 // write-ahead log's size at the last one and what it could not copy (pages a
@@ -333,6 +349,8 @@ module.exports = {
   runLogSeconds,
   dbCommitSeconds,
   dbSynchronous,
+  dbMemoryBytes,
+  dbTempStore,
   dbCheckpointSeconds,
   dbWalFrames,
   dbWalFramesNotCopied,

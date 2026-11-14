@@ -72,8 +72,52 @@ function slowStatementSetting(value) {
 
 const SLOW_MS = slowStatementSetting(process.env.OSCAR_DB_SLOW_MS);
 
+// ── SQLite's memory on the server's connection (#1237) ────────────────────────
+// SQLite's defaults are a page cache of 2 MB, no memory map, and temporary
+// sorts and groupings in files. With a database of 10 GB, each lookup or
+// insert that misses those 2 MB asks the operating system for its page, and
+// run_assertions has 7 indexes: each stored check touches 8 B-trees.
+// - OSCAR_DB_CACHE_MB, the page cache: 64 by default, 2 to 1024.
+// - OSCAR_DB_MMAP_MB, the memory map: 256 by default, 0 (none) to 2047
+//   (Node's SQLite maps 2 GB at most). The mapped pages are the kernel's own
+//   cache of the database file, not a second copy.
+// - OSCAR_DB_TEMP_STORE, temporary storage: MEMORY (the default) or FILE.
+// Read here, so a wrong value stops the start before the database is opened.
+function wholeNumberSetting(name, value, fallback, min, max) {
+  if (value === undefined || value === '') return fallback;
+  const text = String(value).trim();
+  const n = /^\d{1,4}$/.test(text) ? Number(text) : Number.NaN;
+  if (n >= min && n <= max) return n;
+  throw new Error(`${name} must be a whole number of megabytes from ${min} to ${max}, not "${value}"`);
+}
+
+function cacheSetting(value) {
+  return wholeNumberSetting('OSCAR_DB_CACHE_MB', value, 64, 2, 1024);
+}
+
+function mmapSetting(value) {
+  return wholeNumberSetting('OSCAR_DB_MMAP_MB', value, 256, 0, 2047);
+}
+
+function tempStoreSetting(value) {
+  if (value === undefined || value === '') return 'MEMORY';
+  const mode = String(value).trim().toUpperCase();
+  if (mode === 'MEMORY' || mode === 'FILE') return mode;
+  throw new Error(`OSCAR_DB_TEMP_STORE must be MEMORY or FILE, not "${value}"`);
+}
+
+const CACHE_MB = cacheSetting(process.env.OSCAR_DB_CACHE_MB);
+const MMAP_MB = mmapSetting(process.env.OSCAR_DB_MMAP_MB);
+const TEMP_STORE = tempStoreSetting(process.env.OSCAR_DB_TEMP_STORE);
+
 // ── Open database ─────────────────────────────────────────────────────────────
 const db = new DatabaseSync(DB_PATH);
+
+// The PRAGMAs take no bound value: their text holds whole numbers checked
+// above, never the setting's own text.
+db.exec(`PRAGMA cache_size = -${Number(CACHE_MB) * 1024}`);
+db.exec(`PRAGMA mmap_size = ${Number(MMAP_MB) * 1024 * 1024}`);
+db.exec(TEMP_STORE === 'FILE' ? 'PRAGMA temp_store = FILE' : 'PRAGMA temp_store = MEMORY');
 
 // Apply schema (idempotent — all statements use IF NOT EXISTS)
 const schema = fs.readFileSync(SCHEMA_SQL, 'utf8');
@@ -83,6 +127,30 @@ if (db.prepare('PRAGMA journal_mode').get().journal_mode === 'wal') {
   db.exec(SYNCHRONOUS === 'FULL' ? 'PRAGMA synchronous = FULL' : 'PRAGMA synchronous = NORMAL');
 }
 const SYNCHRONOUS_NAMES = ['OFF', 'NORMAL', 'FULL', 'EXTRA'];
+
+/**
+ * What the server's connection uses (#1237), read from the connection, not
+ * from the settings: `cacheBytes` (SQLite gives a negative cache size in
+ * KiB, a positive one in pages), `mmapBytes` (0 for a database in memory,
+ * which SQLite does not map) and `tempStore` as SQLite numbers it: 0 its
+ * build's default (files here), 1 files, 2 memory.
+ */
+function memorySettings(connection = db) {
+  const cache = Number(connection.prepare('PRAGMA cache_size').get().cache_size);
+  const pageSize = Number(connection.prepare('PRAGMA page_size').get().page_size);
+  const mmap = connection.prepare('PRAGMA mmap_size').get();
+  return {
+    cacheBytes: cache < 0 ? -cache * 1024 : cache * pageSize,
+    mmapBytes: Number(mmap?.mmap_size ?? 0),
+    tempStore: Number(connection.prepare('PRAGMA temp_store').get().temp_store),
+  };
+}
+
+const TEMP_STORE_NAMES = ['default', 'files', 'memory'];
+
+function megabytes(bytes) {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
 
 // ── Versioned migrations ──────────────────────────────────────────────────────
 // Each migration declares its version + a short name + an `up` function. The
@@ -1200,7 +1268,8 @@ function _safeAlter(sql) {
   }
 })();
 
-console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]}, checkpoints ${CHECKPOINTS})`);
+const STARTED_WITH = memorySettings();
+console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]}, checkpoints ${CHECKPOINTS}, cache ${megabytes(STARTED_WITH.cacheBytes)}, memory map ${megabytes(STARTED_WITH.mmapBytes)}, temporary storage ${TEMP_STORE_NAMES[STARTED_WITH.tempStore]})`);
 
 // ── Encryption helpers ────────────────────────────────────────────────────────
 const ALGO = 'aes-256-gcm';
@@ -1519,4 +1588,5 @@ module.exports = {
   db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig, synchronousSetting,
   checkpointsSetting, startCheckpointThread, stopCheckpointThread, checkpointState,
   slowStatementSetting, observeStatements, sqlShape, callerOf,
+  cacheSetting, mmapSetting, tempStoreSetting, memorySettings,
 };

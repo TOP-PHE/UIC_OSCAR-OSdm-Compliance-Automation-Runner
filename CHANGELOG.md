@@ -507,6 +507,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.517] — 2026-11-14
+
+Listed in `compatibility.json` (2026.556) without moving `current_release`.
+
+### Changed
+
+- **SQLite's page cache, memory map and temporary storage on the server's
+  connection** (#1237, an action of the review #1233). SQLite's defaults
+  were:
+  - a page cache of 2 MB, for a database of 10 GB on the k3s test machine;
+  - no memory map: each page that misses the cache is a system call;
+  - temporary sorts and groupings in files.
+
+  Storing one check updates 8 B-trees (`run_assertions` and its 7
+  indexes), so most of them missed those 2 MB.
+- The server's connection now runs with a cache of 64 MB, a map of 256 MB
+  and temporary storage in memory. The mapped pages are the system's own
+  cache of the database file, not a second copy. The checkpoint thread's
+  connection keeps SQLite's defaults: it only copies the log into the file.
+- Three settings, each read before the database is opened (a wrong value
+  stops the start):
+  - `OSCAR_DB_CACHE_MB`, 64, from 2 to 1024;
+  - `OSCAR_DB_MMAP_MB`, 256, from 0 (none) to 2047 (Node's SQLite maps
+    2 GB at most);
+  - `OSCAR_DB_TEMP_STORE`, `MEMORY` or `FILE`.
+- The values in use, read from the connection (`memorySettings()`), are on
+  the start-up line (`cache 64 MB, memory map 256 MB, temporary storage
+  memory`) and in two gauges, `oscar_db_memory_bytes{use}` (cache, mmap)
+  and `oscar_db_temp_store`.
+- The PRAGMAs hold whole numbers checked at start, or one of two fixed
+  texts, never a setting's own text (`db-memory.test.js` reads them).
+- *Metrics and monitoring* says how to compare before and after on one
+  machine (one batch with SQLite's defaults set, one without); the k3s
+  guide counts both in the server's 3 GiB. To keep only if the measurement
+  on the test machine shows a gain, as #1237 asks.
+
+---
+
 ## [server-1.11.516] — 2026-11-13
 
 Listed in `compatibility.json` (2026.555) without moving `current_release`.

@@ -199,6 +199,12 @@ work is measured where it runs:
   a transaction, commits too and is not counted;
 - `oscar_db_synchronous`, a gauge (from 1.11.508, #1224): the server
   connection's synchronous mode, 1 NORMAL or 2 FULL;
+- from 1.11.517 (#1237), SQLite's memory on the server's connection, read
+  from the connection at start (below, *SQLite's memory*):
+  - `oscar_db_memory_bytes{use}`, a gauge: the page cache (`use="cache"`)
+    and the memory map (`use="mmap"`), in bytes;
+  - `oscar_db_temp_store`, a gauge: where temporary sorts and groupings go,
+    as SQLite numbers it (1 files, 2 memory);
 - from 1.11.510 (#1230), the checkpoints of the thread that runs them:
   - `oscar_db_checkpoint_seconds`, a histogram: each checkpoint's time, off
     the server's thread;
@@ -348,6 +354,29 @@ reports nothing for a minute, the server's connection checkpoints by itself
 again, so the log never grows without bound. `OSCAR_DB_CHECKPOINTS=inline`
 keeps the old way. The start-up line says which:
 `[db] SQLite ready → … (synchronous NORMAL, checkpoints thread)`.
+
+**SQLite's memory** (#1237, server 1.11.517). SQLite's defaults were a page
+cache of 2 MB, no memory map, and temporary sorts and groupings in files.
+With a database of 10 GB, each lookup or insert that misses those 2 MB asks
+the operating system for its page, and storing one check updates 8 B-trees
+(`run_assertions` and its 7 indexes). The server's connection now runs with:
+
+| Setting | Default | What it is |
+|---|---|---|
+| `OSCAR_DB_CACHE_MB` | 64 | The page cache, 2 to 1024 MB. Memory of OSCAR's process, used as the pages are read. |
+| `OSCAR_DB_MMAP_MB` | 256 | How much of the database file is read through a memory map, 0 (none) to 2047 MB. The mapped pages are the operating system's own cache of the file, not a second copy. |
+| `OSCAR_DB_TEMP_STORE` | `MEMORY` | Where temporary sorts and groupings go: `MEMORY` or `FILE` (as before). |
+
+A wrong value stops the start. The values in use are on the start-up line,
+`[db] SQLite ready → … (… cache 64 MB, memory map 256 MB, temporary storage
+memory)`, and in `oscar_db_memory_bytes` and `oscar_db_temp_store`
+(*Explore*). The checkpoint thread's connection keeps SQLite's defaults: it
+only copies the log into the file.
+
+To compare before and after on one machine, run one batch with
+`OSCAR_DB_CACHE_MB=2`, `OSCAR_DB_MMAP_MB=0` and `OSCAR_DB_TEMP_STORE=FILE`
+(SQLite's defaults), one without them, and read the row *OSCAR's thread* and
+the slow statements of each.
 
 ### Run pods (#1130)
 
