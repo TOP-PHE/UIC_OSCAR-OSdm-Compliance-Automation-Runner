@@ -507,6 +507,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.519] — 2026-11-14
+
+Listed in `compatibility.json` (2026.558) without moving `current_release`.
+
+### Changed
+
+- **The queue panel reads the active runs' own index** (#1239, an action of
+  the review #1233). The Dashboard asks `GET /v1/runs/queue-status` every
+  3 s while it is open. Its query walked every run of the company in
+  `idx_runs_company_queued` to find the few queued or running: 35 ms on
+  96,000 runs on the test machine. A partial index,
+  `idx_runs_active (company_id, queued_at) WHERE status IN ('QUEUED',
+  'RUNNING')`, holds those runs only. Measured locally on 96,000 runs, the
+  query went from 13 ms to 0.04 ms, with the same rows.
+- **Four indexes no query needed are removed** (migration 55):
+  - `runs (company_id)`, a prefix of `idx_runs_company_queued`;
+  - `run_assertions (company_id)`, a prefix of `(company_id,
+    assertion_key)`;
+  - `run_assertions (company_id, category)` and `(company_id, domain)`:
+    the category and domain filters read a run's or a request's checks,
+    through their own indexes.
+
+  Each stored check updated 7 indexes; now 4. Every query on the two tables
+  was read first. The cascades from `companies` and the deletion of a
+  company use the indexes that start with `company_id`.
+  `db-indexes.test.js` covers:
+  - the indexes left;
+  - an index under every foreign key;
+  - the plans of the queue panel, the trends and a company's deletion;
+  - the migration on a database that had the old indexes.
+- **A stored request's parent is found in memory.** The parent is the link
+  from a booking to its offer, a refund to its refund offer, and so on.
+  `inferParentRequestId()` ran one query with a join over `run_requests`
+  and `run_suites` for each stored request. The plan of a run's results now
+  keeps the requests it stored, by scenario, and looks among the last 30 of
+  the scenario as the query did. A run's results are stored once, in order,
+  so they are the same requests. `results-parents.test.js` stores eight
+  drawn runs of 160 requests and compares each parent with the old query's;
+  mutation-checked (a window of 31, one list for every scenario).
+
+---
+
 ## [server-1.11.518] — 2026-11-14
 
 Listed in `compatibility.json` (2026.557) without moving `current_release`.

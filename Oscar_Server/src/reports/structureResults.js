@@ -209,8 +209,11 @@ function isAuthRequestUrl(url) {
  *
  * For now we use a path-based heuristic: a request to one of the "child"
  * endpoints links to the most recent earlier "parent" request from the same
- * scenario (same run_id + scenario_name). We rely on insertion order — by the
- * time we link, the parent has already been INSERT-ed in this transaction.
+ * scenario (same run_id + scenario_name), among the last PARENT_WINDOW
+ * requests of that scenario that have a URL. Since #1239 those are the
+ * requests this run's results stored, kept in memory by the plan (one query
+ * with a join per stored request before): a run's results are stored by one
+ * extraction, in order, so they are the same requests.
  *
  * This stays accurate without needing to parse offerIds out of every body,
  * which would be brittle across vendor variations.
@@ -225,31 +228,26 @@ const PARENT_PATH_RULES = [
   { child: /\/fulfillments(\b|\?|\/|$)/i,         parent: /\/bookings(\/|$)/i },
 ];
 
-function inferParentRequestId(url, runId, scenarioName) {
-  if (!url || !runId) return null;
-  for (const { child, parent } of PARENT_PATH_RULES) {
-    if (child.test(url)) {
-      // Find the most recent matching parent in the same scenario.
-      // We can't filter by parent regex directly in SQL, so we pull the last
-      // few requests of this scenario and pick the first that matches.
-      const candidates = require('../db/db').all(
-        `SELECT rq.id, rq.http_url
-           FROM run_requests rq
-           JOIN run_suites s ON s.id = rq.suite_id
-          WHERE rq.run_id = ?
-            AND s.scenario_name IS ?
-            AND rq.http_url IS NOT NULL
-          ORDER BY rq.id DESC
-          LIMIT 30`,
-        [runId, scenarioName ?? null]
-      );
-      for (const c of candidates) {
-        if (parent.test(c.http_url)) return c.id;
-      }
-      return null;   // child pattern matched but no parent yet — chain root
-    }
+const PARENT_WINDOW = 30;
+
+// The requests of a scenario stored so far, oldest first: { id, url }.
+// A scenario without a name (undefined) is kept under null, as the old query's
+// `scenario_name IS ?` with null did.
+function storedOf(plan, scenarioName = null) {
+  if (!plan.stored.has(scenarioName)) plan.stored.set(scenarioName, []);
+  return plan.stored.get(scenarioName);
+}
+
+function inferParentRequestId(plan, url, scenarioName) {
+  if (!url) return null;
+  const rule = PARENT_PATH_RULES.find(({ child }) => child.test(url));
+  if (!rule) return null;   // not a recognized child endpoint
+  // The most recent matching parent among the last requests of the scenario.
+  const stored = storedOf(plan, scenarioName);
+  for (let i = stored.length - 1; i >= Math.max(0, stored.length - PARENT_WINDOW); i--) {
+    if (rule.parent.test(stored[i].url)) return stored[i].id;
   }
-  return null;       // not a recognized child endpoint
+  return null;   // child pattern matched but no parent yet — chain root
 }
 
 // Auth/token URL patterns to skip (same as diff.js)
@@ -449,6 +447,8 @@ function planOf(runId, companyId, text) {
       suiteTotals: db.prepare(SUITE_TOTALS_SQL),
     },
     counts: noResults(),
+    // The requests stored so far, by scenario, for their parents (#1239).
+    stored: new Map(),
   };
 }
 
@@ -541,7 +541,7 @@ function storeRequest(plan, group, item) {
   // "← view originating offer" arrows in the JSON viewer.
   let parentRequestId = null;
   try {
-    parentRequestId = inferParentRequestId(url, plan.runId, group.scenario);
+    parentRequestId = inferParentRequestId(plan, url, group.scenario);
   } catch (_e) { /* linkage is best-effort */ }
 
   // Insert request row. Phase 2 of issue #60: HTTP traffic columns
@@ -559,6 +559,7 @@ function storeRequest(plan, group, item) {
     colEncrypt(resBody), colEncrypt(resHeaders),
     parentRequestId
   ).lastInsertRowid;
+  if (url) storedOf(plan, group.scenario).push({ id: requestId, url });
   const reqTotals = { total: 0, passed: 0, failed: 0 };
   plan.counts.requests++;
   group.totals.duration += duration;

@@ -148,9 +148,15 @@ CREATE TABLE IF NOT EXISTS runs (
   error_message       TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_runs_company_id ON runs(company_id);
+-- A company's runs are found by the indexes that start with company_id
+-- (migration 54: by queue date, by batch, by scenario); (company_id) alone was
+-- a prefix of them and went in migration 55 (#1239).
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
 CREATE INDEX IF NOT EXISTS idx_runs_user_id ON runs(user_id);
+-- The runs queued or running, by company and queue date: the Dashboard's queue
+-- panel asks for them every 3 s, and a walk of every run of the company took
+-- 35 ms on 96,000 runs (#1239). A partial index holds those few runs only.
+CREATE INDEX IF NOT EXISTS idx_runs_active ON runs(company_id, queued_at) WHERE status IN ('QUEUED', 'RUNNING');
 
 -- ── Run Events (log stream) ───────────────────────────────────────────────────
 -- Additional columns added via migrations in db.js:
@@ -400,10 +406,11 @@ CREATE TABLE IF NOT EXISTS run_assertions (
 -- count of a run's failed checks reads the index only (#1202, migration 53).
 CREATE INDEX IF NOT EXISTS idx_run_assertions_run_passed ON run_assertions(run_id, passed);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_request   ON run_assertions(request_id);
-CREATE INDEX IF NOT EXISTS idx_run_assertions_company   ON run_assertions(company_id);
+-- company_id first: the trends read a company's checks by key, and deleting a
+-- company finds its checks here. (company_id) alone, (company_id, category)
+-- and (company_id, domain) went in migration 55 (#1239): no query read them,
+-- and every stored check updated them.
 CREATE INDEX IF NOT EXISTS idx_run_assertions_key       ON run_assertions(company_id, assertion_key);
-CREATE INDEX IF NOT EXISTS idx_run_assertions_category  ON run_assertions(company_id, category);
-CREATE INDEX IF NOT EXISTS idx_run_assertions_domain    ON run_assertions(company_id, domain);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_suite     ON run_assertions(suite_id);
 
 -- ── Report Templates (certifier saved report configurations) ────────────────
