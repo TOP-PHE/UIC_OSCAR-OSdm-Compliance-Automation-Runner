@@ -4,6 +4,17 @@
   "current_release": "2026.554",
   "releases": [
     {
+      "release": "2026.555",
+      "date": "2026-11-14",
+      "server": "1.11.516",
+      "collection": "OTST_V2.0.258",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.516, collection OTST_V2.0.258 (simulator 0.67.0): offers without a trip (#1258). A trip requirement of type NON_TRIP asks nonTripSearchCriteria between stop places (StopPlaceRef only; found first by POST /places when the scenario gives a name) or in a zone (the first of GET /zones when none is named). Step 01 checks that the answer gives no trip and no trip coverage and that each admission says where it is valid (regionalValidities from OSDM 3.7, the single regionalValidity in 3.6; summary and what it names are warnings); 02, 05 and 07 check the booking the same way. New offer request forms NON_TRIP_PLACES / NON_TRIP_ZONES in the Test Framework, capabilities, run filters; Test Config edits the new trip type; catalogue entries OTST_NONTRIP_PLACES_1ADT and OTST_NONTRIP_ZONES_1ADT. The simulator sells without a trip on every provider and answers GET /zones, which adds 9 checks to every scenario; with the 2 booking checks of #991 the catalogue had not counted, every catalogue count moved (+9, +10 or +11)."
+      ]
+    },
+    {
       "release": "2026.554",
       "date": "2026-11-13",
       "server": "1.11.515",

@@ -289,10 +289,10 @@ describe('#748 — the Test Framework page', () => {
     const toggle = lift('fwToggleOfferRequestForm', { wizData, FW_OFFER_REQUEST_FORMS });
     const el = { classList: { toggle: (_c, on) => { el.on = on; } } };
     toggle(el, 'SEARCH');
-    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS']);
+    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES']);
     expect(el.on).toBe(false);
     toggle(el, 'SEARCH');
-    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS', 'SEARCH']);
+    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'SEARCH']);
     expect(el.on).toBe(true);
   });
 

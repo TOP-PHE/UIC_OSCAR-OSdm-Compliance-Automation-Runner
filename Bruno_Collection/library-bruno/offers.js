@@ -892,6 +892,12 @@ function otherLegOf(leg) {
 
 function validateTripsAndLegs(jsonData) {
   validationLogger("[DEBUG] ➤ validateTripsAndLegs");
+  // #1258: a non-trip sale has no trip to check; nonTrip.js checks that none
+  // is given.
+  if (require("./nonTrip.js").isNonTripSale()) {
+    validationLogger("[DEBUG] Non-trip offers: no trip or leg to check.");
+    return;
+  }
   const trips = jsonData.trips || [];
 
   test(`Trips are defined - length: ${trips.length}`, function () {
@@ -1099,7 +1105,8 @@ function validateOfferParts(selectedOffer) {
       expect(selectedOffer.tripCoverage.coveredTripId, "tripCoverage present but coveredTripId missing/empty")
         .to.be.a("string").and.not.be.empty;
     });
-  } else {
+  } else if (!require("./nonTrip.js").isNonTripSale()) {
+    // #1258: a non-trip offer covers no trip, on purpose.
     validationLogger(`[WARNING] Offer has no tripCoverage — no offer-level coveredTripId; clients must derive the offer↔trip link from offerParts (recommended: return tripCoverage.coveredTripId). (#251)`);
   }
 

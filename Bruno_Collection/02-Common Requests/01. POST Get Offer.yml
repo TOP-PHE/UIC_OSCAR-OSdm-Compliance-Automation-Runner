@@ -66,6 +66,9 @@ runtime:
         postOfferResponsePreRequest();
         // #602: offers asked for a trip of POST /trips-collection, by its id.
         await prepareOfferRequestByTripIds();
+        // #1258: offers without a trip, by stop places or zones (looked up
+        // first when the scenario leaves them to OSCAR).
+        await require(bru.getEnvVar("library_base") + "nonTrip.js").prepareNonTripRequest();
         // #904: requested sections that do not lie inside the trip.
         require(bru.getEnvVar("library_base") + "fares.js").prepareSectionCheck();
         // #703: negative probe, the offer request with no passenger.
@@ -84,6 +87,14 @@ runtime:
         if (require(bru.getEnvVar("library_base") + "fares.js").stopOnSectionsOutside()) {
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
           loopbackOrStop("POST Get Offer (requested sections outside the trip)");
+          return;
+        }
+
+        // #1258: the stop place or zone lookup of a non-trip sale; nothing to
+        // ask offers for ends the scenario.
+        if (require(bru.getEnvVar("library_base") + "nonTrip.js").checkNonTripLookup(bruTest)) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (non-trip lookup)");
           return;
         }
 
@@ -231,6 +242,8 @@ runtime:
           return;
         }
         displayOfferResponse(jsonData);
+        // #1258: no trip, no trip coverage, and where each admission is valid.
+        require(bru.getEnvVar("library_base") + "nonTrip.js").recordNonTripOfferChecks(jsonData, bruTest);
 
         // #598: no offer holds the product the scenario expects (already a
         // failed check): booking another tariff would test nothing. #599: a

@@ -92,6 +92,37 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     used `vehicleNumber: '1001'`). The exchange's offer request
     (`requestExchangeOffersBody()`) follows `TripType` since then; it sent a
     null `tripSearchCriteria` for a specification.
+  - **Offers without a trip** (#1258, 1.11.516 / OTST_V2.0.258, simulator
+    0.67.0). A trip requirement of `tripType: "NON_TRIP"` holds `nonTrip`
+    { by PLACES | ZONES, places, placeLookup, zones [{ id, carrier }],
+    validFrom }; the request sends `nonTripSearchCriteria` and no trip member.
+    Places are **StopPlaceRef only** (maintainer: of all Place subclasses);
+    no places + `placeLookup` = `POST /places` (type STOP) from 01's
+    before-request, the first two StopPlaces; ZONES with none = the first
+    zone of `GET /zones`, id and carrier as given (`getOsdm()` in
+    `osdmPost.js`). `library-bruno/nonTrip.js`: checks at 01 (no trip, no
+    tripCoverage, a regional validity per admission: `regionalValidities`
+    from 3.7, the single `regionalValidity` in 3.6, deprecated-only a
+    WARNING; summary and "names what was asked" WARNINGs) and of the booking
+    inside `postCreateBookingResponse()` (02, 05, 07). `isNonTripSale()`
+    skips `validateTripsAndLegs()` and the #251 tripCoverage warning; no other
+    trip check fired on the simulator. Forms `NON_TRIP_PLACES` /
+    `NON_TRIP_ZONES` (`offerRequestFormOf()` reads the trip first:
+    `NON_TRIP_REQUEST_FORMS`); **the catalogue converts a search into trip
+    forms only** (`TRIP_REQUEST_FORMS` in `catalogueFor()`). Capabilities
+    `offers.nonTripPlaces` / `offers.nonTripZones`. A non-trip trip gets no
+    Test Data train (`hasTrain`, page `trainsFromDatafile`), no train
+    suggestion and is copied as it is (`tripSummary().nonTrip`,
+    `mappedTrip()`). The checklist does not ask yet: the simulator references
+    add both forms from the profile's `nonTrip` (`withNonTripForms()`).
+    Simulator: every profile's `nonTrip` (stop places 0000040–42, zones
+    SIM-CITY / SIM-NORTH, wrong variant from 0000042); `GET /zones` answering
+    200 added 9 checks to every scenario, so every catalogue `checks` moved
+    (with the 2 of #991's "sum of the pre-booked parts" at 02 and 05, never
+    counted until then). **The replay runs in chunks** on a busy Windows PC:
+    Claude Code stops background work when memory runs short, and `record`
+    writes nothing until its end; code lists made by Python there end in
+    `\r`, which matches no scenario (`Recorded 0`).
   - **Place selection flows** (#766, PR 1 = 1.11.297): `placeSelectionFlows`
     (OSDM `PlaceSelectionFlow`: `AUTOMATIC_PLACE_SELECTION`, `…_PREFERENCES`,
     `…_NEARBY`, `MANUAL_PLACE_SELECTION_WITHOUT_FEE`, `…_WITH_FEE`). Absent =

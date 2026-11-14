@@ -94,9 +94,9 @@ describe('tripDateFor in the parser', () => {
 });
 
 describe('the parser uses it for both kinds of trip', () => {
-  test('SEARCH and SPECIFICATION dates go through tripDateFor', () => {
+  test('SEARCH, SPECIFICATION and NON_TRIP (#1258) dates go through tripDateFor', () => {
     const src = require('node:fs').readFileSync(path.join(LIB, 'scenarioParser.js'), 'utf8');
-    expect(src.match(/= tripDateFor\(scenario, nextWeekdayString, tripRequirement\);/g)).toHaveLength(2);
+    expect(src.match(/= tripDateFor\(scenario, nextWeekdayString, tripRequirement\);/g)).toHaveLength(3);
     expect(src).not.toMatch(/= scenarioTripDate\(scenario, nextWeekdayString/);
   });
 });

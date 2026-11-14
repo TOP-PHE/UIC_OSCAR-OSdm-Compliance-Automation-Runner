@@ -92,7 +92,7 @@ const ENUMS = {
   stepFailurePolicy:  ['HARD_STOP', 'CONTINUE'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
-  tripType:           ['SEARCH', 'SPECIFICATION'],
+  tripType:           ['SEARCH', 'SPECIFICATION', 'NON_TRIP'],
   passengerType:      ['PERSON', 'DOG', 'PET', 'LUGGAGE', 'PRM', 'BICYCLE', 'PRAM',
                        'COMPANION_DOG', 'CAR', 'MOTORCYCLE', 'TRAILER', 'FAMILY_CHILD', 'WHEELCHAIR'],
   gender:             ['X', 'MALE', 'FEMALE'],
@@ -110,6 +110,7 @@ const ENUMS = {
 
 // Human-readable labels for enums
 const LABELS = {
+  NON_TRIP:        'NON_TRIP (no trip: stop places or zones)',
   FULL_FLEXIBLE:   'Full flexible',
   SEMI_FLEXIBLE:   'Semi flexible',
   NON_FLEXIBLE:    'Non flexible',
@@ -477,7 +478,13 @@ const FW_OFFER_REQUEST_FORMS = [
   ['SEARCH', 'By trip search (tripSearchCriteria)'],
   ['SPECIFICATION', 'By trip specification (tripSpecifications)'],
   ['TRIP_IDS', 'By trip id (tripIds, after POST /trips-collection)'],
+  // #1258: without a trip (nonTripSearchCriteria).
+  ['NON_TRIP_PLACES', 'Without a trip, between stop places (nonTripSearchCriteria.places)'],
+  ['NON_TRIP_ZONES', 'Without a trip, in zones (nonTripSearchCriteria.zones, after GET /zones)'],
 ];
+
+// #1258: the forms of an offer request without a trip.
+const NON_TRIP_FORMS = ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'];
 
 // #748: no list declared means every form (frameworks from before 1.11.289).
 function fwOfferRequestFormDeclared(fw, form) {
@@ -742,7 +749,11 @@ function fwTogglePlaceSelectionFlow(el, flow) {
 
 // #748: the options of a trip's type picker, an undeclared form marked.
 function tripTypeOptionText(tripType, fw) {
-  return fwOfferRequestFormDeclared(fw, tripType) ? lbl(tripType) : `⚠ ${lbl(tripType)} — not declared in the Test Framework (Offer requests)`;
+  // #1258: a NON_TRIP trip is either non-trip form.
+  const declared = tripType === 'NON_TRIP'
+    ? NON_TRIP_FORMS.some((form) => fwOfferRequestFormDeclared(fw, form))
+    : fwOfferRequestFormDeclared(fw, tripType);
+  return declared ? lbl(tripType) : `⚠ ${lbl(tripType)} — not declared in the Test Framework (Offer requests)`;
 }
 
 // A scenario flag counts as armed in any of the spellings datafiles use.
@@ -1876,6 +1887,8 @@ function trainsFromDatafile(datafile) {
   const seen = new Set();
   const trains = [];
   (Array.isArray(datafile.tripRequirements) ? datafile.tripRequirements : []).forEach((trip, idx) => {
+    // #1258: a request without a trip names no train.
+    if (trip?.tripType === 'NON_TRIP') return;
     const train = trainFromTrip(trip, idx);
     const s = train.data.services[0] || {};
     const key = `${s.vehicleNumber || ''}|${train.data.originURN}|${train.data.destinationURN}|${s.departureTime || ''}|${s.arrivalTime || ''}`;
@@ -3277,6 +3290,16 @@ function buildTripSection(idx, sc, trip) {
   </div>` : '';
 
   let inner = '';
+  if (trip.tripType === 'NON_TRIP') {
+    return `
+  <div class="param-section">
+    <div class="param-section-head" data-action="toggle-param-section">🚂 Trip (requirement #${esc(sc.tripRequirementId)})<span class="ps-arrow">▶</span></div>
+    <div class="param-section-body">
+      <div style="padding:12px 14px 4px">${tripTypeSelect}</div>
+      <div style="padding:0 14px 12px">${buildNonTripFields(tIdx, trip, depDayField)}</div>
+    </div>
+  </div>`;
+  }
   if (trip.tripType === 'SPECIFICATION') {
     // #749: a SPECIFICATION trip without legs shows one empty leg, never the
     // SEARCH fields; drawing writes nothing, the first edit creates the leg.
@@ -3319,6 +3342,79 @@ function buildTripSection(idx, sc, trip) {
       <div style="padding:0 14px 12px">${inner}</div>
     </div>
   </div>`;
+}
+
+// #1258: what a NON_TRIP trip asks: stop places (StopPlaceRef only, two or
+// more, or none and a name for POST /places) or zones (one, or none to take
+// the first of GET /zones), and the start of the validity.
+const NON_TRIP_VALID_FROM = '%TRIP_DATE%T00:00:00+01:00';
+function buildNonTripFields(tIdx, trip, depDayField) {
+  const nt = trip.nonTrip && typeof trip.nonTrip === 'object' ? trip.nonTrip : {};
+  const byZones = String(nt.by || '').toUpperCase() === 'ZONES';
+  const field = (name, label, value, placeholder) => `
+  <div class="param-field">
+    <span class="param-label">${label}</span>
+    <input class="param-input" type="text" value="${esc(value || '')}" placeholder="${esc(egPlaceholder(placeholder))}"
+      data-action="set-nontrip-field" data-tidx="${esc(tIdx)}" data-field="${name}">
+  </div>`;
+  const zone = Array.isArray(nt.zones) && nt.zones[0] && typeof nt.zones[0] === 'object' ? nt.zones[0] : {};
+  const what = byZones
+    ? `${field('zoneId', 'Zone id <span class="param-hint">empty: the first zone of GET /zones</span>', zone.id, 'SIM-CITY')}
+      ${field('zoneCarrier', 'Zone carrier <span class="param-hint">the carrier GET /zones names for it</span>', zone.carrier, 'urn:uic:rics:NNNN')}`
+    : `${field('places', 'Stop places <span class="param-hint">two or more, comma-separated URNs or UIC codes; empty: looked up by name</span>', (Array.isArray(nt.places) ? nt.places : []).join(', '), 'urn:uic:stn:..., urn:uic:stn:...')}
+      ${field('placeLookup', 'Look up by name <span class="param-hint">POST /places (stop places only), the first two found</span>', nt.placeLookup, 'Praha')}`;
+  return `
+    <div class="param-grid">
+      <div class="param-field">
+        <span class="param-label">Valid where <span class="param-hint">nonTripSearchCriteria: stop places (StopPlaceRef) or zones</span></span>
+        <select class="param-input param-select" data-action="set-nontrip-field" data-tidx="${esc(tIdx)}" data-field="by">
+          <option value="PLACES" ${byZones ? '' : 'selected'}>Between stop places</option>
+          <option value="ZONES" ${byZones ? 'selected' : ''}>In zones</option>
+        </select>
+      </div>
+      ${depDayField}
+      ${what}
+      ${buildTripTimeField(tIdx, 'nonTrip.validFrom', 'Valid from <span class="param-hint">HH:MM:SS±HH:MM on the trip date; empty: midnight</span>', nt.validFrom, '00:00:00+01:00')}
+    </div>
+    <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.4">
+      No trip is sent: the offers are checked for no trip and no trip coverage, and each admission for where it is valid (regionalValidities, or regionalValidity in OSDM 3.6) (#1258).
+    </div>`;
+}
+
+// #1258: the nonTrip block with one field changed, from what the editor
+// holds. Pure: places from a comma-separated list, one zone from its id and
+// carrier (both empty: none, taken from GET /zones at run time).
+function withNonTripValue(nonTrip, field, raw) {
+  const nt = { ...(nonTrip && typeof nonTrip === 'object' ? nonTrip : {}) };
+  const value = String(raw == null ? '' : raw).trim();
+  if (field === 'by') {
+    nt.by = value === 'ZONES' ? 'ZONES' : 'PLACES';
+  } else if (field === 'places') {
+    nt.places = value ? value.split(',').map((p) => p.trim()).filter(Boolean) : [];
+  } else if (field === 'placeLookup') {
+    if (value) nt.placeLookup = value;
+    else delete nt.placeLookup;
+  } else if (field === 'zoneId' || field === 'zoneCarrier') {
+    const first = Array.isArray(nt.zones) && nt.zones[0] && typeof nt.zones[0] === 'object' ? nt.zones[0] : {};
+    const zone = { ...first, [field === 'zoneId' ? 'id' : 'carrier']: value };
+    nt.zones = zone.id || zone.carrier ? [{ id: zone.id || '', carrier: zone.carrier || '' }] : [];
+  }
+  return nt;
+}
+
+// #1258: an edit of a NON_TRIP trip's fields; a change of "Valid where"
+// draws the cards using the trip again.
+function changeNonTrip(action, el) {
+  if (action !== 'set-nontrip-field') return false;
+  const tIdx = Number.parseInt(el.dataset.tidx);
+  const trip = state.tripRequirements?.[tIdx];
+  if (!trip) return true;
+  trip.nonTrip = withNonTripValue(trip.nonTrip, el.dataset.field, el.value);
+  markDirty();
+  if (el.dataset.field === 'by') {
+    (state.scenarios || []).forEach((sc, i) => { if (scenarioTripIds(sc).includes(trip.id)) reRenderScenarioDetail(i); });
+  }
+  return true;
 }
 
 // Time field: strips %TRIP_DATE%T for display, re-adds on save
@@ -4151,6 +4247,12 @@ const TRIP_LEG_FIELDS = ['origin', 'destination', 'startDatetime', 'endDatetime'
 function convertTripType(trip, tripType) {
   const filled = (v) => v != null && v !== '';
   trip.tripType = tripType;
+  // #1258: a trip becoming NON_TRIP starts by stop places, none named yet;
+  // its search or legs are kept, unused, for a switch back.
+  if (tripType === 'NON_TRIP') {
+    if (!trip.nonTrip || typeof trip.nonTrip !== 'object') trip.nonTrip = { by: 'PLACES', places: [], validFrom: NON_TRIP_VALID_FROM };
+    return trip;
+  }
   if (tripType === 'SPECIFICATION' && !(Array.isArray(trip.legs) && trip.legs.length > 0)) {
     const src = trip.trip || {};
     const leg = {};
@@ -9019,6 +9121,8 @@ document.body.addEventListener('change', function(e) {
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
   if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el) || changeTraceContext(action, el)) return;
+  // #1258: a NON_TRIP trip's fields.
+  if (changeNonTrip(action, el)) return;
 
   switch (action) {
     case 'file-upload':
@@ -9491,6 +9595,7 @@ document.body.addEventListener('input', function(e) {
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }   // #515, as above
   const action = el.dataset.action;
   if (changeExchange(action, el)) return;
+  if (changeNonTrip(action, el)) return;
   if (inputTraceState(action, el)) return;
   if (inputRequestedSection(action, el)) return;
   if (inputFareRefundFee(action, el)) return;

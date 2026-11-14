@@ -59,10 +59,11 @@ test('a train naming no operator code: the trip specifications are left out, and
   expect(p.copy.some(c => c.code.endsWith('_TRIPID'))).toBe(true);
 });
 
-test('no Test Data at all: nothing is copied', () => {
+test('no Test Data at all: nothing is copied but what asks offers without a trip (#1258)', () => {
   const p = plan({ trains: [], journeys: [] });
-  expect(p.copy).toEqual([]);
+  expect(p.copy.map(c => c.code)).toEqual(['OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
   expect(p.noTestData.length).toBeGreaterThan(0);
+  expect(p.noTestData.some(code => code.startsWith('OTST_NONTRIP_'))).toBe(false);
 });
 
 test('codes the data file holds are already there, not copied again', () => {

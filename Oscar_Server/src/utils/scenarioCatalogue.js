@@ -38,7 +38,7 @@
  */
 
 const {
-  scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT, OFFER_REQUEST_FORMS,
+  scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT, TRIP_REQUEST_FORMS,
   placeSelectionFlowOf, placeSelectionFlowDeclared, PLACE_SELECTION_TEXT, scenarioOfferCriteria,
 } = require('./frameworkGating');
 const { fareRequirementsOf, fareMissing, freeUnderAgeOf, versionAtLeast, COMBINATION_MODELS } = require('./fareDeclarations');
@@ -406,7 +406,13 @@ function dataNeedsOf(scenario, datafile, facts) {
   const passengers = arr(arr(datafile.passengersList).find((l) => isObj(l) && l.id === scenario.passengersListId)?.passengers);
   const kinds = new Set(legs.map((l) => facts.reservations[l.productCategoryShortName]).filter(Boolean));
   const overrule = typeof scenario.overruleCode === 'string' && !NO_OVERRULE.has(scenario.overruleCode) ? scenario.overruleCode : null;
+  // #1258: a non-trip request's stop places, lookup name and zones are the
+  // provider's (a zone left to GET /zones is found at run time).
+  const nonTrip = trip.tripType === 'NON_TRIP' && isObj(trip.nonTrip) ? trip.nonTrip : null;
   const providerValues = [
+    ...(nonTrip && arr(nonTrip.places).length ? ['nonTripPlaces'] : []),
+    ...(nonTrip && typeof nonTrip.placeLookup === 'string' && nonTrip.placeLookup.trim() ? ['placeLookup'] : []),
+    ...(nonTrip && arr(nonTrip.zones).length ? ['nonTripZones'] : []),
     ...(overrule ? ['overruleCode'] : []),
     ...(scenario.expectedProduct ? ['expectedProduct'] : []),
     // #766: seat preferences are codes of the provider's own list.
@@ -416,7 +422,7 @@ function dataNeedsOf(scenario, datafile, facts) {
     ...(typeof scenario.referencePlace === 'string' && !['', 'AUTO'].includes(scenario.referencePlace.trim().toUpperCase()) ? ['referencePlace'] : []),
   ];
   const needs = {
-    trip: trip.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH',
+    trip: ['SPECIFICATION', 'NON_TRIP'].includes(trip.tripType) ? trip.tripType : 'SEARCH',
     legs: legs.length > 1 ? legs.length : null,
     return: scenarioReturnModel(scenario),
     reservations: reservationNeed(scenario, kinds),
@@ -444,7 +450,12 @@ const TARIFF_TEXT = { REFUNDABLE: 'a refundable tariff', EXCHANGEABLE: 'an excha
 const RETURN_TEXT = { COMBINED: 'one offer for both directions', SEPARATE: 'one offer per direction' };
 
 // The phrase of each need, in the order of NEEDS_KEYS; null when it says nothing.
+// #1258: the provider's values of a non-trip request, in words.
+const PROVIDER_VALUE_TEXT = Object.freeze({
+  nonTripPlaces: 'stop places to sell between', placeLookup: 'name for POST /places', nonTripZones: 'zone',
+});
 const NEED_PHRASES = {
+  trip: (v) => (v === 'NON_TRIP' ? 'offers without a trip (nonTripSearchCriteria)' : null),
   legs: (v) => `a journey of ${v} legs`,
   return: (v) => `a return (${RETURN_TEXT[v] || v})`,
   reservations: (v) => v.map((kind) => `a train with ${kind === 'MANDATORY' ? 'a mandatory' : 'an optional'} seat reservation`),
@@ -452,7 +463,7 @@ const NEED_PHRASES = {
   tariff: (v) => TARIFF_TEXT[v] || `tariff ${v}`,
   passengers: (v) => `${v} passenger${v > 1 ? 's' : ''}`,
   reductionCards: () => 'a reduction card the provider accepts',
-  providerValues: (v) => v.map((field) => `the provider's own ${field}`),
+  providerValues: (v) => v.map((field) => `the provider's own ${PROVIDER_VALUE_TEXT[field] || field}`),
   requestedInformation: () => 'a trip where the provider asks for passenger details',
   expiry: (v) => (v.length ? `waits for the provider's deadline: ${v.join(', ').toLowerCase().replaceAll('_', ' ')}` : null),
   exchangeRoute: () => 'a second train, on another route, to exchange to',
@@ -567,7 +578,8 @@ function catalogueFor(catalogue, simulator, framework) {
     if (CURRENCY_PROBES.has(entry.probe)) return currencyProbes(entry, fw);
     if (entry.probe === 'OFFER_OPTION_NOT_DECLARED') return [optionNotDeclaredProbe(entry, fw)];
     if (!forms || !entry.requirements.offerRequest.convertible) return [entry];
-    const variants = OFFER_REQUEST_FORMS.filter((form) => forms.includes(form))
+    // #1258: a trip search becomes another trip form, never a non-trip request.
+    const variants = TRIP_REQUEST_FORMS.filter((form) => forms.includes(form))
       .map((form) => (form === 'SEARCH' ? entry : asForm(entry, form, framework)));
     if (!variants.length) return [entry];
     return variants.map((variant, i) => (i === 0 ? variant : {

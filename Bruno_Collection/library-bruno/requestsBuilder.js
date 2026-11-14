@@ -128,10 +128,12 @@ function buildOfferCollectionRequest() {
   } else if (tripType === "SEARCH") {
     body.tripSearchCriteria = parseEnvJson("offerTripSearchCriteria");
   }
+  // #1258: a NON_TRIP request gets its nonTripSearchCriteria in 01's
+  // before-request (prepareNonTripRequest), after any lookup; no trip member.
 
   // #903: the section of the trip a fare provider prices. #905: an empty list
-  // goes out only with a request for fares.
-  const requestedSections = sectionsToSend(parseEnvJson("requestedSections", null), parseEnvJson("offerSearchCriteria", null));
+  // goes out only with a request for fares. None without a trip (#1258).
+  const requestedSections = tripType === "NON_TRIP" ? null : sectionsToSend(parseEnvJson("requestedSections", null), parseEnvJson("offerSearchCriteria", null));
   if (requestedSections) body.requestedSections = requestedSections;
 
   body.anonymousPassengerSpecifications = passengersWithCardIssuers("offerPassengerSpecifications");

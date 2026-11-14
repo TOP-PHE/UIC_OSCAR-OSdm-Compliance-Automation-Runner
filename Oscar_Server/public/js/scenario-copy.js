@@ -97,7 +97,8 @@
   function renderTrips() {
     const el = document.getElementById('sc-copy-trips');
     const codes = new Set(selectedCodes());
-    const trips = preview.trips.filter(t => t.usedBy.some(c => codes.has(c)));
+    // #1258: a request without a trip is copied as it is, on no train.
+    const trips = preview.trips.filter(t => !t.nonTrip && t.usedBy.some(c => codes.has(c)));
     if (!trips.length) { el.innerHTML = ''; return; }
     const trains = trainOptions(preview.testData);
     const journeys = journeyOptions(preview.testData);

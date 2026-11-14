@@ -863,6 +863,10 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     expect(booking.id).to.be.a('string').and.not.be.empty;
   });
   bru.setEnvVar("bookingId", booking.id);
+  // #1258: a non-trip sale's booking covers no trip, and its admissions keep
+  // where they are valid.
+  const _stage = (expectedBookedOffersStatus || []).includes("PREBOOKED") ? "Pre-booked" : "Confirmed";
+  require("./nonTrip.js").recordNonTripBookingChecks(booking, _stage, test);
   if (booking.bookingCode !== undefined && booking.bookingCode !== null) {
     test(`booking.bookingCode is a non-empty string when present`, () => {
       validationLogger(`[DEBUG] booking.bookingCode: ${booking.bookingCode}`);

@@ -109,6 +109,7 @@ function checkProvider(key, raw) {
     checkOtherCurrencies(raw.otherCurrencies, raw.currency, bad),
     checkOsdmDevelopment(raw.osdmDevelopment, bad),
     checkFares(raw.fares, bad),
+    checkNonTrip(raw.nonTrip, bad),
   ];
   return Object.assign(profile, ...parts);
 }
@@ -319,6 +320,34 @@ function checkRequestOptions(value, bad) {
   }
   if (!Array.isArray(promotionCodes) || promotionCodes.length > 20 || !promotionCodes.every((c) => isText(c, 1, 60))) throw bad('requestOptions');
   return { requestOptions: { from: value.from, members: { ...members }, promotionCodes: [...promotionCodes] } };
+}
+
+// #1258: what the provider sells without a trip: its stop places (by id and
+// name, GET/POST /places), its zones (each with an id, a name, its number in a
+// regional validity and the stop places it holds, GET /zones) and the first
+// stop place whose non-trip offers carry no regional validity (a wrong
+// variant). Absent: offers for trips only, /places and /zones answer 501.
+const ZONE_ID = /^[A-Z0-9][A-Z0-9_-]{0,39}$/;
+function checkNonTrip(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw bad('nonTrip');
+  const { places, zones, withoutValidityFrom } = value;
+  const placeOk = (p) => p && isText(p.id, 1, 120) && p.id.startsWith('urn:') && isText(p.name, 1, 80);
+  if (!Array.isArray(places) || places.length < 2 || places.length > 30 || !places.every(placeOk)) throw bad('nonTrip');
+  const ids = places.map((p) => p.id);
+  if (new Set(ids).size !== ids.length) throw bad('nonTrip');
+  const zoneOk = (z) => z && ZONE_ID.test(z.id) && isText(z.name, 1, 80) && Number.isInteger(z.zoneId) && z.zoneId >= 0 && z.zoneId <= 99999
+    && Array.isArray(z.places) && z.places.length > 0 && z.places.every((ref) => ids.includes(ref));
+  if (!Array.isArray(zones) || zones.length === 0 || zones.length > 10 || !zones.every(zoneOk)) throw bad('nonTrip');
+  if (new Set(zones.map((z) => z.id)).size !== zones.length) throw bad('nonTrip');
+  if (withoutValidityFrom !== undefined && !ids.includes(withoutValidityFrom)) throw bad('nonTrip');
+  return {
+    nonTrip: {
+      places: places.map((p) => ({ id: p.id, name: p.name })),
+      zones: zones.map((z) => ({ id: z.id, name: z.name, zoneId: z.zoneId, places: [...z.places] })),
+      ...(withoutValidityFrom === undefined ? {} : { withoutValidityFrom }),
+    },
+  };
 }
 
 // #704: how many days ahead the provider sells, for trips from one stop

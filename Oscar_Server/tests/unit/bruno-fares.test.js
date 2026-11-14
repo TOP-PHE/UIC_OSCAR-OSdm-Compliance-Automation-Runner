@@ -383,7 +383,7 @@ describe('the negative fare requests (#905)', () => {
     for (const file of ['Bruno_Collection/opencollection.yml', 'Bruno_Collection/library-bruno/scenarioParser.js']) {
       expect(read(file)).toContain('"bookMode", "expectFares", "fareOfferId"');
     }
-    expect(read('Bruno_Collection/library-bruno/requestsBuilder.js')).toContain('const requestedSections = sectionsToSend(parseEnvJson("requestedSections", null), parseEnvJson("offerSearchCriteria", null));');
+    expect(read('Bruno_Collection/library-bruno/requestsBuilder.js')).toContain('const requestedSections = tripType === "NON_TRIP" ? null : sectionsToSend(parseEnvJson("requestedSections", null), parseEnvJson("offerSearchCriteria", null));');
     const src = read('Oscar_Server/public/js/scenarios.js');
     expect(src).toContain("buildSelect(idx, 'expectFares', 'Fares expected', ENUMS.expectFares,");
     expect(src).toContain("expectFares:                       [null, 'false'],");

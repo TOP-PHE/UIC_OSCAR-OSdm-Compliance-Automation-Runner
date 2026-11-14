@@ -507,6 +507,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.516] / [collection-OTST_V2.0.258] — 2026-11-14
+
+Issue #1258, listed in `compatibility.json` (2026.555) without moving `current_release`. Simulator 0.67.0. Offers without a trip: between stop places, or in a zone.
+
+OSDM asks an offer that belongs to no train (a day ticket between two stations, a city zone) with `OfferCollectionRequest.nonTripSearchCriteria` and no trip member. OSCAR could not send one. Places are StopPlaces / StopPlaceRefs only, of all the Place subclasses (maintainer, on the issue); zones are the second scenario; NUTS codes and the refund or exchange of a non-trip sale are left for later.
+
+### Added
+- **A trip requirement of type `NON_TRIP`** (`datafile.schema.json`): `nonTrip` { `by` PLACES or ZONES, `places` (two or more stop places, URN or UIC code), `placeLookup` (a name), `zones` [{ `id`, `carrier` }], `validFrom` (`%TRIP_DATE%`; default midnight of the trip date, in the first stop place's zone) }.
+- **The collection** (`library-bruno/nonTrip.js`):
+  - 01's before-request writes `nonTripSearchCriteria` and removes every trip member, `requestedSections` included.
+  - With no stop place named, it first sends `POST /places` (`placeInput.name`, `restrictions.type` STOP, 5 results) from the step's script and takes the first two StopPlaces. A place of another kind is a WARNING and is not used; fewer than two stop places, or a 501, ends the scenario with one failed check.
+  - By zones with none named, it sends `GET /zones` (new `getOsdm()` beside `postOsdm()`, the same headers and trace) and takes the first zone, its id and carrier as given. No zone ends the scenario with one failed check.
+  - 01's checks: the answer gives no trip; no offer or offer part has a `tripCoverage`; each admission has its regional validity, which names a zone, route, train link, line or polygon. **By version**: `regionalValidities` from OSDM 3.7, the single `regionalValidity` in 3.6 (no list there); from 3.7 the deprecated member alone is a WARNING.
+  - WARNINGs: no `regionalValiditySummary`; a validity not naming every stop place asked (a UIC code without leading zeros counts), or no zone of the carrier asked.
+  - 02, 05 and 07 (`postCreateBookingResponse()`): nothing in the booking covers a trip; each booked admission keeps its validity.
+  - `validateTripsAndLegs()` and the #251 "offer has no tripCoverage" warning are skipped for a non-trip sale. Nothing else of the trip checks fired on the simulator.
+- **The server**:
+  - Offer request forms `NON_TRIP_PLACES` and `NON_TRIP_ZONES` (`frameworkGating.js`, `offerRequestFormOf()` reads a NON_TRIP trip first), with the `offerRequestBy:` warning, the coverage rows, the run filters' *Form* (`runFilters.js`, OpenAPI) and the capabilities `offers.nonTripPlaces` / `offers.nonTripZones`.
+  - The catalogue offers a trip search in the trip forms only (`TRIP_REQUEST_FORMS` in `catalogueFor()`), never as a non-trip request.
+  - A NON_TRIP trip gives no Test Data train (`testResourcesFromDatafile()`, the page's `trainsFromDatafile()`), gets no train suggestion (`suggestTrips()`), is copied as it is (`mappedTrip()`, `tripSummary().nonTrip`; the Copy scenarios page lists no train to choose for it), and needs no Test Data in the checklist's scenario plan.
+  - Needs: `trip: NON_TRIP`, and provider values `nonTripPlaces`, `placeLookup` or `nonTripZones`, said to the person copying.
+  - The checklist does not ask about non-trip offers yet: the simulator references declare both forms from the profile's `nonTrip` (`withNonTripForms()`).
+- **Test Config**: trip type *NON_TRIP*, with *Valid where* (between stop places / in zones), the stop places (comma-separated) or a name to look up, the zone's id and carrier, *Valid from*; the Test Framework's *Offer requests* has the two forms. The picker marks NON_TRIP when neither form is declared.
+- **Catalogue**: `OTST_NONTRIP_PLACES_1ADT` (to complete with the provider's stop places) and `OTST_NONTRIP_ZONES_1ADT` (ready: the zone is found at run time).
+- **Simulator data file**: trips 45–48 and `SIM_NONTRIP_PLACES_1ADT_*`, `SIM_NONTRIP_PLACES_LOOKUP_1ADT_*`, `SIM_NONTRIP_ZONES_1ADT_*` (in the run list) and `SIM_WRONG_NONTRIP_NO_VALIDITY_1ADT_*`, with their version copies, their rows in *OSCAR - OSDM Simulator scenarios*, and the catalogue rows of *OSCAR - What is tested*. Every simulator reference changes (run list, framework): a company following one reads "not up to date" until it updates.
+- A welcome-page news entry.
+
+### Changed
+- Every catalogue entry's `checks`, its row in *OSCAR - What is tested* and *OSCAR - Checks by scenario* (regenerated from a recording of 207 scenarios). `07. GET Zones` now gets the simulator's zones (10 checks, the schema's included) instead of a 501 (1 check): 9 checks more in every scenario. 62 entries moved by 2 more (1 for two NHF entries that stop before 05): "provisionalPrice is the sum of the pre-booked parts", a test at 02 and 05 since #991 (1.11.414), was never counted in the catalogue. `main`'s own collection and simulator give those 2 already (`SIM_SALE_SEARCH_1ADT_38`: 236 against the catalogue's 234). So: 36 entries +9 (those ending at 01, and the fare sales), 60 +11, 2 +10.
+
+### Simulator 0.67.0
+- Every provider sells without a trip (`nonTrip` in its profile, checked by `checkNonTrip()`). Stop places 0000040 (Simtown Central), 0000041 (Simtown Airport), 0000042 (Simtown North); zones `SIM-CITY` (0000040, 0000041) and `SIM-NORTH` (0000042).
+- `GET /places`, `POST /places` (by the words of a name, `numberOfResults`, a type other than STOP finds nothing), `GET /places/{id}` and `GET /zones` (`src/osdm/nonTrip.js`). A provider without `nonTrip` answers 501 as before.
+- `POST /offers` with `nonTripSearchCriteria` and no trip: offers with no trip and no trip coverage, per tariff (no group product) and class, valid for a day from `validFrom`.
+  - An admission's `regionalValidities` is a route through the stop places asked, or a `Zone` of the provider's carrier per zone; it also has a `regionalValiditySummary`. Below OSDM 3.7 it holds the single `regionalValidity` (`versionShapes.js`).
+  - Refused (400): a trip member besides, fewer than two places or a place twice, a PlaceRef other than StopPlaceRef, an unknown zone or one of another carrier, NUTS codes, both places and zones or neither.
+- Booking and fulfilment keep the validity and cover no trip. Wrong variant: from 0000042 (or in `SIM-NORTH`) the admissions carry no validity and no summary.
+- The resources still not provided include `/complaints`, which the 501 tests now use instead of `/places`.
+
+### Checked
+- Replay with the real Bruno CLI 4.2.1 against simulator 0.67.0, of the 24 non-trip scenarios (3.6, 3.7, 3.8, 3.9, 3.10, 3.12): no failed check; `SIM_WRONG_NONTRIP_NO_VALIDITY_*` fails "each admission says where it is valid" at 01, 02, 05 and 07 (4 checks), with the summary WARNING; 3.6 graded on the single `regionalValidity`.
+- Replay of 12 trip scenarios (sale, return, trip ids, exchange, fares, a refund per fulfilment, the offer option discovery: every script-sent request) with `main`'s collection and this branch on the same simulator: the same recordings.
+- Full replay of the 207 `_38` scenarios (and the `_36` / `_37` named in *Checks by scenario*): no failed check but the `SIM_WRONG_*` / `SIM_FAULT_*` ones; `replay.js catalogue` agrees with all 100 entries. Three of them recorded with `main`'s simulator and collection explain the 2 checks the catalogue had not counted since #991.
+- `bruno-non-trip.test.js` (the collection module and the parser's branch), `non-trip-forms.test.js` (forms, warnings, capabilities, filters, catalogue, copy, references, the Test Config helpers; two guards mutation-checked), simulator `non-trip.test.js` (profiles, places, zones, offers, refusals, booking, 3.6 shape, and over HTTP every provider's answers against its version's OSDM response schema).
+
+---
+
 ## [server-1.11.515] — 2026-11-13
 
 Listed in `compatibility.json` (2026.554) without moving `current_release`.

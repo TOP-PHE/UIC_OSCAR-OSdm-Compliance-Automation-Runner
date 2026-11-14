@@ -130,7 +130,7 @@ describe('a selection', () => {
     expect(p.total).toBe(4);
     expect(p.selected).toBe(1);
     expect(p.counts.categories).toEqual({ happy: 2, refusal: 1, simulated: 1 });
-    expect(p.counts.forms).toEqual({ SEARCH: 2, SPECIFICATION: 1, TRIP_IDS: 1 });
+    expect(p.counts.forms).toEqual({ SEARCH: 2, SPECIFICATION: 1, TRIP_IDS: 1, NON_TRIP_PLACES: 0, NON_TRIP_ZONES: 0 });
     expect(p.counts.groups.Refund).toBe(2);
     expect(Object.keys(p.counts.groups)).toEqual([...K.GROUPS]);
     expect(p.counts.lastRun).toEqual({ all: 4, toRunAgain: 2, failed: 2 });

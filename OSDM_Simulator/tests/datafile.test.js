@@ -327,6 +327,8 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_FARE_OTHER_CLASS_38: [],
     SIM_WRONG_FARE_DATES_OFFSET_38: [],
     SIM_WRONG_FARE_COVERED_LEG_38: [],
+    // #1258: by the first stop place of a non-trip request.
+    SIM_WRONG_NONTRIP_NO_VALIDITY_1ADT_38: [],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -483,8 +485,18 @@ test('the data file holds no real person, station or template', () => {
 
 // What the collection sends for a trip of the data file: a search with the
 // local time, without offset, or the specified legs with their categories.
+// The carrier a zone is asked with: the provider's own (#1258).
+let CARRIER_OF_ZONE = null;
 function tripRequest(requirement, day = '2026-11-20') {
   const at = (text) => text.replace('%TRIP_DATE%', day);
+  // #1258: a non-trip request, its places or the provider's first zone.
+  if (requirement.tripType === 'NON_TRIP') {
+    const nt = requirement.nonTrip;
+    const criteria = { validFrom: at(nt.validFrom) };
+    if (nt.by === 'ZONES') criteria.zones = [{ id: 'SIM-CITY', carrier: CARRIER_OF_ZONE }];
+    else criteria.places = (nt.places.length ? nt.places : ['urn:uic:stn:0000040', 'urn:uic:stn:0000041']).map((stopPlaceRef) => ({ objectType: 'StopPlaceRef', stopPlaceRef }));
+    return { nonTripSearchCriteria: criteria };
+  }
   if (requirement.tripType === 'SPECIFICATION') {
     return { tripSpecifications: [{ legs: requirement.legs.map((leg) => ({ timedLeg: {
       start: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: leg.origin }, serviceDeparture: { timetabledTime: at(leg.startDatetime) } },
@@ -502,8 +514,9 @@ function tripRequest(requirement, day = '2026-11-20') {
 test('every trip of the data file is one the simulator answers, on every provider', () => {
   const providers = loadProviders(PROVIDERS_DIR);
   for (const requirement of datafile.tripRequirements) {
-    assert.ok(['SEARCH', 'SPECIFICATION'].includes(requirement.tripType));
+    assert.ok(['SEARCH', 'SPECIFICATION', 'NON_TRIP'].includes(requirement.tripType));
     for (const provider of providers.values()) {
+      CARRIER_OF_ZONE = provider.carrier.ref;
       const { response } = buildOfferCollection({
         ...tripRequest(requirement),
         anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }],
