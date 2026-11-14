@@ -4,6 +4,17 @@
   "current_release": "2026.555",
   "releases": [
     {
+      "release": "2026.556",
+      "date": "2026-11-14",
+      "server": "1.11.517",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.517: SQLite's page cache, memory map and temporary storage on the server's connection (#1237, part of the review #1233). SQLite's defaults were a cache of 2 MB, no memory map and temporary sorts in files, for a database of 10 GB where storing one check updates 8 B-trees. Now a cache of 64 MB, a map of 256 MB (the system's own cache of the file, not a second copy) and temporary storage in memory. OSCAR_DB_CACHE_MB, OSCAR_DB_MMAP_MB and OSCAR_DB_TEMP_STORE change them (a wrong value stops the start); the values in use are on the start-up line and in oscar_db_memory_bytes and oscar_db_temp_store. To be measured on the k3s test machine, one batch with SQLite's defaults and one without; kept only if it helps."
+      ]
+    },
+    {
       "release": "2026.555",
       "date": "2026-11-13",
       "server": "1.11.516",

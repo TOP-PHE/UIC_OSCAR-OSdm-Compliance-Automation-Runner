@@ -161,6 +161,14 @@ describe('GET /metrics', () => {
     expect(res.text).toMatch(/\noscar_db_synchronous 1\n/);
   });
 
+  test('#1237: the page cache, memory map and temporary storage the connection uses', async () => {
+    const res = await request(app).get('/metrics');
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/\noscar_db_memory_bytes\{use="cache"\} 67108864\n/);
+    expect(res.text).toMatch(/\noscar_db_memory_bytes\{use="mmap"\} 268435456\n/);
+    expect(res.text).toMatch(/\noscar_db_temp_store 2\n/);
+  });
+
   test('#1230: the checkpoint thread\'s metrics are written', async () => {
     const res = await request(app).get('/metrics');
     expect(res.status).toBe(200);

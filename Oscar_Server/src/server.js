@@ -139,6 +139,15 @@ try {
   metricsForQueue.dbSynchronous.set(dbGet('PRAGMA synchronous').synchronous);
 } catch (_e) { /* never let metric collection crash the server */ }
 
+// SQLite's page cache, memory map and temporary storage (#1237), read from the
+// connection: OSCAR_DB_CACHE_MB, OSCAR_DB_MMAP_MB, OSCAR_DB_TEMP_STORE.
+try {
+  const memory = require('./db/db').memorySettings();
+  metricsForQueue.dbMemoryBytes.set({ use: 'cache' }, memory.cacheBytes);
+  metricsForQueue.dbMemoryBytes.set({ use: 'mmap' }, memory.mmapBytes);
+  metricsForQueue.dbTempStore.set(memory.tempStore);
+} catch (_e) { /* never let metric collection crash the server */ }
+
 // The database's checkpoints in a thread of their own (#1230): a COMMIT no
 // longer copies the write-ahead log into the database file on this thread.
 // OSCAR_DB_CHECKPOINTS=inline keeps them in the COMMITs; if the thread cannot
