@@ -158,6 +158,25 @@ describe('the statistics, kept by the checkpoint thread (#1238)', () => {
     expect(m.checkpointState().statistics.tables).not.toContain('picky');
   });
 
+  test('a stop between two tables ends the thread at once, and nothing is reported', async () => {
+    const m = boot('stopped');
+    for (const name of ['first', 'second', 'third']) {
+      m.db.exec(`CREATE TABLE ${name} (x INTEGER); CREATE INDEX ${name}_x ON ${name}(x); INSERT INTO ${name} VALUES (1), (2);`);
+    }
+    // The first table analyzed, then a pause of a minute before the next.
+    const worker = m.startCheckpointThread({ intervalMs: 20, optimizeDelayMs: 10, optimizeEveryMs: 600000, optimizePauseMs: 60000 });
+    await until(() => m.checkpointState().running);
+    await until(() => m.db.prepare("SELECT count(*) AS n FROM sqlite_schema WHERE name = 'sqlite_stat1'").get().n === 1);
+    let exited = false;
+    worker.once('exit', () => { exited = true; });
+    const started = Date.now();
+    await m.stopCheckpointThread();
+    // A timer left would keep the thread alive until the 5 s fallback ends it.
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(exited).toBe(true);
+    expect(m.checkpointState().statistics).toBeNull();
+  });
+
   test('off: the thread checkpoints and never analyzes', async () => {
     const m = boot('off', { OSCAR_DB_OPTIMIZE: 'off' });
     fillPicky(m);
