@@ -184,9 +184,13 @@ describe('copy from the catalogue', () => {
   test('the preview proposes the company\'s train and says what is left to complete or check', async () => {
     const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
     // #1019: this train names no operator code, so a trip specification gets none and its scenario is to complete.
-    for (const t of preview.trips.filter(x => !x.needsJourney)) {
+    for (const t of preview.trips.filter(x => !x.needsJourney && !x.nonTrip)) {
       expect(t.suggested).toBe(t.tripType === 'SPECIFICATION' ? null : `train::${train(ids.P)[0]}::0`);
     }
+    // #1258: a request without a trip goes on no train.
+    const nonTrip = preview.trips.filter(x => x.nonTrip);
+    expect(nonTrip.length).toBeGreaterThan(0);
+    for (const t of nonTrip) expect([t.tripType, t.suggested]).toEqual(['NON_TRIP', null]);
     const NO_NAMED = 'a train of the Test Data naming its number and operator code: a trip specification sends both';
     const specUsers = new Set(preview.trips.filter(t => t.tripType === 'SPECIFICATION' && !t.needsJourney).flatMap(t => t.usedBy));
     expect(specUsers.size).toBeGreaterThan(0);

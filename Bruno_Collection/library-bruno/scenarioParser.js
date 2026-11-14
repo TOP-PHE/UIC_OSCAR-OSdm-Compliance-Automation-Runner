@@ -93,6 +93,7 @@ module.exports = {
   passengerUpdateScope,
   osdmTripSearchCriteria,
   osdmTripSpecification,
+  nonTripRequest,
   osdmOfferSearchCriteria,
   osdmFulfillmentOptions,
   buildReturnSearchParameters,
@@ -171,7 +172,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "offerOptionDiscovery", "offerOptionMaxRequests", "offerOptionValues", "offerOptionInvalidValues", "offerOptionSeed", "offerOptionDeclared", "__offerOptionFull", "__offerOptionReport", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults", "requestedSections", "isPartOfInternationalTrip", "desiredFareCluster", "bookMode", "expectFares", "fareOfferId", "__fareSale", "__fareIds", "__fareProductIds", "fareRefundFee", "__fareRefundFulfillments", "__fareRefundFeesSent", "__fareReservationIds", "__fareSectionsOutside", "__chosenTripLegs", "exchangeTripType", "exchangeTripSpecifications", "exchangeTripSearchCriteria", "exchangeOfferSearchCriteria", "__exchangeTripAsked",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "nonTripRequirement", "__nonTripAsked", "__nonTripOutcome", "__cardPriceCompareDone", "__cardRates", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "offerSearchProbe", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "expectedCurrency", "currencyExpectRejection", "offerOptionExpectRejection", "offerOptionDiscovery", "offerOptionMaxRequests", "offerOptionValues", "offerOptionInvalidValues", "offerOptionSeed", "offerOptionDeclared", "__offerOptionFull", "__offerOptionReport", "__saleCurrency", "legTravelClasses", "__legClassesNotOffered", "__legClassesSold", "placeSelectionFlow", "placePreferences", "__placePreferencesSent", "__placePreferencesFor", "__placePreferencesAskedFor", "__placePreferencesOutcome", "__placePreferencesListed", "__placePreferencesRetried", "__placePreferencesRefused", "namedPlaceKind", "__namedPlacesAskedFor", "__namedPlaceChoices", "__namedPlaceFees", "__namedPlacesOutcome", "nearbyReference", "nearbyReferenceAuto", "__referenceBookingTried", "__referenceBookingId", "__nearbyAskedFor", "__nearbyOutcome", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "__reservationsIgnored", "mandatoryReservationForm", "__mandatoryReservationIds", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "__passengerIgnoredFields", "__offerTripLegs", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation", "simulatorFaults", "requestedSections", "isPartOfInternationalTrip", "desiredFareCluster", "bookMode", "expectFares", "fareOfferId", "__fareSale", "__fareIds", "__fareProductIds", "fareRefundFee", "__fareRefundFulfillments", "__fareRefundFeesSent", "__fareReservationIds", "__fareSectionsOutside", "__chosenTripLegs", "exchangeTripType", "exchangeTripSpecifications", "exchangeTripSearchCriteria", "exchangeOfferSearchCriteria", "__exchangeTripAsked",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -1133,6 +1134,17 @@ function parseScenarioData(jsonData) {
               validationLogger('[DEBUG] ' + _trCtx + '.trip dump = ' + JSON.stringify(tripRequirement.trip));
               return true;  // stop iterating; the downstream parseEnvJson error will name the same problem.
             }
+          } else if (tripRequirement.tripType === "NON_TRIP") {
+            // #1258: offers without a trip, by stop places or zones.
+            const _nonTrip = require("./nonTrip.js").nonTripRequirementOf(tripRequirement);
+            if (_nonTrip.problem) {
+              validationLogger(
+                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx + ' ' + _nonTrip.problem + '. ' +
+                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and name the stop places (or a name to look them up) or the zones.'
+              );
+              validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
+              return true;
+            }
           } else if (tripRequirement.tripType === "SPECIFICATION") {
             if (!Array.isArray(tripRequirement.legs) || tripRequirement.legs.length === 0) {
               validationLogger(
@@ -1180,6 +1192,14 @@ function parseScenarioData(jsonData) {
               // #705: the day ages are counted on.
               bru.setEnvVar("__travelDay", _specTripDate);
               specificationTrip(tripRequirement, _specTripDate, scenario, saleEnv);
+              break;
+            }
+
+            case "NON_TRIP": {
+              validationLogger('[INFO] ⏳ processing a non-trip request');
+              const _nonTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
+              bru.setEnvVar("__travelDay", _nonTripDate);
+              nonTripRequest(tripRequirement, _nonTripDate);
               break;
             }
 
@@ -1583,6 +1603,24 @@ function specificationTrip(tripRequirement, tripDate, scenario, env) {
 
 // A SEARCH trip requirement on the day given: the trip* variables and
 // offerTripSearchCriteria.
+// #1258: a non-trip request: the stop places or zones asked and the start of
+// the validity (the trip date at midnight, in the first stop place's zone,
+// unless the data file writes it). 01's before-request looks up what is left
+// to OSCAR and writes nonTripSearchCriteria (nonTrip.js).
+const NON_TRIP_DEFAULT_VALID_FROM = "%TRIP_DATE%T00:00:00+01:00";
+function nonTripRequest(tripRequirement, tripDate) {
+  const nt = require("./nonTrip.js");
+  const want = nt.nonTripRequirementOf(tripRequirement);
+  const written = want.validFrom || NON_TRIP_DEFAULT_VALID_FROM;
+  const firstPlace = want.places[0]?.stopPlaceRef;
+  const validFrom = require("./stationTimeZones.js").onTheDay(subTripDate(written, tripDate, 'validFrom', 'tripRequirement (NON_TRIP)'), firstPlace);
+  bru.setEnvVar("nonTripRequirement", JSON.stringify({ ...want, validFrom }));
+  const what = want.by === "ZONES"
+    ? (want.zones.length > 0 ? "zone(s) " + want.zones.map((z) => z.id + " of " + z.carrier).join(", ") : "a zone from GET /zones")
+    : (want.places.length > 0 ? "stop places " + want.places.map((p) => p.stopPlaceRef).join(", ") : "stop places named “" + want.placeLookup + "” (POST /places)");
+  validationLogger("[INFO] 📍 Non-trip offers by " + what + ", valid from " + validFrom);
+}
+
 function searchTrip(tripRequirement, tripDate, scenario, env) {
   const _searchStart = subTripDate(tripRequirement.trip.startDatetime, tripDate, 'startDatetime', 'tripRequirement (SEARCH)');
   // #333 (v1.11.112): endDatetime is OPTIONAL on a TripSearchCriteria

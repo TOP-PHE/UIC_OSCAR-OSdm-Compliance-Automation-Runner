@@ -26,7 +26,7 @@
  */
 
 const {
-  offerRequestFormOf, placeSelectionFlowOf, scenarioReturnModel, scenarioOfferCriteria,
+  offerRequestFormOf, placeSelectionFlowOf, scenarioReturnModel, scenarioOfferCriteria, NON_TRIP_REQUEST_FORMS,
 } = require('./frameworkGating');
 const { tripSearchParametersOf } = require('./tripSearchParameters');
 const { distributionModesOf } = require('./distributionModes');
@@ -55,6 +55,8 @@ const CAPABILITIES = Object.freeze([
   { id: 'offers.search', group: 'Offers', label: 'Offers by trip search', goal: [OFFER_GOAL] },
   { id: 'offers.specification', group: 'Offers', label: 'Offers by trip specification', goal: [OFFER_GOAL] },
   { id: 'offers.tripIds', group: 'Offers', label: 'Offers by trip id', goal: [OFFER_GOAL] },
+  { id: 'offers.nonTripPlaces', group: 'Offers', label: 'Offers without a trip, between stop places', goal: [OFFER_GOAL] },
+  { id: 'offers.nonTripZones', group: 'Offers', label: 'Offers without a trip, in zones', goal: [OFFER_GOAL] },
   { id: 'offers.tripParameters', group: 'Offers', label: 'Trip search parameters (train filter, transfers, vias…)', stage: 'offer' },
   { id: 'offers.options', group: 'Offers', label: 'Offer search options (classes, flexibility, offer parts…)', stage: 'offer' },
   { id: 'offers.requestOptions', group: 'Offers', label: 'Optional parameters of the offer request', stage: 'offer' },
@@ -161,7 +163,10 @@ const STEP_ROLES = Object.freeze({
 const STAGE_ROLES = Object.freeze({ offer: new Set(['offers']), sale: new Set(['offers', 'sale']) });
 const STAGE_GOAL = Object.freeze({ offer: OFFER_GOAL, sale: SALE_GOAL });
 
-const OFFER_FORM_CAPABILITY = Object.freeze({ SEARCH: 'offers.search', SPECIFICATION: 'offers.specification', TRIP_IDS: 'offers.tripIds' });
+const OFFER_FORM_CAPABILITY = Object.freeze({
+  SEARCH: 'offers.search', SPECIFICATION: 'offers.specification', TRIP_IDS: 'offers.tripIds',
+  NON_TRIP_PLACES: 'offers.nonTripPlaces', NON_TRIP_ZONES: 'offers.nonTripZones',
+});
 const PLACE_FLOW_CAPABILITY = Object.freeze({
   AUTOMATIC_PLACE_SELECTION_PREFERENCES: 'reservation.preferences', AUTOMATIC_PLACE_SELECTION_NEARBY: 'reservation.nearby',
   MANUAL_PLACE_SELECTION_WITHOUT_FEE: 'reservation.namedPlace', MANUAL_PLACE_SELECTION_WITH_FEE: 'reservation.namedPlace',
@@ -236,6 +241,8 @@ const SALE_RULES = [
   [(s) => text(s.requestedInformationProbe), 'passengers.update'],
   [(s) => text(s.bookingPurchaserMode), 'purchaser'],
   [(s, df) => armed(s.currencyExpectRejection) || text(s.expectedCurrency) || text(scenarioOfferCriteria(s, df)?.currency), 'sale.currencies'],
+  // #1258: a sale without a trip is for its offer request form.
+  [(s, df) => NON_TRIP_REQUEST_FORMS.includes(offerRequestFormOf(s, df)), (s, df) => OFFER_FORM_CAPABILITY[offerRequestFormOf(s, df)]],
   [(s) => armed(s.offersByTripIds) || armed(s.tripIdsExpectRejection), 'offers.tripIds'],
   [(s, df) => hasCards(passengersOf(s, df)), 'sale.reductionCards'],
   [(s, df) => hasAges(passengersOf(s, df)), 'passengers.ages'],
@@ -246,7 +253,7 @@ const SALE_RULES = [
 
 function saleCapability(scenario, datafile) {
   for (const [test, capability] of SALE_RULES) {
-    if (test(scenario, datafile)) return typeof capability === 'function' ? capability(scenario) : capability;
+    if (test(scenario, datafile)) return typeof capability === 'function' ? capability(scenario, datafile) : capability;
   }
   return 'sale';
 }

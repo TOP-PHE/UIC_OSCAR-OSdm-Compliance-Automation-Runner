@@ -66,10 +66,14 @@ const PARTIAL_REFUND_SCOPES = ['FULFILLMENT', 'LEG', 'PASSENGER'];
 // #748: how a provider takes an offer request (framework.offerRequestForms):
 // by trip search (tripSearchCriteria), by trip specification
 // (tripSpecifications), by trip id (tripIds). Absent = every form
-// (frameworks from before 1.11.289); [] = none.
-const OFFER_REQUEST_FORMS = ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'];
+// (frameworks from before 1.11.289); [] = none. #1258: without a trip
+// (nonTripSearchCriteria), between stop places or in zones.
+const TRIP_REQUEST_FORMS = Object.freeze(['SEARCH', 'SPECIFICATION', 'TRIP_IDS']);
+const NON_TRIP_REQUEST_FORMS = Object.freeze(['NON_TRIP_PLACES', 'NON_TRIP_ZONES']);
+const OFFER_REQUEST_FORMS = [...TRIP_REQUEST_FORMS, ...NON_TRIP_REQUEST_FORMS];
 const OFFER_REQUEST_TEXT = Object.freeze({
   SEARCH: 'by trip search', SPECIFICATION: 'by trip specification', TRIP_IDS: 'by trip id',
+  NON_TRIP_PLACES: 'without a trip, between stop places', NON_TRIP_ZONES: 'without a trip, in zones',
 });
 
 // #766: how a provider lets a place be chosen (framework.placeSelectionFlows),
@@ -129,6 +133,8 @@ module.exports = {
   PARTIAL_REFUND_SCOPES,
   partialRefundScopeDeclared,
   OFFER_REQUEST_FORMS,
+  TRIP_REQUEST_FORMS,
+  NON_TRIP_REQUEST_FORMS,
   OFFER_REQUEST_TEXT,
   offerRequestFormOf,
   offerRequestFormDeclared,
@@ -210,10 +216,17 @@ function partialRefundScopeDeclared(framework, scope) {
  */
 function offerRequestFormOf(scenario, datafile) {
   if (!scenario || typeof scenario !== 'object') return 'SEARCH';
-  if (isArmedValue(scenario.offersByTripIds) || isArmedValue(scenario.tripIdsExpectRejection)) return 'TRIP_IDS';
   const trips = Array.isArray(datafile?.tripRequirements) ? datafile.tripRequirements : [];
   const trip = trips.find(t => t && typeof t === 'object' && t.id === scenario.tripRequirementId);
+  // #1258: a non-trip request names no trip, whatever else the scenario arms.
+  if (trip?.tripType === 'NON_TRIP') return nonTripFormOf(trip);
+  if (isArmedValue(scenario.offersByTripIds) || isArmedValue(scenario.tripIdsExpectRejection)) return 'TRIP_IDS';
   return trip?.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH';
+}
+
+/** #1258: NON_TRIP_ZONES or NON_TRIP_PLACES (the default) for a NON_TRIP trip. */
+function nonTripFormOf(trip) {
+  return String(trip?.nonTrip?.by || '').toUpperCase() === 'ZONES' ? 'NON_TRIP_ZONES' : 'NON_TRIP_PLACES';
 }
 
 /** #748: true when the framework takes this form: no list declared, or listed. */

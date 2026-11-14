@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-14-offers-without-a-trip",
+    "date": "November 14, 2026",
+    "tag": "New",
+    "title": "Offers without a trip: between stop places, or in a zone",
+    "summary": "A scenario can now ask offers without a trip (nonTripSearchCriteria): valid between stop places, or in a zone the provider lists with GET /zones. OSCAR checks that the answer covers no trip and that each admission says where it is valid.",
+    "content": "Some products are not sold for a train: a day ticket between two stations, a ticket valid in a city zone. OSDM asks them with nonTripSearchCriteria instead of a trip. In Test Config, a trip of type NON_TRIP asks them in one of two ways:\n\n- between stop places: two or more stop places (StopPlaceRef only), or a name that OSCAR looks up first with POST /places (stop places only; another kind of place is told and not used);\n- in a zone: a zone of the provider by its id and carrier, or none, and OSCAR takes the first zone of GET /zones.\n\nThe answer must give no trip and no trip coverage, and each admission must say where it is valid: regionalValidities from OSDM 3.7 (the single regionalValidity in 3.6, and a warning when only that deprecated member is given from 3.7), with a regionalValiditySummary (a warning when missing). The booking and the fulfilment are as for a trip; the booked admissions keep their validity.\n\nThe Test Framework declares the two new forms under Offer requests. A framework that lists its forms gets a warning for a non-trip scenario until it ticks them; one that lists none takes every form. Two reference scenarios can be copied: OTST_NONTRIP_PLACES_1ADT (complete it with the provider's stop places) and OTST_NONTRIP_ZONES_1ADT (ready: the zone is found at run time). The simulator answers both ways."
+  },
+  {
     "id": "2026-11-13-fare-fulfilment-link-settled",
     "date": "November 13, 2026",
     "tag": "Improvement",

@@ -172,15 +172,15 @@ test('OSDM resources the simulator does not provide answer 501 with a Problem', 
   // Not provided anywhere.
   for (const [key, client] of REAL) {
     const token = await tokenFor(sim.base, key, client);
-    for (const path of ['/places', '/coach-deck-layouts', '/coach-layouts', '/bookings/any/reimbursements', '/bookings/any/booked-offers/x/ancillaries']) {
+    for (const path of ['/complaints', '/coach-deck-layouts', '/coach-layouts', '/bookings/any/reimbursements', '/bookings/any/booked-offers/x/ancillaries']) {
       await notProvided(token, `/${key}${path}`);
     }
   }
   // offer-parts is OSDM 3.7 and later (#852): not on alpha, which answers in 3.6.
   await notProvided(await tokenFor(sim.base, 'alpha', alphaOne), '/alpha/bookings/any/booked-offers/x/offer-parts');
-  // Without the functions that provide them (#824: plain), products and trips collection too.
+  // Without the functions that provide them (#824: plain), products, trips collection, places and zones too (#1258).
   const token = await tokenFor(sim.base, 'plain', plainOne);
-  for (const path of ['/places', '/products', '/products/abc', '/coach-deck-layouts', '/coach-layouts', '/trips-collection',
+  for (const path of ['/places', '/zones', '/products', '/products/abc', '/coach-deck-layouts', '/coach-layouts', '/trips-collection',
     '/bookings/any/reimbursements', '/bookings/any/exchange-operations/x', '/bookings/any/booked-offers/x/reservations']) {
     await notProvided(token, `/plain${path}`);
   }
@@ -799,12 +799,12 @@ test('the log names the provider and the client, also for a refusal, and never a
   const token = await tokenFor(sim.base, 'alpha', alphaOne);
   sim.logs.length = 0;
   await call(sim.base, token, 'POST', '/alpha/offers?secret=in-the-query', offerRequest());
-  await call(sim.base, token, 'GET', '/alpha/places');
+  await call(sim.base, token, 'GET', '/alpha/complaints');
   await call(sim.base, 'made.up', 'GET', '/alpha/versions');
   await tokenRequest('alpha', { headers: { Authorization: basic({ ...alphaOne, client_secret: 'wrong' }) } });
   assert.deepEqual(sim.logs.map((l) => [l.method, l.path, l.status, l.provider, l.client]), [
     ['POST', '/alpha/offers', 200, 'alpha', 'alpha-one'],
-    ['GET', '/alpha/places', 501, 'alpha', 'alpha-one'],
+    ['GET', '/alpha/complaints', 501, 'alpha', 'alpha-one'],
     ['GET', '/alpha/versions', 401, 'alpha', undefined],
     ['POST', '/alpha/oauth/token', 401, 'alpha', undefined],
   ]);
