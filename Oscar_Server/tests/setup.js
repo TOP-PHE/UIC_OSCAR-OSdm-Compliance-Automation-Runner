@@ -36,6 +36,10 @@ process.env.LOG_LEVEL       = 'silent';   // keep test output clean
 // off themselves (it is read at call time); see url-policy.test.js and the
 // store/use-time route tests.
 process.env.ALLOW_PRIVATE_TARGETS = '1';
+// A server loaded by a test starts the checkpoint thread, which would analyze
+// the tables a minute in (#1238): in a long test file, after Jest has torn it
+// down. db-statistics.test.js sets its own value.
+process.env.OSCAR_DB_OPTIMIZE = 'off';
 
 // Unique DB per test file (jest runs files in parallel by default). The name
 // carries the run's id (tests/global-setup.js), so that the global teardown

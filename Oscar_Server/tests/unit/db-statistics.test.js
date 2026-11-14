@@ -42,6 +42,7 @@ function boot(name, settings = {}) {
   let fresh;
   try {
     process.env.OSCAR_DB_PATH = path.join(tempDir, `${name}.db`);
+    // Unset when not given, whatever tests/setup.js set (OSCAR_DB_OPTIMIZE off).
     for (const key of SETTINGS.slice(1)) {
       if (settings[key] === undefined) delete process.env[key];
       else process.env[key] = settings[key];

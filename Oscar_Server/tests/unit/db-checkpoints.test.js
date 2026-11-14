@@ -93,7 +93,7 @@ describe('the checkpoint setting (#1230)', () => {
     const m = boot('inline', 'inline');
     expect(m.startCheckpointThread()).toBeNull();
     expect(autocheckpoint(m)).toBe(1000);
-    expect(m.checkpointState()).toEqual({ mode: 'inline', running: false, count: 0, last: null, optimize: 'daily', statistics: null });
+    expect(m.checkpointState()).toMatchObject({ mode: 'inline', running: false, count: 0, last: null, statistics: null });
   });
 });
 
