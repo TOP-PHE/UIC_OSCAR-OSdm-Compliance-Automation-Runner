@@ -132,6 +132,12 @@ afterAll(() => {
 const asRead = (states, codes) => codes.map((code) => [code, states[code] ?? null]);
 const ASKED = [...CODES, 'NEVER_RUN', 'A', 5];
 
+
+// These tests read the statements a route runs through db.prepare(): every
+// call prepares while they run, as before the statements were kept (#1241).
+beforeAll(() => { require('../../src/db/db').keepStatements(false); });
+afterAll(() => { require('../../src/db/db').keepStatements(true); });
+
 describe('the latest run of each scenario asked (#1246)', () => {
   test.each(Object.keys(users))('the answer the old reading gave, for a %s', async (who) => {
     const old = oldLatestRunStates(companyId, users[who]);

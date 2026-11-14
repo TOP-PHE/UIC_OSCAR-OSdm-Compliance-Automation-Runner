@@ -4,6 +4,17 @@
   "current_release": "2026.554",
   "releases": [
     {
+      "release": "2026.560",
+      "date": "2026-11-14",
+      "server": "1.11.521",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.521: statements prepared once, the encryption key read once (#1241, part of the review #1233). The database helpers all, get and run prepared their SQL at every call (a read of one run by id: 45 to 70 µs, 9 to 13 µs prepared once); they now keep their statements by SQL text, the 200 used last. A kept statement behaves as a new one: its parameters are cleared between calls and SQLite prepares it again when the schema changes. The encryption key was read from its hex text at every encryption (about 10 % of a log line); it is now read once, and again only if ENCRYPTION_KEY changes. A gain of 1 to 2 % of the server's thread is expected, no more."
+      ]
+    },
+    {
       "release": "2026.559",
       "date": "2026-11-14",
       "server": "1.11.520",

@@ -124,6 +124,11 @@ const CACHE_MB = cacheSetting(process.env.OSCAR_DB_CACHE_MB);
 const MMAP_MB = mmapSetting(process.env.OSCAR_DB_MMAP_MB);
 const TEMP_STORE = tempStoreSetting(process.env.OSCAR_DB_TEMP_STORE);
 
+// The encryption key as last read (#1241, _key() below). Here, before the
+// migrations: some encrypt rows while this file loads (migration 27), and a
+// `let` read before its line throws.
+let keyRead = { hex: null, key: null };
+
 // ── Open database ─────────────────────────────────────────────────────────────
 // The busy timeout (#1238): another connection may hold the write lock for a
 // moment, the checkpoint thread's when it analyzes a table. A write here then
@@ -1311,12 +1316,19 @@ console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[d
 // ── Encryption helpers ────────────────────────────────────────────────────────
 const ALGO = 'aes-256-gcm';
 
+// The key is read from its hex text once, and again only when ENCRYPTION_KEY
+// changes (tests change it): reading it at each call was about 10 % of a log
+// line's 13 to 18 µs (#1241). createCipheriv copies the key it is given, so
+// the one Buffer is never changed. `keyRead` is declared before the database
+// opens: the migrations encrypt with it while this file loads.
 function _key() {
   const hex = process.env.ENCRYPTION_KEY || '';
+  if (hex === keyRead.hex) return keyRead.key;
   if (hex.length !== 64) {
     throw new Error('ENCRYPTION_KEY must be exactly 64 hex characters. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
   }
-  return Buffer.from(hex, 'hex');
+  keyRead = { hex, key: Buffer.from(hex, 'hex') };
+  return keyRead.key;
 }
 
 function encrypt(plaintext) {
@@ -1341,17 +1353,57 @@ function decrypt(encoded) {
   return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
 }
 
+// ── Statements prepared once (#1241) ──────────────────────────────────────────
+// all/get/run prepared their SQL at every call: a read of one run by id took
+// 45 to 70 µs so, 9 to 13 µs prepared once (measured on the maintainer's PC).
+// The statements are kept by their SQL text, the 200 used last. A kept
+// statement is the same as a new one: Node clears its parameters between two
+// calls (one not given reads NULL), and SQLite prepares it again by itself
+// when the schema changes (checked: a column added, a table made again). The
+// helpers run a statement to its end, so one is never used twice at once.
+const STATEMENT_CACHE_SIZE = 200;
+const statements = new Map();   // SQL → statement, the one used last at the end
+let keepingStatements = true;
+
+function statementFor(sql) {
+  if (!keepingStatements) return db.prepare(sql);
+  let statement = statements.get(sql);
+  if (statement) {
+    statements.delete(sql);
+  } else {
+    statement = db.prepare(sql);
+    if (statements.size >= STATEMENT_CACHE_SIZE) statements.delete(statements.keys().next().value);
+  }
+  statements.set(sql, statement);
+  return statement;
+}
+
+/**
+ * Tests that read each statement through db.prepare() turn the keeping off
+ * (false), so that every call prepares, as before #1241; true turns it on
+ * again. Either way the statements kept so far are let go.
+ */
+function keepStatements(on) {
+  keepingStatements = Boolean(on);
+  statements.clear();
+}
+
+/** How many statements are kept, for the tests. */
+function keptStatements() {
+  return statements.size;
+}
+
 // ── Generic query helpers ─────────────────────────────────────────────────────
 function all(sql, params = []) {
-  return timed(sql, () => db.prepare(sql).all(...params));
+  return timed(sql, () => statementFor(sql).all(...params));
 }
 
 function get(sql, params = []) {
-  return timed(sql, () => db.prepare(sql).get(...params));
+  return timed(sql, () => statementFor(sql).get(...params));
 }
 
 function run(sql, params = []) {
-  return timed(sql, () => db.prepare(sql).run(...params));
+  return timed(sql, () => statementFor(sql).run(...params));
 }
 
 // ── Slow statements (#1234) ───────────────────────────────────────────────────
@@ -1686,4 +1738,5 @@ module.exports = {
   checkpointsSetting, startCheckpointThread, stopCheckpointThread, checkpointState,
   slowStatementSetting, observeStatements, sqlShape, callerOf,
   cacheSetting, mmapSetting, tempStoreSetting, memorySettings, optimizeSetting,
+  keepStatements, keptStatements, STATEMENT_CACHE_SIZE,
 };
