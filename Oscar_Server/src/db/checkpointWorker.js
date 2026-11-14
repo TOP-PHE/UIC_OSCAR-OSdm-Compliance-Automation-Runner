@@ -32,7 +32,6 @@ const db = new DatabaseSync(workerData.dbPath, { timeout: workerData.busyMs ?? 5
 const checkpoint = db.prepare('PRAGMA wal_checkpoint(PASSIVE)');
 let timer = null;
 let optimizeTimer = null;
-let stopping = false;
 
 function tick() {
   const started = process.hrtime.bigint();
@@ -65,42 +64,54 @@ function tablesToAnalyze() {
     .map((match) => ({ statement: match[0], name: match[1].replaceAll('""', '"') }));
 }
 
-function pause(ms) {
-  return new Promise((resolve) => { setTimeout(resolve, ms); });
-}
-
-async function optimize() {
-  const started = process.hrtime.bigint();
-  const tables = [];
-  let error = null;
+// One run: the tables listed, then each analyzed in a timer of its own, the
+// pause after it being the wait for the next timer. Then the server's thread
+// is told, and the next run is set.
+function optimize() {
+  const run = { started: process.hrtime.bigint(), tables: [], planned: [] };
   try {
     db.exec(`PRAGMA analysis_limit = ${ANALYSIS_LIMIT}`);
-    for (const table of tablesToAnalyze()) {
-      if (stopping) return;
-      const t0 = process.hrtime.bigint();
-      db.exec(table.statement);
-      tables.push({ name: table.name, seconds: Number(process.hrtime.bigint() - t0) / 1e9 });
-      await pause(workerData.optimizePauseMs ?? 250);
-    }
+    run.planned = tablesToAnalyze();
   } catch (e) {
-    error = e.message;
+    report(run, e.message);
+    return;
   }
-  if (stopping) return;
+  analyzeNext(run, 0);
+}
+
+function analyzeNext(run, i) {
+  if (i >= run.planned.length) {
+    report(run, null);
+    return;
+  }
+  const table = run.planned[i];
+  try {
+    const t0 = process.hrtime.bigint();
+    db.exec(table.statement);
+    run.tables.push({ name: table.name, seconds: Number(process.hrtime.bigint() - t0) / 1e9 });
+  } catch (e) {
+    report(run, e.message);
+    return;
+  }
+  optimizeTimer = setTimeout(() => analyzeNext(run, i + 1), workerData.optimizePauseMs ?? 250);
+}
+
+function report(run, error) {
   parentPort.postMessage({
     type: 'optimized',
-    seconds: Number(process.hrtime.bigint() - started) / 1e9,
-    tables,
+    seconds: Number(process.hrtime.bigint() - run.started) / 1e9,
+    tables: run.tables,
     error,
   });
   optimizeTimer = setTimeout(optimize, workerData.optimizeEveryMs);
 }
 
 // Asked to stop: the connection is closed, and with nothing left to do the
-// thread ends. A run of the statistics waiting between two tables sees
-// `stopping` and never touches the connection again.
+// thread ends. A run of the statistics between two tables waits on
+// `optimizeTimer`, which is cleared here: it never touches the connection
+// again.
 parentPort.on('message', (msg) => {
   if (msg?.type !== 'stop') return;
-  stopping = true;
   clearTimeout(timer);
   clearTimeout(optimizeTimer);
   db.close();
