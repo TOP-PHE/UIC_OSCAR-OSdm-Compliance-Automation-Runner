@@ -231,10 +231,11 @@ const PARENT_PATH_RULES = [
 const PARENT_WINDOW = 30;
 
 // The requests of a scenario stored so far, oldest first: { id, url }.
-function storedOf(plan, scenarioName) {
-  const key = scenarioName ?? null;
-  if (!plan.stored.has(key)) plan.stored.set(key, []);
-  return plan.stored.get(key);
+// A scenario without a name (undefined) is kept under null, as the old query's
+// `scenario_name IS ?` with null did.
+function storedOf(plan, scenarioName = null) {
+  if (!plan.stored.has(scenarioName)) plan.stored.set(scenarioName, []);
+  return plan.stored.get(scenarioName);
 }
 
 function inferParentRequestId(plan, url, scenarioName) {
