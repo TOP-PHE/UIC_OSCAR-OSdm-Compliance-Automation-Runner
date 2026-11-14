@@ -507,6 +507,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.518] — 2026-11-14
+
+Listed in `compatibility.json` (2026.557) without moving `current_release`.
+
+### Changed
+
+- **SQLite's statistics, kept by the checkpoint thread** (#1238, an action of
+  the review #1233). `ANALYZE` had never run on OSCAR's database, so the
+  planner guessed how many rows an index gives: #1227 met a query that
+  walked every run of a company instead of using its batch's index.
+- **When.** The checkpoint thread (#1230) runs SQLite's `PRAGMA optimize` a
+  minute after the start, then once a day. That is SQLite's advice for a
+  connection that stays open: `0x10002` checks every table, since that
+  connection runs no query of its own. Only tables without statistics, or
+  whose number of rows changed tenfold, are analyzed.
+- **One table at a time, never on the server's thread.** SQLite lists the
+  tables (mask `0x00001`, which runs nothing). The thread then analyzes
+  each one alone, with `analysis_limit` 1,000, and pauses 250 ms after it,
+  so the write lock an analysis takes is held for one table and a write of
+  the server's connection gets in between. A statement other than
+  `ANALYZE "main"."<table>"` is never run.
+- **The server's connection waits instead of failing.** It had no busy
+  timeout: a write while another connection held the lock failed at once
+  with "database is locked". It now waits up to 5 s. The checkpoint thread
+  takes no write lock, so nothing waited before this change.
+- **The server's plans follow.** A connection reads the statistics when it
+  reads the schema. Another connection's `ANALYZE` changes rows of
+  `sqlite_stat1`, not the schema (only the first one ever creates the
+  table), so the server's connection kept what it had read. It now runs
+  `ANALYZE sqlite_schema` after a run that analyzed a table, about a
+  millisecond.
+- **What it says.** One line per run with the tables' names and times,
+  `checkpointState().statistics`, and two metrics:
+  `oscar_db_analyze_seconds` (each table) and
+  `oscar_db_optimize_runs_total{outcome}`. A failure is an error line; the
+  next run is the next day.
+- **Settings.** `OSCAR_DB_OPTIMIZE` is `daily` (the default) or `off`; a
+  wrong value stops the start. With `OSCAR_DB_CHECKPOINTS=inline` there is
+  no thread and no statistics. The start-up line says
+  `statistics daily|off`. *Metrics and monitoring* says how to remove the
+  statistics if a query became slower.
+- `db-statistics.test.js` covers:
+  - the setting and the start-up line;
+  - the tables analyzed by the thread;
+  - the server's plan changing after a later analysis, with `sqlite_stat1`
+    already there;
+  - no second analysis of an unchanged table;
+  - `off`;
+  - a failed run;
+  - a write waiting for another connection's lock.
+
+  Mutation-checked: without the reload, or without the busy timeout, a test
+  fails.
+
+---
+
 ## [server-1.11.517] — 2026-11-14
 
 Listed in `compatibility.json` (2026.556) without moving `current_release`.

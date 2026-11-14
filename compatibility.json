@@ -4,6 +4,17 @@
   "current_release": "2026.554",
   "releases": [
     {
+      "release": "2026.557",
+      "date": "2026-11-14",
+      "server": "1.11.518",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.518: SQLite's statistics, kept by the checkpoint thread (#1238, part of the review #1233). ANALYZE had never run on OSCAR's database, so the planner guessed how many rows an index gives. The checkpoint thread now runs SQLite's PRAGMA optimize a minute after the start and then once a day (SQLite's advice for a connection that stays open), one table at a time with an analysis limit and a pause after each, never on the server's thread. The server's connection waits for such a write lock (busy timeout 5 s) instead of failing, and reads the statistics again (ANALYZE sqlite_schema): another connection's ANALYZE does not make it. OSCAR_DB_OPTIMIZE=off turns it off; a wrong value stops the start. One log line per run names the tables; metrics oscar_db_analyze_seconds and oscar_db_optimize_runs_total."
+      ]
+    },
+    {
       "release": "2026.556",
       "date": "2026-11-14",
       "server": "1.11.517",

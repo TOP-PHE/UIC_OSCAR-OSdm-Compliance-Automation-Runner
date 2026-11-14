@@ -169,6 +169,14 @@ describe('GET /metrics', () => {
     expect(res.text).toMatch(/\noscar_db_temp_store 2\n/);
   });
 
+  test('#1238: the statistics\' metrics are written', async () => {
+    const res = await request(app).get('/metrics');
+    expect(res.status).toBe(200);
+    for (const name of ['oscar_db_analyze_seconds', 'oscar_db_optimize_runs_total']) {
+      expect(res.text).toContain(`# TYPE ${name} `);
+    }
+  });
+
   test('#1230: the checkpoint thread\'s metrics are written', async () => {
     const res = await request(app).get('/metrics');
     expect(res.status).toBe(200);
