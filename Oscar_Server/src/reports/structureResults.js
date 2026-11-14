@@ -363,9 +363,24 @@ function noResults() {
   return { suites: 0, requests: 0, assertions: 0 };
 }
 
-// Lets the requests waiting for the thread be served.
-function yieldToOthers() {
-  return new Promise((resolve) => setImmediate(resolve));
+// Stores the plan's work slice by slice: the first slice now, each next one
+// in a setImmediate, so the requests waiting for the thread are served between
+// two slices. Resolves when all is stored; rejects with a slice's error, the
+// next slices then never run.
+function storeInSlices(plan, sliceMs, timeSlice) {
+  return new Promise((resolve, reject) => {
+    const slice = () => {
+      try {
+        timeSlice(() => storeSlice(plan, sliceMs));
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      if (plan.next < plan.work.length) setImmediate(slice);
+      else resolve();
+    };
+    slice();
+  });
 }
 
 // Handle Bruno CLI output format variations (array wrapper, iterations, etc.)
@@ -678,13 +693,8 @@ async function extractStructuredResults(runId, companyId, {
   const plan = timeRead(() => planOf(runId, companyId, decryptBuffer(stored).toString('utf8')));
   if (!plan) return noResults();
 
-  let slices = 0;
   try {
-    while (plan.next < plan.work.length) {
-      if (slices > 0) await yieldToOthers();
-      timeSlice(() => storeSlice(plan, sliceMs));
-      slices++;
-    }
+    await storeInSlices(plan, sliceMs, timeSlice);
   } catch (err) {
     timeSlice(() => removeStored(runId));
     throw err;
