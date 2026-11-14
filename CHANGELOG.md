@@ -507,6 +507,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.520] — 2026-11-14
+
+Listed in `compatibility.json` (2026.559) without moving `current_release`.
+
+### Changed
+
+- **Result slices keep to their 20 ms** (#1240, an action of the review
+  #1233). Since #1214 a run's results are stored in slices of about 20 ms,
+  each in its own transaction, with other requests served between them.
+  The time was checked after each request, and a request with many checks
+  went on to its end. On the test machine's profile (2026.548) slices took
+  47 to 84 ms. Several runs storing at once put their slices one after the
+  other: most of the 0.2 to 0.5 s waits left.
+- **A request is stored in steps** (`structureResults.js`):
+  - its row, with its suite's for the first request of a suite
+    (`startRequest()`);
+  - then one step a check (`storeNextCheck()`);
+  - its totals, and its suite's after its last request, written with its
+    last check (`finishRequest()`).
+
+  `storeSlice()` checks the time after each step, so a request's checks
+  may span two slices. All or nothing stays: a failed slice removes what the
+  run stored.
+- **`oscar_results_slice_seconds`**, a histogram of each slice's length (the
+  runner's `timeSlice`), to see on the test machine that slices keep to
+  about 20 ms.
+- Tests:
+  - `results-store-slices.test.js`, with `sliceMs` 0, now counts one slice
+    a step (18 for six requests of two checks).
+  - A request of 40 checks spans 41 slices, with its totals only with its
+    last check.
+  - The same rows stored one step a slice or all in one block: suites,
+    requests, parents and checks, without ids, times or bodies.
+  - A slice failing in the middle of a request's checks removes everything.
+  - Mutation-checked: storing a request's checks in one step fails four of
+    these tests.
+
+---
+
 ## [server-1.11.519] — 2026-11-14
 
 Listed in `compatibility.json` (2026.558) without moving `current_release`.

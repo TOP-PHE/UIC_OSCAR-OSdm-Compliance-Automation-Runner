@@ -62,6 +62,17 @@ const runWork = new promClient.Histogram({
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
   registers: [register]
 });
+// Each slice of a run's results stored (#1214, #1240), on the server's
+// thread: a slice stops once about 20 ms are spent, checked after each check,
+// so its length is 20 ms plus one check. 47 to 84 ms were seen when the time
+// was checked after each request only.
+const resultsSliceSeconds = new promClient.Histogram({
+  name: 'oscar_results_slice_seconds',
+  help: "Time of each slice of a run's results stored, on the server's thread (about 20 ms each)",
+  buckets: [0.005, 0.01, 0.02, 0.025, 0.03, 0.04, 0.05, 0.075, 0.1, 0.25, 0.5, 1],
+  registers: [register]
+});
+
 // How big a run's Bruno results file is (#1218): what results_read reads.
 const runResultsBytes = new promClient.Histogram({
   name: 'oscar_run_results_bytes',
@@ -360,6 +371,7 @@ module.exports = {
   routeLabel,
   RUN_WORK_KINDS,
   runWork,
+  resultsSliceSeconds,
   runResultsBytes,
   runLogLines,
   runLogSeconds,

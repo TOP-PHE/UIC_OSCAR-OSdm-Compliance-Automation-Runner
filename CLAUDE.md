@@ -4019,6 +4019,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     stored check: read the queries first (`db-indexes.test.js`).
     `inferParentRequestId(plan, url, scenario)` looks in `plan.stored` (the
     run's stored requests by scenario, last 30), no query.
+    **#1240 (1.11.520): a slice checks its time after each check.** A
+    request is stored in steps, `storeStep()`: `startRequest()` (its row,
+    its suite's when first), `storeNextCheck()`, then `finishRequest()`
+    with the last check (totals, suite totals when last); `plan.next` is the
+    request being stored. With `sliceMs` 0 a slice is one step. A reader may
+    see a request whose totals are not written yet while the run stores (its
+    status is still RUNNING). Histogram `oscar_results_slice_seconds`.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the

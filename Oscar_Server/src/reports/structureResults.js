@@ -448,6 +448,8 @@ function planOf(runId, companyId, text) {
     counts: noResults(),
     // The requests stored so far, by scenario, for their parents (#1239).
     stored: new Map(),
+    // The request being stored (#1240): its row, then its checks one by one.
+    next: 0,
   };
 }
 
@@ -495,7 +497,18 @@ function storeCheck(plan, ids, item, check) {
   );
 }
 
-function storeRequest(plan, group, item) {
+// A request is stored in steps (#1240): its row (and its suite's, for the
+// first request of a suite) in one, then one step a check; its totals, and
+// its suite's after its last request, are written with its last check. A
+// slice checks its time after each step, so a request with many checks no
+// longer runs past the slice: 47 to 84 ms were seen on the test machine.
+function startRequest(plan, work) {
+  const { group, item, first } = work;
+  if (first) {
+    group.suiteId = plan.sql.suite.run(plan.runId, plan.companyId, group.scenario, group.suite).lastInsertRowid;
+    group.totals = { total: 0, passed: 0, failed: 0, skipped: 0, duration: 0 };
+    plan.counts.suites++;
+  }
   const { entry, reqName } = item;
   // Extract request-level data
   const method = entry.request?.method || null;
@@ -559,34 +572,36 @@ function storeRequest(plan, group, item) {
     parentRequestId
   ).lastInsertRowid;
   if (url) storedOf(plan, group.scenario).push({ id: requestId, url });
-  const reqTotals = { total: 0, passed: 0, failed: 0 };
   plan.counts.requests++;
   group.totals.duration += duration;
-
-  for (const check of checksOf(entry)) {
-    storeCheck(plan, { requestId, suiteId: group.suiteId }, item, check);
-    plan.counts.assertions++;
-    reqTotals.total++;
-    group.totals.total++;
-    if (check.passed) { reqTotals.passed++; group.totals.passed++; }
-    else { reqTotals.failed++; group.totals.failed++; }
-  }
-
-  // Update request totals + vendor capability classification
-  let reqStatus = 'SKIP';
-  if (reqTotals.failed > 0)     reqStatus = 'FAIL';
-  else if (reqTotals.total > 0) reqStatus = 'PASS';
-  const capability = classifyVendorCapability(httpStatus, reqTotals.total, reqTotals.failed, reqName);
-  plan.sql.requestTotals.run(reqTotals.total, reqTotals.passed, reqTotals.failed, reqStatus, capability, requestId);
+  work.requestId = requestId;
+  work.httpStatus = httpStatus;
+  work.checks = checksOf(entry);
+  work.stored = 0;
+  work.totals = { total: 0, passed: 0, failed: 0 };
 }
 
-function storeWork(plan, { group, item, first, last }) {
-  if (first) {
-    group.suiteId = plan.sql.suite.run(plan.runId, plan.companyId, group.scenario, group.suite).lastInsertRowid;
-    group.totals = { total: 0, passed: 0, failed: 0, skipped: 0, duration: 0 };
-    plan.counts.suites++;
-  }
-  storeRequest(plan, group, item);
+function storeNextCheck(plan, work) {
+  const { group, item } = work;
+  const check = work.checks[work.stored];
+  storeCheck(plan, { requestId: work.requestId, suiteId: group.suiteId }, item, check);
+  work.stored++;
+  plan.counts.assertions++;
+  work.totals.total++;
+  group.totals.total++;
+  if (check.passed) { work.totals.passed++; group.totals.passed++; }
+  else { work.totals.failed++; group.totals.failed++; }
+}
+
+function finishRequest(plan, work) {
+  const { group, item, last, totals } = work;
+  // Update request totals + vendor capability classification
+  let reqStatus = 'SKIP';
+  if (totals.failed > 0)     reqStatus = 'FAIL';
+  else if (totals.total > 0) reqStatus = 'PASS';
+  const capability = classifyVendorCapability(work.httpStatus, totals.total, totals.failed, item.reqName);
+  plan.sql.requestTotals.run(totals.total, totals.passed, totals.failed, reqStatus, capability, work.requestId);
+  work.checks = null;   // stored: let them go
   if (last) {
     const t = group.totals;
     const suitePassRate = t.total > 0 ? Math.round(t.passed / t.total * 1000) / 10 : 0;
@@ -594,18 +609,26 @@ function storeWork(plan, { group, item, first, last }) {
   }
 }
 
-// One slice: requests from `from`, in one transaction, until `sliceMs` is
-// spent (at least one). Returns where the next slice starts.
-function storeSlice(plan, from, sliceMs) {
+// One step of the request at `plan.next`: its row, or its next check.
+function storeStep(plan) {
+  const work = plan.work[plan.next];
+  if (work.requestId === undefined) startRequest(plan, work);
+  else storeNextCheck(plan, work);
+  if (work.stored === work.checks.length) {
+    finishRequest(plan, work);
+    plan.next++;
+  }
+}
+
+// One slice: steps from where the last one stopped, in one transaction, until
+// `sliceMs` is spent (at least one step).
+function storeSlice(plan, sliceMs) {
   const until = performance.now() + sliceMs;
-  let next = from;
   transaction(() => {
     do {
-      storeWork(plan, plan.work[next]);
-      next++;
-    } while (next < plan.work.length && performance.now() < until);
+      storeStep(plan);
+    } while (plan.next < plan.work.length && performance.now() < until);
   });
-  return next;
 }
 
 // What the run stored before a slice failed. Its checks and requests go with
@@ -630,7 +653,8 @@ function removeStored(runId) {
  * @param {(fn: Function) => any} [options.timeSlice] runs each slice; the
  *   runner times both as the run's work, apart
  * @param {(bytes: number) => void} [options.onFileRead] the file's size
- * @param {number} [options.sliceMs] a slice's time (tests: 0, one request each)
+ * @param {number} [options.sliceMs] a slice's time (tests: 0, one step each:
+ *   a request's row, or one of its checks, #1240)
  * @returns {Promise<{ suites: number, requests: number, assertions: number }>}
  */
 async function extractStructuredResults(runId, companyId, {
@@ -653,11 +677,12 @@ async function extractStructuredResults(runId, companyId, {
   const plan = timeRead(() => planOf(runId, companyId, decryptBuffer(stored).toString('utf8')));
   if (!plan) return noResults();
 
-  let next = 0;
+  let slices = 0;
   try {
-    while (next < plan.work.length) {
-      if (next > 0) await yieldToOthers();
-      next = timeSlice(() => storeSlice(plan, next, sliceMs));
+    while (plan.next < plan.work.length) {
+      if (slices > 0) await yieldToOthers();
+      timeSlice(() => storeSlice(plan, sliceMs));
+      slices++;
     }
   } catch (err) {
     timeSlice(() => removeStored(runId));
