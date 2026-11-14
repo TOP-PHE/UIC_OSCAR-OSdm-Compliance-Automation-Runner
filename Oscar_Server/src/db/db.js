@@ -1215,6 +1215,24 @@ const MIGRATIONS = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_runs_company_queued ON runs(company_id, queued_at, id, status, user_id)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_runs_company_batch ON runs(company_id, batch_id)');
   }},
+  { version: 55, name: 'active-runs-index-fewer-check-indexes', up: () => {
+      // #1239. The queue panel reads a company's queued and running runs every
+      // 3 s: a partial index holds those runs only (schema.sql makes it at
+      // start; here for a database already past it).
+      db.exec("CREATE INDEX IF NOT EXISTS idx_runs_active ON runs(company_id, queued_at) WHERE status IN ('QUEUED', 'RUNNING')");
+      // (company_id) alone is a prefix of idx_runs_company_queued (migration
+      // 54), which also serves the cascade from companies.
+      db.exec('DROP INDEX IF EXISTS idx_runs_company_id');
+      // Each stored check updated 7 indexes. (company_id) alone is a prefix of
+      // idx_run_assertions_key, which serves the cascade and a company's
+      // deletion; no query reads (company_id, category) or (company_id,
+      // domain): the category and domain filters read a run's or a request's
+      // checks, by their own indexes. Every query on the two tables was read
+      // with EXPLAIN QUERY PLAN first (db-indexes.test.js keeps a few).
+      db.exec('DROP INDEX IF EXISTS idx_run_assertions_company');
+      db.exec('DROP INDEX IF EXISTS idx_run_assertions_category');
+      db.exec('DROP INDEX IF EXISTS idx_run_assertions_domain');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

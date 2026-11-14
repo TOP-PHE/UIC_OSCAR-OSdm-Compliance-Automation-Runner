@@ -123,10 +123,10 @@ CREATE TABLE IF NOT EXISTS run_assertions (
 );
 CREATE INDEX IF NOT EXISTS idx_run_assertions_run_passed ON run_assertions(run_id, passed);  -- (run_id) until migration 53, #1202
 CREATE INDEX IF NOT EXISTS idx_run_assertions_request   ON run_assertions(request_id);
-CREATE INDEX IF NOT EXISTS idx_run_assertions_company   ON run_assertions(company_id);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_key       ON run_assertions(company_id, assertion_key);
-CREATE INDEX IF NOT EXISTS idx_run_assertions_category  ON run_assertions(company_id, category);
-CREATE INDEX IF NOT EXISTS idx_run_assertions_domain    ON run_assertions(company_id, domain);
+CREATE INDEX IF NOT EXISTS idx_run_assertions_suite     ON run_assertions(suite_id);
+-- (company_id), (company_id, category) and (company_id, domain) until migration 55 (#1239):
+-- no query read them; the category and domain filters read a run's checks.
 ```
 
 **Enables:** "All failing assertions across all runs", "Trend for specific assertion", "Most flaky assertions", "Filter by category/domain"

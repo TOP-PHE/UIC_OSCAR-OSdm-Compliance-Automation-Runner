@@ -4,6 +4,17 @@
   "current_release": "2026.554",
   "releases": [
     {
+      "release": "2026.558",
+      "date": "2026-11-14",
+      "server": "1.11.519",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.519: indexes of runs and checks, and a stored request's parent found in memory (#1239, part of the review #1233). The Dashboard's queue panel (every 3 s) read every run of the company to find the few queued or running: a partial index holds those only (13 ms to 0.04 ms on 96,000 runs, measured locally). Migration 55 removes four indexes no query needed: runs (company_id), and run_assertions (company_id), (company_id, category) and (company_id, domain); each stored check updated 7 indexes, now 4. A stored request's parent (the link to its offer) is found among the requests the run's results stored, kept in memory, instead of one query with a join per request; the same parents as before."
+      ]
+    },
+    {
       "release": "2026.557",
       "date": "2026-11-14",
       "server": "1.11.518",

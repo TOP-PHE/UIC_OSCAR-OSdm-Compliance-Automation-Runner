@@ -4010,6 +4010,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `onStatistics()` runs `ANALYZE sqlite_schema`; `EXPLAIN QUERY PLAN`
     alone never looks at the schema version, so a plan test runs a real
     query first. An error of the statistics never ends the thread.
+    **#1239 (1.11.519): indexes.** `idx_runs_active` (partial, `status IN
+    ('QUEUED', 'RUNNING')`, in schema.sql and migration 55) serves the queue
+    panel; the query must keep that exact `IN` for SQLite to use it.
+    Migration 55 drops `idx_runs_company_id` and `idx_run_assertions_company
+    | _category | _domain`, **removed from schema.sql too** (schema.sql runs at
+    every start and would make them again). A new index is a cost on every
+    stored check: read the queries first (`db-indexes.test.js`).
+    `inferParentRequestId(plan, url, scenario)` looks in `plan.stored` (the
+    run's stored requests by scenario, last 30), no query.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the
