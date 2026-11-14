@@ -4,6 +4,17 @@
   "current_release": "2026.554",
   "releases": [
     {
+      "release": "2026.555",
+      "date": "2026-11-13",
+      "server": "1.11.516",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.516: the Run page's preview and a launch read the company's runs in slices, the thread free between them (#1256, part of the review #1233). On the k3s test machine, the first preview or launch of each provider after a restart counted the failed checks of up to 500 runs in one statement: 1.1 to 1.6 s of disk reads during which the server answered nothing. Now 50 runs and 100 scenario codes a slice, with other requests answered between two slices. The total and the facets are the same."
+      ]
+    },
+    {
       "release": "2026.554",
       "date": "2026-11-13",
       "server": "1.11.515",

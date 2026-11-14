@@ -13,7 +13,8 @@
 // statement log named both at the start of a batch. The latest run of each
 // scenario asked is now one seek per code, and the failed checks of a
 // finished run, which never change, are counted once. The answer must be the
-// one the old reading gave.
+// one the old reading gave. #1256: both are read in slices, the thread free
+// between them.
 
 const { randomUUID: uuidv4 } = require('node:crypto');
 const D = require('../../src/db/db');
@@ -132,12 +133,12 @@ const asRead = (states, codes) => codes.map((code) => [code, states[code] ?? nul
 const ASKED = [...CODES, 'NEVER_RUN', 'A', 5];
 
 describe('the latest run of each scenario asked (#1246)', () => {
-  test.each(Object.keys(users))('the answer the old reading gave, for a %s', (who) => {
+  test.each(Object.keys(users))('the answer the old reading gave, for a %s', async (who) => {
     const old = oldLatestRunStates(companyId, users[who]);
-    const now = RC.latestRunStates(companyId, users[who], ASKED);
+    const now = await RC.latestRunStates(companyId, users[who], ASKED);
     expect(asRead(now, ASKED)).toEqual(asRead(old, ASKED));
     // And again, the failed checks now kept.
-    expect(asRead(RC.latestRunStates(companyId, users[who], ASKED), ASKED)).toEqual(asRead(old, ASKED));
+    expect(asRead(await RC.latestRunStates(companyId, users[who], ASKED), ASKED)).toEqual(asRead(old, ASKED));
   });
 
   test('the drawn runs hold what the comparison must see', () => {
@@ -150,9 +151,9 @@ describe('the latest run of each scenario asked (#1246)', () => {
     expect(Number(ties)).toBeGreaterThan(0);
   });
 
-  test('no code asked, nothing read', () => {
+  test('no code asked, nothing read', async () => {
     const spy = jest.spyOn(D.db, 'prepare');
-    expect(RC.latestRunStates(companyId, users.manager, [])).toEqual({});
+    expect(await RC.latestRunStates(companyId, users.manager, [])).toEqual({});
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
@@ -168,44 +169,98 @@ describe('the latest run of each scenario asked (#1246)', () => {
 });
 
 describe('the failed checks of a finished run, counted once (#1246)', () => {
-  const statementsOn = (fn) => {
+  const statementsOn = async (fn) => {
     const spy = jest.spyOn(D.db, 'prepare');
-    fn();
+    await fn();
     const sql = spy.mock.calls.map(([s]) => String(s)).filter((s) => s.includes('run_assertions'));
     spy.mockRestore();
     return sql;
   };
 
-  test('a second reading reads no check; a run finished since is counted alone', () => {
+  test('a second reading reads no check; a run finished since is counted alone', async () => {
     const code = `ONCE_${uuidv4()}`;
     addRun({ code, minutes: 5, passed: 2, failed: 1 });
-    const first = statementsOn(() => {
-      expect(RC.latestRunStates(companyId, users.manager, [code])[code].failed).toBe(1);
+    const first = await statementsOn(async () => {
+      expect((await RC.latestRunStates(companyId, users.manager, [code]))[code].failed).toBe(1);
     });
     expect(first).toHaveLength(1);
-    expect(statementsOn(() => RC.latestRunStates(companyId, users.manager, [code]))).toEqual([]);
+    expect(await statementsOn(() => RC.latestRunStates(companyId, users.manager, [code]))).toEqual([]);
 
     addRun({ code, minutes: 1, passed: 1, failed: 3, status: 'FAILED' });
     let states;
-    const after = statementsOn(() => { states = RC.latestRunStates(companyId, users.manager, [code]); });
+    const after = await statementsOn(async () => { states = await RC.latestRunStates(companyId, users.manager, [code]); });
     expect(states[code]).toEqual(expect.objectContaining({ status: 'FAILED', failed: 3 }));
     expect(after).toHaveLength(1);
     expect((after[0].match(/\?/g) || []).length).toBe(1);
   });
 
-  test('a run without checks counts 0, and is not read again', () => {
+  test('a run without checks counts 0, and is not read again', async () => {
     const code = `NONE_${uuidv4()}`;
     addRun({ code, minutes: 2 });
-    expect(RC.latestRunStates(companyId, users.manager, [code])[code].failed).toBe(0);
-    expect(statementsOn(() => RC.latestRunStates(companyId, users.manager, [code]))).toEqual([]);
+    expect((await RC.latestRunStates(companyId, users.manager, [code]))[code].failed).toBe(0);
+    expect(await statementsOn(() => RC.latestRunStates(companyId, users.manager, [code]))).toEqual([]);
   });
 
-  test('a run still going is not the latest finished one, and its checks are not kept', () => {
+  test('a run still going is not the latest finished one, and its checks are not kept', async () => {
     const code = `GOING_${uuidv4()}`;
     const done = addRun({ code, minutes: 9, failed: 2 });
     addRun({ code, minutes: 0, status: 'RUNNING', failed: 5 });
-    const states = RC.latestRunStates(companyId, users.manager, [code]);
+    const states = await RC.latestRunStates(companyId, users.manager, [code]);
     expect(states[code].failed).toBe(2);
     expect(all(`SELECT id FROM runs WHERE id = ?`, [done])).toHaveLength(1);
+  });
+});
+
+describe('read in slices, the thread free between them (#1256)', () => {
+  // A cold count of 500 runs in one statement held the thread 1.1 to 1.6 s on
+  // the k3s test machine. While the reading goes on, a task of the event loop
+  // notes how many slices were read each time it gets the thread.
+  async function readWatched(codes, marker) {
+    const spy = jest.spyOn(D.db, 'prepare');
+    const statements = () => spy.mock.calls.map(([sql]) => String(sql)).filter((sql) => sql.includes(marker));
+    const seen = [];
+    let done = false;
+    const tick = () => {
+      seen.push(statements().length);
+      if (!done) setImmediate(tick);
+    };
+    setImmediate(tick);
+    try {
+      const states = await RC.latestRunStates(companyId, users.manager, codes);
+      return { states, statements: statements(), seen };
+    } finally {
+      done = true;
+      spy.mockRestore();
+    }
+  }
+
+  test('runs not counted yet: slices of at most RUNS_PER_SLICE runs', async () => {
+    // 50 runs read cold on the test machine: about 0.15 s.
+    expect(RC.RUNS_PER_SLICE).toBeLessThanOrEqual(50);
+    const codes = [];
+    for (let i = 0; i < 2 * RC.RUNS_PER_SLICE + 7; i++) {
+      const code = `SLICE_${i}_${uuidv4()}`;
+      addRun({ code, minutes: 3, passed: 1, failed: i % 3 });
+      codes.push(code);
+    }
+    const { states, statements, seen } = await readWatched(codes, 'run_assertions');
+    expect(statements).toHaveLength(3);
+    for (const sql of statements) expect((sql.match(/\?/g) || []).length).toBeLessThanOrEqual(RC.RUNS_PER_SLICE);
+    // Other work had the thread after the first slice and after the second.
+    expect(seen).toEqual(expect.arrayContaining([1, 2]));
+    expect(codes.map((c) => states[c].failed)).toEqual(codes.map((_, i) => i % 3));
+  });
+
+  test('the latest runs: slices of at most CODES_PER_SLICE codes, each one read', async () => {
+    expect(RC.CODES_PER_SLICE).toBeLessThanOrEqual(100);
+    const codes = [];
+    for (let i = 0; i < 2 * RC.CODES_PER_SLICE + 3; i++) codes.push(`NEVER_${i}_${uuidv4()}`);
+    const ran = `RAN_LAST_${uuidv4()}`;
+    addRun({ code: ran, minutes: 4, failed: 1 });
+    codes.push(ran);
+    const { states, statements, seen } = await readWatched(codes, 'json_each');
+    expect(statements).toHaveLength(3);
+    expect(seen).toEqual(expect.arrayContaining([1, 2]));
+    expect(states).toEqual({ [ran]: expect.objectContaining({ status: 'COMPLETED', failed: 1 }) });
   });
 });

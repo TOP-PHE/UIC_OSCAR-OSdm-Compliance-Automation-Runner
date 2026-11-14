@@ -507,6 +507,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.516] — 2026-11-13
+
+Listed in `compatibility.json` (2026.555) without moving `current_release`.
+
+### Changed
+
+- **The Run page's preview and a launch read the company's runs in slices,
+  the thread free between them** (#1256, an action of the review #1233). In
+  a batch on the k3s test machine (release 2026.554, 15 runs at once, six
+  providers), the slow statement log named `runCandidates.js` at the start
+  of the batch: 1.1 s and 1.6 s to count the failed checks of the latest run
+  of each scenario, and 128 ms to find those runs. The server answered
+  nothing meanwhile: a request waited up to 3 s.
+  - Since #1246 the counts are kept, so this is the first preview or launch
+    of each company or provider after a restart. Up to 500 runs went in one
+    statement; the index `(run_id, passed)` already covers it, so the time
+    is the disk reading a cold cache.
+  - `latestRunStates()` (`api/helpers/runCandidates.js`) reads 50 runs
+    (`RUNS_PER_SLICE`) and 100 codes (`CODES_PER_SLICE`) a slice, and
+    waits for the next turn of the event loop (`setImmediate`) between two:
+    other requests are answered in between. The total and the answer are
+    the same.
+  - A call keeps its own counts, so another request evicting the kept ones
+    between two slices cannot change its answer.
+  - `latestRunStates()` and `facetsFor()` are async, and so are the preview
+    (`POST /v1/runs/preview`) and the part of the launch that writes the batch
+    (`queueBatch()` in `runs.js`, after the checks; the route returns its
+    promise, which Express 5 passes to the error handler on a rejection).
+  - Both reads go through one helper, `inSlices()`. Its one `await` in a
+    loop (Sonar S9382) is left open on purpose: the waits must come one after
+    the other, which is what the rule asks to avoid.
+- `run-candidates-latest.test.js`: the slices' sizes, and a task of the
+  event loop that runs between the first and second slice and between the
+  second and third, for both reads. Mutation-checked: a slice of 500 runs or
+  1,000 codes, or no wait between slices, each fails a test.
+
 ## [server-1.11.515] — 2026-11-13
 
 Listed in `compatibility.json` (2026.554) without moving `current_release`.
