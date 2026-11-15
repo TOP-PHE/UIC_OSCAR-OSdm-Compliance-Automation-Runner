@@ -507,6 +507,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.527] — 2026-11-15
+
+Release 2026.566 (`current_release`). The Dashboard's run list keeps the counts of finished runs (#1247, part of #1233).
+
+### Changed
+- **The counts of a finished run are read once.**
+  - **Seen:** on the k3s test machine (2026.565, a batch of about 855 runs), the slow statement log named `runs.js:552`, the scenarios of the runs listed counted and named, at about 100 ms each time.
+  - **Why:** the Dashboard asks every 3 s while a batch goes, and with whole batches (#986) the list holds every run of the batch, so the counts were read again for several hundred runs each time.
+  - **What changes:** a run's reports and scenarios never change once it is COMPLETED or FAILED. The runner stores them before it writes the final status, and nothing writes them afterwards. `withRunCounts()` (`routes/runs.js`) now keeps them by run id (`keptRunCounts`), bounded to 20,000 runs, the least recently used going first. It reads only the runs not kept or not finished.
+  - **Not kept:**
+    - a CANCELLED run, since an emergency stop writes that status while its runner may still store its reports;
+    - a run whose status is no longer finished, such as one whose deletion is asked, which is read again;
+    - the operator share date, which can change at any time and is read at each call (`operatorSharesOf()`).
+  - The answer is the same as before.
+
+### Checked
+- `runs-list-counts.test.js`:
+  - a finished run's counts are read once, and the next list reads none of them, with the same answer as the old query;
+  - a run read while it runs, then given its results and its final status, shows them;
+  - a CANCELLED run is read at each call;
+  - a kept run whose deletion is asked is read again;
+  - the share date is read at each call;
+  - the bound drops the least recently used.
+- The plan test forgets the kept counts first, so it still reads the count statements' plans.
+- Mutation-checked: each of these fails a test:
+  - nothing kept;
+  - a CANCELLED run kept;
+  - a run kept while it runs;
+  - kept counts served whatever the status;
+  - no bound;
+  - the share date kept.
+
+---
+
 ## [server-1.11.526] / [collection-OTST_V2.0.259] — 2026-11-15
 
 Issue #1266, part 1. Release 2026.565 (`current_release`). Simulator 0.68.0. What is sold without a trip, asked by product.

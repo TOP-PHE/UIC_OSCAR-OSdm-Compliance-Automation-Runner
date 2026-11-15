@@ -213,6 +213,8 @@ describe('GET /v1/runs: the answer is the old query\'s (#1227)', () => {
 describe('GET /v1/runs: no query reads a whole table (#1227)', () => {
   // The SQL the route prepares, read through the connection's prepare().
   async function queriesOf(query, tok) {
+    // Counts kept by an earlier list would leave their statements unread (#1247).
+    require('../../src/api/routes/runs').forgetRunCounts();
     const spy = jest.spyOn(D.db, 'prepare');
     try {
       const res = await list(query, tok);
@@ -239,5 +241,124 @@ describe('GET /v1/runs: no query reads a whole table (#1227)', () => {
         expect(step).not.toMatch(/^(SCAN|MATERIALIZE)\b/);
       }
     }
+  });
+});
+
+// #1247: a finished run's reports and scenarios never change, so their counts
+// are read once and kept; the Dashboard asked for them every 3 s.
+describe('GET /v1/runs: a finished run\'s counts are kept (#1247)', () => {
+  const route = require('../../src/api/routes/runs');
+  afterEach(() => route.forgetRunCounts());
+
+  // The ids each count statement read, by table, from the SQL prepared.
+  async function countReads(query, tok) {
+    const spy = jest.spyOn(D.db, 'prepare');
+    try {
+      const res = await list(query, tok);
+      expect(res.status).toBe(200);
+      const idsIn = (table) => spy.mock.calls.map(([sql]) => sql)
+        .filter(sql => /\bFROM\s+(\w+)/.exec(sql)?.[1] === table)
+        .reduce((n, sql) => n + (sql.match(/\?/g) || []).length, 0);
+      return { body: res.body, artifacts: idsIn('run_artifacts'), suites: idsIn('run_suites'), shares: idsIn('run_share') };
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  test('the counts of finished runs are read once: the next list reads none, and answers the same', async () => {
+    route.forgetRunCounts();
+    const tok = token('company_user', testerId);
+    const first = await countReads('limit=50&whole_batches=1', tok);
+    expect(first.artifacts).toBe(3);
+    expect(first.suites).toBe(3);
+    const second = await countReads('limit=50&whole_batches=1', tok);
+    expect(second.artifacts).toBe(0);
+    expect(second.suites).toBe(0);
+    expect(second.body.runs).toEqual(first.body.runs);
+    expectAsBefore(second.body.runs, all(OLD_COMPANY(' AND r.user_id = ?'), [companyId, testerId]));
+  });
+
+  test('a run not finished is read at each call, and kept once it is', async () => {
+    route.forgetRunCounts();
+    const id = addRun({ user: testerId, minutes: 40, status: 'RUNNING', suites: ['R'] });
+    const tok = token('company_user', testerId);
+    const countsOf = async () => (await list('limit=50', tok)).body.runs.find(r => r.id === id);
+    expect(await countsOf()).toMatchObject({ artifact_count: 0, scenario_count: 1, scenario_names: 'R' });
+    run(`INSERT INTO run_suites (run_id, company_id, scenario_name, suite_name) VALUES (?, ?, 'S', 'suite')`, [id, companyId]);
+    run(`INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', 'f', 'p')`, [uuidv4(), id]);
+    expect(await countsOf()).toMatchObject({ artifact_count: 1, scenario_count: 2 });
+    run(`UPDATE runs SET status = 'COMPLETED' WHERE id = ?`, [id]);
+    expect(await countsOf()).toMatchObject({ artifact_count: 1, scenario_count: 2 });
+    // Kept from here: a later row (which the runner never writes) is not read.
+    run(`INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', 'g', 'p')`, [uuidv4(), id]);
+    expect(await countsOf()).toMatchObject({ artifact_count: 1, scenario_count: 2 });
+    route.forgetRunCounts();
+    expect(await countsOf()).toMatchObject({ artifact_count: 2, scenario_count: 2 });
+  });
+
+  test('a run read while it runs, then finished with its results, shows them: nothing was kept while it ran', async () => {
+    route.forgetRunCounts();
+    const id = addRun({ user: testerId, minutes: 42, status: 'RUNNING' });
+    const tok = token('company_user', testerId);
+    const countsOf = async () => (await list('limit=50', tok)).body.runs.find(r => r.id === id);
+    expect(await countsOf()).toMatchObject({ artifact_count: 0, scenario_count: 0 });
+    // The runner stores the results, then writes the final status.
+    run(`INSERT INTO run_suites (run_id, company_id, scenario_name, suite_name) VALUES (?, ?, 'F', 'suite')`, [id, companyId]);
+    run(`INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', 'f', 'p')`, [uuidv4(), id]);
+    run(`UPDATE runs SET status = 'FAILED' WHERE id = ?`, [id]);
+    expect(await countsOf()).toMatchObject({ artifact_count: 1, scenario_count: 1, scenario_names: 'F' });
+  });
+
+  test('a kept run whose status is no longer finished is read again (a deletion asked, in a certifier\'s list)', async () => {
+    route.forgetRunCounts();
+    const tok = token('certification_user', certifierId);
+    const countsOf = async () => (await list('limit=50', tok)).body.runs.find(r => r.id === manager0);
+    expect(await countsOf()).toMatchObject({ artifact_count: 2 });
+    const extra = uuidv4();
+    run(`UPDATE runs SET status = 'DELETION_REQUESTED' WHERE id = ?`, [manager0]);
+    run(`INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', 'x', 'p')`, [extra, manager0]);
+    try {
+      expect(await countsOf()).toMatchObject({ status: 'DELETION_REQUESTED', artifact_count: 3 });
+    } finally {
+      run(`DELETE FROM run_artifacts WHERE id = ?`, [extra]);
+      run(`UPDATE runs SET status = 'COMPLETED' WHERE id = ?`, [manager0]);
+    }
+  });
+
+  test('a CANCELLED run is not kept: its runner may still store its reports', async () => {
+    route.forgetRunCounts();
+    const id = addRun({ user: testerId, minutes: 41, status: 'CANCELLED' });
+    const tok = token('company_user', testerId);
+    const countsOf = async () => (await list('limit=50', tok)).body.runs.find(r => r.id === id);
+    expect(await countsOf()).toMatchObject({ artifact_count: 0 });
+    run(`INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', 'f', 'p')`, [uuidv4(), id]);
+    expect(await countsOf()).toMatchObject({ artifact_count: 1 });
+  });
+
+  test('the operator share date is read at each call, kept counts or not', async () => {
+    route.forgetRunCounts();
+    const tok = token('test_manager', managerId);
+    const first = await countReads('limit=50', tok);
+    expect(first.shares).toBeGreaterThan(0);
+    share(manager1, secondOperatorId, 0.3);
+    const second = await countReads('limit=50', tok);
+    // Only the runs not finished are read again (a CANCELLED one, above).
+    expect(second.artifacts).toBe(second.body.runs.filter(r => !['COMPLETED', 'FAILED'].includes(r.status)).length);
+    expect(second.artifacts).toBeLessThan(first.artifacts);
+    expect(second.shares).toBe(first.shares);
+    expect(second.body.runs.find(r => r.id === manager1).shared_with_operator_at).toBe(at(0.3));
+  });
+
+  test('the counts kept are bounded, the least recently used going first', async () => {
+    route.forgetRunCounts(2);
+    const tok = token('company_user', testerId);
+    const first = await countReads('limit=3', tok);
+    expect(first.body.runs.map(r => r.status)).toEqual(['COMPLETED', 'COMPLETED', 'COMPLETED']);
+    expect(first.artifacts).toBe(3);
+    // Two of the three are kept: the next list reads one.
+    const second = await countReads('limit=3', tok);
+    expect(second.artifacts).toBe(1);
+    expect(second.body.runs).toEqual(first.body.runs);
+    expect(route.MAX_KEPT_RUN_COUNTS).toBe(20000);
   });
 });
