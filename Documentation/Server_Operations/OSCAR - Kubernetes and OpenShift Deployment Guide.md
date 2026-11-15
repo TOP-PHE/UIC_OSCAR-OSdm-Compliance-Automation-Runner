@@ -581,7 +581,13 @@ Details to know:
   resumes once the API answers again: a line may then show twice. Past that
   wait the run ends as failed, with a banner on its page saying it is not a
   test result (`RUN_PROCESS_ERROR`). The dispatcher logs each run it refuses,
-  with the reason (#1272).
+  with the reason (#1272), and each call it tries again: `<run>: creating the
+  Job failed (HTTP 503); trying again for up to 120 s`, then `… went through`.
+- **A 409 Conflict is tried again too** (#1276). Every Job and Secret a run
+  makes updates the quota of `oscar-runs`; with many runs starting at once,
+  two updates meet and the API answers `Conflict` without making the object.
+  The dispatcher tries again; only a 409 `AlreadyExists` reads as "this run's
+  Job is there".
 - **Metrics and alerts.** The server writes `oscar_run_pod_start_seconds`
   and `oscar_run_pods_ended_total{outcome}` (row *Run pods* of *OSCAR ·
   Overview*), and two alerts watch them: `OscarRunPodsNotStarting` and
@@ -625,7 +631,7 @@ Details to know:
 | The `runner` container stops at once, naming a secret or the database | it was given the server's settings (an `envFrom` or a volume added in a patch): it refuses to run beside them |
 | Pod mode: every run fails at once, *the runner agent could not be reached* | the dispatcher is not running: `kubectl -n oscar logs deploy/oscar-dispatcher` |
 | Pod mode: the dispatcher stops at once, naming a setting, a secret or the database | `RUN_IMAGE` or `RUN_RESULTS_URL` is missing, or it was given the server's settings: it refuses to run beside them |
-| Pod mode: runs fail with *The run did not go to its end*, their log saying *the Kubernetes API did not answer for 120 s* | the cluster's API was unavailable for longer than the wait: `kubectl -n oscar logs deploy/oscar-dispatcher` names each run refused; on k3s, `journalctl -u k3s` says why it stopped. Run them again |
+| Pod mode: runs fail with *The run did not go to its end*, their log saying *the Kubernetes API still failed after 120 s* | the cluster's API was unavailable for longer than the wait: `kubectl -n oscar logs deploy/oscar-dispatcher` names each run refused; on k3s, `journalctl -u k3s` says why it stopped. Run them again |
 | Pod mode: runs end as *the run's pod did not start* | `kubectl -n oscar-runs get events`: the run image cannot be pulled (`RUN_IMAGE`, the registry's credentials), the quota is full, or the pod is refused by the namespace's pod security |
 | Pod mode: runs stop at their first request, *Required scenario variable … is empty* | the run pod cannot reach the internal port: the network policies, or `RUN_SERVER_URL` does not name OSCAR's namespace |
 | Pod mode: runs read *Failed*, *No check was recorded*, and their log says `[run-pod] … not sent: fetch failed (ECONNREFUSED)` | the run pods could not reach the internal port at the end of the run. Under a large batch: `kubectl -n oscar get events` shows OSCAR's readiness probe failing (a server short of CPU); give the `oscar` container more CPU or lower *Max Concurrent Runs*. Check that `oscar-internal` has `publishNotReadyAddresses: true` (`kubectl -n oscar get svc oscar-internal -o yaml`; the manifests have it since November 2026: pull and apply the overlay again) |

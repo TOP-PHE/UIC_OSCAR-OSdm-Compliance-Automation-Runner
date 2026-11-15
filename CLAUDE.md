@@ -1582,6 +1582,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   logged with a status or code, **never the API's words** (they go to the
   server only). The runner marks a process error `RUN_PROCESS_ERROR` (banner
   on the run page). `fakeApi()` has `s.down`, `cut()`, `emitTo()`, `endRun()`.
+  **A 409 is read by its reason** (#1276, 1.11.528): `KubeError.reason` keeps
+  `Status.reason` when it is one word. `Conflict` (two writes of the runs'
+  quota met, nothing made: 15 runs starting at once on k3s) is passing;
+  only `AlreadyExists` is "this run's Job" (`createRunJob()`), and a Job
+  that then reads 404 is made again within the wait. A run was refused
+  with `jobs.batch … not found` for it. Log lines: `<what> failed (HTTP 409
+  Conflict); trying again …` / `<what> went through (after N s)`.
   **PR 4 (1.11.490): `RUN_ISOLATION=pod`.** `launchRun()` (launcher; `launch()`
   refuses kinds in pod mode) sends `{ kind: 'run', runId, envName, envYml
   (base64), deadlineSeconds, env }` to `RUN_AGENT_HOST:RUN_AGENT_PORT` (the

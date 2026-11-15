@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.566",
+  "current_release": "2026.567",
   "releases": [
+    {
+      "release": "2026.567",
+      "date": "2026-11-15",
+      "server": "1.11.528",
+      "collection": "OTST_V2.0.259",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.528: in pod mode a 409 Conflict on the runs' quota no longer refuses a run (#1276). With many runs starting at once, two updates of the oscar-runs quota meet and the API answers Conflict without making the Job; since #1272 the dispatcher read it as its own Job, read it back (404) and refused the run (seen once on the k3s test machine).",
+        "A 409 is read by its reason (Status.reason, kept when it is one word): Conflict is tried again within RUN_DISPATCHER_API_WAIT_MS, only AlreadyExists is the run's own Job, made again if it then reads 404. The dispatcher's log says which call failed and when it went through."
+      ]
+    },
     {
       "release": "2026.566",
       "date": "2026-11-15",
