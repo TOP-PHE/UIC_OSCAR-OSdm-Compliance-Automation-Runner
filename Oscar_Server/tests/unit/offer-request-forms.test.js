@@ -64,8 +64,8 @@ describe('#748 — the form of a scenario\'s offer request', () => {
     expect(offerRequestFormOf(null, datafile)).toBe('SEARCH');
   });
 
-  test('no list declared takes every form; a list takes what it names', () => {
-    for (const form of OFFER_REQUEST_FORMS) expect(offerRequestFormDeclared({}, form)).toBe(true);
+  test('no list declared takes every trip form, never a non-trip one (#1258); a list takes what it names', () => {
+    for (const form of OFFER_REQUEST_FORMS) expect([form, offerRequestFormDeclared({}, form)]).toEqual([form, !form.startsWith('NON_TRIP_')]);
     expect(offerRequestFormDeclared({ offerRequestForms: ['SPECIFICATION'] }, 'SEARCH')).toBe(false);
     expect(offerRequestFormDeclared({ offerRequestForms: [] }, 'SPECIFICATION')).toBe(false);
   });
@@ -92,9 +92,11 @@ describe('#748 — the form of a scenario\'s offer request', () => {
 describe('#748 — the catalogue follows the declared forms', () => {
   const plain = catalogueFor(catalogue, simulator, FRAMEWORK);
 
-  test('no declaration: the catalogue as before', () => {
+  test('no declaration: the catalogue as before, but for the non-trip entries, whose form is not declared (#1258)', () => {
     expect(plain.map((e) => e.code)).toEqual(catalogue.entries.map((e) => e.code));
-    expect(plain.some((e) => e.tripAs || e.variantOf || formMissing(e).length)).toBe(false);
+    expect(plain.some((e) => e.tripAs || e.variantOf)).toBe(false);
+    expect(plain.filter((e) => formMissing(e).length).map((e) => e.code).sort())
+      .toEqual(['OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
   });
 
   test('what can go as a specification: one-way searches without the train filter', () => {
@@ -284,15 +286,21 @@ describe('#748 — the Test Framework page', () => {
     expect(FW_OFFER_REQUEST_FORMS.map(([f]) => f)).toEqual(OFFER_REQUEST_FORMS);
   });
 
-  test('the first click starts from every form; the pills follow', () => {
+  test('the first click starts from the trip forms, never declaring a non-trip one (#1258); the pills follow', () => {
     const wizData = { framework: {} };
-    const toggle = lift('fwToggleOfferRequestForm', { wizData, FW_OFFER_REQUEST_FORMS });
+    const fwOfferRequestFormDeclared = lift('fwOfferRequestFormDeclared', {});
+    const toggle = lift('fwToggleOfferRequestForm', { wizData, FW_OFFER_REQUEST_FORMS, fwOfferRequestFormDeclared });
     const el = { classList: { toggle: (_c, on) => { el.on = on; } } };
     toggle(el, 'SEARCH');
-    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES']);
+    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS']);
     expect(el.on).toBe(false);
     toggle(el, 'SEARCH');
-    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'SEARCH']);
+    expect(wizData.framework.offerRequestForms).toEqual(['SPECIFICATION', 'TRIP_IDS', 'SEARCH']);
+    expect(el.on).toBe(true);
+    // A non-trip form is declared by its own click only.
+    const fresh = { framework: {} };
+    lift('fwToggleOfferRequestForm', { wizData: fresh, FW_OFFER_REQUEST_FORMS, fwOfferRequestFormDeclared })(el, 'NON_TRIP_ZONES');
+    expect(fresh.framework.offerRequestForms).toEqual(['SEARCH', 'SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_ZONES']);
     expect(el.on).toBe(true);
   });
 

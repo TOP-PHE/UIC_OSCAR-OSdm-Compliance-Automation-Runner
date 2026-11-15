@@ -38,7 +38,7 @@
  */
 
 const {
-  scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, OFFER_REQUEST_TEXT, TRIP_REQUEST_FORMS,
+  scenarioReturnModel, partialRefundScopeDeclared, offerRequestFormOf, offerRequestFormDeclared, OFFER_REQUEST_TEXT, TRIP_REQUEST_FORMS,
   placeSelectionFlowOf, placeSelectionFlowDeclared, PLACE_SELECTION_TEXT, scenarioOfferCriteria,
 } = require('./frameworkGating');
 const { fareRequirementsOf, fareMissing, freeUnderAgeOf, versionAtLeast, COMBINATION_MODELS } = require('./fareDeclarations');
@@ -338,11 +338,12 @@ function placeSelectionMissing(flow, fw) {
 }
 
 // #748: the offer request form a framework does not take, as a sentence:
-// none when no list is declared, its form is listed, or it is a search that
-// can go in another form the framework takes (#759: by trip id too).
+// none when its form is declared (no list = the trip forms, #1258), or it is
+// a search that can go in another form the framework takes (#759: by trip id
+// too).
 function offerRequestMissing(request, fw) {
-  const forms = fw.offerRequestForms;
-  if (!request || !Array.isArray(forms) || forms.includes(request.form)) return [];
+  if (!request || offerRequestFormDeclared(fw, request.form)) return [];
+  const forms = Array.isArray(fw.offerRequestForms) ? fw.offerRequestForms : [];
   if (request.convertible && (forms.includes('SPECIFICATION') || forms.includes('TRIP_IDS'))) return [];
   return [`offer requests ${OFFER_REQUEST_TEXT[request.form]}`];
 }

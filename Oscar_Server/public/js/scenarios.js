@@ -486,10 +486,12 @@ const FW_OFFER_REQUEST_FORMS = [
 // #1258: the forms of an offer request without a trip.
 const NON_TRIP_FORMS = ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'];
 
-// #748: no list declared means every form (frameworks from before 1.11.289).
+// #748: no list declared means every trip form (frameworks from before
+// 1.11.289); #1258: a non-trip form only when listed. The server's
+// offerRequestFormDeclared() (frameworkGating.js), pinned by a test.
 function fwOfferRequestFormDeclared(fw, form) {
   const declared = fw?.offerRequestForms;
-  return !Array.isArray(declared) || declared.includes(form);
+  return Array.isArray(declared) ? declared.includes(form) : ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'].includes(form);
 }
 
 // #748: the framework editor's Offer requests pills.
@@ -504,10 +506,13 @@ function offerRequestPanelHtml(fw) {
       </div>`;
 }
 
-// #748: a form pill. No list means every form, so the first click starts from all three.
+// #748: a form pill. No list means the trip forms (#1258), so the first click
+// starts from them: the non-trip forms are declared only when ticked.
 function fwToggleOfferRequestForm(el, form) {
   const fw = wizData.framework;
-  const list = Array.isArray(fw.offerRequestForms) ? fw.offerRequestForms : FW_OFFER_REQUEST_FORMS.map(([f]) => f);
+  const list = Array.isArray(fw.offerRequestForms)
+    ? fw.offerRequestForms
+    : FW_OFFER_REQUEST_FORMS.map(([f]) => f).filter((f) => fwOfferRequestFormDeclared(fw, f));
   const on = list.includes(form);
   fw.offerRequestForms = on ? list.filter(x => x !== form) : [...list, form];
   el.classList.toggle('selected', !on);

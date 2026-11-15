@@ -45,9 +45,17 @@ describe('the server', () => {
     for (const form of G.OFFER_REQUEST_FORMS) expect(G.OFFER_REQUEST_TEXT[form]).toEqual(expect.any(String));
   });
 
-  test('the golden rule: a non-trip form the framework leaves out is warned, absent declares every form', () => {
-    expect(G.offerRequestFormDeclared({}, 'NON_TRIP_PLACES')).toBe(true);
+  test('the golden rule: a non-trip form the framework leaves out is warned; no list declares the trip forms only', () => {
+    expect(G.offerRequestFormDeclared({}, 'NON_TRIP_PLACES')).toBe(false);
+    expect(G.offerRequestFormDeclared({}, 'NON_TRIP_ZONES')).toBe(false);
+    expect(G.offerRequestFormDeclared({}, 'SEARCH')).toBe(true);
     expect(G.offerRequestFormDeclared({ offerRequestForms: ['SEARCH'] }, 'NON_TRIP_PLACES')).toBe(false);
+    const noList = structuredClone(datafile);
+    G.annotateDatafile(noList, {});
+    const warned = (code) => noList.scenarios.find((s) => s.code === code).__featureNotDeclaredWarnings || [];
+    expect(warned('S_PLACES')).toContain('offerRequestBy:NON_TRIP_PLACES');
+    expect(warned('S_ZONES')).toContain('offerRequestBy:NON_TRIP_ZONES');
+    expect(warned('S_SEARCH')).not.toContain('offerRequestBy:SEARCH');
     // annotateDatafile() writes the warnings into the file it is given.
     const annotated = structuredClone(datafile);
     G.annotateDatafile(annotated, { offerRequestForms: ['SEARCH', 'NON_TRIP_ZONES'] });
@@ -102,6 +110,19 @@ describe('the catalogue', () => {
     const declared = catalogueFor(catalogue, simulator, { offerRequestForms: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
     for (const entry of declared) expect(entry.missing.join(' ')).not.toMatch(/offer requests/);
+  });
+
+  test('a framework with no list of forms is not offered the non-trip entries, and keeps every trip entry', () => {
+    const { catalogue, simulator } = readCatalogue();
+    const noList = catalogueFor(catalogue, simulator, {});
+    const nonTrip = noList.filter((e) => /^OTST_NONTRIP_/.test(e.code));
+    expect(nonTrip).toHaveLength(2);
+    for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
+    // The trip entries read as before: no form is missing for them.
+    const tripForms = catalogueFor(catalogue, simulator, { offerRequestForms: [...G.TRIP_REQUEST_FORMS] });
+    const formMissing = (entries) => entries.filter((e) => !/^OTST_NONTRIP_/.test(e.code) && /offer requests/.test(e.missing.join(' '))).map((e) => e.code);
+    expect(formMissing(noList)).toEqual([]);
+    expect(formMissing(tripForms)).toEqual([]);
   });
 });
 
@@ -175,10 +196,21 @@ describe('the Test Config page', () => {
     expect(kept.nonTrip).toEqual({ by: 'ZONES', zones: [] });
   });
 
+  test('the page reads a framework\'s forms as the server does (#1258: no list = the trip forms)', () => {
+    const fwOfferRequestFormDeclared = lift('fwOfferRequestFormDeclared', {});
+    const frameworks = [{}, null, { offerRequestForms: [] }, { offerRequestForms: ['SEARCH', 'NON_TRIP_ZONES'] }, { offerRequestForms: ['NON_TRIP_PLACES'] }];
+    for (const fw of frameworks) {
+      for (const form of G.OFFER_REQUEST_FORMS) {
+        expect([fw, form, fwOfferRequestFormDeclared(fw, form)]).toEqual([fw, form, G.offerRequestFormDeclared(fw, form)]);
+      }
+    }
+  });
+
   test('the trip type picker marks NON_TRIP when neither non-trip form is declared', () => {
     const fwOfferRequestFormDeclared = lift('fwOfferRequestFormDeclared', {});
     const text = lift('tripTypeOptionText', { fwOfferRequestFormDeclared, lbl: (v) => v, NON_TRIP_FORMS: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'] });
-    expect(text('NON_TRIP', {})).toBe('NON_TRIP');
+    expect(text('NON_TRIP', {})).toMatch(/^⚠ NON_TRIP — not declared/);
+    expect(text('SEARCH', {})).toBe('SEARCH');
     expect(text('NON_TRIP', { offerRequestForms: ['NON_TRIP_ZONES'] })).toBe('NON_TRIP');
     expect(text('NON_TRIP', { offerRequestForms: ['SEARCH'] })).toMatch(/^⚠ NON_TRIP — not declared/);
   });

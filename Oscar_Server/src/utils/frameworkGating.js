@@ -65,9 +65,10 @@ const PARTIAL_REFUND_SCOPES = ['FULFILLMENT', 'LEG', 'PASSENGER'];
 
 // #748: how a provider takes an offer request (framework.offerRequestForms):
 // by trip search (tripSearchCriteria), by trip specification
-// (tripSpecifications), by trip id (tripIds). Absent = every form
+// (tripSpecifications), by trip id (tripIds). Absent = every trip form
 // (frameworks from before 1.11.289); [] = none. #1258: without a trip
-// (nonTripSearchCriteria), between stop places or in zones.
+// (nonTripSearchCriteria), between stop places or in zones; declared only
+// when listed, since most rail providers sell none.
 const TRIP_REQUEST_FORMS = Object.freeze(['SEARCH', 'SPECIFICATION', 'TRIP_IDS']);
 const NON_TRIP_REQUEST_FORMS = Object.freeze(['NON_TRIP_PLACES', 'NON_TRIP_ZONES']);
 const OFFER_REQUEST_FORMS = [...TRIP_REQUEST_FORMS, ...NON_TRIP_REQUEST_FORMS];
@@ -229,10 +230,13 @@ function nonTripFormOf(trip) {
   return String(trip?.nonTrip?.by || '').toUpperCase() === 'ZONES' ? 'NON_TRIP_ZONES' : 'NON_TRIP_PLACES';
 }
 
-/** #748: true when the framework takes this form: no list declared, or listed. */
+/**
+ * #748: true when the framework takes this form: listed, or no list declared
+ * and a trip form. #1258: a non-trip form only when listed.
+ */
 function offerRequestFormDeclared(framework, form) {
   const declared = framework?.offerRequestForms;
-  return !Array.isArray(declared) || declared.includes(form);
+  return Array.isArray(declared) ? declared.includes(form) : TRIP_REQUEST_FORMS.includes(form);
 }
 
 /**

@@ -72,7 +72,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     "partial refund by …". The page's `FW_PARTIAL_REFUND_SCOPES` is pinned to
     the rule table by `ui-scripts.test.js`.
   - **Offer request forms** (#748, 1.11.289): `offerRequestForms`
-    (`SEARCH` / `SPECIFICATION` / `TRIP_IDS`). Absent = every form. A
+    (`SEARCH` / `SPECIFICATION` / `TRIP_IDS`). Absent = every trip form (the
+    non-trip forms of #1258 only when listed). A
     scenario's form is `offerRequestFormOf()`: trip ids when it arms them, else
     its trip's type; it needs the datafile, so the warning
     (`offerRequestBy:<form>`) is added in `annotateDatafile()`, not in
@@ -108,7 +109,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     skips `validateTripsAndLegs()` and the #251 tripCoverage warning; no other
     trip check fired on the simulator. Forms `NON_TRIP_PLACES` /
     `NON_TRIP_ZONES` (`offerRequestFormOf()` reads the trip first:
-    `NON_TRIP_REQUEST_FORMS`); **the catalogue converts a search into trip
+    `NON_TRIP_REQUEST_FORMS`), **declared only when listed**: no list = the
+    trip forms (`offerRequestFormDeclared()`, the page's twin pinned to it;
+    the first click on a pill starts from the trip forms); **the catalogue converts a search into trip
     forms only** (`TRIP_REQUEST_FORMS` in `catalogueFor()`). Capabilities
     `offers.nonTripPlaces` / `offers.nonTripZones`. A non-trip trip gets no
     Test Data train (`hasTrain`, page `trainsFromDatafile`), no train
