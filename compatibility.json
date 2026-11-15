@@ -4,6 +4,17 @@
   "current_release": "2026.555",
   "releases": [
     {
+      "release": "2026.559",
+      "date": "2026-11-14",
+      "server": "1.11.520",
+      "collection": "OTST_V2.0.257",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.520: result slices that keep to their 20 ms (#1240, part of the review #1233). A run's results are stored in slices of about 20 ms with other requests served between them (#1214), but the time was checked after each request, and a request with many checks went on to its end: slices of 47 to 84 ms on the test machine, most of the 0.2 to 0.5 s waits left when several runs stored at once. A request is now stored in steps (its row, then one step a check) and the time is checked after each; its totals are written with its last check. The rows are the same, and all or nothing stays. New histogram oscar_results_slice_seconds, each slice's length."
+      ]
+    },
+    {
       "release": "2026.558",
       "date": "2026-11-14",
       "server": "1.11.519",

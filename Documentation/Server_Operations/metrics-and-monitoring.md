@@ -189,6 +189,11 @@ work is measured where it runs:
   time is counted, not the waits between them);
 - `oscar_run_results_bytes`, a histogram (from 1.11.506): the size of each
   run's results file, as stored;
+- `oscar_results_slice_seconds`, a histogram (from 1.11.520, #1240): each
+  slice of a run's results stored. A slice stops once about 20 ms are spent,
+  checked after each check since 1.11.520 (after each request before, which
+  let a request with many checks run to 47 to 84 ms): its length is 20 ms
+  plus one check, so nearly all slices fall under 0.025 or 0.03;
 - `oscar_run_log_lines_total` and `oscar_run_log_seconds_total`: every
   line of a run's log, counted, and the time it took in total (its
   encryption, and its share of the write that stores it);
@@ -349,7 +354,9 @@ Read millisecond by millisecond, those stretches held:
   1,000 pages. That COMMIT copies the log into the database file and waits
   for the disk, on the server's thread. About 28 COMMITs in 5 minutes took
   over 0.1 s.
-- **Result slices** of 47 to 84 ms instead of 20.
+- **Result slices** of 47 to 84 ms instead of 20. From server 1.11.520
+  (#1240) a slice checks its time after each check, not each request:
+  `oscar_results_slice_seconds` shows their lengths.
 
 From server 1.11.510 a thread of its own checkpoints, with a connection of
 its own, every second. It runs a passive checkpoint, which never blocks a

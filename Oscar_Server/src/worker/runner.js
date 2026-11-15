@@ -1576,7 +1576,15 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     try {
       stats = await extractStructuredResults(runId, companyRow.id, {
         timeRead: read.time,
-        timeSlice: store.time,
+        // Each slice's own length too (#1240): about 20 ms each.
+        timeSlice: (fn) => {
+          const started = process.hrtime.bigint();
+          try {
+            return store.time(fn);
+          } finally {
+            metrics.resultsSliceSeconds?.observe(Number(process.hrtime.bigint() - started) / 1e9);
+          }
+        },
         onFileRead: (bytes) => { fileRead = true; metrics.runResultsBytes.observe(bytes); },
       });
     } finally {

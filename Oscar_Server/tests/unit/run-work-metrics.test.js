@@ -85,7 +85,8 @@ describe('the metrics of run work (#1205)', () => {
     // The file's read is one block of its own since #1218, observed when there
     // was a file, with the file's size.
     expect(runner).toMatch(/const read = metrics\.runWorkClock\('results_read'\);\s+const store = metrics\.runWorkClock\('results_store'\);/);
-    expect(runner).toMatch(/timeRead: read\.time,\s+timeSlice: store\.time,\s+onFileRead: \(bytes\) => \{ fileRead = true; metrics\.runResultsBytes\.observe\(bytes\); \},/);
+    // Each slice also observed alone since #1240 (oscar_results_slice_seconds).
+    expect(runner).toMatch(/timeRead: read\.time,[\s\S]{0,120}timeSlice: \(fn\) => \{\s+const started = process\.hrtime\.bigint\(\);\s+try \{\s+return store\.time\(fn\);\s+\} finally \{\s+metrics\.resultsSliceSeconds\?\.observe\(Number\(process\.hrtime\.bigint\(\) - started\) \/ 1e9\);\s+\}\s+\},\s+onFileRead: \(bytes\) => \{ fileRead = true; metrics\.runResultsBytes\.observe\(bytes\); \},/);
     expect(runner).toMatch(/\} finally \{\s+if \(fileRead\) read\.done\(\);\s+store\.done\(\);\s+\}/);
     const logEvent = runner.slice(runner.indexOf('function logEvent('), runner.indexOf('\n}\n', runner.indexOf('function logEvent(')));
     expect(logEvent).toContain('metrics.runLogLines.inc()');

@@ -1,6 +1,6 @@
 {
   "name": "oscar-server",
-  "version": "1.11.519",
+  "version": "1.11.520",
   "description": "OSCAR — OSDM Conformance Automation Runner Server",
   "main": "src/server.js",
   "scripts": {

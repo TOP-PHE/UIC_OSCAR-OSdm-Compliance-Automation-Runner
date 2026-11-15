@@ -84,7 +84,9 @@ describe('a run\'s results are stored in slices (#1214)', () => {
     });
     expect(out).toEqual({ suites: 2, requests: 6, assertions: 12 });
     expect(reads).toBe(1);
-    expect(slices).toBe(6);
+    // A step a slice with sliceMs 0 (#1240): each request's row, then each of
+    // its two checks.
+    expect(slices).toBe(18);
     expect(size).toBe(fs.statSync(path.join(ARTIFACTS_DIR, runId, '.bru_results.json')).size);
     expect(countOf('run_requests', runId)).toBe(6);
     const suites = all('SELECT suite_name, total, passed, failed FROM run_suites WHERE run_id = ? ORDER BY suite_name', [runId]);
@@ -112,7 +114,7 @@ describe('a run\'s results are stored in slices (#1214)', () => {
     const exec = jest.spyOn(dbModule.db, 'exec');
     try {
       await extractStructuredResults(runId, companyId, { sliceMs: 0 });
-      expect(exec.mock.calls.map((c) => c[0]).filter((s) => s === 'BEGIN')).toHaveLength(4);
+      expect(exec.mock.calls.map((c) => c[0]).filter((s) => s === 'BEGIN')).toHaveLength(12);
     } finally {
       exec.mockRestore();
     }
@@ -162,6 +164,85 @@ describe('a run\'s results are stored in slices (#1214)', () => {
     expect(out).toEqual({ suites: 0, requests: 0, assertions: 0 });
     expect(reads).toBe(0);
     expect(size).toBeNull();
+  });
+});
+
+describe('a slice checks its time after each check (#1240)', () => {
+  // One request with `n` checks, the others with two.
+  function resultsWithBigRequest(n) {
+    const results = resultsOf(4);
+    results[1].testResults = Array.from({ length: n }, (_, i) => ({ description: `check ${i}`, status: i % 9 ? 'pass' : 'fail' }));
+    return results;
+  }
+  function seededWith(results) {
+    const id = uuidv4();
+    runIds.push(id);
+    run(`INSERT INTO runs (id, company_id, user_id, status, scenario_code) VALUES (?, ?, ?, 'RUNNING', 'SLICES')`, [id, companyId, userId]);
+    fs.mkdirSync(path.join(ARTIFACTS_DIR, id), { recursive: true });
+    encryptToFile(JSON.stringify(results), path.join(ARTIFACTS_DIR, id, '.bru_results.json'));
+    return id;
+  }
+  // What a reader sees of a run's results, without ids, times or bodies.
+  function storedRows(runId) {
+    return {
+      suites: all(`SELECT scenario_name, suite_name, total, passed, failed, skipped, pass_rate, duration_ms
+                    FROM run_suites WHERE run_id = ? ORDER BY id`, [runId]),
+      requests: all(`SELECT rq.request_name, rq.http_method, rq.http_url, rq.http_status, rq.duration_ms, rq.total, rq.passed,
+                           rq.failed, rq.result, rq.vendor_capability, s.suite_name, p.request_name AS parent
+                      FROM run_requests rq JOIN run_suites s ON s.id = rq.suite_id
+                      LEFT JOIN run_requests p ON p.id = rq.parent_request_id
+                     WHERE rq.run_id = ? ORDER BY rq.id`, [runId]),
+      checks: all(`SELECT rq.request_name, a.assertion_key, a.assertion_name, a.type, a.category, a.domain, a.offer_part,
+                         a.severity, a.passed, a.error_msg, a.expected_value, a.actual_value, a.parameterized
+                    FROM run_assertions a JOIN run_requests rq ON rq.id = a.request_id
+                   WHERE a.run_id = ? ORDER BY a.id`, [runId]),
+    };
+  }
+
+  test('a request\'s checks span as many slices as they need; its totals come with its last check', async () => {
+    const runId = seededWith(resultsWithBigRequest(40));
+    const seen = [];
+    await extractStructuredResults(runId, companyId, {
+      sliceMs: 0,
+      timeSlice: (fn) => {
+        const out = fn();
+        seen.push(get(`SELECT total, (SELECT COUNT(*) FROM run_assertions a WHERE a.request_id = rq.id) AS stored
+                          FROM run_requests rq WHERE rq.run_id = ? AND rq.request_name = 'GET Thing 1'`, [runId]));
+        return out;
+      },
+    });
+    // Requests 0 and 2 (suite 01-System) first, 3 steps each; then request 1:
+    // its row, then its 40 checks one by one; then request 3, 3 steps.
+    expect(seen).toHaveLength(3 * 3 + 1 + 40);
+    const ofBig = seen.filter(Boolean);
+    const stored = [...Array.from({ length: 41 }, (_, i) => i), 40, 40, 40];
+    expect(ofBig.map((r) => r.stored)).toEqual(stored);
+    // The totals with the last check, not before.
+    expect(ofBig.map((r) => r.total)).toEqual(stored.map((n, i) => (i < 40 ? 0 : 40)));
+  });
+
+  test('the same rows whatever the slices: one step each, or all in one', async () => {
+    const results = resultsWithBigRequest(25);
+    const sliced = seededWith(results);
+    const whole = seededWith(results);
+    await extractStructuredResults(sliced, companyId, { sliceMs: 0 });
+    let blocks = 0;
+    await extractStructuredResults(whole, companyId, { sliceMs: 60000, timeSlice: (fn) => { blocks++; return fn(); } });
+    expect(blocks).toBe(1);
+    expect(storedRows(sliced)).toEqual(storedRows(whole));
+    expect(storedRows(sliced).checks).toHaveLength(25 + 3 * 2);
+  });
+
+  test('a slice that fails in the middle of a request\'s checks removes everything', async () => {
+    const runId = seededWith(resultsWithBigRequest(30));
+    let blocks = 0;
+    const failing = (fn) => {
+      blocks++;
+      if (blocks === 10) throw new Error('slice failed');
+      return fn();
+    };
+    await expect(extractStructuredResults(runId, companyId, { sliceMs: 0, timeSlice: failing })).rejects.toThrow('slice failed');
+    for (const table of ['run_suites', 'run_requests', 'run_assertions']) expect(countOf(table, runId)).toBe(0);
   });
 });
 
