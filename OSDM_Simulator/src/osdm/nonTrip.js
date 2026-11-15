@@ -183,26 +183,35 @@ function applyVariants(asked, offers, provider) {
   const first = firstStopOf(asked);
   const variants = provider.nonTrip.variants || {};
   const parts = offers.flatMap((o) => o.admissionOfferParts);
-  if (first === provider.nonTrip.withoutValidityFrom) {
-    for (const part of parts) {
-      delete part.regionalValidities;
-      delete part.regionalValiditySummary;
-    }
+  if (first === provider.nonTrip.withoutValidityFrom) withoutValidity(parts);
+  if (first === variants.tripCoverage) withTripCoverage(parts, provider);
+  if (first === variants.otherPlaces && asked.kind === 'places') withOtherPlaces(parts, asked, provider);
+  if (first === variants.otherCarrier && asked.kind === 'zones') withOtherCarrier(parts);
+}
+
+function withoutValidity(parts) {
+  for (const part of parts) {
+    delete part.regionalValidities;
+    delete part.regionalValiditySummary;
   }
-  if (first === variants.tripCoverage) {
-    for (const part of parts) part.tripCoverage = { coveredTripId: `${provider.idPrefix}-TRIP-NONTRIP` };
-  }
-  if (first === variants.otherPlaces && asked.kind === 'places') {
-    const askedRefs = asked.places.map((p) => p.stopPlaceRef);
-    const others = provider.nonTrip.places.filter((p) => !askedRefs.includes(p.id)).slice(0, asked.places.length)
-      .map((p) => ({ stopPlaceRef: p.id, name: p.name }));
-    const elsewhere = regionalValiditiesOf({ kind: 'places', places: others, names: others.map((p) => p.name) }, provider);
-    for (const part of parts) part.regionalValidities = structuredClone(elsewhere);
-  }
-  if (first === variants.otherCarrier && asked.kind === 'zones') {
-    for (const validity of parts.flatMap((part) => part.regionalValidities || [])) {
-      if (validity.zone) validity.zone.carrier = OTHER_CARRIER;
-    }
+}
+
+function withTripCoverage(parts, provider) {
+  for (const part of parts) part.tripCoverage = { coveredTripId: `${provider.idPrefix}-TRIP-NONTRIP` };
+}
+
+// A route through as many of the provider's stop places, none of them asked.
+function withOtherPlaces(parts, asked, provider) {
+  const askedRefs = new Set(asked.places.map((p) => p.stopPlaceRef));
+  const others = provider.nonTrip.places.filter((p) => !askedRefs.has(p.id)).slice(0, asked.places.length)
+    .map((p) => ({ stopPlaceRef: p.id, name: p.name }));
+  const elsewhere = regionalValiditiesOf({ kind: 'places', places: others, names: others.map((p) => p.name) }, provider);
+  for (const part of parts) part.regionalValidities = structuredClone(elsewhere);
+}
+
+function withOtherCarrier(parts) {
+  for (const validity of parts.flatMap((part) => part.regionalValidities || [])) {
+    if (validity.zone) validity.zone.carrier = OTHER_CARRIER;
   }
 }
 
