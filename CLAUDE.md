@@ -142,10 +142,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     tags (`productTagsMissing()`), a product selection OSDM 3.7
     (`requestVersionOf()`), a code selected is provider value `productCode`
     (left out of a copy). The references add the profile's non-trip tags
-    (`withNonTripForms()`). Part 2 (NUTS, other places, lost tickets,
-    fares, #227 discovery, refund and exchange) is still #1266's.
+    (`withNonTripForms()`).
+    **Part 2, refund and exchange** (1.11.528 / OTST_V2.0.260; maintainer:
+    after-sale first, then lost tickets/cards, NUTS, #227, fares last; other
+    places stay out, as in #1258). The refund needed nothing. The exchange
+    sends `nonTripSearchCriteria` (`exchangeTripAndCriteria()`: the sale's
+    *sent* criteria from `OfferCollectionRequest`, so after its lookups, then
+    `exchangeNonTrip` { validFrom, criteria } from `prepareNonTripExchange()`:
+    `dateOffsetDays` moves validFrom, another NON_TRIP trip gives its own
+    places or zones unless left to a lookup). A trip and a non-trip are never
+    mixed (WARNING). 10 runs "Non-trip exchange offers: …", 13/15 "Exchanged
+    parts (…): non-trip booking …"; no `__exchangeTripAsked` is set, so the
+    #959 trip checks stay off. Left in #1266: lost tickets/cards, NUTS, #227
+    without a trip, fares.
     **To regenerate *Checks by scenario* from a partial change**, record the
-    213 scenarios it names in chunks and merge the recordings (the
+    scenarios it names in chunks and merge the recordings (the
     simulator's `replay.js record` keeps only its last call).
   - **Place selection flows** (#766, PR 1 = 1.11.297): `placeSelectionFlows`
     (OSDM `PlaceSelectionFlow`: `AUTOMATIC_PLACE_SELECTION`, `…_PREFERENCES`,
