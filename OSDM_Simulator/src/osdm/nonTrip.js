@@ -154,12 +154,68 @@ function regionalValiditiesOf(asked, provider) {
   }];
 }
 
-function regionalValiditySummaryOf(asked) {
+// How long a product is valid, in words (#1266).
+function durationText(minutes) {
+  if (minutes % 1440 === 0) return minutes === 1440 ? 'one day' : `${minutes / 1440} days`;
+  if (minutes % 60 === 0) return minutes === 60 ? 'one hour' : `${minutes / 60} hours`;
+  return `${minutes} minutes`;
+}
+
+function regionalValiditySummaryOf(asked, item) {
   const between = asked.kind === 'zones' ? `in ${asked.names.join(', ')}` : `between ${asked.names.join(', ')}`;
-  return { description: `Valid ${between}, for one day`, shortDescription: asked.names.join(' - ') };
+  return { description: `${item.name}, valid ${between}, for ${durationText(item.validityMinutes)}`, shortDescription: asked.names.join(' - ') };
+}
+
+// A carrier that is not the provider's, for the wrong variant otherCarrier.
+const OTHER_CARRIER = 'urn:x_osdm_simulator:carrier:other';
+
+/**
+ * The wrong variants (#1258, #1266), each chosen by the first stop place asked
+ * (or of the first zone asked), applied to the admissions of every offer:
+ * - withoutValidityFrom: no regional validity and no summary;
+ * - variants.tripCoverage: a trip coverage, though no trip was asked;
+ * - variants.otherPlaces (between stop places): a route through stop places
+ *   other than those asked;
+ * - variants.otherCarrier (in zones): zones of another carrier.
+ * The booking copies the offer's parts, so it keeps the defect.
+ */
+function applyVariants(asked, offers, provider) {
+  const first = firstStopOf(asked);
+  const variants = provider.nonTrip.variants || {};
+  const parts = offers.flatMap((o) => o.admissionOfferParts);
+  if (first === provider.nonTrip.withoutValidityFrom) withoutValidity(parts);
+  if (first === variants.tripCoverage) withTripCoverage(parts, provider);
+  if (first === variants.otherPlaces && asked.kind === 'places') withOtherPlaces(parts, asked, provider);
+  if (first === variants.otherCarrier && asked.kind === 'zones') withOtherCarrier(parts);
+}
+
+function withoutValidity(parts) {
+  for (const part of parts) {
+    delete part.regionalValidities;
+    delete part.regionalValiditySummary;
+  }
+}
+
+function withTripCoverage(parts, provider) {
+  for (const part of parts) part.tripCoverage = { coveredTripId: `${provider.idPrefix}-TRIP-NONTRIP` };
+}
+
+// A route through as many of the provider's stop places, none of them asked.
+function withOtherPlaces(parts, asked, provider) {
+  const askedRefs = new Set(asked.places.map((p) => p.stopPlaceRef));
+  const others = provider.nonTrip.places.filter((p) => !askedRefs.has(p.id)).slice(0, asked.places.length)
+    .map((p) => ({ stopPlaceRef: p.id, name: p.name }));
+  const elsewhere = regionalValiditiesOf({ kind: 'places', places: others, names: others.map((p) => p.name) }, provider);
+  for (const part of parts) part.regionalValidities = structuredClone(elsewhere);
+}
+
+function withOtherCarrier(parts) {
+  for (const validity of parts.flatMap((part) => part.regionalValidities || [])) {
+    if (validity.zone) validity.zone.carrier = OTHER_CARRIER;
+  }
 }
 
 module.exports = {
   placeCollection, findPlaces, placeById, zoneCollection,
-  nonTripAsked, firstStopOf, regionalValiditiesOf, regionalValiditySummaryOf,
+  nonTripAsked, firstStopOf, regionalValiditiesOf, regionalValiditySummaryOf, applyVariants,
 };

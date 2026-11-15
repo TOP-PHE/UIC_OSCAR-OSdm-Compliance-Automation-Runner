@@ -71,6 +71,9 @@ const WARNING_ONLY = Object.freeze({
   SIM_WRONG_FARE_OTHER_CLASS: '[fares O18]',
   SIM_WRONG_FARE_DATES_OFFSET: '[fares O19]',
   SIM_WRONG_FARE_COVERED_LEG: '[fares O20]',
+  // #1266: where a non-trip offer is valid, against what was asked.
+  SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT: 'the regional validity names every stop place asked',
+  SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT: 'the regional validity names a zone of the carrier asked',
 });
 const baseCode = (code) => String(code).replace(/_\d{2,3}$/, '');
 

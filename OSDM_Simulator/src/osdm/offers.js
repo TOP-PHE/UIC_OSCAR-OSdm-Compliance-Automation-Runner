@@ -76,9 +76,11 @@ function tariffsOf(provider) {
   });
 }
 
+const serviceClassOf = (travelClass) => (travelClass === 'FIRST' ? { type: 'HIGH', name: 'First' } : { type: 'STANDARD', name: 'Standard' });
+
 // The OSDM product of a tariff in a travel class.
 function productOf(tariff, travelClass, provider) {
-  const serviceClass = travelClass === 'FIRST' ? { type: 'HIGH', name: 'First' } : { type: 'STANDARD', name: 'Standard' };
+  const serviceClass = serviceClassOf(travelClass);
   const named = tariff.code !== undefined;
   return {
     id: named ? `${provider.idPrefix}-PRD-${tariff.code}-${travelClass}` : `${provider.idPrefix}-PRD-${tariff.key}-${travelClass}`,
@@ -93,18 +95,36 @@ function productOf(tariff, travelClass, provider) {
   };
 }
 
+// #1266: the OSDM product of a non-trip product in a travel class: its type is
+// its tag (single ride, pass, multi-ride), never bound to a train.
+function nonTripProductOf(item, travelClass, provider) {
+  return {
+    id: `${provider.idPrefix}-PRD-${item.code}-${travelClass}`,
+    code: item.code,
+    summary: item.name,
+    type: item.type,
+    owner: provider.carrier.ref,
+    flexibility: item.flexibility,
+    serviceClass: serviceClassOf(travelClass),
+    travelClass,
+    isTrainBound: false,
+  };
+}
+
 // The travel classes a tariff is sold in: a group product may be second class only.
 const classesOf = (tariff) => Object.keys(TRAVEL_CLASSES).filter((c) => c === 'SECOND' || !tariff.group?.secondClassOnly);
 
 /**
  * The products of a provider, for GET /products: each tariff in each class,
- * and its upgrade to first class when some trains run in second class only.
+ * and its upgrade to first class when some trains run in second class only;
+ * then what is sold without a trip, in each class (#1266).
  */
 function productsOf(provider) {
   return tariffsOf(provider).flatMap((tariff) => [
     ...classesOf(tariff).map((c) => productOf(tariff, c, provider)),
     ...(provider.secondClassOnlyCategories && !tariff.group ? [upgradeProductOf(tariff, provider)] : []),
-  ]).concat(provider.reservations ? FLEXIBILITIES.map((f) => reservationProductOf(f, provider)) : []);
+  ]).concat(provider.reservations ? FLEXIBILITIES.map((f) => reservationProductOf(f, provider)) : [])
+    .concat(provider.nonTrip ? provider.nonTrip.products.flatMap((item) => Object.keys(TRAVEL_CLASSES).map((c) => nonTripProductOf(item, c, provider))) : []);
 }
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
 const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:IC', name: 'InterCity', shortName: 'IC' };
@@ -819,7 +839,6 @@ function nearbyOf(ctx) {
 
 // ── Offers without a trip (#1258) ───────────────────────────────────────────
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const TRIP_MEMBERS = ['tripIds', 'tripSpecifications', 'tripSearchCriteria', 'inboundTripIds', 'inboundTripSpecifications'];
 
 // True for a request asking a non-trip offer: nonTripSearchCriteria and no
@@ -833,22 +852,23 @@ function isNonTripRequest(body) {
 
 // One non-trip offer: per passenger an admission valid where asked, for a day
 // from `validFrom`, without trip coverage.
-function buildNonTripOffer({ asked, validity, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs }) {
+function buildNonTripOffer({ asked, validity, passengers, item, travelClass, fulfillmentOptions, provider, nowMs }) {
   const seed = hashOf(`non-trip|${asked.key}`);
-  // A day's validity: priced like a short trip, the same for the same places.
-  const base = Math.round((800 + (seed.readUInt16BE(4) % 1200)) * flexibility.factor * TRAVEL_CLASSES[travelClass] * provider.priceFactor);
+  const flexibility = FLEXIBILITIES.find((f) => f.key === item.flexibility);
+  // Priced by the product's factor, the same for the same places or zones.
+  const base = Math.max(1, Math.round((800 + (seed.readUInt16BE(4) % 1200)) * item.factor * TRAVEL_CLASSES[travelClass] * provider.priceFactor));
   const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
   const createdOn = new Date(nowMs).toISOString();
-  const product = productOf(flexibility, travelClass, provider);
+  const product = nonTripProductOf(item, travelClass, provider);
   const regionalValidities = nonTrip.regionalValiditiesOf(asked, provider);
-  const regionalValiditySummary = nonTrip.regionalValiditySummaryOf(asked);
+  const regionalValiditySummary = nonTrip.regionalValiditySummaryOf(asked, item);
   const admissionOfferParts = passengers.map((passenger) => withOfferConditions({
     objectType: 'AdmissionOfferPart',
     id: `${provider.idPrefix}-ADM-${randomId()}`,
     summary: `${product.summary}, ${product.serviceClass.name} class, ${regionalValiditySummary.shortDescription}`,
     createdOn,
     validFrom: isoAt(validity.ms, validity.offset),
-    validUntil: isoAt(validity.ms + DAY_MS, validity.offset),
+    validUntil: isoAt(validity.ms + item.validityMinutes * 60 * 1000, validity.offset),
     price: price(reducedPrice(base, passenger[CARDS_APPLIED].applied)),
     ...appliedPassengerTypesOf(passenger, provider),
     offerMode: 'INDIVIDUAL',
@@ -882,8 +902,9 @@ function buildNonTripOffer({ asked, validity, passengers, flexibility, travelCla
 
 /**
  * The answer to a non-trip offer request: no trip, an offer per class and
- * tariff (group products are sold for trips only). The wrong variant's first
- * stop place gives admissions without regional validity.
+ * non-trip product sold for the kind of request (#1266: a single ride, a pass
+ * in zones, a multi-ride card), kept to the product tags or codes asked. The
+ * wrong variants (nonTrip.applyVariants) are chosen by the first stop place.
  */
 function buildNonTripCollection(body, providerAsIs, nowMs) {
   if (!providerAsIs.nonTrip) throw bad('nonTripSearchCriteria: this provider sells offers for trips only');
@@ -896,19 +917,16 @@ function buildNonTripCollection(body, providerAsIs, nowMs) {
     : instant(from, 'nonTripSearchCriteria.validFrom', provider);
   const passengers = passengersOf(body, provider);
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
-  const tariffs = tariffsOf(provider).filter((f) => !f.group && (!askedFlexibilities || askedFlexibilities.includes(f.key)));
+  const by = asked.kind === 'zones' ? 'ZONES' : 'PLACES';
+  const items = provider.nonTrip.products.filter((p) => p.by.includes(by) && (!askedFlexibilities || askedFlexibilities.includes(p.flexibility)));
   const fulfillmentOptions = fulfillmentOptionsOf(body);
-  const offers = classesAsked(criteria).flatMap((travelClass) => tariffs.map((flexibility) => buildNonTripOffer({
-    asked, validity, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs,
+  const built = classesAsked(criteria).flatMap((travelClass) => items.map((item) => buildNonTripOffer({
+    asked, validity, passengers, item, travelClass, fulfillmentOptions, provider, nowMs,
   })));
-  if (nonTrip.firstStopOf(asked) === provider.nonTrip.withoutValidityFrom) {
-    for (const part of offers.flatMap((o) => o.admissionOfferParts)) {
-      delete part.regionalValidities;
-      delete part.regionalValiditySummary;
-    }
-  }
+  nonTrip.applyVariants(asked, built, provider);
+  const { offers, problems: productProblems } = selectProducts(criteria, built, { nonTrip: true });
   const remembered = offers.map((offer) => ({ offer, trips: [], passengers, oneFulfillment: false, shortLivedMs: null }));
-  const problems = problemsOf(passengers, offers, false, new Set());
+  const problems = [...problemsOf(passengers, built, false, new Set()), ...productProblems];
   const response = { anonymousPassengerSpecifications: passengers, offers };
   if (problems.length > 0) response.problems = problems;
   return { response, remembered, trips: [] };

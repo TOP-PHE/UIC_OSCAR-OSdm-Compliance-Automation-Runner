@@ -105,7 +105,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const nonTrip = catalogueFor(catalogue, simulator, { offerRequestForms: ['SEARCH'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
+    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_ZONES_1ADT']);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     const declared = catalogueFor(catalogue, simulator, { offerRequestForms: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
@@ -116,7 +116,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const noList = catalogueFor(catalogue, simulator, {});
     const nonTrip = noList.filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip).toHaveLength(2);
+    expect(nonTrip).toHaveLength(5);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     // The trip entries read as before: no form is missing for them.
     const tripForms = catalogueFor(catalogue, simulator, { offerRequestForms: [...G.TRIP_REQUEST_FORMS] });
@@ -157,6 +157,52 @@ describe('the simulator references', () => {
     expect(ref.framework.offerRequestForms).toEqual(expect.arrayContaining(['NON_TRIP_PLACES', 'NON_TRIP_ZONES']));
     expect(ref.scenariosToRun).toEqual(expect.arrayContaining(['SIM_NONTRIP_PLACES_1ADT_38', 'SIM_NONTRIP_PLACES_LOOKUP_1ADT_38', 'SIM_NONTRIP_ZONES_1ADT_38']));
     expect(ref.scenariosToRun).not.toContain('SIM_WRONG_NONTRIP_NO_VALIDITY_1ADT_38');
+  });
+
+  test('#1266: it declares the tags of what it sells without a trip, after those the checklist ticks', () => {
+    const ref = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'data_base', 'reference', 'simulator-gamma.json'), 'utf8'));
+    expect(ref.framework.offerSearchOptions.productTags).toEqual(['ADMISSION_POINT2POINT', 'ADMISSION_PASS', 'ADMISSION_MULTI_RIDE']);
+    expect(ref.scenariosToRun).toEqual(expect.arrayContaining(['SIM_NONTRIP_PROBE_TAG_PASS_38', 'SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38', 'SIM_NONTRIP_PRODUCT_CODE_1ADT_38']));
+    for (const wrong of ['SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38', 'SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38', 'SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38']) {
+      expect(ref.scenariosToRun).not.toContain(wrong);
+    }
+  });
+});
+
+// #1266: what is sold without a trip, asked by tag or by code.
+describe('the products sold without a trip', () => {
+  const C = require('../../src/utils/scenarioCatalogue');
+  const { adaptReferenceScenario } = require('../../src/utils/catalogueMatch');
+  const byCode = {
+    code: 'S_CODE', scenarioType: 'SALE', tripRequirementId: 3, expectedProduct: 'SIM_DAY_PASS',
+    offerSearchCriteria: { productSelections: [{ productCode: 'SIM_DAY_PASS', numberOfItems: 1 }, { productTag: 'ADMISSION_PASS' }] },
+  };
+  const byTag = { code: 'S_TAG', scenarioType: 'SALE', tripRequirementId: 3, offerSearchCriteria: { productTags: ['ADMISSION_PASS'] } };
+
+  test('a product selection needs OSDM 3.7; a tag, its declaration when the framework lists the tags', () => {
+    const code = C.requirementsOf(byCode, datafile);
+    expect(code.minOsdmVersion).toBe('3.7');
+    const fw = { salesFlows: ['SALE'], offerRequestForms: ['NON_TRIP_ZONES'] };
+    expect(C.missingFor(code, { ...fw, osdmVersion: '3.6.0' })).toEqual(['OSDM 3.7 or later']);
+    expect(C.missingFor(code, { ...fw, osdmVersion: '3.8.0' })).toEqual([]);
+    const tag = C.requirementsOf(byTag, datafile);
+    expect(tag.productTags).toEqual(['ADMISSION_PASS']);
+    expect(C.missingFor(tag, fw)).toEqual([]);
+    expect(C.missingFor(tag, { ...fw, offerSearchOptions: { productTags: ['ADMISSION_POINT2POINT'] } })).toEqual(['product tag ADMISSION_PASS (Offer search options)']);
+    expect(C.missingFor(tag, { ...fw, offerSearchOptions: { productTags: ['ADMISSION_PASS'] } })).toEqual([]);
+  });
+
+  test('a product code is the provider\'s: the copy leaves out the simulator\'s and says what to complete', () => {
+    const needs = C.dataNeedsOf(byCode, datafile, C.simulatorFacts({}));
+    expect(needs.providerValues).toEqual(['expectedProduct', 'productCode']);
+    expect(C.needsText(needs).join(' ')).toContain("the provider's own product code (Product selections)");
+    const { scenario, toComplete } = adaptReferenceScenario(byCode, needs, {});
+    expect(scenario.expectedProduct).toBeUndefined();
+    expect(scenario.offerSearchCriteria.productSelections).toEqual([{ productTag: 'ADMISSION_PASS' }]);
+    expect(toComplete.join(' ')).toContain("now the simulator's SIM_DAY_PASS");
+    expect(byCode.offerSearchCriteria.productSelections).toHaveLength(2);
+    // A tag is OSDM's, not the provider's: nothing to complete.
+    expect(C.dataNeedsOf(byTag, datafile, C.simulatorFacts({})).providerValues).toBeUndefined();
   });
 });
 

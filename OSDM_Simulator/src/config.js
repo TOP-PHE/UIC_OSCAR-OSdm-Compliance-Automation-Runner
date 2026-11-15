@@ -341,13 +341,47 @@ function checkNonTrip(value, bad) {
   if (!Array.isArray(zones) || zones.length === 0 || zones.length > 10 || !zones.every(zoneOk)) throw bad('nonTrip');
   if (new Set(zones.map((z) => z.id)).size !== zones.length) throw bad('nonTrip');
   if (withoutValidityFrom !== undefined && !ids.includes(withoutValidityFrom)) throw bad('nonTrip');
+  const variants = checkNonTripVariants(value.variants, ids, withoutValidityFrom, bad);
   return {
     nonTrip: {
       places: places.map((p) => ({ id: p.id, name: p.name })),
       zones: zones.map((z) => ({ id: z.id, name: z.name, zoneId: z.zoneId, places: [...z.places] })),
+      products: checkNonTripProducts(value.products, bad),
       ...(withoutValidityFrom === undefined ? {} : { withoutValidityFrom }),
+      ...(variants ? { variants } : {}),
     },
   };
+}
+
+// #1266: what is sold without a trip, each product with its OSDM product type
+// (also its tag), flexibility, price factor, validity from `validFrom` and the
+// kinds of request it is sold for (between stop places, in zones).
+const NON_TRIP_TYPES = new Set(['ADMISSION_POINT2POINT', 'ADMISSION_PASS', 'ADMISSION_MULTI_RIDE']);
+const NON_TRIP_BY = new Set(['PLACES', 'ZONES']);
+function checkNonTripProducts(products, bad) {
+  if (!Array.isArray(products) || products.length === 0 || products.length > 10) throw bad('nonTrip');
+  const ok = (p) => p && OVERRULE_CODE.test(p.code) && isText(p.name, 1, 80) && NON_TRIP_TYPES.has(p.type)
+    && FLEXIBILITY_KEYS.has(p.flexibility) && Number.isFinite(p.factor) && p.factor >= 0.1 && p.factor <= 5
+    && Number.isInteger(p.validityMinutes) && p.validityMinutes >= 30 && p.validityMinutes <= 525600
+    && Array.isArray(p.by) && p.by.length > 0 && p.by.every((b) => NON_TRIP_BY.has(b)) && new Set(p.by).size === p.by.length;
+  if (!products.every(ok) || new Set(products.map((p) => p.code)).size !== products.length) throw bad('nonTrip');
+  for (const by of NON_TRIP_BY) if (!products.some((p) => p.by.includes(by))) throw bad('nonTrip');
+  return products.map((p) => ({
+    code: p.code, name: p.name, type: p.type, flexibility: p.flexibility, factor: p.factor, validityMinutes: p.validityMinutes, by: [...p.by],
+  }));
+}
+
+// #1266: wrong variants, each chosen by the first stop place asked (or of the
+// first zone asked): a trip coverage on the admissions, a validity naming
+// other stop places, a zone of another carrier.
+const NON_TRIP_VARIANTS = new Set(['tripCoverage', 'otherPlaces', 'otherCarrier']);
+function checkNonTripVariants(variants, ids, withoutValidityFrom, bad) {
+  if (variants === undefined) return null;
+  if (!variants || typeof variants !== 'object' || Array.isArray(variants)) throw bad('nonTrip');
+  const stations = Object.values(variants);
+  if (!Object.keys(variants).every((k) => NON_TRIP_VARIANTS.has(k)) || !stations.every((s) => ids.includes(s))
+    || new Set(stations).size !== stations.length || stations.includes(withoutValidityFrom)) throw bad('nonTrip');
+  return { ...variants };
 }
 
 // #704: how many days ahead the provider sells, for trips from one stop

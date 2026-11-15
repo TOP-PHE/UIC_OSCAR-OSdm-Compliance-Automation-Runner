@@ -227,12 +227,22 @@
     "places": [
       { "id": "urn:uic:stn:0000040", "name": "Simtown Central" },
       { "id": "urn:uic:stn:0000041", "name": "Simtown Airport" },
-      { "id": "urn:uic:stn:0000042", "name": "Simtown North" }
+      { "id": "urn:uic:stn:0000042", "name": "Simtown North" },
+      { "id": "urn:uic:stn:0000043", "name": "Simtown East" },
+      { "id": "urn:uic:stn:0000044", "name": "Simtown West" },
+      { "id": "urn:uic:stn:0000045", "name": "Simtown South" }
     ],
     "zones": [
       { "id": "SIM-CITY", "name": "Simtown city", "zoneId": 100, "places": ["urn:uic:stn:0000040", "urn:uic:stn:0000041"] },
-      { "id": "SIM-NORTH", "name": "Simtown north", "zoneId": 101, "places": ["urn:uic:stn:0000042"] }
+      { "id": "SIM-NORTH", "name": "Simtown north", "zoneId": 101, "places": ["urn:uic:stn:0000042"] },
+      { "id": "SIM-SOUTH", "name": "Simtown south", "zoneId": 102, "places": ["urn:uic:stn:0000045"] }
     ],
-    "withoutValidityFrom": "urn:uic:stn:0000042"
+    "products": [
+      { "code": "SIM_SINGLE_RIDE", "name": "Single ride", "type": "ADMISSION_POINT2POINT", "flexibility": "NON_FLEXIBLE", "factor": 0.25, "validityMinutes": 120, "by": ["PLACES", "ZONES"] },
+      { "code": "SIM_DAY_PASS", "name": "Day pass", "type": "ADMISSION_PASS", "flexibility": "SEMI_FLEXIBLE", "factor": 0.6, "validityMinutes": 1440, "by": ["ZONES"] },
+      { "code": "SIM_TEN_RIDES", "name": "Ten-ride card", "type": "ADMISSION_MULTI_RIDE", "flexibility": "FULL_FLEXIBLE", "factor": 2, "validityMinutes": 43200, "by": ["PLACES", "ZONES"] }
+    ],
+    "withoutValidityFrom": "urn:uic:stn:0000042",
+    "variants": { "tripCoverage": "urn:uic:stn:0000043", "otherPlaces": "urn:uic:stn:0000044", "otherCarrier": "urn:uic:stn:0000045" }
   }
 }
