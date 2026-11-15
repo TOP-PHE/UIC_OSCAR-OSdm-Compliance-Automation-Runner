@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.565",
+  "current_release": "2026.566",
   "releases": [
+    {
+      "release": "2026.566",
+      "date": "2026-11-15",
+      "server": "1.11.527",
+      "collection": "OTST_V2.0.259",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.527: the Dashboard's run list keeps the counts of finished runs (#1247). A COMPLETED or FAILED run's reports and scenarios never change, yet they were read again every 3 s for every run of a batch (about 100 ms a call on the k3s test machine, named by the slow statement log).",
+        "Kept by run id, 20,000 at most, the least recently used going first; a CANCELLED run, a run whose status is no longer finished, and the operator share date are read at each call. The answer is unchanged."
+      ]
+    },
     {
       "release": "2026.565",
       "date": "2026-11-15",

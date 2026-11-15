@@ -530,18 +530,45 @@ function nextCursorOf(rows, limit) {
   return { at: last.queued_at, id: last.id };
 }
 
-// What each run of the list shows besides its own row: its reports, its
-// scenarios and, for a company's list, when it was last shared with the
-// company that operates the provider. Read for the rows read only (#1227):
-// joined as aggregates, they were computed over every run of the database at
-// each call, 0.5 to 1 s of the server's thread every 3 s while a dashboard
-// watched a batch.
-function withRunCounts(rows, { operatorShares }) {
-  if (rows.length === 0) return rows;
-  const counts = new Map(rows.map(r => [r.id, operatorShares
-    ? { artifact_count: 0, scenario_count: 0, scenario_names: null, shared_with_operator_at: null }
-    : { artifact_count: 0, scenario_count: 0, scenario_names: null }]));
-  const ids = [...counts.keys()];
+// #1247: a finished run's reports and scenarios never change. The runner
+// stores them before it writes the run's final status (steps 10 and 11), and
+// nothing writes them afterwards; a deletion changes the status, a restore
+// gives back the same rows. Yet the Dashboard asked for the counts of every
+// run of a batch every 3 s while it went (whole batches, several hundred
+// runs). So the counts of a COMPLETED or FAILED run are read once and kept,
+// the least recently used going first. A CANCELLED run is not kept: an
+// emergency stop writes that status while its runner may still store its
+// reports. The operator share date can change at any time: never kept.
+const MAX_KEPT_RUN_COUNTS = 20000;
+const KEPT_RUN_STATUSES = new Set(['COMPLETED', 'FAILED']);
+const keptRunCounts = new Map();
+let maxKeptRunCounts = MAX_KEPT_RUN_COUNTS;
+
+// The counts kept for this row's run, made the most recently used; undefined
+// when none are kept, or the run is not finished.
+function keptCountsOf(row) {
+  if (!KEPT_RUN_STATUSES.has(row.status)) return undefined;
+  const kept = keptRunCounts.get(row.id);
+  if (kept === undefined) return undefined;
+  keptRunCounts.delete(row.id);
+  keptRunCounts.set(row.id, kept);
+  return kept;
+}
+
+function keepRunCounts(id, counts) {
+  keptRunCounts.set(id, Object.freeze({ ...counts }));
+  if (keptRunCounts.size > maxKeptRunCounts) keptRunCounts.delete(keptRunCounts.keys().next().value);
+}
+
+// Every count kept is forgotten, and the bound set (tests).
+function forgetRunCounts(max = MAX_KEPT_RUN_COUNTS) {
+  keptRunCounts.clear();
+  maxKeptRunCounts = max;
+}
+
+// The reports and scenarios of the runs `ids`, read into `counts`, 500 runs
+// a statement.
+function readRunCounts(ids, counts) {
   for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);
     const marks = chunk.map(() => '?').join(', ');
@@ -554,13 +581,50 @@ function withRunCounts(rows, { operatorShares }) {
                           WHERE scenario_name IS NOT NULL AND run_id IN (${marks}) GROUP BY run_id`, chunk)) {
       Object.assign(counts.get(s.run_id), { scenario_count: s.n, scenario_names: s.names });
     }
-    if (!operatorShares) continue;
+  }
+}
+
+// When each run of `ids` was last shared with the company that operates its
+// provider, by run id.
+function operatorSharesOf(ids) {
+  const shared = new Map();
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const marks = chunk.map(() => '?').join(', ');
     for (const h of all(`SELECT run_id, MAX(shared_at) AS at FROM run_share
                           WHERE revoked_at IS NULL AND run_id IN (${marks}) GROUP BY run_id`, chunk)) {
-      counts.get(h.run_id).shared_with_operator_at = h.at;
+      shared.set(h.run_id, h.at);
     }
   }
-  return rows.map(r => ({ ...r, ...counts.get(r.id) }));
+  return shared;
+}
+
+// What each run of the list shows besides its own row: its reports, its
+// scenarios and, for a company's list, when it was last shared with the
+// company that operates the provider. Read for the rows read only (#1227):
+// joined as aggregates, they were computed over every run of the database at
+// each call, 0.5 to 1 s of the server's thread every 3 s while a dashboard
+// watched a batch. A finished run's counts are kept (#1247).
+function withRunCounts(rows, { operatorShares }) {
+  if (rows.length === 0) return rows;
+  const counts = new Map();
+  const toRead = [];
+  for (const r of rows) {
+    const kept = keptCountsOf(r);
+    if (kept) {
+      counts.set(r.id, kept);
+    } else {
+      counts.set(r.id, { artifact_count: 0, scenario_count: 0, scenario_names: null });
+      toRead.push(r);
+    }
+  }
+  readRunCounts(toRead.map(r => r.id), counts);
+  for (const r of toRead) {
+    if (KEPT_RUN_STATUSES.has(r.status)) keepRunCounts(r.id, counts.get(r.id));
+  }
+  if (!operatorShares) return rows.map(r => ({ ...r, ...counts.get(r.id) }));
+  const shared = operatorSharesOf(rows.map(r => r.id));
+  return rows.map(r => ({ ...r, ...counts.get(r.id), shared_with_operator_at: shared.get(r.id) ?? null }));
 }
 
 // #1029 PR 3: each run of a batch chosen at launch carries what it was
@@ -1611,3 +1675,5 @@ router.delete('/:id', (req, res) => {
 });
 
 module.exports = router;
+module.exports.forgetRunCounts = forgetRunCounts;
+module.exports.MAX_KEPT_RUN_COUNTS = MAX_KEPT_RUN_COUNTS;
