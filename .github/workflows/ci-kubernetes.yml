@@ -478,8 +478,16 @@ jobs:
           # k3s's Helm controller installs the chart (a job in kube-system),
           # its CRDs first; OSCAR's part needs them, and the operator, which
           # checks a PrometheusRule before it is stored.
+          # A CRD just made has no status yet, and `kubectl wait` then stops
+          # with ".status.conditions accessor error" instead of waiting (seen
+          # on main and on #1273): wait for the conditions to exist first.
+          crds="servicemonitors.monitoring.coreos.com prometheusrules.monitoring.coreos.com"
           for _ in $(seq 1 150); do
-            if kubectl get crd servicemonitors.monitoring.coreos.com prometheusrules.monitoring.coreos.com > /dev/null 2>&1; then break; fi
+            conditions=0
+            for crd in $crds; do
+              if [ -n "$(kubectl get crd "$crd" -o jsonpath='{.status.conditions}' 2> /dev/null)" ]; then conditions=$((conditions + 1)); fi
+            done
+            if [ "$conditions" -eq 2 ]; then break; fi
             sleep 2
           done
           kubectl wait --for condition=established crd/servicemonitors.monitoring.coreos.com crd/prometheusrules.monitoring.coreos.com --timeout=120s

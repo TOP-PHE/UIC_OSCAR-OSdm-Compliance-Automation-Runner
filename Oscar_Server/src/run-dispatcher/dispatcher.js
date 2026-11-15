@@ -21,6 +21,14 @@
  * secret to it), then its exit code. A stop request or a dropped connection
  * deletes the Job; at start, the Jobs and Secrets it made before are removed.
  *
+ * The Kubernetes API may stop answering for a while (#1272: k3s restarting,
+ * 27 s on the test machine). A run then waits for it, keeping its place, for
+ * up to RUN_DISPATCHER_API_WAIT_MS, and a run already running keeps running:
+ * its log resumes once the API answers again. Only past that wait is the run
+ * refused. A refusal was immediate before, and the server's queue emptied
+ * itself into failures within seconds. Each refusal is logged, with its
+ * reason but never the API's own words, which are sent to the server only.
+ *
  * Settings (environment):
  *   RUN_AGENT_TOKEN            the secret the server sends (32 characters or more)
  *   RUN_DISPATCHER_HOST/PORT   where to listen (default 0.0.0.0:3002)
@@ -32,6 +40,7 @@
  *   RUN_RUNTIME_CLASS          a sandboxed runtime, where the cluster offers one
  *   RUN_DISPATCHER_MAX_RUNS    at most this many runs at once (default 50)
  *   RUN_POD_START_TIMEOUT_MS   how long a pod may take to start (default 5 min)
+ *   RUN_DISPATCHER_API_WAIT_MS how long a run waits for the Kubernetes API to answer again (default 2 min)
  *
  * Like the runner agent, it refuses to start while it can see a server
  * secret or the database.
@@ -52,6 +61,32 @@ const EXIT_TIMEOUT = 124;       // the Job reached its deadline
 const EXIT_NOT_STARTED = 125;   // the pod never ran
 const EXIT_STOPPED = 143;       // stopped on the server's word, or the server went away
 const NAME_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+const RETRY_MAX_MS = 8000;      // the longest pause between two tries of the API
+const EXIT_TRIES = 30;          // polls for the container's end once its log stream closed
+const MAX_RESUMES = 20;         // times a run's log is followed again after being cut
+const RESUME_MARGIN_MS = 2000;  // a resumed log starts this much earlier: lines may repeat, none is lost
+
+// Kubernetes API errors that waiting can cure (#1272): no answer at all (a
+// refused, reset or timed-out connection: a system error code), or what the
+// API server answers while it starts: 401 and 403 before its access rules are
+// loaded, 408, 429 and 5xx (k3s: "apiserver not ready", "starting"). Anything
+// else (400, 404, 409, 422, a fault of the dispatcher's own) is final at once.
+function isPassing(err) {
+  if (Number.isInteger(err?.status)) return [401, 403, 408, 429].includes(err.status) || err.status >= 500;
+  return typeof err?.code === 'string';
+}
+// What failed, for the dispatcher's own log: a status or an error code, never
+// the API's words.
+const failureOf = (err) => (Number.isInteger(err?.status) ? `HTTP ${err.status}` : String(err?.code || 'error'));
+
+// The Kubernetes API did not answer for the whole wait.
+class ApiUnavailable extends Error {
+  constructor(waitMs, what, err) {
+    const seconds = Math.round(waitMs / 1000);
+    super(`the Kubernetes API did not answer for ${seconds} s (${what}: ${String(err?.message || err).slice(0, 150)})`);
+    this.logText = `the Kubernetes API did not answer for ${seconds} s (${what}: ${failureOf(err)})`;
+  }
+}
 
 /** The dispatcher's settings, from its environment. */
 function settingsOf(env = process.env) {
@@ -71,6 +106,7 @@ function settingsOf(env = process.env) {
     runtimeClass: env.RUN_RUNTIME_CLASS || '',
     maxRuns: int(env.RUN_DISPATCHER_MAX_RUNS, 50),
     startTimeoutMs: int(env.RUN_POD_START_TIMEOUT_MS, 300000),
+    apiWaitMs: int(env.RUN_DISPATCHER_API_WAIT_MS, 120000),
   };
 }
 
@@ -96,14 +132,22 @@ const ignoreGone = (promise) => promise.catch((err) => { if (err?.status !== 404
 const podsOf = async (kube, name) => (await kube.listPods(`job-name=${name}`))?.items || [];
 const runStatusOf = (pod) => pod?.status?.containerStatuses?.find((c) => c.name === J.CONTAINER) || pod?.status?.containerStatuses?.[0];
 
-/** How the Job failed, as { code, reason }, or null while it has not (or is gone). */
+/**
+ * How the Job failed, as { code, reason }, or null while it has not (or is
+ * gone). An API that does not answer is not a Job gone (#1272): that error
+ * goes up, once the wait for the API is over.
+ */
 async function jobOutcome(kube, name) {
+  let job;
   try {
-    const job = await kube.getJob(name);
-    const failed = (job?.status?.conditions || []).find((c) => c.type === 'Failed' && c.status === 'True');
-    if (failed?.reason === 'DeadlineExceeded') return { code: EXIT_TIMEOUT, reason: 'DeadlineExceeded' };
-    if (failed) return { code: 1, reason: String(failed.reason || 'the Job failed').slice(0, 300) };
-  } catch { /* the Job is gone too */ }
+    job = await kube.getJob(name);
+  } catch (err) {
+    if (err?.status === 404) return null;
+    throw err;
+  }
+  const failed = (job?.status?.conditions || []).find((c) => c.type === 'Failed' && c.status === 'True');
+  if (failed?.reason === 'DeadlineExceeded') return { code: EXIT_TIMEOUT, reason: 'DeadlineExceeded' };
+  if (failed) return { code: 1, reason: String(failed.reason || 'the Job failed').slice(0, 300) };
   return null;
 }
 
@@ -133,18 +177,53 @@ async function waitForPod(kube, name, { pollMs, startTimeoutMs, isStopped }) {
   }
 }
 
-/** How the run's container ended: { code, reason }. */
-async function exitOf(kube, name, podName, { pollMs, tries = 30 }) {
+/**
+ * How the run's container ended, { code, reason }, once its log stream
+ * closed; or { running: true } when it still runs after `tries` polls: the
+ * stream was cut, not ended (#1272: the API server went away).
+ */
+async function exitOf(kube, name, podName, { pollMs, tries = EXIT_TRIES }) {
+  let gone = false;
   for (let i = 0; i < tries; i++) {
     const pods = await podsOf(kube, name);
     const pod = pods.find((p) => p.metadata?.name === podName);
     const ended = runStatusOf(pod)?.state?.terminated;
     if (ended) return { code: Number.isInteger(ended.exitCode) ? ended.exitCode : 1, reason: ended.reason || '' };
-    if (!pod) break;
+    if (!pod) {
+      gone = true;
+      break;
+    }
     await sleep(pollMs);
   }
+  if (!gone) return { running: true };
   // No pod any more: the Job's conditions say why.
   return (await jobOutcome(kube, name)) || { code: 1, reason: 'the pod ended without an exit code' };
+}
+
+// Follows the run's log from sinceTime (null: from its start), until the
+// stream closes. True when it was cut (closed without its end: #1272, the
+// API server went away). The pod may be gone by the time its log is asked
+// (its deadline reached just after it was seen running): nothing more to
+// read, and exitOf() then reads how it ended from the Job. Any other
+// refusal still ends the run.
+function followLog(kube, podName, sinceTime, onData) {
+  return kube.followLog(podName, J.CONTAINER, sinceTime).then((stream) => new Promise((resolve) => {
+    let ended = false;
+    stream.on('data', onData);
+    stream.on('end', () => { ended = true; resolve(false); });
+    stream.on('close', () => resolve(!ended));
+    stream.on('error', () => resolve(!ended));
+  }), (err) => {
+    if (err?.status !== 404) throw err;
+    return false;
+  });
+}
+
+// Where a cut log resumes: a little before its last output, to the second
+// (the API's sinceTime), so that a line may show twice but none is lost.
+function resumeFrom(lastOutputAt) {
+  const at = Math.floor((lastOutputAt - RESUME_MARGIN_MS) / 1000) * 1000;
+  return new Date(at).toISOString().replace('.000Z', 'Z');
 }
 
 /** Removes the Jobs and Secrets the dispatcher made before (a restart ends their runs). */
@@ -161,49 +240,111 @@ async function removeLeftovers(kube, log = console) {
 
 /**
  * The dispatcher's server (not listening yet).
- * @param {{ kube: object, settings: object, log?: object, pollMs?: number }} options
+ * @param {{ kube: object, settings: object, log?: object, pollMs?: number, retryMs?: number }} options
+ *   retryMs: the first pause before the API is tried again; it doubles, up to RETRY_MAX_MS.
  */
-function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
+function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryMs = 500 }) {
   const running = new Set();
+  const apiWaitMs = settings.apiWaitMs ?? 120000;
+
+  // One API call of a run, tried again while the API does not answer (#1272),
+  // for up to apiWaitMs from its first failure. A stopped run waits no more,
+  // except to remove what it made (evenStopped).
+  // `since` is the time of the first failure (0: none yet), `pause` the next
+  // wait; each try after a failure is a call of its own, at most about twenty.
+  async function patiently(run, what, call, { evenStopped = false } = {}, since = 0, pause = retryMs) {
+    try {
+      const value = await call();
+      if (since) log.info?.(`[run-dispatcher] ${run.name}: the Kubernetes API answers again (${what}, after ${Math.round((Date.now() - since) / 1000)} s)`);
+      return value;
+    } catch (err) {
+      if (!isPassing(err) || (run.stopped && !evenStopped)) throw err;
+      const now = Date.now();
+      if (!since) {
+        log.warn?.(`[run-dispatcher] ${run.name}: the Kubernetes API does not answer (${what}: ${failureOf(err)}); waiting for it for up to ${Math.round(apiWaitMs / 1000)} s`);
+      }
+      const first = since || now;
+      const left = first + apiWaitMs - now;
+      if (left <= 0) throw new ApiUnavailable(apiWaitMs, what, err);
+      await sleep(Math.min(pause, left));
+      return patiently(run, what, call, { evenStopped }, first, Math.min(pause * 2, RETRY_MAX_MS));
+    }
+  }
+
+  // The client as one run uses it: each call waits for the API (#1272).
+  function clientOf(run, options = {}) {
+    const wait = (what, call) => (...args) => patiently(run, what, () => call(...args), options);
+    return {
+      createSecret: wait('creating the Secret', kube.createSecret),
+      patchSecret: wait('linking the Secret to the Job', kube.patchSecret),
+      deleteSecret: wait('deleting the Secret', kube.deleteSecret),
+      createJob: wait('creating the Job', kube.createJob),
+      getJob: wait('reading the Job', kube.getJob),
+      deleteJob: wait('deleting the Job', kube.deleteJob),
+      listPods: wait('reading the pod', kube.listPods),
+      followLog: wait('following the log', kube.followLog),
+    };
+  }
 
   async function removeRun(run) {
-    await Promise.all([ignoreGone(kube.deleteJob(run.name)), ignoreGone(kube.deleteSecret(run.name))]).catch((err) => {
-      log.warn?.(`[run-dispatcher] ${run.name} not removed: ${err.message}`);
+    const k = clientOf(run, { evenStopped: true });
+    await Promise.all([ignoreGone(k.deleteJob(run.name)), ignoreGone(k.deleteSecret(run.name))]).catch((err) => {
+      log.warn?.(`[run-dispatcher] ${run.name} not removed: ${err.logText || failureOf(err)}`);
     });
   }
 
-  async function createObjects(run) {
+  async function createObjects(run, k) {
     const secret = J.runSecret({ ...run.request, resultsUrl: settings.resultsUrl });
     try {
-      await kube.createSecret(secret);
+      await k.createSecret(secret);
     } catch (err) {
       if (err?.status !== 409) throw err;
-      await removeRun(run);               // a run id is new: what has its name is left from before
-      await kube.createSecret(secret);
+      // A run id is new: what has its name is left from before, or a try of
+      // this run's that went through unanswered (#1272).
+      await removeRun(run);
+      await k.createSecret(secret);
     }
-    const job = await kube.createJob(J.runJob(run.request, settings));
+    // A Job with this run's name is this run's: a try that went through unanswered (#1272).
+    const job = await k.createJob(J.runJob(run.request, settings)).catch((err) => {
+      if (err?.status !== 409) throw err;
+      return k.getJob(run.name);
+    });
     // The Secret goes with the Job (best effort: the dispatcher removes it too).
-    kube.patchSecret(run.name, J.ownedBy(job)).catch(() => {});
+    k.patchSecret(run.name, J.ownedBy(job)).catch(() => {});
   }
 
-  // The pod may be gone by the time its log is asked (its deadline reached
-  // just after it was seen running): nothing more to read, and exitOf() then
-  // reads how it ended from the Job. Any other refusal still ends the run.
-  function followLog(podName, send) {
-    return ignoreGone(kube.followLog(podName, J.CONTAINER).then((stream) => new Promise((resolve) => {
-      stream.on('data', (chunk) => send({ t: 'out', d: chunk.toString('utf8') }));
-      stream.on('end', resolve);
-      stream.on('close', resolve);
-      stream.on('error', resolve);
-    })));
+  // The run's log until its container ends. A log cut while the container
+  // runs, or a container that ends while its log is cut (#1272: the API
+  // server went away), is read again from a little before its last output:
+  // the run goes on, and no line of it is lost.
+  async function followToTheEnd(run, k, podName, send) {
+    let lastOutputAt = Date.now();
+    let sinceTime = null;
+    const onData = (chunk) => {
+      lastOutputAt = Date.now();
+      send({ t: 'out', d: chunk.toString('utf8') });
+    };
+    for (let reads = 1; ; reads += 1) {
+      const cut = await followLog(k, podName, sinceTime, onData);
+      if (run.stopped) return { code: EXIT_STOPPED };
+      const ended = await exitOf(k, run.name, podName, { pollMs });
+      if (!ended.running && !cut) return endedWith(ended, send);
+      if (reads > MAX_RESUMES) {
+        return ended.running ? { code: 1, reason: `the run's log was cut ${reads} times` } : endedWith(ended, send);
+      }
+      sinceTime = resumeFrom(lastOutputAt);
+      send({ t: 'err', d: `[run-dispatcher] The run's log was cut; it is read again from ${sinceTime}: a line may show twice.\n` });
+      log.info?.(`[run-dispatcher] ${run.name}: its log was cut, read again from ${sinceTime}`);
+    }
   }
 
   async function execute(run, send) {
-    await createObjects(run);
+    const k = clientOf(run);
+    await createObjects(run, k);
     if (run.stopped) return { code: EXIT_STOPPED };
     send({ t: 'started' });
     log.info?.(`[run-dispatcher] started ${run.name}`);
-    const started = await waitForPod(kube, run.name, { pollMs, startTimeoutMs: settings.startTimeoutMs, isStopped: () => run.stopped });
+    const started = await waitForPod(k, run.name, { pollMs, startTimeoutMs: settings.startTimeoutMs, isStopped: () => run.stopped });
     if (started.failed) {
       if (!run.stopped) send({ t: 'err', d: `[run-dispatcher] The run's pod did not start: ${started.failed}\n` });
       return { code: run.stopped ? EXIT_STOPPED : EXIT_NOT_STARTED };
@@ -211,9 +352,7 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
     if (started.ended) return endedWith(started.ended, send);
     const podName = started.pod.metadata.name;
     if (started.pod.status?.podIP) send({ t: 'pod', address: started.pod.status.podIP });
-    await followLog(podName, send);
-    if (run.stopped) return { code: EXIT_STOPPED };
-    return endedWith(await exitOf(kube, run.name, podName, { pollMs }), send);
+    return followToTheEnd(run, k, podName, send);
   }
 
   function endedWith(ended, send) {
@@ -227,6 +366,13 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
     let run = null;
     const send = (msg) => { if (!socket.destroyed && !socket.writableEnded) socket.write(P.line(msg)); };
     const finish = (msg) => { send(msg); socket.end(); };
+    // Every refusal is logged (#1272), in the dispatcher's own words: the
+    // API's words go to the server only.
+    const refuse = (reason, logText = reason) => {
+      const who = run ? `${run.name} ` : '';
+      log.warn?.(`[run-dispatcher] ${who}refused: ${logText}`);
+      finish({ t: 'refused', reason });
+    };
     const stop = () => {
       if (!run || run.stopped || run.done) return;
       run.stopped = true;
@@ -235,26 +381,31 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000 }) {
 
     socket.on('data', P.lineReader((text) => {
       let msg;
-      try { msg = JSON.parse(text); } catch { return finish({ t: 'refused', reason: 'not JSON' }); }
+      try { msg = JSON.parse(text); } catch { return refuse('not JSON'); }
       if (run) {
         if (P.killSignalOf(msg)) stop();
         return undefined;
       }
       const checked = P.checkRunRequest(msg, { token: settings.token });
-      if (!checked.request) return finish({ t: 'refused', reason: checked.reason });
-      if (running.size >= settings.maxRuns) return finish({ t: 'refused', reason: 'too many runs' });
+      if (!checked.request) return refuse(checked.reason);
+      if (running.size >= settings.maxRuns) return refuse('too many runs');
       run = { request: checked.request, name: J.jobNameOf(checked.request.runId), stopped: false, done: false };
       running.add(run);
       execute(run, send).then(
         ({ code, reason }) => finish({ t: 'exit', code, signal: null, reason: reason || undefined }),
-        (err) => finish({ t: 'refused', reason: `the run could not be dispatched: ${String(err?.message || err).slice(0, 200)}` }),
+        (err) => {
+          // A run stopped while the API did not answer ends as stopped.
+          if (run.stopped) return finish({ t: 'exit', code: EXIT_STOPPED, signal: null });
+          return refuse(`the run could not be dispatched: ${String(err?.message || err).slice(0, 200)}`,
+            `the run could not be dispatched (${err?.logText || failureOf(err)})`);
+        },
       ).finally(() => {
         run.done = true;
         running.delete(run);
         return removeRun(run);
       }).catch((err) => log.warn?.(`[run-dispatcher] ${run.name}: ${err?.message || err}`));
       return undefined;
-    }, () => finish({ t: 'refused', reason: 'line too long' })));
+    }, () => refuse('line too long')));
 
     // The server went away: the run does not outlive its connection.
     socket.on('close', stop);
@@ -281,6 +432,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  createDispatcher, settingsOf, startupProblem, removeLeftovers, waitForPod, exitOf,
+  createDispatcher, settingsOf, startupProblem, removeLeftovers, waitForPod, exitOf, isPassing, resumeFrom,
   EXIT_TIMEOUT, EXIT_NOT_STARTED, EXIT_STOPPED,
 };

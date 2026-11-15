@@ -483,6 +483,7 @@ describe('pod mode (option 4)', () => {
     for (const key of Object.keys(dispatcherSettings).filter(k => k.startsWith('RUN_'))) expect([key, readByIt.has(key)]).toEqual([key, true]);
     expect(D.startupProblem({ ...dispatcherSettings, RUN_AGENT_TOKEN: 'k'.repeat(40) }, undefined, () => false)).toBeNull();
     expect(D.settingsOf(dispatcherSettings).serviceAccount).toBe('oscar-run');
+    expect(D.settingsOf(dispatcherSettings).apiWaitMs).toBe(120000);      // #1272: the documented default, written out
   });
 
   test('the internal port is reached by run pods only, the dispatcher by OSCAR\'s pod only', () => {

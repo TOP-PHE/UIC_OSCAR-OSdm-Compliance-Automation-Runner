@@ -467,7 +467,10 @@ The row *Run pods* of *OSCAR · Overview* shows both. Two alerts:
 `OscarRunPodsNotStarting` (the run image cannot be pulled, the runs'
 namespace's quota is full, or its pod security refuses the pod) and
 `OscarRunDispatcherRefusing` (the dispatcher is down, refuses the server's
-key, or has as many runs as `RUN_DISPATCHER_MAX_RUNS`).
+key, has as many runs as `RUN_DISPATCHER_MAX_RUNS`, or the Kubernetes API
+did not answer for `RUN_DISPATCHER_API_WAIT_MS`, 2 minutes by default). Since
+#1272 the dispatcher waits for the API that long instead of refusing at
+once, and logs each refusal with its reason.
 
 ### On Kubernetes (#1147)
 
