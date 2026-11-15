@@ -390,22 +390,37 @@ To compare before and after on one machine, run one batch with
 (SQLite's defaults), one without them, and read the row *OSCAR's thread* and
 the slow statements of each.
 
-**SQLite's statistics** (#1238, server 1.11.518). SQLite chooses an index
-from statistics that `ANALYZE` writes into `sqlite_stat1`. `ANALYZE` had
-never run on OSCAR's database, so the planner guessed how many rows an index
-gives, and a query could walk every run of a company instead of using the
-index of its batch (#1227).
+**SQLite's statistics** (#1238, server 1.11.518; off by default since
+1.11.524, #1269). SQLite chooses an index from statistics that `ANALYZE`
+writes into `sqlite_stat1`. `ANALYZE` had never run on OSCAR's database, so
+the planner guessed how many rows an index gives, and a query could walk
+every run of a company instead of using the index of its batch (#1227). The
+queries where that mattered now name their index (`INDEXED BY`, or `+` in
+front of a column, #1227 and #1246).
 
-- **When.** With `OSCAR_DB_OPTIMIZE=daily` (the default), the checkpoint
-  thread runs SQLite's `PRAGMA optimize` a minute after the start, then once
-  a day: the advice of [SQLite](https://www.sqlite.org/pragma.html#pragma_optimize)
+- **Off by default, for what it costs.** An `ANALYZE` reads every index of
+  its table in full to count its entries; the analysis limit bounds only the
+  sample (measured: a limited `ANALYZE` of a 3-million-row table took as long
+  as a walk of its index). It holds the database's write lock all along. On
+  the k3s test machine, a minute after a restart (a database of 10 GB not yet
+  in memory), one table took more than a minute: the server's writes waited
+  their 5 s busy timeout and failed, so two sign-ins answered 500, and a run
+  storing its results then would have lost them.
+- **When, if asked.** With `OSCAR_DB_OPTIMIZE=daily`, the checkpoint thread
+  runs SQLite's `PRAGMA optimize` a minute after the start, then once a day:
+  the advice of [SQLite](https://www.sqlite.org/pragma.html#pragma_optimize)
   for a connection that stays open. It analyzes only the tables that have no
-  statistics yet, or whose number of rows changed tenfold since.
+  statistics yet, or whose number of rows changed tenfold since. Choose it
+  only where the database stays in memory, or for one start at a quiet
+  moment (then `off` again).
 - **Never on the server's thread.** The thread analyzes one table at a time,
   with an analysis limit of 1,000 rows per index, and pauses a quarter of a
-  second after each. An analysis holds the database's write lock while it
-  runs, and the server's connection waits for it (up to 5 s, its busy
-  timeout) instead of failing.
+  second after each. It says before each table that it is analyzing it, so
+  the watchdog of the checkpoint thread does not take a long analysis for a
+  dead thread (until 1.11.524 it did: the thread was given up and the COMMITs
+  checkpointed by themselves again until the next restart). An analysis
+  longer than a minute is one error line: `[db] statistics: <table> analyzed
+  for over 60 s, holding the write lock: …`.
 - **The server's plans follow.** A connection reads the statistics when it
   reads the schema, and another connection's `ANALYZE` does not make it read
   them again. So the server's connection runs `ANALYZE sqlite_schema` after
@@ -428,8 +443,11 @@ sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e "const
   On the VPS, the same `node` command with `docker exec oscar` in place of
   `sudo kubectl -n oscar exec deploy/oscar -c oscar --`. Then name the slow
   statement in an issue: the fix is in the query (`INDEXED BY`, or `+` in
-  front of a column, as #1227 and #1246 did), and the statistics can come
-  back.
+  front of a column, as #1227 and #1246 did).
+- **Statistics already kept stay** when `OSCAR_DB_OPTIMIZE` is `off`: a
+  server that ran 1.11.518 to 1.11.523 may hold some, from the tables
+  analyzed before a long one. The planner reads them; remove them as above
+  only if a query became slower.
 
 ### Run pods (#1130)
 

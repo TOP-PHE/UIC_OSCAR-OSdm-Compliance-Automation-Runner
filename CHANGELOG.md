@@ -507,6 +507,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.524] — 2026-11-15
+
+Release 2026.563 (`current_release`). SQLite's statistics are off by default (#1269, part of #1233).
+
+### Fixed
+- **Sign-ins failed and the checkpoint thread was given up a minute after a restart.**
+  - **Seen:** on the k3s test machine (release 2026.561, production's data, 10 GB), two sign-ins answered 500 a minute after the server started (`database is locked` in `logAuthEvent()`, after the 5 s busy timeout).
+  - **The thread:** `[db] the checkpoint thread reported nothing for 60 s` followed, and no `[db] statistics:` line ever came.
+  - **The batch run later:** COMMITs at 224 to 482 ms (99th percentile), as before #1230, since the COMMITs checkpointed by themselves again.
+- **Why.** The checkpoint thread's first run of the statistics (#1238) starts a minute after the start.
+  - `PRAGMA analysis_limit` bounds only the sample. An `ANALYZE` still reads every index of its table in full to count its entries.
+  - Measured on SQLite 3.51 with 3,000,000 rows: a limited `ANALYZE` 177 ms, a walk of the index 186 ms, an unlimited `ANALYZE` 718 ms. The limited run wrote the exact count.
+  - `EXPLAIN ANALYZE` on OSCAR's schema shows an exact `Count` for every index.
+  - On a database not yet in memory, one table took more than a minute. All that time it held the write lock, so the server's writes failed: sign-ins, and a run's results and log lines if a batch had been running. The thread posted nothing either, so the watchdog took it for dead.
+- **`OSCAR_DB_OPTIMIZE` is `off` when it is not set** (`optimizeSetting()`); `daily` stays a choice. The queries where the plan mattered already name their index (#1227, #1246). Statistics already kept stay (the planner reads them); *Metrics and monitoring* says how to remove them.
+- **A long analysis is no silence.**
+  - `checkpointWorker.js` posts `{ type: 'analyzing', table }` before each `ANALYZE`.
+  - `watch()` (`db.js`) does not give the thread up while one runs: no checkpoint is missed, since the analysis holds the write lock and nothing else writes.
+  - Past `staleMs` one error line names the table: `[db] statistics: <table> analyzed for over 60 s, holding the write lock: …`.
+  - `checkpointState().analyzing` names the table being analyzed.
+- **Documentation:** *Metrics and monitoring* (what an analysis costs, when to choose `daily`), both `.env.example`.
+
+### Until a machine runs it
+On 1.11.518 to 1.11.523, add `OSCAR_DB_OPTIMIZE=off` to the server's settings and restart OSCAR when no batch runs. The restart also brings back a checkpoint thread that was given up.
+
+### Checked
+- `db-statistics.test.js`:
+  - the setting's default;
+  - the start-up line;
+  - the thread never analyzes with nothing set;
+  - each table is announced before it is analyzed, in order;
+  - an announced analysis longer than `staleMs` keeps the thread and is told once, and a silence after it still gives the thread up.
+- Mutation-checked: a watchdog that ignores the analysis, a worker that announces nothing, and `daily` as the default each fail a test.
+
+---
+
 ## [server-1.11.523] — 2026-11-15
 
 Release 2026.562 (`current_release`). The data file is checked against its schema again in every run.

@@ -4053,6 +4053,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `onStatistics()` runs `ANALYZE sqlite_schema`; `EXPLAIN QUERY PLAN`
     alone never looks at the schema version, so a plan test runs a real
     query first. An error of the statistics never ends the thread.
+    **Off by default since #1269 (1.11.524)**: `analysis_limit` bounds the
+    sample only, each index is still read in full to count it (measured:
+    a limited ANALYZE as long as a walk of the index), under the write lock.
+    On the k3s test machine a minute after a restart (10 GB, cold), one
+    table took over 60 s: two sign-ins failed "database is locked" after
+    the 5 s busy timeout, and the watchdog gave the silent thread up. The
+    worker now posts `analyzing` before each ANALYZE and `watch()` does not
+    count that time (one error line past `staleMs`); `daily` stays a choice.
+    **Never run ANALYZE while the server serves writes on a large database.**
     **#1239 (1.11.519): indexes.** `idx_runs_active` (partial, `status IN
     ('QUEUED', 'RUNNING')`, in schema.sql and migration 55) serves the queue
     panel; the query must keep that exact `IN` for SQLite to use it.

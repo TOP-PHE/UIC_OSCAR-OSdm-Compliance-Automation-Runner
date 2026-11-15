@@ -17,7 +17,8 @@
  *   for the metrics;
  * - with `optimize` on, `optimizeDelayMs` after the start and then every
  *   `optimizeEveryMs`, the tables SQLite says would benefit are analyzed
- *   (below), and the server's thread is told which.
+ *   (below), and the server's thread is told which, and before each table
+ *   that it is analyzing one (#1269).
  * An error of a checkpoint ends the thread, and the server's connection then
  * checkpoints by itself again; an error of the statistics is only reported.
  * Only node: modules: nothing of the server runs here.
@@ -54,6 +55,11 @@ function tick() {
 // run, without running them: each is then run alone, with an analysis limit,
 // and a pause after it, so that the write lock ANALYZE takes is held for one
 // table at a time and a write of the server's connection gets in between.
+// The limit bounds the sample only: each index is still read in full to count
+// its entries (#1269, measured: a limited ANALYZE took as long as a walk of
+// the index). On a large database not yet in memory one table takes minutes,
+// all of it under the write lock, which is why OSCAR_DB_OPTIMIZE is off by
+// default.
 const ANALYZE_STATEMENT = /^ANALYZE "main"\."((?:[^"]|"")+)"$/;
 const ANALYSIS_LIMIT = 1000;
 
@@ -85,6 +91,10 @@ function analyzeNext(run, i) {
     return;
   }
   const table = run.planned[i];
+  // Said first (#1269): an ANALYZE reads each index of its table in full,
+  // whatever the analysis limit, and nothing else is posted until it ends.
+  // The server's watchdog would otherwise take that silence for a dead thread.
+  parentPort.postMessage({ type: 'analyzing', table: table.name });
   try {
     const t0 = process.hrtime.bigint();
     db.exec(table.statement);

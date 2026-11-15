@@ -59,13 +59,18 @@ function checkpointsSetting(value) {
 
 const CHECKPOINTS = checkpointsSetting(process.env.OSCAR_DB_CHECKPOINTS);
 
-// The database's statistics (#1238, the checkpoint thread below): `daily`,
-// the default, has the checkpoint thread run SQLite's PRAGMA optimize a
-// minute after the start and then once a day; `off` never. Without the
-// thread (OSCAR_DB_CHECKPOINTS=inline) there is none either: it must never
-// run on the server's thread. Read here, so a wrong value stops the start.
+// The database's statistics (#1238, the checkpoint thread below): `off`, the
+// default since #1269, never; `daily` has the checkpoint thread run SQLite's
+// PRAGMA optimize a minute after the start and then once a day. An ANALYZE
+// reads every index of its table in full to count it, whatever the analysis
+// limit, and holds the write lock all along: on the k3s test machine, just
+// after a restart (10 GB not yet in memory), one table took over a minute,
+// and every write of the server (sign-ins, a run's results) failed after its
+// 5 s busy timeout. Without the thread (OSCAR_DB_CHECKPOINTS=inline) there is
+// none either: it must never run on the server's thread. Read here, so a
+// wrong value stops the start.
 function optimizeSetting(value) {
-  if (value === undefined || value === '') return 'daily';
+  if (value === undefined || value === '') return 'off';
   const mode = String(value).trim().toLowerCase();
   if (mode === 'daily' || mode === 'off') return mode;
   throw new Error(`OSCAR_DB_OPTIMIZE must be daily or off, not "${value}"`);
@@ -1590,6 +1595,15 @@ function onCheckpointMessage(state, msg) {
     console.log('[db] checkpoints run in a thread of their own');
     return;
   }
+  // #1269: the thread runs one ANALYZE and posts nothing until it ends, which
+  // may take minutes. The watchdog does not count that time (it is no sign of
+  // a dead thread), and no checkpoint is missed: the ANALYZE holds the write
+  // lock, so nothing else writes meanwhile.
+  if (msg?.type === 'analyzing') {
+    state.analyzing = { table: String(msg.table), since: state.lastSeen, told: false };
+    return;
+  }
+  state.analyzing = null;
   if (msg?.type === 'optimized') {
     onStatistics(state, msg);
     return;
@@ -1658,6 +1672,22 @@ function release(state) {
   setCheckpointThreadGauge(false);
 }
 
+// The watchdog (#1230): a thread silent for `staleMs` is given up, unless it
+// said it is analyzing a table (#1269). An analysis that long is told once:
+// it holds the write lock, and the server's writes fail after their busy
+// timeout until it ends.
+function watch(state, staleMs) {
+  if (Date.now() - state.lastSeen <= staleMs) return;
+  if (!state.analyzing) {
+    checkpointsInline(state, `the checkpoint thread reported nothing for ${staleMs / 1000} s`);
+    return;
+  }
+  if (state.analyzing.told) return;
+  state.analyzing.told = true;
+  console.error(`[db] statistics: ${state.analyzing.table} analyzed for over ${staleMs / 1000} s, holding the write lock: `
+    + `the server's writes fail after ${BUSY_TIMEOUT_MS / 1000} s until it ends (OSCAR_DB_OPTIMIZE=off stops the statistics)`);
+}
+
 // The thread failed, ended or went silent: it is given up for good.
 function checkpointsInline(state, reason) {
   if (checkpointer !== state) return;
@@ -1669,8 +1699,8 @@ function checkpointsInline(state, reason) {
 /**
  * Starts the checkpoint thread (OSCAR_DB_CHECKPOINTS=thread, the default, in
  * WAL mode). Gives the Worker, or null when the COMMITs keep checkpointing.
- * With OSCAR_DB_OPTIMIZE=daily (the default) the same thread updates SQLite's
- * statistics `optimizeDelayMs` after the start, then every
+ * With OSCAR_DB_OPTIMIZE=daily (off by default since #1269) the same thread
+ * updates SQLite's statistics `optimizeDelayMs` after the start, then every
  * `optimizeEveryMs`, pausing `optimizePauseMs` after each table (#1238).
  */
 function startCheckpointThread({
@@ -1687,7 +1717,7 @@ function startCheckpointThread({
       optimize: OPTIMIZE === 'daily', optimizeDelayMs, optimizeEveryMs, optimizePauseMs,
     },
   });
-  const state = { worker, running: false, stopping: false, exited: false, lastSeen: Date.now(), last: null, count: 0, watchdog: null, statistics: null };
+  const state = { worker, running: false, stopping: false, exited: false, lastSeen: Date.now(), last: null, count: 0, watchdog: null, statistics: null, analyzing: null };
   checkpointer = state;
   worker.unref();
   worker.on('message', (msg) => onCheckpointMessage(state, msg));
@@ -1696,11 +1726,7 @@ function startCheckpointThread({
     state.exited = true;
     if (!state.stopping) checkpointsInline(state, `the checkpoint thread ended (code ${code})`);
   });
-  state.watchdog = setInterval(() => {
-    if (Date.now() - state.lastSeen > staleMs) {
-      checkpointsInline(state, `the checkpoint thread reported nothing for ${staleMs / 1000} s`);
-    }
-  }, Math.max(Math.min(staleMs / 4, 15000), 10));
+  state.watchdog = setInterval(() => watch(state, staleMs), Math.max(Math.min(staleMs / 4, 15000), 10));
   state.watchdog.unref();
   return worker;
 }
@@ -1729,7 +1755,7 @@ function checkpointState() {
   const state = checkpointer;
   return {
     mode: CHECKPOINTS, running: Boolean(state?.running), count: state?.count ?? 0, last: state?.last ?? null,
-    optimize: OPTIMIZE, statistics: state?.statistics ?? null,
+    optimize: OPTIMIZE, statistics: state?.statistics ?? null, analyzing: state?.analyzing?.table ?? null,
   };
 }
 
