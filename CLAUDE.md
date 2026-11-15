@@ -126,7 +126,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Claude Code stops background work when memory runs short, and `record`
     writes nothing until its end; code lists made by Python there end in
     `\r`, which matches no scenario (`Recorded 0`).
-    **What is sold without a trip** (#1266 part 1, 1.11.525 / OTST_V2.0.259,
+    **What is sold without a trip** (#1266 part 1, 1.11.526 / OTST_V2.0.259,
     simulator 0.68.0; maintainer: they replace the trip tariffs, and a tag
     asked is a probe). `nonTrip.products` in every profile: a single ride
     (`ADMISSION_POINT2POINT`), a day pass (`ADMISSION_PASS`, zones only), a
@@ -1561,6 +1561,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Everything it makes carries `app.kubernetes.io/managed-by=oscar-dispatcher`
   and is removed at its start. Tests use a stand-in API server
   (`run-dispatcher.test.js` `fakeApi()`): extend it, never mock the client.
+  **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
+  failed 454 queued runs (any API error was final, and each freed slot took
+  the next run at once). Every call of a run goes through `patiently()`
+  (`clientOf(run)`): tried again while `isPassing()` (no answer = a system
+  error code, the timeout's is `ETIMEDOUT`; 401/403/408/429/5xx) for up to
+  `RUN_DISPATCHER_API_WAIT_MS` (2 min), the run keeping its slot. A cut log
+  (closed without `end`) or a container still running is read again from
+  `resumeFrom()` (2 s before the last output: a line may repeat, none is
+  lost); a 409 on the Job is this run's own lost try (`getJob`). Refusals are
+  logged with a status or code, **never the API's words** (they go to the
+  server only). The runner marks a process error `RUN_PROCESS_ERROR` (banner
+  on the run page). `fakeApi()` has `s.down`, `cut()`, `emitTo()`, `endRun()`.
   **PR 4 (1.11.490): `RUN_ISOLATION=pod`.** `launchRun()` (launcher; `launch()`
   refuses kinds in pod mode) sends `{ kind: 'run', runId, envName, envYml
   (base64), deadlineSeconds, env }` to `RUN_AGENT_HOST:RUN_AGENT_PORT` (the

@@ -337,6 +337,41 @@ describe('executeRun — spawn happy paths', () => {
     expect(getRunRow(runId).error_message).toBeNull();
   });
 
+  // #1272: a run whose process was refused or lost (the dispatcher could not
+  // make its pod) is not a test result, and says so.
+  test('a process error is FAILED with RUN_PROCESS_ERROR, the reason in the log', async () => {
+    extractSpy.mockReturnValue({ suites: 0, requests: 0, assertions: 0 });
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    fakeProc.emit('error', new Error('the runner agent refused: the run could not be dispatched: the Kubernetes API did not answer for 120 s'));
+    await p;
+    const row = getRunRow(runId);
+    expect(row.status).toBe('FAILED');
+    expect(row.error_message).toBe('RUN_PROCESS_ERROR');
+    const events = getDecryptedEvents(runId);
+    expect(events.some(e => e.level === 'error' && /Process error: .*did not answer for 120 s/.test(e.message))).toBe(true);
+    expect(events.some(e => e.level === 'error' && /The run did not go to its end/.test(e.message))).toBe(true);
+  });
+
+  test('a run that ended without a process error has no RUN_PROCESS_ERROR', async () => {
+    extractSpy.mockReturnValue({ suites: 0, requests: 0, assertions: 0 });
+    const runId = await runEndingWith(2);
+    expect(getRunRow(runId).error_message).toBeNull();
+  });
+
+  test('the run page has a banner of its own for RUN_PROCESS_ERROR (not the OAuth2 one)', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../../public/run-detail.html'), 'utf8');
+    expect(page).toContain("const isProcessError  = run.error_message === 'RUN_PROCESS_ERROR';");
+    expect(page).toMatch(/isOAuthError\s+= [^;]*!isProcessError/);
+    expect(page).toMatch(/showBanner\s+= [^;]*isProcessError/);
+    expect(page).toContain('The run did not go to its end — this is not a test result');
+  });
+
   test('FAILED on a non-zero exit code', async () => {
     const { companyId, userId } = seedCompanyUser();
     const runId = seedRun(companyId, userId);

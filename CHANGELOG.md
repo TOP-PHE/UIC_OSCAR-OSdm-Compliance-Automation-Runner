@@ -507,9 +507,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.525] / [collection-OTST_V2.0.259] — 2026-11-15
+## [server-1.11.526] / [collection-OTST_V2.0.259] — 2026-11-15
 
-Issue #1266, part 1. Release 2026.564 (`current_release`). Simulator 0.68.0. What is sold without a trip, asked by product.
+Issue #1266, part 1. Release 2026.565 (`current_release`). Simulator 0.68.0. What is sold without a trip, asked by product.
 
 #1258 tested how a non-trip sale is asked and answered; it did not test which product is sold. In OSDM the client says it with `offerSearchCriteria.productTags` (`ADMISSION_POINT2POINT`, `ADMISSION_PASS`, `ADMISSION_MULTI_RIDE`…) or `productSelections` (a product of the provider, by code). The simulator ignored both without a trip, and answered with the trip tariffs (a "Train-bound saver" without a train). Part 2 of the issue (NUTS codes, other places, lost tickets and cards, fares, the #227 discovery, refund and exchange) stays open.
 
@@ -540,6 +540,40 @@ Decided with the maintainer: the non-trip products replace the trip tariffs in a
 ### Checked
 - Replay with the real Bruno CLI 4.2.1 against simulator 0.68.0 of the 213 scenarios *OSCAR - Checks by scenario* names (the 207 of the last recording and the six new ones, recorded in chunks and merged): no failed check but the `SIM_WRONG_*` / `SIM_FAULT_*` ones; 203 give the same checks and failures as the last recording, only the four non-trip scenarios of #1258 moved; `replay.js catalogue` agrees with all 103 entries; the new wrong answers fail or warn as their rows say.
 - Simulator tests (`non-trip.test.js`: the products by kind of request, flexibility, tags, selections by code and tag, a trip request's tags unchanged, the three variants, and over HTTP every provider's answers against its version's OSDM response schema; `app.test.js`: `GET /products`), `datafile.test.js`, server tests (`non-trip-forms.test.js`: version 3.7, tags declared, the product code to complete, the references' tags).
+
+---
+
+## [server-1.11.525] — 2026-11-15
+
+Release 2026.564 (`current_release`). In pod mode, a run waits for the Kubernetes API instead of failing at once (#1272).
+
+### Fixed
+- **A short Kubernetes API outage failed every queued run.**
+  - **Seen:** on the k3s test machine (release 2026.563, a batch of about 550 runs, 12 at a time), k3s restarted twice (#1271), the second time for 27 s. 454 runs of those four hours ended FAILED without testing anything; their logs said `the run could not be dispatched: connect ECONNREFUSED 10.43.0.1:443` (275), `apiserver not ready` (144), `starting` (21), `ECONNRESET` (13), or a 403 at the API's start (1).
+  - **Why:** the dispatcher took any API error as final, at every stage, and deleted the Job, so a run already running was stopped too. The refusal was immediate, so each freed slot took the next queued run at once, refused the same way, and the queue emptied itself into failures. Nothing logged the refusals but each run's own log.
+- **A run waits for the API** (`patiently()`, `dispatcher.js`). A run's API calls are tried again while the error is one waiting can cure (`isPassing()`):
+  - no answer: a refused, reset or timed-out connection (the timeout now has the code `ETIMEDOUT`, `kube.js`);
+  - 401 or 403 before the API's access rules are loaded, 408, 429, and 5xx (k3s's `apiserver not ready`, `starting`).
+
+  The pause doubles from 500 ms to 8 s, for up to `RUN_DISPATCHER_API_WAIT_MS` (2 minutes, written out in `oscar-dispatcher-settings`). The run keeps its place meanwhile, so the queue waits. Any other error (400, 404, 409, 422) is final at once.
+- **A run already running goes on.** A log stream cut while the container runs, or a container that ends while its log is cut, is read again from 2 s before its last output (`sinceTime`, `resumeFrom()`): a line may show twice, none is lost. The run's log says so. The Job is no longer deleted for a blink of the API. A Job made by a try whose answer was lost is taken (`409` → `getJob`), not made twice. A Job that cannot be read is no longer taken for a Job gone (`jobOutcome()`).
+- **A run stopped while the API does not answer ends as stopped**, and what it made is removed once the API answers.
+- **Each refusal is logged by the dispatcher**, `[run-dispatcher] <run> refused: …`, with a status or an error code but never the API's own words, which still go to the server only. Its waits are logged too.
+- **A run whose process was refused or lost says so.** The runner writes `error_message = 'RUN_PROCESS_ERROR'` and one log line; the run page shows *The run did not go to its end — this is not a test result*. Before, such a run read FAILED with nothing more. The coverage report already reads a run without a step as not run.
+- **Documentation:** the Kubernetes guide (section 10a and the troubleshooting table), *Metrics and monitoring*, the `OscarRunDispatcherRefusing` alert (and the cluster rules regenerated).
+
+### Checked
+- `run-dispatcher.test.js`, against the stand-in API server, now able to be down (`reset` or a status), to cut the logs it serves and to lose an answer:
+  - k3s starting (503) when the run is asked;
+  - connections reset while the pod is awaited;
+  - a log cut while the run runs, and a run ending while its log is cut;
+  - an outage longer than the wait (refused, logged without the API's words);
+  - a 422 refused at once;
+  - a lost answer to the Job's creation;
+  - a run stopped during an outage;
+  - which errors waiting can cure.
+- Mutation-checked: no error deemed passing, no read after a cut, no resume of a running run, a lost Job answer not taken, refusals not logged, a stopped run refused, a wait that never ends, the API's words logged: each fails a test.
+- `runner.test.js`: a process error gives `RUN_PROCESS_ERROR` and its log line (mutation-checked), a plain failure does not, and the page's banner is pinned.
 
 ---
 

@@ -31,9 +31,11 @@ const KUBE_TOKEN = 'kube-token';
 const AGENT_TOKEN = randomBytes(24).toString('hex');   // 48 characters
 
 // ── The stand-in API server ──────────────────────────────────────────────────
-// scripts: runId -> { lines, exitCode, reason, waiting, pending, hang, vanish, gone, goneAtLog }
+// scripts: runId -> { lines, exitCode, reason, waiting, pending, hang, vanish, gone, goneAtLog, invalid, answerLost }
+// s.down (#1272): while set, the API does not answer: 'reset' closes every
+// connection, { status, message } answers that instead.
 function fakeApi() {
-  const s = { secrets: new Map(), jobs: new Map(), pods: new Map(), logs: new Map(), scripts: new Map(), calls: [], created: { jobs: [], secrets: [] } };
+  const s = { secrets: new Map(), jobs: new Map(), pods: new Map(), logs: new Map(), scripts: new Map(), calls: [], created: { jobs: [], secrets: [] }, down: null };
   const matches = (obj, selector) => selector.split(',').every((pair) => {
     const [k, v] = pair.split('=');
     return (obj.metadata.labels || {})[k] === v;
@@ -55,6 +57,7 @@ function fakeApi() {
   function startPod(job) {
     const runId = job.metadata.labels[J.RUN_ID_LABEL];
     const script = s.scripts.get(runId) || { lines: ['bru output\n'], exitCode: 0 };
+    const startsAfterMs = script.startsAfterMs ?? 20;
     if (script.gone) {                          // the Job ended before its pod was ever seen running
       job.status = { conditions: [{ type: 'Failed', status: 'True', reason: script.gone }] };
       return;
@@ -86,7 +89,7 @@ function fakeApi() {
         }
         endPod(pod, script.exitCode, script.reason || (script.exitCode === 0 ? 'Completed' : 'Error'));
       }, 5);
-    }, 20);
+    }, startsAfterMs);
   }
 
   const server = http.createServer((req, res) => {
@@ -94,6 +97,8 @@ function fakeApi() {
     req.on('data', (c) => { raw += c; });
     req.on('end', () => {
       s.calls.push(`${req.method} ${req.url}`);
+      if (s.down === 'reset') return req.socket.destroy();
+      if (s.down) return json(res, s.down.status, { message: s.down.message });
       if (req.headers.authorization !== `Bearer ${KUBE_TOKEN}`) return json(res, 401, { message: 'Unauthorized' });
       const body = raw ? JSON.parse(raw) : null;
       const url = new URL(req.url, 'http://api');
@@ -122,10 +127,16 @@ function fakeApi() {
       }
       if (req.method === 'POST') {
         if (store.has(body.metadata.name)) return json(res, 409, { message: 'already exists' });
+        const script = s.scripts.get(body.metadata.labels?.[J.RUN_ID_LABEL]);
+        if (kind === 'jobs' && script?.invalid) return json(res, 422, { message: `Job.batch "${body.metadata.name}" is invalid` });
         const obj = { ...body, metadata: { ...body.metadata, uid: randomUUID() }, status: {} };
         store.set(obj.metadata.name, obj);
         s.created[kind].push(body);
         if (kind === 'jobs') startPod(obj);
+        if (kind === 'jobs' && script?.answerLost && !script.lost) {
+          script.lost = true;                   // made, but its answer never arrives
+          return req.socket.destroy();
+        }
         return json(res, 201, obj);
       }
       if (req.method === 'GET' && !name) return json(res, 200, { items: [...store.values()].filter((o) => !selector || matches(o, selector)) });
@@ -146,7 +157,20 @@ function fakeApi() {
       return json(res, 405, { message: 'no' });
     });
   });
-  return { s, server };
+  const podOf = (runId) => s.pods.get(`${J.jobNameOf(runId)}-x1`);
+  return {
+    s,
+    server,
+    // The API server goes away: every log being followed is cut, not ended.
+    cut() {
+      for (const log of s.logs.values()) {
+        for (const res of log.watchers) res.destroy();
+        log.watchers.length = 0;
+      }
+    },
+    emitTo: (runId, line) => emit(podOf(runId), line),
+    endRun: (runId, exitCode) => endPod(podOf(runId), exitCode, exitCode === 0 ? 'Completed' : 'Error'),
+  };
 }
 
 // ── Set-up ───────────────────────────────────────────────────────────────────
@@ -183,10 +207,10 @@ function runRequest(over = {}) {
   };
 }
 // Sends a request; resolves with the messages once the dispatcher ends the connection.
-function ask(msg, { onMessage, socketRef } = {}) {
+function ask(msg, { onMessage, socketRef, at = port } = {}) {
   return new Promise((resolve) => {
     const messages = [];
-    const socket = net.connect(port, '127.0.0.1', () => socket.write(P.line(msg)));
+    const socket = net.connect(at, '127.0.0.1', () => socket.write(P.line(msg)));
     if (socketRef) socketRef.socket = socket;
     socket.on('data', P.lineReader((text) => {
       const m = JSON.parse(text);
@@ -354,6 +378,208 @@ describe('what the dispatcher refuses', () => {
 
   test('the runner agent refuses a run request', () => {
     expect(P.checkRequest(runRequest(), { token: AGENT_TOKEN, workspacesDir: os.tmpdir() })).toEqual({ reason: 'unknown kind' });
+  });
+});
+
+// ── When the Kubernetes API does not answer (#1272) ──────────────────────────
+describe('when the Kubernetes API does not answer (#1272)', () => {
+  let patient;
+  let patientPort;
+  let logged;
+  const WAIT_MS = 600;
+  jest.setTimeout(20000);      // a busy machine stretches the outages these tests play
+  beforeAll(async () => {
+    const kube = createKubeClient({ base: `http://127.0.0.1:${api.server.address().port}`, token: KUBE_TOKEN, namespace: 'oscar-runs' });
+    const log = { info: (line) => logged.push(['info', line]), warn: (line) => logged.push(['warn', line]) };
+    patient = D.createDispatcher({
+      kube,
+      settings: D.settingsOf({
+        RUN_AGENT_TOKEN: AGENT_TOKEN, RUN_IMAGE: 'registry.example.org/oscar/oscar-run:ci', RUN_RESULTS_URL: 'http://oscar-internal:3003',
+        RUN_POD_START_TIMEOUT_MS: '3000', RUN_DISPATCHER_API_WAIT_MS: String(WAIT_MS),
+      }),
+      log, pollMs: 10, retryMs: 10,
+    });
+    await new Promise((resolve) => patient.listen(0, '127.0.0.1', resolve));
+    patientPort = patient.address().port;
+  });
+  beforeEach(() => { logged = []; });
+  afterEach(() => { api.s.down = null; });
+  afterAll(async () => { await new Promise((resolve) => patient.close(resolve)); });
+  const askPatient = (msg, options = {}) => ask(msg, { ...options, at: patientPort });
+  const warnings = () => logged.filter(([level]) => level === 'warn').map(([, line]) => line);
+  const after = (ms, act) => setTimeout(act, ms);
+
+  test('the wait is 2 minutes unless set', () => {
+    expect(D.settingsOf({}).apiWaitMs).toBe(120000);
+    expect(D.settingsOf({ RUN_DISPATCHER_API_WAIT_MS: '30000' }).apiWaitMs).toBe(30000);
+  });
+
+  test.each([
+    ['no connection', Object.assign(new Error('connect ECONNREFUSED 10.43.0.1:443'), { code: 'ECONNREFUSED' }), true],
+    ['a reset connection', Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }), true],
+    ['no answer in time', Object.assign(new Error('the API server did not answer in time'), { code: 'ETIMEDOUT' }), true],
+    ['k3s starting (503)', { status: 503, message: 'apiserver not ready' }, true],
+    ['500', { status: 500 }, true],
+    ['429', { status: 429 }, true],
+    ['401 while the API starts', { status: 401 }, true],
+    ['403 while the API starts', { status: 403 }, true],
+    ['400', { status: 400 }, false],
+    ['404', { status: 404 }, false],
+    ['409', { status: 409 }, false],
+    ['422', { status: 422 }, false],
+    ['a fault of its own', new TypeError('x is not a function'), false],
+  ])('%s: waiting can cure it = %s', (_what, err, passing) => {
+    expect(D.isPassing(err)).toBe(passing);
+  });
+
+  test('a log resumes a little before its last output, to the second', () => {
+    expect(D.resumeFrom(Date.parse('2026-11-15T15:53:07.900Z'))).toBe('2026-11-15T15:53:05Z');
+  });
+
+  test('a run asked while k3s starts (503) waits, then runs to its end', async () => {
+    const req = runRequest();
+    api.s.scripts.set(req.runId, { lines: ['line 1\n'], exitCode: 0 });
+    api.s.down = { status: 503, message: 'apiserver not ready' };
+    after(150, () => { api.s.down = null; });
+    const messages = await askPatient(req);
+    expect(messages.some((m) => m.t === 'refused')).toBe(false);
+    expect(messages[0]).toEqual({ t: 'started' });
+    expect(out(messages)).toBe('line 1\n');
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
+    expect(warnings()).toContain(`[run-dispatcher] ${J.jobNameOf(req.runId)}: the Kubernetes API does not answer (creating the Secret: HTTP 503); waiting for it for up to 1 s`);
+    expect(logged.some(([level, line]) => level === 'info' && line.includes('the Kubernetes API answers again (creating the Secret'))).toBe(true);
+  });
+
+  test('connections reset while the pod is awaited: the run waits, then runs to its end', async () => {
+    const req = runRequest();
+    // The pod starts well after the outage: the dispatcher is still awaiting it then.
+    api.s.scripts.set(req.runId, { lines: ['line 1\n'], exitCode: 4, startsAfterMs: 1500 });
+    const messages = await askPatient(req, {
+      onMessage: (m) => {
+        if (m.t !== 'started') return;
+        api.s.down = 'reset';
+        after(150, () => { api.s.down = null; });
+      },
+    });
+    expect(messages.some((m) => m.t === 'refused')).toBe(false);
+    expect(out(messages)).toBe('line 1\n');
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 4 });
+    expect(warnings().some((line) => line.includes('does not answer (reading the pod: ECONNRESET)'))).toBe(true);
+  });
+
+  test('a run that ends while its log is cut: its last lines are read once the API answers', async () => {
+    const req = runRequest();
+    api.s.scripts.set(req.runId, { lines: ['before\n'], hang: true });
+    let cut = false;
+    const messages = await askPatient(req, {
+      onMessage: (m) => {
+        if (m.t !== 'out' || cut) return;
+        cut = true;
+        api.s.down = 'reset';
+        api.cut();
+        after(100, () => { api.s.down = null; });
+        after(150, () => { api.emitTo(req.runId, 'after\n'); api.endRun(req.runId, 0); });
+      },
+    });
+    expect(messages.some((m) => m.t === 'refused')).toBe(false);
+    expect(out(messages)).toContain('after\n');
+    expect(messages.some((m) => m.t === 'err' && /log was cut while its pod runs|log was cut/.test(m.d))).toBe(true);
+    expect(api.s.calls.some((c) => c.includes('/log?') && c.includes('sinceTime='))).toBe(true);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
+  });
+
+  test('a run still running when its log is cut keeps running: its log resumes, its Job is not deleted', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.scripts.set(req.runId, { lines: ['before\n'], hang: true });
+    let cut = false;
+    let jobKept = null;
+    // Once the dispatcher follows the log again, the run goes on and ends.
+    const goOn = async () => {
+      await until(() => api.s.logs.get(`${name}-x1`).watchers.length === 1, 10000);
+      jobKept = api.s.jobs.has(name);
+      api.emitTo(req.runId, 'after\n');
+      api.endRun(req.runId, 0);
+    };
+    const messages = await askPatient(req, {
+      onMessage: (m) => {
+        if (m.t !== 'out' || cut) return;
+        cut = true;
+        api.s.down = 'reset';
+        api.cut();
+        after(50, () => {
+          api.s.down = null;
+          goOn().catch(() => {});
+        });
+      },
+    });
+    expect(jobKept).toBe(true);
+    expect(out(messages)).toContain('after\n');
+    expect(messages.filter((m) => m.t === 'err' && m.d.includes('log was cut'))).toHaveLength(1);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
+    expect(logged.some(([, line]) => line.includes(`${name}: its log was cut, read again from`))).toBe(true);
+  });
+
+  test('past the wait the run is refused, saying why; the log names it without the API\'s words', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.down = { status: 503, message: 'apiserver not ready' };
+    const started = Date.now();
+    const messages = await askPatient(req);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(WAIT_MS - 20);
+    expect(messages).toEqual([{
+      t: 'refused',
+      reason: 'the run could not be dispatched: the Kubernetes API did not answer for 1 s (creating the Secret: apiserver not ready)',
+    }]);
+    expect(warnings()).toContain(`[run-dispatcher] ${name} refused: the run could not be dispatched (the Kubernetes API did not answer for 1 s (creating the Secret: HTTP 503))`);
+    expect(logged.some(([, line]) => line.includes('apiserver not ready'))).toBe(false);
+  });
+
+  test('an error waiting cannot cure refuses the run at once, and what it made is removed', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.scripts.set(req.runId, { invalid: true });
+    const messages = await askPatient(req);
+    expect(messages).toEqual([{ t: 'refused', reason: `the run could not be dispatched: Job.batch "${name}" is invalid` }]);
+    expect(warnings()).toContain(`[run-dispatcher] ${name} refused: the run could not be dispatched (HTTP 422)`);
+    expect(warnings().some((line) => line.includes(`${name}: the Kubernetes API does not answer`))).toBe(false);
+    await until(() => !api.s.secrets.has(name));
+  });
+
+  test('a Job made by a try whose answer was lost is taken, not made twice', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.scripts.set(req.runId, { lines: ['once\n'], exitCode: 0, answerLost: true });
+    const messages = await askPatient(req);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
+    expect(out(messages)).toBe('once\n');
+    expect(api.s.created.jobs.filter((j) => j.metadata.name === name)).toHaveLength(1);
+    expect(api.s.calls).toContain(`GET /apis/batch/v1/namespaces/oscar-runs/jobs/${name}`);
+  });
+
+  test('a run stopped while the API does not answer ends as stopped, and its Job is removed once it answers', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.scripts.set(req.runId, { lines: ['working\n'], hang: true });
+    let stopped = false;
+    const messages = await askPatient(req, {
+      onMessage: (m, socket) => {
+        if (m.t !== 'out' || stopped) return;
+        stopped = true;
+        api.s.down = 'reset';
+        api.cut();
+        after(30, () => socket.write(P.line({ t: 'kill', signal: 'SIGTERM' })));
+        after(200, () => { api.s.down = null; });
+      },
+    });
+    expect(last(messages)).toMatchObject({ t: 'exit', code: D.EXIT_STOPPED });
+    await until(() => !api.s.jobs.has(name) && !api.s.secrets.has(name));
+  });
+
+  test('the request refusals are logged too', async () => {
+    const messages = await askPatient(runRequest({ token: 'x'.repeat(48) }));
+    expect(messages).toEqual([{ t: 'refused', reason: 'not authorised' }]);
+    expect(warnings()).toContain('[run-dispatcher] refused: not authorised');
   });
 });
 

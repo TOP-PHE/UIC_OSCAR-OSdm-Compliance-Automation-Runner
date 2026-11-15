@@ -39,6 +39,8 @@ configMapGenerator:
       - RUN_RESULTS_URL=http://oscar-internal.oscar.svc:3003
       - RUN_SERVICE_ACCOUNT=oscar-run
       - RUN_DISPATCHER_MAX_RUNS=50
+      # How long a run waits for the Kubernetes API to answer again (#1272).
+      - RUN_DISPATCHER_API_WAIT_MS=120000
       - NODE_ENV=production
       - HOME=/tmp
       - TZ=Europe/Paris
