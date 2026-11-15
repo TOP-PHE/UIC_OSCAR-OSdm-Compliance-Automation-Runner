@@ -9,6 +9,8 @@
 
 // #1258: offers without a trip, valid between stop places or in zones; the
 // stop places (GET/POST /places) and zones (GET /zones) they are asked for.
+// #1266: the products sold without a trip, asked by tag or code, and the
+// wrong variants.
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -26,6 +28,10 @@ const NOW = Date.parse('2026-11-02T09:00:00Z');
 const CENTRAL = 'urn:uic:stn:0000040';
 const AIRPORT = 'urn:uic:stn:0000041';
 const NORTH = 'urn:uic:stn:0000042';
+const EAST = 'urn:uic:stn:0000043';
+const WEST = 'urn:uic:stn:0000044';
+const SOUTH = 'urn:uic:stn:0000045';
+const ALL_PLACES = [CENTRAL, AIRPORT, NORTH, EAST, WEST, SOUTH];
 const PAX = [{ externalRef: '00001', type: 'PERSON', dateOfBirth: '1990-01-15' }];
 
 const stop = (stopPlaceRef) => ({ objectType: 'StopPlaceRef', stopPlaceRef });
@@ -47,8 +53,14 @@ after(async () => { await sim.close(); });
 
 test('every provider sells without a trip, with the same stop places and zones; plain does not', () => {
   for (const key of REAL) assert.deepEqual(providers.get(key).nonTrip, gamma.nonTrip, key);
-  assert.equal(gamma.nonTrip.places.length, 3);
+  assert.deepEqual(gamma.nonTrip.places.map((p) => p.id), ALL_PLACES);
   assert.equal(gamma.nonTrip.withoutValidityFrom, NORTH);
+  assert.deepEqual(gamma.nonTrip.variants, { tripCoverage: EAST, otherPlaces: WEST, otherCarrier: SOUTH });
+  assert.deepEqual(gamma.nonTrip.products.map((p) => [p.code, p.type, p.by.join('+')]), [
+    ['SIM_SINGLE_RIDE', 'ADMISSION_POINT2POINT', 'PLACES+ZONES'],
+    ['SIM_DAY_PASS', 'ADMISSION_PASS', 'ZONES'],
+    ['SIM_TEN_RIDES', 'ADMISSION_MULTI_RIDE', 'PLACES+ZONES'],
+  ]);
   assert.equal(plain.nonTrip, undefined);
 });
 
@@ -67,7 +79,30 @@ test('a wrong nonTrip profile stops the start', () => {
   ]) {
     assert.throws(() => checkProvider('gamma', raw(wrong)), /nonTrip/, JSON.stringify(wrong));
   }
+  // #1266: the products and the wrong variants.
+  const ok = { places, zones: gamma.nonTrip.zones, products: gamma.nonTrip.products };
+  const product = gamma.nonTrip.products[0];
+  for (const wrong of [
+    { ...ok, products: undefined },
+    { ...ok, products: [] },
+    { ...ok, products: [{ ...product, type: 'ADMISSION' }] },
+    { ...ok, products: [{ ...product, by: [] }] },
+    { ...ok, products: [{ ...product, by: ['PLACES', 'PLACES'] }] },
+    { ...ok, products: [{ ...product, validityMinutes: 10 }] },
+    { ...ok, products: [{ ...product, by: ['PLACES'] }] },
+    { ...ok, products: [product, product] },
+    { ...ok, variants: { tripCoverage: 'urn:uic:stn:9999999' } },
+    { ...ok, variants: { elsewhere: EAST } },
+    { ...ok, variants: { tripCoverage: EAST, otherPlaces: EAST } },
+    { ...ok, withoutValidityFrom: NORTH, variants: { tripCoverage: NORTH } },
+  ]) {
+    assert.throws(() => checkProvider('gamma', raw(wrong)), /nonTrip/, JSON.stringify(wrong));
+  }
 });
+
+const productOfPart = (offer, part) => offer.products.find((p) => p.id === part.products[0].productId);
+const UNTIL = { SIM_SINGLE_RIDE: '2026-11-20T02:00:00+01:00', SIM_DAY_PASS: '2026-11-21T00:00:00+01:00', SIM_TEN_RIDES: '2026-12-20T00:00:00+01:00' };
+const FOR = { SIM_SINGLE_RIDE: 'Single ride, valid between Simtown Central, Simtown Airport, for 2 hours', SIM_TEN_RIDES: 'Ten-ride card, valid between Simtown Central, Simtown Airport, for 30 days' };
 
 test('places: every offer has no trip, and each admission is valid between the stop places asked', () => {
   const { response, remembered, trips } = buildOfferCollection(byPlaces([CENTRAL, AIRPORT]), gamma, NOW);
@@ -75,11 +110,12 @@ test('places: every offer has no trip, and each admission is valid between the s
   assert.deepEqual(trips, []);
   assert.ok(response.offers.length > 0);
   for (const offer of response.offers) assert.equal(offer.tripCoverage, undefined);
-  for (const part of admissionsOf(response.offers)) {
+  for (const offer of response.offers) for (const part of offer.admissionOfferParts) {
+    const { code } = productOfPart(offer, part);
     assert.equal(part.tripCoverage, undefined);
     assert.equal(part.validFrom, '2026-11-20T00:00:00+01:00');
-    assert.equal(part.validUntil, '2026-11-21T00:00:00+01:00');
-    assert.deepEqual(part.regionalValiditySummary, { description: 'Valid between Simtown Central, Simtown Airport, for one day', shortDescription: 'Simtown Central - Simtown Airport' });
+    assert.equal(part.validUntil, UNTIL[code], code);
+    assert.deepEqual(part.regionalValiditySummary, { description: FOR[code], shortDescription: 'Simtown Central - Simtown Airport' });
     assert.equal(part.regionalValidities.length, 1);
     const { route } = part.regionalValidities[0];
     assert.deepEqual(route.routeItemList.map((item) => item.station.id), [CENTRAL, AIRPORT]);
@@ -157,7 +193,7 @@ test('over HTTP, in each provider\'s version: places, zones, a non-trip sale', a
     const token = await tokenFor(sim.base, key, SECRETS[key][0]);
     const all = await call(sim.base, token, 'GET', `/${key}/places`);
     assert.equal(all.status, 200, key);
-    assert.deepEqual(all.body.places.map((p) => p.id), [CENTRAL, AIRPORT, NORTH]);
+    assert.deepEqual(all.body.places.map((p) => p.id), ALL_PLACES);
     assert.ok(all.body.places.every((p) => p.objectType === 'StopPlace' && p.name));
 
     const found = await call(sim.base, token, 'POST', `/${key}/places`, { placeInput: { name: 'simtown' }, restrictions: { type: 'STOP', numberOfResults: 2 } });
@@ -190,6 +226,113 @@ test('over HTTP, in each provider\'s version: places, zones, a non-trip sale', a
       const admission = read.body.booking.bookedOffers[0].admissions[0];
       assert.equal(admission.tripCoverage, undefined);
       assert.ok(admission.regionalValidities || admission.regionalValidity, key);
+    }
+  }
+});
+
+// ── #1266: the products sold without a trip ─────────────────────────────────
+
+const codesOf = (offers) => offers.map((o) => `${o.products[0].code}/${o.products[0].travelClass}`);
+const CITY = { id: 'SIM-CITY', carrier: gamma.carrier.ref };
+
+test('the products: a single ride and a ten-ride card between stop places; a day pass too in zones; in each class asked', () => {
+  const places = buildOfferCollection(byPlaces([CENTRAL, AIRPORT]), gamma, NOW).response.offers;
+  assert.deepEqual(codesOf(places), ['SIM_SINGLE_RIDE/SECOND', 'SIM_TEN_RIDES/SECOND']);
+  const both = buildOfferCollection(byPlaces([CENTRAL, AIRPORT], { offerSearchCriteria: { travelClasses: ['FIRST', 'SECOND'] } }), gamma, NOW).response.offers;
+  assert.deepEqual(codesOf(both).sort(), ['SIM_SINGLE_RIDE/FIRST', 'SIM_SINGLE_RIDE/SECOND', 'SIM_TEN_RIDES/FIRST', 'SIM_TEN_RIDES/SECOND']);
+  const zones = buildOfferCollection(byZones([CITY]), gamma, NOW).response.offers;
+  assert.deepEqual(codesOf(zones), ['SIM_SINGLE_RIDE/SECOND', 'SIM_DAY_PASS/SECOND', 'SIM_TEN_RIDES/SECOND']);
+  for (const offer of zones) {
+    const [product] = offer.products;
+    assert.equal(product.isTrainBound, false);
+    assert.equal(offer.offerSummary.overallFlexibility, product.flexibility);
+    assert.equal(product.productTags, undefined, 'tags only in an answer to a product request');
+    assert.equal(offer.admissionOfferParts[0].summaryProductId, product.id);
+  }
+  const pass = zones.find((o) => o.products[0].code === 'SIM_DAY_PASS');
+  assert.equal(pass.products[0].type, 'ADMISSION_PASS');
+  assert.equal(pass.admissionOfferParts[0].validUntil, '2026-11-21T00:00:00+01:00');
+  assert.equal(pass.admissionOfferParts[0].refundable, 'WITH_CONDITION');
+});
+
+test('a flexibility asked keeps the products of that flexibility', () => {
+  const asked = (flexibilities) => codesOf(buildOfferCollection(byZones([CITY], { offerSearchCriteria: { flexibilities } }), gamma, NOW).response.offers);
+  assert.deepEqual(asked(['NON_FLEXIBLE']), ['SIM_SINGLE_RIDE/SECOND']);
+  assert.deepEqual(asked(['SEMI_FLEXIBLE', 'FULL_FLEXIBLE']), ['SIM_DAY_PASS/SECOND', 'SIM_TEN_RIDES/SECOND']);
+});
+
+test('by product tag: the offers of that tag, tagged; a tag not sold for the request gets the usual offers and the problem', () => {
+  const pass = buildOfferCollection(byZones([CITY], { offerSearchCriteria: { productTags: ['ADMISSION_PASS'] } }), gamma, NOW).response;
+  assert.deepEqual(codesOf(pass.offers), ['SIM_DAY_PASS/SECOND']);
+  assert.ok(pass.offers.every((o) => o.products[0].productTags[0] === 'ADMISSION_PASS'));
+  assert.equal(pass.problems, undefined);
+
+  const rides = buildOfferCollection(byPlaces([CENTRAL, AIRPORT], { offerSearchCriteria: { productTags: ['ADMISSION_MULTI_RIDE'] } }), gamma, NOW).response;
+  assert.deepEqual(codesOf(rides.offers), ['SIM_TEN_RIDES/SECOND']);
+
+  // A pass is sold in zones only: between stop places, the usual offers and PARAMETER_NOT_SUPPORTED.
+  const none = buildOfferCollection(byPlaces([CENTRAL, AIRPORT], { offerSearchCriteria: { productTags: ['ADMISSION_PASS'] } }), gamma, NOW).response;
+  assert.equal(none.offers.length, 2);
+  assert.deepEqual(none.problems.map((p) => [p.code, p.pointers[0].requestPointer]), [['PARAMETER_NOT_SUPPORTED', '/offerSearchCriteria/productTags']]);
+});
+
+test('by product selection: a code, or a tag', () => {
+  const byCode = buildOfferCollection(byZones([CITY], { offerSearchCriteria: { productSelections: [{ productCode: 'SIM_DAY_PASS', numberOfItems: 1 }] } }), gamma, NOW).response;
+  assert.deepEqual(codesOf(byCode.offers), ['SIM_DAY_PASS/SECOND']);
+  const byTag = buildOfferCollection(byZones([CITY], { offerSearchCriteria: { productSelections: [{ productTag: 'ADMISSION_POINT2POINT' }] } }), gamma, NOW).response;
+  assert.deepEqual(codesOf(byTag.offers), ['SIM_SINGLE_RIDE/SECOND']);
+  const unknown = buildOfferCollection(byZones([CITY], { offerSearchCriteria: { productSelections: [{ productCode: 'SIM_NOTHING' }] } }), gamma, NOW).response;
+  assert.equal(unknown.offers.length, 3);
+  assert.equal(unknown.problems[0].code, 'PARAMETER_NOT_SUPPORTED');
+});
+
+test('a trip request still knows only its own tags: a pass asked for a trip is ignored, as before', () => {
+  const { selectProducts } = require('../src/osdm/productSelection');
+  const tripOffers = [{ products: [{ code: 'X', type: 'ADMISSION' }] }];
+  const answer = selectProducts({ productTags: ['ADMISSION_PASS'] }, tripOffers);
+  assert.equal(answer.offers.length, 1);
+  assert.equal(answer.problems[0].code, 'PARAMETER_NOT_SUPPORTED');
+});
+
+test('wrong variant tripCoverage: from its stop place, the admissions, and the booked ones, cover a trip', () => {
+  const { response, remembered } = buildOfferCollection(byPlaces([EAST, CENTRAL]), gamma, NOW);
+  for (const part of admissionsOf(response.offers)) assert.deepEqual(part.tripCoverage, { coveredTripId: 'GAMMA-TRIP-NONTRIP' });
+  const byId = new Map(remembered.map((e) => [e.offer.offerId, e]));
+  const booking = createBooking(bookingRequest(response.offers[0]), (id) => byId.get(id), gamma, NOW);
+  assert.deepEqual(booking.bookedOffers[0].admissions[0].tripCoverage, { coveredTripId: 'GAMMA-TRIP-NONTRIP' });
+});
+
+test('wrong variant otherPlaces: from its stop place, a route through other stop places', () => {
+  const { response } = buildOfferCollection(byPlaces([WEST, CENTRAL]), gamma, NOW);
+  for (const part of admissionsOf(response.offers)) {
+    const stations = part.regionalValidities[0].route.routeItemList.map((item) => item.station.id);
+    assert.deepEqual(stations, [AIRPORT, NORTH]);
+    assert.equal(part.tripCoverage, undefined);
+  }
+});
+
+test('wrong variant otherCarrier: in its zone, zones of another carrier; between stop places, nothing changes', () => {
+  const south = buildOfferCollection(byZones([{ id: 'SIM-SOUTH', carrier: gamma.carrier.ref }]), gamma, NOW).response;
+  for (const part of admissionsOf(south.offers)) {
+    assert.deepEqual(part.regionalValidities, [{ seqNb: 1, zone: { carrier: 'urn:x_osdm_simulator:carrier:other', name: 'Simtown south', zoneIds: [102] } }]);
+  }
+  const places = buildOfferCollection(byPlaces([SOUTH, CENTRAL]), gamma, NOW).response;
+  for (const part of admissionsOf(places.offers)) assert.ok(part.regionalValidities[0].route);
+});
+
+test('over HTTP, in each provider\'s version: a pass asked by tag, and the wrong variants answer as OSDM allows', async () => {
+  for (const key of REAL) {
+    const token = await tokenFor(sim.base, key, SECRETS[key][0]);
+    const carrier = providers.get(key).carrier.ref;
+    for (const body of [
+      byZones([{ id: 'SIM-CITY', carrier }], { offerSearchCriteria: { productTags: ['ADMISSION_PASS'] } }),
+      byPlaces([EAST, CENTRAL]),
+      byPlaces([WEST, CENTRAL]),
+      byZones([{ id: 'SIM-SOUTH', carrier }]),
+    ]) {
+      const offers = await call(sim.base, token, 'POST', `/${key}/offers`, body);
+      assert.equal(offers.status, 200, `${key} ${JSON.stringify(offers.body).slice(0, 300)}`);
+      assert.ok(offers.body.offers.length > 0, key);
     }
   }
 });

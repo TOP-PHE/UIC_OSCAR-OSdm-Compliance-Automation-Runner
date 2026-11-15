@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_38", "SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_FARE_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_SRCH_1ADT_38", "SIM_FARE_REFUND_TRIPIDS_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38", "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38", "SIM_SALE_YOUNG_CHILD_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38", "SIM_TRIP_PROBE_ARRIVAL_TIME_38", "SIM_FARE_FIRST_1ADT_38", "SIM_FARE_CARD_1ADT_38", "SIM_FARE_FAMILY_38", "SIM_FARE_BICYCLE_ADMISSION_38", "SIM_FARE_GROUP_6ADT_38", "SIM_FARE_TRANSIT_1ADT_38", "SIM_FARE_ROUTES_1ADT_38", "SIM_FARE_REFUND_NON_FLEX_1ADT_38", "SIM_FARE_REAL_FORM_1ADT_38", "SIM_FARE_NEARBY_STOP_SRCH_1ADT_38", "SIM_NONTRIP_PLACES_1ADT_38", "SIM_NONTRIP_PLACES_LOOKUP_1ADT_38", "SIM_NONTRIP_ZONES_1ADT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_EXCHANGE_OTHER_ROUTE_1ADT_38", "SIM_EXCHANGE_OTHER_DAY_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38", "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38", "SIM_SALE_CLASS_PER_LEG_NOT_OFFERED_1ADT_38", "SIM_SALE_SEAT_PREFERENCE_1ADT_38", "SIM_SALE_SEAT_PREFERENCES_FLOW_2ADT_38", "SIM_VARIANT_IGNORES_PREFERENCES_1ADT_38", "SIM_SALE_NAMED_PLACE_2ADT_38", "SIM_SALE_NAMED_PLACE_FEE_1ADT_38", "SIM_SALE_NAMED_COMPARTMENT_2ADT_38", "SIM_SALE_NEARBY_PLACE_2ADT_38", "SIM_VARIANT_IGNORES_REFERENCE_1ADT_38", "SIM_SALE_NAMED_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_ADD_LATER_2ADT_38", "SIM_SALE_SEAT_PREFERENCES_ADD_LATER_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_2ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_1ADT_38", "SIM_SALE_NEARBY_PLACE_AUTO_ADD_LATER_2ADT_38", "SIM_OFFER_PROBE_TRAVEL_CLASS_FIRST_38", "SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_38", "SIM_OFFER_PROBE_FLEXIBILITY_NON_FLEXIBLE_38", "SIM_OFFER_PROBE_OFFER_PARTS_ADMISSION_38", "SIM_OFFER_PROBE_OFFER_MODE_INDIVIDUAL_38", "SIM_OFFER_PROBE_COMBINATION_38", "SIM_OFFER_PROBE_PRODUCT_TAG_ADMISSION_POINT2POINT_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_TAG_38", "SIM_TRIP_PROBE_VIA_38", "SIM_TRIP_PROBE_TRANSFER_LIMIT_0_38", "SIM_TRIP_PROBE_NOT_VIA_38", "SIM_OFFER_PROBE_NOT_DECLARED_38", "SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38", "SIM_CURRENCY_EUR_EXCHANGE_1ADT_38", "SIM_CURRENCY_DEFAULT_1ADT_38", "SIM_NHF_CURRENCY_NOT_SOLD_38", "SIM_VARIANT_REFUSES_BARE_PLACE_SELECTION_1ADT_38", "SIM_VARIANT_ONE_FULFILLMENT_PER_REFUND_1ADT_38", "SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_38", "SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_FARE_REFUND_1ADT_38", "SIM_FARE_SPEC_1ADT_38", "SIM_FARE_SPEC_FREE_CHILD_38", "SIM_FARE_SRCH_1ADT_38", "SIM_FARE_TRIPIDS_1ADT_38", "SIM_NHF_FARE_UNASKED_38", "SIM_NHF_FARE_NO_SECTION_SRCH_38", "SIM_NHF_FARE_NO_SECTION_SPEC_38", "SIM_NHF_FARE_EMPTY_SECTIONS_38", "SIM_FARE_REFUND_1ADT_38", "SIM_FARE_REFUND_SRCH_1ADT_38", "SIM_FARE_REFUND_TRIPIDS_1ADT_38", "SIM_FARE_REFUND_FEE_1ADT_38", "SIM_FARE_REFUND_COMBINING_1ADT_38", "SIM_FARE_BICYCLE_1ADT_38", "SIM_FARE_BICYCLE_ONLY_38", "SIM_NHF_FARE_EMPTY_SECTIONS_SRCH_38", "SIM_NHF_FARE_NO_SECTION_TRIPIDS_38", "SIM_NHF_FARE_EMPTY_SECTIONS_TRIPIDS_38", "SIM_OFFER_OPTION_DISCOVERY_38", "SIM_EXCHANGE_OVERRULE_TECHNICAL_FAILURE_1ADT_38", "SIM_SALE_YOUNG_CHILD_38", "SIM_OFFER_PROBE_PRODUCT_SELECTION_CODE_38", "SIM_TRIP_PROBE_ARRIVAL_TIME_38", "SIM_FARE_FIRST_1ADT_38", "SIM_FARE_CARD_1ADT_38", "SIM_FARE_FAMILY_38", "SIM_FARE_BICYCLE_ADMISSION_38", "SIM_FARE_GROUP_6ADT_38", "SIM_FARE_TRANSIT_1ADT_38", "SIM_FARE_ROUTES_1ADT_38", "SIM_FARE_REFUND_NON_FLEX_1ADT_38", "SIM_FARE_REAL_FORM_1ADT_38", "SIM_FARE_NEARBY_STOP_SRCH_1ADT_38", "SIM_NONTRIP_PLACES_1ADT_38", "SIM_NONTRIP_PLACES_LOOKUP_1ADT_38", "SIM_NONTRIP_ZONES_1ADT_38", "SIM_NONTRIP_PROBE_TAG_PASS_38", "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38", "SIM_NONTRIP_PRODUCT_CODE_1ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -38151,6 +38151,219 @@
     {
       "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
       "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_PASS_38",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a pass asked by product tag (offerSearchCriteria.productTags ADMISSION_PASS) in the first zone of GET /zones (SIM-CITY). Gamma sells its day pass there (product type ADMISSION_PASS, valid one day), and only that, its products tagged. The scenario ends after the offer. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": [
+          "ADMISSION_PASS"
+        ]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a single ride asked by product tag (offerSearchCriteria.productTags ADMISSION_POINT2POINT) between stations 0000040 and 0000041. Gamma sells its single ride there (valid two hours), and only that, its products tagged. The scenario ends after the offer. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 45,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": [
+          "ADMISSION_POINT2POINT"
+        ]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PRODUCT_CODE_1ADT_38",
+      "description": "Simulated provider: sale without a trip of a product named by its code (#1266): one adult, the day pass SIM_DAY_PASS asked by offerSearchCriteria.productSelections (productCode) in the first zone of GET /zones (SIM-CITY), and expected (expectedProduct). The answer holds the day pass only; it is booked, passenger details updated, fulfilled, and the booking holds the product. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "expectedProduct": "SIM_DAY_PASS",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_DAY_PASS",
+            "numberOfItems": 1
+          }
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked from station 0000043, where gamma gives every admission a tripCoverage though no trip was asked. Expected to fail \"Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)\" at 01 and the same check of the booking at 02, 05 and 07. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 49,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked between stations 0000044 and 0000040, where gamma gives a route through other stop places (0000041 and 0000042). No failed check: a WARNING \"the regional validity names every stop place asked\" at 01, 02, 05 and 07 (OSDM does not say what the validity must name). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 50,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked in zone SIM-SOUTH of gamma's carrier, where gamma answers with a Zone of another carrier. No failed check: a WARNING \"the regional validity names a zone of the carrier asked\" at 01, 02, 05 and 07. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 51,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
       "code": "SIM_FARE_REAL_FORM_1ADT_36",
       "description": "Simulated provider, fares answered as a real provider does (#1045): one adult on trip 38, the section from 0000060 (fares.variants.realAnswerForm, not a wrong variant). The fares name no covered section and no connection point: their coverage is in their route and in the offer's tripCoverage.coveredSections, which O8 reads. The fully flexible offer is booked and confirmed. OSDM 3.6.0, for alpha (a copy of SIM_FARE_REAL_FORM_1ADT_38, #914).",
       "scenarioType": "SALE",
@@ -41497,6 +41710,1011 @@
         "offerMode": null,
         "requestedOfferParts": []
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_PASS_36",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a pass asked by product tag (offerSearchCriteria.productTags ADMISSION_PASS) in the first zone of GET /zones (SIM-CITY). Gamma sells its day pass there (product type ADMISSION_PASS, valid one day), and only that, its products tagged. The scenario ends after the offer. OSDM 3.6.0, for alpha (a copy of SIM_NONTRIP_PROBE_TAG_PASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_PASS"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_36",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a single ride asked by product tag (offerSearchCriteria.productTags ADMISSION_POINT2POINT) between stations 0000040 and 0000041. Gamma sells its single ride there (valid two hours), and only that, its products tagged. The scenario ends after the offer. OSDM 3.6.0, for alpha (a copy of SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 45,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_POINT2POINT"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_36",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked from station 0000043, where gamma gives every admission a tripCoverage though no trip was asked. Expected to fail \"Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)\" at 01 and the same check of the booking at 02, 05 and 07. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 49,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_36",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked between stations 0000044 and 0000040, where gamma gives a route through other stop places (0000041 and 0000042). No failed check: a WARNING \"the regional validity names every stop place asked\" at 01, 02, 05 and 07 (OSDM does not say what the validity must name). OSDM 3.6.0, for alpha (a copy of SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 50,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_36",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked in zone SIM-SOUTH of gamma's carrier, where gamma answers with a Zone of another carrier. No failed check: a WARNING \"the regional validity names a zone of the carrier asked\" at 01, 02, 05 and 07. OSDM 3.6.0, for alpha (a copy of SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.6.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3651,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_PASS_37",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a pass asked by product tag (offerSearchCriteria.productTags ADMISSION_PASS) in the first zone of GET /zones (SIM-CITY). Gamma sells its day pass there (product type ADMISSION_PASS, valid one day), and only that, its products tagged. The scenario ends after the offer. OSDM 3.7.0, for beta (a copy of SIM_NONTRIP_PROBE_TAG_PASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_PASS"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_37",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a single ride asked by product tag (offerSearchCriteria.productTags ADMISSION_POINT2POINT) between stations 0000040 and 0000041. Gamma sells its single ride there (valid two hours), and only that, its products tagged. The scenario ends after the offer. OSDM 3.7.0, for beta (a copy of SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 45,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_POINT2POINT"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PRODUCT_CODE_1ADT_37",
+      "description": "Simulated provider: sale without a trip of a product named by its code (#1266): one adult, the day pass SIM_DAY_PASS asked by offerSearchCriteria.productSelections (productCode) in the first zone of GET /zones (SIM-CITY), and expected (expectedProduct). The answer holds the day pass only; it is booked, passenger details updated, fulfilled, and the booking holds the product. OSDM 3.7.0, for beta (a copy of SIM_NONTRIP_PRODUCT_CODE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "expectedProduct": "SIM_DAY_PASS",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_DAY_PASS",
+            "numberOfItems": 1
+          }
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_37",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked from station 0000043, where gamma gives every admission a tripCoverage though no trip was asked. Expected to fail \"Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)\" at 01 and the same check of the booking at 02, 05 and 07. OSDM 3.7.0, for beta (a copy of SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 49,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_37",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked between stations 0000044 and 0000040, where gamma gives a route through other stop places (0000041 and 0000042). No failed check: a WARNING \"the regional validity names every stop place asked\" at 01, 02, 05 and 07 (OSDM does not say what the validity must name). OSDM 3.7.0, for beta (a copy of SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 50,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_37",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked in zone SIM-SOUTH of gamma's carrier, where gamma answers with a Zone of another carrier. No failed check: a WARNING \"the regional validity names a zone of the carrier asked\" at 01, 02, 05 and 07. OSDM 3.7.0, for beta (a copy of SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.7.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3751,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_PASS_39",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a pass asked by product tag (offerSearchCriteria.productTags ADMISSION_PASS) in the first zone of GET /zones (SIM-CITY). Gamma sells its day pass there (product type ADMISSION_PASS, valid one day), and only that, its products tagged. The scenario ends after the offer. OSDM 3.9.0, for delta (a copy of SIM_NONTRIP_PROBE_TAG_PASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_PASS"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_39",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a single ride asked by product tag (offerSearchCriteria.productTags ADMISSION_POINT2POINT) between stations 0000040 and 0000041. Gamma sells its single ride there (valid two hours), and only that, its products tagged. The scenario ends after the offer. OSDM 3.9.0, for delta (a copy of SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 45,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_POINT2POINT"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PRODUCT_CODE_1ADT_39",
+      "description": "Simulated provider: sale without a trip of a product named by its code (#1266): one adult, the day pass SIM_DAY_PASS asked by offerSearchCriteria.productSelections (productCode) in the first zone of GET /zones (SIM-CITY), and expected (expectedProduct). The answer holds the day pass only; it is booked, passenger details updated, fulfilled, and the booking holds the product. OSDM 3.9.0, for delta (a copy of SIM_NONTRIP_PRODUCT_CODE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "expectedProduct": "SIM_DAY_PASS",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_DAY_PASS",
+            "numberOfItems": 1
+          }
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_39",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked from station 0000043, where gamma gives every admission a tripCoverage though no trip was asked. Expected to fail \"Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)\" at 01 and the same check of the booking at 02, 05 and 07. OSDM 3.9.0, for delta (a copy of SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 49,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_39",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked between stations 0000044 and 0000040, where gamma gives a route through other stop places (0000041 and 0000042). No failed check: a WARNING \"the regional validity names every stop place asked\" at 01, 02, 05 and 07 (OSDM does not say what the validity must name). OSDM 3.9.0, for delta (a copy of SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 50,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_39",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked in zone SIM-SOUTH of gamma's carrier, where gamma answers with a Zone of another carrier. No failed check: a WARNING \"the regional validity names a zone of the carrier asked\" at 01, 02, 05 and 07. OSDM 3.9.0, for delta (a copy of SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.9.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3951,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_PASS_310",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a pass asked by product tag (offerSearchCriteria.productTags ADMISSION_PASS) in the first zone of GET /zones (SIM-CITY). Gamma sells its day pass there (product type ADMISSION_PASS, valid one day), and only that, its products tagged. The scenario ends after the offer. OSDM 3.10.0, for epsilon (a copy of SIM_NONTRIP_PROBE_TAG_PASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_PASS"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_310",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a single ride asked by product tag (offerSearchCriteria.productTags ADMISSION_POINT2POINT) between stations 0000040 and 0000041. Gamma sells its single ride there (valid two hours), and only that, its products tagged. The scenario ends after the offer. OSDM 3.10.0, for epsilon (a copy of SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 45,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_POINT2POINT"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PRODUCT_CODE_1ADT_310",
+      "description": "Simulated provider: sale without a trip of a product named by its code (#1266): one adult, the day pass SIM_DAY_PASS asked by offerSearchCriteria.productSelections (productCode) in the first zone of GET /zones (SIM-CITY), and expected (expectedProduct). The answer holds the day pass only; it is booked, passenger details updated, fulfilled, and the booking holds the product. OSDM 3.10.0, for epsilon (a copy of SIM_NONTRIP_PRODUCT_CODE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "expectedProduct": "SIM_DAY_PASS",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_DAY_PASS",
+            "numberOfItems": 1
+          }
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_310",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked from station 0000043, where gamma gives every admission a tripCoverage though no trip was asked. Expected to fail \"Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)\" at 01 and the same check of the booking at 02, 05 and 07. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 49,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_310",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked between stations 0000044 and 0000040, where gamma gives a route through other stop places (0000041 and 0000042). No failed check: a WARNING \"the regional validity names every stop place asked\" at 01, 02, 05 and 07 (OSDM does not say what the validity must name). OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 50,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_310",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked in zone SIM-SOUTH of gamma's carrier, where gamma answers with a Zone of another carrier. No failed check: a WARNING \"the regional validity names a zone of the carrier asked\" at 01, 02, 05 and 07. OSDM 3.10.0, for epsilon (a copy of SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.10.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31051,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_PASS_312",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a pass asked by product tag (offerSearchCriteria.productTags ADMISSION_PASS) in the first zone of GET /zones (SIM-CITY). Gamma sells its day pass there (product type ADMISSION_PASS, valid one day), and only that, its products tagged. The scenario ends after the offer. OSDM 3.12.0, for zeta (a copy of SIM_NONTRIP_PROBE_TAG_PASS_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_PASS"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_312",
+      "description": "Simulated provider: offer search probe without a trip (#1266), a single ride asked by product tag (offerSearchCriteria.productTags ADMISSION_POINT2POINT) between stations 0000040 and 0000041. Gamma sells its single ride there (valid two hours), and only that, its products tagged. The scenario ends after the offer. OSDM 3.12.0, for zeta (a copy of SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 45,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productTags": ["ADMISSION_POINT2POINT"]
+      },
+      "offerSearchProbe": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NONTRIP_PRODUCT_CODE_1ADT_312",
+      "description": "Simulated provider: sale without a trip of a product named by its code (#1266): one adult, the day pass SIM_DAY_PASS asked by offerSearchCriteria.productSelections (productCode) in the first zone of GET /zones (SIM-CITY), and expected (expectedProduct). The answer holds the day pass only; it is booked, passenger details updated, fulfilled, and the booking holds the product. OSDM 3.12.0, for zeta (a copy of SIM_NONTRIP_PRODUCT_CODE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "expectedProduct": "SIM_DAY_PASS",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 47,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": [],
+        "productSelections": [
+          {
+            "productCode": "SIM_DAY_PASS",
+            "numberOfItems": 1
+          }
+        ]
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_312",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked from station 0000043, where gamma gives every admission a tripCoverage though no trip was asked. Expected to fail \"Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)\" at 01 and the same check of the booking at 02, 05 and 07. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 49,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_312",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked between stations 0000044 and 0000040, where gamma gives a route through other stop places (0000041 and 0000042). No failed check: a WARNING \"the regional validity names every stop place asked\" at 01, 02, 05 and 07 (OSDM does not say what the validity must name). OSDM 3.12.0, for zeta (a copy of SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 50,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_312",
+      "description": "Simulated provider, wrong answer (#1266): non-trip offers asked in zone SIM-SOUTH of gamma's carrier, where gamma answers with a Zone of another carrier. No failed check: a WARNING \"the regional validity names a zone of the carrier asked\" at 01, 02, 05 and 07. OSDM 3.12.0, for zeta (a copy of SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38, #914).",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.12.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 31251,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -44292,6 +45510,47 @@
       }
     },
     {
+      "id": 49,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "PLACES",
+        "places": [
+          "urn:uic:stn:0000043",
+          "urn:uic:stn:0000040"
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) from station 0000043, where the simulator gives the admissions a trip coverage (wrong variant)"
+      }
+    },
+    {
+      "id": 50,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "PLACES",
+        "places": [
+          "urn:uic:stn:0000044",
+          "urn:uic:stn:0000040"
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) from station 0000044, where the simulator gives a route through other stop places (wrong variant)"
+      }
+    },
+    {
+      "id": 51,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "ZONES",
+        "zones": [
+          {
+            "id": "SIM-SOUTH",
+            "carrier": "urn:x_osdm_simulator:carrier:gamma"
+          }
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) in zone SIM-SOUTH, where the simulator answers with a zone of another carrier (wrong variant)"
+      }
+    },
+    {
       "id": 3638,
       "tripType": "SPECIFICATION",
       "legs": [
@@ -44830,6 +46089,86 @@
         }
       ],
       "description": "Simulated trip for a covered section on a leg the trip does not have (#1045): regional 2265 from station 0000065, where zeta answers so, to station 0000002; the section asked is the whole trip. On zeta's carrier (a copy of trip 43, #1022)."
+    },
+    {
+      "id": 3651,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "ZONES",
+        "zones": [
+          {
+            "id": "SIM-SOUTH",
+            "carrier": "urn:x_osdm_simulator:carrier:alpha"
+          }
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) in zone SIM-SOUTH, where the simulator answers with a zone of another carrier (wrong variant)"
+      },
+      "description": "On alpha's carrier (a copy of trip 51, #1022)."
+    },
+    {
+      "id": 3751,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "ZONES",
+        "zones": [
+          {
+            "id": "SIM-SOUTH",
+            "carrier": "urn:x_osdm_simulator:carrier:beta"
+          }
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) in zone SIM-SOUTH, where the simulator answers with a zone of another carrier (wrong variant)"
+      },
+      "description": "On beta's carrier (a copy of trip 51, #1022)."
+    },
+    {
+      "id": 3951,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "ZONES",
+        "zones": [
+          {
+            "id": "SIM-SOUTH",
+            "carrier": "urn:x_osdm_simulator:carrier:delta"
+          }
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) in zone SIM-SOUTH, where the simulator answers with a zone of another carrier (wrong variant)"
+      },
+      "description": "On delta's carrier (a copy of trip 51, #1022)."
+    },
+    {
+      "id": 31051,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "ZONES",
+        "zones": [
+          {
+            "id": "SIM-SOUTH",
+            "carrier": "urn:x_osdm_simulator:carrier:epsilon"
+          }
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) in zone SIM-SOUTH, where the simulator answers with a zone of another carrier (wrong variant)"
+      },
+      "description": "On epsilon's carrier (a copy of trip 51, #1022)."
+    },
+    {
+      "id": 31251,
+      "tripType": "NON_TRIP",
+      "nonTrip": {
+        "by": "ZONES",
+        "zones": [
+          {
+            "id": "SIM-SOUTH",
+            "carrier": "urn:x_osdm_simulator:carrier:zeta"
+          }
+        ],
+        "validFrom": "%TRIP_DATE%T00:00:00+01:00",
+        "description": "Non-trip offers (#1266) in zone SIM-SOUTH, where the simulator answers with a zone of another carrier (wrong variant)"
+      },
+      "description": "On zeta's carrier (a copy of trip 51, #1022)."
     }
   ],
   "purchaserList": [

@@ -1,9 +1,9 @@
 {
  "about": {
-  "collection": "OTST_V2.0.184",
-  "simulator": "0.36.0",
-  "day": "2026-10-18",
-  "scenarios": 110
+  "collection": "OTST_V2.0.259",
+  "simulator": "0.68.0",
+  "day": "2026-11-15",
+  "scenarios": 161
  },
  "checks": {
   "del exchange offer|Status code is N, offer is deleted": [
@@ -143,7 +143,7 @@
    0
   ],
   "get booking after fulfillments|'…' object exists": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|Booking (classes of the offer sold): leg N (<id>-L1) in SECOND class — SECOND, by its admission": [
@@ -155,11 +155,11 @@
    0
   ],
   "get booking after fulfillments|Booking contains exactly the expected number of passengers - expected: N, actual: N": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|Booking: a booked offer holds the expected product \"…\"": [
-   7,
+   8,
    0
   ],
   "get booking after fulfillments|Booking: holds the reservation on leg <id>-L1": [
@@ -202,12 +202,20 @@
    1,
    0
   ],
+  "get booking after fulfillments|Confirmed: non-trip booking — nothing covers a trip (tripCoverage absent)": [
+   4,
+   0
+  ],
+  "get booking after fulfillments|Confirmed: non-trip booking: each admission says where it is valid (regionalValidities) — N admission": [
+   4,
+   0
+  ],
   "get booking after fulfillments|Expired booking: admissions/reservations are EXPIRED/RELEASED/CANCELLED after the deadline": [
    1,
    0
   ],
   "get booking after fulfillments|Fulfillment <id>: covers a part of the expected product \"…\"": [
-   8,
+   9,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>], actual: [<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>]": [
@@ -227,27 +235,27 @@
    0
   ],
   "get booking after fulfillments|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>,<id>]": [
-   16,
+   17,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>]": [
-   58,
+   60,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>], actual: [<id>]": [
-   31,
+   40,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] bookingRef exists": [
-   139,
+   151,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] controlNumber exists": [
-   139,
+   151,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] createdOn is a valid datetime at or before now (clock tolerance <duration>)": [
-   139,
+   151,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] documents exist and contain valid data": [
@@ -255,15 +263,15 @@
    0
   ],
   "get booking after fulfillments|Fulfillment[N] id exists": [
-   139,
+   151,
    0
   ],
   "get booking after fulfillments|Fulfillment[N] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED": [
-   139,
+   151,
    0
   ],
   "get booking after fulfillments|Fulfillment[N].bookingRef matches current bookingId (expected: <id>, actual: <id>)": [
-   139,
+   151,
    0
   ],
   "get booking after fulfillments|Fulfillment[N].document[N] - fields exist": [
@@ -271,27 +279,27 @@
    0
   ],
   "get booking after fulfillments|Fulfillment[N].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.N integrity, when siblings present)": [
-   121,
+   133,
    0
   ],
   "get booking after fulfillments|Fulfillment[N].fulfillmentDocumentRefs are non-empty strings (OSDM v3.N: replaces fulfillmentDocuments)": [
-   121,
+   133,
    0
   ],
   "get booking after fulfillments|Fulfillment[N].status '…' is a valid OSDM FulfillmentStatus": [
-   139,
+   151,
    0
   ],
   "get booking after fulfillments|Fulfillments exist at index N": [
-   92,
+   103,
    0
   ],
   "get booking after fulfillments|HTTP response status — expected N, actual: N": [
-   92,
+   126,
    0
   ],
   "get booking after fulfillments|Price fields exist (currency, amount) in confirmedPrice": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|Return: N fulfillment(s) as the scenario expects (ONE) — actual: N": [
@@ -299,11 +307,11 @@
    0
   ],
   "get booking after fulfillments|Return: N fulfillment(s) as the scenario expects (PER_DIRECTION) — actual: N": [
-   25,
+   26,
    0
   ],
   "get booking after fulfillments|Status is FULFILLED,CONFIRMED for admission[N] - expected: FULFILLED,CONFIRMED, actual: FULFILLED": [
-   166,
+   180,
    0
   ],
   "get booking after fulfillments|Status is FULFILLED,CONFIRMED for reservation[N] - expected: FULFILLED,CONFIRMED, actual: FULFILLED": [
@@ -315,7 +323,59 @@
    0
   ],
   "get booking after fulfillments|[OSDM] Content-Type is JSON": [
-   94,
+   128,
+   0
+  ],
+  "get booking after fulfillments|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
+   21,
+   0
+  ],
+  "get booking after fulfillments|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
+   21,
+   0
+  ],
+  "get booking after fulfillments|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
+   21,
+   0
+  ],
+  "get booking after fulfillments|[fares B6] Each booked fare's status is CONFIRMED or FULFILLED": [
+   21,
+   0
+  ],
+  "get booking after fulfillments|[fares F1] Each fare fulfilment is CONFIRMED or FULFILLED": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|[fares F3] Each fare fulfilment names only parts of this booking (Fulfillment.bookingParts)": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|[fares F4] No fulfilment holds both fares and product booking parts (OSDM processes)": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|[fares F5] Every booked fare is in a fare fulfilment": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|[fares V10] Each booked fare reservation's status is CONFIRMED or FULFILLED": [
+   2,
+   0
+  ],
+  "get booking after fulfillments|[fares V11] Every booked fare reservation is in a fulfilment (bookingParts)": [
+   2,
+   0
+  ],
+  "get booking after fulfillments|[fares V1] Each booked fare reservation is in FARE_MODE (Reservation.distributionMode; absent = PRODUCT_MODE)": [
+   2,
+   0
+  ],
+  "get booking after fulfillments|[fares V3] Each booked fare reservation holds the passengers of its offer part (the bicycle)": [
+   2,
+   0
+  ],
+  "get booking after fulfillments|[fares V9] Every fare reservation of the offer is in the booking (selected in optionalReservationSelections; paired by id, else passengers and leg)": [
+   2,
    0
   ],
   "get booking after fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]": [
@@ -335,7 +395,7 @@
    0
   ],
   "get booking after fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
-   2,
+   4,
    0
   ],
   "get booking after fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES] booking=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES]": [
@@ -347,7 +407,7 @@
    0
   ],
   "get booking after fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   62,
+   66,
    0
   ],
   "get booking after fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -355,11 +415,11 @@
    0
   ],
   "get booking after fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   33,
+   41,
    0
   ],
   "get booking after fulfillments|admission prices have at least one member in common between offer and booking": [
-   166,
+   180,
    0
   ],
   "get booking after fulfillments|admission refundable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]": [
@@ -379,7 +439,7 @@
    0
   ],
   "get booking after fulfillments|admission refundable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
-   2,
+   4,
    0
   ],
   "get booking after fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES] booking=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES]": [
@@ -391,7 +451,7 @@
    0
   ],
   "get booking after fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   62,
+   66,
    0
   ],
   "get booking after fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -399,19 +459,55 @@
    0
   ],
   "get booking after fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   33,
+   41,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions exist in both offer and booking": [
+   11,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions[N] - EXCHANGE exists in booking": [
+   11,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions[N] - REFUND exists in booking": [
+   11,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions[N].afterSaleFee exists in both": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions[N].afterSaleFee.amount matches": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions[N].afterSaleFee.currency matches": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions[N].afterSaleFee.scale matches": [
+   22,
+   0
+  ],
+  "get booking after fulfillments|admission[N] afterSalesConditions[N].condition matches": [
+   22,
    0
   ],
   "get booking after fulfillments|admission[N] appliedPassengerTypes exist in both offer and booking": [
-   12,
+   14,
    0
   ],
   "get booking after fulfillments|admission[N] appliedPassengerTypes[N] - type=ADULT exists in booking": [
-   13,
+   14,
    0
   ],
   "get booking after fulfillments|admission[N] appliedPassengerTypes[N] - type=CHILD exists in booking": [
    7,
+   0
+  ],
+  "get booking after fulfillments|admission[N] appliedPassengerTypes[N] - type=YOUNG_CHILD exists in booking": [
+   1,
    0
   ],
   "get booking after fulfillments|admission[N] appliedPassengerTypes[N] - type=YOUTH exists in booking": [
@@ -435,51 +531,51 @@
    0
   ],
   "get booking after fulfillments|admission[N] appliedPassengerTypes[N].description matches": [
-   24,
+   26,
    0
   ],
   "get booking after fulfillments|admission[N] appliedPassengerTypes[N].passengerRef exists in booking": [
-   24,
+   26,
    0
   ],
   "get booking after fulfillments|admission[N] appliedPassengerTypes[N].type matches": [
-   24,
+   26,
    0
   ],
   "get booking after fulfillments|admission[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   166,
+   180,
    0
   ],
   "get booking after fulfillments|admission[N].offerMode matches between offer and booking : offer='…' booking='…'": [
-   166,
+   180,
    0
   ],
   "get booking after fulfillments|admission[N].status '…' is a valid OSDM BookingPartStatus": [
-   166,
+   180,
    0
   ],
   "get booking after fulfillments|admission[N].validFrom is present in both offer and booking": [
-   166,
+   180,
    0
   ],
   "get booking after fulfillments|admission[N].validUntil is present in both offer and booking": [
-   166,
+   180,
    0
   ],
   "get booking after fulfillments|booking.bookedOffers is a non-empty array (OSDM: required)": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|booking.bookingCode is a non-empty string when present": [
-   91,
+   103,
    0
   ],
   "get booking after fulfillments|booking.createdOn: <instant>, offer.createdOn: <instant>": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|booking.id is a non-empty string (OSDM: Booking.id required)": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|booking.provisionalPrice.currency matches offer currency (expected: CHF, actual: CHF)": [
@@ -487,7 +583,7 @@
    0
   ],
   "get booking after fulfillments|booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: CZK)": [
-   79,
+   91,
    0
   ],
   "get booking after fulfillments|booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)": [
@@ -495,11 +591,11 @@
    0
   ],
   "get booking after fulfillments|confirmedPrice structure exists (booking stage: FULFILLED,CONFIRMED)": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)": [
-   92,
+   104,
    0
   ],
   "get booking after fulfillments|reservation exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
@@ -547,39 +643,39 @@
    0
   ],
   "get booking after fulfillment|'…' object exists": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|Booking contains exactly the expected number of passengers - expected: N, actual: N": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>]": [
-   5,
+   11,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] bookingRef exists": [
-   5,
+   11,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] controlNumber exists": [
-   5,
+   11,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] createdOn is a valid datetime at or before now (clock tolerance <duration>)": [
-   5,
+   11,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] id exists": [
-   5,
+   11,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] status comparison - expected: EXCHANGED,FULFILLED,CONFIRMED, actual: EXCHANGED": [
-   2,
+   5,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] status comparison - expected: EXCHANGED,FULFILLED,CONFIRMED, actual: FULFILLED": [
-   2,
+   5,
    0
   ],
   "get booking after fulfillment|Fulfillment[N] status comparison - expected: EXCHANGED,FULFILLED,CONFIRMED,CANCELLED, actual: FULFILLED": [
@@ -587,39 +683,39 @@
    0
   ],
   "get booking after fulfillment|Fulfillment[N].bookingRef matches current bookingId (expected: <id>, actual: <id>)": [
-   5,
+   11,
    0
   ],
   "get booking after fulfillment|Fulfillment[N].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.N integrity, when siblings present)": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|Fulfillment[N].fulfillmentDocumentRefs are non-empty strings (OSDM v3.N: replaces fulfillmentDocuments)": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|Fulfillment[N].status '…' is a valid OSDM FulfillmentStatus": [
-   5,
+   11,
    0
   ],
   "get booking after fulfillment|Fulfillments exist at index N": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|HTTP response status — expected N, actual: N": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|New admission <id> from the exchange is FULFILLED or CONFIRMED - actual: FULFILLED": [
-   2,
+   5,
    0
   ],
   "get booking after fulfillment|Price fields exist (currency, amount) in confirmedPrice": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|Status is EXCHANGED for admission[N] - expected: EXCHANGED, actual: EXCHANGED": [
-   2,
+   5,
    0
   ],
   "get booking after fulfillment|Status is FULFILLED,CONFIRMED for admission[N] - expected: FULFILLED,CONFIRMED, actual: FULFILLED": [
@@ -627,11 +723,11 @@
    0
   ],
   "get booking after fulfillment|The booking holds the admissions the exchange sold": [
-   2,
+   5,
    0
   ],
   "get booking after fulfillment|[OSDM] Content-Type is JSON": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
@@ -639,51 +735,83 @@
    0
   ],
   "get booking after fulfillment|admission prices have at least one member in common between offer and booking": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
    1,
    0
   ],
+  "get booking after fulfillment|admission[N] afterSalesConditions exist in both offer and booking": [
+   1,
+   0
+  ],
+  "get booking after fulfillment|admission[N] afterSalesConditions[N] - EXCHANGE exists in booking": [
+   1,
+   0
+  ],
+  "get booking after fulfillment|admission[N] afterSalesConditions[N] - REFUND exists in booking": [
+   1,
+   0
+  ],
+  "get booking after fulfillment|admission[N] afterSalesConditions[N].afterSaleFee exists in both": [
+   2,
+   0
+  ],
+  "get booking after fulfillment|admission[N] afterSalesConditions[N].afterSaleFee.amount matches": [
+   2,
+   0
+  ],
+  "get booking after fulfillment|admission[N] afterSalesConditions[N].afterSaleFee.currency matches": [
+   2,
+   0
+  ],
+  "get booking after fulfillment|admission[N] afterSalesConditions[N].afterSaleFee.scale matches": [
+   2,
+   0
+  ],
+  "get booking after fulfillment|admission[N] afterSalesConditions[N].condition matches": [
+   2,
+   0
+  ],
   "get booking after fulfillment|admission[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|admission[N].offerMode matches between offer and booking : offer='…' booking='…'": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|admission[N].status '…' is a valid OSDM BookingPartStatus": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|admission[N].validFrom is present in both offer and booking": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|admission[N].validUntil is present in both offer and booking": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|booking.bookedOffers is a non-empty array (OSDM: required)": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|booking.bookingCode is a non-empty string when present": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|booking.createdOn: <instant>, offer.createdOn: <instant>": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|booking.id is a non-empty string (OSDM: Booking.id required)": [
-   3,
+   6,
    0
   ],
   "get booking after fulfillment|booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: CZK)": [
-   2,
+   5,
    0
   ],
   "get booking after fulfillment|booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)": [
@@ -691,7 +819,7 @@
    0
   ],
   "get booking after fulfillment|confirmedPrice structure exists (booking stage: EXCHANGED)": [
-   2,
+   5,
    0
   ],
   "get booking after fulfillment|confirmedPrice structure exists (booking stage: FULFILLED,CONFIRMED)": [
@@ -699,31 +827,39 @@
    0
   ],
   "get booking after fulfillment|provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)": [
-   3,
+   6,
+   0
+  ],
+  "get booking after fulfillment|🔁 The booked offer of the exchange covers the trip asked: urn:uic:stn:N → urn:uic:stn:N on <instant>": [
+   2,
    0
   ],
   "get booking after patch refund|'…' object exists": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|Booked admission <id> is REFUNDED - status: REFUNDED": [
-   73,
+   77,
    0
   ],
   "get booking after patch refund|Booked admission <id> is not REFUNDED (left out of the refund) - status: FULFILLED": [
-   124,
+   125,
+   0
+  ],
+  "get booking after patch refund|Booked fare <id> is REFUNDED - status: REFUNDED": [
+   7,
    0
   ],
   "get booking after patch refund|Booking contains exactly the expected number of passengers - expected: N, actual: N": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|Fulfillment <id> is REFUNDED (held by the confirmed refund offer) - status: REFUNDED": [
-   73,
+   82,
    0
   ],
   "get booking after patch refund|Fulfillment <id> is not REFUNDED (left out of the refund) - status: FULFILLED": [
-   124,
+   125,
    0
   ],
   "get booking after patch refund|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>], actual: [<id>]": [
@@ -731,7 +867,7 @@
    0
   ],
   "get booking after patch refund|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>]": [
-   62,
+   66,
    0
   ],
   "get booking after patch refund|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>], actual: [<id>]": [
@@ -739,15 +875,15 @@
    0
   ],
   "get booking after patch refund|Fulfillment[N] bookingRef exists": [
-   197,
+   201,
    0
   ],
   "get booking after patch refund|Fulfillment[N] controlNumber exists": [
-   197,
+   201,
    0
   ],
   "get booking after patch refund|Fulfillment[N] createdOn is a valid datetime at or before now (clock tolerance <duration>)": [
-   197,
+   201,
    0
   ],
   "get booking after patch refund|Fulfillment[N] documents exist and contain valid data": [
@@ -755,23 +891,23 @@
    0
   ],
   "get booking after patch refund|Fulfillment[N] id exists": [
-   197,
+   201,
    0
   ],
   "get booking after patch refund|Fulfillment[N] status comparison - expected: REFUNDED, actual: REFUNDED": [
-   26,
+   28,
    0
   ],
   "get booking after patch refund|Fulfillment[N] status comparison - expected: REFUNDED,FULFILLED,CONFIRMED, actual: FULFILLED": [
-   124,
+   125,
    0
   ],
   "get booking after patch refund|Fulfillment[N] status comparison - expected: REFUNDED,FULFILLED,CONFIRMED, actual: REFUNDED": [
-   47,
+   48,
    0
   ],
   "get booking after patch refund|Fulfillment[N].bookingRef matches current bookingId (expected: <id>, actual: <id>)": [
-   197,
+   201,
    0
   ],
   "get booking after patch refund|Fulfillment[N].document[N] - fields exist": [
@@ -779,47 +915,59 @@
    0
   ],
   "get booking after patch refund|Fulfillment[N].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.N integrity, when siblings present)": [
-   185,
+   189,
    0
   ],
   "get booking after patch refund|Fulfillment[N].fulfillmentDocumentRefs are non-empty strings (OSDM v3.N: replaces fulfillmentDocuments)": [
-   185,
+   189,
    0
   ],
   "get booking after patch refund|Fulfillment[N].status '…' is a valid OSDM FulfillmentStatus": [
-   197,
+   201,
    0
   ],
   "get booking after patch refund|Fulfillments exist at index N": [
-   40,
+   42,
    0
   ],
   "get booking after patch refund|Full refund: every fulfillment of the booking is refunded (N/N)": [
-   14,
+   23,
    0
   ],
   "get booking after patch refund|HTTP response status — expected N, actual: N": [
-   40,
+   50,
    0
   ],
   "get booking after patch refund|Price fields exist (currency, amount) in confirmedPrice": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|Status is REFUNDED for admission[N] - expected: REFUNDED, actual: REFUNDED": [
-   17,
+   20,
    0
   ],
   "get booking after patch refund|Status is REFUNDED,FULFILLED,CONFIRMED for admission[N] - expected: REFUNDED,FULFILLED,CONFIRMED, actual: FULFILLED": [
-   121,
+   122,
    0
   ],
   "get booking after patch refund|Status is REFUNDED,FULFILLED,CONFIRMED for admission[N] - expected: REFUNDED,FULFILLED,CONFIRMED, actual: REFUNDED": [
-   38,
+   39,
    0
   ],
   "get booking after patch refund|[OSDM] Content-Type is JSON": [
-   40,
+   50,
+   0
+  ],
+  "get booking after patch refund|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
+   7,
+   0
+  ],
+  "get booking after patch refund|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
+   7,
+   0
+  ],
+  "get booking after patch refund|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
+   7,
    0
   ],
   "get booking after patch refund|admission exchangeable values have at least one member in common between offer and booking offer=[WITH_CONDITION,WITH_CONDITION] booking=[WITH_CONDITION]": [
@@ -859,7 +1007,7 @@
    0
   ],
   "get booking after patch refund|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES]": [
-   12,
+   14,
    0
   ],
   "get booking after patch refund|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
@@ -867,7 +1015,7 @@
    0
   ],
   "get booking after patch refund|admission prices have at least one member in common between offer and booking": [
-   176,
+   181,
    0
   ],
   "get booking after patch refund|admission refundable values have at least one member in common between offer and booking offer=[WITH_CONDITION,WITH_CONDITION] booking=[WITH_CONDITION]": [
@@ -907,47 +1055,79 @@
    0
   ],
   "get booking after patch refund|admission refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES]": [
-   12,
+   14,
    0
   ],
   "get booking after patch refund|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
    8,
    0
   ],
+  "get booking after patch refund|admission[N] afterSalesConditions exist in both offer and booking": [
+   12,
+   0
+  ],
+  "get booking after patch refund|admission[N] afterSalesConditions[N] - EXCHANGE exists in booking": [
+   12,
+   0
+  ],
+  "get booking after patch refund|admission[N] afterSalesConditions[N] - REFUND exists in booking": [
+   12,
+   0
+  ],
+  "get booking after patch refund|admission[N] afterSalesConditions[N].afterSaleFee exists in both": [
+   24,
+   0
+  ],
+  "get booking after patch refund|admission[N] afterSalesConditions[N].afterSaleFee.amount matches": [
+   24,
+   0
+  ],
+  "get booking after patch refund|admission[N] afterSalesConditions[N].afterSaleFee.currency matches": [
+   24,
+   0
+  ],
+  "get booking after patch refund|admission[N] afterSalesConditions[N].afterSaleFee.scale matches": [
+   24,
+   0
+  ],
+  "get booking after patch refund|admission[N] afterSalesConditions[N].condition matches": [
+   24,
+   0
+  ],
   "get booking after patch refund|admission[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   176,
+   181,
    0
   ],
   "get booking after patch refund|admission[N].offerMode matches between offer and booking : offer='…' booking='…'": [
-   176,
+   181,
    0
   ],
   "get booking after patch refund|admission[N].status '…' is a valid OSDM BookingPartStatus": [
-   176,
+   181,
    0
   ],
   "get booking after patch refund|admission[N].validFrom is present in both offer and booking": [
-   176,
+   181,
    0
   ],
   "get booking after patch refund|admission[N].validUntil is present in both offer and booking": [
-   176,
+   181,
    0
   ],
   "get booking after patch refund|booking.bookedOffers is a non-empty array (OSDM: required)": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|booking.bookingCode is a non-empty string when present": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|booking.createdOn: <instant>, offer.createdOn: <instant>": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|booking.id is a non-empty string (OSDM: Booking.id required)": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|booking.provisionalPrice.currency matches offer currency (expected: CHF, actual: CHF)": [
@@ -955,7 +1135,7 @@
    0
   ],
   "get booking after patch refund|booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: CZK)": [
-   32,
+   35,
    0
   ],
   "get booking after patch refund|booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)": [
@@ -963,15 +1143,15 @@
    0
   ],
   "get booking after patch refund|confirmedPrice structure exists (booking stage: REFUNDED)": [
-   14,
+   16,
    0
   ],
   "get booking after patch refund|confirmedPrice structure exists (booking stage: REFUNDED,FULFILLED,CONFIRMED)": [
-   26,
+   27,
    0
   ],
   "get booking after patch refund|provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)": [
-   40,
+   43,
    0
   ],
   "get booking after patch refund|🧪 Exchange a refunded ticket [N refunded fulfillment(s)]: error body is an RFC-N Problem (title/detail/code present)": [
@@ -991,23 +1171,31 @@
    0
   ],
   "get booking before fulfillments|'…' object exists": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|Booking contains exactly the expected number of passengers - expected: N, actual: N": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|HTTP response status — expected N, actual: N": [
-   94,
+   128,
+   0
+  ],
+  "get booking before fulfillments|Pre-booked: non-trip booking — nothing covers a trip (tripCoverage absent)": [
+   4,
+   0
+  ],
+  "get booking before fulfillments|Pre-booked: non-trip booking: each admission says where it is valid (regionalValidities) — N admission": [
+   4,
    0
   ],
   "get booking before fulfillments|Price fields exist (currency, amount) in provisionalPrice": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|Status is PREBOOKED for admission[N] - expected: PREBOOKED, actual: PREBOOKED": [
-   168,
+   182,
    0
   ],
   "get booking before fulfillments|Status is PREBOOKED for reservation[N] - expected: PREBOOKED, actual: PREBOOKED": [
@@ -1015,7 +1203,43 @@
    0
   ],
   "get booking before fulfillments|[OSDM] Content-Type is JSON": [
-   94,
+   128,
+   0
+  ],
+  "get booking before fulfillments|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
+   21,
+   0
+  ],
+  "get booking before fulfillments|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
+   21,
+   0
+  ],
+  "get booking before fulfillments|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
+   21,
+   0
+  ],
+  "get booking before fulfillments|[fares B4] Each booked fare'…'s": [
+   21,
+   0
+  ],
+  "get booking before fulfillments|[fares B6] Each booked fare's status is PREBOOKED": [
+   21,
+   0
+  ],
+  "get booking before fulfillments|[fares V10] Each booked fare reservation's status is PREBOOKED": [
+   2,
+   0
+  ],
+  "get booking before fulfillments|[fares V1] Each booked fare reservation is in FARE_MODE (Reservation.distributionMode; absent = PRODUCT_MODE)": [
+   2,
+   0
+  ],
+  "get booking before fulfillments|[fares V3] Each booked fare reservation holds the passengers of its offer part (the bicycle)": [
+   2,
+   0
+  ],
+  "get booking before fulfillments|[fares V9] Every fare reservation of the offer is in the booking (selected in optionalReservationSelections; paired by id, else passengers and leg)": [
+   2,
    0
   ],
   "get booking before fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]": [
@@ -1035,7 +1259,7 @@
    0
   ],
   "get booking before fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
-   2,
+   4,
    0
   ],
   "get booking before fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES] booking=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES]": [
@@ -1047,7 +1271,7 @@
    0
   ],
   "get booking before fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   62,
+   66,
    0
   ],
   "get booking before fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -1055,11 +1279,11 @@
    0
   ],
   "get booking before fulfillments|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   35,
+   43,
    0
   ],
   "get booking before fulfillments|admission prices have at least one member in common between offer and booking": [
-   168,
+   182,
    0
   ],
   "get booking before fulfillments|admission refundable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]": [
@@ -1079,7 +1303,7 @@
    0
   ],
   "get booking before fulfillments|admission refundable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
-   2,
+   4,
    0
   ],
   "get booking before fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES] booking=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES]": [
@@ -1091,7 +1315,7 @@
    0
   ],
   "get booking before fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   62,
+   66,
    0
   ],
   "get booking before fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -1099,19 +1323,55 @@
    0
   ],
   "get booking before fulfillments|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   35,
+   43,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions exist in both offer and booking": [
+   11,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions[N] - EXCHANGE exists in booking": [
+   11,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions[N] - REFUND exists in booking": [
+   11,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions[N].afterSaleFee exists in both": [
+   22,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions[N].afterSaleFee.amount matches": [
+   22,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions[N].afterSaleFee.currency matches": [
+   22,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions[N].afterSaleFee.scale matches": [
+   22,
+   0
+  ],
+  "get booking before fulfillments|admission[N] afterSalesConditions[N].condition matches": [
+   22,
    0
   ],
   "get booking before fulfillments|admission[N] appliedPassengerTypes exist in both offer and booking": [
-   12,
+   14,
    0
   ],
   "get booking before fulfillments|admission[N] appliedPassengerTypes[N] - type=ADULT exists in booking": [
-   13,
+   14,
    0
   ],
   "get booking before fulfillments|admission[N] appliedPassengerTypes[N] - type=CHILD exists in booking": [
    7,
+   0
+  ],
+  "get booking before fulfillments|admission[N] appliedPassengerTypes[N] - type=YOUNG_CHILD exists in booking": [
+   1,
    0
   ],
   "get booking before fulfillments|admission[N] appliedPassengerTypes[N] - type=YOUTH exists in booking": [
@@ -1135,55 +1395,55 @@
    0
   ],
   "get booking before fulfillments|admission[N] appliedPassengerTypes[N].description matches": [
-   24,
+   26,
    0
   ],
   "get booking before fulfillments|admission[N] appliedPassengerTypes[N].passengerRef exists in booking": [
-   24,
+   26,
    0
   ],
   "get booking before fulfillments|admission[N] appliedPassengerTypes[N].type matches": [
-   24,
+   26,
    0
   ],
   "get booking before fulfillments|admission[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   168,
+   182,
    0
   ],
   "get booking before fulfillments|admission[N].offerMode matches between offer and booking : offer='…' booking='…'": [
-   168,
+   182,
    0
   ],
   "get booking before fulfillments|admission[N].status '…' is a valid OSDM BookingPartStatus": [
-   168,
+   182,
    0
   ],
   "get booking before fulfillments|admission[N].validFrom is present in both offer and booking": [
-   168,
+   182,
    0
   ],
   "get booking before fulfillments|admission[N].validUntil is present in both offer and booking": [
-   168,
+   182,
    0
   ],
   "get booking before fulfillments|booking confirmation deadline is a valid future datetime — source: booking.confirmationTimeLimit (OSDM-standard)": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|booking.bookedOffers is a non-empty array (OSDM: required)": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|booking.bookingCode is a non-empty string when present": [
-   93,
+   105,
    0
   ],
   "get booking before fulfillments|booking.createdOn: <instant>, offer.createdOn: <instant>": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|booking.id is a non-empty string (OSDM: Booking.id required)": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|booking.provisionalPrice.currency matches offer currency (expected: CHF, actual: CHF)": [
@@ -1191,7 +1451,7 @@
    0
   ],
   "get booking before fulfillments|booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: CZK)": [
-   81,
+   93,
    0
   ],
   "get booking before fulfillments|booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)": [
@@ -1203,15 +1463,27 @@
    0
   ],
   "get booking before fulfillments|provisionalPrice is not below the offer's minimalPrice - provisional: N CZK, minimal: N CZK": [
-   81,
+   93,
    0
   ],
   "get booking before fulfillments|provisionalPrice is not below the offer's minimalPrice - provisional: N EUR, minimal: N EUR": [
    7,
    0
   ],
+  "get booking before fulfillments|provisionalPrice is the sum of the pre-booked parts - provisional: N CHF, sum: N (N part(s))": [
+   6,
+   0
+  ],
+  "get booking before fulfillments|provisionalPrice is the sum of the pre-booked parts - provisional: N CZK, sum: N (N part(s))": [
+   93,
+   0
+  ],
+  "get booking before fulfillments|provisionalPrice is the sum of the pre-booked parts - provisional: N EUR, sum: N (N part(s))": [
+   7,
+   0
+  ],
   "get booking before fulfillments|provisionalPrice structure exists (booking stage: PREBOOKED)": [
-   94,
+   106,
    0
   ],
   "get booking before fulfillments|reservation exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
@@ -1259,123 +1531,163 @@
    0
   ],
   "get booking before fulfillment|'…' object exists": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Booking contains exactly the expected number of passengers - expected: N, actual: N": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>]": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N] bookingRef exists": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N] controlNumber exists": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N] createdOn is a valid datetime at or before now (clock tolerance <duration>)": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N] id exists": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N] status comparison - expected: FULFILLED,CONFIRMED,ON_HOLD, actual: FULFILLED": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N].bookingRef matches current bookingId (expected: <id>, actual: <id>)": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.N integrity, when siblings present)": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N].fulfillmentDocumentRefs are non-empty strings (OSDM v3.N: replaces fulfillmentDocuments)": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillment[N].status '…' is a valid OSDM FulfillmentStatus": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Fulfillments exist at index N": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|HTTP response status — expected N, actual: N": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Price fields exist (currency, amount) in provisionalPrice": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|Status is EXCHANGE_ONGOING for admission[N] - expected: EXCHANGE_ONGOING, actual: EXCHANGE_ONGOING": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|[OSDM] Content-Type is JSON": [
-   3,
+   6,
+   0
+  ],
+  "get booking before fulfillment|admission exchangeable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
+   1,
    0
   ],
   "get booking before fulfillment|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   3,
+   5,
    0
   ],
   "get booking before fulfillment|admission prices have at least one member in common between offer and booking": [
-   3,
+   6,
+   0
+  ],
+  "get booking before fulfillment|admission refundable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
+   1,
    0
   ],
   "get booking before fulfillment|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   3,
+   5,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions exist in both offer and booking": [
+   1,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions[N] - EXCHANGE exists in booking": [
+   1,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions[N] - REFUND exists in booking": [
+   1,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions[N].afterSaleFee exists in both": [
+   2,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions[N].afterSaleFee.amount matches": [
+   2,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions[N].afterSaleFee.currency matches": [
+   2,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions[N].afterSaleFee.scale matches": [
+   2,
+   0
+  ],
+  "get booking before fulfillment|admission[N] afterSalesConditions[N].condition matches": [
+   2,
    0
   ],
   "get booking before fulfillment|admission[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|admission[N].offerMode matches between offer and booking : offer='…' booking='…'": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|admission[N].status '…' is a valid OSDM BookingPartStatus": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|admission[N].validFrom is present in both offer and booking": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|admission[N].validUntil is present in both offer and booking": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|booking.bookedOffers is a non-empty array (OSDM: required)": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|booking.bookingCode is a non-empty string when present": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|booking.createdOn: <instant>, offer.createdOn: <instant>": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|booking.id is a non-empty string (OSDM: Booking.id required)": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: CZK)": [
-   2,
+   5,
    0
   ],
   "get booking before fulfillment|booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)": [
@@ -1383,19 +1695,19 @@
    0
   ],
   "get booking before fulfillment|provisionalPrice structure exists (booking stage: EXCHANGE_ONGOING)": [
-   3,
+   6,
    0
   ],
   "get booking before fulfillment|provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)": [
-   3,
+   6,
    0
   ],
   "get booking before patch refund|'…' object exists": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|Booking contains exactly the expected number of passengers - expected: N, actual: N": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>,<id>], actual: [<id>]": [
@@ -1403,7 +1715,7 @@
    0
   ],
   "get booking before patch refund|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>]": [
-   38,
+   40,
    0
   ],
   "get booking before patch refund|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>], actual: [<id>]": [
@@ -1411,15 +1723,15 @@
    0
   ],
   "get booking before patch refund|Fulfillment[N] bookingRef exists": [
-   63,
+   65,
    0
   ],
   "get booking before patch refund|Fulfillment[N] controlNumber exists": [
-   63,
+   65,
    0
   ],
   "get booking before patch refund|Fulfillment[N] createdOn is a valid datetime at or before now (clock tolerance <duration>)": [
-   63,
+   65,
    0
   ],
   "get booking before patch refund|Fulfillment[N] documents exist and contain valid data": [
@@ -1427,15 +1739,15 @@
    0
   ],
   "get booking before patch refund|Fulfillment[N] id exists": [
-   63,
+   65,
    0
   ],
   "get booking before patch refund|Fulfillment[N] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED": [
-   63,
+   65,
    0
   ],
   "get booking before patch refund|Fulfillment[N].bookingRef matches current bookingId (expected: <id>, actual: <id>)": [
-   63,
+   65,
    0
   ],
   "get booking before patch refund|Fulfillment[N].document[N] - fields exist": [
@@ -1443,35 +1755,51 @@
    0
   ],
   "get booking before patch refund|Fulfillment[N].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.N integrity, when siblings present)": [
-   55,
+   57,
    0
   ],
   "get booking before patch refund|Fulfillment[N].fulfillmentDocumentRefs are non-empty strings (OSDM v3.N: replaces fulfillmentDocuments)": [
-   55,
+   57,
    0
   ],
   "get booking before patch refund|Fulfillment[N].status '…' is a valid OSDM FulfillmentStatus": [
-   63,
+   65,
    0
   ],
   "get booking before patch refund|Fulfillments exist at index N": [
-   26,
+   27,
    0
   ],
   "get booking before patch refund|HTTP response status — expected N, actual: N": [
-   26,
+   35,
    0
   ],
   "get booking before patch refund|Price fields exist (currency, amount) in confirmedPrice": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|Status is FULFILLED,CONFIRMED for admission[N] - expected: FULFILLED,CONFIRMED, actual: FULFILLED": [
-   51,
+   54,
    0
   ],
   "get booking before patch refund|[OSDM] Content-Type is JSON": [
-   26,
+   35,
+   0
+  ],
+  "get booking before patch refund|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
+   7,
+   0
+  ],
+  "get booking before patch refund|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
+   7,
+   0
+  ],
+  "get booking before patch refund|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
+   7,
+   0
+  ],
+  "get booking before patch refund|[fares B6] Each booked fare's status is CONFIRMED or FULFILLED": [
+   7,
    0
   ],
   "get booking before patch refund|admission exchangeable values have at least one member in common between offer and booking offer=[WITH_CONDITION,WITH_CONDITION] booking=[WITH_CONDITION,WITH_CONDITION]": [
@@ -1487,7 +1815,7 @@
    0
   ],
   "get booking before patch refund|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   12,
+   14,
    0
   ],
   "get booking before patch refund|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -1495,11 +1823,11 @@
    0
   ],
   "get booking before patch refund|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   6,
+   7,
    0
   ],
   "get booking before patch refund|admission prices have at least one member in common between offer and booking": [
-   51,
+   54,
    0
   ],
   "get booking before patch refund|admission refundable values have at least one member in common between offer and booking offer=[WITH_CONDITION,WITH_CONDITION] booking=[WITH_CONDITION,WITH_CONDITION]": [
@@ -1515,7 +1843,7 @@
    0
   ],
   "get booking before patch refund|admission refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   12,
+   14,
    0
   ],
   "get booking before patch refund|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -1523,43 +1851,75 @@
    0
   ],
   "get booking before patch refund|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
+   7,
+   0
+  ],
+  "get booking before patch refund|admission[N] afterSalesConditions exist in both offer and booking": [
    6,
    0
   ],
+  "get booking before patch refund|admission[N] afterSalesConditions[N] - EXCHANGE exists in booking": [
+   6,
+   0
+  ],
+  "get booking before patch refund|admission[N] afterSalesConditions[N] - REFUND exists in booking": [
+   6,
+   0
+  ],
+  "get booking before patch refund|admission[N] afterSalesConditions[N].afterSaleFee exists in both": [
+   12,
+   0
+  ],
+  "get booking before patch refund|admission[N] afterSalesConditions[N].afterSaleFee.amount matches": [
+   12,
+   0
+  ],
+  "get booking before patch refund|admission[N] afterSalesConditions[N].afterSaleFee.currency matches": [
+   12,
+   0
+  ],
+  "get booking before patch refund|admission[N] afterSalesConditions[N].afterSaleFee.scale matches": [
+   12,
+   0
+  ],
+  "get booking before patch refund|admission[N] afterSalesConditions[N].condition matches": [
+   12,
+   0
+  ],
   "get booking before patch refund|admission[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   51,
+   54,
    0
   ],
   "get booking before patch refund|admission[N].offerMode matches between offer and booking : offer='…' booking='…'": [
-   51,
+   54,
    0
   ],
   "get booking before patch refund|admission[N].status '…' is a valid OSDM BookingPartStatus": [
-   51,
+   54,
    0
   ],
   "get booking before patch refund|admission[N].validFrom is present in both offer and booking": [
-   51,
+   54,
    0
   ],
   "get booking before patch refund|admission[N].validUntil is present in both offer and booking": [
-   51,
+   54,
    0
   ],
   "get booking before patch refund|booking.bookedOffers is a non-empty array (OSDM: required)": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|booking.bookingCode is a non-empty string when present": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|booking.createdOn: <instant>, offer.createdOn: <instant>": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|booking.id is a non-empty string (OSDM: Booking.id required)": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|booking.provisionalPrice.currency matches offer currency (expected: CHF, actual: CHF)": [
@@ -1567,7 +1927,7 @@
    0
   ],
   "get booking before patch refund|booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: CZK)": [
-   21,
+   23,
    0
   ],
   "get booking before patch refund|booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)": [
@@ -1575,11 +1935,11 @@
    0
   ],
   "get booking before patch refund|confirmedPrice structure exists (booking stage: FULFILLED,CONFIRMED)": [
-   26,
+   28,
    0
   ],
   "get booking before patch refund|provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)": [
-   26,
+   28,
    0
   ],
   "get booking purchaser|[OSDM] Content-Type is JSON": [
@@ -1595,83 +1955,107 @@
    0
   ],
   "get coach|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "get exchange offer|'…' exists in response": [
-   3,
+   6,
+   0
+  ],
+  "get exchange offer|AppliedOverruleCode is valid, (expected: TECHNICAL_FAILURE, actual: TECHNICAL_FAILURE)": [
+   1,
    0
   ],
   "get exchange offer|Exchange offer [N] has overallFlexibility: FULL_FLEXIBLE and minimal price: N": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange offer at index N has a valid Offer Id <id>": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange offer[N] amountToBePaid = exchangePrice + exchangeFee - confirmedPrice (OSDM financial identity, integer arithmetic)": [
-   3,
+   6,
+   0
+  ],
+  "get exchange offer|Exchange offer[N] asked with overrule code TECHNICAL_FAILURE has no exchange fee (technical exchange)": [
+   1,
    0
   ],
   "get exchange offer|Exchange offer[N] has amount to be paid: N": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange offer[N] has required properties exchangeFee, exchangePrice, createdOn, passengerRefs, fulfillments": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange offer[N].admissionOfferParts is a non-empty array (OSDM: required field)": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange offer[N].preBookableUntil is a valid future datetime (OSDM: required)": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange operation contains exchangeOffers": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange operation has a valid Id <id>": [
-   3,
+   6,
    0
   ],
   "get exchange offer|Exchange operation has valid status, expected : PREBOOKED, actual : PREBOOKED": [
-   3,
+   6,
    0
   ],
   "get exchange offer|HTTP response status — expected N, actual: N": [
-   3,
+   6,
    0
   ],
   "get exchange offer|[OSDM] Content-Type is JSON": [
-   3,
+   6,
    0
   ],
   "get fulfillment|Fulfillment <id>: the answer is that fulfillment": [
-   139,
+   152,
    0
   ],
   "get fulfillment|HTTP response status — expected N, actual: N": [
-   139,
+   174,
    0
   ],
   "get fulfillment|[OSDM] Content-Type is JSON": [
-   139,
+   174,
+   0
+  ],
+  "get fulfillment|[fares F1] Each fare fulfilment is CONFIRMED or FULFILLED": [
+   22,
+   0
+  ],
+  "get fulfillment|[fares F1] GET /fulfillments/{id} gives the fulfilment asked": [
+   22,
+   0
+  ],
+  "get fulfillment|[fares F3] Each fare fulfilment names only parts of this booking (Fulfillment.bookingParts)": [
+   22,
+   0
+  ],
+  "get fulfillment|[fares F4] No fulfilment holds both fares and product booking parts (OSDM processes)": [
+   22,
    0
   ],
   "get passenger categories|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "get passenger|HTTP response status — expected N, actual: N": [
-   166,
+   179,
    0
   ],
   "get passenger|Passenger N - Date of birth is correct (expected: <instant>, actual: <instant>)": [
-   164,
+   177,
    0
   ],
   "get passenger|Passenger N - Date of birth not returned by the provider (WARNING, optional member)": [
@@ -1687,7 +2071,7 @@
    0
   ],
   "get passenger|Passenger N - Email is correct (expected: alexis.sample@example.org, actual: alexis.sample@example.org)": [
-   61,
+   72,
    0
   ],
   "get passenger|Passenger N - Email is correct (expected: ariel.sample@example.org, actual: ariel.sample@example.org)": [
@@ -1826,6 +2210,10 @@
    1,
    0
   ],
+  "get passenger|Passenger N - Email is correct (expected: petra.parent@example.org, actual: petra.parent@example.org)": [
+   1,
+   0
+  ],
   "get passenger|Passenger N - Email is correct (expected: petra.sample@example.org, actual: petra.sample@example.org)": [
    2,
    0
@@ -1850,6 +2238,10 @@
    21,
    0
   ],
+  "get passenger|Passenger N - Email is correct (expected: tom.toddler@example.org, actual: tom.toddler@example.org)": [
+   1,
+   0
+  ],
   "get passenger|Passenger N - Email is correct (expected: zedd.sample@example.org, actual: zedd.sample@example.org)": [
    1,
    0
@@ -1867,7 +2259,7 @@
    0
   ],
   "get passenger|Passenger N - First name is correct (expected: Alexis, actual: Alexis)": [
-   61,
+   72,
    0
   ],
   "get passenger|Passenger N - First name is correct (expected: Ariel, actual: Ariel)": [
@@ -2006,6 +2398,10 @@
    2,
    0
   ],
+  "get passenger|Passenger N - First name is correct (expected: Petraa, actual: Petraa)": [
+   1,
+   0
+  ],
   "get passenger|Passenger N - First name is correct (expected: Quentin, actual: Quentin)": [
    2,
    0
@@ -2026,6 +2422,10 @@
    22,
    0
   ],
+  "get passenger|Passenger N - First name is correct (expected: Tomas, actual: Tomas)": [
+   1,
+   0
+  ],
   "get passenger|Passenger N - First name is correct (expected: Zedd, actual: Zedd)": [
    1,
    0
@@ -2039,7 +2439,7 @@
    0
   ],
   "get passenger|Passenger N - Gender is correct (expected: X, actual: X)": [
-   166,
+   179,
    0
   ],
   "get passenger|Passenger N - Last name is correct (expected: Adult, actual: Adult)": [
@@ -2050,8 +2450,16 @@
    1,
    0
   ],
+  "get passenger|Passenger N - Last name is correct (expected: Parent, actual: Parent)": [
+   1,
+   0
+  ],
   "get passenger|Passenger N - Last name is correct (expected: Sample, actual: Sample)": [
-   157,
+   166,
+   0
+  ],
+  "get passenger|Passenger N - Last name is correct (expected: Simvariant-Booking-Without-Fulfillments, actual: Simvariant-Booking-Without-Fulfillments)": [
+   1,
    0
   ],
   "get passenger|Passenger N - Last name is correct (expected: Simvariant-Ignores-Place-Preferences, actual: Simvariant-Ignores-Place-Preferences)": [
@@ -2062,7 +2470,15 @@
    1,
    0
   ],
+  "get passenger|Passenger N - Last name is correct (expected: Simvariant-One-Fulfillment-Per-Refund-Request, actual: Simvariant-One-Fulfillment-Per-Refund-Request)": [
+   1,
+   0
+  ],
   "get passenger|Passenger N - Last name is correct (expected: Simvariant-Refuses-Bare-Place-Selection, actual: Simvariant-Refuses-Bare-Place-Selection)": [
+   1,
+   0
+  ],
+  "get passenger|Passenger N - Last name is correct (expected: Toddler, actual: Toddler)": [
    1,
    0
   ],
@@ -2083,7 +2499,7 @@
    0
   ],
   "get passenger|Passenger N - Phone number is correct (expected: +N, actual: +N)": [
-   164,
+   177,
    0
   ],
   "get passenger|Passenger N - Phone number not returned by the provider (WARNING, optional member)": [
@@ -2091,15 +2507,15 @@
    0
   ],
   "get passenger|Passenger N - id is a non-empty string after PATCH (OSDM: Passenger.id immutable)": [
-   166,
+   179,
    0
   ],
   "get passenger|Passenger N - id unchanged after PATCH (still in booking passengerIdList)": [
-   166,
+   179,
    0
   ],
   "get passenger|Passenger N - type is a non-empty PassengerType code - value: PERSON": [
-   164,
+   177,
    0
   ],
   "get passenger|Passenger N - type is a non-empty PassengerType code - value: YOUTH": [
@@ -2107,155 +2523,155 @@
    0
   ],
   "get passenger|[OSDM] Content-Type is JSON": [
-   166,
+   179,
    0
   ],
   "get product by productid|GET /products/{productId} response body is present": [
-   110,
+   161,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is array": [
-   110,
+   161,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is boolean": [
-   220,
+   322,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is object": [
-   110,
+   161,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is string": [
-   550,
+   805,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" is a Product object": [
-   110,
+   161,
    0
   ],
   "get product by productid|GET /products/{productId} → N OK": [
-   110,
+   161,
    0
   ],
   "get product by productid|GET /products/{productId} → Product has required \"…\" (string)": [
-   440,
+   644,
    0
   ],
   "get product by productid|GET /products/{productId} → conforms to OSDM N.N Product schema (deep)": [
-   110,
+   161,
    0
   ],
   "get product by productid|GET /products/{productId} → response is a resource object": [
-   110,
+   161,
    0
   ],
   "get product by productid|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "get product tags|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "get products|GET /products response body is present and not empty": [
-   110,
+   161,
    0
   ],
   "get products|GET /products response contains at least one product id": [
-   110,
+   161,
    0
   ],
   "get products|GET /products → \"…\" (when present) is array": [
-   110,
+   161,
    0
   ],
   "get products|GET /products → \"…\" (when present) is boolean": [
-   220,
+   322,
    0
   ],
   "get products|GET /products → \"…\" (when present) is object": [
-   110,
+   161,
    0
   ],
   "get products|GET /products → \"…\" (when present) is string": [
-   550,
+   805,
    0
   ],
   "get products|GET /products → \"…\" is an array<Product>": [
-   110,
+   161,
    0
   ],
   "get products|GET /products → N OK": [
-   110,
+   161,
    0
   ],
   "get products|GET /products → conforms to OSDM N.N Product schema (deep)": [
-   110,
+   161,
    0
   ],
   "get products|GET /products → every Product has required \"…\" (string)": [
-   440,
+   644,
    0
   ],
   "get products|GET /products → response is a collection object": [
-   110,
+   161,
    0
   ],
   "get products|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "get promotion codes|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards response body is present and not empty": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is boolean": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is string": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" is an array<ReductionCardType>": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards → N OK": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards → conforms to OSDM N.N ReductionCardType schema (deep)": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (object)": [
-   110,
+   161,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (string)": [
-   220,
+   322,
    0
   ],
   "get reduction cards|GET /reduction-cards → response is a collection object": [
-   110,
+   161,
    0
   ],
   "get reduction cards|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "get refund offer|'…' array exists with N refund offer(s)": [
-   26,
+   35,
    0
   ],
   "get refund offer|AppliedOverruleCode is null as expected (actual: undefined → treated as null)": [
-   21,
+   30,
    0
   ],
   "get refund offer|AppliedOverruleCode matches expected — expected: CONNECTION_BROKEN, actual: \"…\"": [
@@ -2275,7 +2691,7 @@
    0
   ],
   "get refund offer|HTTP response status — expected N, actual: N": [
-   26,
+   35,
    0
   ],
   "get refund offer|Partial refund: refundFee(N) + refundableAmount(N) < confirmedPrice(N) (partial scope returns strictly less than full)": [
@@ -2303,31 +2719,35 @@
    0
   ],
   "get refund offer|Refund offer at index N has a valid Offer Id <id>": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund offer[N] breakdown[N] is valid, refundFee amount: N, refundableAmount amount: N": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund offer[N] createdOn is valid and in the past: <instant> (= <instant> Europe/Paris)": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund offer[N] fulfillments is a non-empty array (OSDM: minItems:N)": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund offer[N] has valid status, expected: PROPOSED, actual: PROPOSED": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CHF, scale=N (= no carrier retention)": [
    2,
    0
   ],
+  "get refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CZK, scale=N (= kept by carrier per OSDM)": [
+   7,
+   0
+  ],
   "get refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CZK, scale=N (= no carrier retention)": [
-   21,
+   23,
    0
   ],
   "get refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=EUR, scale=N (= no carrier retention)": [
@@ -2339,7 +2759,7 @@
    0
   ],
   "get refund offer|Refund offer[N] refundableAmount Price structure is well-formed — amount=N, currency=CZK, scale=N": [
-   21,
+   30,
    0
   ],
   "get refund offer|Refund offer[N] refundableAmount Price structure is well-formed — amount=N, currency=EUR, scale=N": [
@@ -2347,75 +2767,107 @@
    0
   ],
   "get refund offer|Refund offer[N] validFrom is before or equal to validUntil (OSDM: temporal order)": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund offer[N] validFrom is valid: <instant> (= <instant> Europe/Paris)": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund offer[N] validUntil is valid and in the future: <instant> (= <instant> Europe/Paris)": [
-   26,
+   35,
    0
   ],
   "get refund offer|Refund response bounds — refundable(N) and fee(N) are non-negative, sum ≤ confirmedPrice(N), currencies consistent": [
-   26,
+   35,
    0
   ],
   "get refund offer|[OSDM] Content-Type is JSON": [
-   26,
+   35,
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an ISO-N date-time": [
-   110,
+   161,
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an object": [
-   110,
+   161,
    0
   ],
   "get system version check|GET /versions → N OK": [
-   110,
+   161,
    0
   ],
   "get system version check|GET /versions → at least one ApiVersion entry": [
-   110,
+   161,
    0
   ],
   "get system version check|GET /versions → conforms to OSDM N.N ApiVersion schema (deep)": [
-   110,
+   161,
    0
   ],
   "get system version check|GET /versions → every entry has required \"…\" (non-empty string)": [
-   110,
+   161,
    0
   ],
   "get system version check|GET /versions → response is an array<ApiVersion>": [
-   110,
+   161,
    0
   ],
   "get system version check|OSDM version check (soft): data file \"…\" vs API [N.N] — match": [
-   110,
+   161,
    0
   ],
   "get system version check|Trip Search Criteria has at least one leg": [
-   88,
+   116,
    0
   ],
   "get system version check|Trip Specification has at least one leg": [
-   22,
+   41,
    0
   ],
   "get system version check|[OSDM] Content-Type is JSON": [
-   110,
+   161,
+   0
+  ],
+  "get zones|GET /zones response body is present and not empty": [
+   161,
+   0
+  ],
+  "get zones|GET /zones → \"…\" (when present) is array": [
+   161,
+   0
+  ],
+  "get zones|GET /zones → \"…\" (when present) is string": [
+   161,
+   0
+  ],
+  "get zones|GET /zones → \"…\" is an array<ZoneDefinition>": [
+   161,
+   0
+  ],
+  "get zones|GET /zones → N OK": [
+   161,
+   0
+  ],
+  "get zones|GET /zones → conforms to OSDM N.N ZoneDefinition schema (deep)": [
+   161,
+   0
+  ],
+  "get zones|GET /zones → every ZoneDefinition has required \"…\" (string)": [
+   322,
+   0
+  ],
+  "get zones|GET /zones → response is a collection object": [
+   161,
    0
   ],
   "get zones|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ],
   "patch multi passenger|HTTP response status — expected N, actual: N": [
-   165,
+   178,
    0
   ],
   "patch multi passenger|Negative requestedInformation [passenger0.dateOfBirth]: error body is an RFC-N Problem (title/detail/code present)": [
@@ -2459,7 +2911,7 @@
    0
   ],
   "patch multi passenger|Passenger N - Date of birth is correct (expected: <instant>, actual: <instant>)": [
-   164,
+   177,
    0
   ],
   "patch multi passenger|Passenger N - Date of birth not returned by the provider (WARNING, optional member)": [
@@ -2475,7 +2927,7 @@
    0
   ],
   "patch multi passenger|Passenger N - Email is correct (expected: alexis.sample@example.org, actual: alexis.sample@example.org)": [
-   61,
+   72,
    0
   ],
   "patch multi passenger|Passenger N - Email is correct (expected: ariel.sample@example.org, actual: ariel.sample@example.org)": [
@@ -2614,6 +3066,10 @@
    1,
    0
   ],
+  "patch multi passenger|Passenger N - Email is correct (expected: petra.parent@example.org, actual: petra.parent@example.org)": [
+   1,
+   0
+  ],
   "patch multi passenger|Passenger N - Email is correct (expected: petra.sample@example.org, actual: petra.sample@example.org)": [
    2,
    0
@@ -2638,6 +3094,10 @@
    21,
    0
   ],
+  "patch multi passenger|Passenger N - Email is correct (expected: tom.toddler@example.org, actual: tom.toddler@example.org)": [
+   1,
+   0
+  ],
   "patch multi passenger|Passenger N - Email is correct (expected: zedd.sample@example.org, actual: zedd.sample@example.org)": [
    1,
    0
@@ -2655,7 +3115,7 @@
    0
   ],
   "patch multi passenger|Passenger N - First name is correct (expected: Alexis, actual: Alexis)": [
-   61,
+   72,
    0
   ],
   "patch multi passenger|Passenger N - First name is correct (expected: Ariel, actual: Ariel)": [
@@ -2794,6 +3254,10 @@
    2,
    0
   ],
+  "patch multi passenger|Passenger N - First name is correct (expected: Petraa, actual: Petraa)": [
+   1,
+   0
+  ],
   "patch multi passenger|Passenger N - First name is correct (expected: Quentin, actual: Quentin)": [
    2,
    0
@@ -2814,6 +3278,10 @@
    22,
    0
   ],
+  "patch multi passenger|Passenger N - First name is correct (expected: Tomas, actual: Tomas)": [
+   1,
+   0
+  ],
   "patch multi passenger|Passenger N - First name is correct (expected: Zedd, actual: Zedd)": [
    1,
    0
@@ -2823,7 +3291,7 @@
    0
   ],
   "patch multi passenger|Passenger N - Gender is correct (expected: X, actual: X)": [
-   165,
+   178,
    0
   ],
   "patch multi passenger|Passenger N - Last name is correct (expected: Adult, actual: Adult)": [
@@ -2834,8 +3302,16 @@
    1,
    0
   ],
+  "patch multi passenger|Passenger N - Last name is correct (expected: Parent, actual: Parent)": [
+   1,
+   0
+  ],
   "patch multi passenger|Passenger N - Last name is correct (expected: Sample, actual: Sample)": [
-   157,
+   166,
+   0
+  ],
+  "patch multi passenger|Passenger N - Last name is correct (expected: Simvariant-Booking-Without-Fulfillments, actual: Simvariant-Booking-Without-Fulfillments)": [
+   1,
    0
   ],
   "patch multi passenger|Passenger N - Last name is correct (expected: Simvariant-Ignores-Place-Preferences, actual: Simvariant-Ignores-Place-Preferences)": [
@@ -2846,7 +3322,15 @@
    1,
    0
   ],
+  "patch multi passenger|Passenger N - Last name is correct (expected: Simvariant-One-Fulfillment-Per-Refund-Request, actual: Simvariant-One-Fulfillment-Per-Refund-Request)": [
+   1,
+   0
+  ],
   "patch multi passenger|Passenger N - Last name is correct (expected: Simvariant-Refuses-Bare-Place-Selection, actual: Simvariant-Refuses-Bare-Place-Selection)": [
+   1,
+   0
+  ],
+  "patch multi passenger|Passenger N - Last name is correct (expected: Toddler, actual: Toddler)": [
    1,
    0
   ],
@@ -2863,7 +3347,7 @@
    0
   ],
   "patch multi passenger|Passenger N - Phone number is correct (expected: +N, actual: +N)": [
-   164,
+   177,
    0
   ],
   "patch multi passenger|Passenger N - Phone number not returned by the provider (WARNING, optional member)": [
@@ -2871,15 +3355,15 @@
    0
   ],
   "patch multi passenger|Passenger N - id is a non-empty string after PATCH (OSDM: Passenger.id immutable)": [
-   165,
+   178,
    0
   ],
   "patch multi passenger|Passenger N - id unchanged after PATCH (still in booking passengerIdList)": [
-   165,
+   178,
    0
   ],
   "patch multi passenger|Passenger N - type is a non-empty PassengerType code - value: PERSON": [
-   163,
+   176,
    0
   ],
   "patch multi passenger|Passenger N - type is a non-empty PassengerType code - value: YOUTH": [
@@ -2887,7 +3371,7 @@
    0
   ],
   "patch multi passenger|[OSCAR request] PATCH /bookings/{bookingId}/passengers/{passengerId} conforms to OSDM N.N Passenger": [
-   171,
+   184,
    0
   ],
   "patch multi passenger|[OSCAR request] PATCH /bookings/{bookingId}/passengers/{passengerId} does not conform to OSDM N.N Passenger, on purpose (negative test: passenger negative sweep)": [
@@ -2895,15 +3379,15 @@
    0
   ],
   "patch multi passenger|[OSDM] Content-Type is JSON": [
-   172,
+   185,
    0
   ],
   "patch refund offer|'…' array exists with N refund offer(s)": [
-   40,
+   50,
    0
   ],
   "patch refund offer|AppliedOverruleCode is null as expected (actual: undefined → treated as null)": [
-   30,
+   40,
    0
   ],
   "patch refund offer|AppliedOverruleCode matches expected — expected: CONNECTION_BROKEN, actual: \"…\"": [
@@ -2931,39 +3415,43 @@
    0
   ],
   "patch refund offer|HTTP response status — expected N, actual: N": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer at index N has a valid Offer Id <id>": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer[N] breakdown[N] is valid, refundFee amount: N, refundableAmount amount: N": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer[N] confirmed with the amounts it was proposed at - proposed: refundable N, fee N; confirmed: refundable N, fee N": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer[N] createdOn is valid and in the past: <instant> (= <instant> Europe/Paris)": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer[N] fulfillments is a non-empty array (OSDM: minItems:N)": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer[N] has valid status, expected: CONFIRMED, actual: CONFIRMED": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CHF, scale=N (= no carrier retention)": [
    3,
    0
   ],
+  "patch refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CZK, scale=N (= kept by carrier per OSDM)": [
+   7,
+   0
+  ],
   "patch refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CZK, scale=N (= no carrier retention)": [
-   32,
+   35,
    0
   ],
   "patch refund offer|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=EUR, scale=N (= no carrier retention)": [
@@ -2975,7 +3463,7 @@
    0
   ],
   "patch refund offer|Refund offer[N] refundableAmount Price structure is well-formed — amount=N, currency=CZK, scale=N": [
-   32,
+   42,
    0
   ],
   "patch refund offer|Refund offer[N] refundableAmount Price structure is well-formed — amount=N, currency=EUR, scale=N": [
@@ -2983,11 +3471,11 @@
    0
   ],
   "patch refund offer|Refund offer[N] validFrom is before or equal to validUntil (OSDM: temporal order)": [
-   40,
+   50,
    0
   ],
   "patch refund offer|Refund offer[N] validFrom is valid: <instant> (= <instant> Europe/Paris)": [
-   40,
+   50,
    0
   ],
   "patch refund offer|[<id>] Expired refund offer: PATCH /refund-offers/{id} is rejected with a client error (4xx) — an expired refund offer must not be confirmable (got N)": [
@@ -2999,11 +3487,11 @@
    0
   ],
   "patch refund offer|[OSCAR request] PATCH /bookings/{bookingId}/refund-offers/{refundOfferId} conforms to OSDM N.N RefundOfferPatchRequest": [
-   42,
+   52,
    0
   ],
   "patch refund offer|[OSDM] Content-Type is JSON": [
-   42,
+   52,
    0
   ],
   "post add reservation to booking|Added reservation: holds the reservation on leg <id>-L1": [
@@ -3107,11 +3595,11 @@
    0
   ],
   "post create booking|'…' object exists": [
-   96,
+   108,
    0
   ],
   "post create booking|Booking contains exactly the expected number of passengers - expected: N, actual: N": [
-   96,
+   108,
    0
   ],
   "post create booking|Booking: holds the reservation on leg <id>-L1": [
@@ -3155,7 +3643,7 @@
    0
   ],
   "post create booking|HTTP response status — expected N, actual: N": [
-   80,
+   114,
    0
   ],
   "post create booking|Idempotency-Key, POST /bookings sent again with the same key: HTTP status N — actual N": [
@@ -3182,12 +3670,36 @@
    3,
    0
   ],
+  "post create booking|Pre-booked: non-trip booking — nothing covers a trip (tripCoverage absent)": [
+   4,
+   0
+  ],
+  "post create booking|Pre-booked: non-trip booking: each admission says where it is valid (regionalValidities) — N admission": [
+   4,
+   0
+  ],
   "post create booking|Price fields exist (currency, amount) in provisionalPrice": [
-   96,
+   108,
+   0
+  ],
+  "post create booking|Purchaser negative sweep in the booking [purchaser.firstName]: error body is an RFC-N Problem (title/detail/code present)": [
+   1,
+   0
+  ],
+  "post create booking|Purchaser negative sweep in the booking [purchaser.firstName]: provider rejects with a client error (4xx)": [
+   1,
+   0
+  ],
+  "post create booking|Purchaser negative sweep in the booking [purchaser.lastName]: error body is an RFC-N Problem (title/detail/code present)": [
+   1,
+   0
+  ],
+  "post create booking|Purchaser negative sweep in the booking [purchaser.lastName]: provider rejects with a client error (4xx)": [
+   1,
    0
   ],
   "post create booking|Status is PREBOOKED for admission[N] - expected: PREBOOKED, actual: PREBOOKED": [
-   170,
+   184,
    0
   ],
   "post create booking|Status is PREBOOKED for reservation[N] - expected: PREBOOKED, actual: PREBOOKED": [
@@ -3195,15 +3707,47 @@
    0
   ],
   "post create booking|[OSCAR request] POST /bookings conforms to OSDM N.N BookingRequest": [
-   97,
+   133,
+   0
+  ],
+  "post create booking|[OSCAR request] POST /bookings does not conform to OSDM N.N BookingRequest, on purpose (negative test: purchaser negative sweep in the booking)": [
+   2,
    0
   ],
   "post create booking|[OSDM] Content-Type is JSON": [
-   97,
+   135,
    0
   ],
   "post create booking|[OSDM] Vendor books a round trip (both offers) in a single booking": [
    16,
+   0
+  ],
+  "post create booking|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
+   21,
+   0
+  ],
+  "post create booking|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
+   21,
+   0
+  ],
+  "post create booking|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
+   21,
+   0
+  ],
+  "post create booking|[fares B4] Each booked fare'…'s": [
+   21,
+   0
+  ],
+  "post create booking|[fares V1] Each booked fare reservation is in FARE_MODE (Reservation.distributionMode; absent = PRODUCT_MODE)": [
+   2,
+   0
+  ],
+  "post create booking|[fares V3] Each booked fare reservation holds the passengers of its offer part (the bicycle)": [
+   2,
+   0
+  ],
+  "post create booking|[fares V9] Every fare reservation of the offer is in the booking (selected in optionalReservationSelections; paired by id, else passengers and leg)": [
+   2,
    0
   ],
   "post create booking|admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]": [
@@ -3223,7 +3767,7 @@
    0
   ],
   "post create booking|admission exchangeable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
-   2,
+   4,
    0
   ],
   "post create booking|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES] booking=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES]": [
@@ -3235,7 +3779,7 @@
    0
   ],
   "post create booking|admission exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   62,
+   66,
    0
   ],
   "post create booking|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -3243,11 +3787,11 @@
    0
   ],
   "post create booking|admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   37,
+   45,
    0
   ],
   "post create booking|admission prices have at least one member in common between offer and booking": [
-   170,
+   184,
    0
   ],
   "post create booking|admission refundable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]": [
@@ -3267,7 +3811,7 @@
    0
   ],
   "post create booking|admission refundable values have at least one member in common between offer and booking offer=[WITH_CONDITION] booking=[WITH_CONDITION]": [
-   2,
+   4,
    0
   ],
   "post create booking|admission refundable values have at least one member in common between offer and booking offer=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES] booking=[YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES,YES]": [
@@ -3279,7 +3823,7 @@
    0
   ],
   "post create booking|admission refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
-   62,
+   66,
    0
   ],
   "post create booking|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES,YES]": [
@@ -3287,19 +3831,55 @@
    0
   ],
   "post create booking|admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]": [
-   37,
+   45,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions exist in both offer and booking": [
+   11,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions[N] - EXCHANGE exists in booking": [
+   11,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions[N] - REFUND exists in booking": [
+   11,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions[N].afterSaleFee exists in both": [
+   22,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions[N].afterSaleFee.amount matches": [
+   22,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions[N].afterSaleFee.currency matches": [
+   22,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions[N].afterSaleFee.scale matches": [
+   22,
+   0
+  ],
+  "post create booking|admission[N] afterSalesConditions[N].condition matches": [
+   22,
    0
   ],
   "post create booking|admission[N] appliedPassengerTypes exist in both offer and booking": [
-   12,
+   14,
    0
   ],
   "post create booking|admission[N] appliedPassengerTypes[N] - type=ADULT exists in booking": [
-   13,
+   14,
    0
   ],
   "post create booking|admission[N] appliedPassengerTypes[N] - type=CHILD exists in booking": [
    7,
+   0
+  ],
+  "post create booking|admission[N] appliedPassengerTypes[N] - type=YOUNG_CHILD exists in booking": [
+   1,
    0
   ],
   "post create booking|admission[N] appliedPassengerTypes[N] - type=YOUTH exists in booking": [
@@ -3323,55 +3903,55 @@
    0
   ],
   "post create booking|admission[N] appliedPassengerTypes[N].description matches": [
-   24,
+   26,
    0
   ],
   "post create booking|admission[N] appliedPassengerTypes[N].passengerRef exists in booking": [
-   24,
+   26,
    0
   ],
   "post create booking|admission[N] appliedPassengerTypes[N].type matches": [
-   24,
+   26,
    0
   ],
   "post create booking|admission[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   170,
+   184,
    0
   ],
   "post create booking|admission[N].offerMode matches between offer and booking : offer='…' booking='…'": [
-   170,
+   184,
    0
   ],
   "post create booking|admission[N].status '…' is a valid OSDM BookingPartStatus": [
-   170,
+   184,
    0
   ],
   "post create booking|admission[N].validFrom is present in both offer and booking": [
-   170,
+   184,
    0
   ],
   "post create booking|admission[N].validUntil is present in both offer and booking": [
-   170,
+   184,
    0
   ],
   "post create booking|booking confirmation deadline is a valid future datetime — source: booking.confirmationTimeLimit (OSDM-standard)": [
-   96,
+   108,
    0
   ],
   "post create booking|booking.bookedOffers is a non-empty array (OSDM: required)": [
-   96,
+   108,
    0
   ],
   "post create booking|booking.bookingCode is a non-empty string when present": [
-   95,
+   107,
    0
   ],
   "post create booking|booking.createdOn: <instant>, offer.createdOn: <instant>": [
-   96,
+   108,
    0
   ],
   "post create booking|booking.id is a non-empty string (OSDM: Booking.id required)": [
-   96,
+   108,
    0
   ],
   "post create booking|booking.provisionalPrice.currency matches offer currency (expected: CHF, actual: CHF)": [
@@ -3379,7 +3959,7 @@
    0
   ],
   "post create booking|booking.provisionalPrice.currency matches offer currency (expected: CZK, actual: CZK)": [
-   83,
+   95,
    0
   ],
   "post create booking|booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)": [
@@ -3391,15 +3971,27 @@
    0
   ],
   "post create booking|provisionalPrice is not below the offer's minimalPrice - provisional: N CZK, minimal: N CZK": [
-   83,
+   95,
    0
   ],
   "post create booking|provisionalPrice is not below the offer's minimalPrice - provisional: N EUR, minimal: N EUR": [
    7,
    0
   ],
+  "post create booking|provisionalPrice is the sum of the pre-booked parts - provisional: N CHF, sum: N (N part(s))": [
+   6,
+   0
+  ],
+  "post create booking|provisionalPrice is the sum of the pre-booked parts - provisional: N CZK, sum: N (N part(s))": [
+   95,
+   0
+  ],
+  "post create booking|provisionalPrice is the sum of the pre-booked parts - provisional: N EUR, sum: N (N part(s))": [
+   7,
+   0
+  ],
   "post create booking|provisionalPrice structure exists (booking stage: PREBOOKED)": [
-   96,
+   108,
    0
   ],
   "post create booking|reservation exchangeable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES,YES]": [
@@ -3447,51 +4039,59 @@
    0
   ],
   "post exchange offers|'…' array exists with N exchange offer(s)": [
+   7,
+   0
+  ],
+  "post exchange offers|AppliedOverruleCode is valid, (expected: TECHNICAL_FAILURE, actual: TECHNICAL_FAILURE)": [
    4,
    0
   ],
   "post exchange offers|Exchange offer [N] has overallFlexibility: FULL_FLEXIBLE and minimal price: N": [
-   8,
+   14,
    0
   ],
   "post exchange offers|Exchange offer [N] has overallFlexibility: NON_FLEXIBLE and minimal price: N": [
-   4,
+   7,
    0
   ],
   "post exchange offers|Exchange offer [N] has overallFlexibility: SEMI_FLEXIBLE and minimal price: N": [
-   4,
+   7,
    0
   ],
   "post exchange offers|Exchange offer at index N has a valid Offer Id <id>": [
-   16,
+   28,
    0
   ],
   "post exchange offers|Exchange offer[N] amountToBePaid = exchangePrice + exchangeFee - confirmedPrice (OSDM financial identity, integer arithmetic)": [
-   8,
+   16,
+   0
+  ],
+  "post exchange offers|Exchange offer[N] asked with overrule code TECHNICAL_FAILURE has no exchange fee (technical exchange)": [
+   4,
    0
   ],
   "post exchange offers|Exchange offer[N] has amount to be paid: N": [
-   8,
+   16,
    0
   ],
   "post exchange offers|Exchange offer[N] has refundable amount defined N": [
-   8,
+   12,
    0
   ],
   "post exchange offers|Exchange offer[N] has required properties exchangeFee, exchangePrice, createdOn, passengerRefs, fulfillments": [
-   16,
+   28,
    0
   ],
   "post exchange offers|Exchange offer[N].admissionOfferParts is a non-empty array (OSDM: required field)": [
-   16,
+   28,
    0
   ],
   "post exchange offers|Exchange offer[N].preBookableUntil is a valid future datetime (OSDM: required)": [
-   16,
+   28,
    0
   ],
   "post exchange offers|Exchange offer[N]: priced in the sale's currency (CZK)": [
-   12,
+   24,
    0
   ],
   "post exchange offers|Exchange offer[N]: priced in the sale's currency (EUR)": [
@@ -3499,59 +4099,71 @@
    0
   ],
   "post exchange offers|HTTP response status — expected N, actual: N": [
-   4,
+   7,
    0
   ],
   "post exchange offers|[OSCAR request] POST /bookings/{bookingId}/exchange-offers conforms to OSDM N.N ExchangeOfferCollectionRequest": [
-   4,
+   7,
    0
   ],
   "post exchange offers|[OSDM] Content-Type is JSON": [
-   4,
+   7,
+   0
+  ],
+  "post exchange offers|🔁 The exchange offers cover the trip asked: urn:uic:stn:N → urn:uic:stn:N on <instant>": [
+   2,
    0
   ],
   "post exchange operations|'…' exists in response": [
-   3,
+   6,
+   0
+  ],
+  "post exchange operations|AppliedOverruleCode is valid, (expected: TECHNICAL_FAILURE, actual: TECHNICAL_FAILURE)": [
+   1,
    0
   ],
   "post exchange operations|Exchange offer [N] has overallFlexibility: FULL_FLEXIBLE and minimal price: N": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange offer at index N has a valid Offer Id <id>": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange offer[N] amountToBePaid = exchangePrice + exchangeFee - confirmedPrice (OSDM financial identity, integer arithmetic)": [
-   3,
+   6,
+   0
+  ],
+  "post exchange operations|Exchange offer[N] asked with overrule code TECHNICAL_FAILURE has no exchange fee (technical exchange)": [
+   1,
    0
   ],
   "post exchange operations|Exchange offer[N] has amount to be paid: N": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange offer[N] has required properties exchangeFee, exchangePrice, createdOn, passengerRefs, fulfillments": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange offer[N].admissionOfferParts is a non-empty array (OSDM: required field)": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange offer[N].preBookableUntil is a valid future datetime (OSDM: required)": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange operation contains exchangeOffers": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange operation has a valid Id <id>": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Exchange operation has valid status, expected : PREBOOKED, actual : PREBOOKED": [
-   3,
+   6,
    0
   ],
   "post exchange operations|Expired exchange offer: POST /exchange-operations is rejected with a client error (4xx) — an exchange offer whose preBookableUntil has passed must not be bookable (got N)": [
@@ -3563,15 +4175,15 @@
    0
   ],
   "post exchange operations|HTTP response status — expected N, actual: N": [
-   3,
+   6,
    0
   ],
   "post exchange operations|[OSCAR request] POST /bookings/{bookingId}/exchange-operations conforms to OSDM N.N ExchangeOperationRequest": [
-   4,
+   7,
    0
   ],
   "post exchange operations|[OSDM] Content-Type is JSON": [
-   4,
+   7,
    0
   ],
   "post get offer individual|Group offer: the group pays less than the same passengers alone — group N CZK, alone N (offer <id>)": [
@@ -3586,8 +4198,12 @@
    3,
    0
   ],
+  "post get offer without cards|Reduction cards: passenger N pays N % less with the card — N against N without": [
+   2,
+   0
+  ],
   "post get offer without cards|Reduction cards: passenger N pays less with the card — N against N without": [
-   4,
+   2,
    0
   ],
   "post get offer without cards|[OSCAR request] POST /offers conforms to OSDM N.N OfferCollectionRequest": [
@@ -3599,7 +4215,7 @@
    0
   ],
   "post get offer|'…' array exists with N offer(s)": [
-   105,
+   126,
    0
   ],
   "post get offer|Admission <id> reservation relation N: minGroupItemsToBeBooked N is a whole number no larger than the group (N), and no larger than maxGroupItemsToBeBooked N": [
@@ -3614,28 +4230,40 @@
    17,
    0
   ],
-  "post get offer|Admission part N permits EXCHANGE (scenarioType=EXCHANGE) - exchangeable: YES": [
-   4,
+  "post get offer|Admission part N afterSalesConditions validity": [
+   11,
    0
   ],
-  "post get offer|Admission part N permits REFUND (scenarioType=REFUND) - refundable: WITH_CONDITION": [
+  "post get offer|Admission part N permits EXCHANGE (scenarioType=EXCHANGE) - exchangeable: YES": [
    6,
    0
   ],
+  "post get offer|Admission part N permits EXCHANGE (scenarioType=EXCHANGE) - schedule: N/N window(s) below full price (flag: WITH_CONDITION)": [
+   1,
+   0
+  ],
   "post get offer|Admission part N permits REFUND (scenarioType=REFUND) - refundable: YES": [
-   43,
+   45,
+   0
+  ],
+  "post get offer|Admission part N permits REFUND (scenarioType=REFUND) - schedule: N/N window(s) below full price (flag: WITH_CONDITION)": [
+   6,
    0
   ],
   "post get offer|AdmissionOfferPart N appliedPassengerTypes are valid - count: N": [
-   10,
+   12,
    0
   ],
   "post get offer|AdmissionOfferPart N appliedPassengerTypes[N].type is a non-empty PassengerType code - value: ADULT": [
-   12,
+   13,
    0
   ],
   "post get offer|AdmissionOfferPart N appliedPassengerTypes[N].type is a non-empty PassengerType code - value: CHILD": [
    5,
+   0
+  ],
+  "post get offer|AdmissionOfferPart N appliedPassengerTypes[N].type is a non-empty PassengerType code - value: YOUNG_CHILD": [
+   1,
    0
   ],
   "post get offer|AdmissionOfferPart N appliedPassengerTypes[N].type is a non-empty PassengerType code - value: YOUTH": [
@@ -3643,7 +4271,7 @@
    0
   ],
   "post get offer|AdmissionOfferPart N isReusable is a boolean or null - isReusable: false": [
-   176,
+   198,
    0
   ],
   "post get offer|AdmissionOfferPart N offerMode is a known value - offerMode: COLLECTIVE": [
@@ -3651,11 +4279,11 @@
    0
   ],
   "post get offer|AdmissionOfferPart N offerMode is a known value - offerMode: INDIVIDUAL": [
-   173,
+   195,
    0
   ],
   "post get offer|AdmissionOfferPart N passengerRefs has at least one entry": [
-   176,
+   198,
    0
   ],
   "post get offer|AdmissionOfferPart N price structure is valid - amount: N, currency: CHF": [
@@ -3663,7 +4291,7 @@
    0
   ],
   "post get offer|AdmissionOfferPart N price structure is valid - amount: N, currency: CZK": [
-   161,
+   183,
    0
   ],
   "post get offer|AdmissionOfferPart N price structure is valid - amount: N, currency: EUR": [
@@ -3671,15 +4299,23 @@
    0
   ],
   "post get offer|AdmissionOfferPart N validFrom is a valid date - validFrom: <instant>": [
-   176,
+   198,
    0
   ],
   "post get offer|AdmissionOfferPart N validUntil is in the future - validUntil: <instant>": [
-   176,
+   198,
    0
   ],
   "post get offer|At least one matching product has the expected flexibility - count : N": [
-   105,
+   126,
+   0
+  ],
+  "post get offer|GET /zones: HTTP N — actual N": [
+   3,
+   0
+  ],
+  "post get offer|GET /zones: at least one zone with its id and carrier (ZoneDefinition.id, .carrier required)": [
+   3,
    0
   ],
   "post get offer|Group offer: admission <id> names the passenger type of each passenger — N: ADULT, N: ADULT, N: ADULT, N: ADULT, N: ADULT, N: ADULT": [
@@ -3699,27 +4335,51 @@
    0
   ],
   "post get offer|HTTP response status — expected N, actual: N": [
-   105,
+   154,
+   0
+  ],
+  "post get offer|Non-trip offers: each admission says where it is valid (regionalValidities) — N admission": [
+   3,
+   0
+  ],
+  "post get offer|Non-trip offers: each admission says where it is valid (regionalValidities) — N admissions": [
+   3,
+   0
+  ],
+  "post get offer|Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)": [
+   6,
+   0
+  ],
+  "post get offer|Non-trip offers: the answer gives no trip": [
+   6,
    0
   ],
   "post get offer|Offer minimalPrice >= sum of admission parts price - minimalPrice: N, admissions: N": [
-   105,
+   126,
    0
   ],
   "post get offer|Offer overallFlexibility consistency - overallFlex: FULL_FLEXIBLE, derived (most restrictive): FULL_FLEXIBLE": [
-   88,
+   105,
    0
   ],
   "post get offer|Offer overallFlexibility consistency - overallFlex: NON_FLEXIBLE, derived (most restrictive): NON_FLEXIBLE": [
-   9,
+   10,
    0
   ],
   "post get offer|Offer overallFlexibility consistency - overallFlex: SEMI_FLEXIBLE, derived (most restrictive): SEMI_FLEXIBLE": [
-   8,
+   11,
    0
   ],
   "post get offer|Offer preBookableUntil is a valid date in the future - preBookableUntil: <instant>": [
-   105,
+   126,
+   0
+  ],
+  "post get offer|Offer request: an offer holds the product selected (product code SIM_ALL_DAY)": [
+   1,
+   0
+  ],
+  "post get offer|Offer request: an offer holds the product selected (product tag <id>)": [
+   1,
    0
   ],
   "post get offer|Offer request: the offers keep to the flexibilities asked (NON_FLEXIBLE)": [
@@ -3734,6 +4394,14 @@
    2,
    0
   ],
+  "post get offer|Offer request: the offers keep to the product tags asked (<id>)": [
+   2,
+   0
+  ],
+  "post get offer|Offer request: the offers keep to the product tags asked (ADMISSION_PASS)": [
+   1,
+   0
+  ],
   "post get offer|Offer request: the offers keep to the service classes asked (HIGH)": [
    1,
    0
@@ -3743,31 +4411,31 @@
    0
   ],
   "post get offer|Offer summary - minimalPrice structure exists, is a number >= N : N": [
-   105,
+   126,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is a valid OSDM value: FULL_FLEXIBLE": [
-   88,
+   105,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is a valid OSDM value: NON_FLEXIBLE": [
-   9,
+   10,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is a valid OSDM value: SEMI_FLEXIBLE": [
-   8,
+   11,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is defined - overallFlexibility: FULL_FLEXIBLE": [
-   88,
+   105,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is defined - overallFlexibility: NON_FLEXIBLE": [
-   9,
+   10,
    0
   ],
   "post get offer|Offer summary - overallFlexibility is defined - overallFlexibility: SEMI_FLEXIBLE": [
-   8,
+   11,
    0
   ],
   "post get offer|Offer summary - overallServiceClass is defined - overallServiceClass: First": [
@@ -3775,7 +4443,7 @@
    0
   ],
   "post get offer|Offer summary - overallServiceClass is defined - overallServiceClass: Standard": [
-   101,
+   122,
    0
   ],
   "post get offer|Offer summary - overallTravelClass is defined - overallTravelClass: FIRST": [
@@ -3783,15 +4451,15 @@
    0
   ],
   "post get offer|Offer summary - overallTravelClass is defined - overallTravelClass: SECOND": [
-   101,
+   122,
    0
   ],
   "post get offer|Offer tripCoverage.coveredLegIds are non-empty strings - count: N": [
-   105,
+   120,
    0
   ],
   "post get offer|Offer tripCoverage.coveredTripId is present (OSDM: TripCoverage.coveredTripId required)": [
-   105,
+   120,
    0
   ],
   "post get offer|Offer: an offer gives each leg its class [FIRST, SECOND] — N offer(s)": [
@@ -3799,7 +4467,7 @@
    0
   ],
   "post get offer|Offer: an offer holds the expected product \"…\" — N offer(s)": [
-   7,
+   8,
    0
   ],
   "post get offer|Offer: leg N (<id>-L1) in FIRST class — FIRST, with a supplement on this leg": [
@@ -3815,10 +4483,14 @@
    0
   ],
   "post get offer|Offer: passenger N is priced as ADULT — applied: ADULT": [
-   1,
+   2,
    0
   ],
   "post get offer|Offer: passenger N is priced as CHILD — applied: CHILD": [
+   1,
+   0
+  ],
+  "post get offer|Offer: passenger N is priced as YOUNG_CHILD — applied: YOUNG_CHILD": [
    1,
    0
   ],
@@ -3839,19 +4511,35 @@
    0
   ],
   "post get offer|Offers by trip id: every offer covers the trip asked (<id>)": [
-   2,
+   6,
+   0
+  ],
+  "post get offer|POST /places (“Simtown”): HTTP N — actual N": [
+   1,
+   0
+  ],
+  "post get offer|POST /places: at least two stop places to ask offers between": [
+   1,
+   0
+  ],
+  "post get offer|POST /places: each stop place has its name (StopPlace.name required)": [
+   1,
+   0
+  ],
+  "post get offer|POST /places: the answer holds places (PlaceResponse.places, minItems N)": [
+   1,
    0
   ],
   "post get offer|Passenger N dateOfBirth is a valid date in the past - dateOfBirth: <instant>": [
-   184,
+   206,
    0
   ],
   "post get offer|Passenger N externalRef is defined - externalRef: N": [
-   184,
+   206,
    0
   ],
   "post get offer|Passenger N type is a non-empty PassengerType code - value: PERSON": [
-   182,
+   204,
    0
   ],
   "post get offer|Passenger N type is a non-empty PassengerType code - value: YOUTH": [
@@ -3859,11 +4547,11 @@
    0
   ],
   "post get offer|Passengers are defined - length: N": [
-   105,
+   126,
    0
   ],
   "post get offer|Price fields exist (currency) in minimalPrice": [
-   105,
+   126,
    0
   ],
   "post get offer|Reservation linkage in admission with id <id>, reservationsRef ids should match reservationOfferParts ids": [
@@ -3899,43 +4587,63 @@
    0
   ],
   "post get offer|Selected offer has expected flexibility - expected: FULL_FLEXIBLE, actual: FULL_FLEXIBLE": [
-   88,
+   105,
    0
   ],
   "post get offer|Selected offer has expected flexibility - expected: NON_FLEXIBLE, actual: NON_FLEXIBLE": [
-   9,
+   10,
    0
   ],
   "post get offer|Selected offer has expected flexibility - expected: SEMI_FLEXIBLE, actual: SEMI_FLEXIBLE": [
-   8,
+   11,
    0
   ],
   "post get offer|Trip N Leg N has TrainID, Origin & Destination - TrainID: N, Origin: Station N, Destination: Station N": [
-   113,
+   129,
    0
   ],
   "post get offer|Trip N direction is a known value - direction: OUT_BOUND": [
-   105,
+   120,
    0
   ],
   "post get offer|Trip N has legs - length: N": [
-   105,
+   120,
    0
   ],
   "post get offer|Trip N startTime is before endTime (OSDM: temporal order)": [
-   105,
+   120,
+   0
+  ],
+  "post get offer|Trip search: no more trips than asked (N)": [
+   1,
+   0
+  ],
+  "post get offer|Trip search: the trips arrive by the time asked (<instant>)": [
+   1,
+   0
+  ],
+  "post get offer|Trip search: the trips avoid the places asked (urn:uic:stn:N)": [
+   1,
+   0
+  ],
+  "post get offer|Trip search: the trips keep to the transfer limit asked (N)": [
+   1,
+   0
+  ],
+  "post get offer|Trip search: the trips pass the via asked (urn:uic:stn:N)": [
+   1,
    0
   ],
   "post get offer|Trips are defined - length: N": [
-   105,
+   120,
    0
   ],
   "post get offer|Trips collection: HTTP status N — actual N": [
-   2,
+   6,
    0
   ],
   "post get offer|Trips collection: a trip to ask offers for — the first trip leaving at N:N or later, <id>": [
-   1,
+   5,
    0
   ],
   "post get offer|Trips collection: a trip to ask offers for — the trip of train N, <id>": [
@@ -3943,23 +4651,23 @@
    0
   ],
   "post get offer|Trips collection: every trip has an id, none twice": [
-   2,
+   6,
    0
   ],
   "post get offer|Trips collection: every trip has legs": [
-   2,
+   6,
    0
   ],
   "post get offer|Trips collection: has an id (TripCollectionResponse.id is required)": [
-   2,
+   6,
    0
   ],
   "post get offer|Trips collection: holds trips — N": [
-   2,
+   6,
    0
   ],
   "post get offer|[OSCAR request] POST /offers conforms to OSDM N.N OfferCollectionRequest": [
-   110,
+   161,
    0
   ],
   "post get offer|[OSCAR request] POST /offers does not conform to OSDM N.N OfferCollectionRequest, on purpose (negative test: empty passenger list)": [
@@ -3967,7 +4675,83 @@
    0
   ],
   "post get offer|[OSDM] Content-Type is JSON": [
-   111,
+   162,
+   0
+  ],
+  "post get offer|[fares N] No fare in the answer, as the scenario expects (expectFares: false)": [
+   6,
+   0
+  ],
+  "post get offer|[fares O13] No fare price is negative": [
+   21,
+   0
+  ],
+  "post get offer|[fares O14] No fare when the request asks for ADMISSION only": [
+   3,
+   0
+  ],
+  "post get offer|[fares O1] At least one offer holds fares (offers[].fares)": [
+   21,
+   0
+  ],
+  "post get offer|[fares O2] Each fare has the members OSDM requires (Fare.required, passengerRefs)": [
+   21,
+   0
+  ],
+  "post get offer|[fares O3] Each fare is of a type asked (ADMISSION)": [
+   19,
+   0
+  ],
+  "post get offer|[fares O3] Each fare is of a type asked (ADMISSION, ANCILLARY)": [
+   1,
+   0
+  ],
+  "post get offer|[fares O3] Each fare is of a type asked (ADMISSION, RESERVATION)": [
+   1,
+   0
+  ],
+  "post get offer|[fares O4] Each fare has regional validities (regionalConstraint.regionalValidities)": [
+   21,
+   0
+  ],
+  "post get offer|[fares O5] Each fare has after-sales conditions (afterSalesCondition.conditions)": [
+   21,
+   0
+  ],
+  "post get offer|[fares O6] Each fare has a validity range (travelValidityConstraint.validityRange)": [
+   21,
+   0
+  ],
+  "post get offer|[fares O7] Every passenger has a fare in each fare offer (a free one priced N)": [
+   21,
+   0
+  ],
+  "post get offer|[fares O8] Each passenger's fares cover the requested section without a gap": [
+   21,
+   0
+  ],
+  "post get offer|[fares O8] Each passenger's fares do not overlap": [
+   21,
+   0
+  ],
+  "post get offer|[fares V1] Each reservation of a bicycle passenger is in FARE_MODE (ReservationOfferPart.distributionMode; absent = PRODUCT_MODE)": [
+   2,
+   0
+  ],
+  "post get offer|[fares V3] Each bicycle passenger has a reservation (a bicycle place)": [
+   2,
+   0
+  ],
+  "post get offer|[fares] An offer holds fares of cluster FULL_FLEX (desiredFareCluster)": [
+   1,
+   0
+  ],
+  "post get offer|[fares] An offer holds fares of cluster NON_FLEX (desiredFareCluster)": [
+   4,
+   0
+  ],
+  "post get offer|[fares] An offer holds fares of cluster SEMI_FLEX (desiredFareCluster)": [
+   5,
    0
   ],
   "post get offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: CHF, actual: CHF)": [
@@ -3975,7 +4759,7 @@
    0
   ],
   "post get offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: CZK, actual: CZK)": [
-   161,
+   183,
    0
   ],
   "post get offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: EUR, actual: EUR)": [
@@ -3995,19 +4779,19 @@
    0
   ],
   "post get offer|offers[N].createdOn is a valid ISO datetime (OSDM: Offer.createdOn required)": [
-   432,
+   499,
    0
   ],
   "post get offer|offers[N].offerId is a non-empty string (OSDM: Offer.offerId required)": [
-   432,
+   499,
    0
   ],
   "post get offer|offers[N].passengerRefs count matches requested passengers (expected: N, actual: N)": [
-   432,
+   499,
    0
   ],
   "post get offer|offers[N].passengerRefs is a non-empty array (OSDM: Offer.passengerRefs minItems:N)": [
-   432,
+   499,
    0
   ],
   "post get offer|reservationOfferParts[N].price.currency matches offerSummary currency (expected: CZK, actual: CZK)": [
@@ -4015,7 +4799,7 @@
    0
   ],
   "post get offer|selectedOffer.tripCoverage.coveredTripId (<id>) is part of Trip ids": [
-   105,
+   120,
    0
   ],
   "post get offer|🔎 Train filter: the answer holds a trip of train N — N of N trip(s)": [
@@ -4070,16 +4854,28 @@
    1,
    0
   ],
-  "post get return offer|'…' array exists with N offer(s)": [
-   26,
+  "post get offer|🧪 Undeclared option probe [serviceClassTypes BEST, POST /offers]: the offers do not keep to the value asked": [
+   1,
    0
   ],
-  "post get return offer|Admission part N permits REFUND (scenarioType=REFUND) - refundable: WITH_CONDITION": [
+  "post get offer|🧭 Offer request with the mandatory parameters only — answered with offers (HTTP N)": [
+   1,
+   0
+  ],
+  "post get return offer|'…' array exists with N offer(s)": [
+   27,
+   0
+  ],
+  "post get return offer|Admission part N afterSalesConditions validity": [
    7,
    0
   ],
   "post get return offer|Admission part N permits REFUND (scenarioType=REFUND) - refundable: YES": [
-   14,
+   16,
+   0
+  ],
+  "post get return offer|Admission part N permits REFUND (scenarioType=REFUND) - schedule: N/N window(s) below full price (flag: WITH_CONDITION)": [
+   7,
    0
   ],
   "post get return offer|AdmissionOfferPart N appliedPassengerTypes are valid - count: N": [
@@ -4099,7 +4895,7 @@
    0
   ],
   "post get return offer|AdmissionOfferPart N isReusable is a boolean or null - isReusable: false": [
-   36,
+   38,
    0
   ],
   "post get return offer|AdmissionOfferPart N offerMode is a known value - offerMode: COLLECTIVE": [
@@ -4107,11 +4903,11 @@
    0
   ],
   "post get return offer|AdmissionOfferPart N offerMode is a known value - offerMode: INDIVIDUAL": [
-   34,
+   36,
    0
   ],
   "post get return offer|AdmissionOfferPart N passengerRefs has at least one entry": [
-   36,
+   38,
    0
   ],
   "post get return offer|AdmissionOfferPart N price structure is valid - amount: N, currency: CHF": [
@@ -4119,7 +4915,7 @@
    0
   ],
   "post get return offer|AdmissionOfferPart N price structure is valid - amount: N, currency: CZK": [
-   27,
+   29,
    0
   ],
   "post get return offer|AdmissionOfferPart N price structure is valid - amount: N, currency: EUR": [
@@ -4127,15 +4923,15 @@
    0
   ],
   "post get return offer|AdmissionOfferPart N validFrom is a valid date - validFrom: <instant>": [
-   36,
+   38,
    0
   ],
   "post get return offer|AdmissionOfferPart N validUntil is in the future - validUntil: <instant>": [
-   36,
+   38,
    0
   ],
   "post get return offer|At least one matching product has the expected flexibility - count : N": [
-   26,
+   27,
    0
   ],
   "post get return offer|Group offer: admission <id> names the passenger type of each passenger — N: ADULT, N: CHILD, N: CHILD": [
@@ -4147,7 +4943,7 @@
    0
   ],
   "post get return offer|HTTP response status — expected N, actual: N": [
-   26,
+   27,
    0
   ],
   "post get return offer|Inbound offer N (<id>) covers an inbound trip, not the outbound one": [
@@ -4159,11 +4955,11 @@
    0
   ],
   "post get return offer|Offer minimalPrice >= sum of admission parts price - minimalPrice: N, admissions: N": [
-   26,
+   27,
    0
   ],
   "post get return offer|Offer overallFlexibility consistency - overallFlex: FULL_FLEXIBLE, derived (most restrictive): FULL_FLEXIBLE": [
-   19,
+   20,
    0
   ],
   "post get return offer|Offer overallFlexibility consistency - overallFlex: NON_FLEXIBLE, derived (most restrictive): NON_FLEXIBLE": [
@@ -4175,15 +4971,15 @@
    0
   ],
   "post get return offer|Offer preBookableUntil is a valid date in the future - preBookableUntil: <instant>": [
-   26,
+   27,
    0
   ],
   "post get return offer|Offer summary - minimalPrice structure exists, is a number >= N : N": [
-   26,
+   27,
    0
   ],
   "post get return offer|Offer summary - overallFlexibility is a valid OSDM value: FULL_FLEXIBLE": [
-   19,
+   20,
    0
   ],
   "post get return offer|Offer summary - overallFlexibility is a valid OSDM value: NON_FLEXIBLE": [
@@ -4195,7 +4991,7 @@
    0
   ],
   "post get return offer|Offer summary - overallFlexibility is defined - overallFlexibility: FULL_FLEXIBLE": [
-   19,
+   20,
    0
   ],
   "post get return offer|Offer summary - overallFlexibility is defined - overallFlexibility: NON_FLEXIBLE": [
@@ -4207,19 +5003,19 @@
    0
   ],
   "post get return offer|Offer summary - overallServiceClass is defined - overallServiceClass: Standard": [
-   26,
+   27,
    0
   ],
   "post get return offer|Offer summary - overallTravelClass is defined - overallTravelClass: SECOND": [
-   26,
+   27,
    0
   ],
   "post get return offer|Offer tripCoverage.coveredLegIds are non-empty strings - count: N": [
-   26,
+   27,
    0
   ],
   "post get return offer|Offer tripCoverage.coveredTripId is present (OSDM: TripCoverage.coveredTripId required)": [
-   26,
+   27,
    0
   ],
   "post get return offer|Offer: an offer holds the expected product \"…\" — N offer(s)": [
@@ -4227,15 +5023,15 @@
    0
   ],
   "post get return offer|Passenger N dateOfBirth is a valid date in the past - dateOfBirth: <instant>": [
-   28,
+   29,
    0
   ],
   "post get return offer|Passenger N externalRef is defined - externalRef: N": [
-   28,
+   29,
    0
   ],
   "post get return offer|Passenger N type is a non-empty PassengerType code - value: PERSON": [
-   27,
+   28,
    0
   ],
   "post get return offer|Passenger N type is a non-empty PassengerType code - value: YOUTH": [
@@ -4243,31 +5039,31 @@
    0
   ],
   "post get return offer|Passengers are defined - length: N": [
-   26,
+   27,
    0
   ],
   "post get return offer|Price fields exist (currency) in minimalPrice": [
-   26,
+   27,
    0
   ],
   "post get return offer|Return offer N (<id>) covers an inbound trip of the response (inboundTripCoverage.coveredTripId)": [
-   42,
+   46,
    0
   ],
   "post get return offer|Return offer N (<id>) covers the chosen outbound trip (tripCoverage.coveredTripId)": [
-   42,
+   46,
    0
   ],
   "post get return offer|Return: a trip goes back, from urn:uic:stn:N to urn:uic:stn:N": [
-   26,
+   27,
    0
   ],
   "post get return offer|Return: the passengers are those of the outbound search": [
-   26,
+   27,
    0
   ],
   "post get return offer|Selected offer has expected flexibility - expected: FULL_FLEXIBLE, actual: FULL_FLEXIBLE": [
-   19,
+   20,
    0
   ],
   "post get return offer|Selected offer has expected flexibility - expected: NON_FLEXIBLE, actual: NON_FLEXIBLE": [
@@ -4279,35 +5075,35 @@
    0
   ],
   "post get return offer|Trip N Leg N has TrainID, Origin & Destination - TrainID: N, Origin: Station N, Destination: Station N": [
-   36,
+   38,
    0
   ],
   "post get return offer|Trip N direction is a known value - direction: IN_BOUND": [
-   26,
+   27,
    0
   ],
   "post get return offer|Trip N direction is a known value - direction: OUT_BOUND": [
-   10,
+   11,
    0
   ],
   "post get return offer|Trip N has legs - length: N": [
-   36,
+   38,
    0
   ],
   "post get return offer|Trip N startTime is before endTime (OSDM: temporal order)": [
-   36,
+   38,
    0
   ],
   "post get return offer|Trips are defined - length: N": [
-   26,
+   27,
    0
   ],
   "post get return offer|[OSCAR request] POST /offers conforms to OSDM N.N OfferCollectionRequest": [
-   26,
+   27,
    0
   ],
   "post get return offer|[OSDM] Content-Type is JSON": [
-   26,
+   27,
    0
   ],
   "post get return offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: CHF, actual: CHF)": [
@@ -4315,7 +5111,7 @@
    0
   ],
   "post get return offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: CZK, actual: CZK)": [
-   27,
+   29,
    0
   ],
   "post get return offer|admissionOfferParts[N].price.currency matches offerSummary currency (expected: EUR, actual: EUR)": [
@@ -4323,23 +5119,23 @@
    0
   ],
   "post get return offer|offers[N].createdOn is a valid ISO datetime (OSDM: Offer.createdOn required)": [
-   106,
+   110,
    0
   ],
   "post get return offer|offers[N].offerId is a non-empty string (OSDM: Offer.offerId required)": [
-   106,
+   110,
    0
   ],
   "post get return offer|offers[N].passengerRefs count matches requested passengers (expected: N, actual: N)": [
-   106,
+   110,
    0
   ],
   "post get return offer|offers[N].passengerRefs is a non-empty array (OSDM: Offer.passengerRefs minItems:N)": [
-   106,
+   110,
    0
   ],
   "post get return offer|selectedOffer.tripCoverage.coveredTripId (<id>) is part of Trip ids": [
-   26,
+   27,
    0
   ],
   "post obtaining fulfillments from booking|Expired booking: error body is an RFC-N Problem (title/detail/code present)": [
@@ -4367,27 +5163,27 @@
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>,<id>]": [
-   16,
+   17,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>,<id>], actual: [<id>]": [
-   62,
+   70,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [<id>], actual: [<id>]": [
-   31,
+   41,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] bookingRef exists": [
-   143,
+   162,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] controlNumber exists": [
-   143,
+   162,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] createdOn is a valid datetime at or before now (clock tolerance <duration>)": [
-   143,
+   162,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] documents exist and contain valid data": [
@@ -4395,23 +5191,23 @@
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] id exists": [
-   143,
+   162,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] status comparison - expected: EXCHANGED,FULFILLED,CONFIRMED, actual: EXCHANGED": [
-   2,
+   5,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] status comparison - expected: EXCHANGED,FULFILLED,CONFIRMED, actual: FULFILLED": [
-   2,
+   5,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED": [
-   139,
+   152,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N].bookingRef matches current bookingId (expected: <id>, actual: <id>)": [
-   143,
+   162,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N].document[N] - fields exist": [
@@ -4419,19 +5215,19 @@
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.N integrity, when siblings present)": [
-   121,
+   134,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N].fulfillmentDocumentRefs are non-empty strings (OSDM v3.N: replaces fulfillmentDocuments)": [
-   123,
+   139,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillment[N].status '…' is a valid OSDM FulfillmentStatus": [
-   143,
+   162,
    0
   ],
   "post obtaining fulfillments from booking|Fulfillments exist at index N": [
-   94,
+   109,
    0
   ],
   "post obtaining fulfillments from booking|Idempotency-Key, POST /bookings/{id}/fulfillments sent again with the same key: HTTP status N — actual N": [
@@ -4443,7 +5239,7 @@
    0
   ],
   "post obtaining fulfillments from booking|Status code is N or N": [
-   94,
+   131,
    0
   ],
   "post obtaining fulfillments from booking|[<id>] Expired booking: error body is an RFC-N Problem (title/detail/code present)": [
@@ -4455,11 +5251,27 @@
    0
   ],
   "post obtaining fulfillments from booking|[OSCAR request] POST /bookings/{bookingId}/fulfillments conforms to OSDM N.N FulfillmentPostRequest": [
-   96,
+   133,
    0
   ],
   "post obtaining fulfillments from booking|[OSDM] Content-Type is JSON": [
-   96,
+   133,
+   0
+  ],
+  "post obtaining fulfillments from booking|[fares F1] Each fare fulfilment is CONFIRMED or FULFILLED": [
+   22,
+   0
+  ],
+  "post obtaining fulfillments from booking|[fares F1] The confirmation gives the fare fulfilment (fulfillments)": [
+   22,
+   0
+  ],
+  "post obtaining fulfillments from booking|[fares F3] Each fare fulfilment names only parts of this booking (Fulfillment.bookingParts)": [
+   22,
+   0
+  ],
+  "post obtaining fulfillments from booking|[fares F4] No fulfilment holds both fares and product booking parts (OSDM processes)": [
+   22,
    0
   ],
   "post obtaining fulfillments from booking|🧪 Confirm again: no new ticket — HTTP N, the same fulfillments": [
@@ -4467,11 +5279,11 @@
    0
   ],
   "post refund offers|'…' array exists with N refund offer(s)": [
-   26,
+   35,
    0
   ],
   "post refund offers|AppliedOverruleCode is null as expected (actual: undefined → treated as null)": [
-   34,
+   44,
    0
   ],
   "post refund offers|AppliedOverruleCode matches expected — expected: CONNECTION_BROKEN, actual: \"…\"": [
@@ -4491,11 +5303,11 @@
    0
   ],
   "post refund offers|HTTP response status — expected N, actual: N": [
-   26,
+   35,
    0
   ],
   "post refund offers|No fulfillment is in two of the N refund offers": [
-   13,
+   14,
    0
   ],
   "post refund offers|Partial refund: refundFee(N) + refundableAmount(N) < confirmedPrice(N) (partial scope returns strictly less than full)": [
@@ -4543,35 +5355,43 @@
    0
   ],
   "post refund offers|Refund offer N (<id>) names fulfillments of this booking": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer at index N has a valid Offer Id <id>": [
-   44,
+   54,
+   0
+  ],
+  "post refund offers|Refund offer request for fulfillment <id> alone — HTTP N": [
+   2,
    0
   ],
   "post refund offers|Refund offer[N] breakdown[N] is valid, refundFee amount: N, refundableAmount amount: N": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer[N] createdOn is valid and in the past: <instant> (= <instant> Europe/Paris)": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer[N] fulfillments is a non-empty array (OSDM: minItems:N)": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer[N] has valid status, expected: PROPOSED, actual: PROPOSED": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CHF, scale=N (= no carrier retention)": [
    3,
    0
   ],
+  "post refund offers|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CZK, scale=N (= kept by carrier per OSDM)": [
+   7,
+   0
+  ],
   "post refund offers|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=CZK, scale=N (= no carrier retention)": [
-   36,
+   39,
    0
   ],
   "post refund offers|Refund offer[N] refundFee Price structure is well-formed — amount=N, currency=EUR, scale=N (= no carrier retention)": [
@@ -4583,7 +5403,7 @@
    0
   ],
   "post refund offers|Refund offer[N] refundableAmount Price structure is well-formed — amount=N, currency=CZK, scale=N": [
-   36,
+   46,
    0
   ],
   "post refund offers|Refund offer[N] refundableAmount Price structure is well-formed — amount=N, currency=EUR, scale=N": [
@@ -4591,15 +5411,15 @@
    0
   ],
   "post refund offers|Refund offer[N] validFrom is before or equal to validUntil (OSDM: temporal order)": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer[N] validFrom is valid: <instant> (= <instant> Europe/Paris)": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer[N] validUntil is valid and in the future: <instant> (= <instant> Europe/Paris)": [
-   44,
+   54,
    0
   ],
   "post refund offers|Refund offer[N]: priced in the sale's currency (CHF)": [
@@ -4607,7 +5427,7 @@
    0
   ],
   "post refund offers|Refund offer[N]: priced in the sale's currency (CZK)": [
-   36,
+   39,
    0
   ],
   "post refund offers|Refund offer[N]: priced in the sale's currency (EUR)": [
@@ -4615,15 +5435,31 @@
    0
   ],
   "post refund offers|Refund response bounds — refundable(N) and fee(N) are non-negative, sum ≤ confirmedPrice(N), currencies consistent": [
-   44,
+   54,
    0
   ],
   "post refund offers|[OSCAR request] POST /bookings/{bookingId}/refund-offers conforms to OSDM N.N RefundOfferRequest": [
-   27,
+   36,
    0
   ],
   "post refund offers|[OSDM] Content-Type is JSON": [
-   27,
+   36,
+   0
+  ],
+  "post refund offers|[fares R1] The refund offers cover every fare fulfilment asked": [
+   7,
+   0
+  ],
+  "post refund offers|[fares R2] Each refund offer gives back and keeps what its fares cost (refundableAmount + refundFee)": [
+   7,
+   0
+  ],
+  "post refund offers|[fares R3] COMBINING: each refund offer'…' after-sales conditions give (osdm.io: the distributor must obey the fares' fees)": [
+   1,
+   0
+  ],
+  "post refund offers|[fares R4] CLUSTERING: each refund offer's fee is the refundFee OSCAR sent (osdm.io: the provider uses the amount the client states)": [
+   1,
    0
   ],
   "post refund offers|🧪 Overrule code probe [STRIKE]: error body is an RFC-N Problem (title/detail/code present)": [
@@ -4635,11 +5471,11 @@
    0
   ],
   "simulator access token|Authentication: access token acquired for Simulator": [
-   110,
+   161,
    0
   ],
   "simulator access token|[OSDM] Content-Type is JSON": [
-   110,
+   161,
    0
   ]
  }

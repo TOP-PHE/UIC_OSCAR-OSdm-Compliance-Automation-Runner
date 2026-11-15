@@ -20,14 +20,23 @@
  * Asked only for what it does not sell (another tag, an unknown code), the
  * simulator answers as usual and says the member was ignored
  * (PARAMETER_NOT_SUPPORTED), as it does for requestedOfferParts.
+ *
+ * #1266: a product sold without a trip has its tag for type (single ride
+ * ADMISSION_POINT2POINT, pass ADMISSION_PASS, multi-ride ADMISSION_MULTI_RIDE).
+ * Without a trip, a tag is sold when an offer of the answer holds it, so a
+ * pass asked between two stop places gets the usual offers and the problem.
  */
 
 const TAG_OF_TYPE = Object.freeze({
   ADMISSION: 'ADMISSION_POINT2POINT',
   UPGRADE_POINT2POINT: 'UPGRADE_POINT2POINT',
   RESERVATION: 'RESERVATION',
+  ADMISSION_POINT2POINT: 'ADMISSION_POINT2POINT',
+  ADMISSION_PASS: 'ADMISSION_PASS',
+  ADMISSION_MULTI_RIDE: 'ADMISSION_MULTI_RIDE',
 });
-const TAGS = Object.values(TAG_OF_TYPE);
+// The tags sold with a trip, whatever the answer holds (#780).
+const TRIP_TAGS = Object.freeze(['ADMISSION_POINT2POINT', 'UPGRADE_POINT2POINT', 'RESERVATION']);
 const MAX_ASKED = 20;
 
 const text = (v) => (typeof v === 'string' && v.trim() !== '' && v.length <= 60 ? v.trim() : null);
@@ -61,11 +70,16 @@ function ignored(member, asked) {
   };
 }
 
+// The tags the offers of an answer hold (#1266).
+const tagsHeld = (offers) => [...new Set(offers.flatMap((o) => (o.products || []).map(tagOf).filter(Boolean)))];
+
 /**
  * The offers kept for the products asked, and the problems to answer with.
- * The offers' products carry their tag when anything was asked.
+ * The offers' products carry their tag when anything was asked. `nonTrip`:
+ * the tags sold are those the offers hold (#1266), else those sold with a trip.
  */
-function selectProducts(criteria, offers) {
+function selectProducts(criteria, offers, { nonTrip = false } = {}) {
+  const TAGS = nonTrip ? tagsHeld(offers) : TRIP_TAGS;
   const asked = productsAsked(criteria);
   if (!asked) return { offers, problems: [] };
   const tagged = offers.map((offer) => ({

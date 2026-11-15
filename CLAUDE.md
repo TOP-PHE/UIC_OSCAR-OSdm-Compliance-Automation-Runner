@@ -126,6 +126,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     Claude Code stops background work when memory runs short, and `record`
     writes nothing until its end; code lists made by Python there end in
     `\r`, which matches no scenario (`Recorded 0`).
+    **What is sold without a trip** (#1266 part 1, 1.11.525 / OTST_V2.0.259,
+    simulator 0.68.0; maintainer: they replace the trip tariffs, and a tag
+    asked is a probe). `nonTrip.products` in every profile: a single ride
+    (`ADMISSION_POINT2POINT`), a day pass (`ADMISSION_PASS`, zones only), a
+    ten-ride card (`ADMISSION_MULTI_RIDE`), type = tag, each with its
+    flexibility and validity, also in `GET /products`. Without a trip
+    `selectProducts(…, { nonTrip: true })` sells the tags the answer's offers
+    hold; **a trip request keeps its three fixed tags** (a pass asked for a
+    trip stays ignored: `SIM_WRONG_OFFER_PROBE_PRODUCT_TAG_PASS_38`). Wrong
+    variants by first stop place (`nonTrip.variants`, `applyVariants()`):
+    0000043 trip coverage (fails), 0000044 other stop places, `SIM-SOUTH`
+    other carrier (both WARNING only, `WARNING_ONLY` by the check's words).
+    Catalogue: a tag asked needs its declaration when the framework lists
+    tags (`productTagsMissing()`), a product selection OSDM 3.7
+    (`requestVersionOf()`), a code selected is provider value `productCode`
+    (left out of a copy). The references add the profile's non-trip tags
+    (`withNonTripForms()`). Part 2 (NUTS, other places, lost tickets,
+    fares, #227 discovery, refund and exchange) is still #1266's.
+    **To regenerate *Checks by scenario* from a partial change**, record the
+    213 scenarios it names in chunks and merge the recordings (the
+    simulator's `replay.js record` keeps only its last call).
   - **Place selection flows** (#766, PR 1 = 1.11.297): `placeSelectionFlows`
     (OSDM `PlaceSelectionFlow`: `AUTOMATIC_PLACE_SELECTION`, `…_PREFERENCES`,
     `…_NEARBY`, `MANUAL_PLACE_SELECTION_WITHOUT_FEE`, `…_WITH_FEE`). Absent =

@@ -1269,8 +1269,8 @@
     {
       "code": "OTST_NONTRIP_PLACES_1ADT",
       "source": "SIM_NONTRIP_PLACES_1ADT_38",
-      "checks": 245,
-      "purpose": "Sale without a trip for one adult (#1258): offers asked by nonTripSearchCriteria between two stop places (StopPlaceRef), no trip sent. The answer gives no trip and no trip coverage; each admission says where it is valid (regionalValidities, regionalValidity in OSDM 3.6) and gives a regionalValiditySummary. Booked, passenger details updated, fulfilled; the booked admissions keep their validity.",
+      "checks": 237,
+      "purpose": "Sale without a trip for one adult (#1258): offers asked by nonTripSearchCriteria between two stop places (StopPlaceRef), no trip sent; the fully flexible offer is booked. The answer gives no trip and no trip coverage; each admission says where it is valid (regionalValidities, regionalValidity in OSDM 3.6) and gives a regionalValiditySummary. Booked, passenger details updated, fulfilled; the booked admissions keep their validity.",
       "capability": "offers.nonTripPlaces",
       "needs": {
         "trip": "NON_TRIP",
@@ -1281,12 +1281,48 @@
     {
       "code": "OTST_NONTRIP_ZONES_1ADT",
       "source": "SIM_NONTRIP_ZONES_1ADT_38",
-      "checks": 247,
-      "purpose": "Sale without a trip for one adult in a zone (#1258): the first zone of GET /zones, its id and carrier as given, asked by nonTripSearchCriteria. No trip and no trip coverage in the answer; each admission valid in a Zone of that carrier. Booked, passenger details updated, fulfilled.",
+      "checks": 243,
+      "purpose": "Sale without a trip for one adult in a zone (#1258): the first zone of GET /zones, its id and carrier as given, asked by nonTripSearchCriteria; the fully flexible offer is booked. No trip and no trip coverage in the answer; each admission valid in a Zone of that carrier. Booked, passenger details updated, fulfilled.",
       "capability": "offers.nonTripZones",
       "needs": {
         "trip": "NON_TRIP",
         "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_SINGLE_RIDE_BY_TAG",
+      "source": "SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38",
+      "checks": 109,
+      "purpose": "Offer search probe without a trip (#1266): a single ride asked by product tag (offerSearchCriteria.productTags ADMISSION_POINT2POINT) between two stop places. Fails when no offer holds a product of that tag, or when the provider says it ignored the tags (PARAMETER_NOT_SUPPORTED). The scenario ends after the offer.",
+      "capability": "offers.options",
+      "needs": {
+        "trip": "NON_TRIP",
+        "tariff": "NON_FLEXIBLE",
+        "passengers": 1,
+        "providerValues": ["nonTripPlaces"]
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_PASS_BY_TAG",
+      "source": "SIM_NONTRIP_PROBE_TAG_PASS_38",
+      "checks": 112,
+      "purpose": "Offer search probe without a trip (#1266): a pass asked by product tag (offerSearchCriteria.productTags ADMISSION_PASS) in the first zone of GET /zones. Fails when no offer holds a pass, or when the provider says it ignored the tags (PARAMETER_NOT_SUPPORTED). The scenario ends after the offer.",
+      "capability": "offers.options",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_PRODUCT_BY_CODE_1ADT",
+      "source": "SIM_NONTRIP_PRODUCT_CODE_1ADT_38",
+      "checks": 278,
+      "purpose": "Sale without a trip of a product named by its code (#1266): one adult, the product asked by offerSearchCriteria.productSelections (productCode) in the first zone of GET /zones and expected (expectedProduct). Fails when no offer holds the product, or when the booking does not. Booked, passenger details updated, fulfilled. OSDM 3.7 or later.",
+      "capability": "sale.products",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": ["expectedProduct", "productCode"]
       }
     }
   ]

@@ -507,6 +507,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.525] / [collection-OTST_V2.0.259] — 2026-11-15
+
+Issue #1266, part 1. Release 2026.564 (`current_release`). Simulator 0.68.0. What is sold without a trip, asked by product.
+
+#1258 tested how a non-trip sale is asked and answered; it did not test which product is sold. In OSDM the client says it with `offerSearchCriteria.productTags` (`ADMISSION_POINT2POINT`, `ADMISSION_PASS`, `ADMISSION_MULTI_RIDE`…) or `productSelections` (a product of the provider, by code). The simulator ignored both without a trip, and answered with the trip tariffs (a "Train-bound saver" without a train). Part 2 of the issue (NUTS codes, other places, lost tickets and cards, fares, the #227 discovery, refund and exchange) stays open.
+
+Decided with the maintainer: the non-trip products replace the trip tariffs in a non-trip answer, and a product asked by tag is an offer search probe (a failed check when no offer holds it or the tags are said ignored; the scenario ends after the offer), as the trip tag probes are.
+
+### Added
+- **Simulator scenarios** (gamma, with their version copies; rows in *OSCAR - OSDM Simulator scenarios*):
+  - `SIM_NONTRIP_PROBE_TAG_PASS_*` (a pass by tag in the first zone of `GET /zones`) and `SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_*` (a single ride by tag between 0000040 and 0000041): offer search probes, in the run list.
+  - `SIM_NONTRIP_PRODUCT_CODE_1ADT_*`: the day pass asked by `productSelections` (productCode `SIM_DAY_PASS`) and expected (`expectedProduct`), sold and fulfilled; no `_36` copy (OSDM 3.6 has no `productSelections`). In the run list.
+  - Wrong answers, not in the run list: `SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_*` (fails "no tripCoverage" at 01, 02, 05, 07), `SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_*` and `SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_*` (no failed check: the WARNING "the regional validity names every stop place asked", resp. "a zone of the carrier asked", at 01, 02, 05 and 07; `WARNING_ONLY` in `simulatedErrors.js`, by the words of the check). Until now those checks were tested by unit tests only.
+- **Catalogue**: `OTST_NONTRIP_SINGLE_RIDE_BY_TAG` (109 checks, to complete with the provider's stop places), `OTST_NONTRIP_PASS_BY_TAG` (112) and `OTST_NONTRIP_PRODUCT_BY_CODE_1ADT` (278, to complete with the provider's product code), with their rows in *OSCAR - What is tested*.
+- **The server**:
+  - A catalogue entry asking product tags needs each declared when the Test Framework lists its tags (`productTagsMissing()`, "product tag X (Offer search options)"; no list declares every tag).
+  - A product selection needs OSDM 3.7 (`requestVersionOf()`, as the simulator's version copies rule it).
+  - A product selected by code is the provider's: provider value `productCode` (`dataNeedsOf()`); the copy leaves the simulator's code out of `productSelections` and says what to complete (`adaptReferenceScenario()`), as it does for `expectedProduct`.
+  - The simulator references declare the tags of what their profile sells without a trip, after those the checklist ticks (`withNonTripForms()`): every reference changes, so a company following one reads "not up to date" until it updates.
+- **Test Config**: the non-trip trip's hint says how to ask a kind of product (product tags) or one product (product selections and Expected product).
+- A welcome-page news entry.
+
+### Changed
+- The non-trip sales book the ten-ride card (their `desiredFlexibility` is FULL_FLEXIBLE), with one offer per product instead of one per tariff: `OTST_NONTRIP_PLACES_1ADT` 245 → 237 and `OTST_NONTRIP_ZONES_1ADT` 247 → 243 checks (4 checks per offer fewer in the answer). *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`, last generated on 2026-10-18 from 110 scenarios, now from the 161 scenarios of this recording that do not fail on purpose).
+
+### Simulator 0.68.0
+- Simulator 0.68.0. **What is sold without a trip** (`nonTrip.products` in every profile, checked by `checkNonTripProducts()`): `SIM_SINGLE_RIDE` (type and tag `ADMISSION_POINT2POINT`, NON_FLEXIBLE, valid 2 hours from `validFrom`, between stop places and in zones), `SIM_DAY_PASS` (`ADMISSION_PASS`, SEMI_FLEXIBLE, one day, in zones only) and `SIM_TEN_RIDES` (`ADMISSION_MULTI_RIDE`, FULL_FLEXIBLE, 30 days, both). One offer per product sold for the kind of request and per class asked (second class when none is asked); the regional validity summary names the product and its duration. `GET /products` lists them, after the trip products, in both classes.
+- `productTags` and `productSelections` are read without a trip (`selectProducts(…, { nonTrip: true })`): a tag is sold when an offer of the answer holds it, so a pass asked between two stop places gets the usual offers and `PARAMETER_NOT_SUPPORTED`. A trip request keeps its own three tags: a pass asked for a trip is still ignored (`SIM_WRONG_OFFER_PROBE_PRODUCT_TAG_PASS_38` unchanged).
+- Stop places 0000043 (Simtown East), 0000044 (Simtown West), 0000045 (Simtown South) and zone `SIM-SOUTH` (0000045), for the wrong variants (`nonTrip.variants`, `applyVariants()` in `src/osdm/nonTrip.js`): `tripCoverage` (from 0000043, every admission and booked admission covers a trip), `otherPlaces` (from 0000044, a route through other stop places) and `otherCarrier` (in `SIM-SOUTH`, a Zone of `urn:x_osdm_simulator:carrier:other`). `withoutValidityFrom` (0000042) is unchanged.
+
+### Checked
+- Replay with the real Bruno CLI 4.2.1 against simulator 0.68.0 of the 213 scenarios *OSCAR - Checks by scenario* names (the 207 of the last recording and the six new ones, recorded in chunks and merged): no failed check but the `SIM_WRONG_*` / `SIM_FAULT_*` ones; 203 give the same checks and failures as the last recording, only the four non-trip scenarios of #1258 moved; `replay.js catalogue` agrees with all 103 entries; the new wrong answers fail or warn as their rows say.
+- Simulator tests (`non-trip.test.js`: the products by kind of request, flexibility, tags, selections by code and tag, a trip request's tags unchanged, the three variants, and over HTTP every provider's answers against its version's OSDM response schema; `app.test.js`: `GET /products`), `datafile.test.js`, server tests (`non-trip-forms.test.js`: version 3.7, tags declared, the product code to complete, the references' tags).
+
+---
+
 ## [server-1.11.524] — 2026-11-15
 
 Release 2026.563 (`current_release`). SQLite's statistics are off by default (#1269, part of #1233).

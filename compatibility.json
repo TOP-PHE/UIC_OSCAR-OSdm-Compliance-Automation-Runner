@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.563",
+  "current_release": "2026.564",
   "releases": [
+    {
+      "release": "2026.564",
+      "date": "2026-11-15",
+      "server": "1.11.525",
+      "collection": "OTST_V2.0.259",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.525, collection OTST_V2.0.259, simulator 0.68.0: what is sold without a trip, asked by product (#1266, part 1). The simulator sells three products without a trip instead of the trip tariffs: a single ride (ADMISSION_POINT2POINT, 2 hours, between stop places and in zones), a day pass (ADMISSION_PASS, one day, in zones only) and a ten-ride card (ADMISSION_MULTI_RIDE, 30 days), listed by GET /products. offerSearchCriteria.productTags and productSelections keep the offers holding such a product; asked for what is not sold for that request, the usual offers and PARAMETER_NOT_SUPPORTED. Three wrong variants by stop place: a trip coverage (fails at 01, 02, 05, 07), a route through other stop places and a zone of another carrier (warnings only).",
+        "New simulator scenarios (gamma and copies): SIM_NONTRIP_PROBE_TAG_PASS, SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE (offer search probes), SIM_NONTRIP_PRODUCT_CODE_1ADT (from 3.7), and three SIM_WRONG_NONTRIP_* scenarios. Catalogue: OTST_NONTRIP_SINGLE_RIDE_BY_TAG, OTST_NONTRIP_PASS_BY_TAG, OTST_NONTRIP_PRODUCT_BY_CODE_1ADT; the non-trip sales now book the ten-ride card, with fewer offers in the answer, so OTST_NONTRIP_PLACES_1ADT (245 to 237) and OTST_NONTRIP_ZONES_1ADT (247 to 243) moved. A catalogue entry asking product tags needs them declared when the Test Framework lists its tags; a product selection needs OSDM 3.7; a product selected by the simulator's code is left out of a copy, to complete. The simulator references declare the tags of what they sell without a trip, and every reference changes."
+      ]
+    },
     {
       "release": "2026.563",
       "date": "2026-11-15",

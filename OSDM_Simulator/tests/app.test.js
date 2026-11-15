@@ -215,6 +215,9 @@ test('products: gamma lists its named products in both classes and gives one by 
     'GAMMA-PRD-SIM_WEEKEND_GROUP-SECOND', 'GAMMA-PRD-SIM_WEEKEND_GROUP-FIRST', 'GAMMA-PRD-SIM_GROUP-SECOND',
     // #601: the seat reservation, one per flexibility.
     'GAMMA-PRD-RES-FULL_FLEXIBLE', 'GAMMA-PRD-RES-SEMI_FLEXIBLE', 'GAMMA-PRD-RES-NON_FLEXIBLE',
+    // #1266: what is sold without a trip, in both classes.
+    'GAMMA-PRD-SIM_SINGLE_RIDE-SECOND', 'GAMMA-PRD-SIM_SINGLE_RIDE-FIRST', 'GAMMA-PRD-SIM_DAY_PASS-SECOND',
+    'GAMMA-PRD-SIM_DAY_PASS-FIRST', 'GAMMA-PRD-SIM_TEN_RIDES-SECOND', 'GAMMA-PRD-SIM_TEN_RIDES-FIRST',
   ]);
   for (const p of list.body.products) for (const field of ['id', 'code', 'owner', 'flexibility']) assert.ok(p[field], `${p.id} ${field}`);
   const one = await call(sim.base, token, 'GET', '/gamma/products/GAMMA-PRD-SIM_TRAIN_BOUND-FIRST');

@@ -3383,6 +3383,7 @@ function buildNonTripFields(tIdx, trip, depDayField) {
     </div>
     <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.4">
       No trip is sent: the offers are checked for no trip and no trip coverage, and each admission for where it is valid (regionalValidities, or regionalValidity in OSDM 3.6) (#1258).
+      To ask a kind of product (a single ride, a pass, a multi-ride card), name its tag in the scenario's Offer search criteria (productTags: ADMISSION_POINT2POINT, ADMISSION_PASS, ADMISSION_MULTI_RIDE), or select one of the provider's products by its code (productSelections, OSDM 3.7 or later) and expect it (Expected product) (#1266).
     </div>`;
 }
 

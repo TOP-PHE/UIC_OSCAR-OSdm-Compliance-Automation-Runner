@@ -122,6 +122,13 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
     delete out.expectedProduct;
     toComplete.push(PRODUCT_TO_COMPLETE);
   }
+  // #1266: a product selected by the simulator's code: the provider has its own.
+  if (arr(n.providerValues).includes('productCode') && isObj(out.offerSearchCriteria)) {
+    const selections = arr(out.offerSearchCriteria.productSelections);
+    const codes = selections.filter((p) => isObj(p) && typeof p.productCode === 'string' && p.productCode.trim()).map((p) => p.productCode);
+    out.offerSearchCriteria.productSelections = selections.filter((p) => !(isObj(p) && codes.includes(p.productCode)));
+    toComplete.push(`the provider's product code to select (Offer search → Product selections, now the simulator's ${codes.join(', ')})`);
+  }
   // #1258: the simulator's stop places, lookup name and zones mean nothing
   // at another provider.
   if (arr(n.providerValues).includes('nonTripPlaces')) {

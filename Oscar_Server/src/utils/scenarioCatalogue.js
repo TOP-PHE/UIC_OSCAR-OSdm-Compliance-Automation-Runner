@@ -231,12 +231,18 @@ function minimumVersionOf(requirements) {
 // The OSDM version a scenario's own request needs, or null: a COMBINED return
 // names the outbound trip (3.7); a named compartment needs
 // PlaceSelection.compartments (3.8, #1027: copied to a 3.6 or 3.7 provider,
-// the booking request did not conform). As `reasonNotPossible()` of the
-// simulator's version copies (`version-copies-lib.js`) rules it.
+// the booking request did not conform); a product selection needs
+// OfferSearchCriteria.productSelections (3.7, #1266). As
+// `reasonNotPossible()` of the simulator's version copies
+// (`version-copies-lib.js`) rules it.
 function requestVersionOf(scenario, model) {
   if (scenario.namedPlaceKind === 'COMPARTMENT') return '3.8';
+  if (arr(scenario.offerSearchCriteria?.productSelections).length > 0) return '3.7';
   return model === 'COMBINED' ? '3.7' : null;
 }
+
+// #1266: the product tags a scenario's own offer request asks.
+const productTagsOf = (scenario) => arr(scenario.offerSearchCriteria?.productTags).filter((t) => typeof t === 'string' && t.trim() !== '');
 
 /** What a reference scenario needs the Test Framework to declare. */
 function requirementsOf(scenario, datafile) {
@@ -259,6 +265,8 @@ function requirementsOf(scenario, datafile) {
     distributionModes: require('./distributionModes').distributionModesOf(scenario, datafile),
     // #937: what its fares need declared under `fares`.
     fares: fareRequirementsOf(scenario, scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts),
+    // #1266: the product tags it asks (a pass, a multi-ride card…).
+    productTags: productTagsOf(scenario),
   };
 }
 
@@ -299,7 +307,16 @@ function missingFor(requirements, framework) {
     ...missing, ...placeSelectionMissing(requirements.placeSelectionFlow, fw),
     ...offerRequestMissing(requirements.offerRequest, fw), ...limitsMissing(requirements, fw),
     ...stepsMissing(requirements, fw), ...tripParametersMissing(requirements, fw),
+    ...productTagsMissing(requirements, fw),
   ];
+}
+
+// #1266: a product tag asked that the framework's list leaves out (an absent
+// list declares every tag), as a sentence.
+function productTagsMissing(requirements, fw) {
+  const declared = isObj(fw.offerSearchOptions) && Array.isArray(fw.offerSearchOptions.productTags) ? fw.offerSearchOptions.productTags : null;
+  if (!declared) return [];
+  return arr(requirements.productTags).filter((tag) => !declared.includes(tag)).map((tag) => `product tag ${tag} (Offer search options)`);
 }
 
 // The OSDM version the requirements need and the framework is below, as a sentence.
@@ -416,6 +433,8 @@ function dataNeedsOf(scenario, datafile, facts) {
     ...(nonTrip && arr(nonTrip.zones).length ? ['nonTripZones'] : []),
     ...(overrule ? ['overruleCode'] : []),
     ...(scenario.expectedProduct ? ['expectedProduct'] : []),
+    // #1266: a product selected by its code names one of the simulator's.
+    ...(arr(scenario.offerSearchCriteria?.productSelections).some((p) => isObj(p) && typeof p.productCode === 'string' && p.productCode.trim()) ? ['productCode'] : []),
     // #766: seat preferences are codes of the provider's own list.
     ...(placeSelectionFlowOf({ placePreferences: scenario.placePreferences }) ? ['placePreferences'] : []),
     // #766 PR 4: a reference place is a coach and place of the provider's train.
@@ -454,6 +473,7 @@ const RETURN_TEXT = { COMBINED: 'one offer for both directions', SEPARATE: 'one 
 // #1258: the provider's values of a non-trip request, in words.
 const PROVIDER_VALUE_TEXT = Object.freeze({
   nonTripPlaces: 'stop places to sell between', placeLookup: 'name for POST /places', nonTripZones: 'zone',
+  productCode: 'product code (Product selections)',
 });
 const NEED_PHRASES = {
   trip: (v) => (v === 'NON_TRIP' ? 'offers without a trip (nonTripSearchCriteria)' : null),

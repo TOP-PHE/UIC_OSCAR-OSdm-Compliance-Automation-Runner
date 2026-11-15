@@ -329,6 +329,9 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_WRONG_FARE_COVERED_LEG_38: [],
     // #1258: by the first stop place of a non-trip request.
     SIM_WRONG_NONTRIP_NO_VALIDITY_1ADT_38: [],
+    SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38: [],
+    SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38: [],
+    SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38: [],
   };
   const found = Object.fromEntries(datafile.scenarios
     .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
@@ -440,7 +443,16 @@ test('the product scenarios: each names a product gamma sells, by code or by nam
     assert.equal(scenario.desiredFlexibility, product.flexibility, `${scenario.code}: the flexibility agrees with the product`);
   }
   assert.ok(named.some((s) => !gamma.products.some((p) => p.code === s.expectedProduct)), 'one names the product by its name');
-  const others = datafile.scenarios.filter((s) => !named.includes(s) && !s.code.startsWith('SIM_GROUP_'));
+  // #1266: a product sold without a trip, named by its code, in its flexibility.
+  const nonTrip = datafile.scenarios.filter((s) => s.code.startsWith('SIM_NONTRIP_PRODUCT_'));
+  assert.deepEqual(nonTrip.map((s) => s.code), ['SIM_NONTRIP_PRODUCT_CODE_1ADT_38']);
+  for (const scenario of nonTrip) {
+    const product = gamma.nonTrip.products.find((p) => p.code === scenario.expectedProduct);
+    assert.ok(product, scenario.code);
+    assert.equal(scenario.desiredFlexibility, product.flexibility, scenario.code);
+    assert.deepEqual(scenario.offerSearchCriteria.productSelections.map((p) => p.productCode), [product.code]);
+  }
+  const others = datafile.scenarios.filter((s) => !named.includes(s) && !nonTrip.includes(s) && !s.code.startsWith('SIM_GROUP_'));
   for (const scenario of others) assert.equal(scenario.expectedProduct, undefined, scenario.code);
 });
 

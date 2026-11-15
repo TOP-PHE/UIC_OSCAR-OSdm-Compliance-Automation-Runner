@@ -115,8 +115,10 @@ describe('the wrong answers meant to warn only', () => {
     const warnOnly = rows.filter((c) => /no failed check/i.test(c[4] || '')).map((c) => ({ code: c[1].trim().replaceAll('`', ''), expected: c[4] }));
     expect(warnOnly.map((w) => base(w.code)).sort()).toEqual(Object.keys(SE.WARNING_ONLY).sort());
     for (const { code, expected } of warnOnly) {
-      const id = /^\[fares (\w+)\]$/.exec(SE.WARNING_ONLY[base(code)])[1];
-      expect(expected).toContain('check ' + id + ' ');
+      // A fare check by its id (O10, F2…); another (#1266) by its words.
+      const tag = SE.WARNING_ONLY[base(code)];
+      const fare = /^\[fares (\w+)\]$/.exec(tag);
+      expect(expected).toContain(fare ? 'check ' + fare[1] + ' ' : tag);
     }
   });
 

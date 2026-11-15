@@ -392,10 +392,19 @@ function checkFaresAgainstProfile(provider, framework, profile) {
 // trip. A simulated provider whose profile sells so (`nonTrip`) declares both
 // non-trip forms, after those the checklist ticks.
 function withNonTripForms(framework, profile) {
-  if (!profile?.nonTrip || !Array.isArray(framework.offerRequestForms)) return;
-  const { NON_TRIP_REQUEST_FORMS } = require('./frameworkGating');
-  for (const form of NON_TRIP_REQUEST_FORMS) {
-    if (!framework.offerRequestForms.includes(form)) framework.offerRequestForms.push(form);
+  if (!profile?.nonTrip) return;
+  if (Array.isArray(framework.offerRequestForms)) {
+    const { NON_TRIP_REQUEST_FORMS } = require('./frameworkGating');
+    for (const form of NON_TRIP_REQUEST_FORMS) {
+      if (!framework.offerRequestForms.includes(form)) framework.offerRequestForms.push(form);
+    }
+  }
+  // #1266: the product tags of what it sells without a trip (a pass, a
+  // multi-ride card), when the checklist lists the tags.
+  const tags = framework.offerSearchOptions?.productTags;
+  if (!Array.isArray(tags)) return;
+  for (const product of Array.isArray(profile.nonTrip.products) ? profile.nonTrip.products : []) {
+    if (typeof product?.type === 'string' && !tags.includes(product.type)) tags.push(product.type);
   }
 }
 
