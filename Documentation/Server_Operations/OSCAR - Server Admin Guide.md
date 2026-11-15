@@ -221,11 +221,11 @@ COLLECTION_PATH=C:\Users\patri\OneDrive\...\OTST_V2.0.1
 # Full path to the Bruno CLI command
 BRU_CMD=C:\Users\patri\AppData\Roaming\npm\bru.cmd
 
-# URL of the OSDM data file JSON schema (used for validation).
-# Since v1.11.112 OSCAR serves the schema itself; leave the default.
-# Do NOT use the deprecated OSDM-testing/exch_dev GitHub URL — its schema
-# is out of sync and produces false-positive validation failures.
-JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json
+# JSON_SCHEMA_URL (the OSDM data file JSON schema) is left unset: OSCAR
+# serves the schema itself and gives each run its address. Do NOT use the
+# deprecated OSDM-testing/exch_dev GitHub URL — its schema is out of sync
+# and produces false-positive validation failures.
+# JSON_SCHEMA_URL=
 
 # Maximum time (ms) a single Bruno run is allowed to run before it is killed
 RUN_TIMEOUT_MS=600000

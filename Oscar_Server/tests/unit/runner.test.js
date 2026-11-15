@@ -759,6 +759,15 @@ describe('executeRun — RUN_ISOLATION=pod (#1130)', () => {
     expect((await done).exitCode).toBe(0);
   });
 
+  test('a JSON_SCHEMA_URL on the loopback (the old deployment files) still gives the pod the internal port', async () => {
+    process.env.JSON_SCHEMA_URL = 'http://127.0.0.1:3001/json_validator/datafile.schema.json';
+    const { request, proc, done } = await startPodRun();
+    const file = readEnvYml(Buffer.from(request.envYml, 'base64').toString('utf8'));
+    expect(valueIn(file, 'json_schema')).toBe('http://oscar-internal:3003/json_validator/datafile.schema.json');
+    proc.emit('close', 0);
+    expect((await done).exitCode).toBe(0);
+  });
+
   test('the run\'s secret is bound to its pod\'s address', async () => {
     const { runId, request, proc, done } = await startPodRun();
     proc.emit('pod', '10.1.0.9');

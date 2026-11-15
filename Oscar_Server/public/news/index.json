@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-15-data-file-schema-checked-again",
+    "date": "November 15, 2026",
+    "tag": "Bug Fix",
+    "title": "The data file is checked against its schema again in every run",
+    "summary": "Since runs moved to a container of their own in early November, each run failed to load the data file's schema and skipped that check. They load it again.",
+    "content": "At its start, each run checks the data file against its schema, the one bundled with the Bruno collection, which OSCAR serves itself. Since early November runs go to a container of their own, separate from the server, and the address of the schema still named the server's own machine as it was seen from the server. From the run's container nothing answered there: the run log showed \"Error loading the schema: connect ECONNREFUSED 127.0.0.1:3001\" at the start, and the data file was not checked.\n\nNo run failed because of it, and no result changed: that check is not counted among a run's checks, passed or failed. The data file was still checked when uploaded.\n\nOSCAR now gives each run the address where it reaches the server, so the schema loads again and the line is gone from the run log.\n\nNo action is required. Administrators may remove JSON_SCHEMA_URL from the server's settings: unset is now right in every set-up (see the installation guide)."
+  },
+  {
     "id": "2026-11-14-offers-without-a-trip",
     "date": "November 14, 2026",
     "tag": "New",

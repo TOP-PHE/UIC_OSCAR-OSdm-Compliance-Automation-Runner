@@ -507,6 +507,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.523] — 2026-11-15
+
+Release 2026.562 (`current_release`). The data file is checked against its schema again in every run.
+
+### Fixed
+- **A run in the runner container or in a run pod could not load the data file's schema.** `OSCAR_Deploy/.env.example` and the cluster's `base/settings.env` set `JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json`, and the installation guide advised it. That address names the machine Bruno runs on. Since runs went to the `oscar-runner` container (`RUN_ISOLATION=isolated`, production since 2026-11-07) or to a run pod (`RUN_ISOLATION=pod`), it is that container, where nothing answers: every run logged `Error loading the schema: connect ECONNREFUSED 127.0.0.1:3001` and the data file went unchecked at run time. Found in the reports of the non-trip scenarios on alpha and gamma (batch of 2026-11-15); the reports of October, in local mode, loaded it.
+  - With `RUN_SERVER_URL` set (isolated or pod mode), `serverUrls()` (`worker/runner.js`) replaces a loopback `JSON_SCHEMA_URL` (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`, read with the URL parser, so `127.1` counts) by its own schema at `RUN_SERVER_URL`, and says so once in its log. Another address (a schema hosted elsewhere) is kept; so is a loopback value where Bruno shares the server's loopback (local mode, or isolated on a cluster pod without `RUN_SERVER_URL`).
+  - The line is gone from `OSCAR_Deploy/.env.example`, `kubernetes/base/settings.env`, `Oscar_Server/.env.example` (which still named the deprecated OSDM-testing URL) and the guides (*installation-guide* §3, *Server Admin Guide*): unset is right in every mode. An existing `.env` keeps working; removing the line (then `docker compose up -d oscar`) is tidier, not required.
+- **Why nothing failed:** the collection registers the check's result in the schema request's callback (`validateDataFileJsonWithTemplate()`, `validators.js`), which Bruno runs after the step's script has ended, so the result, pass or fail, was never counted. Left as it is here: counting it adds a check to every scenario and moves every catalogue count, a decision of its own.
+
+### Checked
+- `run-agent-peer.test.js`: every loopback form replaced in isolated and pod mode, other addresses kept, local mode and isolated without `RUN_SERVER_URL` kept. `runner.test.js`: a pod run's environment file names the internal port with the old setting. Both mutation-checked (the old rule fails 10 tests).
+
+---
+
 ## [server-1.11.522] / [collection-OTST_V2.0.258] — 2026-11-15
 
 Issue #1258, listed in `compatibility.json` (2026.561) without moving `current_release`. Simulator 0.67.0. Offers without a trip: between stop places, or in a zone.
