@@ -466,7 +466,10 @@ function recordNonTripExchangeOfferChecks(body, test) {
 function recordNonTripExchangedPartsChecks(added, stage, test) {
   if (!isNonTripSale() || !Array.isArray(added) || added.length === 0) return;
   const bookedOffer = {};
-  for (const { list: key, part } of added) (bookedOffer[key] ||= []).push(part);
+  for (const { list: key, part } of added) {
+    if (!bookedOffer[key]) bookedOffer[key] = [];
+    bookedOffer[key].push(part);
+  }
   const version = require('./osdmVersion.js').getComplianceVersion();
   const sent = parseJson(bruEnv('requestExchangeOffersBodyData'), null);
   const askedNow = askedOfCriteria(sent?.nonTripSearchCriteria) || asked();
