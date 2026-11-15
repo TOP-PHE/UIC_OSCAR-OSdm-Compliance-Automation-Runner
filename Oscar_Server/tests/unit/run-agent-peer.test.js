@@ -79,4 +79,58 @@ describe('where Bruno reaches the server', () => {
       schema: 'http://oscar:3001/json_validator/datafile.schema.json',
     });
   });
+
+  // The deployment files set JSON_SCHEMA_URL to the loopback until 1.11.523.
+  // Once Bruno ran on the runner agent or in a run pod, every run failed to
+  // load the schema (ECONNREFUSED 127.0.0.1:3001) and the data file went
+  // unchecked.
+  describe('JSON_SCHEMA_URL on the loopback', () => {
+    const ownIsolated = 'http://oscar:3001/json_validator/datafile.schema.json';
+    beforeEach(() => {
+      process.env.PORT = '3001';
+      process.env.RUN_SERVER_URL = 'http://oscar:3001';
+    });
+
+    test.each([
+      'http://127.0.0.1:3001/json_validator/datafile.schema.json',
+      'http://127.0.0.2:3001/json_validator/datafile.schema.json',
+      'http://localhost:3001/json_validator/datafile.schema.json',
+      'http://LOCALHOST:3001/json_validator/datafile.schema.json',
+      'http://oscar.localhost:3001/json_validator/datafile.schema.json',
+      'http://[::1]:3001/json_validator/datafile.schema.json',
+      'http://[0:0:0:0:0:0:0:1]:3001/json_validator/datafile.schema.json',
+      'http://127.1:3001/json_validator/datafile.schema.json',
+    ])('isolated: %s is replaced by the server on RUN_SERVER_URL', (url) => {
+      process.env.RUN_ISOLATION = 'isolated';
+      process.env.JSON_SCHEMA_URL = url;
+      expect(serverUrls().schema).toBe(ownIsolated);
+    });
+
+    test('pod: replaced by the internal port', () => {
+      process.env.RUN_ISOLATION = 'pod';
+      process.env.RUN_SERVER_URL = 'http://oscar-internal.oscar.svc:3003/';
+      process.env.JSON_SCHEMA_URL = 'http://127.0.0.1:3001/json_validator/datafile.schema.json';
+      expect(serverUrls().schema).toBe('http://oscar-internal.oscar.svc:3003/json_validator/datafile.schema.json');
+    });
+
+    test.each([
+      'https://schemas.example.org/datafile.schema.json',
+      'http://127.0.0.1.example.org/datafile.schema.json',
+      'not a url',
+    ])('isolated: %s, not the loopback, is kept', (url) => {
+      process.env.RUN_ISOLATION = 'isolated';
+      process.env.JSON_SCHEMA_URL = url;
+      expect(serverUrls().schema).toBe(url);
+    });
+
+    test('kept where Bruno shares the server\'s loopback: local mode, or isolated without RUN_SERVER_URL', () => {
+      const url = 'http://127.0.0.1:3001/json_validator/datafile.schema.json';
+      process.env.JSON_SCHEMA_URL = url;
+      process.env.RUN_ISOLATION = 'local';
+      expect(serverUrls().schema).toBe(url);
+      process.env.RUN_ISOLATION = 'isolated';
+      delete process.env.RUN_SERVER_URL;
+      expect(serverUrls().schema).toBe(url);
+    });
+  });
 });

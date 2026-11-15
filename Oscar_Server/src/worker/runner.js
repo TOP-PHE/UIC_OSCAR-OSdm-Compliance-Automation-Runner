@@ -22,6 +22,7 @@
  */
 
 const path        = require('node:path');
+const net         = require('node:net');
 const { tokenErrorText } = require('../utils/tokenErrors');
 const fs          = require('node:fs');
 const { launch, launchRun, launcherProblem, isolationMode } = require('./launcher');
@@ -73,6 +74,37 @@ function withoutTrailingSlashes(url) {
   while (end > 0 && url[end - 1] === '/') end--;
   return url.slice(0, end);
 }
+// Whether an address names this machine (localhost, 127.0.0.0/8, ::1).
+function onLoopback(url) {
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return host === 'localhost' || host.endsWith('.localhost') || host === '[::1]'
+    || (host.startsWith('127.') && net.isIPv4(host));
+}
+// JSON_SCHEMA_URL on the loopback (the value the deployment files gave
+// until 1.11.523) names the machine Bruno runs on. Once Bruno runs on the
+// runner agent or in a run pod (RUN_SERVER_URL set), nothing answers there:
+// every run logged "Error loading the schema: connect ECONNREFUSED
+// 127.0.0.1:3001" and the data file went unchecked. Such an address is
+// replaced by this server's on RUN_SERVER_URL; any other (a schema hosted
+// elsewhere) is kept. Said once in the server's log.
+let loopbackSchemaWarned = false;
+function schemaUrlFor(isolatedBase, loopback) {
+  const configured = process.env.JSON_SCHEMA_URL;
+  const own = `${loopback}/json_validator/datafile.schema.json`;
+  if (!configured) return own;
+  if (!isolatedBase || !onLoopback(configured)) return configured;
+  if (!loopbackSchemaWarned) {
+    loopbackSchemaWarned = true;
+    log.warn({ configured, used: own },
+      'JSON_SCHEMA_URL names the loopback, which is not where runs reach this server: using RUN_SERVER_URL instead (remove JSON_SCHEMA_URL from the settings)');
+  }
+  return own;
+}
 function serverUrls() {
   const port = process.env.PORT || 3001;
   const isolatedBase = ['isolated', 'pod'].includes(isolationMode()) && process.env.RUN_SERVER_URL
@@ -81,7 +113,7 @@ function serverUrls() {
   return {
     data: isolatedBase || `http://localhost:${port}`,
     loopback,
-    schema: process.env.JSON_SCHEMA_URL || `${loopback}/json_validator/datafile.schema.json`,
+    schema: schemaUrlFor(isolatedBase, loopback),
   };
 }
 const ARTIFACTS_DIR   = path.resolve(__dirname, '../../data/artifacts');

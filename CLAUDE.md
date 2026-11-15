@@ -1484,6 +1484,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   with `NODE_ENV=production`. Switching: `OSCAR - Server
   Hardening` 4.1. In isolated mode `oscar_run_processes` counts nothing (the
   processes are the runner's).
+  **No address a run uses may name the loopback once `RUN_SERVER_URL` is
+  set** (1.11.523): the deployment files set `JSON_SCHEMA_URL` to
+  `127.0.0.1:3001`, and from the move to isolated runs every run logged
+  `Error loading the schema: … ECONNREFUSED` and skipped the data file
+  check, unseen for a week because that check is registered in a
+  `bru.sendRequest` callback and never counted. `serverUrls()` replaces a
+  loopback `JSON_SCHEMA_URL` there (`schemaUrlFor()`), and the line is gone
+  from every deployment file. A new address handed to a run comes from
+  `serverUrls()`, never from a setting read as it is.
   **Option 4, a Kubernetes Job per run** (#1130, tracking issue; decided
   2026-11-07: a separate dispatcher holds the only Kubernetes rights, the run
   pod sends its results, kind CI first). The option 4 PRs bump the server

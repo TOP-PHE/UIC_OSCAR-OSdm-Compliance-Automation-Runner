@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.561",
+  "current_release": "2026.562",
   "releases": [
+    {
+      "release": "2026.562",
+      "date": "2026-11-15",
+      "server": "1.11.523",
+      "collection": "OTST_V2.0.258",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.523: the data file is checked against its schema again in every run. JSON_SCHEMA_URL was set to http://127.0.0.1:3001/json_validator/datafile.schema.json by OSCAR_Deploy/.env.example and the cluster settings. Since runs went to the oscar-runner container (RUN_ISOLATION=isolated, production since 2026-11-07) or to a run pod, 127.0.0.1 is that container, where nothing answers: every run logged \"Error loading the schema: connect ECONNREFUSED 127.0.0.1:3001\" and the data file went unchecked. Nothing failed, because the collection registers that check in the schema request's callback and Bruno never counts it. With RUN_SERVER_URL set, the server now replaces a loopback JSON_SCHEMA_URL by its own address there (said once in its log); another address is kept. The line is gone from .env.example, kubernetes/base/settings.env and the guides: remove it from an existing .env (then docker compose up -d oscar), not required."
+      ]
+    },
     {
       "release": "2026.561",
       "date": "2026-11-15",

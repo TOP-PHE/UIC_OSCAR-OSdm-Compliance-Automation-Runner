@@ -93,56 +93,57 @@ LOG_LEVEL=info
 
 ### `JSON_SCHEMA_URL` — datafile schema validation
 
-From v1.11.112 the default value points at the schema **bundled with the
-Bruno collection and served by OSCAR_Server itself** at the loopback URL:
+**Leave it unset.** OSCAR_Server serves the schema bundled with the Bruno
+collection at `/json_validator/datafile.schema.json`, and each run is given
+the address where it reaches the server: the loopback
+(`http://127.0.0.1:3001/…`) when Bruno runs in the `oscar` container,
+`RUN_SERVER_URL` (`http://oscar:3001/…`) when it runs in the
+`oscar-runner` container (`RUN_ISOLATION=isolated`), and the internal port
+for a run pod on a cluster. The schema always matches the running
+collection, as both ship together. Set `JSON_SCHEMA_URL` only for a schema
+of your own hosted elsewhere.
+
+**Older installs** may still have one of these lines in `.env`:
 
 ```
 JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json
+JSON_SCHEMA_URL=https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
 ```
 
-Leave this default unchanged unless you maintain a custom schema. It works
-offline and always matches the running collection's expectations because
-both ship together.
+- The loopback value was this guide's advice until 1.11.523. In isolated
+  mode it names the runner container, where nothing answers: every run
+  logged `Error loading the schema: connect ECONNREFUSED 127.0.0.1:3001`
+  and the data file went unchecked. Since 1.11.523 the server ignores a
+  loopback value in that mode (and says so once in its log).
+- The GitHub repository is deprecated and its schema is out of sync with
+  the modern OSCAR datafile shape: a `[WARNING]` in every run log and
+  false-positive validation failures (typically *"Required property
+  'offerSearchCriteriaList' is missing"*).
 
-**Older installs** may have an obsolete value pointing at:
-
-```
-https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
-```
-
-That repo is deprecated and its schema is out of sync with the modern
-OSCAR datafile shape — you'll see a `[WARNING]` in every run log and
-false-positive validation failures (typically *"Required property
-'offerSearchCriteriaList' is missing"*). To fix:
+Remove either line:
 
 ```bash
-cd /opt/OSCAR/OSCAR_Deploy
-sudo cp .env .env.bak.$(date +%Y%m%d)
-sudo nano .env
-# → set JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json
-sudo docker compose up -d oscar
-# verify the running container actually sees the new value:
-sudo docker compose exec oscar printenv JSON_SCHEMA_URL
+cd /opt/OSCAR/OSCAR_Deploy && sudo cp .env .env.bak.$(date +%Y%m%d) && sudo sed -i '/^JSON_SCHEMA_URL=/d' .env && sudo docker compose up -d oscar
+```
+
+Then check that the running container no longer has it (no output):
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose exec oscar printenv JSON_SCHEMA_URL
 ```
 
 > **Why `up -d` and not `restart`** — environment values from `env_file`
 > are baked into a container when it is **created**. `docker compose
 > restart` keeps the existing container, so an edited `.env` is silently
-> ignored — the run logs keep showing the old URL and the false-positive
-> failures continue. `docker compose up -d oscar` detects the config
-> change and recreates the container with the new value. (Watchtower
-> image updates don't pick up `.env` edits either — it clones the old
-> container's environment — so an explicit `up -d` is the only path.)
-> The `printenv` line confirms the value landed; if it still shows the
-> old URL, the container was not recreated.
+> ignored. `docker compose up -d oscar` detects the config change and
+> recreates the container with the new value. (Watchtower image updates
+> don't pick up `.env` edits either — it clones the old container's
+> environment — so an explicit `up -d` is the only path.) If `printenv`
+> still shows the old URL, the container was not recreated.
 
 The route is public, no auth, served from the bind-mounted `/collection`
 volume inside the oscar container. There is no per-company schema — this
-is a single VPS-wide setting.
-
-Since v1.11.115 the server also **defaults** to the loopback URL when
-`JSON_SCHEMA_URL` is not set at all, so removing the line from `.env`
-entirely (then `up -d`) is equally valid.
+is a single server-wide setting.
 
 ---
 
