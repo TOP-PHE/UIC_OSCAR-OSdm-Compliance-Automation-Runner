@@ -163,6 +163,12 @@ function expectAsBefore(answer, oldRows) {
   }
 }
 
+
+// These tests read the statements a route runs through db.prepare(): every
+// call prepares while they run, as before the statements were kept (#1241).
+beforeAll(() => { require('../../src/db/db').keepStatements(false); });
+afterAll(() => { require('../../src/db/db').keepStatements(true); });
+
 describe('GET /v1/runs: the answer is the old query\'s (#1227)', () => {
   test('a Test Manager\'s page holds the same runs, in the same order, with the same counts', async () => {
     const res = await list('limit=4', token('test_manager', managerId));

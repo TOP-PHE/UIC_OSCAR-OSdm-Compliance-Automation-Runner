@@ -507,6 +507,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.521] — 2026-11-14
+
+Listed in `compatibility.json` (2026.560) without moving `current_release`.
+
+### Changed
+
+- **Statements prepared once** (#1241, an action of the review #1233).
+  `db.js` has 532 calls of `all`, `get` and `run`, and each prepared its
+  SQL at every call. Measured on the maintainer's PC:
+  - a read of one run by id: 45 to 70 µs prepared each time, 9 to 13 µs
+    prepared once;
+  - an insert into `run_events`: 17 to 22 µs against 4 to 5 µs.
+
+  The helpers now keep their statements by SQL text, the 200 used last
+  (`statementFor()`). A kept statement is the same as a new one:
+  - Node clears its parameters between two calls (checked: one not given
+    reads NULL);
+  - SQLite prepares it again by itself when the schema changes (checked: a
+    column added, a table made again);
+  - the helpers run a statement to its end, so one is never used twice at
+    once.
+- **The encryption key read once.** `encrypt()` and `decrypt()` read the key
+  from its hex text at each call, about 10 % of a log line's 13 to 18 µs. It
+  is read once, and again only when `ENCRYPTION_KEY` changes (tests change
+  it). A key of the wrong length is still refused. The last key read is declared before the
+  database opens: migration 27 encrypts rows while `db.js` loads, and the
+  full suite caught a first version that read it before its line
+  (`db-migrations.test.js`, an upgrade from a database before migration 27).
+- A gain of 1 to 2 % of the server's thread is expected, no more.
+- Tests:
+  - `db-statements.test.js`: one text prepared once whichever helper runs
+    it; a parameter not given; `run`; a change of schema; the 200 limit and
+    which statement goes; turning the keeping off; the key read once, read
+    again when it changes, refused when wrong.
+  - The two test files that read each statement through `db.prepare()`
+    (`run-candidates-latest`, `runs-list-counts`) turn the keeping off
+    while they run (`keepStatements(false)`).
+
+---
+
 ## [server-1.11.520] — 2026-11-14
 
 Listed in `compatibility.json` (2026.559) without moving `current_release`.

@@ -4026,6 +4026,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     request being stored. With `sliceMs` 0 a slice is one step. A reader may
     see a request whose totals are not written yet while the run stores (its
     status is still RUNNING). Histogram `oscar_results_slice_seconds`.
+    **#1241 (1.11.521): statements kept.** `all`/`get`/`run` go through
+    `statementFor(sql)` (a Map of 200, least recently used goes). **A test
+    that reads the statements a route runs through `jest.spyOn(db,
+    'prepare')` calls `keepStatements(false)`** in `beforeAll` (and `true`
+    after), or a repeated query never reaches `prepare`. `_key()` keeps the
+    key while `ENCRYPTION_KEY` is the same text.
   - **Monitoring on a cluster** (#1147, guide k3s section 8a).
     `monitoring/stack` (k3s): kube-prometheus-stack as a k3s `HelmChart`
     (pinned `version`; release name `kube-prometheus-stack`, so the
