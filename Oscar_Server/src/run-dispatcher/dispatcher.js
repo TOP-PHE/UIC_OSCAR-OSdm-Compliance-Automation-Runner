@@ -183,18 +183,40 @@ async function waitForPod(kube, name, { pollMs, startTimeoutMs, isStopped }) {
  * stream was cut, not ended (#1272: the API server went away).
  */
 async function exitOf(kube, name, podName, { pollMs, tries = EXIT_TRIES }) {
+  let gone = false;
   for (let i = 0; i < tries; i++) {
     const pods = await podsOf(kube, name);
     const pod = pods.find((p) => p.metadata?.name === podName);
     const ended = runStatusOf(pod)?.state?.terminated;
     if (ended) return { code: Number.isInteger(ended.exitCode) ? ended.exitCode : 1, reason: ended.reason || '' };
     if (!pod) {
-      // No pod any more: the Job's conditions say why.
-      return (await jobOutcome(kube, name)) || { code: 1, reason: 'the pod ended without an exit code' };
+      gone = true;
+      break;
     }
     await sleep(pollMs);
   }
-  return { running: true };
+  if (!gone) return { running: true };
+  // No pod any more: the Job's conditions say why.
+  return (await jobOutcome(kube, name)) || { code: 1, reason: 'the pod ended without an exit code' };
+}
+
+// Follows the run's log from sinceTime (null: from its start), until the
+// stream closes. True when it was cut (closed without its end: #1272, the
+// API server went away). The pod may be gone by the time its log is asked
+// (its deadline reached just after it was seen running): nothing more to
+// read, and exitOf() then reads how it ended from the Job. Any other
+// refusal still ends the run.
+function followLog(kube, podName, sinceTime, onData) {
+  return kube.followLog(podName, J.CONTAINER, sinceTime).then((stream) => new Promise((resolve) => {
+    let ended = false;
+    stream.on('data', onData);
+    stream.on('end', () => { ended = true; resolve(false); });
+    stream.on('close', () => resolve(!ended));
+    stream.on('error', () => resolve(!ended));
+  }), (err) => {
+    if (err?.status !== 404) throw err;
+    return false;
+  });
 }
 
 // Where a cut log resumes: a little before its last output, to the second
@@ -228,26 +250,24 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
   // One API call of a run, tried again while the API does not answer (#1272),
   // for up to apiWaitMs from its first failure. A stopped run waits no more,
   // except to remove what it made (evenStopped).
-  async function patiently(run, what, call, { evenStopped = false } = {}) {
-    let since = 0;
-    let pause = retryMs;
-    for (;;) {
-      try {
-        const value = await call();
-        if (since) log.info?.(`[run-dispatcher] ${run.name}: the Kubernetes API answers again (${what}, after ${Math.round((Date.now() - since) / 1000)} s)`);
-        return value;
-      } catch (err) {
-        if (!isPassing(err) || (run.stopped && !evenStopped)) throw err;
-        const now = Date.now();
-        if (!since) {
-          since = now;
-          log.warn?.(`[run-dispatcher] ${run.name}: the Kubernetes API does not answer (${what}: ${failureOf(err)}); waiting for it for up to ${Math.round(apiWaitMs / 1000)} s`);
-        }
-        const left = since + apiWaitMs - now;
-        if (left <= 0) throw new ApiUnavailable(apiWaitMs, what, err);
-        await sleep(Math.min(pause, left));
-        pause = Math.min(pause * 2, RETRY_MAX_MS);
+  // `since` is the time of the first failure (0: none yet), `pause` the next
+  // wait; each try after a failure is a call of its own, at most about twenty.
+  async function patiently(run, what, call, { evenStopped = false } = {}, since = 0, pause = retryMs) {
+    try {
+      const value = await call();
+      if (since) log.info?.(`[run-dispatcher] ${run.name}: the Kubernetes API answers again (${what}, after ${Math.round((Date.now() - since) / 1000)} s)`);
+      return value;
+    } catch (err) {
+      if (!isPassing(err) || (run.stopped && !evenStopped)) throw err;
+      const now = Date.now();
+      if (!since) {
+        log.warn?.(`[run-dispatcher] ${run.name}: the Kubernetes API does not answer (${what}: ${failureOf(err)}); waiting for it for up to ${Math.round(apiWaitMs / 1000)} s`);
       }
+      const first = since || now;
+      const left = first + apiWaitMs - now;
+      if (left <= 0) throw new ApiUnavailable(apiWaitMs, what, err);
+      await sleep(Math.min(pause, left));
+      return patiently(run, what, call, { evenStopped }, first, Math.min(pause * 2, RETRY_MAX_MS));
     }
   }
 
@@ -291,25 +311,6 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
     });
     // The Secret goes with the Job (best effort: the dispatcher removes it too).
     k.patchSecret(run.name, J.ownedBy(job)).catch(() => {});
-  }
-
-  // Follows the run's log from sinceTime (null: from its start), until the
-  // stream closes. True when it was cut (closed without its end: #1272, the
-  // API server went away). The pod may be gone by the time its log is asked
-  // (its deadline reached just after it was seen running): nothing more to
-  // read, and exitOf() then reads how it ended from the Job. Any other
-  // refusal still ends the run.
-  function followLog(k, podName, sinceTime, onData) {
-    return k.followLog(podName, J.CONTAINER, sinceTime).then((stream) => new Promise((resolve) => {
-      let ended = false;
-      stream.on('data', onData);
-      stream.on('end', () => { ended = true; resolve(false); });
-      stream.on('close', () => resolve(!ended));
-      stream.on('error', () => resolve(!ended));
-    }), (err) => {
-      if (err?.status !== 404) throw err;
-      return false;
-    });
   }
 
   // The run's log until its container ends. A log cut while the container
@@ -368,7 +369,8 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
     // Every refusal is logged (#1272), in the dispatcher's own words: the
     // API's words go to the server only.
     const refuse = (reason, logText = reason) => {
-      log.warn?.(`[run-dispatcher] ${run ? `${run.name} ` : ''}refused: ${logText}`);
+      const who = run ? `${run.name} ` : '';
+      log.warn?.(`[run-dispatcher] ${who}refused: ${logText}`);
       finish({ t: 'refused', reason });
     };
     const stop = () => {
