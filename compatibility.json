@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.563",
+  "current_release": "2026.564",
   "releases": [
+    {
+      "release": "2026.564",
+      "date": "2026-11-15",
+      "server": "1.11.525",
+      "collection": "OTST_V2.0.258",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.525: in pod mode a run waits for the Kubernetes API instead of failing at once (#1272). On the k3s test machine a 27 s restart of k3s failed 454 queued runs: the dispatcher took any API error as final, and each freed slot took the next run at once.",
+        "A run's API calls are tried again while waiting can cure the error (no answer, 401/403 at the API's start, 408, 429, 5xx), for up to RUN_DISPATCHER_API_WAIT_MS (2 minutes); the run keeps its place, so the queue waits. A running run goes on: a cut log is read again from 2 s before its last output.",
+        "Each refusal is logged by the dispatcher, without the API's words. A run whose process was refused or lost is marked RUN_PROCESS_ERROR, with a banner on its page saying it is not a test result."
+      ]
+    },
     {
       "release": "2026.563",
       "date": "2026-11-15",

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-15-runs-wait-for-the-cluster",
+    "date": "November 15, 2026",
+    "tag": "Bug Fix",
+    "title": "A short outage of the cluster no longer fails every queued run",
+    "summary": "On a server that runs each test in a pod of its own, a run now waits for the cluster for up to two minutes instead of failing at once, and a run that still cannot go to its end says it is not a test result.",
+    "content": "Some OSCAR servers run each test in a pod of its own, made by the cluster they run on. When the cluster stopped answering for a moment, for example while it restarted, each run asked in that moment failed at once, and the next run of the queue took its place and failed the same way. On a test server, a restart of 27 seconds failed several hundred runs that had tested nothing.\n\nA run now waits for the cluster, keeping its place in the queue, for up to two minutes. A run that was already running goes on, and its execution log resumes once the cluster answers again: a line may then show twice.\n\nA run that still cannot go to its end reads Failed with the banner \"The run did not go to its end — this is not a test result\". The \"Process error\" line of its execution log gives the reason. Before, such a run read Failed with no reason given.\n\nNo action is required. If you see that banner, run the scenario again; if many runs show it, tell your OSCAR administrator."
+  },
+  {
     "id": "2026-11-15-data-file-schema-checked-again",
     "date": "November 15, 2026",
     "tag": "Bug Fix",

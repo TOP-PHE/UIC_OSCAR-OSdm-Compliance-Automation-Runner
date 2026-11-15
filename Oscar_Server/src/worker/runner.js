@@ -1362,6 +1362,9 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   // Detect auth/format failures in Bruno log output
   let authErrorDetected  = false;
   let tokenFormatError   = false;
+  // #1272: the run's process could not be started or was lost (in pod mode,
+  // the dispatcher refused it or went away): the run never went to its end.
+  let processError       = false;
   const AUTH_401_PATTERN    = /Wrong response status:\s*401|401\s+Unauthorized|HTTP\s+401/i;
   const TOKEN_FORMAT_PATTERN = /Error parsing environment|YAMLParseError|Unexpected scalar/i;
 
@@ -1404,6 +1407,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       }
     } catch (err) {
       if (podMode) metrics.runPodsEnded.inc({ outcome: 'refused' });
+      processError = true;
       runSecrets.revoke(runId);
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
@@ -1538,6 +1542,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: no child, no valid secret
       podEnded('refused');
+      processError = true;
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
     });
@@ -1673,6 +1678,10 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     dbRun(`UPDATE runs SET error_message = 'NO_CHECKS' WHERE id = ?`, [runId]);
     logEvent(runId, 'error',
       '[runner] ⚠️ No check was recorded for this run, so it is marked failed: nothing was checked. Its results did not reach the server, or the collection made no check (its data file or scenario could not be read); the lines above say which.');
+  } else if (processError) {
+    dbRun(`UPDATE runs SET error_message = 'RUN_PROCESS_ERROR' WHERE id = ?`, [runId]);
+    logEvent(runId, 'error',
+      '[runner] ⚠️ The run did not go to its end: its process could not be started, or was lost (in a cluster: its pod could not be made or followed). This is not a result of the test; the "Process error" line above gives the reason. Run the scenario again.');
   }
 
   logEvent(runId, 'info', `[runner] Run finished — status=${finalStatus} exit=${exitCode}`);

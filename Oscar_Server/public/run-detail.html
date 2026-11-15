@@ -357,8 +357,9 @@ function updateStatus(run) {
   const isFormatError   = run.error_message === 'TOKEN_FORMAT_ERROR';
   const isAuthError     = run.error_message === 'TOKEN_AUTH_ERROR';
   const isNoChecks      = run.error_message === 'NO_CHECKS';
-  const isOAuthError    = !isFormatError && !isAuthError && !isNoChecks && run.error_message && run.auth_mode_used === 'oauth2';
-  const showBanner      = isFormatError || isAuthError || isNoChecks || isOAuthError;
+  const isProcessError  = run.error_message === 'RUN_PROCESS_ERROR';
+  const isOAuthError    = !isFormatError && !isAuthError && !isNoChecks && !isProcessError && run.error_message && run.auth_mode_used === 'oauth2';
+  const showBanner      = isFormatError || isAuthError || isNoChecks || isProcessError || isOAuthError;
 
   if (showBanner && !existingBanner) {
     const banner = document.createElement('div');
@@ -394,6 +395,16 @@ function updateStatus(run) {
           <div class="auth-msg">
             Bruno ended without error, but OSCAR received no check result for this run: nothing was checked.<br>
             The execution log says why. Run the scenario again; if it happens again, tell your OSCAR administrator.
+          </div>
+        </div>`;
+    } else if (isProcessError) {
+      banner.innerHTML = `
+        <div class="auth-icon">⚠️</div>
+        <div class="auth-body">
+          <div class="auth-title">The run did not go to its end — this is not a test result</div>
+          <div class="auth-msg">
+            OSCAR could not start the run, or lost it while it ran (on a cluster: its pod could not be made or followed). Nothing, or not all, was tested.<br>
+            The "Process error" line of the execution log gives the reason. Run the scenario again; if it happens again, tell your OSCAR administrator.
           </div>
         </div>`;
     } else {

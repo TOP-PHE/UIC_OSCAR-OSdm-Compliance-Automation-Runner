@@ -88,7 +88,8 @@ function createKubeClient({ base, ca = null, token = null, tokenFile = null, nam
         return readAnswer(res, resolve, reject);
       });
       // A followed log stays open as long as the run; any other call answers soon.
-      if (!stream) req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error('the API server did not answer in time')));
+      // The code marks it as no answer, like a refused or reset connection (#1272).
+      if (!stream) req.setTimeout(TIMEOUT_MS, () => req.destroy(Object.assign(new Error('the API server did not answer in time'), { code: 'ETIMEDOUT' })));
       req.on('error', reject);
       if (data) req.write(data);
       req.end();
@@ -110,8 +111,10 @@ function createKubeClient({ base, ca = null, token = null, tokenFile = null, nam
     deleteJob: (name) => call('DELETE', `/apis/batch/v1/namespaces/${ns}/jobs/${one(name)}?propagationPolicy=Background`),
     listJobs: (labels) => call('GET', `/apis/batch/v1/namespaces/${ns}/jobs?${selector(labels)}`),
     listPods: (labels) => call('GET', `/api/v1/namespaces/${ns}/pods?${selector(labels)}`),
-    followLog: (pod, container) => call('GET',
-      `/api/v1/namespaces/${ns}/pods/${one(pod)}/log?container=${encodeURIComponent(container)}&follow=true`, { stream: true }),
+    // sinceTime (RFC 3339, to the second) resumes a log cut short (#1272).
+    followLog: (pod, container, sinceTime = null) => call('GET',
+      `/api/v1/namespaces/${ns}/pods/${one(pod)}/log?container=${encodeURIComponent(container)}&follow=true`
+      + (sinceTime ? `&sinceTime=${encodeURIComponent(sinceTime)}` : ''), { stream: true }),
   };
 }
 

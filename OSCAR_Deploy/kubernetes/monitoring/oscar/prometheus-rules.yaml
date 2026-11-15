@@ -149,7 +149,7 @@ spec:
             severity: warning
           annotations:
             summary: The run dispatcher refused or lost {{ $value | humanize }} run(s) in 15 minutes
-            description: 'The server could not have a run''s pod made: the dispatcher is down, refuses the server''s key (RUN_AGENT_TOKEN), or has reached RUN_DISPATCHER_MAX_RUNS. See `kubectl -n oscar logs deploy/oscar-dispatcher`.'
+            description: 'The server could not have a run''s pod made: the dispatcher is down, refuses the server''s key (RUN_AGENT_TOKEN), has reached RUN_DISPATCHER_MAX_RUNS, or the Kubernetes API did not answer for RUN_DISPATCHER_API_WAIT_MS (2 minutes by default). The dispatcher logs each refusal: see `kubectl -n oscar logs deploy/oscar-dispatcher`.'
             runbook: Documentation/Server_Operations/OSCAR - Kubernetes and OpenShift Deployment Guide.md#10a-each-run-in-a-pod-of-its-own-pod-mode
 ---
 apiVersion: monitoring.coreos.com/v1
