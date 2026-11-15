@@ -1216,6 +1216,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   order instead of using the batch index). `runs-list-counts.test.js`
   compares the answer with the old query's and reads every query's plan
   (no `SCAN`, no `MATERIALIZE`).
+  **A finished run's counts are kept** (#1247, 1.11.527): `keptRunCounts`
+  (`routes/runs.js`, 20,000 runs, least recently used first), for COMPLETED
+  and FAILED only, served only while the row still reads so: the runner
+  stores reports and suites before the final status, nothing writes them
+  after. Never CANCELLED (an emergency stop writes it while the runner may
+  still store), never the operator share date. **A new writer of
+  `run_artifacts` or `run_suites` for a finished run must forget its kept
+  counts.** A test that reads the count statements calls
+  `forgetRunCounts()` first.
 - **A batch is chosen at launch** (#1029, PR 1 = 1.11.431). `POST /v1/runs`
   takes `selection: { base, categories, groups, forms, lastRun }`; without it
   the run list runs, as before (every other caller, the API key's included).
