@@ -191,7 +191,7 @@ describe('POST /v1/runs/preview', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ total: 7, selected: 2, seen: 7, runList: 2 });
     expect(res.body.counts.categories).toEqual({ happy: 4, refusal: 1, simulated: 2 });
-    expect(res.body.counts.forms).toEqual({ SEARCH: 6, SPECIFICATION: 0, TRIP_IDS: 1 });
+    expect(res.body.counts.forms).toEqual({ SEARCH: 6, SPECIFICATION: 0, TRIP_IDS: 1, NON_TRIP_PLACES: 0, NON_TRIP_ZONES: 0 });
     expect(res.body.counts.modes).toEqual({ PRODUCT: 7, FARE: 0 });
     expect(res.body.labels.modes).toEqual({ PRODUCT: 'Product based', FARE: 'Fare based' });
     expect(res.body.selection).toMatchObject({ base: 'all', categories: ['simulated'], lastRun: 'all' });
@@ -223,7 +223,7 @@ describe('the batch says what it ran (#1029 PR 3)', () => {
     const stored = get('SELECT company_id, selection FROM run_batch WHERE batch_id = ?', [chosen.body.batch_id]);
     expect(stored.company_id).toBe(companyId);
     expect(JSON.parse(stored.selection)).toEqual({
-      base: 'all', categories: ['happy', 'refusal'], modes: ['PRODUCT', 'FARE'], groups: ['Refund'], forms: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'], lastRun: 'all',
+      base: 'all', categories: ['happy', 'refusal'], modes: ['PRODUCT', 'FARE'], groups: ['Refund'], forms: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES'], lastRun: 'all',
     });
     expect(get('SELECT COUNT(*) AS n FROM run_batch WHERE batch_id = ?', [plain.body.batch_id]).n).toBe(0);
   });

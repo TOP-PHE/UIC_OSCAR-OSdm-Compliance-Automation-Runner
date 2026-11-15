@@ -43,8 +43,11 @@ const { DISTRIBUTION_MODES, distributionModesOf } = require('./distributionModes
 
 const CATEGORIES = Object.freeze(['happy', 'refusal', 'simulated']);
 const CATEGORY_TEXT = Object.freeze({ happy: 'Happy flows', refusal: 'Expected refusals', simulated: 'Simulated errors' });
-const FORMS = Object.freeze(['SEARCH', 'SPECIFICATION', 'TRIP_IDS']);
-const FORM_TEXT = Object.freeze({ SEARCH: 'Search', SPECIFICATION: 'Specification', TRIP_IDS: 'Trip id' });
+const FORMS = Object.freeze(['SEARCH', 'SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES']);
+const FORM_TEXT = Object.freeze({
+  SEARCH: 'Search', SPECIFICATION: 'Specification', TRIP_IDS: 'Trip id',
+  NON_TRIP_PLACES: 'Without a trip: stop places', NON_TRIP_ZONES: 'Without a trip: zones',
+});
 const BASES = Object.freeze(['all', 'list']);
 const LAST_RUNS = Object.freeze(['all', 'toRunAgain', 'failed']);
 const LAST_RUN_TEXT = Object.freeze({ all: 'All', toRunAgain: 'To run again', failed: 'Failed at the last run' });
@@ -101,7 +104,7 @@ function groupsOf(scenario, datafile, entries) {
 // A facet's groups; one made before `groups` existed has its group only.
 const facetGroups = (facet) => (arr(facet?.groups).length > 0 ? facet.groups : [facet?.group]);
 
-/** SEARCH, SPECIFICATION or TRIP_IDS. */
+/** SEARCH, SPECIFICATION, TRIP_IDS, NON_TRIP_PLACES or NON_TRIP_ZONES. */
 function formOf(scenario, datafile) {
   const form = offerRequestFormOf(scenario, datafile);
   return FORMS.includes(form) ? form : 'SEARCH';

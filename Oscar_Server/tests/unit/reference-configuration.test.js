@@ -125,6 +125,8 @@ describe('the Test Data', () => {
       const own = R.testResourcesFromDatafile(part).filter(r => r.resource_type === 'TRAIN');
       for (const [i, trip] of part.tripRequirements.entries()) {
         checked.add(trip.id);
+        // #1258: a non-trip request has no train.
+        if (trip.tripType === 'NON_TRIP') continue;
         const legs = trip.tripType === 'SPECIFICATION' ? trip.legs : [trip.trip];
         if (legs.length !== 1) continue;
         const fromPage = ctx.trainFromTrip(trip, i).data;

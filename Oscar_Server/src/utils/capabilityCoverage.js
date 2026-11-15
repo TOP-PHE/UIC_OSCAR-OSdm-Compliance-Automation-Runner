@@ -72,7 +72,9 @@ const RESULT_TEXT = Object.freeze({
 // (any declared makes it declared), or a flag that says "not supported".
 const CAPABILITY_FUNCTIONS = Object.freeze({
   'offers.search': ['offerRequestForm:SEARCH'], 'offers.specification': ['offerRequestForm:SPECIFICATION'],
-  'offers.tripIds': ['offerRequestForm:TRIP_IDS'], 'return.separate': ['returnModel:SEPARATE'], 'return.combined': ['returnModel:COMBINED'],
+  'offers.tripIds': ['offerRequestForm:TRIP_IDS'],
+  'offers.nonTripPlaces': ['offerRequestForm:NON_TRIP_PLACES'], 'offers.nonTripZones': ['offerRequestForm:NON_TRIP_ZONES'],
+  'return.separate': ['returnModel:SEPARATE'], 'return.combined': ['returnModel:COMBINED'],
   'refund.full': ['salesFlow:REFUND_FULL'], 'refund.technical': ['salesFlow:REFUND_IROPS'],
   'refund.partial.fulfillment': ['partialRefund:FULFILLMENT'], 'refund.partial.passenger': ['partialRefund:PASSENGER'],
   'refund.partial.leg': ['partialRefund:LEG'], 'exchange.full': ['salesFlow:EXCHANGE_FULL'], sale: ['distribution:PRODUCT'],
