@@ -64,6 +64,8 @@ function scenarioPlan({ catalogue, simulator, framework, testData, existingCodes
   const suggestions = suggestTrips(plan.trips, testData);
   const hasTrains = arr(testData?.trains).length > 0;
   for (const trip of plan.trips) {
+    // #1258: a request without a trip needs no Test Data.
+    if (trip.nonTrip) continue;
     const suggested = suggestions[trip.id];
     if (suggested) tripMap[String(trip.id)] = mappingOf(suggested);
     else if (!trip.needsJourney && (Number(trip.legs) || 1) === 1) {

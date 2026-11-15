@@ -184,6 +184,8 @@ function admissionFrom(part, passengers, createdOn, confirmableUntil) {
     // #601: as the offer said (true when a reservation is mandatory).
     isReservationRequired: part.isReservationRequired === true,
     ...(part.appliedPassengerTypes ? { appliedPassengerTypes: part.appliedPassengerTypes } : {}),
+    // #1258: a non-trip admission keeps where it is valid (no trip coverage).
+    ...(part.regionalValidities ? { regionalValidities: part.regionalValidities } : {}),
   });
 }
 

@@ -122,6 +122,17 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
     delete out.expectedProduct;
     toComplete.push(PRODUCT_TO_COMPLETE);
   }
+  // #1258: the simulator's stop places, lookup name and zones mean nothing
+  // at another provider.
+  if (arr(n.providerValues).includes('nonTripPlaces')) {
+    toComplete.push('the stop places to sell between, of the provider (Trip → Stop places, now the simulator\'s)');
+  }
+  if (arr(n.providerValues).includes('placeLookup')) {
+    toComplete.push('a name the provider\'s POST /places finds stop places for (Trip → Look up by name, now the simulator\'s)');
+  }
+  if (arr(n.providerValues).includes('nonTripZones')) {
+    toComplete.push('a zone of the provider, its id and carrier (Trip → Zone; empty: the first of GET /zones)');
+  }
   // #766 PR 4: the simulator's coach and place mean nothing on another train.
   if (arr(n.providerValues).includes('referencePlace')) {
     toComplete.push(`a coach and place of the provider's train to sit near (referencePlace, now the simulator's ${out.referencePlace})`);
@@ -584,6 +595,8 @@ function suggestTrips(trips, testData) {
   const saleOf = {};
   const exchangeCodes = (trip) => arr(trip.usedBy).filter(isExchangeUse).map((u) => u.slice(0, -EXCHANGE_USE.length));
   for (const trip of list) {
+    // #1258: a request without a trip goes on no train.
+    if (trip.nonTrip) { out[trip.id] = null; continue; }
     if (exchangeCodes(trip).length) continue;
     out[trip.id] = suggestTrip(trip, testData);
     for (const code of arr(trip.usedBy)) (saleOf[code] || (saleOf[code] = [])).push(out[trip.id]);

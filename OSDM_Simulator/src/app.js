@@ -24,6 +24,7 @@ const crypto = require('node:crypto');
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
 const { buildOfferCollection, productsOf } = require('./osdm/offers');
+const { placeCollection, findPlaces, placeById, zoneCollection } = require('./osdm/nonTrip');
 const { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
@@ -491,6 +492,24 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
     return preferenceAvailability(query, found(), provider);
   }
 
+  // #1258: GET /places, POST /places, GET /places/{id}, GET /zones.
+  async function nonTripRoute(req, provider, resource, rest) {
+    if (resource === 'zones') {
+      if (rest.length > 0) throw notFound();
+      requireMethod(req, 'GET');
+      return zoneCollection(provider);
+    }
+    if (rest.length === 1) {
+      requireMethod(req, 'GET');
+      const found = placeById(provider, rest[0]);
+      if (!found) throw notFound();
+      return found;
+    }
+    if (rest.length > 1) throw notFound();
+    requireMethod(req, 'GET', 'POST');
+    return req.method === 'POST' ? findPlaces(await bodyOf(req), provider) : placeCollection(provider);
+  }
+
   async function osdmRoute(req, provider, clientId, segments) {
     const scope = `${provider.key}\n${clientId}`;
     const [resource, ...rest] = segments;
@@ -505,6 +524,8 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
       requireMethod(req, 'GET');
       return reductionCardCollection(provider);
     }
+    // #1258: a provider selling without a trip lists its stop places and zones.
+    if (provider.nonTrip && (resource === 'places' || resource === 'zones')) return nonTripRoute(req, provider, resource, rest);
     if (resource === 'offers' && rest.length === 0) return offerRoute(req, provider, scope);
     if (rest.length === 0 && servesTripSearch(provider, resource)) return tripCollectionRoute(req, provider, scope);
     if (resource === 'bookings') return bookingRoute(req, provider, scope, rest);

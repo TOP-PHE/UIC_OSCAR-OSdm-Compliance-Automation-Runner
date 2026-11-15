@@ -71,6 +71,8 @@ function tripSummary(entry) {
   return {
     id: entry.id,
     tripType: entry.tripType || 'SEARCH',
+    // #1258: copied as it is, on no train.
+    nonTrip: entry.tripType === 'NON_TRIP',
     legs: spec ? legs.length : 1,
     origin: first.origin || '',
     destination: last.destination || '',
@@ -184,6 +186,8 @@ function mapToJourney(out, mapping, resources) {
 function mappedTrip(entry, mapping, resources) {
   const out = clone(entry);
   delete out.id;
+  // #1258: a request without a trip names no train: copied as it is.
+  if (entry.tripType === 'NON_TRIP') return { entry: out };
   if (mapping?.type === 'train') return mapToTrain(entry, out, mapping, resources);
   if (mapping?.type === 'journey') return mapToJourney(out, mapping, resources);
   return { error: 'has no train or journey chosen' };

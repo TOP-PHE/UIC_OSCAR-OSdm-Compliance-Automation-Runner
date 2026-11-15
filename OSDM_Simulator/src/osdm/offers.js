@@ -50,6 +50,7 @@ const { horizonProblem } = require('./salesHorizon');
 const ageTariffs = require('./ageTariffs');
 const { fareOffersOf, asksOnlyFares, noFareOfferProblem, nearbyStopsOf, nearbyTripOffers } = require('./fares');
 const { withOfferConditions } = require('./afterSales');
+const nonTrip = require('./nonTrip');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -816,7 +817,105 @@ function nearbyOf(ctx) {
   return { trips: [trip], offers: nearbyTripOffers(ctx, trip) };
 }
 
+// ── Offers without a trip (#1258) ───────────────────────────────────────────
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TRIP_MEMBERS = ['tripIds', 'tripSpecifications', 'tripSearchCriteria', 'inboundTripIds', 'inboundTripSpecifications'];
+
+// True for a request asking a non-trip offer: nonTripSearchCriteria and no
+// trip. Both together are refused.
+function isNonTripRequest(body) {
+  if (!body || typeof body !== 'object' || body.nonTripSearchCriteria === undefined || body.nonTripSearchCriteria === null) return false;
+  const withTrip = TRIP_MEMBERS.filter((m) => body[m] !== undefined && body[m] !== null);
+  if (withTrip.length > 0) throw bad(`nonTripSearchCriteria cannot go with ${withTrip.join(', ')}`);
+  return true;
+}
+
+// One non-trip offer: per passenger an admission valid where asked, for a day
+// from `validFrom`, without trip coverage.
+function buildNonTripOffer({ asked, validity, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs }) {
+  const seed = hashOf(`non-trip|${asked.key}`);
+  // A day's validity: priced like a short trip, the same for the same places.
+  const base = Math.round((800 + (seed.readUInt16BE(4) % 1200)) * flexibility.factor * TRAVEL_CLASSES[travelClass] * provider.priceFactor);
+  const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
+  const createdOn = new Date(nowMs).toISOString();
+  const product = productOf(flexibility, travelClass, provider);
+  const regionalValidities = nonTrip.regionalValiditiesOf(asked, provider);
+  const regionalValiditySummary = nonTrip.regionalValiditySummaryOf(asked);
+  const admissionOfferParts = passengers.map((passenger) => withOfferConditions({
+    objectType: 'AdmissionOfferPart',
+    id: `${provider.idPrefix}-ADM-${randomId()}`,
+    summary: `${product.summary}, ${product.serviceClass.name} class, ${regionalValiditySummary.shortDescription}`,
+    createdOn,
+    validFrom: isoAt(validity.ms, validity.offset),
+    validUntil: isoAt(validity.ms + DAY_MS, validity.offset),
+    price: price(reducedPrice(base, passenger[CARDS_APPLIED].applied)),
+    ...appliedPassengerTypesOf(passenger, provider),
+    offerMode: 'INDIVIDUAL',
+    isReusable: false,
+    passengerRefs: [passenger.externalRef],
+    refundable: flexibility.refundable,
+    exchangeable: flexibility.exchangeable,
+    summaryProductId: product.id,
+    products: [{ productId: product.id }],
+    availableFulfillmentOptions: fulfillmentOptions,
+    isReservationRequired: false,
+    regionalValiditySummary,
+    regionalValidities: structuredClone(regionalValidities),
+  }));
+  return {
+    offerId: `${provider.idPrefix}-OFR-${randomId()}`,
+    summary: `${product.summary}, ${product.serviceClass.name} class, ${regionalValiditySummary.shortDescription}`,
+    offerSummary: {
+      minimalPrice: price(admissionOfferParts.reduce((sum, part) => sum + part.price.amount, 0)),
+      overallServiceClass: product.serviceClass,
+      overallTravelClass: travelClass,
+      overallFlexibility: flexibility.key,
+    },
+    createdOn,
+    preBookableUntil: new Date(nowMs + OFFER_LIFETIME_MS).toISOString(),
+    passengerRefs: passengers.map((p) => p.externalRef),
+    products: [product],
+    admissionOfferParts,
+  };
+}
+
+/**
+ * The answer to a non-trip offer request: no trip, an offer per class and
+ * tariff (group products are sold for trips only). The wrong variant's first
+ * stop place gives admissions without regional validity.
+ */
+function buildNonTripCollection(body, providerAsIs, nowMs) {
+  if (!providerAsIs.nonTrip) throw bad('nonTripSearchCriteria: this provider sells offers for trips only');
+  const criteria = body.offerSearchCriteria;
+  const provider = inCurrency(providerAsIs, criteria);
+  const asked = nonTrip.nonTripAsked(body.nonTripSearchCriteria, provider);
+  const from = body.nonTripSearchCriteria.validFrom;
+  const validity = from === undefined || from === null
+    ? { ms: nowMs, offset: provider.utcOffset }
+    : instant(from, 'nonTripSearchCriteria.validFrom', provider);
+  const passengers = passengersOf(body, provider);
+  const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
+  const tariffs = tariffsOf(provider).filter((f) => !f.group && (!askedFlexibilities || askedFlexibilities.includes(f.key)));
+  const fulfillmentOptions = fulfillmentOptionsOf(body);
+  const offers = classesAsked(criteria).flatMap((travelClass) => tariffs.map((flexibility) => buildNonTripOffer({
+    asked, validity, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs,
+  })));
+  if (nonTrip.firstStopOf(asked) === provider.nonTrip.withoutValidityFrom) {
+    for (const part of offers.flatMap((o) => o.admissionOfferParts)) {
+      delete part.regionalValidities;
+      delete part.regionalValiditySummary;
+    }
+  }
+  const remembered = offers.map((offer) => ({ offer, trips: [], passengers, oneFulfillment: false, shortLivedMs: null }));
+  const problems = problemsOf(passengers, offers, false, new Set());
+  const response = { anonymousPassengerSpecifications: passengers, offers };
+  if (problems.length > 0) response.problems = problems;
+  return { response, remembered, trips: [] };
+}
+
 function buildOfferCollection(asked, providerAsIs, nowMs, known = {}) {
+  if (isNonTripRequest(asked)) return buildNonTripCollection(asked, providerAsIs, nowMs);
   const trips = tripsOf(asked, providerAsIs, known);
   // #227: optional parameters this provider ignores, refuses or answers without offers.
   const options = applyRequestOptions(asked, trips, providerAsIs);
