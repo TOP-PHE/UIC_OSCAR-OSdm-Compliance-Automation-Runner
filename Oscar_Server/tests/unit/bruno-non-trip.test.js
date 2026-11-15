@@ -280,3 +280,92 @@ describe('the parser', () => {
     expect(JSON.parse(envStore.nonTripRequirement)).toMatchObject({ by: 'ZONES', zones: [], validFrom: '2026-11-20T00:00:00+01:00' });
   });
 });
+
+// ── #1266: the after-sale of a sale without a trip ──────────────────────────
+
+describe('the exchange (#1266)', () => {
+  const recorded = [];
+  const test2 = (name, fn) => { try { fn(); recorded.push({ name, ok: true }); } catch (e) { recorded.push({ name, ok: false, message: e.message }); } };
+  beforeEach(() => { recorded.length = 0; });
+  const CITY = [{ id: 'SIM-CITY', carrier: 'urn:x_osdm_simulator:carrier:gamma' }];
+
+  test('its nonTripSearchCriteria: the sale\'s, on another day, or another trip\'s own stop places or zones', () => {
+    const sale = { validFrom: '2026-11-25T00:00:00+01:00', zones: CITY };
+    expect(NT.exchangeNonTripCriteria(sale, null)).toEqual(sale);
+    expect(NT.exchangeNonTripCriteria(sale, { validFrom: '2026-11-26T00:00:00+01:00', criteria: null }))
+      .toEqual({ validFrom: '2026-11-26T00:00:00+01:00', zones: CITY });
+    expect(NT.exchangeNonTripCriteria(sale, { validFrom: '2026-11-26T00:00:00+01:00', criteria: { places: [stop(CENTRAL), stop(AIRPORT)] } }))
+      .toEqual({ validFrom: '2026-11-26T00:00:00+01:00', places: [stop(CENTRAL), stop(AIRPORT)] });
+    expect(NT.exchangeNonTripCriteria({ zones: CITY }, null)).toEqual({ zones: CITY });
+    expect(NT.exchangeNonTripCriteria(null, null)).toBeNull();
+    expect(NT.askedOfCriteria(sale)).toEqual({ by: 'ZONES', places: [], zones: CITY });
+    expect(NT.askedOfCriteria({ places: [stop(CENTRAL)] })).toEqual({ by: 'PLACES', places: [stop(CENTRAL)], zones: [] });
+    expect(NT.askedOfCriteria(undefined)).toBeNull();
+  });
+
+  test('the exchange offers and the parts it added are checked as a non-trip sale\'s, under names of their own', () => {
+    envStore.TripType = 'NON_TRIP';
+    envStore.__nonTripAsked = JSON.stringify(ZONES);
+    envStore.requestExchangeOffersBodyData = JSON.stringify({ nonTripSearchCriteria: { places: [stop(CENTRAL), stop(AIRPORT)] } });
+    NT.recordNonTripExchangeOfferChecks({ exchangeOffers: [{ admissionOfferParts: [admission({ tripCoverage: { coveredTripId: 'T1' } })] }] }, test2);
+    expect(recorded.filter((r) => !r.ok).map((r) => r.name)).toEqual(['Non-trip exchange offers: no offer or offer part covers a trip (tripCoverage absent)']);
+    // Judged against the exchange's request (places), not the sale's zone.
+    expect(recorded.every((r) => r.name.startsWith('Non-trip exchange offers: '))).toBe(true);
+    expect(mockLogs.some((l) => l.includes('names a zone of the carrier asked'))).toBe(false);
+
+    recorded.length = 0;
+    NT.recordNonTripExchangedPartsChecks([{ list: 'admissions', part: admission() }, { list: 'reservations', part: { id: 'R1' } }], 'Exchanged parts (confirmed)', test2);
+    expect(recorded.map((r) => [r.name.split(' — ')[0].split(': each')[0], r.ok])).toEqual([
+      ['Exchanged parts (confirmed): non-trip booking', true],
+      ['Exchanged parts (confirmed): non-trip booking', true],
+    ]);
+
+    recorded.length = 0;
+    envStore.TripType = 'SEARCH';
+    NT.recordNonTripExchangeOfferChecks({ exchangeOffers: [] }, test2);
+    NT.recordNonTripExchangedPartsChecks([{ list: 'admissions', part: admission() }], 'Exchanged parts (confirmed)', test2);
+    envStore.TripType = 'NON_TRIP';
+    NT.recordNonTripExchangedPartsChecks([], 'Exchanged parts (pre-booked)', test2);
+    expect(recorded).toEqual([]);
+  });
+
+  describe('the parser', () => {
+    const { prepareExchangeTrip } = require('../../../Bruno_Collection/library-bruno/scenarioParser.js');
+    beforeEach(() => { global.validationLogger = (line) => { mockLogs.push(line); }; });
+    afterEach(() => { delete global.validationLogger; });
+    const trips = [
+      { id: 47, tripType: 'NON_TRIP', nonTrip: { by: 'ZONES', zones: [] } },
+      { id: 51, tripType: 'NON_TRIP', nonTrip: { by: 'ZONES', zones: [{ id: 'SIM-SOUTH', carrier: 'urn:c' }] } },
+      { id: 52, tripType: 'NON_TRIP', nonTrip: { by: 'PLACES', places: [], placeLookup: 'Simtown' } },
+      { id: 1, tripType: 'SEARCH', trip: { origin: 'urn:uic:stn:1', destination: 'urn:uic:stn:2', startDatetime: '%TRIP_DATE%T08:00:00+01:00' } },
+    ];
+    const exchange = (block, tripRequirementId = 47) => {
+      envStore.__travelDay = '2026-11-25';
+      prepareExchangeTrip({ scenarioType: 'EXCHANGE', tripRequirementId, exchange: block }, { tripRequirements: trips });
+    };
+
+    test('a day later: the sale\'s zone, valid from that day', () => {
+      exchange({ dateOffsetDays: 1, offerSearchCriteria: { travelClasses: ['FIRST'] } });
+      expect(envStore.exchangeTripType).toBe('NON_TRIP');
+      expect(JSON.parse(envStore.exchangeNonTrip)).toEqual({ validFrom: '2026-11-26T00:00:00+01:00', criteria: null });
+      expect(JSON.parse(envStore.exchangeOfferSearchCriteria)).toEqual({ travelClasses: ['FIRST'] });
+      expect(envStore.__exchangeTripAsked).toBeUndefined();
+    });
+
+    test('another trip without a trip: its own zone; one left to a lookup keeps the sale\'s', () => {
+      exchange({ tripRequirementId: 51 });
+      expect(JSON.parse(envStore.exchangeNonTrip)).toEqual({ validFrom: '2026-11-25T00:00:00+01:00', criteria: { zones: [{ id: 'SIM-SOUTH', carrier: 'urn:c' }] } });
+      exchange({ tripRequirementId: 52 });
+      expect(JSON.parse(envStore.exchangeNonTrip).criteria).toBeNull();
+      expect(mockLogs.some((l) => l.includes('leaves its stop places or zone to a lookup'))).toBe(true);
+    });
+
+    test('a trip and an offer without a trip are never mixed', () => {
+      exchange({ tripRequirementId: 1 });
+      expect(envStore.exchangeTripType).toBeUndefined();
+      exchange({ tripRequirementId: 47, dateOffsetDays: 1 }, 1);
+      expect(envStore.exchangeTripType).toBeUndefined();
+      expect(mockLogs.filter((l) => l.includes('is not tested'))).toHaveLength(2);
+    });
+  });
+});

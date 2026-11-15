@@ -96,7 +96,7 @@ describe('#748 — the catalogue follows the declared forms', () => {
     expect(plain.map((e) => e.code)).toEqual(catalogue.entries.map((e) => e.code));
     expect(plain.some((e) => e.tripAs || e.variantOf)).toBe(false);
     expect(plain.filter((e) => formMissing(e).length).map((e) => e.code).sort())
-      .toEqual(['OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_ZONES_1ADT']);
+      .toEqual(['OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_ZONES_1ADT']);
   });
 
   test('what can go as a specification: one-way searches without the train filter', () => {

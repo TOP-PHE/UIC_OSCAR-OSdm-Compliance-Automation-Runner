@@ -105,7 +105,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const nonTrip = catalogueFor(catalogue, simulator, { offerRequestForms: ['SEARCH'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_ZONES_1ADT']);
+    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_ZONES_1ADT']);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     const declared = catalogueFor(catalogue, simulator, { offerRequestForms: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
@@ -116,7 +116,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const noList = catalogueFor(catalogue, simulator, {});
     const nonTrip = noList.filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip).toHaveLength(5);
+    expect(nonTrip).toHaveLength(7);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     // The trip entries read as before: no form is missing for them.
     const tripForms = catalogueFor(catalogue, simulator, { offerRequestForms: [...G.TRIP_REQUEST_FORMS] });

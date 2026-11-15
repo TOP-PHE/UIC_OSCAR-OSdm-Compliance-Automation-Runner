@@ -264,10 +264,10 @@ function admissionValidityChecks(parts, asked, version, { label, summary }) {
  * The checks of a non-trip OfferCollectionResponse (#1258): no trip, no trip
  * coverage, and the admissions' validity. Pure.
  */
-function checkNonTripOffers(body, asked, version) {
+function checkNonTripOffers(body, asked, version, label = 'Non-trip offers') {
   const offers = list(body?.offers);
   const checks = [];
-  checks.push({ name: 'Non-trip offers: the answer gives no trip', ok: list(body?.trips).length === 0, message: `${list(body?.trips).length} trip(s) in the answer` });
+  checks.push({ name: `${label}: the answer gives no trip`, ok: list(body?.trips).length === 0, message: `${list(body?.trips).length} trip(s) in the answer` });
   const covered = [];
   offers.forEach((offer, i) => {
     if (offer?.tripCoverage != null || offer?.inboundTripCoverage != null) covered.push(`offers[${i}]`);
@@ -275,9 +275,33 @@ function checkNonTripOffers(body, asked, version) {
       list(offer?.[key]).forEach((part, k) => { if (part?.tripCoverage != null) covered.push(`offers[${i}].${key}[${k}]`); });
     }
   });
-  checks.push({ name: 'Non-trip offers: no offer or offer part covers a trip (tripCoverage absent)', ok: covered.length === 0, message: firstFew(covered) });
+  checks.push({ name: `${label}: no offer or offer part covers a trip (tripCoverage absent)`, ok: covered.length === 0, message: firstFew(covered) });
   const parts = offers.flatMap((offer, i) => admissionsOfOffer(offer).map((part, k) => ({ part, where: `offers[${i}].admissionOfferParts[${k}]` })));
-  return checks.concat(admissionValidityChecks(parts, asked, version, { label: 'Non-trip offers', summary: true }));
+  return checks.concat(admissionValidityChecks(parts, asked, version, { label, summary: true }));
+}
+
+/**
+ * #1266: the nonTripSearchCriteria of an exchange of a sale without a trip:
+ * the stop places or zones of the exchange's plan when it names them, else
+ * those the sale sent (after its lookups); the plan's validFrom, else the
+ * sale's. Null when neither is known. Pure.
+ */
+function exchangeNonTripCriteria(saleCriteria, plan) {
+  const base = isObject(saleCriteria) ? saleCriteria : null;
+  const own = isObject(plan) && isObject(plan.criteria) ? plan.criteria : null;
+  const chosen = own || base;
+  if (!chosen) return null;
+  const where = { ...chosen };
+  delete where.validFrom;
+  const validFrom = (isObject(plan) && typeof plan.validFrom === 'string' && plan.validFrom) || base?.validFrom;
+  return validFrom ? { validFrom, ...where } : where;
+}
+
+/** #1266: what a nonTripSearchCriteria asks, in the shape nonTripRequirementOf() gives (by, places, zones). Pure. */
+function askedOfCriteria(criteria) {
+  if (!isObject(criteria)) return null;
+  if (list(criteria.zones).length > 0) return { by: 'ZONES', places: [], zones: list(criteria.zones) };
+  return { by: 'PLACES', places: list(criteria.places), zones: [] };
 }
 
 /**
@@ -420,6 +444,35 @@ function recordNonTripOfferChecks(body, test) {
   record(checkNonTripOffers(body, asked(), version), test);
 }
 
+/**
+ * #1266, step 10 of an exchange: the exchange offers of a sale without a trip
+ * give no trip, cover none and say where they are valid, against what the
+ * exchange asked (its request), else what the sale asked.
+ */
+function recordNonTripExchangeOfferChecks(body, test) {
+  if (!isNonTripSale()) return;
+  const version = require('./osdmVersion.js').getComplianceVersion();
+  const sent = parseJson(bruEnv('requestExchangeOffersBodyData'), null);
+  const askedNow = askedOfCriteria(sent?.nonTripSearchCriteria) || asked();
+  const answer = { offers: list(body?.exchangeOffers), trips: list(body?.trips) };
+  record(checkNonTripOffers(answer, askedNow, version, 'Non-trip exchange offers'), test);
+}
+
+/**
+ * #1266, 13 and 15 of an exchange: the parts the exchange added (from
+ * splitExchangeBooking) cover no trip, and each new admission says where it
+ * is valid, against what the exchange asked.
+ */
+function recordNonTripExchangedPartsChecks(added, stage, test) {
+  if (!isNonTripSale() || !Array.isArray(added) || added.length === 0) return;
+  const bookedOffer = {};
+  for (const { list: key, part } of added) (bookedOffer[key] ||= []).push(part);
+  const version = require('./osdmVersion.js').getComplianceVersion();
+  const sent = parseJson(bruEnv('requestExchangeOffersBodyData'), null);
+  const askedNow = askedOfCriteria(sent?.nonTripSearchCriteria) || asked();
+  record(checkNonTripBooking({ bookedOffers: [bookedOffer] }, askedNow, version, stage), test);
+}
+
 /** 02, 05, 07: the booking's non-trip checks. */
 function recordNonTripBookingChecks(booking, step, test) {
   if (!isNonTripSale()) return;
@@ -430,6 +483,7 @@ function recordNonTripBookingChecks(booking, step, test) {
 module.exports = {
   stopPlaceRefOf, sameStopPlace, isAuto, nonTripRequirementOf, nonTripCriteria, nonTripOfferRequest, placeRequest,
   checkPlaceAnswer, checkZonesAnswer, validityListExpected, validitiesOf, stopPlacesNamedIn, admissionValidityChecks,
-  checkNonTripOffers, checkNonTripBooking,
+  checkNonTripOffers, checkNonTripBooking, exchangeNonTripCriteria, askedOfCriteria,
   isNonTripSale, prepareNonTripRequest, checkNonTripLookup, recordNonTripOfferChecks, recordNonTripBookingChecks,
+  recordNonTripExchangeOfferChecks, recordNonTripExchangedPartsChecks,
 };

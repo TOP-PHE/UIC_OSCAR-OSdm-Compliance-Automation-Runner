@@ -199,7 +199,8 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
   const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH'
     // #907: SIM_FARE_REFUND_ ones refund a one-way fare sale, tested with the fares below.
-    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_FARE_'].some((prefix) => s.code.startsWith(prefix))
+    // #1266: SIM_NONTRIP_REFUND_ refunds a sale without a trip.
+    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_FAULT_', 'SIM_FARE_', 'SIM_NONTRIP_'].some((prefix) => s.code.startsWith(prefix))
     && !BY_SCOPE.has(s.code));
   // Some providers sell a return only as one offer: the SIM_REFUND_COMBINED_ ones refund that.
   // #781: SIM_CURRENCY_EUR_REFUND_RETURN_1ADT_38 is the full refund of a return sold in EUR.
