@@ -507,6 +507,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.530] — 2026-11-16
+
+Release 2026.569 (`current_release`). Dependency updates only, no code change. Collection unchanged at OTST_V2.0.260.
+
+### Changed
+
+- **Dependency updates merged since 2026.568**, released so that they reach the running server: a dependency-only merge does not deploy by itself.
+
+  | Package | From | To | Used for | PR |
+  |---|---|---|---|---|
+  | nodemailer | 10.3.1 | 10.5.0 | e-mail | #1279 |
+  | express-rate-limit | 8.7.3 | 8.7.4 | rate limits | #1279 |
+  | supertest | 7.3.1 | 7.3.2 | development only | #1280 |
+  | grafana/grafana | 13.3.0 | 13.3.1 | monitoring of a VPS deployment | #1281 |
+  | prom/alertmanager | 0.34.2 | 0.35.0 | monitoring of a VPS deployment | #1282 |
+
+- **nodemailer 10.4–10.5**: a forced close of pooled connections, a per-message `AbortSignal`, and fixes to DKIM for internationalised domains and to header encoding. OSCAR uses none of the new options.
+- **Grafana 13.3.1**: its release notes list six security fixes.
+- **Alertmanager 0.35.0** has breaking changes: the `auto-gomemlimit` feature flag, named `eventrecorder` outputs, the `types` package. None of them is used by `docker-compose.metrics.yml` or by the configuration OSCAR writes (`alertmanagerConfig.js`: global SMTP, `email_configs`, `matchers`, `inhibit_rules`).
+- **On a VPS, Grafana and Alertmanager change only when the metrics stack is started again**:
+  `cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d`.
+  A cluster takes both from the kube-prometheus-stack chart, which these updates do not touch.
+- Also on `main` since 2026.568 and released on its own: simulator 0.69.0 (#1284), the entry below.
+
+### Verification
+
+- Each PR passed the full CI (lint, unit and integration tests, CodeQL, the Trivy image scan, Sonar).
+- To check on the deployed instance: Server Config → *Send Test Email* (nodemailer).
+- No news entry: nothing changes for users.
+
+---
+
 ## [simulator-0.69.0] — 2026-11-16
 
 Issue #1283. Simulator 0.69.0. Server and collection unchanged. On a VPS that is an LXC container, the simulator's host figures were the provider's whole machine.
