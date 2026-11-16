@@ -40,7 +40,7 @@ spec:
             description: 'Autoheal is restarting OSCAR but it keeps failing its healthcheck. Likely causes: corrupted SQLite DB, full data volume, missing env var after a deploy, or migration failure on boot. Check `docker logs oscar` and the OSCAR · Logs Grafana dashboard.'
             runbook: Documentation/Server_Operations/OSCAR - Server Admin Guide.md#operational-monitoring--alerting
         - alert: OscarQueueStuck
-          expr: oscar_queue_depth > 0 and rate(oscar_runs_total[10m]) == 0
+          expr: oscar_queue_depth > 0 unless sum without (status) (rate(oscar_runs_total[10m])) > 0
           for: 5m
           labels:
             severity: warning
@@ -51,9 +51,9 @@ spec:
         - alert: OscarRunFailureRateHigh
           expr: |
             (
-              rate(oscar_runs_total{status="FAILED"}[15m])
+              sum without (status) (rate(oscar_runs_total{status="FAILED"}[15m]))
               /
-              (rate(oscar_runs_total[15m]) > 0)
+              (sum without (status) (rate(oscar_runs_total[15m])) > 0)
             ) > 0.5
           for: 10m
           labels:

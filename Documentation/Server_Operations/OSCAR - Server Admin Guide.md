@@ -767,8 +767,8 @@ OSCAR ships a self-healing + paging stack so production incidents get caught and
 |---|---|---|---|
 | `OscarServerDown` | critical | `/metrics` unscrapeable for 2 min | Autoheal usually restarts within 60 s. If it didn't, `docker ps` + `docker logs oscar`. |
 | `OscarRestartLoop` | critical | >3 container restarts in 10 min | Persistent boot-time failure — DB corruption, full disk, broken migration, missing env var. Stop autoheal first, debug, fix, restart. |
-| `OscarQueueStuck` | warning | `oscar_queue_depth > 0` AND no run completed in 10 min | Hung Bruno child. Restart the OSCAR container — kills zombie children. |
-| `OscarRunFailureRateHigh` | warning | >50 % of runs FAILED over 15 min | Vendor outage, expired OAuth credentials, or a bad collection update. |
+| `OscarQueueStuck` | warning | `oscar_queue_depth > 0` AND no run ended in 10 min, for 5 min (could not fire before #1286) | Hung Bruno child: restart the OSCAR container, which kills zombie children. A campaign of long scenarios (expiry probes) holding every slot for over 10 min sets it off too: check the Dashboard before restarting. |
+| `OscarRunFailureRateHigh` | warning | >50 % of runs FAILED over 15 min, for 10 min (before #1286, 100 % from a single failure) | Vendor outage, expired OAuth credentials, or a bad collection update. A campaign including deliberately wrong `SIM_WRONG_…` scenarios counts their failures too. |
 | `OscarSmtpDegraded` | warning | Any SMTP failure in last 10 min | Check SMTP creds in Server Config tab. Use **Send test email** to reproduce. |
 | `OscarLoginAttackBurst` | warning | >50 failed logins in 5 min | Possible brute force / credential stuffing. Check Server Activity for source IP, block at firewall. |
 | `OscarHighMemory` | warning | RSS >1 GB for 15 min | Likely a leak. Snapshot heap before restarting if you want to investigate. |

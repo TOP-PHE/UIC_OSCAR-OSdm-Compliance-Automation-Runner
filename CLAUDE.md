@@ -3798,6 +3798,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     four `oscar.host` alerts; `host-metrics.test.js` pins their names to the
     text. **The load has a `period` label the CPU count has not: divide with
     `ignoring(period)`** (found on a local Prometheus, pinned by the test).
+    **A server metric with labels is summed before it meets another series**
+    (#1286): `oscar_runs_total{status="FAILED"} / oscar_runs_total` divided
+    FAILED by FAILED (`OscarRunFailureRateHigh` read 100 % from one
+    failure), and `oscar_queue_depth > 0 and rate(oscar_runs_total…)`
+    matched nothing (`OscarQueueStuck` never fired). Use `sum without
+    (status) (…)`. `alert-label-matching.test.js` reads the labelled
+    metrics from the registry and checks every VPS and cluster rule.
     One run ≈ 0.2 CPU and 250 MB: *Max Concurrent Runs* ≈ 4 per CPU.
     **A free run slot is shared fairly** (#1015, 1.11.425): `nextJobIndex()`
     (`worker/queue.js`, pure) gives it to the company or provider with the
