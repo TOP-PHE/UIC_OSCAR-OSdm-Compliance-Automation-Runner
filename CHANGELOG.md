@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Two alert rules compared `oscar_runs_total` across its `status` label** (#1286). Deployment files and a test only, no version.
+  - **Seen:** on 2026-11-16 at 18:42 the k3s test machine sent `OscarRunFailureRateHigh`, "More than 50% of Bruno runs failing (100%)". Two deliberately wrong `SIM_WRONG_…` scenarios had failed out of about twenty runs.
+  - **Why:** Prometheus matches the two sides of a binary operation label by label.
+    - `rate(oscar_runs_total{status="FAILED"}[15m]) / rate(oscar_runs_total[15m])` divided the FAILED series by the FAILED series: 100 % from one failure, and the alert fired ten minutes later.
+    - `oscar_queue_depth > 0 and rate(oscar_runs_total[10m]) == 0` set a series without `status` against series with it: `and` matched nothing, so `OscarQueueStuck` never fired.
+  - **Now:** both sides of `OscarRunFailureRateHigh` are summed over `status` (`sum without (status) (…)`). `OscarQueueStuck` is `oscar_queue_depth > 0 unless sum without (status) (rate(oscar_runs_total[10m])) > 0`, which also fires when no run has ended since the server started. It can now fire during a campaign of long scenarios that holds every slot for over 10 minutes; the Server Admin Guide (14.2) says so.
+  - The cluster copy (`kubernetes/monitoring/oscar/prometheus-rules.yaml`) is regenerated.
+  - **Checked:** `alert-label-matching.test.js` refuses, in every rule file of the VPS and the cluster, a metric the server registers with labels that meets another series without being summed. It refuses the two rules as they were, and each of six mutations fails it.
+  - **To apply:**
+    - on the VPS, at the next release or by hand: `docker exec oscar-prometheus kill -HUP 1` once the checkout holds the file;
+    - on a cluster: k3s guide 8a step 3, which applies `monitoring/oscar` again.
+
 ### Added
 
 - **k3s on one VPS, section 9: a new OSCAR release in three blocks, with

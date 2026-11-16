@@ -46,7 +46,11 @@ groups:
         # Work is queued but no run has completed in 10 min — the worker is
         # not draining the queue. Most common root cause: a Bruno child
         # process hung past RUN_TIMEOUT_MS without releasing its slot.
-        expr: oscar_queue_depth > 0 and rate(oscar_runs_total[10m]) == 0
+        # #1286: oscar_runs_total has a `status` label and oscar_queue_depth
+        # none, so the statuses are summed first (`and` matched nothing, and
+        # the alert never fired); `unless` also fires when no run has ended
+        # since the server started (no series at all).
+        expr: oscar_queue_depth > 0 unless sum without (status) (rate(oscar_runs_total[10m])) > 0
         for: 5m
         labels:
           severity: warning
@@ -58,11 +62,13 @@ groups:
       - alert: OscarRunFailureRateHigh
         # >50% of runs failing over a 15 min window — vendor outage, expired
         # credentials, or the test collection is broken.
+        # #1286: both sides summed over `status`. Divided as they were, the
+        # FAILED series met only the FAILED series: 100 % from one failure.
         expr: |
           (
-            rate(oscar_runs_total{status="FAILED"}[15m])
+            sum without (status) (rate(oscar_runs_total{status="FAILED"}[15m]))
             /
-            (rate(oscar_runs_total[15m]) > 0)
+            (sum without (status) (rate(oscar_runs_total[15m])) > 0)
           ) > 0.5
         for: 10m
         labels:
