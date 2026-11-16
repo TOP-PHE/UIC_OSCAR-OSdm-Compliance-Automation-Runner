@@ -399,17 +399,17 @@ function withNonTripForms(framework, profile) {
       if (!framework.offerRequestForms.includes(form)) framework.offerRequestForms.push(form);
     }
   }
-  // #1266: the product tags of what it sells without a trip (a pass, a
-  // multi-ride card), when the checklist lists the tags.
-  const tags = framework.offerSearchOptions?.productTags;
+  withNonTripTags(framework.offerSearchOptions?.productTags, profile.nonTrip);
+}
+
+// #1266: the product tags of what a provider sells without a trip (a pass, a
+// multi-ride card), and of the replacement of a lost ticket and card when it
+// replaces them, added to the tags the checklist lists (none listed: none).
+function withNonTripTags(tags, nonTrip) {
   if (!Array.isArray(tags)) return;
-  for (const product of Array.isArray(profile.nonTrip.products) ? profile.nonTrip.products : []) {
-    if (typeof product?.type === 'string' && !tags.includes(product.type)) tags.push(product.type);
-  }
-  // #1266: and the replacement of a lost ticket and card, when it replaces them.
-  if (profile.nonTrip.replacements) {
-    for (const tag of ['TICKET_LOST', 'CARD_LOST']) if (!tags.includes(tag)) tags.push(tag);
-  }
+  const types = (Array.isArray(nonTrip.products) ? nonTrip.products : []).map((p) => p?.type).filter((t) => typeof t === 'string');
+  const lost = nonTrip.replacements ? ['TICKET_LOST', 'CARD_LOST'] : [];
+  for (const tag of [...types, ...lost]) if (!tags.includes(tag)) tags.push(tag);
 }
 
 /** The reference of one provider, as stored in the repository. */

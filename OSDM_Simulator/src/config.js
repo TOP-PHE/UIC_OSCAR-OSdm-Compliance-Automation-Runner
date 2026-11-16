@@ -365,7 +365,7 @@ function checkNonTripReplacements(value, bad) {
   if (value === undefined) return null;
   const { fee, ticket, card } = value && typeof value === 'object' ? value : {};
   const minutesOk = (m) => Number.isInteger(m) && m >= 30 && m <= 525600;
-  const listOk = (list, ok) => Array.isArray(list) && list.length > 0 && list.length <= 20 && list.every(ok);
+  const listOk = (list, ok) => Array.isArray(list) && list.length > 0 && list.length <= 20 && list.every((item) => ok(item));
   const ok = Number.isInteger(fee) && fee >= 1 && fee <= 10000
     && ticket && OVERRULE_CODE.test(ticket.code) && isText(ticket.name, 1, 80) && NON_TRIP_TYPES.has(ticket.type) && minutesOk(ticket.validityMinutes)
     && listOk(ticket.holders, (h) => h && isText(h.lastName, 1, 80) && DATE.test(h.dateOfBirth))

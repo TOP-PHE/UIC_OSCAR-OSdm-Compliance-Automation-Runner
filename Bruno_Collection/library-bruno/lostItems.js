@@ -156,7 +156,8 @@ function recordReplacementChecks(test) {
   if (!offer) return;
   const kind = kindOfOffer(offer, kinds);
   const fees = feesOf(offer);
-  validationLogger(`[INFO] 🔑 Replacement of a lost ${WHAT[kind]} (${kind}): ${offer.summary || offer.offerId}; ${fees ? `fee ${amountText(fees)}` : 'no fee'}.`);
+  const feeText = fees ? 'fee ' + amountText(fees) : 'no fee';
+  validationLogger(`[INFO] 🔑 Replacement of a lost ${WHAT[kind]} (${kind}): ${offer.summary || offer.offerId}; ${feeText}.`);
   for (const c of replacementChecks(offer, kinds, scenarioLostCard())) {
     if (c.level === 'warn') {
       if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);

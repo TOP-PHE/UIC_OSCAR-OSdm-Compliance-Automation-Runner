@@ -99,30 +99,37 @@ const sameName = (a, b) => typeof a === 'string' && typeof b === 'string' && a.t
  * a lost ticket the provider knows, or a card it knows. `specs` are the
  * booking's passenger specifications of that offer, with their index.
  */
+// The holder of a lost ticket: a last name and date of birth the profile knows.
+function checkHolder(spec, at, ticket) {
+  const lastName = spec?.detail?.lastName;
+  const dateOfBirth = spec?.dateOfBirth;
+  if (!text(lastName) || !text(dateOfBirth)) {
+    throw refused('REQUESTED_INFORMATION_MISSING', 'Requested information missing',
+      `The replacement of a lost ticket needs the holder's last name and date of birth (requestedInformation: ${REQUESTED.TICKET_LOST}).`, at);
+  }
+  if (!ticket.holders.some((h) => sameName(h.lastName, lastName) && h.dateOfBirth === dateOfBirth)) {
+    throw refused('LOST_TICKET_NOT_FOUND', 'Lost ticket not found', 'No ticket of this holder is known: nothing to replace.', at);
+  }
+}
+
+// A lost card: a number among the passenger's cards that the profile knows.
+function checkCard(spec, at, card) {
+  const numbers = (Array.isArray(spec?.cards) ? spec.cards : []).map((c) => text(c?.number)).filter(Boolean);
+  if (numbers.length === 0) {
+    throw refused('REQUESTED_INFORMATION_MISSING', 'Requested information missing',
+      `The replacement of a lost card needs the card's number (requestedInformation: ${REQUESTED.CARD_LOST}).`, `${at}/cards`);
+  }
+  if (!card.cards.some((c) => numbers.includes(c.number))) {
+    throw refused('LOST_CARD_NOT_FOUND', 'Lost card not found', 'No card of this number is known: nothing to replace.', `${at}/cards`);
+  }
+}
+
 function checkBooking(kind, specs, provider) {
   const r = provider.nonTrip.replacements;
   for (const { spec, index } of specs) {
     const at = `/passengerSpecifications/${index}`;
-    if (kind === 'TICKET_LOST') {
-      const lastName = spec?.detail?.lastName;
-      const dateOfBirth = spec?.dateOfBirth;
-      if (!text(lastName) || !text(dateOfBirth)) {
-        throw refused('REQUESTED_INFORMATION_MISSING', 'Requested information missing',
-          `The replacement of a lost ticket needs the holder's last name and date of birth (requestedInformation: ${REQUESTED.TICKET_LOST}).`, at);
-      }
-      if (!r.ticket.holders.some((h) => sameName(h.lastName, lastName) && h.dateOfBirth === dateOfBirth)) {
-        throw refused('LOST_TICKET_NOT_FOUND', 'Lost ticket not found', 'No ticket of this holder is known: nothing to replace.', at);
-      }
-    } else {
-      const numbers = (Array.isArray(spec?.cards) ? spec.cards : []).map((c) => text(c?.number)).filter(Boolean);
-      if (numbers.length === 0) {
-        throw refused('REQUESTED_INFORMATION_MISSING', 'Requested information missing',
-          `The replacement of a lost card needs the card's number (requestedInformation: ${REQUESTED.CARD_LOST}).`, `${at}/cards`);
-      }
-      if (!r.card.cards.some((c) => numbers.includes(c.number))) {
-        throw refused('LOST_CARD_NOT_FOUND', 'Lost card not found', 'No card of this number is known: nothing to replace.', `${at}/cards`);
-      }
-    }
+    if (kind === 'TICKET_LOST') checkHolder(spec, at, r.ticket);
+    else checkCard(spec, at, r.card);
   }
 }
 
