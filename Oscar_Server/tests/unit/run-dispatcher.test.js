@@ -23,7 +23,7 @@ const http = require('node:http');
 const { randomUUID, randomBytes } = require('node:crypto');
 const P = require('../../src/runner-agent/protocol');
 const J = require('../../src/run-dispatcher/jobSpec');
-const { createKubeClient } = require('../../src/run-dispatcher/kube');
+const { createKubeClient, KubeError } = require('../../src/run-dispatcher/kube');
 const D = require('../../src/run-dispatcher/dispatcher');
 const { SERVER_SECRETS } = require('../../src/runner-agent/agent');
 
@@ -129,6 +129,19 @@ function fakeApi() {
         if (store.has(body.metadata.name)) return json(res, 409, { message: 'already exists' });
         const script = s.scripts.get(body.metadata.labels?.[J.RUN_ID_LABEL]);
         if (kind === 'jobs' && script?.invalid) return json(res, 422, { message: `Job.batch "${body.metadata.name}" is invalid` });
+        // #1276: the runs' quota updated by two creations at once; nothing made.
+        if (script?.conflicts?.[kind] > 0) {
+          script.conflicts[kind] -= 1;
+          return json(res, 409, {
+            kind: 'Status', reason: 'Conflict',
+            message: 'Operation cannot be fulfilled on resourcequotas "oscar-runs": the object has been modified; please apply your changes to the latest version and try again',
+          });
+        }
+        // Said to exist, yet not made (then read 404).
+        if (kind === 'jobs' && script?.saidToExist > 0) {
+          script.saidToExist -= 1;
+          return json(res, 409, { kind: 'Status', reason: 'AlreadyExists', message: `jobs.batch "${body.metadata.name}" already exists` });
+        }
         const obj = { ...body, metadata: { ...body.metadata, uid: randomUUID() }, status: {} };
         store.set(obj.metadata.name, obj);
         s.created[kind].push(body);
@@ -426,6 +439,8 @@ describe('when the Kubernetes API does not answer (#1272)', () => {
     ['400', { status: 400 }, false],
     ['404', { status: 404 }, false],
     ['409', { status: 409 }, false],
+    ['409 Conflict (two writes of the quota met, #1276)', { status: 409, reason: 'Conflict' }, true],
+    ['409 AlreadyExists', { status: 409, reason: 'AlreadyExists' }, false],
     ['422', { status: 422 }, false],
     ['a fault of its own', new TypeError('x is not a function'), false],
   ])('%s: waiting can cure it = %s', (_what, err, passing) => {
@@ -446,8 +461,8 @@ describe('when the Kubernetes API does not answer (#1272)', () => {
     expect(messages[0]).toEqual({ t: 'started' });
     expect(out(messages)).toBe('line 1\n');
     expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
-    expect(warnings()).toContain(`[run-dispatcher] ${J.jobNameOf(req.runId)}: the Kubernetes API does not answer (creating the Secret: HTTP 503); waiting for it for up to 1 s`);
-    expect(logged.some(([level, line]) => level === 'info' && line.includes('the Kubernetes API answers again (creating the Secret'))).toBe(true);
+    expect(warnings()).toContain(`[run-dispatcher] ${J.jobNameOf(req.runId)}: creating the Secret failed (HTTP 503); trying again for up to 1 s`);
+    expect(logged.some(([level, line]) => level === 'info' && line.includes('creating the Secret went through (after'))).toBe(true);
   });
 
   test('connections reset while the pod is awaited: the run waits, then runs to its end', async () => {
@@ -464,7 +479,7 @@ describe('when the Kubernetes API does not answer (#1272)', () => {
     expect(messages.some((m) => m.t === 'refused')).toBe(false);
     expect(out(messages)).toBe('line 1\n');
     expect(last(messages)).toMatchObject({ t: 'exit', code: 4 });
-    expect(warnings().some((line) => line.includes('does not answer (reading the pod: ECONNRESET)'))).toBe(true);
+    expect(warnings().some((line) => line.includes('reading the pod failed (ECONNRESET)'))).toBe(true);
   });
 
   test('a run that ends while its log is cut: its last lines are read once the API answers', async () => {
@@ -529,9 +544,9 @@ describe('when the Kubernetes API does not answer (#1272)', () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(WAIT_MS - 20);
     expect(messages).toEqual([{
       t: 'refused',
-      reason: 'the run could not be dispatched: the Kubernetes API did not answer for 1 s (creating the Secret: apiserver not ready)',
+      reason: 'the run could not be dispatched: the Kubernetes API still failed after 1 s (creating the Secret: apiserver not ready)',
     }]);
-    expect(warnings()).toContain(`[run-dispatcher] ${name} refused: the run could not be dispatched (the Kubernetes API did not answer for 1 s (creating the Secret: HTTP 503))`);
+    expect(warnings()).toContain(`[run-dispatcher] ${name} refused: the run could not be dispatched (the Kubernetes API still failed after 1 s (creating the Secret: HTTP 503))`);
     expect(logged.some(([, line]) => line.includes('apiserver not ready'))).toBe(false);
   });
 
@@ -542,7 +557,7 @@ describe('when the Kubernetes API does not answer (#1272)', () => {
     const messages = await askPatient(req);
     expect(messages).toEqual([{ t: 'refused', reason: `the run could not be dispatched: Job.batch "${name}" is invalid` }]);
     expect(warnings()).toContain(`[run-dispatcher] ${name} refused: the run could not be dispatched (HTTP 422)`);
-    expect(warnings().some((line) => line.includes(`${name}: the Kubernetes API does not answer`))).toBe(false);
+    expect(warnings().some((line) => line.includes(`${name}: `) && line.includes('trying again'))).toBe(false);
     await until(() => !api.s.secrets.has(name));
   });
 
@@ -580,6 +595,62 @@ describe('when the Kubernetes API does not answer (#1272)', () => {
     const messages = await askPatient(runRequest({ token: 'x'.repeat(48) }));
     expect(messages).toEqual([{ t: 'refused', reason: 'not authorised' }]);
     expect(warnings()).toContain('[run-dispatcher] refused: not authorised');
+  });
+
+  // #1276: on the k3s test machine a run was refused with 'jobs.batch "…" not
+  // found': its Job's creation met another write of the runs' quota (409
+  // Conflict, nothing made), read as "its own Job exists", then read 404.
+  test('a 409 Conflict on the Job is tried again: one Job is made, and the run goes to its end', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.scripts.set(req.runId, { lines: ['line 1\n'], exitCode: 0, conflicts: { jobs: 2 } });
+    const messages = await askPatient(req);
+    expect(messages.some((m) => m.t === 'refused')).toBe(false);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
+    expect(api.s.created.jobs.filter((j) => j.metadata.name === name)).toHaveLength(1);
+    expect(warnings()).toContain(`[run-dispatcher] ${name}: creating the Job failed (HTTP 409 Conflict); trying again for up to 1 s`);
+    expect(api.s.calls).not.toContain(`GET /apis/batch/v1/namespaces/oscar-runs/jobs/${name}`);
+  });
+
+  test('a 409 Conflict on the Secret is tried again, never taken for a Secret left from before', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.scripts.set(req.runId, { lines: ['line 1\n'], exitCode: 0, conflicts: { secrets: 1 } });
+    const messages = await askPatient(req);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
+    expect(warnings()).toContain(`[run-dispatcher] ${name}: creating the Secret failed (HTTP 409 Conflict); trying again for up to 1 s`);
+    // A Secret left from before would be removed first: a conflict removes
+    // nothing, so the Secret is deleted once, when the run ends.
+    await until(() => !api.s.secrets.has(name));
+    expect(api.s.calls.filter((c) => c === `DELETE /api/v1/namespaces/oscar-runs/secrets/${name}`)).toHaveLength(1);
+  });
+
+  test('a Job said to exist that then reads 404 is made again, not a refusal', async () => {
+    const req = runRequest();
+    const name = J.jobNameOf(req.runId);
+    api.s.scripts.set(req.runId, { lines: ['line 1\n'], exitCode: 0, saidToExist: 1 });
+    const messages = await askPatient(req);
+    expect(messages.some((m) => m.t === 'refused')).toBe(false);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: 0 });
+    expect(api.s.created.jobs.filter((j) => j.metadata.name === name)).toHaveLength(1);
+    expect(warnings()).toContain(`[run-dispatcher] ${name}: its Job was said to exist, then not found; making it again`);
+  });
+
+  test('a Job said to exist and never found is refused once the wait is over', async () => {
+    const req = runRequest();
+    api.s.scripts.set(req.runId, { lines: ['line 1\n'], exitCode: 0, saidToExist: 1000 });
+    const started = Date.now();
+    const messages = await askPatient(req);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(WAIT_MS - 20);
+    expect(messages).toEqual([{ t: 'refused', reason: 'the run could not be dispatched: not found' }]);
+  });
+
+  test('the reason of an answer is kept when it is one word of the API, dropped otherwise', () => {
+    expect(new KubeError(409, 'x', 'Conflict').reason).toBe('Conflict');
+    expect(new KubeError(409, 'x', 'AlreadyExists').reason).toBe('AlreadyExists');
+    expect(new KubeError(409, 'x', 'the object <b>has</b> been modified').reason).toBeNull();
+    expect(new KubeError(409, 'x', { reason: 'Conflict' }).reason).toBeNull();
+    expect(new KubeError(500, 'x').reason).toBeNull();
   });
 });
 

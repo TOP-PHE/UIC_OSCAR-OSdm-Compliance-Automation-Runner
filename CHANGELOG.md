@@ -507,9 +507,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.528] / [collection-OTST_V2.0.260] — 2026-11-15
+## [server-1.11.529] / [collection-OTST_V2.0.260] — 2026-11-16
 
-Issue #1266, part 2, first case. Release 2026.567 (`current_release`). The refund and the exchange of a sale without a trip.
+Issue #1266, part 2, first case. Release 2026.568 (`current_release`). The refund and the exchange of a sale without a trip.
 
 Decided with the maintainer on starting part 2: the after-sale first, then `TICKET_LOST` / `CARD_LOST`, NUTS codes, the #227 discovery without a trip, and fares without a trip last. Places other than stop places (an address, a point of interest, a geo position) are left out, as decided for #1258.
 
@@ -543,6 +543,38 @@ Decided with the maintainer on starting part 2: the after-sale first, then `TICK
   - the parser (a day later, another NON_TRIP trip naming its zone or left to a lookup, a trip and a non-trip never mixed).
 - `bruno-exchange-parts.test.js`: the exchange request, with no trip member.
 - The request and parser rules are mutation-checked.
+
+---
+
+## [server-1.11.528] — 2026-11-15
+
+Release 2026.567 (`current_release`). In pod mode, a 409 Conflict on the runs' quota no longer refuses a run (#1276, follow-up of #1272).
+
+### Fixed
+- **A run refused with `jobs.batch "oscar-run-…" not found`, with no outage of the API.**
+  - **Seen:** on the k3s test machine (2026.565, a batch of about 855 runs, 15 at a time), one run was refused 1.8 s after it was sent to the dispatcher, the only time. k3s logged a slow write of the `oscar-runs` quota at the same moment.
+  - **Why:** every Job and Secret a run makes updates the quota of `oscar-runs`. With many runs starting at once, two updates meet, and the API server answers the creation with 409, reason `Conflict`, without making the object. Since #1272 the dispatcher read any 409 on a Job as "this run's own Job exists", read it back, got 404, and refused the run. On the Secret, the same 409 removed the run's objects before making it again.
+- **A 409 is read by its reason.**
+  - `kube.js` keeps `Status.reason` on the error (`KubeError.reason`) when it is one word of the API's list, and drops anything else.
+  - A 409 `Conflict` is passing (`isPassing()`): tried again like a 5xx, within `RUN_DISPATCHER_API_WAIT_MS`, for every call.
+  - Only a 409 `AlreadyExists` is "this run's Job" (`createRunJob()`). A Job that then reads 404 is made again within the same wait, never taken for a refusal.
+- **The dispatcher's log names the call and the reason**: `<run>: creating the Job failed (HTTP 409 Conflict); trying again for up to 120 s`, then `<run>: creating the Job went through (after N s)`. These replace the "does not answer / answers again" lines of 1.11.525, since a conflict is an answer. A refusal after the wait reads `the Kubernetes API still failed after N s (…)`.
+- **Documentation:** the Kubernetes guide (section 10a and the troubleshooting row).
+
+### Checked
+- `run-dispatcher.test.js`, against the stand-in API server, which can now answer `Conflict` on a Job or a Secret, and `AlreadyExists` for a Job it did not make:
+  - two conflicts on the Job: one Job made, the run to its end, never read back;
+  - a conflict on the Secret: tried again, nothing removed;
+  - a Job said to exist then not found: made again;
+  - one never found: refused once the wait is over;
+  - which reasons are kept;
+  - which 409s are passing.
+- Mutation-checked: each of the following fails a test.
+  - a Conflict not passing;
+  - a Job said to exist then 404 refused;
+  - no bound on making it again;
+  - the reason not kept, kept whatever its text, or not read from the answer.
+- The mutation checks of #1272 still pass.
 
 ---
 

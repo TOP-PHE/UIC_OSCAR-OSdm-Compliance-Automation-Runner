@@ -1,18 +1,30 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.567",
+  "current_release": "2026.568",
   "releases": [
     {
-      "release": "2026.567",
-      "date": "2026-11-15",
-      "server": "1.11.528",
+      "release": "2026.568",
+      "date": "2026-11-16",
+      "server": "1.11.529",
       "collection": "OTST_V2.0.260",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.528, collection OTST_V2.0.260: the refund and the exchange of a sale without a trip (#1266, part 2). The exchange offer request of such a sale sends nonTripSearchCriteria (the sale's stop places or zone, validFrom moved by exchange.dateOffsetDays, or another NON_TRIP trip's own) and no trip; before, it went out as an empty trip search, and an exchange block stopped the scenario at its start. Step 10 checks the exchange offers as the sale's were (no trip, no trip coverage, a validity per admission), and 13/15 the parts the exchange added. An exchange between a trip and an offer without a trip is not tested (a WARNING). The refund needed no change.",
+        "Server 1.11.529, collection OTST_V2.0.260: the refund and the exchange of a sale without a trip (#1266, part 2). The exchange offer request of such a sale sends nonTripSearchCriteria (the sale's stop places or zone, validFrom moved by exchange.dateOffsetDays, or another NON_TRIP trip's own) and no trip; before, it went out as an empty trip search, and an exchange block stopped the scenario at its start. Step 10 checks the exchange offers as the sale's were (no trip, no trip coverage, a validity per admission), and 13/15 the parts the exchange added. An exchange between a trip and an offer without a trip is not tested (a WARNING). The refund needed no change.",
         "New simulator scenarios SIM_NONTRIP_REFUND_1ADT_* and SIM_NONTRIP_EXCHANGE_1ADT_* (in the run list) and catalogue entries OTST_NONTRIP_REFUND_1ADT (361 checks) and OTST_NONTRIP_EXCHANGE_1ADT (397); the simulator answers both as it is (0.68.0). Every simulator reference changes."
+      ]
+    },
+    {
+      "release": "2026.567",
+      "date": "2026-11-15",
+      "server": "1.11.528",
+      "collection": "OTST_V2.0.259",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.528: in pod mode a 409 Conflict on the runs' quota no longer refuses a run (#1276). With many runs starting at once, two updates of the oscar-runs quota meet and the API answers Conflict without making the Job; since #1272 the dispatcher read it as its own Job, read it back (404) and refused the run (seen once on the k3s test machine).",
+        "A 409 is read by its reason (Status.reason, kept when it is one word): Conflict is tried again within RUN_DISPATCHER_API_WAIT_MS, only AlreadyExists is the run's own Job, made again if it then reads 404. The dispatcher's log says which call failed and when it went through."
       ]
     },
     {
