@@ -3965,7 +3965,7 @@ function buildExchangeSection(idx, sc) {
     <div class="param-section-body">
     <div class="param-grid" style="padding:12px 14px 4px">
       <div class="param-field">
-        <span class="param-label">Trip <span class="param-hint">${esc('What the booking is exchanged for (#959): another trip of the data file (another route), or the sale\'s own. It goes on the sale\'s day, moved to the first day its Test Data trains run. The exchange offers and, once confirmed, the booked offer of the exchange must cover it.')}</span></span>
+        <span class="param-label">Trip <span class="param-hint">${esc('What the booking is exchanged for (#959): another trip of the data file (another route), or the sale\'s own. It goes on the sale\'s day, moved to the first day its Test Data trains run. The exchange offers and, once confirmed, the booked offer of the exchange must cover it. A sale without a trip (#1266) is exchanged for offers without a trip: its own stop places or zone, valid from the day below, or another NON_TRIP trip\'s own; a trip and an offer without a trip are not mixed.')}</span></span>
         <select class="param-input param-select" data-action="set-exchange-field" data-idx="${esc(idx)}" data-field="tripRequirementId">
           ${options}
         </select>

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-15-non-trip-refund-exchange",
+    "date": "November 15, 2026",
+    "tag": "New",
+    "title": "Without a trip: a refund and an exchange",
+    "summary": "A sale without a trip can now be refunded and exchanged in a scenario. The exchange asks offers without a trip, in the same stop places or zone, on another day if the scenario says so.",
+    "content": "A ticket sold without a trip, such as a pass for a city zone, can be refunded or exchanged like any other. OSCAR now tests both.\n\nThe refund goes as for a ticket with a trip: the refund offer, its confirmation, and the booking after it, which must still name no trip.\n\nThe exchange asks the provider for offers without a trip too: the same stop places or zone as the sale, valid from the day the scenario's Exchange to section gives (Days after the sale's day), or the stop places or zone of another trip without a trip that you choose there. The exchange offers, and the ticket the exchange gives once confirmed, are checked as the sale's were: no trip, no trip coverage, and where each admission is valid. An exchange from a ticket with a trip to one without, or the other way round, is not tested.\n\nTwo reference scenarios can be copied: OTST_NONTRIP_REFUND_1ADT and OTST_NONTRIP_EXCHANGE_1ADT, both in the first zone the provider lists. Your Test Framework must declare offers without a trip in zones, and the refund or the exchange.\n\nIf your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
+  },
+  {
     "id": "2026-11-15-non-trip-products",
     "date": "November 15, 2026",
     "tag": "New",

@@ -23,10 +23,15 @@ const SA_DIR = '/var/run/secrets/kubernetes.io/serviceaccount';
 const MAX_ANSWER = 4 * 1024 * 1024;
 const TIMEOUT_MS = 30 * 1000;
 
+// A Status' reason (#1276): one word of the API's own list (Conflict,
+// AlreadyExists, NotFound…), never its free text; anything else is dropped.
+const REASON_RE = /^[A-Za-z]{1,40}$/;
+
 class KubeError extends Error {
-  constructor(status, message) {
+  constructor(status, message, reason = null) {
     super(message);
     this.status = status;
+    this.reason = typeof reason === 'string' && REASON_RE.test(reason) ? reason : null;
   }
 }
 
@@ -57,7 +62,7 @@ function readAnswer(res, resolve, reject) {
     let json = null;
     try { json = text ? JSON.parse(text) : null; } catch { json = null; }
     if (res.statusCode >= 200 && res.statusCode < 300) return resolve(json);
-    return reject(new KubeError(res.statusCode, String(json?.message || `HTTP ${res.statusCode}`).slice(0, 300)));
+    return reject(new KubeError(res.statusCode, String(json?.message || `HTTP ${res.statusCode}`).slice(0, 300), json?.reason));
   });
   res.on('error', reject);
 }

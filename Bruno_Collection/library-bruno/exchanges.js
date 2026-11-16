@@ -413,6 +413,8 @@ function recordTripChecks(checks) {
 // Step 10: the exchange offers cover the trip asked; the one that does is
 // taken when the first does not.
 function checkExchangeTripOffers(jsonData) {
+  // #1266: an exchange of a sale without a trip: offers without a trip.
+  require('./nonTrip.js').recordNonTripExchangeOfferChecks(jsonData, test);
   const asked = exchangeTripAsked();
   if (!asked) return;
   const { checkExchangeOffers } = require('./exchangeTrip.js');
@@ -450,6 +452,8 @@ function checkBookingAroundExchange(jsonData, stage) {
     if (c.level === 'info') { validationLogger(`[INFO] ${c.name}: ${c.message}`); return; }
     test(c.name, () => { if (!c.ok) throw new Error(c.message); });
   });
+  // #1266: the parts an exchange of a sale without a trip added cover no trip.
+  require('./nonTrip.js').recordNonTripExchangedPartsChecks(added, rule.confirmed ? 'Exchanged parts (confirmed)' : 'Exchanged parts (pre-booked)', test);
   // #959: once confirmed, the new booked offer is for the trip asked.
   const asked = rule.confirmed ? exchangeTripAsked() : null;
   if (asked) {
