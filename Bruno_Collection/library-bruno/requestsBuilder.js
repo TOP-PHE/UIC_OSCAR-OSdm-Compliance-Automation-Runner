@@ -761,7 +761,12 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
 function exchangeTripAndCriteria() {
   const own = bru.getEnvVar("exchangeTripType");
   let trip;
-  if (own === "SPECIFICATION") trip = { tripSpecifications: parseEnvJson('exchangeTripSpecifications') };
+  // #1266: a sale without a trip is exchanged for offers without a trip.
+  if (own === "NON_TRIP" || (own !== "SPECIFICATION" && own !== "SEARCH" && bru.getEnvVar("TripType") === "NON_TRIP")) {
+    const sale = parseEnvJson('OfferCollectionRequest', null);
+    const criteria = require('./nonTrip.js').exchangeNonTripCriteria(sale?.nonTripSearchCriteria, parseEnvJson('exchangeNonTrip', null));
+    trip = { nonTripSearchCriteria: criteria };
+  } else if (own === "SPECIFICATION") trip = { tripSpecifications: parseEnvJson('exchangeTripSpecifications') };
   else if (own === "SEARCH") trip = { tripSearchCriteria: parseEnvJson('exchangeTripSearchCriteria') };
   else if (bru.getEnvVar("TripType") === "SPECIFICATION") trip = { tripSpecifications: parseEnvJson('offerTripSpecifications') };
   else trip = { tripSearchCriteria: parseEnvJson('offerTripSearchCriteria') };

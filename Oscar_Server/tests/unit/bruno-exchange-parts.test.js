@@ -211,3 +211,37 @@ describe('#671: the fulfillments of the parts an exchange made', () => {
       .toMatch(/jsonData\.fulfillmentDocuments, \{ deferUnknownParts: true \}\);/);
   });
 });
+
+// #1266: a sale without a trip is exchanged for offers without a trip.
+describe('requestExchangeOffersBody: a sale without a trip', () => {
+  const zones = [{ id: 'SIM-CITY', carrier: 'urn:c' }];
+  const base = () => ({
+    fulfillmentIds: '["F1"]',
+    offerPassengerSpecifications: '[{"externalRef":"PAX01","type":"PERSON","dateOfBirth":"1990-01-16"}]',
+    offerSearchCriteria: '{}',
+    TripType: 'NON_TRIP',
+    OfferCollectionRequest: JSON.stringify({ nonTripSearchCriteria: { validFrom: '2026-11-25T00:00:00+01:00', zones } }),
+  });
+
+  test('the sale\'s criteria as sent, no trip member', () => {
+    envStore = base();
+    rb.requestExchangeOffersBody();
+    const body = JSON.parse(envStore.requestExchangeOffersBodyData);
+    expect(body.nonTripSearchCriteria).toEqual({ validFrom: '2026-11-25T00:00:00+01:00', zones });
+    for (const member of ['tripSearchCriteria', 'tripSpecifications', 'tripIds']) expect(body).not.toHaveProperty(member);
+  });
+
+  test('the exchange block\'s day', () => {
+    envStore = { ...base(), exchangeTripType: 'NON_TRIP', exchangeNonTrip: JSON.stringify({ validFrom: '2026-11-26T00:00:00+01:00', criteria: null }) };
+    rb.requestExchangeOffersBody();
+    expect(JSON.parse(envStore.requestExchangeOffersBodyData).nonTripSearchCriteria).toEqual({ validFrom: '2026-11-26T00:00:00+01:00', zones });
+  });
+
+  test('a trip sale is unchanged', () => {
+    envStore = { ...base(), TripType: 'SEARCH', offerTripSearchCriteria: '{"origin":"A"}' };
+    rb.requestExchangeOffersBody();
+    const body = JSON.parse(envStore.requestExchangeOffersBodyData);
+    expect(body.tripSearchCriteria).toEqual({ origin: 'A' });
+    expect(body).not.toHaveProperty('nonTripSearchCriteria');
+  });
+});

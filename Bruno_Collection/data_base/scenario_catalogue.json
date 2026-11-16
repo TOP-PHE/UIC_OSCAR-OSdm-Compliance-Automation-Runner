@@ -1324,6 +1324,30 @@
         "passengers": 1,
         "providerValues": ["expectedProduct", "productCode"]
       }
+    },
+    {
+      "code": "OTST_NONTRIP_REFUND_1ADT",
+      "source": "SIM_NONTRIP_REFUND_1ADT_38",
+      "checks": 361,
+      "purpose": "Full refund of a sale without a trip (#1266): one adult, a refundable offer bought in the first zone of GET /zones, then refunded (refund offer, confirmed). The refund checks of a sale with a trip; the booking after the refund names no trip and keeps the admission's validity.",
+      "capability": "refund.full",
+      "needs": {
+        "trip": "NON_TRIP",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_EXCHANGE_1ADT",
+      "source": "SIM_NONTRIP_EXCHANGE_1ADT_38",
+      "checks": 397,
+      "purpose": "Exchange of a sale without a trip (#1266): one adult, an exchangeable offer bought in the first zone of GET /zones, exchanged for offers asked by nonTripSearchCriteria in the same zone a day later; taken, confirmed. The exchange offers give no trip and say where they are valid; so does the admission the exchange adds.",
+      "capability": "exchange.full",
+      "needs": {
+        "trip": "NON_TRIP",
+        "tariff": "EXCHANGEABLE",
+        "passengers": 1
+      }
     }
   ]
 }
