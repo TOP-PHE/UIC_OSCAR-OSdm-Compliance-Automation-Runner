@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.568",
+  "current_release": "2026.569",
   "releases": [
+    {
+      "release": "2026.569",
+      "date": "2026-11-16",
+      "server": "1.11.530",
+      "collection": "OTST_V2.0.260",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "chore(deps): dependency updates only, no code change; released so that they reach the running server (a dependency-only merge does not deploy by itself). Run-time: nodemailer 10.3.1 -> 10.5.0 (e-mail: a forced close of pooled connections, a per-message AbortSignal, DKIM and header-encoding fixes; OSCAR uses none of the new options) and express-rate-limit 8.7.3 -> 8.7.4 (#1279). Development only: supertest 7.3.1 -> 7.3.2 (#1280).",
+        "Monitoring of a VPS deployment: Grafana 13.3.0 -> 13.3.1 (#1281; its release notes list six security fixes) and Alertmanager 0.34.2 -> 0.35.0 (#1282; its breaking changes, the auto-gomemlimit feature flag, named eventrecorder outputs and the types package, are used neither by the compose file nor by the configuration OSCAR writes). They change only when the metrics stack is started again on the VPS: docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d in /opt/OSCAR/OSCAR_Deploy. A cluster takes its Grafana and Alertmanager from the kube-prometheus-stack chart, which these do not touch.",
+        "Also on main since 2026.568, released on its own: simulator 0.69.0 (#1284), which reads its host's memory, load and CPU from the VPS's own files on an LXC VPS. Server-only; collection unchanged at OTST_V2.0.260. No news entry: nothing changes for users. To check on the deployed instance: Server Config, Send Test Email (nodemailer)."
+      ]
+    },
     {
       "release": "2026.568",
       "date": "2026-11-16",
