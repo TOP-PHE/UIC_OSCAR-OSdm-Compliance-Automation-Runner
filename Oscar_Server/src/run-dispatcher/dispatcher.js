@@ -69,22 +69,30 @@ const RESUME_MARGIN_MS = 2000;  // a resumed log starts this much earlier: lines
 // Kubernetes API errors that waiting can cure (#1272): no answer at all (a
 // refused, reset or timed-out connection: a system error code), or what the
 // API server answers while it starts: 401 and 403 before its access rules are
-// loaded, 408, 429 and 5xx (k3s: "apiserver not ready", "starting"). Anything
-// else (400, 404, 409, 422, a fault of the dispatcher's own) is final at once.
+// loaded, 408, 429 and 5xx (k3s: "apiserver not ready", "starting"). And a
+// 409 Conflict (#1276): two writes of one object met, typically the runs'
+// quota, which every Job and Secret made updates; nothing was made. Anything
+// else (400, 404, 409 AlreadyExists, 422, a fault of the dispatcher's own) is
+// final at once.
 function isPassing(err) {
-  if (Number.isInteger(err?.status)) return [401, 403, 408, 429].includes(err.status) || err.status >= 500;
+  if (Number.isInteger(err?.status)) {
+    return [401, 403, 408, 429].includes(err.status) || err.status >= 500 || (err.status === 409 && err.reason === 'Conflict');
+  }
   return typeof err?.code === 'string';
 }
-// What failed, for the dispatcher's own log: a status or an error code, never
-// the API's words.
-const failureOf = (err) => (Number.isInteger(err?.status) ? `HTTP ${err.status}` : String(err?.code || 'error'));
+// What failed, for the dispatcher's own log: a status and its reason word, or
+// an error code; never the API's words.
+function failureOf(err) {
+  if (!Number.isInteger(err?.status)) return String(err?.code || 'error');
+  return err.reason ? `HTTP ${err.status} ${err.reason}` : `HTTP ${err.status}`;
+}
 
-// The Kubernetes API did not answer for the whole wait.
+// The Kubernetes API still failed when the wait was over.
 class ApiUnavailable extends Error {
   constructor(waitMs, what, err) {
     const seconds = Math.round(waitMs / 1000);
-    super(`the Kubernetes API did not answer for ${seconds} s (${what}: ${String(err?.message || err).slice(0, 150)})`);
-    this.logText = `the Kubernetes API did not answer for ${seconds} s (${what}: ${failureOf(err)})`;
+    super(`the Kubernetes API still failed after ${seconds} s (${what}: ${String(err?.message || err).slice(0, 150)})`);
+    this.logText = `the Kubernetes API still failed after ${seconds} s (${what}: ${failureOf(err)})`;
   }
 }
 
@@ -247,21 +255,21 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
   const running = new Set();
   const apiWaitMs = settings.apiWaitMs ?? 120000;
 
-  // One API call of a run, tried again while the API does not answer (#1272),
-  // for up to apiWaitMs from its first failure. A stopped run waits no more,
-  // except to remove what it made (evenStopped).
+  // One API call of a run, tried again while its failure is one waiting can
+  // cure (#1272, #1276), for up to apiWaitMs from its first failure. A stopped
+  // run waits no more, except to remove what it made (evenStopped).
   // `since` is the time of the first failure (0: none yet), `pause` the next
   // wait; each try after a failure is a call of its own, at most about twenty.
   async function patiently(run, what, call, { evenStopped = false } = {}, since = 0, pause = retryMs) {
     try {
       const value = await call();
-      if (since) log.info?.(`[run-dispatcher] ${run.name}: the Kubernetes API answers again (${what}, after ${Math.round((Date.now() - since) / 1000)} s)`);
+      if (since) log.info?.(`[run-dispatcher] ${run.name}: ${what} went through (after ${Math.round((Date.now() - since) / 1000)} s)`);
       return value;
     } catch (err) {
       if (!isPassing(err) || (run.stopped && !evenStopped)) throw err;
       const now = Date.now();
       if (!since) {
-        log.warn?.(`[run-dispatcher] ${run.name}: the Kubernetes API does not answer (${what}: ${failureOf(err)}); waiting for it for up to ${Math.round(apiWaitMs / 1000)} s`);
+        log.warn?.(`[run-dispatcher] ${run.name}: ${what} failed (${failureOf(err)}); trying again for up to ${Math.round(apiWaitMs / 1000)} s`);
       }
       const first = since || now;
       const left = first + apiWaitMs - now;
@@ -298,19 +306,38 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
     try {
       await k.createSecret(secret);
     } catch (err) {
+      // A 409 Conflict was tried again by patiently(): this one says the
+      // Secret exists. A run id is new: what has its name is left from
+      // before, or a try of this run's that went through unanswered (#1272).
       if (err?.status !== 409) throw err;
-      // A run id is new: what has its name is left from before, or a try of
-      // this run's that went through unanswered (#1272).
       await removeRun(run);
       await k.createSecret(secret);
     }
-    // A Job with this run's name is this run's: a try that went through unanswered (#1272).
-    const job = await k.createJob(J.runJob(run.request, settings)).catch((err) => {
-      if (err?.status !== 409) throw err;
-      return k.getJob(run.name);
-    });
+    const job = await createRunJob(run, k, J.runJob(run.request, settings), Date.now() + apiWaitMs);
     // The Secret goes with the Job (best effort: the dispatcher removes it too).
     k.patchSecret(run.name, J.ownedBy(job)).catch(() => {});
+  }
+
+  // The run's Job. A 409 that says it exists (AlreadyExists; a Conflict was
+  // tried again by patiently()) is this run's own Job, from a try that went
+  // through unanswered (#1272): read back. One that then reads 404 is not
+  // there after all, and is made again within the API wait, never taken for
+  // a refusal (#1276: it read 404 after a quota conflict). The tries go one
+  // after the other: a call of its own each time.
+  async function createRunJob(run, k, spec, until) {
+    try {
+      return await k.createJob(spec);
+    } catch (err) {
+      if (err?.status !== 409) throw err;
+    }
+    try {
+      return await k.getJob(run.name);
+    } catch (err) {
+      if (err?.status !== 404 || run.stopped || Date.now() >= until) throw err;
+    }
+    log.warn?.(`[run-dispatcher] ${run.name}: its Job was said to exist, then not found; making it again`);
+    await sleep(retryMs);
+    return createRunJob(run, k, spec, until);
   }
 
   // The run's log until its container ends. A log cut while the container
