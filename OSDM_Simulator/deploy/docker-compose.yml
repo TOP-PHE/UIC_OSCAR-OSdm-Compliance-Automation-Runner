@@ -54,12 +54,19 @@ services:
       # own: all of a server's runs come from its one address.
       SIM_TRUSTED_ADDRESSES: ${SIM_TRUSTED_ADDRESSES:-}
       SIM_TRUSTED_REQUESTS_PER_MINUTE: ${SIM_TRUSTED_REQUESTS_PER_MINUTE:-30000}
+      # #1283: the host's memory, load and CPU are read from the host's own
+      # files, mounted below. On a VPS that is an LXC container, the
+      # container's /proc shows the provider's whole machine instead.
+      SIM_HOST_PROC: /run/osdm-simulator/host
     ports:
       - "127.0.0.1:3002:3002"
     volumes:
       - ..:/simulator:ro
       - ./clients.json:/run/osdm-simulator/clients.json:ro
       - ./data:/var/lib/osdm-simulator
+      - /proc/meminfo:/run/osdm-simulator/host/meminfo:ro
+      - /proc/loadavg:/run/osdm-simulator/host/loadavg:ro
+      - /proc/stat:/run/osdm-simulator/host/stat:ro
     read_only: true
     cap_drop:
       - ALL

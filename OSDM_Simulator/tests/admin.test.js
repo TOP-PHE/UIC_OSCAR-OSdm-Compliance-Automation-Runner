@@ -145,6 +145,34 @@ test('with a data folder the server needs accounts or the key, and names what it
   assert.ok(lines.some((l) => /administration API is closed/.test(l)), lines.join('\n'));
 });
 
+// #1283: the server hands SIM_HOST_PROC to its metrics. The folder holds a
+// meminfo of its own; SIM_HOST_PROC takes a POSIX path, so on Windows the
+// folder is named from the root of the current drive.
+test('the server reads the host where SIM_HOST_PROC says', async (t) => {
+  const dir = tempDir();
+  if (path.parse(dir).root.toLowerCase() !== path.parse(process.cwd()).root.toLowerCase()) {
+    t.skip('the temporary folder is on another drive');
+    return;
+  }
+  fs.writeFileSync(path.join(dir, 'meminfo'), 'MemTotal: 1234 kB\nMemAvailable: 1000 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n');
+  const server = start({
+    SIM_PORT: '0', SIM_DATA_DIR: tempDir(), SIM_CLIENTS_FILE: writeClientsFile(REAL_SECRETS),
+    SIM_ADMIN_KEY_SHA256: KEY_SHA256, SIM_HOST_PROC: dir.slice(path.parse(dir).root.length - 1).replaceAll('\\', '/'),
+  });
+  await new Promise((resolve) => server.on('listening', resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/admin/api/metrics`, {
+      headers: { Authorization: `Bearer ${KEY}`, 'X-Admin-Actor': ACTOR },
+    });
+    assert.equal(res.status, 200);
+    const { host } = await res.json();
+    assert.equal(host.memoryTotal, 1234 * 1024);
+    assert.equal(host.load, null);
+  } finally {
+    server.close();
+  }
+});
+
 test('the key setting is the SHA-256 of the key, and it needs a data folder', () => {
   assert.equal(loadSettings({ SIM_DATA_DIR: '/d', SIM_ADMIN_KEY_SHA256: KEY_SHA256.toUpperCase() }, '/b').adminKeySha256, KEY_SHA256);
   assert.equal(loadSettings({}, '/b').adminKeySha256, null);

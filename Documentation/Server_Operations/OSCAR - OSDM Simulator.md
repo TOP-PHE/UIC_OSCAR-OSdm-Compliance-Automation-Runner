@@ -627,10 +627,32 @@ Nothing is installed on this host for it. OSCAR reads `GET
 /admin/api/metrics` with the administration key it already holds (Admin →
 OSDM Simulator), and relays the figures to its Prometheus. So it works once
 the administration API is set up (section 7, *Accounts while it runs*)
-and the simulator is at 0.57.0 or later. The host's
-figures come from `/proc`, which the container reads as the host's: memory,
-swap, load and CPU time are the host's own, the disk is that of the data
-folder.
+and the simulator is at 0.57.0 or later. Memory, swap, load, CPU time and
+the number of CPUs come from the host's `/proc/meminfo`, `/proc/loadavg` and
+`/proc/stat`. The compose file mounts these three files read-only in the
+container, at `/run/osdm-simulator/host` (`SIM_HOST_PROC`). The disk is that
+of the data folder.
+
+**Why the files are mounted** (#1283, simulator 0.69.0). Before, the
+simulator read the container's own `/proc`. On a VPS that is an LXC container
+(`systemd-detect-virt` answers `lxc`), that shows the provider's whole
+machine, not the VPS. The simulator's VPS of 8 GiB, which used no swap,
+reported 189 GiB of memory and 43 GiB of swap in use. `SimulatorSwapInUse`
+then fired whenever other customers of the provider swapped.
+
+An installed simulator gets the mounts at its next `docker compose up -d`; the
+automatic update only restarts the container. Then check, as root on this
+host:
+
+```bash
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+head -n 1 /proc/meminfo
+docker compose exec osdm-simulator head -n 1 /run/osdm-simulator/host/meminfo
+```
+
+The second `MemTotal` is the VPS's (the first line) or, on an LXC VPS, the
+container's own limit of 256 MiB (262144 kB). A figure far above the VPS's
+memory means the container still reads another machine.
 
 To see the figures by hand, from the OSCAR server (the key never goes
 anywhere else):
@@ -656,6 +678,8 @@ read the simulator. Admin → OSDM Simulator says whether the key is refused.
 | The administration answers `404` | no key (`.env` missing, or made after the last `up -d`), or the container runs without the data folder (made before 0.51.0): see "Moving an installed simulator to a data folder" in section 7 |
 | The workflow *Simulator · update the installed simulator* fails with `open …/deploy/.env: permission denied`, and `/healthz` keeps an old version | `.env` was made by root after the automatic update was set up: `docker compose`, run by `simdeploy`, cannot read it. `chown simdeploy /opt/osdm-simulator/OSDM_Simulator/deploy/.env` (it stays `600`), then run the workflow by hand or `docker compose up -d` |
 | The administration answers `401` | OSCAR holds another key than the one whose SHA-256 is in `.env` |
+| `SimulatorSwapInUse` or `SimulatorMemoryHigh` while `free -h` on this host shows memory free and no swap in use, and the alert names a memory or swap far above this host's | the container reads another machine's `/proc`: the simulator is older than 0.69.0, or the container was not re-created since (#1283). `docker compose up -d`, then the check under *Monitoring* in section 7 |
+| The simulator's host panels in Grafana are empty from 0.69.0 on | the three files are not mounted where `SIM_HOST_PROC` reads them (the container was started from another compose file), or LXC's files on this host stopped answering: `docker compose up -d` |
 | The administration answers `429` | 10 wrong keys from that address in 15 minutes: wait, and correct the key in OSCAR |
 | The administration answers `403` (nginx) | the `allow` lines of the `/admin/` location do not name the OSCAR server's address |
 | A booking made a while ago answers 404 | bookings are dropped after one hour, when a client has more than 200 of them, and at every restart |

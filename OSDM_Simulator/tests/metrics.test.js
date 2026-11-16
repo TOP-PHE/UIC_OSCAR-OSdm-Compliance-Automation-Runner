@@ -21,7 +21,8 @@ const { createAdmin } = require('../src/admin');
 const { createTokenService } = require('../src/tokens');
 const { createStore } = require('../src/store');
 const { createApp } = require('../src/app');
-const { createMetrics, parseMeminfo, parseLoadavg, parseCpuSeconds, BUCKETS } = require('../src/metrics');
+const { createMetrics, parseMeminfo, parseLoadavg, parseCpuSeconds, countCpus, BUCKETS } = require('../src/metrics');
+const os = require('node:os');
 
 const MEMINFO = [
   'MemTotal:        8000000 kB',
@@ -105,6 +106,61 @@ test('without /proc the host part is null, and the process part is still there',
   const s = m.snapshot();
   assert.equal(s.host, null);
   assert.equal(s.process.residentBytes, 80_000_000);
+});
+
+// #1283: in a Docker container on an LXC VPS, /proc is the provider's whole
+// machine; the VPS's own files are mounted in a folder of their own.
+test('with hostProc, the host is read from that folder only, its CPU count from its stat', () => {
+  const read = [];
+  const files = {
+    '/run/osdm-simulator/host/meminfo': MEMINFO.replace('SwapFree:         750000', 'SwapFree:        1000000'),
+    '/run/osdm-simulator/host/loadavg': '0.10 0.20 0.30 1/90 77\n',
+    '/run/osdm-simulator/host/stat': 'cpu  8 0 2 90 0 0 0 0 0 0\ncpu0 2 0 1 45 0 0 0 0 0 0\ncpu1 2 0 1 45 0 0 0 0 0 0\ncpu2 2 0 0 0 0 0 0 0 0 0\ncpu3 2 0 0 0 0 0 0 0 0 0\n',
+    // What a container's own /proc shows on such a VPS: never to be read.
+    '/proc/meminfo': MEMINFO.replace('MemTotal:        8000000', 'MemTotal:      197945712'),
+    '/proc/loadavg': '9.00 9.00 9.00 9/9 9\n',
+    '/proc/stat': STAT,
+  };
+  const m = createMetrics({
+    version: 'x',
+    hostProc: '/run/osdm-simulator/host',
+    ...fixedSources({
+      readFile: (file) => {
+        read.push(file);
+        if (!(file in files)) throw new Error('ENOENT');
+        return files[file];
+      },
+    }),
+  });
+  const { host } = m.snapshot();
+  assert.equal(host.memoryTotal, 8000000 * 1024);
+  assert.equal(host.swapTotal - host.swapFree, 0);
+  assert.deepEqual(host.load, [0.1, 0.2, 0.3]);
+  assert.equal(host.cpuSeconds.idle, 0.9);
+  assert.equal(host.cpus, 4);
+  assert.deepEqual(read.filter((f) => f.startsWith('/proc/')), []);
+});
+
+test('the CPU count is the stat\'s cpuN lines, else the system\'s', () => {
+  assert.equal(countCpus(STAT), 1);
+  assert.equal(countCpus('cpu  1 2 3 4\ncpu0 1 1 1 1\ncpu1 1 1 1 1\ncpu10 1 1 1 1\nintr 5\n'), 3);
+  assert.equal(countCpus('cpu  1 2 3 4\nintr 5\n'), null);
+  const m = createMetrics({ version: 'x', ...fixedSources() });
+  assert.equal(m.snapshot().host.cpus, 1);
+  const without = createMetrics({
+    version: 'x',
+    ...fixedSources({ readFile: (file) => { if (file === '/proc/meminfo') return MEMINFO; throw new Error('ENOENT'); } }),
+  });
+  assert.equal(without.snapshot().host.cpus, os.cpus().length);
+});
+
+test('a host folder that cannot be read leaves the host figures out, never /proc\'s', () => {
+  const m = createMetrics({
+    version: 'x',
+    hostProc: '/run/osdm-simulator/host',
+    ...fixedSources({ statfs: () => { throw new Error('ENOSYS'); } }),
+  });
+  assert.equal(m.snapshot().host, null);
 });
 
 test('the real process and host can be read', () => {
