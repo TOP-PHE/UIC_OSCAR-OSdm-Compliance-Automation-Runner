@@ -54,9 +54,12 @@
     255: 'Bruno stopped on an unexpected error ("Something went wrong"), for example when the machine or cluster running it was restarted under it',
   });
 
+  // Bruno's two exits that are test results: 0 (passed) and 1 (failed).
+  const RESULT_EXITS = new Set([0, 1]);
+
   /** Whether Bruno's exit code is a test result: 0 (passed) or 1 (failed). */
   function isTestResultExit(code) {
-    return code === 0 || code === 1;
+    return RESULT_EXITS.has(code);
   }
 
   /** What an exit code that is not a test result says, in words. */
