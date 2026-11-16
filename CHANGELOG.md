@@ -507,6 +507,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.529] / [collection-OTST_V2.0.260] — 2026-11-16
+
+Issue #1266, part 2, first case. Release 2026.568 (`current_release`). The refund and the exchange of a sale without a trip.
+
+Decided with the maintainer on starting part 2: the after-sale first, then `TICKET_LOST` / `CARD_LOST`, NUTS codes, the #227 discovery without a trip, and fares without a trip last. Places other than stop places (an address, a point of interest, a geo position) are left out, as decided for #1258.
+
+### Added
+- **The exchange of a sale without a trip** (`ExchangeOfferCollectionRequest.nonTripSearchCriteria`):
+  - `exchangeTripAndCriteria()` (`requestsBuilder.js`) sends `nonTripSearchCriteria` and no trip member. These are the criteria the sale sent at 01, after its lookups (`OfferCollectionRequest`), with what the scenario's `exchange` block changes (`exchangeNonTripCriteria()` in `nonTrip.js`). Before, the exchange of such a sale went out as an empty trip search.
+  - In the parser, `prepareExchangeTrip()` → `prepareNonTripExchange()`. `exchange.dateOffsetDays` moves `validFrom`. Another NON_TRIP trip (`exchange.tripRequirementId`) gives its own stop places or zones; one that leaves them to a lookup keeps the sale's, with a WARNING. These are kept as `exchangeNonTrip`, in both reset lists. Before, an exchange block on such a sale stopped the scenario at its start ("Cannot read properties of undefined (reading 'startDatetime')").
+  - An exchange between a trip and an offer without a trip is not tested: a WARNING, then the exchange asks for the sale's own.
+  - Step 10 checks the exchange offers as the sale's were: "Non-trip exchange offers: the answer gives no trip / no offer or offer part covers a trip / each admission says where it is valid…" (`recordNonTripExchangeOfferChecks()`). They are judged against what the exchange asked, else what the sale asked; `checkNonTripOffers()` takes the label.
+  - Steps 13 and 15 check, besides the parts sold first, the parts the exchange added: "Exchanged parts (confirmed): non-trip booking — …" (`recordNonTripExchangedPartsChecks()`).
+- **The refund of a sale without a trip** needed no change: it was tested end to end (full refund, confirmed).
+- **Simulator scenarios** (gamma, with their version copies; rows in *OSCAR - OSDM Simulator scenarios*, in the run list):
+  - `SIM_NONTRIP_REFUND_1ADT_*`: full refund of the ten-ride card bought in `SIM-CITY`.
+  - `SIM_NONTRIP_EXCHANGE_1ADT_*`: exchange of that card for an offer in the same zone a day later.
+
+  The simulator already answers both, so it has no new version.
+- **Catalogue**: `OTST_NONTRIP_REFUND_1ADT` (361 checks) and `OTST_NONTRIP_EXCHANGE_1ADT` (397), with their rows in *OSCAR - What is tested*.
+- **Docs and page**:
+  - *What is tested*: the exchange step says what a non-trip exchange asks and checks.
+  - Test Config's *Exchange to* hint says it too.
+- A welcome-page news entry.
+
+### Changed
+- *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`, 163 scenarios). Every simulator reference changes (run list), so a company following one reads "not up to date" until it updates.
+
+### Checked
+- Replay with the real Bruno CLI 4.2.1 against simulator 0.68.0 of the 215 scenarios of *OSCAR - Checks by scenario*: the two new ones pass, the 213 others give the same checks and failures as the last recording, and `replay.js catalogue` agrees with all 105 entries.
+- `bruno-non-trip.test.js`:
+  - the exchange's criteria (`exchangeNonTripCriteria()`, `askedOfCriteria()`);
+  - the exchange offers' and added parts' checks, for a non-trip sale only;
+  - the parser (a day later, another NON_TRIP trip naming its zone or left to a lookup, a trip and a non-trip never mixed).
+- `bruno-exchange-parts.test.js`: the exchange request, with no trip member.
+- The request and parser rules are mutation-checked.
+
+---
+
 ## [server-1.11.528] — 2026-11-15
 
 Release 2026.567 (`current_release`). In pod mode, a 409 Conflict on the runs' quota no longer refuses a run (#1276, follow-up of #1272).
