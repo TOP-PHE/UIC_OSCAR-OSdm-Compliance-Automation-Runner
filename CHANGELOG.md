@@ -507,6 +507,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.69.0] — 2026-11-16
+
+Issue #1283. Simulator 0.69.0. Server and collection unchanged. On a VPS that is an LXC container, the simulator's host figures were the provider's whole machine.
+
+### Simulator 0.69.0
+- **Seen:** on 2026-11-16 `SimulatorSwapInUse` reported "Simulator host uses 43.13GiB of swap", while nobody was running tests.
+  - The simulator's VPS (8 GiB of memory, 8 GiB of swap, 4.5 MiB in use) is an LXC container: `systemd-detect-virt` answers `lxc`.
+  - LXC rewrites `/proc/meminfo`, `/proc/stat` and `/proc/loadavg` for the VPS. The simulator's Docker container mounts a `/proc` of its own, which LXC does not rewrite: from there `/proc/meminfo` showed 189 GiB of memory and 488 GiB of swap, 43 GiB of it in use, the provider's machine.
+  - So every `osdm_sim_host_*` figure (memory, swap, load, CPU time, number of CPUs) was another machine's, and with them the alerts and the host panels of *OSDM Simulator · Overview*.
+- **The host is read where `SIM_HOST_PROC` says** (`/proc` when unset).
+  - The compose file mounts the host's `/proc/meminfo`, `/proc/loadavg` and `/proc/stat` read-only at `/run/osdm-simulator/host`, a folder of its own (never over `/proc`), and sets `SIM_HOST_PROC` to it.
+  - The number of CPUs is counted from that `stat` (`countCpus()`), falling back to the system's only when it has no `cpuN` line.
+  - A file that cannot be read leaves its figures out; `/proc` is never read in its place.
+  - `SIM_HOST_PROC` must be an absolute path without `..`, or the start stops.
+- **To install:** the automatic update only restarts the container, so the mounts take effect at the next `docker compose up -d` on the simulator's host (bookings and tokens are lost). The check is under *Monitoring* in the simulator guide, section 7, which has two new rows in its troubleshooting table.
+- **Checked:**
+  - `metrics.test.js`: the host is read from the folder only, never `/proc`; the CPU count; a folder that cannot be read.
+  - `config.test.js`: the setting and its refusals.
+  - `admin.test.js`: the server hands the setting to its metrics.
+  - `deploy.test.js`: the three mounts, read-only, where the setting points.
+  - Each of ten mutations fails a test.
+
+---
+
 ## [server-1.11.529] / [collection-OTST_V2.0.260] — 2026-11-16
 
 Issue #1266, part 2, first case. Release 2026.568 (`current_release`). The refund and the exchange of a sale without a trip.

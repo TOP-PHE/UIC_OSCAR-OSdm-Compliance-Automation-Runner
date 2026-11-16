@@ -596,6 +596,21 @@ function adminKeyOf(env) {
   return hex;
 }
 
+/**
+ * #1283: the folder the host's meminfo, loadavg and stat are read from; /proc
+ * when unset. An absolute path without `..`: a mistyped one would leave the
+ * host figures out without a word, so it stops the start instead.
+ */
+function hostProcOf(env) {
+  const value = env.SIM_HOST_PROC;
+  if (value === undefined || value === '') return '/proc';
+  const dir = String(value);
+  if (!dir.startsWith('/') || dir.split('/').includes('..') || dir.includes('\0')) {
+    throw new ConfigError('SIM_HOST_PROC must be an absolute path without ".." (the folder holding meminfo, loadavg and stat)');
+  }
+  return dir;
+}
+
 /** Settings read from the environment, with their defaults. */
 function loadSettings(env, baseDir) {
   return {
@@ -611,6 +626,8 @@ function loadSettings(env, baseDir) {
     adminKeySha256: adminKeyOf(env),
     // How long the usage statistics are kept (#930 PR 3).
     statsRetentionDays: intFromEnv(env, 'SIM_STATS_RETENTION_DAYS', 400, 7, 3660),
+    // Where the host's memory, load and CPU are read (#1283).
+    hostProc: hostProcOf(env),
     // Behind a reverse proxy the caller's address is in X-Forwarded-For.
     trustProxy: env.SIM_TRUST_PROXY === '1',
     limits: {

@@ -222,6 +222,15 @@ test('settings have defaults, listen on loopback, and refuse a value out of rang
   assert.throws(() => loadSettings({ SIM_TTL_SECONDS: '1.5' }, '/base'), /SIM_TTL_SECONDS/);
 });
 
+test('the host is read in /proc unless SIM_HOST_PROC names an absolute folder (#1283)', () => {
+  assert.equal(loadSettings({}, '/base').hostProc, '/proc');
+  assert.equal(loadSettings({ SIM_HOST_PROC: '' }, '/base').hostProc, '/proc');
+  assert.equal(loadSettings({ SIM_HOST_PROC: '/run/osdm-simulator/host' }, '/base').hostProc, '/run/osdm-simulator/host');
+  for (const wrong of ['run/osdm-simulator/host', '/run/../etc', '/run/x/..', 'C:\\proc', '/run/a\0b']) {
+    assert.throws(() => loadSettings({ SIM_HOST_PROC: wrong }, '/base'), /SIM_HOST_PROC/, wrong);
+  }
+});
+
 test('group rules: gamma\'s two group products; a wrong rule stops the start (#599)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   assert.deepEqual(gamma.products.find((p) => p.code === 'SIM_WEEKEND_GROUP').group,

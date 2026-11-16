@@ -71,7 +71,7 @@ function start(env = process.env, baseDir = __dirname) {
     ttlMs: settings.limits.ttlSeconds * 1000,
   });
   // #1005: read by OSCAR through the administration API only.
-  const metrics = createMetrics({ version, store, dataDir: settings.dataDir });
+  const metrics = createMetrics({ version, store, dataDir: settings.dataDir, hostProc: settings.hostProc });
   const { clients, accounts, admin, stats } = accountsOf(settings, providers, metrics);
   const app = createApp({
     providers,

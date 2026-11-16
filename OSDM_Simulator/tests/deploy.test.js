@@ -37,3 +37,11 @@ test('the container runs unprivileged, read-only, on the loopback port only', ()
   assert.match(COMPOSE, /^\s*- no-new-privileges:true$/m);
   assert.match(COMPOSE, /^\s*- "127\.0\.0\.1:3002:3002"$/m);
 });
+
+// #1283: on an LXC VPS the container's own /proc is the provider's machine.
+test('the host\'s three files are mounted read-only where SIM_HOST_PROC reads them', () => {
+  const folder = /^\s*SIM_HOST_PROC: (\S+)$/m.exec(COMPOSE)?.[1];
+  assert.equal(folder, '/run/osdm-simulator/host');
+  const mounts = [...COMPOSE.matchAll(/^\s*- \/proc\/(\w+):(\S+)$/gm)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(mounts, ['meminfo', 'loadavg', 'stat'].map((f) => [f, `${folder}/${f}:ro`]));
+});

@@ -21,13 +21,23 @@
  * in /proc, which a container shares with its host for these files; on a
  * system without them the host part is null.
  *
+ * #1283: on a VPS that is an LXC container, LXC rewrites those files for the
+ * VPS, but a Docker container in it mounts a /proc of its own, which shows the
+ * provider's whole machine (189 GiB of memory and 43 GiB of swap in use, for a
+ * VPS of 8 GiB that used none). `hostProc` names the folder the three files
+ * are read from: the compose file mounts the VPS's own there
+ * (`SIM_HOST_PROC`). The CPU count is read from the same `stat`.
+ *
  * Nothing names an account, a token or a body: a provider key, a method and a
  * status only.
  */
 
 const fs = require('node:fs');
 const os = require('node:os');
+const path = require('node:path');
 const { monitorEventLoopDelay } = require('node:perf_hooks');
+
+const PROC = '/proc';
 
 const BUCKETS = Object.freeze([0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]);
 const METHODS = new Set(['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'HEAD', 'OPTIONS']);
@@ -65,16 +75,22 @@ function parseCpuSeconds(text) {
   return seconds;
 }
 
+/** The "cpuN" lines of /proc/stat, one per CPU; null when there is none. */
+function countCpus(text) {
+  const n = String(text).split('\n').filter((l) => /^cpu\d+\s/.test(l)).length;
+  return n > 0 ? n : null;
+}
+
 function readText(readFile, file) {
   try { return readFile(file, 'utf8'); } catch { return null; }
 }
 
-/** The host as /proc shows it, or null where it says nothing. */
-function hostOf({ readFile, statfs, dataDir }) {
-  const meminfo = readText(readFile, '/proc/meminfo');
+/** The host as `hostProc` shows it, or null where it says nothing. */
+function hostOf({ readFile, statfs, dataDir, hostProc = PROC }) {
+  const meminfo = readText(readFile, path.posix.join(hostProc, 'meminfo'));
   const memory = meminfo === null ? null : parseMeminfo(meminfo);
-  const loadavgText = readText(readFile, '/proc/loadavg');
-  const statText = readText(readFile, '/proc/stat');
+  const loadavgText = readText(readFile, path.posix.join(hostProc, 'loadavg'));
+  const statText = readText(readFile, path.posix.join(hostProc, 'stat'));
   let disk = null;
   try {
     const s = statfs(dataDir || '/');
@@ -85,7 +101,7 @@ function hostOf({ readFile, statfs, dataDir }) {
     ...memory,
     load: loadavgText === null ? null : parseLoadavg(loadavgText),
     cpuSeconds: statText === null ? null : parseCpuSeconds(statText),
-    cpus: os.cpus().length,
+    cpus: (statText === null ? null : countCpus(statText)) ?? os.cpus().length,
     disk,
   };
 }
@@ -94,6 +110,7 @@ function createMetrics({
   version,
   store = null,
   dataDir = null,
+  hostProc = PROC,
   now = Date.now,
   readFile = fs.readFileSync,
   statfs = fs.statfsSync,
@@ -156,7 +173,7 @@ function createMetrics({
         cpuSystemSeconds: cpu.system / 1e6,
         eventLoop: eventLoopOf(),
       },
-      host: hostOf({ readFile, statfs, dataDir }),
+      host: hostOf({ readFile, statfs, dataDir, hostProc }),
       requests: [...requests].map(([key, count]) => {
         const [provider, method, status] = key.split('|');
         return { provider, method, status: Number(status), count };
@@ -173,4 +190,4 @@ function createMetrics({
   return { record, rateLimited, snapshot };
 }
 
-module.exports = { createMetrics, parseMeminfo, parseLoadavg, parseCpuSeconds, BUCKETS };
+module.exports = { createMetrics, parseMeminfo, parseLoadavg, parseCpuSeconds, countCpus, BUCKETS };

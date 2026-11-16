@@ -3778,6 +3778,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     their metric names to the relay's: rename on both sides or neither.
     Checked with promtool and a local Prometheus: a stub serving text needs
     `fallback_scrape_protocol`, OSCAR's route sends the content type.
+    **The simulator's VPS is an LXC container** (#1283, simulator 0.69.0):
+    LXC rewrites `/proc/meminfo`, `stat` and `loadavg` for the VPS, not for a
+    Docker container in it, whose `/proc` is the provider's whole machine
+    (189 GiB, 43 GiB of swap in use: a false `SimulatorSwapInUse`). The
+    compose file mounts the VPS's three files read-only at
+    `/run/osdm-simulator/host` and `SIM_HOST_PROC` names it; `hostOf()`
+    never falls back to `/proc`, and counts the CPUs from that `stat`. A
+    figure read in a container is checked against `head /proc/meminfo` on
+    the host before it is trusted.
     **The OSCAR server's machine (#1013, 1.11.424)**: a run is a Bruno child
     process, invisible to `oscar_node_process_*`. `utils/hostMetrics.js`
     (parsers pure, `snapshot()` takes the reader) appends to `/metrics` the
