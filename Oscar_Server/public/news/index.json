@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-16-lost-ticket-card",
+    "date": "November 16, 2026",
+    "tag": "New",
+    "title": "Without a trip: replacing a lost ticket or card",
+    "summary": "OSCAR now tests the replacement of a lost physical ticket or card, which OSDM asks as an offer without a trip tagged TICKET_LOST or CARD_LOST, and a lost card the provider does not know.",
+    "content": "OSDM replaces a lost physical ticket or card through an offer without a trip whose product tags hold TICKET_LOST or CARD_LOST. The provider asks for the data of the lost item, and the offer may include a fee. It is then booked like any offer.\n\nOSCAR asks for the replacement, books it and fulfils it. The offer should ask for what it needs in its requested information: the holder's name or date of birth for a ticket, the card's number for a card. An offer that asks for nothing gives a warning, since OSDM says so in prose only. The fee is shown in the run log.\n\nFor a card, give the lost card in the scenario: Scenario Parameters → Lost card number and code. The booking sends it in the passenger's cards. With Unknown lost card refused, the card is one the provider does not know, and the booking must be refused.\n\nThree reference scenarios can be copied: OTST_NONTRIP_TICKET_LOST_1ADT, OTST_NONTRIP_CARD_LOST_1ADT and NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT. Complete them with a holder or a lost card your provider knows. Your Test Framework must declare offers without a trip in zones, and the tags when it lists product tags.\n\nIf your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
+  },
+  {
     "id": "2026-11-16-run-not-finished",
     "date": "November 16, 2026",
     "tag": "Bug Fix",

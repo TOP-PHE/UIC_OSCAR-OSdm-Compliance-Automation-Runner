@@ -88,6 +88,17 @@ runtime:
           }
         }
 
+        // #1266: the booking of a lost card the provider does not know must be
+        // refused. Graded, then the scenario ends.
+        {
+          let _lostBody;
+          try { _lostBody = res.getBody(); } catch (_e) { _lostBody = null; }
+          if (require(bru.getEnvVar("library_base") + "lostItems.js").checkLostCardRefused(res.getStatus(), _lostBody)) {
+            loopbackOrStop("POST Create Booking (unknown lost card probe)");
+            return;
+          }
+        }
+
         // #899: a pass of the invalid purchaser probe in the booking: graded,
         // then the booking is sent again (next pass, or the valid purchaser).
         {

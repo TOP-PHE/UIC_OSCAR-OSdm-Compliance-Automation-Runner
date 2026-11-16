@@ -105,7 +105,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const nonTrip = catalogueFor(catalogue, simulator, { offerRequestForms: ['SEARCH'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_ZONES_1ADT']);
+    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_CARD_LOST_1ADT', 'OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_TICKET_LOST_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     const declared = catalogueFor(catalogue, simulator, { offerRequestForms: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
@@ -116,11 +116,11 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const noList = catalogueFor(catalogue, simulator, {});
     const nonTrip = noList.filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip).toHaveLength(7);
+    expect(nonTrip).toHaveLength(9);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     // The trip entries read as before: no form is missing for them.
     const tripForms = catalogueFor(catalogue, simulator, { offerRequestForms: [...G.TRIP_REQUEST_FORMS] });
-    const formMissing = (entries) => entries.filter((e) => !/^OTST_NONTRIP_/.test(e.code) && /offer requests/.test(e.missing.join(' '))).map((e) => e.code);
+    const formMissing = (entries) => entries.filter((e) => !/^(OTST|NHF)_NONTRIP_/.test(e.code) && /offer requests/.test(e.missing.join(' '))).map((e) => e.code);
     expect(formMissing(noList)).toEqual([]);
     expect(formMissing(tripForms)).toEqual([]);
   });
@@ -159,10 +159,10 @@ describe('the simulator references', () => {
     expect(ref.scenariosToRun).not.toContain('SIM_WRONG_NONTRIP_NO_VALIDITY_1ADT_38');
   });
 
-  test('#1266: it declares the tags of what it sells without a trip, after those the checklist ticks', () => {
+  test('#1266: it declares the tags of what it sells without a trip, and the lost ticket and card it replaces, after those the checklist ticks', () => {
     const ref = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'data_base', 'reference', 'simulator-gamma.json'), 'utf8'));
-    expect(ref.framework.offerSearchOptions.productTags).toEqual(['ADMISSION_POINT2POINT', 'ADMISSION_PASS', 'ADMISSION_MULTI_RIDE']);
-    expect(ref.scenariosToRun).toEqual(expect.arrayContaining(['SIM_NONTRIP_PROBE_TAG_PASS_38', 'SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38', 'SIM_NONTRIP_PRODUCT_CODE_1ADT_38']));
+    expect(ref.framework.offerSearchOptions.productTags).toEqual(['ADMISSION_POINT2POINT', 'ADMISSION_PASS', 'ADMISSION_MULTI_RIDE', 'TICKET_LOST', 'CARD_LOST']);
+    expect(ref.scenariosToRun).toEqual(expect.arrayContaining(['SIM_NONTRIP_PROBE_TAG_PASS_38', 'SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38', 'SIM_NONTRIP_PRODUCT_CODE_1ADT_38', 'SIM_NONTRIP_TICKET_LOST_1ADT_38', 'SIM_NONTRIP_CARD_LOST_1ADT_38', 'SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_38']));
     for (const wrong of ['SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38', 'SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38', 'SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38']) {
       expect(ref.scenariosToRun).not.toContain(wrong);
     }

@@ -51,6 +51,7 @@ const ageTariffs = require('./ageTariffs');
 const { fareOffersOf, asksOnlyFares, noFareOfferProblem, nearbyStopsOf, nearbyTripOffers } = require('./fares');
 const { withOfferConditions } = require('./afterSales');
 const nonTrip = require('./nonTrip');
+const replacements = require('./replacements');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -124,7 +125,8 @@ function productsOf(provider) {
     ...classesOf(tariff).map((c) => productOf(tariff, c, provider)),
     ...(provider.secondClassOnlyCategories && !tariff.group ? [upgradeProductOf(tariff, provider)] : []),
   ]).concat(provider.reservations ? FLEXIBILITIES.map((f) => reservationProductOf(f, provider)) : [])
-    .concat(provider.nonTrip ? provider.nonTrip.products.flatMap((item) => Object.keys(TRAVEL_CLASSES).map((c) => nonTripProductOf(item, c, provider))) : []);
+    .concat(provider.nonTrip ? provider.nonTrip.products.flatMap((item) => Object.keys(TRAVEL_CLASSES).map((c) => nonTripProductOf(item, c, provider))) : [])
+    .concat(replacements.productsOf(provider, nonTripProductOf));
 }
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
 const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:IC', name: 'InterCity', shortName: 'IC' };
@@ -920,12 +922,20 @@ function buildNonTripCollection(body, providerAsIs, nowMs) {
   const by = asked.kind === 'zones' ? 'ZONES' : 'PLACES';
   const items = provider.nonTrip.products.filter((p) => p.by.includes(by) && (!askedFlexibilities || askedFlexibilities.includes(p.flexibility)));
   const fulfillmentOptions = fulfillmentOptionsOf(body);
-  const built = classesAsked(criteria).flatMap((travelClass) => items.map((item) => buildNonTripOffer({
-    asked, validity, passengers, item, travelClass, fulfillmentOptions, provider, nowMs,
-  })));
+  // #1266: a lost ticket or card asked (TICKET_LOST / CARD_LOST) is answered
+  // with its replacement only.
+  const lost = replacements.lostAsked(criteria, provider);
+  const offerOf = (item, travelClass) => buildNonTripOffer({ asked, validity, passengers, item, travelClass, fulfillmentOptions, provider, nowMs });
+  const built = lost.length > 0
+    ? lost.flatMap((kind) => classesAsked(criteria).map((travelClass) => replacements.asReplacement(
+      offerOf(replacements.itemOf(kind, provider), travelClass), kind, provider, `${provider.idPrefix}-FEE-${randomId()}`)))
+    : classesAsked(criteria).flatMap((travelClass) => items.map((item) => offerOf(item, travelClass)));
   nonTrip.applyVariants(asked, built, provider);
   const { offers, problems: productProblems } = selectProducts(criteria, built, { nonTrip: true });
-  const remembered = offers.map((offer) => ({ offer, trips: [], passengers, oneFulfillment: false, shortLivedMs: null }));
+  const replacementOf = (offer) => replacements.KINDS.find((kind) => offer.products?.[0]?.productTags?.includes(kind)) || null;
+  const remembered = offers.map((offer) => ({
+    offer, trips: [], passengers, oneFulfillment: false, shortLivedMs: null, replacement: lost.length > 0 ? replacementOf(offer) : null,
+  }));
   const problems = [...problemsOf(passengers, built, false, new Set()), ...productProblems];
   const response = { anonymousPassengerSpecifications: passengers, offers };
   if (problems.length > 0) response.problems = problems;

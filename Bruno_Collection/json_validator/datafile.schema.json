@@ -358,6 +358,20 @@
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },
+          "lostCard": {
+            "description": "The lost card a CARD_LOST replacement names (#1266): its number (required), its code (the card type) and perhaps its issuer. OSDM: the provider asks for the data of the lost card; the booking gives it in the first passenger's cards (CardReference: type REDUCTION_CARD, code, number, issuer).",
+            "type": ["object", "null"],
+            "properties": {
+              "code": { "type": ["string", "null"] },
+              "number": { "type": ["string", "null"] },
+              "issuer": { "type": ["string", "null"] }
+            }
+          },
+          "lostCardExpectRejection": {
+            "description": "Negative test (#1266). When on, the lost card (lostCard) is one the provider does not know: POST /bookings of the replacement must be refused with a 4xx RFC-9457 Problem, and the scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "departureDaysFromToday": {
             "description": "The scenario's own departure date (#704), in days from the day of the run: 0 today, -1 yesterday, 90 in ninety days. It replaces the run's lead time and the trip's weekday. Used for the sales-horizon and past-departure tests. Between -366 and 1000; any other value is ignored.",
             "type": ["integer", "null"]

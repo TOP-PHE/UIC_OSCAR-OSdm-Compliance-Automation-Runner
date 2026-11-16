@@ -406,6 +406,10 @@ function withNonTripForms(framework, profile) {
   for (const product of Array.isArray(profile.nonTrip.products) ? profile.nonTrip.products : []) {
     if (typeof product?.type === 'string' && !tags.includes(product.type)) tags.push(product.type);
   }
+  // #1266: and the replacement of a lost ticket and card, when it replaces them.
+  if (profile.nonTrip.replacements) {
+    for (const tag of ['TICKET_LOST', 'CARD_LOST']) if (!tags.includes(tag)) tags.push(tag);
+  }
 }
 
 /** The reference of one provider, as stored in the repository. */

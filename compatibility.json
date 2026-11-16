@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.570",
+  "current_release": "2026.571",
   "releases": [
+    {
+      "release": "2026.571",
+      "date": "2026-11-16",
+      "server": "1.11.532",
+      "collection": "OTST_V2.0.261",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.532, collection OTST_V2.0.261, simulator 0.70.0: the replacement of a lost ticket or card (#1266, part 2). OSDM asks it as a non-trip offer tagged TICKET_LOST or CARD_LOST; the provider asks for the lost item's data and may add a fee. Step 01 checks that the chosen offer asks for that data in its requestedInformation (the holder's name or date of birth, the card's number; a WARNING when it asks nothing) and says its fee; step 02 gives the scenario's lostCard in the first passenger's cards; lostCardExpectRejection expects an unknown card refused (4xx Problem). requestedInformation reads cards.number as the scenario's lostCard.",
+        "The simulator answers a lost tag with the replacement only (an admission priced 0 asking for the data, and a fee in Offer.fees), refuses at booking a holder or card it does not know (400 LOST_TICKET_NOT_FOUND / LOST_CARD_NOT_FOUND) and confirms the fee with the booking. New simulator scenarios SIM_NONTRIP_TICKET_LOST_1ADT_*, SIM_NONTRIP_CARD_LOST_1ADT_* and SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_* (in the run list); catalogue entries OTST_NONTRIP_TICKET_LOST_1ADT (236 checks), OTST_NONTRIP_CARD_LOST_1ADT (236) and NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT (115); capability \"Replacement of a lost ticket or card\"; Test Config fields Lost card number and code, Unknown lost card refused. Every simulator reference changes."
+      ]
+    },
     {
       "release": "2026.570",
       "date": "2026-11-16",

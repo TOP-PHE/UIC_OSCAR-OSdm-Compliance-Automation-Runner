@@ -417,6 +417,12 @@ function reservationNeed(scenario, kinds) {
  * scenario, the data file it lives in and the facts of the simulator that
  * answers it (simulatorFacts). Only the needs that apply are written.
  */
+// Whether a scenario's own offer search criteria ask a product tag.
+const asksTag = (scenario, tag) => [
+  ...arr(scenario.offerSearchCriteria?.productTags),
+  ...arr(scenario.offerSearchCriteria?.productSelections).map((p) => p?.productTag),
+].includes(tag);
+
 function dataNeedsOf(scenario, datafile, facts) {
   const trip = arr(datafile.tripRequirements).find((t) => isObj(t) && t.id === scenario.tripRequirementId) || {};
   const legs = arr(trip.legs).filter(isObj);
@@ -435,6 +441,10 @@ function dataNeedsOf(scenario, datafile, facts) {
     ...(scenario.expectedProduct ? ['expectedProduct'] : []),
     // #1266: a product selected by its code names one of the simulator's.
     ...(arr(scenario.offerSearchCriteria?.productSelections).some((p) => isObj(p) && typeof p.productCode === 'string' && p.productCode.trim()) ? ['productCode'] : []),
+    // #1266: a lost card is one of the provider's (a probe's unknown card is
+    // made up, and stays unknown); a lost ticket's holder is one it knows.
+    ...(isObj(scenario.lostCard) && !ARMED.has(scenario.lostCardExpectRejection) ? ['lostCard'] : []),
+    ...(asksTag(scenario, 'TICKET_LOST') ? ['lostTicketHolder'] : []),
     // #766: seat preferences are codes of the provider's own list.
     ...(placeSelectionFlowOf({ placePreferences: scenario.placePreferences }) ? ['placePreferences'] : []),
     // #766 PR 4: a reference place is a coach and place of the provider's train.
@@ -474,6 +484,8 @@ const RETURN_TEXT = { COMBINED: 'one offer for both directions', SEPARATE: 'one 
 const PROVIDER_VALUE_TEXT = Object.freeze({
   nonTripPlaces: 'stop places to sell between', placeLookup: 'name for POST /places', nonTripZones: 'zone',
   productCode: 'product code (Product selections)',
+  lostCard: 'lost card (lostCard: its number and code)',
+  lostTicketHolder: "holder of a lost ticket (the passenger's last name and date of birth)",
 });
 const NEED_PHRASES = {
   trip: (v) => (v === 'NON_TRIP' ? 'offers without a trip (nonTripSearchCriteria)' : null),

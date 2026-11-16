@@ -174,9 +174,12 @@ function buildBookingRequest() {
 
   const bookingPassengerSpecifications = passengersWithCardIssuers("bookingPassengerSpecifications");
   const firstPassenger = bookingPassengerSpecifications[0];
-  const passengerSpecifications = (firstPassenger?.detail?.firstName && firstPassenger?.detail?.lastName)
+  // #1266: the lost card a CARD_LOST replacement asks for goes in the first
+  // passenger's cards.
+  const _lost = require("./lostItems.js");
+  const passengerSpecifications = _lost.withLostCard((firstPassenger?.detail?.firstName && firstPassenger?.detail?.lastName)
     ? bookingPassengerSpecifications
-    : passengersWithCardIssuers("offerPassengerSpecifications");
+    : passengersWithCardIssuers("offerPassengerSpecifications"), _lost.scenarioLostCard());
 
   // #601: reservations booked by placeSelections (reservationBookingForm
   // PLACE_SELECTION) go with the seat map's own selections.

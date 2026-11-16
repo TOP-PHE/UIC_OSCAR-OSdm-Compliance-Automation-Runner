@@ -140,6 +140,17 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
   if (arr(n.providerValues).includes('nonTripZones')) {
     toComplete.push('a zone of the provider, its id and carrier (Trip → Zone; empty: the first of GET /zones)');
   }
+  // #1266: the simulator's lost card is no card of the provider's, and the
+  // holder of a lost ticket must be one the provider knows. (The unknown card
+  // of the refusal probe is made up, and stays unknown: kept.)
+  if (arr(n.providerValues).includes('lostCard')) {
+    const number = isObj(out.lostCard) ? out.lostCard.number : null;
+    delete out.lostCard;
+    toComplete.push(`a lost card the provider knows, its number and code (Scenario Parameters → Lost card number and code, now the simulator's ${number || 'card'})`);
+  }
+  if (arr(n.providerValues).includes('lostTicketHolder')) {
+    toComplete.push('the holder of a lost ticket the provider knows: the passenger\'s last name and date of birth (Passengers, now the simulator\'s)');
+  }
   // #766 PR 4: the simulator's coach and place mean nothing on another train.
   if (arr(n.providerValues).includes('referencePlace')) {
     toComplete.push(`a coach and place of the provider's train to sit near (referencePlace, now the simulator's ${out.referencePlace})`);
