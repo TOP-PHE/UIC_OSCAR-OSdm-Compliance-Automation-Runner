@@ -766,6 +766,13 @@ Displayed when the run ended without error but recorded no check (§10.2).
 - Message: nothing was checked; the execution log says why; run the scenario again, and tell the OSCAR administrator if it happens again.
 - No action button.
 
+### RUN_NOT_FINISHED banner
+Displayed when Bruno ended the run with an exit code other than 0 (every check passed) or 1 (a check or request failed): the run did not go to its end (#1287). Such codes are Bruno's own (2–13: it could not run the collection; 255: an unexpected error), or, on a cluster, the run pod's (124 time limit, 125 never started, 137 killed, 143 stopped). Their meanings are in `public/js/run-exit.js`, shared by the runner and the page.
+- Title: *"The run did not go to its end — this is not a test result"*
+- Message: the exit code and its meaning; the checks shown are those made before it stopped; run the scenario again.
+- No action button.
+- The coverage report leaves such a run out, as it does a `NO_CHECKS` or `RUN_PROCESS_ERROR` run: the scenario's finished run before it stands as its result, or none.
+
 ### OAuth2 failure banner
 Displayed when `error_message` contains none of the sentinels above but the run failed — typically an OAuth2 token fetch error. Shows the raw error message returned by the token endpoint.
 

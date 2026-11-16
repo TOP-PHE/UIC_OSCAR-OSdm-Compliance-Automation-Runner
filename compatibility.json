@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.569",
+  "current_release": "2026.570",
   "releases": [
+    {
+      "release": "2026.570",
+      "date": "2026-11-16",
+      "server": "1.11.531",
+      "collection": "OTST_V2.0.260",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.531: a run Bruno ends with a code other than 0 or 1 is not a test result (#1287). A k3s restart during a campaign made three runs end with exit 255 partway, every check passed; they read Failed like a provider's defect. Any such exit (Bruno's 2-13 and 255, the run pod's 124, 125, 137, 143) is now RUN_NOT_FINISHED: the run log and a banner on the run page give the code and its meaning (public/js/run-exit.js, shared by the runner and the page).",
+        "The coverage report leaves out a run that is not a test result (RUN_NOT_FINISHED, RUN_PROCESS_ERROR, NO_CHECKS): the scenario's finished run before it stands, or none. The Run page's last-run facets are unchanged. Collection unchanged at OTST_V2.0.260."
+      ]
+    },
     {
       "release": "2026.569",
       "date": "2026-11-16",

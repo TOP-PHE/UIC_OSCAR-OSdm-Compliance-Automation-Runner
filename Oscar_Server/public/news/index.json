@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-16-run-not-finished",
+    "date": "November 16, 2026",
+    "tag": "Bug Fix",
+    "title": "A run the test engine stopped partway is no longer read as a failed test",
+    "summary": "When the test engine stops a run before its end, the run now says so, with the reason, instead of reading Failed like a provider's defect; the coverage report leaves it out.",
+    "content": "The test engine ends a run in one of two ways when the run goes to its end: every check passed, or a check failed. It can also stop partway, for example on an unexpected error when the machine or cluster running it is restarted. Such a run read Failed, with all its checks passed and no reason given, like a defect of the provider.\n\nIt now reads Failed with the banner \"The run did not go to its end — this is not a test result\", which gives the engine's code and what it means. The checks shown are those made before it stopped; the rest of the scenario was not tested.\n\nThe coverage report no longer takes such a run as the scenario's result: the scenario's finished run before it stands, or none. The same now goes for a run with no check recorded and a run OSCAR lost while it ran.\n\nNo action is required. If you see that banner, run the scenario again; if many runs show it, tell your OSCAR administrator."
+  },
+  {
     "id": "2026-11-15-non-trip-refund-exchange",
     "date": "November 15, 2026",
     "tag": "New",

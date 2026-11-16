@@ -521,6 +521,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.531] — 2026-11-16
+
+Release 2026.570 (`current_release`). A run Bruno ends with a code other than 0 or 1 is not a test result, and says so (#1287).
+
+### Fixed
+- **A run the test engine stopped partway read as a failed test.**
+  - **Seen:** on the k3s test machine (2026.569), `systemctl restart k3s` during a gamma campaign made three runs end with exit 255 after 10 to 19 requests. Their 303, 243 and 77 checks had all passed. They read *Failed*, with no message and no banner, like a provider's defect, and the coverage report took them as the scenarios' latest result.
+  - **Why:** Bruno CLI ends a run with 0 (every check passed) or 1 (a check or request failed). Its other codes say it could not run the collection (2–13) or stopped on an unexpected error (255, "Something went wrong"). On a cluster, the run pod ends with 124 (time limit), 125 (never started), 137 (killed) or 143 (stopped). The runner set `FAILED` for any code but 0, and marked only a lost process (`RUN_PROCESS_ERROR`) and a run with no check (`NO_CHECKS`).
+- **`RUN_NOT_FINISHED`.** Any exit other than 0 and 1 sets this `error_message`, after the 401, YAML, no-check and process-error cases. The run log says `The run did not go to its end (exit N): <meaning>. This is not a result of the test`. The checks made before the stop stay stored.
+- **The run page** has its own banner, *The run did not go to its end — this is not a test result*, with the code and its meaning (`notFinishedBannerHtml()`, escaped; a code that is not a whole number reads "unknown").
+- **One table of meanings**, `public/js/run-exit.js` (`OscarRunExit`, browser global and CommonJS like `copy-report.js`), used by the runner and the run page.
+- **The coverage report leaves out a run that is not a test result:** `RUN_NOT_FINISHED`, and now `RUN_PROCESS_ERROR` and `NO_CHECKS` too, whose banners already said so. The scenario's finished run before it stands as its result, or none. The Run page's *last run* facets are unchanged, so such a run still reads failed there and is easy to select again.
+- Unchanged: in local and isolated mode, a run killed by a signal (time limit, silence) still ends with 1, as before.
+- **Documentation:** the Tester User Guide's troubleshooting table, the Specification's banners (§12), a news entry, `CLAUDE.md`.
+
+### Checked
+- `runner.test.js`:
+  - exit 255 with checks stored is `RUN_NOT_FINISHED`, with the code and its meaning in the log;
+  - 0 and 1 are test results;
+  - 2, 3, 6, 7, 124, 125, 137 and 143 are not;
+  - a 401 still names the token;
+  - the page's wiring.
+- `run-exit.test.js`:
+  - the module;
+  - every code of the installed Bruno CLI 4.3 but 1 has a meaning (checked against `bruno-cli`'s `constants.js` where it is installed);
+  - the banner's text and escaping.
+- `coverage-routes.test.js`: a later `RUN_NOT_FINISHED`, `RUN_PROCESS_ERROR` or `NO_CHECKS` run leaves the run before it as the result; a 401 run still stands.
+- Mutation-checked: each of 12 mutations fails a test (the runner's branch, mark and meaning; the module's codes, list and type guard; the coverage filter; the page's banner wiring, escaping, code guard and script tag).
+
+---
+
 ## [server-1.11.530] — 2026-11-16
 
 Release 2026.569 (`current_release`). Dependency updates only, no code change. Collection unchanged at OTST_V2.0.260.
