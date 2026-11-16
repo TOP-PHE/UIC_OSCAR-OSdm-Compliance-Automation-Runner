@@ -1593,6 +1593,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   logged with a status or code, **never the API's words** (they go to the
   server only). The runner marks a process error `RUN_PROCESS_ERROR` (banner
   on the run page). `fakeApi()` has `s.down`, `cut()`, `emitTo()`, `endRun()`.
+  **Only Bruno's 0 and 1 are test results** (#1287, 1.11.531): any other exit
+  (Bruno's 2–13 and 255, the pod's 124/125/137/143) is `RUN_NOT_FINISHED`,
+  its meaning from `public/js/run-exit.js` (shared by the runner and the run
+  page, `OscarRunExit`). A k3s restart made runs end with 255 partway, every
+  check passed, and they read as the provider's failure. The coverage route
+  leaves out every `NOT_A_RESULT` run (`NO_CHECKS`, `RUN_PROCESS_ERROR`,
+  `RUN_NOT_FINISHED`): the finished run before it stands. A new "not a
+  result" sentinel goes in that list. Local mode still resolves a signal as 1.
   **A 409 is read by its reason** (#1276, 1.11.528): `KubeError.reason` keeps
   `Status.reason` when it is one word. `Conflict` (two writes of the runs'
   quota met, nothing made: 15 runs starting at once on k3s) is passing;

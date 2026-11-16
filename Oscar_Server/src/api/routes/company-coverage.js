@@ -38,6 +38,7 @@ const { getRunSelection } = require('../../utils/runSelections');
 const { currentCollectionVersion } = require('../../utils/versionInfo');
 const { splitSimulated, simulatedErrorsOf } = require('../../utils/simulatedErrors');
 const { coverageOf, latestRunsOf, failureOf } = require('../../utils/frameworkCoverage');
+const { NOT_A_RESULT } = require('../../../public/js/run-exit');
 const { coverageMatrixOf } = require('../../utils/coverageMatrix');
 const { capabilityCoverageOf } = require('../../utils/capabilityCoverage');
 const { armed, ALWAYS_REQUIRED } = require('../../utils/capabilities');
@@ -133,17 +134,21 @@ function stepsOfRuns(ids) {
 // The latest finished run of each scenario of the company within the window,
 // with its check counts, its steps and its failed checks, among the runs
 // `user` may read (runScopeSql(): a certifier the shared ones, #1043; a tester
-// their own, 1.11.477).
+// their own, 1.11.477). A run that is not a test result (#1287: no check, its
+// process lost, Bruno stopped before the end) is left out: the scenario's
+// finished run before it stands, or none.
+const NOT_A_RESULT_MARKS = NOT_A_RESULT.map(() => '?').join(', ');
 function latestRuns(companyId, days, user) {
   const scope = runScopeSql(user, '');
   const rows = all(
     `SELECT id, scenario_code, status, queued_at, completed_at, server_version, collection_version, scenario_hash
        FROM runs
       WHERE company_id = ? AND scenario_code IS NOT NULL AND status IN ('COMPLETED', 'FAILED')${scope.sql}
+        AND (error_message IS NULL OR error_message NOT IN (${NOT_A_RESULT_MARKS}))
         AND queued_at >= datetime('now', ?)
       ORDER BY queued_at DESC, id DESC
       LIMIT ${MAX_RUNS}`,
-    [companyId, ...scope.params, `-${days} days`]
+    [companyId, ...scope.params, ...NOT_A_RESULT, `-${days} days`]
   );
   const latest = latestRunsOf(rows);
   const ids = Object.values(latest).map((r) => r.id);

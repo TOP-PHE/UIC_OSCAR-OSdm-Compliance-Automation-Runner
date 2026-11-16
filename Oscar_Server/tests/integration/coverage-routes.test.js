@@ -133,6 +133,27 @@ describe('GET /v1/company/coverage', () => {
     run('DELETE FROM runs WHERE id = ?', [failed]);
   });
 
+  // #1287: a run that is not a test result (Bruno stopped before the end, its
+  // process lost, no check made) does not stand as the scenario's result: the
+  // finished run before it does.
+  test.each(['RUN_NOT_FINISHED', 'RUN_PROCESS_ERROR', 'NO_CHECKS'])('a later %s run leaves the run before it as the result', async (sentinel) => {
+    const latest = addRun(ids.D, 'SHARED_SALE', 'FAILED', 2, { at: '2026-10-26 09:00:00' });
+    run('UPDATE runs SET error_message = ? WHERE id = ?', [sentinel, latest]);
+    try {
+      const res = await request(app).get('/v1/company/coverage').set(as('TM'));
+      const sale = res.body.functions.find((f) => f.id === 'salesFlow:SALE').scenarios.find((s) => s.code === 'SHARED_SALE');
+      expect(sale).toMatchObject({ result: 'passed', run: { passed: 4, failed: 0, collectionVersion: 'OLD' } });
+      expect(sale.run.id).not.toBe(latest);
+      // A run whose message is a test result's own (a 401) still stands.
+      run(`UPDATE runs SET error_message = 'TOKEN_AUTH_ERROR' WHERE id = ?`, [latest]);
+      const after = await request(app).get('/v1/company/coverage').set(as('TM'));
+      const saleAfter = after.body.functions.find((f) => f.id === 'salesFlow:SALE').scenarios.find((s) => s.code === 'SHARED_SALE');
+      expect(saleAfter.run.id).toBe(latest);
+    } finally {
+      run('DELETE FROM runs WHERE id = ?', [latest]);
+    }
+  });
+
   test('by capability (#972): the run\'s steps prove the sale; a refund whose run stopped without a failed check is not run (#1008)', async () => {
     const id = addRun(ids.D, 'SHARED_SALE', 'COMPLETED', 0, { at: '2026-10-25 10:00:00' });
     const suite = get('SELECT id FROM run_suites WHERE run_id = ?', [id]).id;

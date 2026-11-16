@@ -162,6 +162,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
   <script src="/js/banner.js"></script>
   <div class="uic-banner-nav" id="oscar-nav"></div>
   <script src="/js/esc.js"></script>
+  <script src="/js/run-exit.js"></script>
   <script src="/nav.js"></script>
   <script>renderOscarNav('oscar-nav', 'dashboard');</script>
 </header>
@@ -327,6 +328,21 @@ function showIntrusionBanner(run) {
   document.getElementById('meta').insertAdjacentElement('beforebegin', banner);
 }
 
+// #1287: Bruno ended the run with a code that is not a test result. The code
+// is a number from the server; the meaning is OscarRunExit's own text.
+function notFinishedBannerHtml(code) {
+  const shown = Number.isInteger(code) ? String(code) : 'unknown';
+  return `
+        <div class="auth-icon">⚠️</div>
+        <div class="auth-body">
+          <div class="auth-title">The run did not go to its end — this is not a test result</div>
+          <div class="auth-msg">
+            It ended with code ${escHtml(shown)}: ${escHtml(OscarRunExit.exitMeaning(code))}.<br>
+            The checks shown are those made before it stopped; the rest of the scenario was not tested. Run the scenario again; if it happens again, tell your OSCAR administrator.
+          </div>
+        </div>`;
+}
+
 function updateStatus(run) {
   currentRun = run;
   const badge = document.getElementById('status-badge');
@@ -358,8 +374,9 @@ function updateStatus(run) {
   const isAuthError     = run.error_message === 'TOKEN_AUTH_ERROR';
   const isNoChecks      = run.error_message === 'NO_CHECKS';
   const isProcessError  = run.error_message === 'RUN_PROCESS_ERROR';
-  const isOAuthError    = !isFormatError && !isAuthError && !isNoChecks && !isProcessError && run.error_message && run.auth_mode_used === 'oauth2';
-  const showBanner      = isFormatError || isAuthError || isNoChecks || isProcessError || isOAuthError;
+  const isNotFinished   = run.error_message === OscarRunExit.NOT_FINISHED;
+  const isOAuthError    = !isFormatError && !isAuthError && !isNoChecks && !isProcessError && !isNotFinished && run.error_message && run.auth_mode_used === 'oauth2';
+  const showBanner      = isFormatError || isAuthError || isNoChecks || isProcessError || isNotFinished || isOAuthError;
 
   if (showBanner && !existingBanner) {
     const banner = document.createElement('div');
@@ -407,6 +424,8 @@ function updateStatus(run) {
             The "Process error" line of the execution log gives the reason. Run the scenario again; if it happens again, tell your OSCAR administrator.
           </div>
         </div>`;
+    } else if (isNotFinished) {
+      banner.innerHTML = notFinishedBannerHtml(run.exit_code);
     } else {
       banner.innerHTML = `
         <div class="auth-icon">⚠️</div>

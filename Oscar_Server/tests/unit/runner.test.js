@@ -361,7 +361,63 @@ describe('executeRun — spawn happy paths', () => {
   test('a run that ended without a process error has no RUN_PROCESS_ERROR', async () => {
     extractSpy.mockReturnValue({ suites: 0, requests: 0, assertions: 0 });
     const runId = await runEndingWith(2);
+    // Bruno's 2 is not a test result (#1287), but the process was not lost.
+    expect(getRunRow(runId).error_message).toBe('RUN_NOT_FINISHED');
+  });
+
+  // #1287: Bruno ends a run with 0 or 1; any other code is not a test result.
+  // Seen on k3s: a cluster restart made runs end with 255 partway, every check
+  // passed, and they read as FAILED like a provider's defect.
+  test('exit 255 with checks stored is FAILED with RUN_NOT_FINISHED, the code and its meaning in the log', async () => {
+    extractSpy.mockReturnValue({ suites: 2, requests: 19, assertions: 303 });
+    const runId = await runEndingWith(255);
+    const row = getRunRow(runId);
+    expect(row.status).toBe('FAILED');
+    expect(row.exit_code).toBe(255);
+    expect(row.error_message).toBe('RUN_NOT_FINISHED');
+    const events = getDecryptedEvents(runId);
+    expect(events.some(e => e.level === 'error'
+      && /The run did not go to its end \(exit 255\): Bruno stopped on an unexpected error/.test(e.message)
+      && /This is not a result of the test/.test(e.message))).toBe(true);
+  });
+
+  test.each([[1, 'FAILED'], [0, 'COMPLETED']])('exit %i with checks stored is a test result: %s, no error message', async (code, status) => {
+    extractSpy.mockReturnValue({ suites: 1, requests: 5, assertions: 40 });
+    const runId = await runEndingWith(code);
+    expect(getRunRow(runId).status).toBe(status);
     expect(getRunRow(runId).error_message).toBeNull();
+  });
+
+  test.each([3, 6, 124, 125, 137, 143, 7])('exit %i is not a test result either', async (code) => {
+    extractSpy.mockReturnValue({ suites: 1, requests: 5, assertions: 40 });
+    const runId = await runEndingWith(code);
+    expect(getRunRow(runId).error_message).toBe('RUN_NOT_FINISHED');
+  });
+
+  test('a 401 in the log still names the token, whatever the exit code', async () => {
+    extractSpy.mockReturnValue({ suites: 1, requests: 5, assertions: 40 });
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    fakeProc.stdout.emit('data', Buffer.from('Wrong response status: 401\n'));
+    fakeProc.emit('close', 255);
+    await p;
+    expect(getRunRow(runId).error_message).toBe('TOKEN_AUTH_ERROR');
+  });
+
+  test('the run page has a banner of its own for RUN_NOT_FINISHED, with the code and its meaning', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../../public/run-detail.html'), 'utf8');
+    expect(page).toContain('const isNotFinished   = run.error_message === OscarRunExit.NOT_FINISHED;');
+    expect(page).toMatch(/isOAuthError\s+= [^;]*!isNotFinished/);
+    expect(page).toMatch(/showBanner\s+= [^;]*isNotFinished/);
+    expect(page).toContain('banner.innerHTML = notFinishedBannerHtml(run.exit_code);');
+    // The shared module is loaded before the page's own script uses it.
+    expect(page.indexOf('<script src="/js/run-exit.js"></script>')).toBeGreaterThan(-1);
+    expect(page.indexOf('<script src="/js/run-exit.js"></script>')).toBeLessThan(page.indexOf('OscarRunExit.NOT_FINISHED'));
   });
 
   test('the run page has a banner of its own for RUN_PROCESS_ERROR (not the OAuth2 one)', () => {

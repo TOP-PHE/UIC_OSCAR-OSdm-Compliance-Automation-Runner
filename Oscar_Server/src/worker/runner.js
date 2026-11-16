@@ -52,6 +52,7 @@ const { usableUrlRefusal } = require('../utils/urlPolicy');
 const { versionRefusal } = require('../utils/osdmVersion');
 const { frameworkConfigOf } = require('../api/helpers/configurationStore');
 const { runSettingsOf: traceRunSettingsOf } = require('../../public/js/trace-context');
+const RunExit = require('../../public/js/run-exit');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
 // analyzer (jssecurity:S6549) requires the regex to live in the same
@@ -1682,6 +1683,14 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     dbRun(`UPDATE runs SET error_message = 'RUN_PROCESS_ERROR' WHERE id = ?`, [runId]);
     logEvent(runId, 'error',
       '[runner] ⚠️ The run did not go to its end: its process could not be started, or was lost (in a cluster: its pod could not be made or followed). This is not a result of the test; the "Process error" line above gives the reason. Run the scenario again.');
+  } else if (!RunExit.isTestResultExit(exitCode)) {
+    // #1287: Bruno ends a run with 0 or 1; any other code is not a test
+    // result (a k3s restart made runs end with 255 partway, every check
+    // passed). Its checks stay stored; the run is marked so that no one
+    // reads it as the provider's failure.
+    dbRun(`UPDATE runs SET error_message = ? WHERE id = ?`, [RunExit.NOT_FINISHED, runId]);
+    logEvent(runId, 'error',
+      `[runner] ⚠️ The run did not go to its end (exit ${exitCode}): ${RunExit.exitMeaning(exitCode)}. This is not a result of the test: the checks above are those made before it stopped. Run the scenario again.`);
   }
 
   logEvent(runId, 'info', `[runner] Run finished — status=${finalStatus} exit=${exitCode}`);
