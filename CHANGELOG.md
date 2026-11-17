@@ -521,11 +521,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.538] / [collection-OTST_V2.0.263] — 2026-11-17
+## [server-1.11.539] / [collection-OTST_V2.0.263] — 2026-11-17
 
-Issue #1298, part of #1297. Release 2026.577. Every booking read after 07 is held to the fulfilments seen before. Server 1.11.538 for the news entry only; simulator unchanged (0.71.0).
+Issue #1298, part of #1297. Release 2026.578. Every booking read after 07 is held to the fulfilments seen before. Server 1.11.539 for the news entry only; simulator unchanged (0.71.0).
 
 Some real providers answer `POST /bookings/{id}/fulfillments` with the fulfilments, then leave them out of the booking they give afterwards. Since 1.11.447 (#1045) step 07 said so; the refund's 12, 14, 16 and the exchange's 13, 15, 17 said nothing (12 and 16 wrote a `[DEBUG]` line, the exchange steps nothing). OSDM does not require `Booking.fulfillments` (`Booking` requires `id`, `createdOn`, `passengers`), but `GET /bookings/{bookingId}` embeds everything by default (`embed`, "Default value: ALL", value `BOOKING_FULFILLMENTS`), and these six steps ask `embed=ALL`. So it is a WARNING, never a failed check.
+
+Version 1.11.539 / release 2026.578: #1306 took 1.11.538 / 2026.577 first.
 
 ### Added
 - **The fulfilments seen before, at every booking read after 07** (`checkBookingStillLists()`, `confirmedFulfillments.js`): those the confirmation gave (06), those 07 listed, and those the exchange's confirmation gave (exchange 14, `rememberFulfillments()`), in `__fulfillmentIdsSeen` (a new confirmation starts it again; in both reset lists and `SUBRUN_SALE_STATE`). A booking listing none of them, or no longer listing some, gives one `[WARNING]` naming the step and the ids. No test is added: no number of checks moves.
@@ -546,6 +548,48 @@ Some real providers answer `POST /bookings/{id}/fulfillments` with the fulfilmen
 - **Collection**: `bruno-confirmed-fulfillments.test.js` covers the rule (nothing seen, all listed, none, some left out), what is held (06, then 07 and exchange 14 added, a new confirmation starting again), the log lines (WARNING only, never a test), the wiring of the six steps (after the answer is an object, under its own name, each asking `embed=ALL`) and exchange 14, the reset lists, and step 14 with a refunded fulfilment the booking dropped.
 - **Mutation checks**: each of the 11 rules of this change, removed one by one, fails a test.
 - **Suites**: the collection, data file, reference, catalogue and checklist tests (2,141): all pass but `bruno-answer-threats.test.js`, the known Windows-only timing failure. Simulator `datafile.test.js` passes.
+
+---
+
+## [server-1.11.538] — 2026-11-17
+
+Release 2026.577 (`current_release`). The command that replaces the checks' index reads before it changes the database (#1305). **Run that command in production only with this release or a later one.**
+
+### What happened
+The first run of `node src/db/checkIndexes.js --apply` on a server (#1295, release 2026.576), on the k3s test machine: 8,493,328 checks, a database of 14.25 GB.
+
+- **Removing the old index took 442 s**, against 5 to 10 s on the bench, and the swap about a quarter of an hour in all. The documentation said "count a few minutes on a server".
+- **Every write of the server failed for all that time** (`database is locked`): two reference updates and the New Run page answered 500.
+- **The command said nothing until a part had ended.** After seven minutes of a silent screen the operator pressed Ctrl-C, which ended `kubectl exec` and not the command: it went on in the container, holding the database, with nothing left to show it.
+- The swap itself ended well.
+
+### Why
+Removing an index reads every one of its pages, in the order of the keys: more than a gigabyte of random reads, about 700 pages a second on that disk. The command did that reading as part of the `DROP INDEX`, so under the write lock. The bench had the file in memory, and its figures said nothing of a server's disk.
+
+### Changed
+- **Read first, change after.** The command works in two parts, the old index removed, then the new one made, each its own change.
+  - Before each change it reads what the change needs as an ordinary reader: the old index, company by company, then the checks, by their ids. A reader blocks nobody: the server works as usual.
+  - The change then finds its pages in memory.
+  - Stopped between the two parts, the database has no index by company for a while: the server works, a start says so, and the command run again makes it.
+- **Each step is said before it starts**, with whether the server can write meanwhile. The readings say how far they are every ten seconds. Each change ends with the time the server could not write.
+- **A run started while it was reading stops it before the change**, as a run queued or running stops it at the start. `--force` passes both.
+- **Closing the window does not stop it, and it says so**, with its process number and how to stop it. What it says is also written to `check-indexes.log` beside the database, and a screen that is gone no longer matters.
+- Without `--apply`, it names the parts this database still needs.
+- The start (migration 56) is unchanged: one transaction, up to 500,000 checks.
+- **Documentation:** *metrics-and-monitoring.md*, **The checks' index**, with the figures of the test machine; `CLAUDE.md`.
+
+### Checked
+- `check-indexes.test.js` (22 tests):
+  - every line the command says, in order, and the same lines in its log;
+  - while it reads, another connection writes at once and the index it reads is still there;
+  - what it reads: the old index through that index alone, every company, then every id up to the last;
+  - a run started during either reading stops it before the change, and the next run of the command does the rest;
+  - a screen that is gone; a part that fails after the first one ended.
+- The command on the bench database (7.8 million checks, a fast disk, the file in memory): the first part read for 4.2 s, then the server could not write for 2.8 s; the second read for 13.1 s, then 29.0 s without writes. With four of SQLite's worker threads for the sort (`PRAGMA threads`, added after that run), the new index is made in 24 to 26 s against 36 to 44 s.
+
+### Not checked here
+How long each change holds the database on a server with its pages read first: the bench's disk is too fast to say. The command prints it; the next server to run it will tell.
+
 ---
 
 ## [server-1.11.537] — 2026-11-17
