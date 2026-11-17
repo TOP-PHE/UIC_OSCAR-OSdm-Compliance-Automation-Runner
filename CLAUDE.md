@@ -4191,6 +4191,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     on a large table goes the same way: a guarded migration and a command,
     never `schema.sql`. Still without an index by company: `run_requests`
     (a deleted company's cascade reads it whole, as before).
+    **The command reads before it changes** (#1305, 1.11.538). Its first
+    run on a server (the test machine, 8.5 million checks) removed the old
+    index in 442 s and took a quarter of an hour in all, every write
+    failing meanwhile, silent until a part ended: a `DROP INDEX` reads every
+    page of the index in key order (about 700 pages a second on that disk),
+    under the write lock. Now two parts (`PARTS`), each its own change:
+    `readOldIndex()` / `readChecks()` read first as a reader, `doPart()`
+    looks for runs again, then changes. It says each step before it starts,
+    progress every 10 s, and writes to `check-indexes.log` beside the
+    database (Ctrl-C ends `kubectl exec`, not the command). **A duration
+    measured on the bench says nothing of a server's disk**: give none for
+    a server before one has run it. A long statement run by hand says what
+    it does before it starts, and reads outside the write lock what it can.
     **The review of #1233** (2026-11-13) read the database access instead
     of measuring one more round; its plan is #1234–#1243, in order.
     **#1234 (1.11.511): slow statements are logged.** `all`/`get`/`run`
