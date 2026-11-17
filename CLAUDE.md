@@ -2423,8 +2423,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   instants, product by code through the offer's and the booked offer's
   `products` (ids may differ: another id with no product to read is INFO),
   flexibility, travel class, service class type, trip coverage (one side,
-  or other legs of the same trip id), passengers by `externalRef`. WARNING
-  lines only. **`OFFER_PART_PRICE_CHANGE`** (osdm.io *Processes*, "Price
+  or other legs of the same trip id; not said when the booking names no
+  trip at all, `namesTrip`: #1299 says it once), passengers by
+  `externalRef`. WARNING lines only. **`OFFER_PART_PRICE_CHANGE`** (osdm.io *Processes*, "Price
   changes when creating a booking") is read at 02 (`priceChangeSaid()`,
   problems or deprecated warnings) and kept in `__bookingPriceChangeSaid`
   (reset lists, `SUBRUN_SALE_STATE`): then the amount of "prices have at
@@ -2432,7 +2433,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   below `minimalPrice` is a WARNING; currency and scale still fail.
   Simulator variant `booking-price-change` (+1.00 per admission, the price
   object replaced: it is the offer's own), `bookingProblems()` in the
-  answer of `POST /bookings`, `SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_*`,
+  answer of `POST /bookings` (`urn:uic:problem:OFFER_PART_PRICE_CHANGE`, the
+  form of OSDM's examples; the bare form makes the collection's "not a
+  urn:uic:* catalogue code" WARNING fire), `SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_*`,
   passenger list 42.
 - **A refund can come as one refund offer per fulfillment, and every offer is
   confirmed** (#595, 1.11.225 / OTST_V2.0.110). Step 10 keeps the ids
