@@ -134,7 +134,11 @@ function validatePartEqualityFields(part, bookedPart, partType, index, fields) {
   });
 }
 
-function validatePartPrices(offerParts, bookedParts, partType) {
+// #1300: with priceChangeSaid (the booking answer said OFFER_PART_PRICE_CHANGE),
+// an amount kept by no part is not a failure: OSDM allows a price changed at
+// pre-booking when it is said (osdm.io, Processes, "Price changes when creating
+// a booking"), and each change is a WARNING of its part (bookedAsOffered.js).
+function validatePartPrices(offerParts, bookedParts, partType, priceChangeSaid = false) {
   // #650: an absent or null scale is the OSDM default 2.
   const offerPrices   = offerParts.filter(p => p.price).map(p => ({ amount: p.price.amount, currency: p.price.currency, scale: p.price.scale ?? 2 }));
   // #766 PR 3: a reservation on a seat named with a selection fee costs the
@@ -150,6 +154,10 @@ function validatePartPrices(offerParts, bookedParts, partType) {
         const offerValues   = offerPrices.map(p => p[field]);
         const bookingValues = bookingPrices.map(p => p[field]);
         const intersection  = offerValues.filter(v => bookingValues.includes(v));
+        if (field === 'amount' && priceChangeSaid && intersection.length === 0) {
+          validationLogger(`[DEBUG] ${partType} price.amount: offer=[${offerValues}] booking=[${bookingValues}], none in common; the provider said OFFER_PART_PRICE_CHANGE, so each change is a WARNING of its part (#1300).`);
+          return;
+        }
         expect(intersection.length, `No common value for price.${field} between offer and booking`).to.be.above(0);
         validationLogger(`[DEBUG] ${partType} price.${field}: offer=[${offerValues}] booking=[${bookingValues}] intersection=[${intersection}]`);
       });
@@ -583,7 +591,9 @@ function _describePart(part) {
 
 // ─── Part-level orchestrator ─────────────────────────────────────────────────
 
-function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOffersStatus) {
+// `context` (#1300): bookedAsOffered.contextOf() of the booking; with it each
+// pair is also compared member by member (WARNING lines only).
+function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOffersStatus, context = null) {
   const _idsRaw = bru.getEnvVar("admissionReservationAncillaryBookingPartsIds");
   const ids = Array.isArray(_idsRaw) ? _idsRaw : JSON.parse(_idsRaw || "[]");
 
@@ -653,10 +663,17 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
         `Valid OSDM values: [${_validBookingPartStatuses.join(', ')}].`);
     });
 
-    validatePartPrices(offerParts, bookedParts, partType);
+    validatePartPrices(offerParts, bookedParts, partType, context?.priceChangeSaid === true);
     validatePartDates(part, bookedPart, partType, index);
     validateAfterSalesConditions(part, bookedPart, partType, index);
     validateAppliedPassengerTypes(part, bookedPart, partType, index);
+    // #1300: the members not compared above (price per pair, validity, product,
+    // flexibility, classes, trip coverage, passengers).
+    if (context) {
+      const found = require('./bookedAsOffered.js').pairFindings(part, bookedPart, context);
+      found.warn.forEach((text) => validationLogger(`[WARNING] ${partType}[${index}] (${_describePart(part)}) is not booked as offered: ${text}.`));
+      found.info.forEach((text) => validationLogger(`[INFO] ${partType}[${index}] (${_describePart(part)}): ${text}.`));
+    }
   });
 
   bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", [...new Set(ids)]);
@@ -1168,16 +1185,26 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     });
   }
 
+  // #1300: OFFER_PART_PRICE_CHANGE is said by the answer of 02 and kept for
+  // the later reads of the same sale.
+  const _asOffered = require("./bookedAsOffered.js");
+  if (isCreateBookingStep()) bru.setEnvVar("__bookingPriceChangeSaid", String(_asOffered.priceChangeSaid(jsonData)));
+  const _priceChangeSaid = String(bru.getEnvVar("__bookingPriceChangeSaid")) === "true";
+
   const requestName = (typeof req !== "undefined" && req?.getName?.()) || "";
   if (requestName === "02. POST Create Booking" || requestName === "05. GET Booking before Fulfillments") {
-    checkProvisionalPrice(prov, mini, booking);
+    checkProvisionalPrice(prov, mini, booking, _priceChangeSaid);
   }
 
   // Validate booked offer parts
   const bookedOffers = booking.bookedOffers || [];
-  validateOfferParts(selectedOffer.admissionOfferParts   || [], bookedOffers.flatMap(b => b.admissions   || []), "admission",   expectedBookedOffersStatus);
-  validateOfferParts(selectedOffer.reservationOfferParts || [], bookedOffers.flatMap(b => b.reservations || []), "reservation", expectedBookedOffersStatus);
-  validateOfferParts(selectedOffer.ancillaryOfferParts   || [], bookedOffers.flatMap(b => b.ancillaries  || []), "ancillary",   expectedBookedOffersStatus);
+  const _context = _asOffered.contextOf(selectedOffer, booking, {
+    fees: require('./seatReservations.js').fromEnv(bru.getEnvVar("__namedPlaceFees"), {}) || {},
+    priceChangeSaid: _priceChangeSaid,
+  });
+  validateOfferParts(selectedOffer.admissionOfferParts   || [], bookedOffers.flatMap(b => b.admissions   || []), "admission",   expectedBookedOffersStatus, _context);
+  validateOfferParts(selectedOffer.reservationOfferParts || [], bookedOffers.flatMap(b => b.reservations || []), "reservation", expectedBookedOffersStatus, _context);
+  validateOfferParts(selectedOffer.ancillaryOfferParts   || [], bookedOffers.flatMap(b => b.ancillaries  || []), "ancillary",   expectedBookedOffersStatus, _context);
 
   // #239: the reservation↔booked-reservation correspondence just checked above
   // by validateOfferParts is the same check regardless of HOW the reservation
@@ -1233,7 +1260,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
 // and fares are parts of a booked offer too, so they are in the sum). The
 // values are read inside the check, so a missing member fails the check
 // instead of throwing in the title.
-function checkProvisionalPrice(prov, mini, booking) {
+// #1300: with priceChangeSaid, a provisionalPrice below the offer's minimal
+// price is a WARNING: OSDM allows a price changed at pre-booking when it is said.
+function checkProvisionalPrice(prov, mini, booking, priceChangeSaid = false) {
   test(`provisionalPrice is not below the offer's minimalPrice - provisional: ${prov?.amount} ${prov?.currency}, minimal: ${mini?.amount} ${mini?.currency}`, () => {
     expect(prov, 'provisionalPrice missing').to.exist;
     if (!mini) {
@@ -1244,6 +1273,10 @@ function checkProvisionalPrice(prov, mini, booking) {
     const ps = prov.scale == null ? 2 : prov.scale;
     const ms = mini.scale == null ? 2 : mini.scale;
     expect(ps, 'provisionalPrice and minimalPrice differ in scale').to.eql(ms);
+    if (priceChangeSaid && prov.amount < mini.amount) {
+      validationLogger(`[WARNING] provisionalPrice ${prov.amount} is below the offer's minimalPrice ${mini.amount}: the provider said OFFER_PART_PRICE_CHANGE, which OSDM allows at pre-booking (#1300).`);
+      return;
+    }
     expect(prov.amount, 'provisionalPrice is below the minimal price of the offer').to.be.at.least(mini.amount);
   });
   if (!prov || typeof prov.amount !== 'number') return;

@@ -42,6 +42,12 @@
  *                           (booked offers, parts, fulfillments), as some
  *                           real providers do (#1299); the stored booking
  *                           keeps them. OSDM requires none of them.
+ *   booking-price-change    every admission is booked 1.00 dearer than
+ *                           offered, provisionalPrice with them, and the
+ *                           answer of POST /bookings carries a problem
+ *                           OFFER_PART_PRICE_CHANGE, as OSDM allows (osdm.io,
+ *                           Processes, "Price changes when creating a
+ *                           booking") (#1300)
  *   wrong-booking-price     provisionalPrice one cent off the sum of its parts
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
@@ -69,12 +75,14 @@
 
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
-  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request', 'booking-without-fulfillments', 'booking-without-trip',
+  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request', 'booking-without-fulfillments', 'booking-without-trip', 'booking-price-change',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount', 'wrong-exchange-keeps-trip',
   'fare-not-in-fulfillment', 'fare-fulfillment-document', 'fare-wrong-combining-fee', 'fare-ignores-refund-fee', 'fare-reservation-product-mode',
 ]);
 
 const VARIANTS = Symbol('variants');
+// #1300: what booking-price-change adds to each admission (1.00 at scale 2).
+const PRICE_CHANGE = 100;
 
 /** The variants a booking request names, on a provider that has them. */
 function variantsOf(specs, provider) {
@@ -107,6 +115,18 @@ function shapeNewBooking(booking) {
     }
   }
   if (has(booking, 'wrong-booking-price')) booking.provisionalPrice.amount += 1;
+  // #1300: a price changed at pre-booking. The part's price is replaced, never
+  // changed in place: it is the offer's own object.
+  if (has(booking, 'booking-price-change')) {
+    let added = 0;
+    for (const bookedOffer of booking.bookedOffers) {
+      for (const part of bookedOffer.admissions) {
+        part.price = { ...part.price, amount: part.price.amount + PRICE_CHANGE };
+        added += PRICE_CHANGE;
+      }
+    }
+    booking.provisionalPrice = { ...booking.provisionalPrice, amount: booking.provisionalPrice.amount + added };
+  }
   shapePassengers(booking);
 }
 
@@ -175,6 +195,22 @@ function bookingAsAnswered(booking) {
 }
 
 /**
+ * The problems the answer of POST /bookings carries (#1300): for
+ * booking-price-change, OFFER_PART_PRICE_CHANGE (osdm.io, Errors & Problems:
+ * "A request to confirm an offer results in bookedofferparts with a price
+ * change"). An object to spread into the answer.
+ */
+function bookingProblems(booking) {
+  if (!has(booking, 'booking-price-change')) return {};
+  const changed = booking.bookedOffers.reduce((n, bookedOffer) => n + bookedOffer.admissions.length, 0);
+  return { problems: [{
+    code: 'OFFER_PART_PRICE_CHANGE',
+    title: 'Price change',
+    detail: `The price of ${changed} booked offer part(s) changed at pre-booking.`,
+  }] };
+}
+
+/**
  * The booking as GET /bookings/{id} gives it: for booking-without-fulfillments,
  * a copy listing no fulfilment; for booking-without-trip (#1299), one without
  * its trips. The stored booking is not changed.
@@ -201,5 +237,5 @@ function scopedPartIds(booking, heldIds, spec, parts) {
 }
 
 module.exports = {
-  variantsOf, keepVariants, has, shapeNewBooking, shapePassengers, mayChangePassenger, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds, bookingAsRead, bookingAsAnswered,
+  variantsOf, keepVariants, has, shapeNewBooking, shapePassengers, mayChangePassenger, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds, bookingAsRead, bookingAsAnswered, bookingProblems,
 };

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-booked-as-offered",
+    "date": "November 17, 2026",
+    "tag": "Improvement",
+    "title": "A booking compared with the offer booked, member by member",
+    "summary": "OSCAR now says when a booked part differs from the offer part it was booked from: price, validity, product, flexibility, class, trip or passengers.",
+    "content": "OSDM says the booked offers should look a lot like the offers booked. OSCAR paired each booked part with its offer part and compared some of their members; the price only over all the parts together, and the validity, the product, the flexibility, the classes, the trip and the passengers not at all.\n\nIt now compares them pair by pair at every booking step. Each member booked otherwise than offered is a warning naming the part: another price, another validity, another product (by its code, since a provider may give booked products other ids), another flexibility, travel or service class, another trip coverage, other passengers.\n\nOSDM allows a price to change when the offer is booked, and asks the provider to say so with the warning OFFER_PART_PRICE_CHANGE. When the provider says it, a changed price is no longer a failed check, only a warning. Without it, a changed price still fails as before.\n\nNo number of checks changes. If your company follows a simulator reference configuration, update it from Test Config (a new scenario is in its run list). Otherwise no action is required."
+  },
+  {
     "id": "2026-11-17-booking-trip",
     "date": "November 17, 2026",
     "tag": "Improvement",

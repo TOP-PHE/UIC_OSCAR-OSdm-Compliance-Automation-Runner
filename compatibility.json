@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.578",
+  "current_release": "2026.579",
   "releases": [
+    {
+      "release": "2026.579",
+      "date": "2026-11-17",
+      "server": "1.11.540",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.540 (news entry only), collection OTST_V2.0.265, simulator 0.73.0: the booked parts against the offer's, member by member (#1300, part of #1297). At every booking step, each pair of parts (paired by content, #550) gives a WARNING for a price changed (saying whether the provider said OFFER_PART_PRICE_CHANGE), another validFrom or validUntil, another product, flexibility, travel or service class (read through the offer's and the booked offer's products, by code), another trip coverage or other passengers (by externalRef). They are WARNINGs, not failed checks: no number of checks moves.",
+        "One change of an existing check: when the booking answer says OFFER_PART_PRICE_CHANGE (osdm.io, Processes: a price is not guaranteed before pre-booking, and a change is said by that warning), \"prices have at least one member in common\" no longer fails on the amount, and a provisionalPrice below the offer's minimalPrice is a WARNING. Without that warning both still fail as before; another currency still fails.",
+        "The simulator gets variant booking-price-change (each admission booked 1.00 dearer, provisionalPrice with them, and OFFER_PART_PRICE_CHANGE in the answer of POST /bookings). New simulator scenario SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_* (in the run list). Every simulator reference changes (its run list): a company following one updates it from Test Config. Otherwise no action is required."
+      ]
+    },
     {
       "release": "2026.578",
       "date": "2026-11-17",

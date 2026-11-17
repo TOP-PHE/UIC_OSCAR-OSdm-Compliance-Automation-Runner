@@ -215,7 +215,7 @@ function resetScenarioEnvVars() {
     // Exchange / Refund
     "exchangeOffersOfferId", "exchangeOperationId",
     "requestExchangeOffersBodyData", "requestExchangeOperationsBodyData",
-    "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed", "__refundProposed", "__refundedFulfillmentIds", "__bookingFulfillmentIds", "__confirmedFulfillments", "__fulfillmentIdsSeen", "__offerTrips",
+    "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed", "__refundProposed", "__refundedFulfillmentIds", "__bookingFulfillmentIds", "__confirmedFulfillments", "__fulfillmentIdsSeen", "__offerTrips", "__bookingPriceChangeSaid",
     "requestRefundOffersBodyData",
     "afterSaleCondition_EXCHANGE_amount", "afterSaleCondition_EXCHANGE_currency", "afterSaleCondition_EXCHANGE_scale",
     "afterSaleCondition_REFUND_amount",   "afterSaleCondition_REFUND_currency",   "afterSaleCondition_REFUND_scale",
