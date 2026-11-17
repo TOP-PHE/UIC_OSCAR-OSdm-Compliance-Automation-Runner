@@ -521,6 +521,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.537] — 2026-11-17
+
+Release 2026.576 (`current_release`). The checks are indexed by company, no longer by company and text of the check (#1295). Step 2 of the performance audit of 2026-11-17.
+
+### To do after deployment, on a large database
+A database of more than 500,000 checks (the test machine, production) keeps the old index until an administrator of the machine runs one command, once, at a quiet time. Until then nothing changes there, and each start says so in one line.
+
+```bash
+sudo docker exec oscar node --no-warnings src/db/checkIndexes.js --apply
+```
+
+On Kubernetes: `kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings src/db/checkIndexes.js --apply`. Without `--apply` the command says what there is and changes nothing. *metrics-and-monitoring.md*, **The checks' index**, says what to know before running it.
+
+### Changed
+- **Storing a run wrote nine times the pages it needed.**
+  - **Why:** `run_assertions` had an index by company and text of the check (`idx_run_assertions_key`). Sorted by that text, it gave each of a run's 250 to 400 checks a page of its own, in an index of more than a gigabyte.
+  - **Measured** with the server's own `extractStructuredResults()` on a database of 7.7 million checks (4.7 GB), 36 runs of 242 checks:
+
+    | Index of the checks by company | Pages of log per run | Time to store a run |
+    |---|---|---|
+    | By company and text of the check (until now) | 860 | 119 ms |
+    | By company alone | 94 | 24 ms |
+    | None | 82 | 16 ms |
+
+  - That index held 1.2 GB of the 4.7 GB.
+- **An index by company alone replaces it** (`idx_run_assertions_company`). A deleted company's cascade needs one: without any, it read the whole table (7.5 s on that database, on a fast disk).
+- **The two trend routes read by run** (`api/helpers/checkTrends.js`). They were the old index's readers.
+  - `GET /v1/reports/trends/summary`: the finished runs queued in the last 30 days, the latest 500 at most, ten runs at a time, the thread given back between two slices. It read every check the company had ever stored, in one block: 11 to 21 s for a company of 5,300 runs on that database; 0.3 to 1 s now, in slices.
+  - `GET /v1/reports/trends`: the company's latest 500 finished runs, newest first, until it has the results asked.
+  - Both answers add `runs_read` and `more_runs`. A limit that is not a whole number from 1 up is the default, where it was an error.
+  - No page of OSCAR calls either route.
+- **A company is deleted through its runs** (`companyPurge.js`): its checks, requests and suites are found by run, where each table has an index. By company, `run_requests` has none.
+
+### How the index is replaced
+- Replacing it reads the old index and every check: seconds on a small database, minutes on a large one, too long for a start (a server that does not answer for two minutes is restarted).
+- **At start (migration 56):** only on a database of at most 500,000 checks, a new one included. Not in `schema.sql`, which runs at every start.
+- **On a larger database:** the command above (`src/db/checkIndexes.js`, a connection of its own). The old index goes first, so the new one is written in the pages it frees and the file does not grow. Both in one transaction.
+  - It refuses while a run is queued or running, and when the database's disk has less free than it needs (about 150 bytes per check).
+  - SQLite's sort files go beside the database, not in `/tmp`, which a container keeps small.
+  - On the 7.7-million-check database, two runs: 5 and 10 s to remove the old index, 33 and 47 s to make the new one; 1.2 GB freed for the next data.
+- While the swap is not made, the old index serves the cascade, and the trend routes and the deletion work the same.
+
+### Checked
+- `check-trends.test.js`: the same counts and the same results as the two former queries, on drawn runs; the order; the roles (a tester's own runs and the Test Managers', a certifier's shared runs, never another company's); 500 runs at most and `more_runs`; the thread given back between slices; the plans (by run, no sort). The test database's old index is dropped first.
+- `check-indexes.test.js`: a new database; a small one swapped at start; a large one kept, its cascade still served, the line at each start; the swap all or nothing; the file not growing; the command's refusals, `--force`, a second run, a wrong argument, no database, another database, and run as a program; a company deleted with either index.
+- `db-indexes.test.js`: the four indexes of the checks; no statement of the server names the old one.
+- The command, run twice on the bench database with the old index put back.
+
+### Not checked here
+The command on a Linux server, and how long it takes there: on the test machine first.
+
+---
+
 ## [server-1.11.536] — 2026-11-17
 
 Release 2026.575 (`current_release`). The database's log is copied when it passes a size or an age, not every second (#1294). Step 1 of the performance audit of 2026-11-17, which follows the review #1233.

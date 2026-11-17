@@ -394,6 +394,72 @@ A wrong value of either setting stops the start. To check on a batch: the
 COMMITs over 0.1 s in 5 minutes (panel *Database commits*) should fall from
 about 200 to a handful.
 
+**The checks' index** (#1295, server 1.11.537). The checks of every run
+(`run_assertions`) had an index by company and text of the check. Sorted by
+that text, it gave each of a run's 250 to 400 checks a page of its own, in an
+index of more than a gigabyte. Measured with the server's own code on a
+database of 7.7 million checks:
+
+| | Pages of log written per run | Time to store a run |
+|---|---|---|
+| With that index | 860 | 119 ms |
+| With an index by company alone | 94 | 24 ms |
+
+It held 1.2 GB of a 4.7 GB database. Its two readers were the trend routes
+(`GET /v1/reports/trends` and `/trends/summary`), which now read the
+company's latest finished runs, a few at a time, and a deleted company's
+cascade, which the index by company alone serves.
+
+Replacing one index by the other reads the old index and every check. So:
+
+- **A new database, or one of at most 500,000 checks** (about 2,000 runs):
+  done at the first start of 1.11.537, in a moment.
+- **A larger database** keeps the old index, which still works, and each
+  start says so in one line: `[db] the checks are still indexed by their
+  text (about N checks) …`. An administrator of the machine then runs one
+  command, once, at a quiet time.
+
+What there is, and what the command would do (changes nothing):
+
+```bash
+sudo docker exec oscar node --no-warnings src/db/checkIndexes.js
+```
+
+The swap:
+
+```bash
+sudo docker exec oscar node --no-warnings src/db/checkIndexes.js --apply
+```
+
+On Kubernetes, the same in the server's container:
+
+```bash
+kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings src/db/checkIndexes.js --apply
+```
+
+What to know before running it:
+
+- **The server stays up.** Pages are read as usual. Whatever *writes* to the
+  database while the swap runs (a sign-in, a save, a run) waits five
+  seconds, then fails. Choose a time when nobody works, and no run is
+  going: the command refuses while a run is queued or running.
+- **How long:** 5 to 10 s to remove the old index and 33 to 47 s to make the
+  new one for 7.7 million checks on a fast disk (two runs). Count a few
+  minutes on a server. The command prints the time of each part.
+- **All or nothing:** one transaction. Stopped midway, it changed nothing.
+- **Disk:** it needs about 150 bytes per check free beside the database
+  while it runs (1.1 GB for 7.7 million checks), and refuses with less. The
+  database file does not grow: the new index is written in the pages the
+  old one frees, and the rest of those pages hold the next data stored.
+- **With the server stopped** (a container of the same image and volume),
+  the runs the server left marked running make it refuse: add `--force`.
+
+It ends with `done. The database file keeps its size; N MB of it are free
+and will hold the next data stored.` A second run answers `nothing to do`,
+and the start-up line is gone at the next start. To check on a batch
+afterwards: `oscar_run_work_seconds{work="results_store"}` per run and the
+growth of `oscar_db_wal_bytes` should both fall.
+
 **SQLite's memory** (#1237, server 1.11.517). SQLite's defaults were a page
 cache of 2 MB, no memory map, and temporary sorts and groupings in files.
 With a database of 10 GB, each lookup or insert that misses those 2 MB asks

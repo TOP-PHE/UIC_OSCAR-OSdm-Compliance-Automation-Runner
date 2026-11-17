@@ -179,13 +179,13 @@ module.exports = {
   },
   '/v1/reports/trends/summary': {
     get: { tags: reports, summary: 'The most failing checks of the company over 30 days', security: bearer,
-      description: 'Finished runs of the request\'s company, last 30 days; a certifier counts runs shared with certifiers only, an administrator gets an empty list. { company_id, top_failures: [{ assertion_key, assertion_name, category, domain, severity, run_count, fail_count, pass_rate }] }.',
+      description: 'Finished runs of the request\'s company queued in the last 30 days, the latest 500 of them at most (#1295); a certifier counts runs shared with certifiers only, a tester their own and the Test Managers\', an administrator gets an empty list. { company_id, top_failures: [{ assertion_key, assertion_name, category, domain, severity, run_count, fail_count, pass_rate }], runs_read, more_runs }: run_count is how many times the check was made, pass_rate a percentage to one decimal, runs_read the runs counted, more_runs true when the period holds more finished runs than those.',
       parameters: [queryParam('limit', 'At most this many (default 20, at most 50)', { type: 'integer', default: 20, maximum: 50 })],
       responses: { ...ok('The checks'), 400: { description: 'No company context' } } },
   },
   '/v1/reports/trends': {
     get: { tags: reports, summary: 'The last results of one check across runs', security: bearer,
-      description: 'Finished runs of the request\'s company, newest first, same role rules as /v1/reports/trends/summary. { assertion_key, points: [{ run_id, passed, error, category, severity, scenario_code, completed_at }] }.',
+      description: 'Read from the latest 500 finished runs of the request\'s company, newest first, until it has the results asked (#1295); same role rules as /v1/reports/trends/summary. { assertion_key, points: [{ run_id, passed, error, category, severity, scenario_code, completed_at }], runs_read, more_runs }: runs_read is how many runs were looked at, more_runs true when the company has older finished runs that were not.',
       parameters: [
         { name: 'assertion_key', in: 'query', required: true, description: 'The check', schema: { type: 'string' } },
         queryParam('limit', 'At most this many (default 20, at most 100)', { type: 'integer', default: 20, maximum: 100 }),

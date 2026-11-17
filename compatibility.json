@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.575",
+  "current_release": "2026.576",
   "releases": [
+    {
+      "release": "2026.576",
+      "date": "2026-11-17",
+      "server": "1.11.537",
+      "collection": "OTST_V2.0.262",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.537: the checks are indexed by company, no longer by company and text of the check (#1295, step 2 of the performance audit of 2026-11-17). Sorted by the text of the check, that index gave each check of a run a page of its own: 860 pages of log per stored run on a database of 7.7 million checks, 94 with an index by company alone, and 1.2 GB of a 4.7 GB database. The two trend routes, its readers, now read the company's latest 500 finished runs, a few at a time (the summary held the server's thread 11 to 21 s for a company of 5,300 runs; 0.3 to 1 s now, in slices of a few milliseconds), and answer runs_read and more_runs. A company is deleted through its runs. TO DO ON A LARGE DATABASE: the swap is made at start only up to 500,000 checks; a larger database keeps the old index, says so at each start, and an administrator runs once, at a quiet time: docker exec oscar node --no-warnings src/db/checkIndexes.js --apply (metrics-and-monitoring.md, The checks' index)."
+      ]
+    },
     {
       "release": "2026.575",
       "date": "2026-11-17",
