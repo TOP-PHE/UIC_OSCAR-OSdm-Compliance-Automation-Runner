@@ -773,6 +773,13 @@ Displayed when Bruno ended the run with an exit code other than 0 (every check p
 - No action button.
 - The coverage report leaves such a run out, as it does a `NO_CHECKS` or `RUN_PROCESS_ERROR` run: the scenario's finished run before it stands as its result, or none.
 
+### Server restart banner
+Displayed when the server restarted while the run was going or waiting (#1291). At start, the server marks every run still `RUNNING` or `QUEUED` as `FAILED` (`worker/reconcile.js`), with one of two messages kept in `public/js/run-exit.js`: *"Interrupted by a server restart — …"* or *"Cancelled by a server restart before this run started. …"*.
+- Title: *"Stopped by a server restart — this is not a test result"*
+- Message: the stored message; nothing, or not all, of the scenario was tested, and the coverage report does not count the run; run the scenario again.
+- No action button. Before 1.11.534 such a run of a company using OAuth2 showed the OAuth2 failure banner.
+- The coverage report leaves such a run out, like the three above.
+
 ### OAuth2 failure banner
 Displayed when `error_message` contains none of the sentinels above but the run failed — typically an OAuth2 token fetch error. Shows the raw error message returned by the token endpoint.
 

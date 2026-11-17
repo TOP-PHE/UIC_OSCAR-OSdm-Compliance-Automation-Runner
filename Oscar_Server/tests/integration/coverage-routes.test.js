@@ -135,8 +135,16 @@ describe('GET /v1/company/coverage', () => {
 
   // #1287: a run that is not a test result (Bruno stopped before the end, its
   // process lost, no check made) does not stand as the scenario's result: the
-  // finished run before it does.
-  test.each(['RUN_NOT_FINISHED', 'RUN_PROCESS_ERROR', 'NO_CHECKS'])('a later %s run leaves the run before it as the result', async (sentinel) => {
+  // finished run before it does. #1291: nor does a run a server restart
+  // failed, with the very messages the start-up reconciliation writes.
+  const { RUNNING_MSG, QUEUED_MSG } = require('../../src/worker/reconcile');
+  test.each([
+    ['RUN_NOT_FINISHED', 'RUN_NOT_FINISHED'],
+    ['RUN_PROCESS_ERROR', 'RUN_PROCESS_ERROR'],
+    ['NO_CHECKS', 'NO_CHECKS'],
+    ['interrupted by a restart', RUNNING_MSG],
+    ['cancelled by a restart', QUEUED_MSG],
+  ])('a later %s run leaves the run before it as the result', async (_name, sentinel) => {
     const latest = addRun(ids.D, 'SHARED_SALE', 'FAILED', 2, { at: '2026-10-26 09:00:00' });
     run('UPDATE runs SET error_message = ? WHERE id = ?', [sentinel, latest]);
     try {

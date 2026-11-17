@@ -343,6 +343,20 @@ function notFinishedBannerHtml(code) {
         </div>`;
 }
 
+// #1291: the server restarted while the run was going or waiting, and its
+// start marked the run failed. The message is OscarRunExit's own text.
+function restartedBannerHtml(message) {
+  return `
+        <div class="auth-icon">⚠️</div>
+        <div class="auth-body">
+          <div class="auth-title">Stopped by a server restart — this is not a test result</div>
+          <div class="auth-msg">
+            ${escHtml(message)}<br>
+            Nothing, or not all, of the scenario was tested, and the coverage report does not count this run. Run the scenario again.
+          </div>
+        </div>`;
+}
+
 function updateStatus(run) {
   currentRun = run;
   const badge = document.getElementById('status-badge');
@@ -375,8 +389,9 @@ function updateStatus(run) {
   const isNoChecks      = run.error_message === 'NO_CHECKS';
   const isProcessError  = run.error_message === 'RUN_PROCESS_ERROR';
   const isNotFinished   = run.error_message === OscarRunExit.NOT_FINISHED;
-  const isOAuthError    = !isFormatError && !isAuthError && !isNoChecks && !isProcessError && !isNotFinished && run.error_message && run.auth_mode_used === 'oauth2';
-  const showBanner      = isFormatError || isAuthError || isNoChecks || isProcessError || isNotFinished || isOAuthError;
+  const isRestarted     = OscarRunExit.isRestarted(run.error_message);
+  const isOAuthError    = !isFormatError && !isAuthError && !isNoChecks && !isProcessError && !isNotFinished && !isRestarted && run.error_message && run.auth_mode_used === 'oauth2';
+  const showBanner      = isFormatError || isAuthError || isNoChecks || isProcessError || isNotFinished || isRestarted || isOAuthError;
 
   if (showBanner && !existingBanner) {
     const banner = document.createElement('div');
@@ -426,6 +441,8 @@ function updateStatus(run) {
         </div>`;
     } else if (isNotFinished) {
       banner.innerHTML = notFinishedBannerHtml(run.exit_code);
+    } else if (isRestarted) {
+      banner.innerHTML = restartedBannerHtml(run.error_message);
     } else {
       banner.innerHTML = `
         <div class="auth-icon">⚠️</div>

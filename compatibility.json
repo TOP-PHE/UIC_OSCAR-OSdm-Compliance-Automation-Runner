@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.571",
+  "current_release": "2026.573",
   "releases": [
+    {
+      "release": "2026.573",
+      "date": "2026-11-17",
+      "server": "1.11.534",
+      "collection": "OTST_V2.0.261",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.534: a run a server restart failed is not a test result (#1291). At start the server marks every run still RUNNING or QUEUED as FAILED, with 'Interrupted by a server restart …' or 'Cancelled by a server restart before this run started …'. The coverage report took those runs as the scenarios' latest result (read 'not run', hiding the finished run before), and the run page showed them as an OAuth2 failure. Both messages now live in public/js/run-exit.js and join NOT_A_RESULT: the coverage report leaves them out, and the run page shows 'Stopped by a server restart — this is not a test result'. The text is unchanged, so earlier rows are left out too.",
+        "Release 2026.572 / server 1.11.533 is left to the change in preparation for NUTS codes (#1266)."
+      ]
+    },
     {
       "release": "2026.571",
       "date": "2026-11-16",

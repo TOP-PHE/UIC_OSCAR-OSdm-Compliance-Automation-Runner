@@ -14,8 +14,9 @@
 // on 2026-11-16: a k3s restart made three runs end with 255 partway through,
 // all their checks passed, and they read as FAILED like a provider's defect.
 //
-// One implementation for the runner (worker/runner.js), the coverage report
-// and the run page (run-detail.html, browser global OscarRunExit).
+// One implementation for the runner (worker/runner.js), the start-up
+// reconciliation (worker/reconcile.js), the coverage report and the run page
+// (run-detail.html, browser global OscarRunExit).
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -26,10 +27,19 @@
   // The runs' error_message for an exit that is not a test result.
   const NOT_FINISHED = 'RUN_NOT_FINISHED';
 
+  // What a server start writes on the runs it finds still RUNNING or QUEUED
+  // (worker/reconcile.js, #1291): nothing resumes them. Rows of earlier
+  // releases hold the same text, so it must not change.
+  const RESTART_INTERRUPTED =
+    'Interrupted by a server restart — the run process was terminated and cannot be resumed. Please resubmit.';
+  const RESTART_CANCELLED =
+    'Cancelled by a server restart before this run started. Please resubmit.';
+  const RESTARTED = Object.freeze([RESTART_INTERRUPTED, RESTART_CANCELLED]);
+
   // error_message values that say a run is not a test result: nothing, or not
   // all, was tested. The coverage report leaves such a run out (the scenario's
   // finished run before it stands, or none).
-  const NOT_A_RESULT = Object.freeze(['NO_CHECKS', 'RUN_PROCESS_ERROR', NOT_FINISHED]);
+  const NOT_A_RESULT = Object.freeze(['NO_CHECKS', 'RUN_PROCESS_ERROR', NOT_FINISHED, ...RESTARTED]);
 
   // Bruno CLI 4.3's codes (src/constants.js), then the run pod's and the
   // dispatcher's (run-dispatcher/dispatcher.js, run-pod/runPod.js).
@@ -73,5 +83,13 @@
     return NOT_A_RESULT.includes(errorMessage);
   }
 
-  return { NOT_FINISHED, NOT_A_RESULT, isTestResultExit, exitMeaning, isNotAResult };
+  /** Whether a run's error_message says a server restart failed it. */
+  function isRestarted(errorMessage) {
+    return RESTARTED.includes(errorMessage);
+  }
+
+  return {
+    NOT_FINISHED, RESTART_INTERRUPTED, RESTART_CANCELLED, NOT_A_RESULT,
+    isTestResultExit, exitMeaning, isNotAResult, isRestarted,
+  };
 }));
