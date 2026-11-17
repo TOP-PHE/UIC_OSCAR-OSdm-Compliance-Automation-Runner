@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.577",
+  "current_release": "2026.578",
   "releases": [
+    {
+      "release": "2026.578",
+      "date": "2026-11-17",
+      "server": "1.11.539",
+      "collection": "OTST_V2.0.264",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.539 (news entry only), collection OTST_V2.0.264, simulator 0.72.0: the booking names the trip sold (#1299, part of #1297). At every booking step (02, 05, 07, the refund's 12, 14, 16, the exchange's 13, 15, 17), a sale of a trip gives one WARNING when the booking names no trip (no Booking.trips, no trip coverage on its booked offers or parts), when none of its trips is the trip sold (first and last stop places, start, end, number of legs), or when a coverage names a trip the booking does not hold. OSDM requires none of these members, so they are WARNINGs, not failed checks: no number of checks moves. A sale without a trip is exempt.",
+        "The simulator gets variant booking-without-trip (POST /bookings and GET /bookings/{id} answer without trips and trip coverage; the stored booking keeps them). New simulator scenario SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_* (in the run list). Every simulator reference changes (its run list): a company following one updates it from Test Config. Otherwise no action is required."
+      ]
+    },
     {
       "release": "2026.577",
       "date": "2026-11-17",

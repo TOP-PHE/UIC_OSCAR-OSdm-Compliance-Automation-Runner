@@ -290,6 +290,8 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_FARE_REFUND_1ADT_38: ['booking-without-fulfillments'],
     // #1298: the same variant on an exchange.
     SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_38: ['booking-without-fulfillments'],
+    // #1299: a booking that names no trip.
+    SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_38: ['booking-without-trip'],
     SIM_WRONG_OFFER_PRICE_38: [],
     SIM_WRONG_CARD_RATE_38: [],
     SIM_WRONG_BOOKING_PRICE_38: ['wrong-booking-price'],
