@@ -437,20 +437,43 @@ On Kubernetes, the same in the server's container:
 kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings src/db/checkIndexes.js --apply
 ```
 
+What the command does, since server 1.11.538 (#1305). It works in two
+parts: the old index removed, then the new one made. Each part has two
+steps, and says each one before it starts:
+
+| Step | The server meanwhile | What the command prints |
+|---|---|---|
+| It reads what the part needs (the old index, then the checks) | works as usual: a reader blocks nobody | `Reading … without any lock`, then `read so far: …` every ten seconds |
+| It changes the database | pages are read as usual; whatever *writes* (a sign-in, a save, a run) waits five seconds, then fails | `Now removing it: the server cannot write until the next line`, then `Removed: the server could not write for N s` |
+
+The reading is the long step. Done first, it leaves the pages in memory,
+so the change that follows holds the database for much less time.
+
 What to know before running it:
 
-- **The server stays up.** Pages are read as usual. Whatever *writes* to the
-  database while the swap runs (a sign-in, a save, a run) waits five
-  seconds, then fails. Choose a time when nobody works, and no run is
-  going: the command refuses while a run is queued or running.
-- **How long:** 5 to 10 s to remove the old index and 33 to 47 s to make the
-  new one for 7.7 million checks on a fast disk (two runs). Count a few
-  minutes on a server. The command prints the time of each part.
-- **All or nothing:** one transaction. Stopped midway, it changed nothing.
+- **Choose a time when nobody works, and no run is going.** The command
+  refuses while a run is queued or running, at the start and again before
+  each change: a run started while it was reading stops it before the
+  change, and the command is run again later. It goes on from where it was.
+- **How long.** The first run on a server, on the k3s test machine with 8.5
+  million checks in a database of 14 GB, was made by 1.11.537, which read
+  *while* it held the database: 442 s for the first part, about a quarter
+  of an hour in all, every write of the server failing for all that time.
+  The reading takes as long with 1.11.538, but the server works meanwhile.
+  How long the two changes then hold the database on a server is not
+  measured yet: the command prints it.
+- **Closing the window, or Ctrl-C, does not stop it.** It goes on in the
+  container. What it says is also written beside the database, in
+  `check-indexes.log`; to read it from another window:
+  `sudo docker exec oscar tail -n 20 data/check-indexes.log`. To stop it:
+  `sudo docker exec oscar sh -c "kill N"`, N being the process number its
+  first lines give. A part that had not ended changes nothing; a part that
+  had ended stays, and the command run again does the rest.
 - **Disk:** it needs about 150 bytes per check free beside the database
-  while it runs (1.1 GB for 7.7 million checks), and refuses with less. The
-  database file does not grow: the new index is written in the pages the
-  old one frees, and the rest of those pages hold the next data stored.
+  while it makes the new index (1.1 GB for 7.7 million checks), and refuses
+  with less. The database file does not grow: the new index is written in
+  the pages the old one frees, and the rest of those pages hold the next
+  data stored.
 - **With the server stopped** (a container of the same image and volume),
   the runs the server left marked running make it refuse: add `--force`.
 
