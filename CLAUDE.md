@@ -1616,13 +1616,25 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Everything it makes carries `app.kubernetes.io/managed-by=oscar-dispatcher`
   and is removed at its start. Tests use a stand-in API server
   (`run-dispatcher.test.js` `fakeApi()`): extend it, never mock the client.
-  **A run pod may use 2 CPUs and keeps its folders in memory** (#1307,
-  1.11.542). Measured on the test machine once the server's thread was no
-  longer the limit: at `RUN_CPU_LIMIT` 1 every run pod was throttled in 32
-  to 52 % of its periods (Bruno starts on several threads), which is what
-  the host's "CPU pressure 50 %" was; and the run pods were the first
+  **A run pod keeps its folders in memory; its CPU limit is 1** (#1307,
+  1.11.542; #1310, 1.11.543). Measured on the test machine once the
+  server's thread was no longer the limit: the run pods were the first
   writer on the node's disk (~11 MB a run: the collection copied into
-  `/work`). `work` and `tmp` are `emptyDir` `medium: Memory` with a
+  `/work`), and at `RUN_CPU_LIMIT` 1 every run pod was throttled in a
+  quarter to half of its periods (Bruno starts on several threads). #1307
+  moved the folders to memory (certain: no disk write from run pods, the
+  machine's writes halved) and set 2 CPUs. **The 2 CPUs gave nothing**: on
+  16 CPUs with 15 runs going, the same runs a minute at 1 and at 2, and
+  pods 2 to 4 s slower to start at 2; host CPU pressure 50 to 60 % either
+  way, so the limit only moved the wait. Back to 1 in #1310. **How it was
+  found: three batches of one evening, one setting changed, each measured
+  the same way. The first batch after a deployment is an outlier, and two
+  batches of different selections, hours or cache states compare nothing**
+  (the node's shared disk went from 7 to 16 ms a write in one day by
+  itself). `kubectl -n oscar set env deployment/oscar-dispatcher
+  RUN_CPU_LIMIT=2` tries a value between two batches (`RUN_CPU_LIMIT-`
+  undoes it; the dispatcher's restart removes the runs going). `work` and
+  `tmp` are `emptyDir` `medium: Memory` with a
   `sizeLimit` (`FOLDER_SIZES`, counted in the pod's memory limit);
   `RUN_WORK_FOLDERS=disk` keeps them on the node. The quota of `oscar-runs`
   is pinned to 50 pods at the dispatcher's default limits by

@@ -521,6 +521,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.543] — 2026-11-17
+
+Release 2026.582 (`current_release`). A run pod's CPU limit is 1 again by default (#1310). The run pods' folders stay in memory.
+
+### What was expected, and what was measured
+Release 2026.581 (#1307) let a run pod use 2 CPUs: at 1 CPU every run pod was throttled in 32 to 52 % of its periods, so more CPU was expected to save seconds per run.
+
+Three batches of one evening on the k3s test machine (16 CPUs, 15 runs going, the six simulators, the same selection), the folders in memory in all three, each measured 15 to 25 minutes in:
+
+| | Batch 1: 2 CPUs, the first after the deployment | Batch 2: 1 CPU | Batch 3: 2 CPUs |
+|---|---|---|---|
+| Share of a run pod's periods throttled | 0 to 11 % | 24 to 38 % | 0 to 13 % |
+| Time for a pod to start, median | 12.2 s | 7.4 s | 9 to 12.5 s |
+| Runs ended a minute | 13.3 | 15.4 | 16.6 |
+| Run pods ended in 15 minutes, about 17 minutes in | 207 | 263 | about 245 |
+| Server's thread waiting for a CPU | 8.0 % | 7.8 % | 8.5 % |
+| Disk, time per write | 10.9 ms | 11.1 ms | 16.2 ms |
+
+- Batch 1 was the outlier: the first batch after a deployment.
+- Between batches 2 and 3 the throughput is the same within the noise.
+- **Pods start 2 to 4 s sooner at 1 CPU**, in both comparisons.
+- The machine's CPU pressure is 50 to 60 % in all three. At 15 runs for 16 CPUs the machine as a whole is short of CPU: a higher limit moves the wait from the pod's quota to the machine's run queue.
+
+### Changed
+- **`RUN_CPU_LIMIT` is 1 again by default.** 2 remains a setting, for a machine with far fewer runs at once than CPUs (not measured).
+- **The quota of `oscar-runs` is 50 CPUs of limits again.** A cluster that applied the 100 of 2026.581 may keep it; applying `OSCAR_Deploy/kubernetes/runs` again puts 50 back.
+- **Unchanged: a run pod's work folder and `/tmp` in memory.** In all three batches the run pods wrote nothing to the disk, and what the machine writes went from 6.5 to about 3.3 MB a second.
+- **Documentation:** the *Kubernetes and OpenShift Deployment Guide* (why 1 CPU, and when 2); `CLAUDE.md`, with how the comparison was made: one setting changed, batches back to back, the first batch after a deployment set aside.
+
+### To do on a cluster
+Upgrade between two batches: the dispatcher restarts and removes the runs going. Nothing else.
+
+### Checked
+- `run-dispatcher.test.js`: the Job a run gets (1 CPU at most, folders in memory), the defaults, a limit set to 2 reaching the Job.
+- `kubernetes-manifests.test.js`: the quota has room for exactly its 50 pods at the dispatcher's default limits.
+
+---
+
 ## [server-1.11.542] — 2026-11-17
 
 Release 2026.581 (`current_release`). A run pod may use 2 CPUs, and its work folders are kept in memory (#1307). From the performance audit of 2026-11-17, once the server's thread was no longer the limit (#1294, #1295).
