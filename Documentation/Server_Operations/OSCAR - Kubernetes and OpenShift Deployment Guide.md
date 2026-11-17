@@ -567,11 +567,26 @@ Details to know:
   range in the run pods' policy (`runs/network-policy.yaml`), as well as
   `ALLOW_PRIVATE_TARGETS` (section 7). The CI's `ci/pod-runs` does so for
   the simulator.
-- **Size.** Each run pod asks for 200m CPU and 256 MiB, and may use 1 CPU
+- **Size.** Each run pod asks for 200m CPU and 256 MiB, and may use 2 CPUs
   and 1 GiB (`RUN_CPU_*`, `RUN_MEMORY_*` in `oscar-dispatcher-settings`).
-  The quota of `oscar-runs` allows 50 pods: keep `MAX_CONCURRENT_RUNS` within
-  it. A run pod over the quota is not made, and its run ends as "did not
-  start".
+  2 CPUs since server 1.11.542 (#1307): at 1 CPU, on a machine of 16 CPUs
+  with CPUs to spare, each run pod was throttled in 32 to 52 % of its
+  periods, 1.4 to 10.5 s of CPU held back per run. Bruno starts on several
+  threads.
+  The quota of `oscar-runs` allows 50 pods of that size: keep
+  `MAX_CONCURRENT_RUNS` within it. A run pod over the quota is not made, and
+  its run ends as "did not start". **Upgrading to 1.11.542, apply the
+  runs' namespace again** (`kubectl apply -k OSCAR_Deploy/kubernetes/runs`):
+  its quota goes from 50 to 100 CPUs of limits. With the former quota, more
+  than 25 runs at once would be refused.
+- **Work folders.** A run copies the collection into its work folder, then
+  writes its reports there: about 11 MB a run. Since 1.11.542 that folder
+  and `/tmp` are kept in memory (256 MiB and 64 MiB at most; they count in
+  the pod's memory limit). On the node's disk, the run pods were the first
+  writer of the test machine's one disk: 671 MB in 200 s, against 248 MB
+  for the server. `RUN_WORK_FOLDERS=disk` in `oscar-dispatcher-settings`
+  (a patch of that ConfigMap, as for `RUN_IMAGE`) puts them back on the
+  node's disk, for a cluster short of memory.
 - **Start time.** A run waits for its pod: a few seconds with the image
   already on the node, more on a node that must pull it first.
 - **When the Kubernetes API stops answering** (an upgrade or a restart of the

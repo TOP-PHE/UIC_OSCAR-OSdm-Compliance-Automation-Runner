@@ -12,12 +12,21 @@
 # network policy (run isolation option 4, #1130).
 #
 #   OSCAR_Deploy/kubernetes/ci/probe-run-network.sh <pod name> <host> <port>
+#
+# It tries for PROBE_SECONDS (10 by default), every half second: "open" as
+# soon as one try connects, "closed" when none did. A pod's traffic follows
+# the policy only once the node has taken the pod's address into its rules, a
+# moment after the pod starts. One try at the pod's start was refused before
+# that moment on k3s (#1308: the try at 17:18:30.3, the rule at 17:18:30.9),
+# and proved nothing when it read "closed".
 set -euo pipefail
 name=$1
 host=$2
 port=$3
+seconds=${PROBE_SECONDS:-10}
+case "$seconds" in ''|*[!0-9]*) echo "PROBE_SECONDS is not a whole number" >&2; exit 2 ;; esac
 
-script="const s=require('node:net').connect(${port},'${host}');s.setTimeout(5000,()=>process.exit(2));s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1));"
+script="const net=require('node:net');const end=Date.now()+${seconds}*1000;(function attempt(){const s=net.connect(${port},'${host}');let over=false;const next=()=>{if(over)return;over=true;s.destroy();if(Date.now()>=end)process.exit(1);setTimeout(attempt,500);};s.setTimeout(2000,next);s.on('connect',()=>process.exit(0));s.on('error',next);})();"
 overrides=$(jq -n --arg n "$name" --arg s "$script" '{
   spec: {
     restartPolicy: "Never",

@@ -14,7 +14,8 @@
  *
  * The pod is held to the "restricted" pod security standard and more: no
  * service account token, no service links, a read-only root file system
- * (its work folder and /tmp are emptyDirs), every capability dropped, no
+ * (its work folder and /tmp are emptyDirs, kept in memory unless the
+ * dispatcher is told otherwise: #1307), every capability dropped, no
  * privilege escalation, the RuntimeDefault seccomp profile, never restarted.
  * The Job ends at the run's deadline and is removed after it.
  */
@@ -26,6 +27,15 @@ const LABELS = Object.freeze({
 });
 const RUN_ID_LABEL = 'oscar.uic.org/run-id';
 const CONTAINER = 'run';
+// Where a run pod's work folder and /tmp are kept (RUN_WORK_FOLDERS). Each run
+// copies the collection into its work folder, then writes its reports there:
+// about 11 MB a run. On the node's disk, the run pods were the first writer
+// of the test machine's one disk (671 MB in 200 s against 248 MB for the
+// server), a disk that took 7 ms a write. In memory, those writes reach no
+// disk; the folders count in the pod's memory limit, so each has a size it
+// cannot pass.
+const WORK_FOLDERS = Object.freeze(['memory', 'disk']);
+const FOLDER_SIZES = Object.freeze({ work: '256Mi', tmp: '64Mi' });
 // What a Job leaves once it ends, in case the dispatcher could not remove it.
 const TTL_AFTER_FINISHED_S = 300;
 // The pod has a little more than the run's own budget to send its results.
@@ -62,6 +72,12 @@ function runSecret({ runId, envName, envYml, env, resultsUrl }) {
  * @param {object} settings  { image, serviceAccount, cpuRequest, cpuLimit,
  *                             memoryRequest, memoryLimit, runtimeClass? }
  */
+// The emptyDir of one of a run pod's two folders. On disk, as before #1307:
+// no size of its own, the node's disk is the limit.
+function folderOf(name, where) {
+  return where === 'disk' ? {} : { medium: 'Memory', sizeLimit: FOLDER_SIZES[name] };
+}
+
 function runJob({ runId, deadlineSeconds }, settings) {
   const name = jobNameOf(runId);
   const labels = { ...LABELS, [RUN_ID_LABEL]: runId };
@@ -86,7 +102,7 @@ function runJob({ runId, deadlineSeconds }, settings) {
       },
       volumeMounts: [{ name: 'work', mountPath: '/work' }, { name: 'tmp', mountPath: '/tmp' }],
     }],
-    volumes: [{ name: 'work', emptyDir: {} }, { name: 'tmp', emptyDir: {} }],
+    volumes: Object.keys(FOLDER_SIZES).map((name) => ({ name, emptyDir: folderOf(name, settings.workFolders) })),
   };
   if (settings.runtimeClass) podSpec.runtimeClassName = settings.runtimeClass;
   return {
@@ -114,4 +130,5 @@ function ownedBy(job) {
 module.exports = {
   runSecret, runJob, ownedBy, jobNameOf,
   LABELS, RUN_ID_LABEL, CONTAINER, MANAGED_SELECTOR, DEADLINE_MARGIN_S, TTL_AFTER_FINISHED_S,
+  WORK_FOLDERS, FOLDER_SIZES,
 };
