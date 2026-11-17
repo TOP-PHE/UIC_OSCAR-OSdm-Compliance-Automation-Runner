@@ -277,8 +277,8 @@ describe('a run in a pod of its own', () => {
     expect(c.securityContext).toEqual({ allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ['ALL'] } });
     expect(c.envFrom).toEqual([{ secretRef: { name: J.jobNameOf(req.runId) } }]);
     expect(c.env).toBeUndefined();
-    // #1307: 2 CPUs at most, and both folders in memory, each with its size.
-    expect(c.resources).toEqual({ requests: { cpu: '200m', memory: '256Mi' }, limits: { cpu: '2', memory: '1Gi' } });
+    // #1307: both folders in memory, each with its size. #1310: 1 CPU at most.
+    expect(c.resources).toEqual({ requests: { cpu: '200m', memory: '256Mi' }, limits: { cpu: '1', memory: '1Gi' } });
     expect(c.volumeMounts).toEqual([{ name: 'work', mountPath: '/work' }, { name: 'tmp', mountPath: '/tmp' }]);
     expect(pod.volumes).toEqual([
       { name: 'work', emptyDir: { medium: 'Memory', sizeLimit: '256Mi' } },
@@ -706,12 +706,15 @@ describe('the Kubernetes client', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  test('a run pod\'s size and folders: 2 CPUs and memory unless set (#1307)', () => {
+  test('a run pod\'s size and folders: 1 CPU and memory unless set (#1307, #1310)', () => {
     const byDefault = D.settingsOf({});
-    expect([byDefault.cpuRequest, byDefault.cpuLimit, byDefault.memoryRequest, byDefault.memoryLimit]).toEqual(['200m', '2', '256Mi', '1Gi']);
+    expect([byDefault.cpuRequest, byDefault.cpuLimit, byDefault.memoryRequest, byDefault.memoryLimit]).toEqual(['200m', '1', '256Mi', '1Gi']);
     expect(byDefault.workFolders).toBe('memory');
     expect(J.WORK_FOLDERS).toEqual(['memory', 'disk']);
-    expect(D.settingsOf({ RUN_CPU_LIMIT: '1', RUN_WORK_FOLDERS: ' Disk ' })).toMatchObject({ cpuLimit: '1', workFolders: 'disk' });
+    expect(D.settingsOf({ RUN_CPU_LIMIT: '2', RUN_WORK_FOLDERS: ' Disk ' })).toMatchObject({ cpuLimit: '2', workFolders: 'disk' });
+    // The limit set reaches the Job.
+    const two = J.runJob({ runId: randomUUID(), deadlineSeconds: 600 }, D.settingsOf({ RUN_CPU_LIMIT: '2' }));
+    expect(two.spec.template.spec.containers[0].resources.limits.cpu).toBe('2');
     // The folders and the pod's memory: both folders full still leave Bruno its memory.
     const megabytes = (size) => Number(size.replace('Mi', ''));
     expect(megabytes(J.FOLDER_SIZES.work) + megabytes(J.FOLDER_SIZES.tmp)).toBeLessThanOrEqual(1024 / 2);

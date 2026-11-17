@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.581",
+  "current_release": "2026.582",
   "releases": [
+    {
+      "release": "2026.582",
+      "date": "2026-11-17",
+      "server": "1.11.543",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.543: a run pod's CPU limit is 1 again by default (#1310). Release 2026.581 (#1307) raised it to 2, expecting seconds saved per run. Measured on the k3s test machine (16 CPUs, 15 runs going), three batches of one evening with one setting changed: the same runs a minute at 1 CPU and at 2 (15.4 and 16.6; 13.3 in the first batch after the deployment), and pods 2 to 4 s slower to start at 2 (7.4 s at the median against 9 to 12.5 s). With about one run per CPU the machine as a whole is short of CPU, and a higher limit only moves the wait. The quota of oscar-runs is 50 CPUs of limits again; a cluster that applied 100 may keep it. The run pods' folders stay in memory: in all three batches they wrote nothing to the disk, and the machine's writes went from 6.5 to about 3.3 MB a second. RUN_CPU_LIMIT=2 remains a setting for a machine with CPUs to spare."
+      ]
+    },
     {
       "release": "2026.581",
       "date": "2026-11-17",

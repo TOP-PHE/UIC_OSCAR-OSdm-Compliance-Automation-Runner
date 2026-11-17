@@ -109,9 +109,14 @@ function settingsOf(env = process.env) {
     resultsUrl: env.RUN_RESULTS_URL || '',
     serviceAccount: env.RUN_SERVICE_ACCOUNT || 'oscar-run',
     cpuRequest: env.RUN_CPU_REQUEST || '200m',
-    // 2 since #1307: at 1 CPU a run pod was throttled in 32 to 52 % of its
-    // periods on a machine with CPUs to spare (Bruno starts on several threads).
-    cpuLimit: env.RUN_CPU_LIMIT || '2',
+    // 1 CPU. At 1 a run pod is throttled in a quarter to half of its periods
+    // (Bruno starts on several threads), and #1307 tried 2. Measured on a
+    // machine of 16 CPUs with 15 runs going (#1310): the same runs a minute
+    // at 1 and at 2, pods 2 to 4 s slower to start at 2. With about one run
+    // per CPU the machine as a whole is short of CPU: a higher limit moves the
+    // wait from the pod's quota to the machine's run queue. 2 may help where
+    // far fewer runs go at once than there are CPUs; not measured.
+    cpuLimit: env.RUN_CPU_LIMIT || '1',
     memoryRequest: env.RUN_MEMORY_REQUEST || '256Mi',
     memoryLimit: env.RUN_MEMORY_LIMIT || '1Gi',
     workFolders: (env.RUN_WORK_FOLDERS || 'memory').trim().toLowerCase(),

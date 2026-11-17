@@ -567,18 +567,30 @@ Details to know:
   range in the run pods' policy (`runs/network-policy.yaml`), as well as
   `ALLOW_PRIVATE_TARGETS` (section 7). The CI's `ci/pod-runs` does so for
   the simulator.
-- **Size.** Each run pod asks for 200m CPU and 256 MiB, and may use 2 CPUs
+- **Size.** Each run pod asks for 200m CPU and 256 MiB, and may use 1 CPU
   and 1 GiB (`RUN_CPU_*`, `RUN_MEMORY_*` in `oscar-dispatcher-settings`).
-  2 CPUs since server 1.11.542 (#1307): at 1 CPU, on a machine of 16 CPUs
-  with CPUs to spare, each run pod was throttled in 32 to 52 % of its
-  periods, 1.4 to 10.5 s of CPU held back per run. Bruno starts on several
-  threads.
   The quota of `oscar-runs` allows 50 pods of that size: keep
   `MAX_CONCURRENT_RUNS` within it. A run pod over the quota is not made, and
-  its run ends as "did not start". **Upgrading to 1.11.542, apply the
-  runs' namespace again** (`kubectl apply -k OSCAR_Deploy/kubernetes/runs`):
-  its quota goes from 50 to 100 CPUs of limits. With the former quota, more
-  than 25 runs at once would be refused.
+  its run ends as "did not start".
+- **Why 1 CPU, and when 2.** At 1 CPU a run pod is throttled in a quarter to
+  half of its periods: Bruno starts on several threads. Server 1.11.542
+  (#1307) let it use 2. Measured on a machine of 16 CPUs with 15 runs going
+  (#1310, three batches of one evening):
+
+  | | 1 CPU | 2 CPUs |
+  |---|---|---|
+  | A run pod's periods throttled | 24 to 38 % | 0 to 13 % |
+  | Runs ended a minute | 15.4 | 16.6 (13.3 in the first batch after a deployment) |
+  | Time for a pod to start, median | 7.4 s | 9 to 12.5 s |
+
+  The throughput is the same within the noise, and pods start 2 to 4 s
+  later at 2. With about one run per CPU the machine as a whole is short of
+  CPU, so a higher limit moves the wait from the pod's quota to the
+  machine's run queue. Since 1.11.543 the limit is 1 again. `RUN_CPU_LIMIT=2`
+  may help on a machine with CPUs to spare, that is, far fewer runs at once
+  than CPUs (not measured); `limits.cpu` of the quota then becomes twice
+  its number of pods. A cluster that applied the quota of 1.11.542 (100) may
+  keep it, or apply `runs/` again to get 50 back.
 - **Work folders.** A run copies the collection into its work folder, then
   writes its reports there: about 11 MB a run. Since 1.11.542 that folder
   and `/tmp` are kept in memory (256 MiB and 64 MiB at most; they count in
