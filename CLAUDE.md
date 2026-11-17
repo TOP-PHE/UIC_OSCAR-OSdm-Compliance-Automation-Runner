@@ -4106,6 +4106,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the start before the database opens. `stopCheckpointThread()` (tests)
     lets the thread close its connection: Windows cannot remove a file
     still open.
+    **The thread copies the log past a size or an age, not every second**
+    (#1294, 1.11.536, step 1 of the performance audit of 2026-11-17). With
+    `synchronous = NORMAL` SQLite still syncs the log to the disk at the
+    first write after a *complete* checkpoint (the log starts again), and
+    that write is the server's: a checkpoint a second was one disk sync a
+    second on the server's thread (about 200 COMMITs over 0.1 s per 5 min on
+    the test machine; reproduced: 1.32 ms against 0.026 ms). The worker
+    looks every second (`isDue()`): the log file larger than
+    `OSCAR_DB_CHECKPOINT_MB` (16) and written since the last checkpoint, a
+    last checkpoint older than `OSCAR_DB_CHECKPOINT_SECONDS` (30), or frames
+    the last one could not copy. The server's connection sets
+    `journal_size_limit` to that size (the file is cut back when the log
+    starts again, so its size says what it holds). Each look posts
+    `waiting` or `checkpoint`, which is also what the watchdog listens for;
+    gauge `oscar_db_wal_bytes`. **A test that counts checkpoints passes
+    `{ limitBytes: 0, maxWaitMs: 0 }`** (one at every look, as before).
     **The review of #1233** (2026-11-13) read the database access instead
     of measuring one more round; its plan is #1234–#1243, in order.
     **#1234 (1.11.511): slow statements are logged.** `all`/`get`/`run`

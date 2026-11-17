@@ -521,6 +521,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.536] — 2026-11-17
+
+Release 2026.575 (`current_release`). The database's log is copied when it passes a size or an age, not every second (#1294). Step 1 of the performance audit of 2026-11-17, which follows the review #1233.
+
+### Changed
+- **The server's thread waited for the disk about once a second during a batch.**
+  - **Seen:** on the k3s test machine (2026.571, six simulators, 15 slots), about 200 COMMITs over 0.1 s per 5 minutes, 367 ms at the 99th percentile for a median of 1.7 ms. Requests waited up to 2.1 s for the thread.
+  - **Why:** with `synchronous = NORMAL` (#1224) an ordinary COMMIT does not wait for the disk. But the first write after a *complete* checkpoint starts the write-ahead log again from its beginning, and SQLite then syncs the log to the disk. That write is the server's. The checkpoint thread of #1230 ran every second: during a batch the log was emptied about once a second, and the next COMMIT, a run log flush or a slice of results, paid the sync.
+  - **Reproduced** with two connections, one writing and one running `PRAGMA wal_checkpoint(PASSIVE)` every 10 COMMITs: the COMMIT right after a checkpoint took 1.32 ms, the others 0.026 ms. A COMMIT with `synchronous = FULL` takes 1.22 ms; with `OFF`, the one after a checkpoint 0.085 ms.
+- **The checkpoint thread looks at the log every second, and copies it only when it is worth it** (`checkpointWorker.js` `isDue()`):
+  - the log file is larger than `OSCAR_DB_CHECKPOINT_MB` (16 by default, 1 to 1024) and was written since the last checkpoint;
+  - or the last checkpoint is older than `OSCAR_DB_CHECKPOINT_SECONDS` (30 by default, 1 to 600);
+  - or the last checkpoint could not copy everything (a reader still used some pages): tried again at the next look.
+- **The server's connection sets `journal_size_limit` to the same size** while the thread checkpoints: the log file is cut back when the log starts again, so its size says how much it holds. It is put back to SQLite's default when the thread is let go.
+- Both settings are read before the database opens: a wrong value stops the start.
+- **New gauge `oscar_db_wal_bytes`**: the size of the log file at each look. The thread's looks are also what the watchdog listens for.
+- **Documentation:** `metrics-and-monitoring.md`, `OSCAR_Deploy/.env.example`, the installation guide's start-up lines, the panel's text in *OSCAR · Overview*, `CLAUDE.md`.
+
+### To check after deployment
+During a batch, the COMMITs over 0.1 s in 5 minutes (panel *Database commits* of *OSCAR · Overview*) should fall from about 200 to a handful.
+
+### Checked
+- `db-checkpoints.test.js`:
+  - the two settings, their bounds, and a wrong value refused before the database is opened;
+  - the settings reach the thread, `journal_size_limit` is set, and put back when the thread stops;
+  - a log under the size with a recent checkpoint is looked at and left;
+  - a log past the size is copied without waiting, then left alone;
+  - an old checkpoint is made again;
+  - what a checkpoint could not copy, because of a reader, is tried again at each look.
+- The tests that count checkpoints now ask for one at every look. The test of a silent thread waits a second, not 0.2 s: on a busy machine the thread took longer than that to start.
+
+---
+
 ## [server-1.11.535] / [collection-OTST_V2.0.262] — 2026-11-17
 
 Issue #1266, part 2, third case. Release 2026.574 (`current_release`). Simulator 0.71.0. Offers without a trip in regions named by NUTS codes.

@@ -11,10 +11,14 @@
  * checkpointWorker.js — the database's checkpoints and statistics, off the
  * server's thread (#1230, #1238). Started by db.js startCheckpointThread()
  * with a connection of its own:
- * - every `intervalMs` a passive checkpoint copies what the write-ahead log
- *   holds into the database file. A passive checkpoint never blocks a reader
- *   or a writer. Its time and the log's size go back to the server's thread
- *   for the metrics;
+ * - every `intervalMs` it looks at the write-ahead log, and a passive
+ *   checkpoint copies what the log holds into the database file when the log
+ *   file is larger than `limitBytes`, when the last checkpoint is older than
+ *   `maxWaitMs`, or when the last one could not copy everything (#1294). Not
+ *   at every look: the server's first write after a complete checkpoint
+ *   starts the log again and waits for the disk. A passive checkpoint never
+ *   blocks a reader or a writer. Its time and the log's size go back to the
+ *   server's thread for the metrics, and each look says the log file's size;
  * - with `optimize` on, `optimizeDelayMs` after the start and then every
  *   `optimizeEveryMs`, the tables SQLite says would benefit are analyzed
  *   (below), and the server's thread is told which, and before each table
@@ -24,6 +28,7 @@
  * Only node: modules: nothing of the server runs here.
  */
 
+const fs = require('node:fs');
 const { parentPort, workerData } = require('node:worker_threads');
 const { DatabaseSync } = require('node:sqlite');
 
@@ -31,19 +36,59 @@ const { DatabaseSync } = require('node:sqlite');
 // end, instead of failing.
 const db = new DatabaseSync(workerData.dbPath, { timeout: workerData.busyMs ?? 5000 });
 const checkpoint = db.prepare('PRAGMA wal_checkpoint(PASSIVE)');
+const WAL_PATH = `${workerData.dbPath}-wal`;
+const LIMIT_BYTES = workerData.limitBytes ?? 0;
+const MAX_WAIT_MS = workerData.maxWaitMs ?? 0;
 let timer = null;
 let optimizeTimer = null;
+// When the last checkpoint ended, whether it left frames it could not copy (a
+// reader still used them: tried again at the next look), and the log file as
+// it was then.
+let lastAt = 0;
+let leftSome = false;
+let seenAtLast = '';
 
-function tick() {
+// The log file: its size, and a mark that changes with every write to it. The
+// server's connection cuts the file back to the limit when the log starts
+// again (journal_size_limit), so a file larger than the limit holds more than
+// the limit, unless nothing was written since it was last copied.
+function walFile() {
+  try {
+    const stat = fs.statSync(WAL_PATH, { bigint: true });
+    return { bytes: Number(stat.size), mark: `${stat.size}:${stat.mtimeNs}` };
+  } catch {
+    return { bytes: 0, mark: '' };   // no log yet
+  }
+}
+
+function checkpointNow(file) {
   const started = process.hrtime.bigint();
   const { busy, log, checkpointed } = checkpoint.get();
+  lastAt = Date.now();
+  leftSome = Number(log) > Number(checkpointed);
+  seenAtLast = file.mark;
   parentPort.postMessage({
     type: 'checkpoint',
     seconds: Number(process.hrtime.bigint() - started) / 1e9,
     busy,
     log,
     checkpointed,
+    walBytes: file.bytes,
   });
+}
+
+// Whether this look copies the log: what the last checkpoint left, a log
+// written since then and past its size, or a last checkpoint that is old.
+function isDue(file) {
+  if (leftSome) return true;
+  if (file.bytes > LIMIT_BYTES && file.mark !== seenAtLast) return true;
+  return Date.now() - lastAt >= MAX_WAIT_MS;
+}
+
+function tick() {
+  const file = walFile();
+  if (isDue(file)) checkpointNow(file);
+  else parentPort.postMessage({ type: 'waiting', walBytes: file.bytes });
   timer = setTimeout(tick, workerData.intervalMs);
 }
 
