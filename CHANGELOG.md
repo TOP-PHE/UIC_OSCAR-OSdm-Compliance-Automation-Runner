@@ -536,7 +536,7 @@ The parts of a booking were paired with the offer's by content (#550), but some 
   - another `validFrom` or `validUntil` instant;
   - another product: the offer part's (`summaryProductId`, else its first product) against the booked part's, read through the offer's and the booked offer's `products` and compared by `code`; a product on one side only; another id for which the booking gives no product to read is said at `[INFO]`;
   - another flexibility, travel class or service class type of those two products;
-  - a trip coverage on one side only, or other legs of the same trip (another trip id is #1299's);
+  - a trip coverage on one side only, or other legs of the same trip (another trip id is #1299's, and a booking that names no trip at all is said once, by #1299's check);
   - other passengers (the booked part's `passengerIds` read as `externalRef`).
   No test is added: no number of checks moves.
 - **`OFFER_PART_PRICE_CHANGE`** is read in the answer of 02 (`priceChangeSaid()`: `problems`, or the deprecated `warnings`; a code or a URN ending in it) and kept for the later reads (`__bookingPriceChangeSaid`, both reset lists and `SUBRUN_SALE_STATE`).
@@ -546,7 +546,7 @@ The parts of a booking were paired with the offer's by content (#550), but some 
 - **When the booking answer says `OFFER_PART_PRICE_CHANGE`**, "<part> prices have at least one member in common between offer and booking" no longer requires an amount in common (the currency and the scale still do), and a `provisionalPrice` below the offer's `minimalPrice` is a WARNING instead of a failure. OSDM allows a price changed at pre-booking when it is said. Without the warning, both fail as before. No simulator scenario but the new one has a changed price, so no count moves.
 
 ### Simulator 0.73.0
-- **Variant `booking-price-change`** (last name `Simvariant-Booking-Price-Change`): each admission is booked 1.00 dearer than offered (its price object is replaced, never changed in place: it is the offer's own), `provisionalPrice` with them, and the answer of `POST /bookings` carries `problems: [{ code: OFFER_PART_PRICE_CHANGE, … }]` (`bookingProblems()`). The reads keep the new prices without the problem; the confirmed price follows them. No other answer changes.
+- **Variant `booking-price-change`** (last name `Simvariant-Booking-Price-Change`): each admission is booked 1.00 dearer than offered (its price object is replaced, never changed in place: it is the offer's own), `provisionalPrice` with them, and the answer of `POST /bookings` carries `problems: [{ code: urn:uic:problem:OFFER_PART_PRICE_CHANGE, … }]`, the URN form of OSDM's Problem examples (`bookingProblems()`). The reads keep the new prices without the problem; the confirmed price follows them. No other answer changes.
 
 ### Changed
 - *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`), from the replay of #1298, #1299 and #1300 together.
@@ -554,11 +554,22 @@ The parts of a booking were paired with the offer's by content (#550), but some 
 - Docs: *What is tested* (step 02), *OSCAR - OSDM Simulator scenarios* (one row), CLAUDE.md, a welcome-page news entry.
 
 ### Checked
-- **Replay**: being recorded; this line is replaced with its result before review.
+- **Replay** with the real Bruno CLI 4.2.1, recorded in chunks. Before: `main` at 6b532427 on simulator 0.71.0. After: #1298, #1299 and this PR on simulator 0.73.0. It covers the 220 scenarios of *Checks by scenario* and the three new ones (223).
+  - The 220 give the same checks and results. No "is not booked as offered" line appears on any of them, so the simulator books every part as offered.
+  - The only warnings that move are #1298's, on the two `booking-without-fulfillments` variants.
+  - `SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_38` gives 246 checks (245 of `SIM_SALE_SEARCH_1ADT_38`, plus the check of the answer's `problems`) and no failure. It gives one WARNING at 02, 05 and 07: the price changed, as the provider said. The price check of the parts passes.
+  - Two things were changed after the first recording:
+    - a part's trip coverage is no longer said again when the booking names no trip (#1299 says it);
+    - the simulator gives the code in OSDM's URN form (the bare form made the existing "not a urn:uic:* catalogue code" WARNING fire).
+    The two new scenarios and five others were then recorded again: one WARNING per step, the five unchanged.
+  - `replay.js catalogue` agrees with all 110 entries: no number of checks moved.
+  - *Checks by scenario* and `simulator-checks.json` are regenerated from this recording. Their changes are the scenario counts and five check keys of the new scenarios; none is removed.
+- **Full local suites**:
+  - simulator: 454 of 455 pass, the one failure the known Windows file-mode test;
+  - server (2 workers): 6,485 of 6,505 pass, 12 skipped. The 8 failures are the known Windows-only ones (`/metrics`, the answer-threats timing, the runner agent, the checkpoint thread, MCP).
 - **Collection**: `bruno-booked-as-offered.test.js` covers `OFFER_PART_PRICE_CHANGE` (problems, warnings, code, URN, a title that is not the code), each member (price, scale, currency, named place fee, validity instants, product by code and by id, flexibility, classes, trip coverage, passengers), the context, the WARNING lines (never a test), the price check and the minimal price with and without the warning, another currency still failing, and the simulator's own offer and booking with and without the variant, and with the variant's warning removed.
 - **Simulator**: `app.test.js` books with the variant, reads, confirms, and books the same offer again without it.
-- **Mutation checks**: each of the 30 rules of this change (collection and simulator), removed one by one, fails a test.
-
+- **Mutation checks**: each rule of this change (collection and simulator), removed one by one, fails a test: 48 mutations, the last ones after the lists were compared without sorting them (Sonar S2871) and after the review of the replay.
 ---
 
 ## [server-1.11.539] / [collection-OTST_V2.0.264] — 2026-11-17
