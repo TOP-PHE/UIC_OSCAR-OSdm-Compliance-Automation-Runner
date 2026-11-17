@@ -210,8 +210,22 @@ describe('step 14 on a booking read listing no fulfilment', () => {
       'Booked admission A1 is REFUNDED - status: REFUNDED: ok',
       'Booked admission A2 is not REFUNDED (left out of the refund) - status: FULFILLED: ok',
     ]);
-    expect(mockLogs.filter((l) => l.startsWith('[WARNING] Refund scope: the booking read after the refund lists no fulfilment, so the REFUNDED state of F1, F2'))).toHaveLength(1);
+    // #1298: the WARNING is the step's own (checkBookingStillLists); this line says what is checked instead.
+    expect(mockLogs.filter((l) => l.startsWith('[INFO] Refund scope: the booking read after the refund lists no fulfilment, so the REFUNDED state of F1, F2'))).toHaveLength(1);
+    expect(mockLogs.filter((l) => l.startsWith('[WARNING]'))).toEqual([]);
     expect(refunds.isScopedRefundOnBooking(booking)).toBe(true);
+  });
+
+  realTest('#1298: a refunded fulfilment the booking no longer lists keeps its parts from the confirmation', () => {
+    confirm();
+    env.__refundedFulfillmentIds = JSON.stringify(['F1']);
+    const partly = { fulfillments: [{ id: 'F2', status: 'FULFILLED' }], bookedOffers: booking.bookedOffers };
+    withBrunoExpect(() => refunds.checkRefundScopeOnBooking(partly));
+    expect(mockRecorded).toEqual([
+      'Fulfillment F2 is not REFUNDED (left out of the refund) - status: FULFILLED: ok',
+      'Booked admission A1 is REFUNDED - status: REFUNDED: ok',
+      'Booked admission A2 is not REFUNDED (left out of the refund) - status: FULFILLED: ok',
+    ]);
   });
 
   realTest('a full refund is held to every fulfilment the confirmation gave', () => {
@@ -271,6 +285,66 @@ describe('step 14 on a fare fulfilment that names no fare', () => {
   });
 });
 
+// #1298: a real provider leaves the fulfilments out of the booking reads
+// after the refund or exchange steps; each read after 07 says so.
+describe('#1298: the booking reads after 07 still list the fulfilments seen before', () => {
+  const ids = ['15900622583907', '15900622583908'];
+
+  realTest('the rule: nothing seen, all listed, none listed, some left out', () => {
+    expect(C.stillListedMessage([], [], '12. X')).toBeNull();
+    expect(C.stillListedMessage(CONFIRMATION.fulfillments, ids, '12. X')).toBeNull();
+    expect(C.stillListedMessage([...CONFIRMATION.fulfillments, { id: 'NEW' }], ids, '12. X')).toBeNull();
+    expect(C.stillListedMessage(undefined, ids, '12. X'))
+      .toBe('12. X: the booking lists no fulfilment, though 15900622583907, 15900622583908 were given before (by the confirmation or an earlier booking read). OSDM does not require Booking.fulfillments, but this read asks embed=ALL');
+    expect(C.stillListedMessage([{ id: '15900622583907' }], ids, '15. Y'))
+      .toMatch(/^15\. Y: the booking no longer lists 15900622583908 \(it lists 15900622583907\), though 15900622583907, 15900622583908 were given before/);
+    expect(C.stillListedMessage([], ['F1', 'F1', '', null], 'Z')).toMatch(/^Z: the booking lists no fulfilment, though F1 was given before/);
+  });
+
+  realTest('what is held: the confirmation\'s, then 07\'s and an exchange\'s added; a new confirmation starts again', () => {
+    C.keepConfirmation(CONFIRMATION);
+    expect(C.seenFulfillmentIds()).toEqual(ids);
+    C.checkBookingLists({ fulfillments: [{ id: ids[0] }, { id: 'AT07' }] });
+    expect(C.seenFulfillmentIds()).toEqual([...ids, 'AT07']);
+    C.rememberFulfillments([{ id: 'EXCHANGED-NEW' }, { id: ids[1] }]);
+    expect(C.seenFulfillmentIds()).toEqual([...ids, 'AT07', 'EXCHANGED-NEW']);
+    C.keepConfirmation({ fulfillments: [{ id: 'OTHER' }] });
+    expect(C.seenFulfillmentIds()).toEqual(['OTHER']);
+  });
+
+  realTest('one WARNING per read that lists none or leaves one out, never a test', () => {
+    C.keepConfirmation(CONFIRMATION);
+    C.checkBookingStillLists({ fulfillments: CONFIRMATION.fulfillments }, '12. GET Booking before Patch Refund');
+    C.checkBookingStillLists({ fulfillments: [] }, '14. GET Booking after Patch Refund');
+    C.checkBookingStillLists({}, '15. GET Booking after Fulfillment (exchange)');
+    expect(mockRecorded).toEqual([]);
+    expect(mockLogs).toEqual([
+      `[WARNING] ${C.STILL_CHECK} — 14. GET Booking after Patch Refund: the booking lists no fulfilment, though ${ids.join(', ')} were given before (by the confirmation or an earlier booking read). OSDM does not require Booking.fulfillments, but this read asks embed=ALL.`,
+      `[WARNING] ${C.STILL_CHECK} — 15. GET Booking after Fulfillment (exchange): the booking lists no fulfilment, though ${ids.join(', ')} were given before (by the confirmation or an earlier booking read). OSDM does not require Booking.fulfillments, but this read asks embed=ALL.`,
+    ]);
+  });
+
+  realTest('the wiring: each read after 07 checks once, after its answer is an object, under its own name', () => {
+    const steps = {
+      'Bruno_Collection/03-Refund/12. GET Booking before Patch Refund.yml': '12. GET Booking before Patch Refund',
+      'Bruno_Collection/03-Refund/14. GET Booking after Patch Refund.yml': '14. GET Booking after Patch Refund',
+      'Bruno_Collection/03-Refund/16. GET Booking after Delete Refund.yml': '16. GET Booking after Delete Refund',
+      'Bruno_Collection/04-Exchange/13. GET Booking before Fulfillment.yml': '13. GET Booking before Fulfillment (exchange)',
+      'Bruno_Collection/04-Exchange/15. GET Booking after Fulfillment.yml': '15. GET Booking after Fulfillment (exchange)',
+      'Bruno_Collection/04-Exchange/17. GET Booking after Fulfillment.yml': '17. GET Booking after Fulfillment (exchange withdrawn)',
+    };
+    for (const [file, step] of Object.entries(steps)) {
+      const text = fs.readFileSync(path.join(ROOT, file), 'utf8');
+      const call = `checkBookingStillLists((jsonData && jsonData.booking) || jsonData, "${step}");`;
+      expect([file, text.split(call).length - 1]).toEqual([file, 1]);
+      expect([file, text.indexOf(call) > text.indexOf('jsonObjectOrStop(jsonData')]).toEqual([file, true]);
+      expect([file, text.includes('?embed=ALL')]).toEqual([file, true]);
+    }
+    const exchange14 = fs.readFileSync(path.join(ROOT, 'Bruno_Collection/04-Exchange/14. POST Obtaining Fulfillments from Booking.yml'), 'utf8');
+    expect(exchange14.indexOf('rememberFulfillments(jsonData.fulfillments)')).toBeGreaterThan(exchange14.indexOf('validateFulfillments(jsonData.fulfillments'));
+  });
+});
+
 describe('the wiring', () => {
   const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
@@ -291,8 +365,8 @@ describe('the wiring', () => {
 
   realTest('the variable is cleared with the sale: both reset lists and each expiry sub-run', () => {
     for (const file of ['Bruno_Collection/opencollection.yml', 'Bruno_Collection/library-bruno/scenarioParser.js']) {
-      expect([file, read(file).includes('"__bookingFulfillmentIds", "__confirmedFulfillments"')]).toEqual([file, true]);
+      expect([file, read(file).includes('"__bookingFulfillmentIds", "__confirmedFulfillments", "__fulfillmentIdsSeen"')]).toEqual([file, true]);
     }
-    expect(read('Bruno_Collection/library-bruno/expiredFlow.js')).toContain("'__bookingFulfillmentIds', '__confirmedFulfillments',");
+    expect(read('Bruno_Collection/library-bruno/expiredFlow.js')).toContain("'__bookingFulfillmentIds', '__confirmedFulfillments', '__fulfillmentIdsSeen',");
   });
 });

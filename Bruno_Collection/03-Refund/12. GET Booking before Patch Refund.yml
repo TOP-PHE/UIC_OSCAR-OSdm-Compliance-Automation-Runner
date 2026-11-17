@@ -54,6 +54,8 @@ runtime:
             return;
         }
         if (!require(bru.getEnvVar("library_base") + "loopback.js").jsonObjectOrStop(jsonData, "GET Booking before Patch Refund")) return;
+        // #1298: every fulfilment seen before is still listed (a WARNING when not).
+        require(bru.getEnvVar("library_base") + "confirmedFulfillments.js").checkBookingStillLists((jsonData && jsonData.booking) || jsonData, "12. GET Booking before Patch Refund");
         // #907: a booking of fares has its own checks.
         if (!require(bru.getEnvVar("library_base") + "fareRefund.js").checkFareBookingInRefund(jsonData, "confirmed")) {
         postCreateBookingResponse(

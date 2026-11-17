@@ -21,6 +21,9 @@ http://www.apache.org/licenses/LICENSE-2.0
  *     with one failed check: OSDM's RefundOfferRequest and
  *     ExchangeOfferCollectionRequest need at least one fulfillmentId
  *     (minItems 1), and a request without one tests nothing.
+ * At every booking read after 07 (refund 12, 14, 16; exchange 13, 15, 17,
+ * which ask embed=ALL), a fulfilment seen before and no longer listed is a
+ * WARNING too (#1298): the confirmation's, 07's and an exchange's.
  *
  * The pure part has no Bruno globals; the glue at the bottom has.
  */
@@ -71,6 +74,28 @@ function bookingListCheck(bookingFulfillments, confirmed) {
   };
 }
 
+const STILL_CHECK = 'The booking still lists the fulfilments given before';
+
+/**
+ * #1298: a booking read after 07 (refund 12, 14, 16; exchange 13, 15, 17)
+ * against the fulfilment ids seen so far: the confirmation's, those 07
+ * listed, those an exchange's confirmation gave. The text of the WARNING, or
+ * null when none was seen or all are listed. A fulfilment refunded or
+ * exchanged stays in the booking, in state REFUNDED or EXCHANGED.
+ */
+function stillListedMessage(bookingFulfillments, seen, step) {
+  const ids = [...new Set(list(seen).filter((id) => typeof id === 'string' && id !== ''))];
+  if (ids.length === 0) return null;
+  const listed = idsOf(bookingFulfillments);
+  const missing = ids.filter((id) => !listed.includes(id));
+  if (missing.length === 0) return null;
+  const what = listed.length === 0
+    ? 'the booking lists no fulfilment'
+    : `the booking no longer lists ${missing.join(', ')} (it lists ${listed.join(', ')})`;
+  return `${step}: ${what}, though ${ids.join(', ')} ${ids.length === 1 ? 'was' : 'were'} given before `
+    + '(by the confirmation or an earlier booking read). OSDM does not require Booking.fulfillments, but this read asks embed=ALL';
+}
+
 /** The fulfilments a refund or exchange names: the booking's when it lists some, else the confirmation's. */
 function fulfillmentsInUse(bookingFulfillments, confirmed) {
   return idsOf(bookingFulfillments).length > 0 ? list(bookingFulfillments) : keptOf(confirmed);
@@ -107,6 +132,27 @@ function readJson(name, fallback) {
 /** Step 06: keep the fulfilments the confirmation gave (none when it gave none). */
 function keepConfirmation(body) {
   bru.setEnvVar('__confirmedFulfillments', JSON.stringify(keptOf(body?.fulfillments)));
+  // #1298: a new confirmation starts what later booking reads are held to.
+  bru.setEnvVar('__fulfillmentIdsSeen', JSON.stringify(idsOf(body?.fulfillments)));
+}
+
+/** #1298: the fulfilment ids seen so far in this sale. */
+function seenFulfillmentIds() {
+  return list(readJson('__fulfillmentIdsSeen', [])).filter((id) => typeof id === 'string');
+}
+
+/** #1298: add the ids of these fulfilments to those later booking reads are held to. */
+function rememberFulfillments(fulfillments) {
+  bru.setEnvVar('__fulfillmentIdsSeen', JSON.stringify([...new Set([...seenFulfillmentIds(), ...idsOf(fulfillments)])]));
+}
+
+/**
+ * #1298: refund 12, 14, 16 and exchange 13, 15, 17: the WARNING when the
+ * booking does not list every fulfilment seen before.
+ */
+function checkBookingStillLists(booking, step) {
+  const message = stillListedMessage(booking?.fulfillments, seenFulfillmentIds(), step);
+  if (message) require('./displays.js').validationLogger(`[WARNING] ${STILL_CHECK} — ${message}.`);
 }
 
 /** The fulfilments step 06 kept. */
@@ -122,6 +168,7 @@ function checkBookingLists(booking) {
   const confirmed = confirmedFulfillments();
   const c = bookingListCheck(booking?.fulfillments, confirmed);
   if (c && !c.ok) require('./displays.js').validationLogger(`[WARNING] ${c.name} — ${c.message}`);
+  rememberFulfillments(booking?.fulfillments);
   return fulfillmentsInUse(booking?.fulfillments, confirmed);
 }
 
@@ -138,6 +185,7 @@ function stopWithoutFulfillment(ids) {
 }
 
 module.exports = {
-  idsOf, keptOf, bookingListCheck, fulfillmentsInUse, afterSaleOf, nothingToNameCheck,
+  idsOf, keptOf, bookingListCheck, fulfillmentsInUse, afterSaleOf, nothingToNameCheck, stillListedMessage,
   keepConfirmation, confirmedFulfillments, checkBookingLists, stopWithoutFulfillment, LIST_CHECK,
+  seenFulfillmentIds, rememberFulfillments, checkBookingStillLists, STILL_CHECK,
 };

@@ -60,6 +60,8 @@ runtime:
             loopbackOrStop("GET Booking after Delete Refund (missing booking)");
             return;
         }
+        // #1298: every fulfilment seen before is still listed (a WARNING when not).
+        require(bru.getEnvVar("library_base") + "confirmedFulfillments.js").checkBookingStillLists((jsonData && jsonData.booking) || jsonData, "16. GET Booking after Delete Refund");
 
         if (String(bru.getEnvVar("isRefundConfirmed")) === "true") {
             // #613 F6: the refund was confirmed, so the DELETE was refused (409)

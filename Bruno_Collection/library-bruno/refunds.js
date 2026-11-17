@@ -386,9 +386,11 @@ function checkRefundScopeOnBooking(booking) {
   // Nothing to tell a refunded part from another: the part-level check is skipped below.
   let partsKnown = fulfillments.length > 0;
   // #1045: a booking listing no fulfilment says nothing of their state; the
-  // confirmation's still say which parts each one holds.
+  // confirmation's still say which parts each one holds. #1298: the WARNING
+  // that it lists none is the step's own (checkBookingStillLists), so this
+  // line only says what is checked instead.
   if (fromConfirmation && fulfillments.length > 0) {
-    validationLogger(`[WARNING] Refund scope: the booking read after the refund lists no fulfilment, so the REFUNDED state of ${fulfillments.map((f) => f.id).join(", ")} cannot be read from it; the booked parts are checked through the fulfilments the confirmation gave (OSDM does not require Booking.fulfillments).`);
+    validationLogger(`[INFO] Refund scope: the booking read after the refund lists no fulfilment, so the REFUNDED state of ${fulfillments.map((f) => f.id).join(", ")} cannot be read from it; the booked parts are checked through the fulfilments the confirmation gave (OSDM does not require Booking.fulfillments).`);
   }
   const fareScope = _refundedFareScope(booking, fulfillments, refunded);
   fulfillments.forEach((f) => {
@@ -405,6 +407,15 @@ function checkRefundScopeOnBooking(booking) {
       else expect(f.status, `fulfillment ${f.id} was not part of the refund`).to.not.eql("REFUNDED");
     });
   });
+  // #1298: a refunded fulfilment the booking no longer lists (it lists
+  // others) still says, through the confirmation, which parts it held:
+  // without them, its parts read "left out of the refund", the wrong cause.
+  if (!fromConfirmation) {
+    const listed = new Set(fulfillments.map((f) => f?.id));
+    require("./confirmedFulfillments.js").confirmedFulfillments()
+      .filter((f) => refunded.includes(f.id) && !listed.has(f.id))
+      .forEach((f) => (Array.isArray(f.bookingParts) ? f.bookingParts : []).forEach((bp) => { if (bp?.id) refundedPartIds.add(bp.id); }));
+  }
   if (!partsKnown) {
     validationLogger(fulfillments.length > 0
       ? "[INFO] Refund scope: a refunded fulfillment does not list its booking parts — the part-level scope check is skipped."
