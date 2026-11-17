@@ -1,17 +1,30 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.580",
+  "current_release": "2026.581",
   "releases": [
+    {
+      "release": "2026.581",
+      "date": "2026-11-17",
+      "server": "1.11.542",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.542: a run pod may use 2 CPUs, and its work folders are kept in memory (#1307, from the performance audit of 2026-11-17). On the k3s test machine, with the server's thread no longer the limit, each run pod was throttled in 32 to 52 % of its periods by its 1-CPU limit (1.4 to 10.5 s of CPU held back per run) on a machine with CPUs to spare, and the run pods were the first writer of the machine's one disk: 671 MB in 200 s, about 11 MB a run, against 248 MB for the server. RUN_CPU_LIMIT is 2 by default; the work folder and /tmp of a run pod are memory-backed (256 MiB and 64 MiB at most, within the pod's memory limit), RUN_WORK_FOLDERS=disk keeps them on the node's disk. ON A CLUSTER, AFTER THE UPGRADE: kubectl apply -k OSCAR_Deploy/kubernetes/runs (the quota of oscar-runs goes from 50 to 100 CPUs of limits). The dispatcher restarts with the upgrade and removes the runs going: upgrade between two batches."
+      ]
+    },
     {
       "release": "2026.580",
       "date": "2026-11-17",
       "server": "1.11.541",
-      "collection": "OTST_V2.0.264",
+      "collection": "OTST_V2.0.265",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.541: a run pod may use 2 CPUs, and its work folders are kept in memory (#1307, from the performance audit of 2026-11-17). On the k3s test machine, with the server's thread no longer the limit, each run pod was throttled in 32 to 52 % of its periods by its 1-CPU limit (1.4 to 10.5 s of CPU held back per run) on a machine with CPUs to spare, and the run pods were the first writer of the machine's one disk: 671 MB in 200 s, about 11 MB a run, against 248 MB for the server. RUN_CPU_LIMIT is 2 by default; the work folder and /tmp of a run pod are memory-backed (256 MiB and 64 MiB at most, within the pod's memory limit), RUN_WORK_FOLDERS=disk keeps them on the node's disk. ON A CLUSTER, AFTER THE UPGRADE: kubectl apply -k OSCAR_Deploy/kubernetes/runs (the quota of oscar-runs goes from 50 to 100 CPUs of limits). The dispatcher restarts with the upgrade and removes the runs going: upgrade between two batches."
+        "Server 1.11.541 (news entry only), collection OTST_V2.0.265, simulator 0.73.0: the booked parts against the offer's, member by member (#1300, part of #1297). At every booking step, each pair of parts (paired by content, #550) gives a WARNING for a price changed (saying whether the provider said OFFER_PART_PRICE_CHANGE), another validFrom or validUntil, another product, flexibility, travel or service class (read through the offer's and the booked offer's products, by code), another trip coverage or other passengers (by externalRef). They are WARNINGs, not failed checks: no number of checks moves.",
+        "One change of an existing check: when the booking answer says OFFER_PART_PRICE_CHANGE (osdm.io, Processes: a price is not guaranteed before pre-booking, and a change is said by that warning), \"prices have at least one member in common\" no longer fails on the amount, and a provisionalPrice below the offer's minimalPrice is a WARNING. Without that warning both still fail as before; another currency still fails.",
+        "The simulator gets variant booking-price-change (each admission booked 1.00 dearer, provisionalPrice with them, and OFFER_PART_PRICE_CHANGE in the answer of POST /bookings). New simulator scenario SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_* (in the run list). Every simulator reference changes (its run list): a company following one updates it from Test Config. Otherwise no action is required."
       ]
     },
     {

@@ -499,6 +499,32 @@ test('variant booking-without-trip: the booking answers and reads name no trip; 
   assert.equal((await call(sim.base, token, 'PATCH', `${base}/refund-offers/${refundOffer.id}`, { status: 'CONFIRMED' })).body.refundOffer.status, 'CONFIRMED');
 });
 
+test('variant booking-price-change: each admission 1.00 dearer, said by OFFER_PART_PRICE_CHANGE; the offer is unchanged (#1300)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const offers = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body;
+  const offer = offers.offers.find((o) => o.offerSummary.overallFlexibility === 'FULL_FLEXIBLE');
+  const offered = offer.admissionOfferParts.map((p) => p.price.amount);
+  const request = bookingRequest(offer);
+  request.passengerSpecifications[0].detail.lastName = 'Simvariant-Booking-Price-Change';
+  const answer = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body;
+  assert.deepEqual(answer.problems.map((p) => p.code), ['urn:uic:problem:OFFER_PART_PRICE_CHANGE']);
+  const booked = answer.booking.bookedOffers[0].admissions.map((p) => p.price.amount);
+  assert.deepEqual(booked, offered.map((amount) => amount + 100));
+  assert.equal(answer.booking.provisionalPrice.amount, booked.reduce((a, b) => a + b, 0));
+  // The read has the new prices and no problem; the confirmed price follows them.
+  const base = `/gamma/bookings/${answer.booking.id}`;
+  const read = (await call(sim.base, token, 'GET', base)).body;
+  assert.equal(read.problems, undefined);
+  assert.deepEqual(read.booking.bookedOffers[0].admissions.map((p) => p.price.amount), booked);
+  await call(sim.base, token, 'POST', `${base}/fulfillments`, {});
+  assert.equal((await call(sim.base, token, 'GET', base)).body.booking.confirmedPrice.amount, answer.booking.provisionalPrice.amount);
+  // Booked again without the variant, the same offer keeps its price.
+  const plain = bookingRequest(offer);
+  const again = (await call(sim.base, token, 'POST', '/gamma/bookings', plain)).body;
+  assert.equal(again.problems, undefined);
+  assert.deepEqual(again.booking.bookedOffers[0].admissions.map((p) => p.price.amount), offered);
+});
+
 test('refund: confirming one offer refunds that direction only; the other keeps its status', async () => {
   const { token, fulfillments, base } = await confirmedReturn();
   const [first, second] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;

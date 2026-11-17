@@ -1617,7 +1617,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   and is removed at its start. Tests use a stand-in API server
   (`run-dispatcher.test.js` `fakeApi()`): extend it, never mock the client.
   **A run pod may use 2 CPUs and keeps its folders in memory** (#1307,
-  1.11.541). Measured on the test machine once the server's thread was no
+  1.11.542). Measured on the test machine once the server's thread was no
   longer the limit: at `RUN_CPU_LIMIT` 1 every run pod was throttled in 32
   to 52 % of its periods (Bruno starts on several threads), which is what
   the host's "CPU pressure 50 %" was; and the run pods were the first
@@ -2428,6 +2428,29 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`bookingAsAnswered()`, also used by `bookingAsRead()`: the answers lose
   trips and coverage, the stored booking keeps them),
   `SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_*`, passenger list 41.
+- **A booked part is compared with its offer part member by member** (#1300,
+  OTST_V2.0.265, simulator 0.73.0; tracking #1297).
+  `library-bruno/bookedAsOffered.js` (pure) `pairFindings()`, called per
+  pair by `validateBookedOfferParts()` when `postCreateBookingResponse()`
+  passes its `contextOf()` (a 5th argument; without it nothing changes):
+  price (as a value at its scale; offer + named place fee passes), validity
+  instants, product by code through the offer's and the booked offer's
+  `products` (ids may differ: another id with no product to read is INFO),
+  flexibility, travel class, service class type, trip coverage (one side,
+  or other legs of the same trip id; not said when the booking names no
+  trip at all, `namesTrip`: #1299 says it once), passengers by
+  `externalRef`. WARNING lines only. **`OFFER_PART_PRICE_CHANGE`** (osdm.io *Processes*, "Price
+  changes when creating a booking") is read at 02 (`priceChangeSaid()`,
+  problems or deprecated warnings) and kept in `__bookingPriceChangeSaid`
+  (reset lists, `SUBRUN_SALE_STATE`): then the amount of "prices have at
+  least one member in common" is not required and a `provisionalPrice`
+  below `minimalPrice` is a WARNING; currency and scale still fail.
+  Simulator variant `booking-price-change` (+1.00 per admission, the price
+  object replaced: it is the offer's own), `bookingProblems()` in the
+  answer of `POST /bookings` (`urn:uic:problem:OFFER_PART_PRICE_CHANGE`, the
+  form of OSDM's examples; the bare form makes the collection's "not a
+  urn:uic:* catalogue code" WARNING fire), `SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_*`,
+  passenger list 42.
 - **A refund can come as one refund offer per fulfillment, and every offer is
   confirmed** (#595, 1.11.225 / OTST_V2.0.110). Step 10 keeps the ids
   (`__refundOfferIds`, `__refundOfferIndex`); step 14, after checking the

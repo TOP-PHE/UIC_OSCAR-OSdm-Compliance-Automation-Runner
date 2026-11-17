@@ -292,6 +292,8 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_38: ['booking-without-fulfillments'],
     // #1299: a booking that names no trip.
     SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_38: ['booking-without-trip'],
+    // #1300: a price changed at pre-booking, said.
+    SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_38: ['booking-price-change'],
     SIM_WRONG_OFFER_PRICE_38: [],
     SIM_WRONG_CARD_RATE_38: [],
     SIM_WRONG_BOOKING_PRICE_38: ['wrong-booking-price'],
