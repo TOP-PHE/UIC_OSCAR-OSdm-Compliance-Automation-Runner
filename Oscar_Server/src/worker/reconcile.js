@@ -43,10 +43,13 @@
  * that inject `run` never open a database.
  */
 
-const RUNNING_MSG =
-  'Interrupted by a server restart — the run process was terminated and cannot be resumed. Please resubmit.';
-const QUEUED_MSG =
-  'Cancelled by a server restart before this run started. Please resubmit.';
+// The two messages live in run-exit.js, with the other runs that are not a
+// test result: the coverage report leaves them out and the run page gives
+// them a banner of their own (#1291).
+const {
+  RESTART_INTERRUPTED: RUNNING_MSG,
+  RESTART_CANCELLED: QUEUED_MSG,
+} = require('../../public/js/run-exit');
 
 /**
  * @param {object}   [deps]

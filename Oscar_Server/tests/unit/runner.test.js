@@ -420,6 +420,16 @@ describe('executeRun — spawn happy paths', () => {
     expect(page.indexOf('<script src="/js/run-exit.js"></script>')).toBeLessThan(page.indexOf('OscarRunExit.NOT_FINISHED'));
   });
 
+  // #1291: auth_mode_used is written when a run is queued, so a run a restart
+  // cancelled before it started read as an OAuth2 failure.
+  test('the run page has a banner of its own for a run a server restart failed (not the OAuth2 one)', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../../public/run-detail.html'), 'utf8');
+    expect(page).toContain('const isRestarted     = OscarRunExit.isRestarted(run.error_message);');
+    expect(page).toMatch(/isOAuthError\s+= [^;]*!isRestarted/);
+    expect(page).toMatch(/showBanner\s+= [^;]*isRestarted/);
+    expect(page).toContain('banner.innerHTML = restartedBannerHtml(run.error_message);');
+  });
+
   test('the run page has a banner of its own for RUN_PROCESS_ERROR (not the OAuth2 one)', () => {
     const page = fs.readFileSync(path.join(__dirname, '../../public/run-detail.html'), 'utf8');
     expect(page).toContain("const isProcessError  = run.error_message === 'RUN_PROCESS_ERROR';");

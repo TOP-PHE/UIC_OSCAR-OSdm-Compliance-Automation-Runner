@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-server-restart-runs",
+    "date": "November 17, 2026",
+    "tag": "Bug Fix",
+    "title": "A run a server restart stopped is no longer counted as a result",
+    "summary": "When the OSCAR server restarts, the runs going or waiting are marked failed. They now say so on the run page, and the coverage report no longer takes them as the scenarios' result.",
+    "content": "Nothing resumes a run after the OSCAR server restarts, for an update or by an administrator. At start, the server marks every run that was going or waiting in the queue as failed.\n\nThe coverage report took those runs as each scenario's latest result. Having tested nothing, they read \"not run\" and hid the result before them. It now leaves them out: the scenario's finished run before stands, or none.\n\nThe run page showed such a run of a company using OAuth2 as an OAuth2 failure, with a link to update the credentials. It now shows the banner \"Stopped by a server restart — this is not a test result\".\n\nNo action is required. Run those scenarios again: on the Run page, Last run: failed selects them."
+  },
+  {
     "id": "2026-11-16-lost-ticket-card",
     "date": "November 16, 2026",
     "tag": "New",

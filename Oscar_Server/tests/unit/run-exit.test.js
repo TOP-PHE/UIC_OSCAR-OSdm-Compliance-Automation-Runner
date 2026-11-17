@@ -49,9 +49,25 @@ describe('run-exit.js', () => {
 
   test('the sentinels that are not a test result', () => {
     expect(RunExit.NOT_FINISHED).toBe('RUN_NOT_FINISHED');
-    expect([...RunExit.NOT_A_RESULT].sort()).toEqual(['NO_CHECKS', 'RUN_NOT_FINISHED', 'RUN_PROCESS_ERROR']);
+    expect([...RunExit.NOT_A_RESULT].sort()).toEqual([
+      RunExit.RESTART_CANCELLED, RunExit.RESTART_INTERRUPTED, 'NO_CHECKS', 'RUN_NOT_FINISHED', 'RUN_PROCESS_ERROR',
+    ].sort());
     expect(RunExit.isNotAResult('RUN_NOT_FINISHED')).toBe(true);
     for (const v of ['TOKEN_AUTH_ERROR', 'TOKEN_FORMAT_ERROR', null, undefined, '']) expect(RunExit.isNotAResult(v)).toBe(false);
+  });
+
+  // #1291: the server's start fails every run it finds unfinished. Rows of
+  // earlier releases hold these exact texts, so they are pinned here.
+  test('the two messages of a server restart are not a test result, and keep their text', () => {
+    expect(RunExit.RESTART_INTERRUPTED).toBe('Interrupted by a server restart — the run process was terminated and cannot be resumed. Please resubmit.');
+    expect(RunExit.RESTART_CANCELLED).toBe('Cancelled by a server restart before this run started. Please resubmit.');
+    for (const message of [RunExit.RESTART_INTERRUPTED, RunExit.RESTART_CANCELLED]) {
+      expect(RunExit.isRestarted(message)).toBe(true);
+      expect(RunExit.isNotAResult(message)).toBe(true);
+    }
+    for (const v of ['RUN_NOT_FINISHED', 'NO_CHECKS', 'TOKEN_AUTH_ERROR', 'Cancelled by a server restart', null, undefined, '']) {
+      expect(RunExit.isRestarted(v)).toBe(false);
+    }
   });
 
   // Bruno CLI is installed in its own folder (bruno-cli/) only where it runs:
@@ -81,5 +97,21 @@ describe('the run page banner for a run that did not go to its end', () => {
       expect(html).toContain('It ended with code unknown:');
       expect(html).not.toContain('<b>');
     }
+  });
+});
+
+describe('the run page banner for a run a server restart failed (#1291)', () => {
+  const banner = pageFunction('restartedBannerHtml', { escHtml: esc });
+
+  test('says it is not a test result and gives the stored message', () => {
+    const html = banner(RunExit.RESTART_CANCELLED);
+    expect(html).toContain('Stopped by a server restart — this is not a test result');
+    expect(html).toContain('Cancelled by a server restart before this run started. Please resubmit.');
+    expect(html).toContain('the coverage report does not count this run');
+    expect(html).not.toContain('OAuth2');
+  });
+
+  test('the message is escaped', () => {
+    expect(banner('<b>x</b>')).not.toContain('<b>');
   });
 });

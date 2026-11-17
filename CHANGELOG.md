@@ -521,6 +521,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.534] — 2026-11-17
+
+Release 2026.573 (`current_release`). A run a server restart failed is not a test result, and says so (#1291).
+
+### Fixed
+- **Runs failed by a server restart counted as results.**
+  - **Seen:** on the k3s test machine (2026.571), the server was restarted during a campaign on the six simulators: about 15 runs going, about a thousand queued.
+  - **Why:** at start, `worker/reconcile.js` marks every run still `RUNNING` or `QUEUED` as `FAILED`, with "Interrupted by a server restart …" or "Cancelled by a server restart before this run started …". That is right: nothing resumes them. But two readers took them as results:
+    - **the coverage report** took them as each scenario's latest result. With no step stored, they read "not run" and hid the finished run before them. The two messages were not in `NOT_A_RESULT` (#1287).
+    - **the run page** showed them as an OAuth2 failure, with a link to update the credentials. It does so for any `error_message` it does not know when `auth_mode_used` is `oauth2`, and that field is written when the run is queued.
+- **The two messages move to `public/js/run-exit.js`** (`RESTART_INTERRUPTED`, `RESTART_CANCELLED`, `isRestarted()`), and `reconcile.js` takes them from there. Both join `NOT_A_RESULT`, so the coverage report leaves them out: the scenario's finished run before stands as its result, or none. Published reports and the certifier's coverage go through the same route. The text is unchanged, so the rows of earlier releases are left out too.
+- **The run page** has its own banner, *Stopped by a server restart — this is not a test result*, with the stored message (`restartedBannerHtml()`, escaped).
+- Unchanged: the Run page's *last run* facets, as for #1287. Such a run still reads failed there, so it is easy to select again.
+- Version 1.11.534: 1.11.533 / 2026.572 is left to the change in preparation for NUTS codes (#1266).
+- **Documentation:** the Tester User Guide's troubleshooting table, the Specification's banners (§12), a news entry, `CLAUDE.md`.
+
+### Checked
+- `run-exit.test.js`: both messages are in `NOT_A_RESULT` and `isRestarted()`, their text is pinned (earlier rows hold it), and the banner says what it is and escapes the message.
+- `reconcile.test.js`: the reconciliation writes run-exit.js's two messages.
+- `coverage-routes.test.js`: a later run with either message leaves the run before it as the result.
+- `runner.test.js`: the page's wiring (the banner, and no OAuth2 banner for such a run).
+
+---
+
 ## [server-1.11.532] / [collection-OTST_V2.0.261] — 2026-11-16
 
 Issue #1266, part 2, second case. Release 2026.571 (`current_release`). Simulator 0.70.0. The replacement of a lost ticket or card (TICKET_LOST / CARD_LOST).
