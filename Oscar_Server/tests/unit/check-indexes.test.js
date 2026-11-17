@@ -10,6 +10,8 @@
 // #1295: the checks are indexed by company, no longer by company and text of
 // the check. The swap is made at start on a small database (migration 56), by
 // a command on a large one; until then the old index stays and still works.
+// #1305: the command reads what each of its two parts needs before it changes
+// the database, says each step before it starts, and keeps a log.
 
 const fs = require('node:fs');
 const os = require('node:os');
@@ -49,7 +51,8 @@ const AS_BEFORE = ['idx_run_assertions_key', 'idx_run_assertions_request', 'idx_
 // indexed by company and text. `highestCheck` puts one check at that id, which
 // is how many checks the database is taken to hold.
 function databaseAt55(name, { highestCheck = 0, activeRuns = 0 } = {}) {
-  const file = path.join(tempDir, `${name}.db`);
+  fs.mkdirSync(path.join(tempDir, name), { recursive: true });
+  const file = path.join(tempDir, name, `${name}.db`);
   boot(file).db.close();
   const db = new DatabaseSync(file, { enableForeignKeyConstraints: false });
   db.exec(`
@@ -174,30 +177,70 @@ describe('the swap', () => {
 });
 
 describe('the command, for a large database', () => {
+  const logOf = (file) => {
+    try { return fs.readFileSync(path.join(path.dirname(file), C.LOG_NAME), 'utf8'); } catch { return ''; }
+  };
+  // What the command said, without its times, process id and sizes.
+  const said = (lines) => lines.map((line) => line.replace('[check-indexes] ', '')
+    .replaceAll(/\d+\.\d s/g, 'N s').replaceAll(/process \d+/g, 'process P').replaceAll(/kill \d+/g, 'kill P')
+    .replaceAll(/\d+ MB/g, 'N MB'));
+  // A run that starts while the command is reading, seen from another connection.
+  const startRun = (file) => {
+    const other = new DatabaseSync(file, { enableForeignKeyConstraints: false });
+    other.prepare("INSERT INTO runs (id, company_id, user_id, status) VALUES (?, 'c', 'u', 'RUNNING')").run(randomUUID());
+    other.close();
+  };
+  const endRuns = (file) => {
+    const other = new DatabaseSync(file, { enableForeignKeyConstraints: false });
+    other.exec("UPDATE runs SET status = 'COMPLETED' WHERE status IN ('QUEUED', 'RUNNING')");
+    other.close();
+  };
+
   test('without --apply it says what there is and what it would do, and changes nothing', () => {
     const file = databaseAt55('told', { highestCheck: 1234567 });
     const { code, text } = command([], file);
     expect(code).toBe(0);
     expect(text).toContain('about 1,234,567 checks; index by check text present, index by company absent');
-    expect(text).toContain('--apply would remove the index by check text and make the index by company');
-    expect(text).toContain('choose a quiet time');
+    expect(text).toContain('--apply would remove the index by check text, then make the index by company.');
+    expect(text).toContain('Each part first reads what it needs, without any lock: the server works as usual.');
+    expect(text).toContain('whatever writes to it waits, then fails. Choose a quiet time, with no run going.');
     readOnly(file, (db) => expect(indexesOf(db)).toEqual(AS_BEFORE));
+    // Nothing is done: no log either.
+    expect(logOf(file)).toBe('');
   });
 
-  test('--apply swaps, says how long each part took, and a second run has nothing to do', () => {
+  test('--apply says each step before it starts, and how long the server could not write', () => {
     const file = databaseAt55('applied', { highestCheck: 1234567 });
     // The free space is read from the disk here, as the command does by itself.
     const first = command(['--apply'], file, { freeOf: undefined });
     expect(first.code).toBe(0);
-    expect(first.lines.filter((line) => / s$/.test(line)).map((line) => line.replace(/: [\d.]+ s$/, ''))).toEqual([
-      '[check-indexes] removing the index by check text', '[check-indexes] making the index by company',
+    expect(said(first.lines)).toEqual([
+      `${file}: about 1,234,567 checks; index by check text present, index by company absent`,
+      `This is process P. Closing this window, or Ctrl-C, does not stop it: it goes on in the container, and writes what it says to ${path.join(path.dirname(file), 'check-indexes.log')}. To stop it, from another window: kill P. A part that had not ended changes nothing.`,
+      'Part 1 of 2, removing the index by check text.',
+      'Reading that index first, without any lock: the server works as usual. This is the long part.',
+      'Read in N s. Now removing it: the server cannot write until the next line.',
+      'Removed: the server could not write for N s.',
+      'Part 2 of 2, making the index by company.',
+      'Reading the checks first, without any lock: the server works as usual. This is the long part.',
+      'Read in N s. Now making the index, which sorts and writes every check: the server cannot write until the next line.',
+      'Made: the server could not write for N s.',
+      'done. The database file keeps its size; N MB of it are free and will hold the next data stored.',
     ]);
-    expect(first.text).toMatch(/done\. The database file keeps its size; \d+ MB of it are free/);
     readOnly(file, (db) => expect(indexesOf(db)).toEqual(SWAPPED));
+
+    // The same lines are in the log beside the database, each with its time.
+    const logged = logOf(file).trimEnd().split('\n');
+    expect(logged).toHaveLength(first.lines.length);
+    for (const [at, line] of logged.entries()) {
+      expect(line).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /);
+      expect(line.slice(25)).toBe(first.lines[at].replace('[check-indexes] ', ''));
+    }
 
     const second = command(['--apply'], file);
     expect(second.code).toBe(0);
     expect(second.text).toContain('nothing to do');
+    expect(logOf(file).trimEnd().split('\n')).toHaveLength(first.lines.length);
 
     // And the server then starts without a word about it.
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -211,18 +254,126 @@ describe('the command, for a large database', () => {
     }
   });
 
+  test('each part reads before it changes: no lock while it reads, and what it read is still there', () => {
+    const file = databaseAt55('reads', { highestCheck: 10 });
+    const seen = [];
+    const { code } = command(['--apply'], file, {
+      afterReading: () => {
+        // Another connection writes at once: nothing holds the write lock.
+        const other = new DatabaseSync(file, { timeout: 0 });
+        other.exec('CREATE TABLE IF NOT EXISTS probe (x); INSERT INTO probe (x) VALUES (1)');
+        seen.push(indexesOf(other).filter((name) => name === C.KEY_INDEX || name === C.COMPANY_INDEX));
+        other.close();
+      },
+    });
+    expect(code).toBe(0);
+    // Read for part 1: the old index is still there. Read for part 2: it is gone, the new one not made yet.
+    expect(seen).toEqual([[C.KEY_INDEX], []]);
+    readOnly(file, (db) => {
+      expect(indexesOf(db)).toEqual(SWAPPED);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM probe').get().n).toBe(2);
+    });
+  });
+
+  test('what it reads: the whole old index, company by company, then every check, by their ids', () => {
+    const file = databaseAt55('progress');
+    const db = new DatabaseSync(file, { enableForeignKeyConstraints: false });
+    const companies = ['one', 'two', 'three'];
+    for (const id of companies) db.prepare('INSERT INTO companies (id, name, slug) VALUES (?, ?, ?)').run(id, `Company ${id}`, `slug-${id}`);
+    const insert = db.prepare(`INSERT INTO run_assertions (id, request_id, suite_id, run_id, company_id, assertion_key, assertion_name)
+                               VALUES (?, 1, 1, 'r', ?, ?, 'n')`);
+    db.exec('BEGIN');
+    for (let i = 1; i <= 60; i++) insert.run(i, companies[i % 3], `key ${i}`);
+    // The last id is far away: the ids in between are read too, and found empty.
+    insert.run(2 * C.CHECKS_PER_READ + 5, 'one', 'the last key');
+    db.exec('COMMIT');
+    const inAll = db.prepare('SELECT COUNT(*) AS n FROM companies').get().n;
+    const plans = (sql, ...params) => db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params).map((row) => row.detail).join(' | ');
+    expect(plans(`SELECT COUNT(*) AS n FROM run_assertions INDEXED BY ${C.KEY_INDEX} WHERE company_id = ?`, 'one'))
+      .toContain(`USING COVERING INDEX ${C.KEY_INDEX} (company_id=?)`);
+    expect(plans('SELECT COUNT(company_id) AS n FROM run_assertions NOT INDEXED WHERE id > ? AND id <= ?', 0, 10))
+      .toContain('USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)');
+    db.close();
+
+    // A clock that jumps 11 s at each look: every step of a reading is told.
+    let clock = 0;
+    const { code, lines } = command(['--apply'], file, { now: () => (clock += 11000) });
+    expect(code).toBe(0);
+    const progress = said(lines).filter((line) => line.startsWith('  read so far: '));
+    expect(progress.filter((line) => line.includes('companies')).at(-1)).toBe(`  read so far: ${inAll} of ${inAll} companies, 61 checks (N s)`);
+    expect(progress.filter((line) => !line.includes('companies'))).toEqual([
+      '  read so far: 100,000 of 200,005 checks (N s)',
+      '  read so far: 200,000 of 200,005 checks (N s)',
+      '  read so far: 200,005 of 200,005 checks (N s)',
+    ]);
+
+    // With the real clock a reading this short says nothing in between.
+    const quiet = databaseAt55('quiet', { highestCheck: 10 });
+    expect(command(['--apply'], quiet).text).not.toContain('read so far');
+    expect([C.CHECKS_PER_READ, C.PROGRESS_EVERY_MS]).toEqual([100000, 10000]);
+  });
+
+  test('a run started while it was reading stops it before the change; the next run of the command goes on', () => {
+    const file = databaseAt55('meanwhile', { highestCheck: 10 });
+    // During the reading of part 1: nothing is changed at all.
+    const first = command(['--apply'], file, { afterReading: () => startRun(file) });
+    expect(first.code).toBe(1);
+    expect(first.text).toContain('1 run(s) started meanwhile: stopping before the database is changed, so that they do not fail.');
+    expect(first.text).not.toContain('Now removing it');
+    readOnly(file, (db) => expect(indexesOf(db)).toEqual(AS_BEFORE));
+    endRuns(file);
+
+    // During the reading of part 2: the old index is gone, the new one is still to make.
+    const second = command(['--apply'], file, { afterReading: (part) => { if (part.title.startsWith('making')) startRun(file); } });
+    expect(second.code).toBe(1);
+    expect(second.text).toContain('Removed: the server could not write for');
+    expect(second.text).toContain('What was done so far stays. Run the command again when they have ended.');
+    expect(second.text).not.toContain('Now making the index');
+    readOnly(file, (db) => {
+      expect(C.stateOf(db)).toMatchObject({ keyIndex: false, companyIndex: false });
+      expect(C.pendingText(C.stateOf(db))).toContain('the checks have no index by company yet (about 10 checks): deleting a company reads every one of them.');
+      expect(C.pendingText(C.stateOf(db))).toContain('node src/db/checkIndexes.js --apply');
+    });
+    endRuns(file);
+
+    // What is left is said, and done.
+    expect(command([], file).text).toContain('--apply would make the index by company. Each part');
+    const third = command(['--apply'], file);
+    expect(third.code).toBe(0);
+    expect(said(third.lines).filter((line) => line.startsWith('Part '))).toEqual(['Part 1 of 1, making the index by company.']);
+    readOnly(file, (db) => expect(indexesOf(db)).toEqual(SWAPPED));
+
+    // With --force a run going stops nothing.
+    const forced = databaseAt55('meanwhile-forced', { highestCheck: 10 });
+    expect(command(['--apply', '--force'], forced, { afterReading: () => startRun(forced) }).code).toBe(0);
+    readOnly(forced, (db) => expect(indexesOf(db)).toEqual(SWAPPED));
+  });
+
+  test('a screen that is gone does not stop it: the log has what it said', () => {
+    const file = databaseAt55('no-screen', { highestCheck: 10 });
+    const { code } = command(['--apply'], file, { log: () => { throw new Error('write EPIPE'); } });
+    expect(code).toBe(0);
+    readOnly(file, (db) => expect(indexesOf(db)).toEqual(SWAPPED));
+    expect(logOf(file)).toContain('Made: the server could not write for');
+    expect(logOf(file).trimEnd().split('\n').at(-1)).toContain('done. The database file keeps its size');
+  });
+
   test('a database with both indexes still has the old one to remove', () => {
     const file = databaseAt55('both', { highestCheck: C.AT_START_MAX_CHECKS + 1 });
     const db = new DatabaseSync(file);
     db.exec('CREATE INDEX idx_run_assertions_company ON run_assertions(company_id)');
     expect(C.isSwapped(C.stateOf(db))).toBe(false);
+    expect(C.pendingText(C.stateOf(db))).toContain('the checks are still indexed by their text');
     expect(C.pendingText(C.stateOf(db))).toContain('node src/db/checkIndexes.js --apply');
     db.close();
 
     const told = command([], file);
     expect(told.text).toContain('index by check text present, index by company present');
-    expect(told.text).toContain('--apply would remove');
-    expect(command(['--apply'], file).code).toBe(0);
+    expect(told.text).toContain('--apply would remove the index by check text. Each part');
+    // Nothing is made, so no space is needed.
+    const applied = command(['--apply'], file, { freeOf: () => 1 });
+    expect(applied.code).toBe(0);
+    expect(said(applied.lines).filter((line) => line.startsWith('Part '))).toEqual(['Part 1 of 1, removing the index by check text.']);
     readOnly(file, (after) => {
       expect(indexesOf(after)).toEqual(SWAPPED);
       expect(C.pendingText(C.stateOf(after))).toBeNull();
@@ -235,6 +386,7 @@ describe('the command, for a large database', () => {
     expect(refused.code).toBe(1);
     expect(refused.text).toContain('3 run(s) are queued or running: nothing changed');
     readOnly(file, (db) => expect(indexesOf(db)).toEqual(AS_BEFORE));
+    expect(logOf(file)).toBe('');
 
     expect(command(['--apply', '--force'], file).code).toBe(0);
     readOnly(file, (db) => expect(indexesOf(db)).toEqual(SWAPPED));
@@ -271,13 +423,28 @@ describe('the command, for a large database', () => {
   });
 
   test('a file that is not OSCAR\'s database: said, not thrown', () => {
-    const file = path.join(tempDir, 'other.db');
+    fs.mkdirSync(path.join(tempDir, 'other'), { recursive: true });
+    const file = path.join(tempDir, 'other', 'other.db');
     const db = new DatabaseSync(file);
     db.exec('CREATE TABLE t (x)');
     db.close();
     const { code, text } = command(['--apply'], file);
     expect(code).toBe(1);
-    expect(text).toContain('failed, nothing changed');
+    expect(text).toContain('failed: no such table: run_assertions. A part that had not ended changed nothing');
+  });
+
+  test('a part that fails says so, and leaves what the part before did', () => {
+    const file = databaseAt55('fails', { highestCheck: 10 });
+    const blocker = new DatabaseSync(file);
+    // Something else has the new index's name: the second part cannot be done.
+    blocker.exec('CREATE TABLE idx_run_assertions_company (x)');
+    blocker.close();
+    const { code, text } = command(['--apply'], file);
+    expect(code).toBe(1);
+    expect(text).toContain('Removed: the server could not write for');
+    expect(text).toMatch(/failed: .*idx_run_assertions_company.*\. A part that had not ended changed nothing: run the command without --apply to see what there is\./);
+    readOnly(file, (db) => expect(C.stateOf(db)).toMatchObject({ keyIndex: false, companyIndex: false }));
+    expect(logOf(file)).toContain('failed: ');
   });
 
   test('run as a program, it ends with the command\'s code', () => {
@@ -290,6 +457,7 @@ describe('the command, for a large database', () => {
     expect(run(['--nope']).status).toBe(2);
     const applied = run(['--apply']);
     expect([applied.status, applied.stdout.includes('done.')]).toEqual([0, true]);
+    expect(applied.stdout).toMatch(/This is process \d+\./);
     readOnly(file, (db) => expect(indexesOf(db)).toEqual(SWAPPED));
   });
 });
