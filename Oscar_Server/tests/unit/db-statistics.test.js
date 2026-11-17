@@ -199,7 +199,8 @@ describe('the statistics, kept by the checkpoint thread (#1238)', () => {
   ])('%s: the thread checkpoints and never analyzes', async (name, settings) => {
     const m = boot(`off-${name.split(' ')[0]}`, settings);
     fillPicky(m);
-    m.startCheckpointThread({ intervalMs: 20, optimizeDelayMs: 10, optimizePauseMs: 1 });
+    // A checkpoint at every look, as before #1294: the count is what is watched.
+    m.startCheckpointThread({ intervalMs: 20, limitBytes: 0, maxWaitMs: 0, optimizeDelayMs: 10, optimizePauseMs: 1 });
     await until(() => m.checkpointState().count >= 10);
     expect(m.checkpointState()).toMatchObject({ optimize: 'off', statistics: null });
     expect(m.db.prepare("SELECT count(*) AS n FROM sqlite_schema WHERE name = 'sqlite_stat1'").get().n).toBe(0);
@@ -236,7 +237,7 @@ describe('the statistics, kept by the checkpoint thread (#1238)', () => {
 
   test('a failed run is logged and counted, and the thread goes on', async () => {
     const m = boot('failed');
-    const worker = m.startCheckpointThread({ intervalMs: 20 });
+    const worker = m.startCheckpointThread({ intervalMs: 20, limitBytes: 0, maxWaitMs: 0 });
     await until(() => m.checkpointState().running);
     const errors = [];
     const spy = jest.spyOn(console, 'error').mockImplementation((line) => { errors.push(String(line)); });

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.574",
+  "current_release": "2026.575",
   "releases": [
+    {
+      "release": "2026.575",
+      "date": "2026-11-17",
+      "server": "1.11.536",
+      "collection": "OTST_V2.0.262",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.536: the database's log is copied when it passes a size or an age, not every second (#1294, step 1 of the performance audit of 2026-11-17). With synchronous NORMAL, SQLite still syncs the write-ahead log to the disk at the first write after a complete checkpoint, and that write is the server's. The checkpoint thread of #1230 ran every second, so the server's thread waited for the disk about once a second during a batch: about 200 COMMITs over 0.1 s per 5 minutes on the k3s test machine (367 ms at the 99th percentile). The thread now looks every second but copies the log only when its file is larger than OSCAR_DB_CHECKPOINT_MB (16) or its last checkpoint older than OSCAR_DB_CHECKPOINT_SECONDS (30); the server's connection sets journal_size_limit to that size. New gauge oscar_db_wal_bytes."
+      ]
+    },
     {
       "release": "2026.574",
       "date": "2026-11-17",

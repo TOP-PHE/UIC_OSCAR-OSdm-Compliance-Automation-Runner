@@ -224,6 +224,8 @@ work is measured where it runs:
   - `oscar_db_checkpoint_thread`, a gauge: 1 while that thread checkpoints,
     0 when the server's connection does in its COMMITs
     (`OSCAR_DB_CHECKPOINTS=inline`, or the thread stopped);
+  - from 1.11.536 (#1294), `oscar_db_wal_bytes`, a gauge: the size of the
+    log file as that thread last saw it, each second, copied or not;
 - from 1.11.511 (#1234), every statement of the database helpers `all`,
   `get` and `run` (most of OSCAR's statements):
   - `oscar_db_statement_seconds`, a histogram: each one's time on the
@@ -359,13 +361,38 @@ Read millisecond by millisecond, those stretches held:
   `oscar_results_slice_seconds` shows their lengths.
 
 From server 1.11.510 a thread of its own checkpoints, with a connection of
-its own, every second. It runs a passive checkpoint, which never blocks a
+its own. It runs a passive checkpoint, which never blocks a
 reader or a writer, and the server's connection no longer checkpoints in its
 COMMITs (`PRAGMA wal_autocheckpoint = 0`). If that thread fails, ends or
 reports nothing for a minute, the server's connection checkpoints by itself
 again, so the log never grows without bound. `OSCAR_DB_CHECKPOINTS=inline`
 keeps the old way. The start-up line says which:
 `[db] SQLite ready → … (synchronous NORMAL, checkpoints thread)`.
+
+**When the thread checkpoints** (#1294, server 1.11.536). Until then it did
+every second. The performance audit of 2026-11-17 found the cost of that on
+the server's thread: the first write after a complete checkpoint starts the
+log again from its beginning, and SQLite then syncs the log to the disk, with
+`synchronous = NORMAL` too. That write is the server's. During a batch the
+log was emptied about once a second, so the server's thread waited for the
+disk about once a second: about 200 COMMITs over 0.1 s per 5 minutes on the
+k3s test machine, 367 ms at the 99th percentile. Reproduced with two
+connections: the COMMIT right after a checkpoint took 1.32 ms, the others
+0.026 ms, and a COMMIT with `synchronous = FULL` 1.22 ms.
+
+The thread still looks at the log every second, but copies it only:
+- when the log file is larger than `OSCAR_DB_CHECKPOINT_MB` (16 by default,
+  1 to 1024), and was written since the last checkpoint;
+- when its last checkpoint is older than `OSCAR_DB_CHECKPOINT_SECONDS` (30 by
+  default, 1 to 600);
+- at the next look, when the last checkpoint could not copy everything (a
+  reader still used some pages).
+
+The server's connection sets `journal_size_limit` to the same size: the log
+file is cut back when it starts again, so its size says how much it holds.
+A wrong value of either setting stops the start. To check on a batch: the
+COMMITs over 0.1 s in 5 minutes (panel *Database commits*) should fall from
+about 200 to a handful.
 
 **SQLite's memory** (#1237, server 1.11.517). SQLite's defaults were a page
 cache of 2 MB, no memory map, and temporary sorts and groupings in files.
