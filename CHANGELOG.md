@@ -594,11 +594,12 @@ Some real providers give a booking with no trip, though the offer booked covers 
 - Docs: *What is tested* (step 02), *OSCAR - OSDM Simulator scenarios* (one row), CLAUDE.md, a welcome-page news entry.
 
 ### Checked
-- **Replay**: being recorded; this line is replaced with its result before review.
+- **Replay** with the real Bruno CLI 4.2.1, recorded in chunks: before = `main` at 6b532427 on simulator 0.71.0, after = this PR with #1300 on top, on simulator 0.73.0 (recorded once for both). It covers the 220 scenarios of *Checks by scenario* and the three new ones.
+  - No existing scenario gains a "Trip of the booking" line: every simulator booking names its trip, the returns, exchanges, fares, cards and sales without a trip included.
+  - `SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_38` gives 245 checks (as `SIM_SALE_SEARCH_1ADT_38`), no failure, and one WARNING at 02, 05 and 07.
 - **Collection**: `bruno-booking-trip.test.js` covers the trips an offer covers, a trip read from its timed legs, the same trip under another id, a UIC code without its zeros and another offset of the same instant, each difference named, a booking naming no trip, a coverage alone, another trip, a coverage naming a trip the booking does not hold, the glue (WARNING lines only, a sale without a trip exempt), the wiring and the reset lists; and the simulator's own offer and booking with and without the variant.
 - **Simulator**: `app.test.js` books, reads, confirms and refunds with the variant; every answer is checked against the OSDM response schema of the provider's version.
 - **Mutation checks**: each of the 17 rules of this change (collection and simulator), removed one by one, fails a test.
-
 ---
 
 ## [server-1.11.538] / [collection-OTST_V2.0.263] — 2026-11-17
