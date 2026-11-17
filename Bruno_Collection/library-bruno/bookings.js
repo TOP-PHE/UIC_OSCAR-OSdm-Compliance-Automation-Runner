@@ -867,6 +867,8 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // where they are valid.
   const _stage = (expectedBookedOffersStatus || []).includes("PREBOOKED") ? "Pre-booked" : "Confirmed";
   require("./nonTrip.js").recordNonTripBookingChecks(booking, _stage, test);
+  // #1299: the booking names the trip sold (WARNINGs only; a sale without a trip is exempt).
+  require("./bookingTrip.js").checkBookingTrip(booking);
   if (booking.bookingCode !== undefined && booking.bookingCode !== null) {
     test(`booking.bookingCode is a non-empty string when present`, () => {
       validationLogger(`[DEBUG] booking.bookingCode: ${booking.bookingCode}`);

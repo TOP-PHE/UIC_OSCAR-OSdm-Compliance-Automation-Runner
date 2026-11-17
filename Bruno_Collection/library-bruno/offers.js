@@ -712,6 +712,8 @@ function selectAndSetOffer(jsonData) {
   // Store selected offer and related info in environment
   bru.setEnvVar("offer", selectedOffer);
   bru.setEnvVar("offerId", selectedOffer.offerId);
+  // #1299: what the trips the chosen offer covers are, for the booking's.
+  require("./bookingTrip.js").keepOfferTrips(selectedOffer, jsonData.trips);
   bru.setEnvVar("offers", jsonData.offers);
 
   // #379: the selected offer's coverage must reference this response's

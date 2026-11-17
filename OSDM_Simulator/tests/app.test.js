@@ -471,6 +471,34 @@ test('variant booking-without-fulfillments: the booking read lists none, the con
   assert.ok(after.bookedOffers[0].admissions.every((part) => part.status === 'REFUNDED'));
 });
 
+test('variant booking-without-trip: the booking answers and reads name no trip; the confirmation and the refund still work (#1299)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const offers = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body;
+  const offer = offers.offers.find((o) => o.offerSummary.overallFlexibility === 'FULL_FLEXIBLE');
+  assert.ok(offer.tripCoverage.coveredTripId);
+  const request = bookingRequest(offer);
+  request.passengerSpecifications[0].detail.lastName = 'Simvariant-Booking-Without-Trip';
+  const noTrip = (booking) => {
+    assert.equal(booking.trips, undefined);
+    for (const bookedOffer of booking.bookedOffers) {
+      assert.equal(bookedOffer.tripCoverage, undefined);
+      for (const part of [...bookedOffer.admissions, ...(bookedOffer.reservations || [])]) assert.equal(part.tripCoverage, undefined);
+    }
+    for (const fulfillment of booking.fulfillments || []) assert.equal(fulfillment.tripCoverage, undefined);
+  };
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+  noTrip(booking);
+  const base = `/gamma/bookings/${booking.id}`;
+  noTrip((await call(sim.base, token, 'GET', base)).body.booking);
+  const fulfillments = (await call(sim.base, token, 'POST', `${base}/fulfillments`, {})).body.fulfillments;
+  assert.ok(fulfillments.length > 0);
+  const read = (await call(sim.base, token, 'GET', base)).body.booking;
+  noTrip(read);
+  assert.deepEqual(read.fulfillments.map((f) => f.id), fulfillments.map((f) => f.id));
+  const [refundOffer] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;
+  assert.equal((await call(sim.base, token, 'PATCH', `${base}/refund-offers/${refundOffer.id}`, { status: 'CONFIRMED' })).body.refundOffer.status, 'CONFIRMED');
+});
+
 test('refund: confirming one offer refunds that direction only; the other keeps its status', async () => {
   const { token, fulfillments, base } = await confirmedReturn();
   const [first, second] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;
