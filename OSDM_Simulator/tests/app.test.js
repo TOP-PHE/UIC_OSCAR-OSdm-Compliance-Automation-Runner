@@ -507,7 +507,7 @@ test('variant booking-price-change: each admission 1.00 dearer, said by OFFER_PA
   const request = bookingRequest(offer);
   request.passengerSpecifications[0].detail.lastName = 'Simvariant-Booking-Price-Change';
   const answer = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body;
-  assert.deepEqual(answer.problems.map((p) => p.code), ['OFFER_PART_PRICE_CHANGE']);
+  assert.deepEqual(answer.problems.map((p) => p.code), ['urn:uic:problem:OFFER_PART_PRICE_CHANGE']);
   const booked = answer.booking.bookedOffers[0].admissions.map((p) => p.price.amount);
   assert.deepEqual(booked, offered.map((amount) => amount + 100));
   assert.equal(answer.booking.provisionalPrice.amount, booked.reduce((a, b) => a + b, 0));

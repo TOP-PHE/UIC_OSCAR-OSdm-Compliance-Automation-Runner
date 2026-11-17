@@ -132,6 +132,9 @@ describe('the rules', () => {
 
   test('the trip coverage: one side only, or other legs of the same trip; another trip id is #1299\'s', () => {
     expect(A.pairFindings(OFFER_PART, BOOKED({ tripCoverage: undefined }), CTX()).warn).toEqual(['a trip coverage is in the offer but not in the booking']);
+    // A booking that names no trip at all is said once, by #1299's check.
+    expect(A.pairFindings(OFFER_PART, BOOKED({ tripCoverage: undefined }), CTX({ namesTrip: false })).warn).toEqual([]);
+    expect(A.pairFindings({ ...OFFER_PART, tripCoverage: undefined }, BOOKED(), CTX({ namesTrip: false })).warn).toEqual(['a trip coverage is in the booking but not in the offer']);
     expect(A.pairFindings(OFFER_PART, BOOKED({ tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L2'] } }), CTX()).warn).toEqual(['it covers legs L2 of trip T1, the offer part L1']);
     // The same legs in another order are the same; a leg given twice instead of another is not.
     const two = { ...OFFER_PART, tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L2', 'L1'] } };
@@ -150,7 +153,10 @@ describe('the rules', () => {
 
   test('the context of a booking', () => {
     const ctx = A.contextOf({ products: [{ id: 'P1' }] }, { passengers: [{ id: 'X', externalRef: '00001' }, { id: 'Y' }], bookedOffers: [{ products: [{ id: 'B1' }] }, {}] }, { priceChangeSaid: true });
-    expect(ctx).toEqual({ offerProducts: [{ id: 'P1' }], bookedProducts: [{ id: 'B1' }], passengerRefs: { X: '00001' }, priceChangeSaid: true });
+    expect(ctx).toEqual({ offerProducts: [{ id: 'P1' }], bookedProducts: [{ id: 'B1' }], passengerRefs: { X: '00001' }, namesTrip: false, priceChangeSaid: true });
+    expect(A.contextOf({}, { trips: [{ id: 'T' }] }).namesTrip).toBe(true);
+    expect(A.contextOf({}, { bookedOffers: [{ admissions: [{ tripCoverage: { coveredTripId: 'T' } }] }] }).namesTrip).toBe(true);
+    expect(A.contextOf({}, { bookedOffers: [{ inboundTripCoverage: { coveredTripId: 'R' } }] }).namesTrip).toBe(true);
   });
 });
 
@@ -234,7 +240,7 @@ describe('on the simulator\'s own answers', () => {
 
   test('variant booking-price-change: one WARNING for the admission, the change said, no price check failed', () => {
     const s = sale('Simvariant-Booking-Price-Change');
-    expect(s.answer.problems).toEqual([{ code: 'OFFER_PART_PRICE_CHANGE', title: 'Price change', detail: 'The price of 1 booked offer part(s) changed at pre-booking.' }]);
+    expect(s.answer.problems).toEqual([{ code: 'urn:uic:problem:OFFER_PART_PRICE_CHANGE', title: 'Price change', detail: 'The price of 1 booked offer part(s) changed at pre-booking.' }]);
     const offered = s.offer.admissionOfferParts[0].price.amount;
     expect(s.answer.booking.bookedOffers[0].admissions[0].price.amount).toBe(offered + 100);
     expect(s.answer.booking.provisionalPrice.amount).toBe(offered + 100);

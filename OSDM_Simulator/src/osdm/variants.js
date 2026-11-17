@@ -208,7 +208,8 @@ function bookingProblems(booking) {
   if (!has(booking, 'booking-price-change')) return {};
   const changed = booking.bookedOffers.reduce((n, bookedOffer) => n + bookedOffer.admissions.length, 0);
   return { problems: [{
-    code: 'OFFER_PART_PRICE_CHANGE',
+    // The URN form of OSDM's examples (osdm.io, Errors & Problems).
+    code: 'urn:uic:problem:OFFER_PART_PRICE_CHANGE',
     title: 'Price change',
     detail: `The price of ${changed} booked offer part(s) changed at pre-booking.`,
   }] };

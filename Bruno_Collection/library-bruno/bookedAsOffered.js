@@ -136,10 +136,13 @@ function sameMembers(a, b) {
   });
 }
 
-function coverageFindings(offerPart, bookedPart) {
+// A booking that names no trip at all is said once, by bookingTrip.js (#1299):
+// its parts' missing coverage is not said again here.
+function coverageFindings(offerPart, bookedPart, ctx) {
   const o = offerPart?.tripCoverage;
   const b = bookedPart?.tripCoverage;
   if (!o && !b) return [];
+  if (o && !b && ctx.namesTrip === false) return [];
   if (!o || !b) return [`a trip coverage is in the ${o ? 'offer' : 'booking'} but not in the ${o ? 'booking' : 'offer'}`];
   if (o.coveredTripId !== b.coveredTripId) return [];
   const ol = list(o.coveredLegIds).map(String);
@@ -165,7 +168,8 @@ function passengerFindings(offerPart, bookedPart, ctx) {
  * @param {object} offerPart, bookedPart  the pair (pairOfferParts())
  * @param {object} ctx  { offerProducts, bookedProducts, passengerRefs (booked
  *                      passenger id → externalRef), fees (offer part id →
- *                      named place fee, #766), priceChangeSaid }
+ *                      named place fee, #766), priceChangeSaid,
+ *                      namesTrip (the booking names a trip somewhere) }
  */
 function pairFindings(offerPart, bookedPart, ctx = {}) {
   const product = productFindings(offerPart, bookedPart, ctx);
@@ -173,7 +177,7 @@ function pairFindings(offerPart, bookedPart, ctx = {}) {
     priceFinding(offerPart, bookedPart, ctx),
     ...validityFindings(offerPart, bookedPart),
     ...product.warn,
-    ...coverageFindings(offerPart, bookedPart),
+    ...coverageFindings(offerPart, bookedPart, ctx),
     ...passengerFindings(offerPart, bookedPart, ctx),
   ].filter(Boolean);
   return { warn, info: product.info };
@@ -185,10 +189,15 @@ function contextOf(selectedOffer, booking, extra = {}) {
   list(booking?.passengers).forEach((p) => {
     if (typeof p?.id === 'string' && p.externalRef != null && p.externalRef !== '') passengerRefs[p.id] = String(p.externalRef);
   });
+  const covers = (holder) => holder?.tripCoverage != null || holder?.inboundTripCoverage != null;
+  const bookedOffers = list(booking?.bookedOffers);
   return {
     offerProducts: list(selectedOffer?.products),
-    bookedProducts: list(booking?.bookedOffers).flatMap((bo) => list(bo?.products)),
+    bookedProducts: bookedOffers.flatMap((bo) => list(bo?.products)),
     passengerRefs,
+    // #1299: whether the booking names a trip anywhere.
+    namesTrip: list(booking?.trips).length > 0 || bookedOffers.some((bo) => covers(bo)
+      || ['admissions', 'reservations', 'ancillaries'].some((key) => list(bo?.[key]).some(covers))),
     ...extra,
   };
 }
