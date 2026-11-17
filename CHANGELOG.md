@@ -521,6 +521,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.538] / [collection-OTST_V2.0.263] — 2026-11-17
+
+Issue #1298, part of #1297. Release 2026.577. Every booking read after 07 is held to the fulfilments seen before. Server 1.11.538 for the news entry only; simulator unchanged (0.71.0).
+
+Some real providers answer `POST /bookings/{id}/fulfillments` with the fulfilments, then leave them out of the booking they give afterwards. Since 1.11.447 (#1045) step 07 said so; the refund's 12, 14, 16 and the exchange's 13, 15, 17 said nothing (12 and 16 wrote a `[DEBUG]` line, the exchange steps nothing). OSDM does not require `Booking.fulfillments` (`Booking` requires `id`, `createdOn`, `passengers`), but `GET /bookings/{bookingId}` embeds everything by default (`embed`, "Default value: ALL", value `BOOKING_FULFILLMENTS`), and these six steps ask `embed=ALL`. So it is a WARNING, never a failed check.
+
+Version 1.11.538 / release 2026.577: 1.11.536–1.11.537 and 2026.575–2026.576 are taken by #1294 / #1295, not merged when this was written.
+
+### Added
+- **The fulfilments seen before, at every booking read after 07** (`checkBookingStillLists()`, `confirmedFulfillments.js`): those the confirmation gave (06), those 07 listed, and those the exchange's confirmation gave (exchange 14, `rememberFulfillments()`), in `__fulfillmentIdsSeen` (a new confirmation starts it again; in both reset lists and `SUBRUN_SALE_STATE`). A booking listing none of them, or no longer listing some, gives one `[WARNING]` naming the step and the ids. No test is added: no number of checks moves.
+- **Simulator scenario** `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_38` and its version copies (in the run list): the existing `booking-without-fulfillments` variant on an exchange. No failed check; a WARNING at 07, 13 and 15.
+
+### Changed
+- **Refund 14**: the refund scope check's line about a booking that lists no fulfilment is `[INFO]` (what it checks instead): the WARNING is the step's own, so one defect gives one WARNING. A refunded fulfilment the booking no longer lists, while it lists others, keeps the parts the confirmation gave it: before, those parts failed "is not REFUNDED (left out of the refund)", which named the wrong cause.
+- The descriptions of `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_*` and `_FARE_REFUND_1ADT_*` (and their scenarios document rows) say "a WARNING at 07 and one at 12 and 14".
+- Every simulator reference changes (its run list): a company following one reads "not up to date" until it updates.
+- Docs: *What is tested* (refund 12/14, exchange 13), *OSCAR - OSDM Simulator scenarios* (one row, two rows reworded), CLAUDE.md, a welcome-page news entry.
+
+### Checked
+- **Replay**: being recorded; this line is replaced with its result before review.
+- **Collection**: `bruno-confirmed-fulfillments.test.js` covers the rule (nothing seen, all listed, none, some left out), what is held (06, then 07 and exchange 14 added, a new confirmation starting again), the log lines (WARNING only, never a test), the wiring of the six steps (after the answer is an object, under its own name, each asking `embed=ALL`) and exchange 14, the reset lists, and step 14 with a refunded fulfilment the booking dropped.
+- **Mutation checks**: each of the 11 rules of this change, removed one by one, fails a test.
+- **Suites**: the collection, data file, reference, catalogue and checklist tests (2,141): all pass but `bruno-answer-threats.test.js`, the known Windows-only timing failure. Simulator `datafile.test.js` passes.
+
+---
+
 ## [server-1.11.535] / [collection-OTST_V2.0.262] — 2026-11-17
 
 Issue #1266, part 2, third case. Release 2026.574 (`current_release`). Simulator 0.71.0. Offers without a trip in regions named by NUTS codes.
