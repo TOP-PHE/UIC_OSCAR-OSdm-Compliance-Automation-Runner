@@ -542,7 +542,7 @@ The parts of a booking were paired with the offer's by content (#550), but some 
 - **`OFFER_PART_PRICE_CHANGE`** is read in the answer of 02 (`priceChangeSaid()`: `problems`, or the deprecated `warnings`; a code or a URN ending in it) and kept for the later reads (`__bookingPriceChangeSaid`, both reset lists and `SUBRUN_SALE_STATE`).
 - **Simulator scenario** `SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_38` and its version copies (in the run list), passenger list 42: no failed check, a WARNING at 02, 05 and 07.
 
-### Changed (for the maintainer to accept or drop)
+### Changed (accepted by the maintainer, 2026-11-17)
 - **When the booking answer says `OFFER_PART_PRICE_CHANGE`**, "<part> prices have at least one member in common between offer and booking" no longer requires an amount in common (the currency and the scale still do), and a `provisionalPrice` below the offer's `minimalPrice` is a WARNING instead of a failure. OSDM allows a price changed at pre-booking when it is said. Without the warning, both fail as before. No simulator scenario but the new one has a changed price, so no count moves.
 
 ### Simulator 0.73.0
