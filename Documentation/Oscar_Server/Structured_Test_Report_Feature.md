@@ -309,6 +309,11 @@ GET /v1/reports/trends?assertion_key=...&limit=20
 
 Returns last N pass/fail results for a specific assertion across runs.
 
+Since server 1.11.537 (#1295) it reads the company's latest 500 finished runs,
+newest first, and stops once it has the N results. The answer adds
+`runs_read` (the runs looked at) and `more_runs` (the company has older
+finished runs that were not).
+
 ### 6.3 Trend Summary
 
 ```
@@ -316,6 +321,12 @@ GET /v1/reports/trends/summary
 ```
 
 Returns top-20 most-failing assertions with fail rate, filtered by company.
+
+Since server 1.11.537 (#1295) it counts the finished runs queued in the last
+30 days, the latest 500 of them at most. The answer adds `runs_read` and
+`more_runs` (the period holds more finished runs than those counted). Until
+then it read every check the company had ever stored, on the server's
+thread: 11 to 21 s for a company of 5,300 runs.
 
 ### 6.4 Report Configuration (Certifiers)
 

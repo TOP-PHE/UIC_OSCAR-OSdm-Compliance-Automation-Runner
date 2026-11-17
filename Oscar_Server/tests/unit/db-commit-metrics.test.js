@@ -97,7 +97,10 @@ describe('every COMMIT of the server goes through transaction()', () => {
       }
     };
     walk(src);
-    expect(commitsBy).toEqual(['db/db.js']);
+    // checkIndexes.js (#1295) commits the swap of the checks' index: at start,
+    // inside a migration like db.js's own, or on the connection of a command
+    // run by hand. Never while the server serves.
+    expect(commitsBy.sort((a, b) => a.localeCompare(b))).toEqual(['db/checkIndexes.js', 'db/db.js']);
   });
 
   test('transaction() commits through timedCommit()', () => {

@@ -17,6 +17,7 @@ const path   = require('node:path');
 const fs     = require('node:fs');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const checkIndexes = require('./checkIndexes');
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 // OSCAR_DB_PATH env var overrides the default DB location — used by test
@@ -1267,6 +1268,19 @@ const MIGRATIONS = [
       db.exec('DROP INDEX IF EXISTS idx_run_assertions_category');
       db.exec('DROP INDEX IF EXISTS idx_run_assertions_domain');
   }},
+  { version: 56, name: 'checks-indexed-by-company-not-by-text', up: () => {
+      // #1295. The checks' index (company_id, assertion_key) is sorted by the
+      // text of the check: each check of a run landed on a page of its own, 860
+      // pages of log a run on a database of 7.7 million checks, 94 without it.
+      // The trends read by run now (checkTrends.js); the cascade from a deleted
+      // company takes (company_id) alone, which migration 55 had removed as a
+      // prefix of the other. The swap reads the old index and every check, so
+      // it is made here only on a database small enough (checkIndexes.js): a
+      // larger one keeps the old index, and an operator runs the command. Not
+      // in schema.sql, which runs at every start and would make the new index,
+      // or the old one again, on a database of any size.
+      checkIndexes.swapAtStart(db);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
@@ -1338,6 +1352,11 @@ function _safeAlter(sql) {
     }
   }
 })();
+
+// A large database whose checks are still indexed by their text: said at
+// each start, until an operator has run the command (#1295).
+const CHECK_INDEXES_PENDING = checkIndexes.pendingText(checkIndexes.stateOf(db));
+if (CHECK_INDEXES_PENDING) console.warn(CHECK_INDEXES_PENDING);
 
 const STARTED_WITH = memorySettings();
 console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]}, checkpoints ${CHECKPOINTS}, statistics ${CHECKPOINTS === 'thread' ? OPTIMIZE : 'off'}, cache ${megabytes(STARTED_WITH.cacheBytes)}, memory map ${megabytes(STARTED_WITH.mmapBytes)}, temporary storage ${TEMP_STORE_NAMES[STARTED_WITH.tempStore]})`);
