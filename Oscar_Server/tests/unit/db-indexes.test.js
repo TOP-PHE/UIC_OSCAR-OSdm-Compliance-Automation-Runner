@@ -10,6 +10,8 @@
 // #1239: the indexes of runs and run_assertions. A partial index holds the
 // runs queued or running, which the Dashboard's queue panel reads every 3 s.
 // Four indexes no query needed went: each stored check updated 7 indexes.
+// #1295: the checks' index by company and text of the check went too; an
+// index by company alone finds a deleted company's checks.
 
 const fs = require('node:fs');
 const os = require('node:os');
@@ -36,10 +38,11 @@ describe('the indexes after migration 55 (#1239)', () => {
     ]);
   });
 
-  test('run_assertions: four indexes, each one read by a query or a cascade', () => {
+  test('run_assertions: four indexes, each one read by a query or a cascade; none by the text of the check (#1295)', () => {
     expect(indexesOf('run_assertions')).toEqual([
-      'idx_run_assertions_key', 'idx_run_assertions_request', 'idx_run_assertions_run_passed', 'idx_run_assertions_suite',
+      'idx_run_assertions_company', 'idx_run_assertions_request', 'idx_run_assertions_run_passed', 'idx_run_assertions_suite',
     ]);
+    expect(all('PRAGMA index_info(idx_run_assertions_company)').map((column) => column.name)).toEqual(['company_id']);
   });
 
   test('every foreign key of both tables has an index that starts with it (a cascade finds its rows)', () => {
@@ -70,7 +73,7 @@ describe('the queries those indexes serve (#1239)', () => {
     ['a company\'s runs', 'SELECT COUNT(*) FROM runs WHERE company_id = ?', 'runs'],
     ['a company\'s runs deleted', 'DELETE FROM runs WHERE company_id = ?', 'runs'],
     ['a company\'s checks deleted', 'DELETE FROM run_assertions WHERE company_id = ?', 'run_assertions'],
-    ['the trends of a check', 'SELECT run_id FROM run_assertions WHERE company_id = ? AND assertion_key = ?', 'run_assertions'],
+    ['a company\'s checks deleted through its runs', 'DELETE FROM run_assertions WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)', 'run_assertions'],
   ])('%s: an index, never the whole table', (_name, sql, table) => {
     const params = (sql.match(/\?/g) || []).map(() => 'x');
     const plan = planOf(sql, params);
@@ -78,12 +81,20 @@ describe('the queries those indexes serve (#1239)', () => {
     expect(plan).not.toMatch(new RegExp(`SCAN ${table}( |$)`));
   });
 
-  test('the trends of a company group its checks by key from the key\'s index', () => {
-    const plan = planOf(`
-      SELECT ra.assertion_key, COUNT(*) FROM run_assertions ra JOIN runs r ON r.id = ra.run_id
-      WHERE ra.company_id = ? AND r.status IN ('COMPLETED', 'FAILED')
-      GROUP BY ra.assertion_key`, ['c']);
-    expect(plan).toContain('USING INDEX idx_run_assertions_key (company_id=?)');
+  test('no statement of the server names the index by the text of the check (#1295)', () => {
+    // The trends read by run: check-trends.test.js holds their plans.
+    const sources = (folder) => fs.readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(folder, entry.name);
+      if (entry.isDirectory()) return sources(full);
+      return /\.(js|sql)$/.test(entry.name) ? [full] : [];
+    });
+    const src = path.resolve(__dirname, '../../src');
+    const naming = sources(src).filter((file) => fs.readFileSync(file, 'utf8').includes('idx_run_assertions_key'))
+      .map((file) => path.relative(src, file).replaceAll(path.sep, '/'));
+    // The module that removes it, and the comments of the migrations.
+    expect(naming.sort((a, b) => a.localeCompare(b))).toEqual(['db/checkIndexes.js', 'db/db.js']);
+    const schema = fs.readFileSync(path.join(src, 'db/schema.sql'), 'utf8');
+    expect(schema).not.toMatch(/CREATE INDEX[^;]*ON run_assertions\(company_id/);
   });
 });
 
@@ -109,6 +120,8 @@ describe('migration 55 on a database that had the old indexes (#1239)', () => {
     old.exec(`
       DROP INDEX idx_runs_active;
       CREATE INDEX idx_runs_company_id ON runs(company_id);
+      DROP INDEX idx_run_assertions_company;
+      CREATE INDEX idx_run_assertions_key      ON run_assertions(company_id, assertion_key);
       CREATE INDEX idx_run_assertions_company  ON run_assertions(company_id);
       CREATE INDEX idx_run_assertions_category ON run_assertions(company_id, category);
       CREATE INDEX idx_run_assertions_domain   ON run_assertions(company_id, domain);
@@ -119,8 +132,10 @@ describe('migration 55 on a database that had the old indexes (#1239)', () => {
       const q = (sql) => again.db.prepare(sql).all();
       expect(indexesOf('runs', q)).toContain('idx_runs_active');
       expect(indexesOf('runs', q)).not.toContain('idx_runs_company_id');
+      // (company_id) is there again, made by migration 56 once the index by
+      // the text of the check, which stood for it, is gone (#1295).
       expect(indexesOf('run_assertions', q)).toEqual([
-        'idx_run_assertions_key', 'idx_run_assertions_request', 'idx_run_assertions_run_passed', 'idx_run_assertions_suite',
+        'idx_run_assertions_company', 'idx_run_assertions_request', 'idx_run_assertions_run_passed', 'idx_run_assertions_suite',
       ]);
       expect(q('SELECT MAX(version) AS v FROM schema_version')[0].v).toBeGreaterThanOrEqual(55);
     } finally {
