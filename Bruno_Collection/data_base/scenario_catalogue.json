@@ -1387,6 +1387,28 @@
         "trip": "NON_TRIP",
         "passengers": 1
       }
+    },
+    {
+      "code": "OTST_NONTRIP_NUTS_1ADT",
+      "source": "SIM_NONTRIP_NUTS_1ADT_38",
+      "checks": 243,
+      "purpose": "Sale without a trip for one adult in a region named by NUTS codes (#1266): the NUTS codes of the first zone of GET /zones that lists some (ZoneDefinition.nutsCodes), asked by nonTripSearchCriteria.nutsCodes; the fully flexible offer is booked. No trip and no trip coverage in the answer; each admission should be valid in a Zone naming a code asked (Zone.nutsCode, a WARNING otherwise). Booked, passenger details updated, fulfilled.",
+      "capability": "offers.nonTripNuts",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_NONTRIP_NUTS_UNKNOWN_1ADT",
+      "source": "SIM_NHF_NONTRIP_NUTS_UNKNOWN_1ADT_38",
+      "checks": 79,
+      "purpose": "Negative test (#1266): offers without a trip for a NUTS code the provider does not know (nonTrip.nutsCodes, nutsCodeExpectRejection). POST /offers must refuse it with a 4xx Problem or give no offer; offers given fail. The scenario ends there.",
+      "capability": "offers.nonTripNuts",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1
+      }
     }
   ]
 }

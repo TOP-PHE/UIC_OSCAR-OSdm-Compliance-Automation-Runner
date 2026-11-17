@@ -395,7 +395,10 @@ function withNonTripForms(framework, profile) {
   if (!profile?.nonTrip) return;
   if (Array.isArray(framework.offerRequestForms)) {
     const { NON_TRIP_REQUEST_FORMS } = require('./frameworkGating');
+    // #1266: NUTS codes only where a zone of the profile names some.
+    const nuts = (Array.isArray(profile.nonTrip.zones) ? profile.nonTrip.zones : []).some((z) => Array.isArray(z?.nutsCodes) && z.nutsCodes.length > 0);
     for (const form of NON_TRIP_REQUEST_FORMS) {
+      if (form === 'NON_TRIP_NUTS' && !nuts) continue;
       if (!framework.offerRequestForms.includes(form)) framework.offerRequestForms.push(form);
     }
   }
@@ -484,5 +487,5 @@ function configurationOf(reference, datafile, { version, at } = {}) {
 module.exports = {
   REFERENCE_KEY, REFERENCE_FORMAT, PROVIDERS, DATAFILE_NAME, IROPS_MANDATORY, ANCILLARY_TYPES,
   referenceName, defaultFramework, frameworkFromChecklist, questionsOf, testResourcesFromDatafile, namedTrains, simulatorTrainNumber, providerPartOf, runListFor,
-  buildReference, versionOf, configurationOf,
+  buildReference, versionOf, configurationOf, withNonTripForms,
 };

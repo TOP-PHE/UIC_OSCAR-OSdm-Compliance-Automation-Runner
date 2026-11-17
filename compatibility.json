@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.573",
+  "current_release": "2026.574",
   "releases": [
+    {
+      "release": "2026.574",
+      "date": "2026-11-17",
+      "server": "1.11.535",
+      "collection": "OTST_V2.0.262",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.535, collection OTST_V2.0.262, simulator 0.71.0: offers without a trip in regions named by NUTS codes (#1266, part 2). A NON_TRIP trip by NUTS sends nonTripSearchCriteria.nutsCodes: those it names, else those of the first zone of GET /zones that lists some. Each admission should be valid in a Zone naming a code asked (Zone.nutsCode); one that does not is a WARNING, since OSDM calls the region a hint. nutsCodeExpectRejection expects an unknown code refused (4xx Problem) or given no offer.",
+        "The simulator names made-up NUTS codes on its zones (SIM-CITY XS111, SIM-NORTH XS112), serves a request by NUTS code through the zone naming it, and refuses an unknown code (400, pointing at it). New simulator scenarios SIM_NONTRIP_NUTS_1ADT_* and SIM_NHF_NONTRIP_NUTS_UNKNOWN_1ADT_* (in the run list); catalogue entries OTST_NONTRIP_NUTS_1ADT and NHF_NONTRIP_NUTS_UNKNOWN_1ADT; offer request form NON_TRIP_NUTS and capability \"Offers without a trip, in regions named by NUTS codes\"; Test Config: Valid where → In regions named by NUTS codes, NUTS codes, Unknown NUTS code refused.",
+        "Every simulator reference changes (the form declared, the run list): a company following one updates it from Test Config. Otherwise no action is required.",
+        "Server 1.11.535 / release 2026.574: #1292 took 1.11.534 / 2026.573 first, so 1.11.533 / 2026.572 are not used."
+      ]
+    },
     {
       "release": "2026.573",
       "date": "2026-11-17",

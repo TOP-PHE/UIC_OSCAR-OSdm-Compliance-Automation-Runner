@@ -507,6 +507,8 @@ function tripRequest(requirement, day = '2026-11-20') {
     const nt = requirement.nonTrip;
     const criteria = { validFrom: at(nt.validFrom) };
     if (nt.by === 'ZONES') criteria.zones = [{ id: 'SIM-CITY', carrier: CARRIER_OF_ZONE }];
+    // #1266: NUTS codes named, else those of the first zone of GET /zones (SIM-CITY).
+    else if (nt.by === 'NUTS') criteria.nutsCodes = nt.nutsCodes.length ? nt.nutsCodes : ['XS111'];
     else criteria.places = (nt.places.length ? nt.places : ['urn:uic:stn:0000040', 'urn:uic:stn:0000041']).map((stopPlaceRef) => ({ objectType: 'StopPlaceRef', stopPlaceRef }));
     return { nonTripSearchCriteria: criteria };
   }
@@ -528,8 +530,14 @@ test('every trip of the data file is one the simulator answers, on every provide
   const providers = loadProviders(PROVIDERS_DIR);
   for (const requirement of datafile.tripRequirements) {
     assert.ok(['SEARCH', 'SPECIFICATION', 'NON_TRIP'].includes(requirement.tripType));
+    // #1266: a trip of the unknown NUTS code probe is refused, and only that one.
+    const refusal = datafile.scenarios.some((s) => s.tripRequirementId === requirement.id && s.nutsCodeExpectRejection === 'on');
     for (const provider of providers.values()) {
       CARRIER_OF_ZONE = provider.carrier.ref;
+      if (refusal) {
+        assert.throws(() => buildOfferCollection({ ...tripRequest(requirement), anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }] }, provider, Date.parse('2026-11-02T09:00:00Z')), (e) => e.status === 400 && /no NUTS code of this provider/.test(e.detail));
+        continue;
+      }
       const { response } = buildOfferCollection({
         ...tripRequest(requirement),
         anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }],

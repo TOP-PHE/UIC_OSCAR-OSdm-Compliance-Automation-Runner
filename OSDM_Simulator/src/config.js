@@ -328,6 +328,8 @@ function checkRequestOptions(value, bad) {
 // stop place whose non-trip offers carry no regional validity (a wrong
 // variant). Absent: offers for trips only, /places and /zones answer 501.
 const ZONE_ID = /^[A-Z0-9][A-Z0-9_-]{0,39}$/;
+// A NUTS code: two letters of a country, then up to three letters or digits.
+const NUTS_CODE = /^[A-Z]{2}[A-Z0-9]{0,3}$/;
 function checkNonTrip(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw bad('nonTrip');
@@ -336,17 +338,21 @@ function checkNonTrip(value, bad) {
   if (!Array.isArray(places) || places.length < 2 || places.length > 30 || !places.every(placeOk)) throw bad('nonTrip');
   const ids = places.map((p) => p.id);
   if (new Set(ids).size !== ids.length) throw bad('nonTrip');
-  const zoneOk = (z) => z && ZONE_ID.test(z.id) && isText(z.name, 1, 80) && Number.isInteger(z.zoneId) && z.zoneId >= 0 && z.zoneId <= 99999
+  // #1266: a zone may name the NUTS codes it covers (NUTS form, made up in the profiles).
+  const nutsOk = (codes) => codes === undefined || (Array.isArray(codes) && codes.length > 0 && codes.length <= 10 && codes.every((c) => NUTS_CODE.test(c)));
+  const zoneOk = (z) => z && ZONE_ID.test(z.id) && isText(z.name, 1, 80) && Number.isInteger(z.zoneId) && z.zoneId >= 0 && z.zoneId <= 99999 && nutsOk(z.nutsCodes)
     && Array.isArray(z.places) && z.places.length > 0 && z.places.every((ref) => ids.includes(ref));
   if (!Array.isArray(zones) || zones.length === 0 || zones.length > 10 || !zones.every(zoneOk)) throw bad('nonTrip');
   if (new Set(zones.map((z) => z.id)).size !== zones.length) throw bad('nonTrip');
+  const nuts = zones.flatMap((z) => z.nutsCodes || []);
+  if (new Set(nuts).size !== nuts.length) throw bad('nonTrip');
   if (withoutValidityFrom !== undefined && !ids.includes(withoutValidityFrom)) throw bad('nonTrip');
   const variants = checkNonTripVariants(value.variants, ids, withoutValidityFrom, bad);
   const replacements = checkNonTripReplacements(value.replacements, bad);
   return {
     nonTrip: {
       places: places.map((p) => ({ id: p.id, name: p.name })),
-      zones: zones.map((z) => ({ id: z.id, name: z.name, zoneId: z.zoneId, places: [...z.places] })),
+      zones: zones.map((z) => ({ id: z.id, name: z.name, zoneId: z.zoneId, ...(z.nutsCodes ? { nutsCodes: [...z.nutsCodes] } : {}), places: [...z.places] })),
       products: checkNonTripProducts(value.products, bad),
       ...(withoutValidityFrom === undefined ? {} : { withoutValidityFrom }),
       ...(variants ? { variants } : {}),

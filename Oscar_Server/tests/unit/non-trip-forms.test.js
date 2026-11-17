@@ -105,9 +105,9 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const nonTrip = catalogueFor(catalogue, simulator, { offerRequestForms: ['SEARCH'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_CARD_LOST_1ADT', 'OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_TICKET_LOST_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
+    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_CARD_LOST_1ADT', 'OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_NUTS_1ADT', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_TICKET_LOST_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
-    const declared = catalogueFor(catalogue, simulator, { offerRequestForms: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'] })
+    const declared = catalogueFor(catalogue, simulator, { offerRequestForms: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
     for (const entry of declared) expect(entry.missing.join(' ')).not.toMatch(/offer requests/);
   });
@@ -116,7 +116,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const noList = catalogueFor(catalogue, simulator, {});
     const nonTrip = noList.filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip).toHaveLength(9);
+    expect(nonTrip).toHaveLength(10);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     // The trip entries read as before: no form is missing for them.
     const tripForms = catalogueFor(catalogue, simulator, { offerRequestForms: [...G.TRIP_REQUEST_FORMS] });
@@ -154,7 +154,7 @@ describe('a copy', () => {
 describe('the simulator references', () => {
   test('a provider selling without a trip declares both non-trip forms, and its non-trip scenarios get no warning', () => {
     const ref = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'data_base', 'reference', 'simulator-gamma.json'), 'utf8'));
-    expect(ref.framework.offerRequestForms).toEqual(expect.arrayContaining(['NON_TRIP_PLACES', 'NON_TRIP_ZONES']));
+    expect(ref.framework.offerRequestForms).toEqual(expect.arrayContaining(['NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS']));
     expect(ref.scenariosToRun).toEqual(expect.arrayContaining(['SIM_NONTRIP_PLACES_1ADT_38', 'SIM_NONTRIP_PLACES_LOOKUP_1ADT_38', 'SIM_NONTRIP_ZONES_1ADT_38']));
     expect(ref.scenariosToRun).not.toContain('SIM_WRONG_NONTRIP_NO_VALIDITY_1ADT_38');
   });
@@ -162,7 +162,7 @@ describe('the simulator references', () => {
   test('#1266: it declares the tags of what it sells without a trip, and the lost ticket and card it replaces, after those the checklist ticks', () => {
     const ref = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'data_base', 'reference', 'simulator-gamma.json'), 'utf8'));
     expect(ref.framework.offerSearchOptions.productTags).toEqual(['ADMISSION_POINT2POINT', 'ADMISSION_PASS', 'ADMISSION_MULTI_RIDE', 'TICKET_LOST', 'CARD_LOST']);
-    expect(ref.scenariosToRun).toEqual(expect.arrayContaining(['SIM_NONTRIP_PROBE_TAG_PASS_38', 'SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38', 'SIM_NONTRIP_PRODUCT_CODE_1ADT_38', 'SIM_NONTRIP_TICKET_LOST_1ADT_38', 'SIM_NONTRIP_CARD_LOST_1ADT_38', 'SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_38']));
+    expect(ref.scenariosToRun).toEqual(expect.arrayContaining(['SIM_NONTRIP_PROBE_TAG_PASS_38', 'SIM_NONTRIP_PROBE_TAG_SINGLE_RIDE_38', 'SIM_NONTRIP_PRODUCT_CODE_1ADT_38', 'SIM_NONTRIP_TICKET_LOST_1ADT_38', 'SIM_NONTRIP_CARD_LOST_1ADT_38', 'SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_38', 'SIM_NONTRIP_NUTS_1ADT_38', 'SIM_NHF_NONTRIP_NUTS_UNKNOWN_1ADT_38']));
     for (const wrong of ['SIM_WRONG_NONTRIP_TRIP_COVERAGE_1ADT_38', 'SIM_WRONG_NONTRIP_OTHER_PLACES_1ADT_38', 'SIM_WRONG_NONTRIP_OTHER_CARRIER_1ADT_38']) {
       expect(ref.scenariosToRun).not.toContain(wrong);
     }
@@ -214,7 +214,8 @@ describe('the Test Config page', () => {
     const end = lines.findIndex((l, i) => i > start && l === '}');
     return vm.runInNewContext(`(${lines.slice(start, end + 1).join('\n')})`, context);
   };
-  const withNonTripValue = lift('withNonTripValue', {});
+  const nonTripByOf = lift('nonTripByOf', {});
+  const withNonTripValue = lift('withNonTripValue', { nonTripByOf });
 
   test('places from a comma-separated list, a lookup name, the kind', () => {
     expect(withNonTripValue({}, 'places', ' urn:uic:stn:40 ,5400014,, ')).toEqual({ places: ['urn:uic:stn:40', '5400014'] });
@@ -223,6 +224,11 @@ describe('the Test Config page', () => {
     expect(withNonTripValue({ placeLookup: 'Praha' }, 'placeLookup', '')).toEqual({});
     expect(withNonTripValue({ by: 'PLACES' }, 'by', 'ZONES').by).toBe('ZONES');
     expect(withNonTripValue({}, 'by', 'anything').by).toBe('PLACES');
+    // #1266: NUTS codes, from a comma-separated list, in capitals.
+    expect(withNonTripValue({ by: 'PLACES' }, 'by', 'NUTS').by).toBe('NUTS');
+    expect(withNonTripValue({ by: 'NUTS' }, 'nutsCodes', ' cz010, XS111 ,, ')).toEqual({ by: 'NUTS', nutsCodes: ['CZ010', 'XS111'] });
+    expect(withNonTripValue({ by: 'NUTS', nutsCodes: ['XS111'] }, 'nutsCodes', '')).toEqual({ by: 'NUTS', nutsCodes: [] });
+    expect([nonTripByOf({ by: 'nuts' }), nonTripByOf({ by: 'zones' }), nonTripByOf(null), nonTripByOf({ by: 'LINES' })]).toEqual(['NUTS', 'ZONES', 'PLACES', 'PLACES']);
   });
 
   test('one zone from its id and carrier; both emptied: none, taken from GET /zones', () => {
@@ -267,5 +273,64 @@ describe('the Test Config page', () => {
     // Once in the change listener, once in the input listener.
     expect(page.match(/^ {2}if \(changeNonTrip\(action, el\)\) return;$/gm)).toHaveLength(2);
     expect(page).toContain("if (trip?.tripType === 'NON_TRIP') return;");
+  });
+});
+
+// #1266: regions named by NUTS codes.
+describe('NUTS codes (#1266)', () => {
+  const C = require('../../src/utils/scenarioCatalogue');
+  const { adaptReferenceScenario } = require('../../src/utils/catalogueMatch');
+  const { isRefusalTest } = require('../../src/utils/capabilities');
+  const nutsFile = {
+    tripRequirements: [
+      { id: 4, tripType: 'NON_TRIP', nonTrip: { by: 'NUTS', nutsCodes: [] } },
+      { id: 5, tripType: 'NON_TRIP', nonTrip: { by: 'NUTS', nutsCodes: ['XS111'] } },
+      { id: 6, tripType: 'NON_TRIP', nonTrip: { by: 'NUTS', nutsCodes: ['XS999'] } },
+    ],
+    scenarios: [
+      { code: 'S_NUTS', scenarioType: 'SALE', tripRequirementId: 4 },
+      { code: 'S_NUTS_NAMED', scenarioType: 'SALE', tripRequirementId: 5 },
+      { code: 'S_NUTS_UNKNOWN', scenarioType: 'SALE', tripRequirementId: 6, nutsCodeExpectRejection: 'on' },
+    ],
+  };
+  const [lookup, named, unknown] = nutsFile.scenarios;
+
+  test('the form, its declaration, its capability and its run filter', () => {
+    expect(G.offerRequestFormOf(lookup, nutsFile)).toBe('NON_TRIP_NUTS');
+    expect(G.NON_TRIP_REQUEST_FORMS).toContain('NON_TRIP_NUTS');
+    expect(G.offerRequestFormDeclared({}, 'NON_TRIP_NUTS')).toBe(false);
+    expect(G.offerRequestFormDeclared({ offerRequestForms: ['NON_TRIP_ZONES'] }, 'NON_TRIP_NUTS')).toBe(false);
+    expect(G.offerRequestFormDeclared({ offerRequestForms: ['NON_TRIP_NUTS'] }, 'NON_TRIP_NUTS')).toBe(true);
+    const annotated = structuredClone(nutsFile);
+    G.annotateDatafile(annotated, { offerRequestForms: ['NON_TRIP_ZONES'] });
+    expect(annotated.scenarios[0].__featureNotDeclaredWarnings).toContain('offerRequestBy:NON_TRIP_NUTS');
+    expect(derivedCapability(lookup, nutsFile)).toBe('offers.nonTripNuts');
+    expect(CAPABILITIES.find((c) => c.id === 'offers.nonTripNuts').label).toBe('Offers without a trip, in regions named by NUTS codes');
+    expect(facetsOf(['S_NUTS'], { datafile: nutsFile })[0].form).toBe('NON_TRIP_NUTS');
+  });
+
+  test('the unknown code probe is an expected refusal', () => {
+    expect(isRefusalTest(unknown)).toBe(true);
+    expect(isRefusalTest(named)).toBe(false);
+  });
+
+  test('NUTS codes named are the provider\'s, but a probe\'s made-up code stays', () => {
+    const facts = C.simulatorFacts({});
+    expect(C.dataNeedsOf(lookup, nutsFile, facts).providerValues).toBeUndefined();
+    expect(C.dataNeedsOf(unknown, nutsFile, facts).providerValues).toBeUndefined();
+    const needs = C.dataNeedsOf(named, nutsFile, facts);
+    expect(needs.providerValues).toEqual(['nutsCodes']);
+    expect(C.needsText(needs).join(' ')).toContain('NUTS codes');
+    expect(adaptReferenceScenario(named, needs, {}).toComplete.join(' ')).toContain("the NUTS codes of the provider's regions");
+  });
+
+  test('a reference adds the NUTS form only for a provider whose zones name NUTS codes', () => {
+    const forms = (zones) => {
+      const framework = { offerRequestForms: ['SEARCH'], offerSearchOptions: {} };
+      R.withNonTripForms(framework, { nonTrip: { zones } });
+      return framework.offerRequestForms;
+    };
+    expect(forms([{ id: 'Z', nutsCodes: ['XS111'] }])).toEqual(['SEARCH', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS']);
+    expect(forms([{ id: 'Z' }])).toEqual(['SEARCH', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES']);
   });
 });

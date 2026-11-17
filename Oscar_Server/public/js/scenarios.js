@@ -73,6 +73,8 @@ const ENUMS = {
   // #699: negative test, one passenger over the provider's maximum must be refused.
   passengerLimitExpectRejection:     ['off', 'on'],
   lostCardExpectRejection:           ['off', 'on'],
+  // #1266: negative test, a NUTS code the provider does not know.
+  nutsCodeExpectRejection:           ['off', 'on'],
   // #703: negative test, an offer request with no passenger must be refused.
   emptyPassengersExpectRejection:    ['off', 'on'],
   // #704: negative test, a departure in the past or beyond the sales horizon must be refused.
@@ -482,10 +484,12 @@ const FW_OFFER_REQUEST_FORMS = [
   // #1258: without a trip (nonTripSearchCriteria).
   ['NON_TRIP_PLACES', 'Without a trip, between stop places (nonTripSearchCriteria.places)'],
   ['NON_TRIP_ZONES', 'Without a trip, in zones (nonTripSearchCriteria.zones, after GET /zones)'],
+  // #1266: regions named by NUTS codes.
+  ['NON_TRIP_NUTS', 'Without a trip, in regions named by NUTS codes (nonTripSearchCriteria.nutsCodes)'],
 ];
 
 // #1258: the forms of an offer request without a trip.
-const NON_TRIP_FORMS = ['NON_TRIP_PLACES', 'NON_TRIP_ZONES'];
+const NON_TRIP_FORMS = ['NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS'];
 
 // #748: no list declared means every trip form (frameworks from before
 // 1.11.289); #1258: a non-trip form only when listed. The server's
@@ -2281,6 +2285,8 @@ function buildDetailHTML(idx) {
         ${buildSelect(idx, 'passengerLimitExpectRejection', 'Over the passenger limit', ENUMS.passengerLimitExpectRejection,
           'Negative test (#699). On: the scenario\'s passengers are one more than the provider\'s maximum (Test Framework → Passenger Types). POST /offers must refuse them (4xx + RFC-9457 Problem, or no offer), or else POST /bookings must; the scenario ends at the refusal, and a booking made over the limit fails.')}
         ${buildLostCardFields(idx)}
+        ${buildSelect(idx, 'nutsCodeExpectRejection', 'Unknown NUTS code refused', ENUMS.nutsCodeExpectRejection,
+          'Negative test (#1266), for a trip without a trip by NUTS codes. On: the NUTS codes of the trip are ones the provider does not know; POST /offers must refuse them (4xx + RFC-9457 Problem) or give no offer; offers given fail. The scenario ends there.')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE
@@ -3395,11 +3401,12 @@ function buildTripSection(idx, sc, trip) {
 
 // #1258: what a NON_TRIP trip asks: stop places (StopPlaceRef only, two or
 // more, or none and a name for POST /places) or zones (one, or none to take
-// the first of GET /zones), and the start of the validity.
+// the first of GET /zones), and the start of the validity. #1266: or NUTS
+// codes (none: those of the first zone of GET /zones that lists some).
 const NON_TRIP_VALID_FROM = '%TRIP_DATE%T00:00:00+01:00';
 function buildNonTripFields(tIdx, trip, depDayField) {
   const nt = trip.nonTrip && typeof trip.nonTrip === 'object' ? trip.nonTrip : {};
-  const byZones = String(nt.by || '').toUpperCase() === 'ZONES';
+  const by = nonTripByOf(nt);
   const field = (name, label, value, placeholder) => `
   <div class="param-field">
     <span class="param-label">${label}</span>
@@ -3407,18 +3414,22 @@ function buildNonTripFields(tIdx, trip, depDayField) {
       data-action="set-nontrip-field" data-tidx="${esc(tIdx)}" data-field="${name}">
   </div>`;
   const zone = Array.isArray(nt.zones) && nt.zones[0] && typeof nt.zones[0] === 'object' ? nt.zones[0] : {};
-  const what = byZones
-    ? `${field('zoneId', 'Zone id <span class="param-hint">empty: the first zone of GET /zones</span>', zone.id, 'SIM-CITY')}
-      ${field('zoneCarrier', 'Zone carrier <span class="param-hint">the carrier GET /zones names for it</span>', zone.carrier, 'urn:uic:rics:NNNN')}`
-    : `${field('places', 'Stop places <span class="param-hint">two or more, comma-separated URNs or UIC codes; empty: looked up by name</span>', (Array.isArray(nt.places) ? nt.places : []).join(', '), 'urn:uic:stn:..., urn:uic:stn:...')}
-      ${field('placeLookup', 'Look up by name <span class="param-hint">POST /places (stop places only), the first two found</span>', nt.placeLookup, 'Praha')}`;
+  const what = {
+    ZONES: `${field('zoneId', 'Zone id <span class="param-hint">empty: the first zone of GET /zones</span>', zone.id, 'SIM-CITY')}
+      ${field('zoneCarrier', 'Zone carrier <span class="param-hint">the carrier GET /zones names for it</span>', zone.carrier, 'urn:uic:rics:NNNN')}`,
+    NUTS: field('nutsCodes', 'NUTS codes <span class="param-hint">1 to 10, comma-separated (two capital letters, then up to three letters or digits); empty: those of the first zone of GET /zones that lists some</span>', (Array.isArray(nt.nutsCodes) ? nt.nutsCodes : []).join(', '), 'CZ010, CZ020'),
+    PLACES: `${field('places', 'Stop places <span class="param-hint">two or more, comma-separated URNs or UIC codes; empty: looked up by name</span>', (Array.isArray(nt.places) ? nt.places : []).join(', '), 'urn:uic:stn:..., urn:uic:stn:...')}
+      ${field('placeLookup', 'Look up by name <span class="param-hint">POST /places (stop places only), the first two found</span>', nt.placeLookup, 'Praha')}`,
+  }[by];
+  const option = (value, text) => `<option value="${value}" ${by === value ? 'selected' : ''}>${text}</option>`;
   return `
     <div class="param-grid">
       <div class="param-field">
-        <span class="param-label">Valid where <span class="param-hint">nonTripSearchCriteria: stop places (StopPlaceRef) or zones</span></span>
+        <span class="param-label">Valid where <span class="param-hint">nonTripSearchCriteria: stop places (StopPlaceRef), zones or NUTS codes</span></span>
         <select class="param-input param-select" data-action="set-nontrip-field" data-tidx="${esc(tIdx)}" data-field="by">
-          <option value="PLACES" ${byZones ? '' : 'selected'}>Between stop places</option>
-          <option value="ZONES" ${byZones ? 'selected' : ''}>In zones</option>
+          ${option('PLACES', 'Between stop places')}
+          ${option('ZONES', 'In zones')}
+          ${option('NUTS', 'In regions named by NUTS codes')}
         </select>
       </div>
       ${depDayField}
@@ -3431,14 +3442,23 @@ function buildNonTripFields(tIdx, trip, depDayField) {
     </div>`;
 }
 
+// #1258: how a NON_TRIP trip is asked: PLACES (the default), ZONES or (#1266) NUTS.
+function nonTripByOf(nt) {
+  const by = String(nt?.by || '').toUpperCase();
+  return by === 'ZONES' || by === 'NUTS' ? by : 'PLACES';
+}
+
 // #1258: the nonTrip block with one field changed, from what the editor
 // holds. Pure: places from a comma-separated list, one zone from its id and
-// carrier (both empty: none, taken from GET /zones at run time).
+// carrier (both empty: none, taken from GET /zones at run time), (#1266)
+// NUTS codes from a comma-separated list, in capitals.
 function withNonTripValue(nonTrip, field, raw) {
   const nt = { ...(nonTrip && typeof nonTrip === 'object' ? nonTrip : {}) };
   const value = String(raw == null ? '' : raw).trim();
   if (field === 'by') {
-    nt.by = value === 'ZONES' ? 'ZONES' : 'PLACES';
+    nt.by = nonTripByOf({ by: value });
+  } else if (field === 'nutsCodes') {
+    nt.nutsCodes = value ? value.split(',').map((c) => c.trim().toUpperCase()).filter(Boolean) : [];
   } else if (field === 'places') {
     nt.places = value ? value.split(',').map((p) => p.trim()).filter(Boolean) : [];
   } else if (field === 'placeLookup') {

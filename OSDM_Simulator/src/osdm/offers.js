@@ -919,7 +919,8 @@ function buildNonTripCollection(body, providerAsIs, nowMs) {
     : instant(from, 'nonTripSearchCriteria.validFrom', provider);
   const passengers = passengersOf(body, provider);
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
-  const by = asked.kind === 'zones' ? 'ZONES' : 'PLACES';
+  // #1266: a region asked by NUTS code is sold what a zone is.
+  const by = asked.kind === 'places' ? 'PLACES' : 'ZONES';
   const items = provider.nonTrip.products.filter((p) => p.by.includes(by) && (!askedFlexibilities || askedFlexibilities.includes(p.flexibility)));
   const fulfillmentOptions = fulfillmentOptionsOf(body);
   // #1266: a lost ticket or card asked (TICKET_LOST / CARD_LOST) is answered

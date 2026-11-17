@@ -14,8 +14,10 @@
  *
  * Places are stop places only: a request naming another kind of PlaceRef
  * (an address, a point of interest, a geo position) is refused. NUTS codes
- * are not provided. Everything comes from the profile's `nonTrip`, so the
- * same request always gives the same answer.
+ * (#1266) are those the profile's zones name: a region asked by NUTS code is
+ * served by the zone that names it, each admission valid in a Zone naming the
+ * code; an unknown code is refused. Everything comes from the profile's
+ * `nonTrip`, so the same request always gives the same answer.
  */
 
 const { HttpError } = require('../http');
@@ -75,6 +77,7 @@ const zoneDefinitionOf = (zone, provider) => ({
   id: zone.id,
   name: zone.name,
   carrier: provider.carrier.ref,
+  ...(zone.nutsCodes ? { nutsCodes: [...zone.nutsCodes] } : {}),
   places: zone.places.map((stopPlaceRef) => ({ objectType: 'StopPlaceRef', stopPlaceRef })),
 });
 
@@ -113,18 +116,41 @@ function zonesAsked(list, provider) {
   });
 }
 
+// #1266: the NUTS codes asked, each one a zone of the provider names.
+function nutsAsked(list, provider) {
+  if (!Array.isArray(list) || list.length === 0 || list.length > MAX_PLACES) throw bad(`nonTripSearchCriteria.nutsCodes must hold 1 to ${MAX_PLACES} codes`);
+  const codes = list.map((code, i) => {
+    if (typeof code !== 'string' || code.length === 0 || code.length > 10) throw bad(`nonTripSearchCriteria.nutsCodes[${i}] is missing or not valid`);
+    return code;
+  });
+  if (new Set(codes).size !== codes.length) throw bad('nonTripSearchCriteria.nutsCodes names a code twice');
+  return codes.map((code, i) => {
+    const zone = provider.nonTrip.zones.find((z) => (z.nutsCodes || []).includes(code));
+    // The Problem points at the code refused (RFC 9457 recommends it).
+    if (!zone) {
+      throw new HttpError(400, 'VALIDATION_ERROR', 'The offer request is not valid',
+        `nonTripSearchCriteria.nutsCodes[${i}]: "${code.slice(0, 10)}" is no NUTS code of this provider (GET /zones lists them)`,
+        {}, { pointers: [{ requestPointer: `/nonTripSearchCriteria/nutsCodes/${i}` }] });
+    }
+    return { code, zone };
+  });
+}
+
 /**
- * What a non-trip request asks for: `{ kind: 'places', places }` or
- * `{ kind: 'zones', zones }`, a key for its price, the names for its summary.
+ * What a non-trip request asks for: `{ kind: 'places', places }`,
+ * `{ kind: 'zones', zones }` or (#1266) `{ kind: 'nuts', nuts, zones }`, a
+ * key for its price, the names for its summary.
  */
 function nonTripAsked(criteria, provider) {
   if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) throw bad('nonTripSearchCriteria must be an object');
-  const hasNuts = Array.isArray(criteria.nutsCodes) && criteria.nutsCodes.length > 0;
-  if (hasNuts) throw bad('nonTripSearchCriteria.nutsCodes: a validity by NUTS code is not provided by this simulator');
-  const hasPlaces = criteria.places !== undefined && criteria.places !== null;
-  const hasZones = criteria.zones !== undefined && criteria.zones !== null;
-  if (hasPlaces === hasZones) throw bad('nonTripSearchCriteria must name either places or zones');
-  if (hasPlaces) {
+  const given = (member) => criteria[member] !== undefined && criteria[member] !== null;
+  const kinds = ['places', 'zones', 'nutsCodes'].filter(given);
+  if (kinds.length !== 1) throw bad('nonTripSearchCriteria must name either places, zones or nutsCodes');
+  if (kinds[0] === 'nutsCodes') {
+    const nuts = nutsAsked(criteria.nutsCodes, provider);
+    return { kind: 'nuts', nuts, zones: nuts.map((n) => n.zone), key: `nuts|${nuts.map((n) => n.code).join('|')}`, names: nuts.map((n) => `${n.zone.name} (${n.code})`) };
+  }
+  if (kinds[0] === 'places') {
     const places = placesAsked(criteria.places, provider);
     return { kind: 'places', places, key: places.map((p) => p.stopPlaceRef).join('|'), names: places.map((p) => p.name) };
   }
@@ -132,7 +158,7 @@ function nonTripAsked(criteria, provider) {
   return { kind: 'zones', zones, key: zones.map((z) => z.id).join('|'), names: zones.map((z) => z.name) };
 }
 
-/** The first stop place asked, or of the first zone asked: it chooses a variant. */
+/** The first stop place asked, or of the first zone asked (or named by the first NUTS code): it chooses a variant. */
 const firstStopOf = (asked) => (asked.kind === 'places' ? asked.places[0].stopPlaceRef : asked.zones[0].places[0]);
 
 /**
@@ -141,6 +167,10 @@ const firstStopOf = (asked) => (asked.kind === 'places' ? asked.places[0].stopPl
  * or one Zone per zone asked.
  */
 function regionalValiditiesOf(asked, provider) {
+  // #1266: a Zone per NUTS code asked, naming it.
+  if (asked.kind === 'nuts') {
+    return asked.nuts.map((n, i) => ({ seqNb: i + 1, zone: { carrier: provider.carrier.ref, name: n.zone.name, zoneIds: [n.zone.zoneId], nutsCode: n.code } }));
+  }
   if (asked.kind === 'zones') {
     return asked.zones.map((zone, i) => ({ seqNb: i + 1, zone: { carrier: provider.carrier.ref, name: zone.name, zoneIds: [zone.zoneId] } }));
   }
@@ -162,7 +192,7 @@ function durationText(minutes) {
 }
 
 function regionalValiditySummaryOf(asked, item) {
-  const between = asked.kind === 'zones' ? `in ${asked.names.join(', ')}` : `between ${asked.names.join(', ')}`;
+  const between = asked.kind === 'places' ? `between ${asked.names.join(', ')}` : `in ${asked.names.join(', ')}`;
   return { description: `${item.name}, valid ${between}, for ${durationText(item.validityMinutes)}`, shortDescription: asked.names.join(' - ') };
 }
 

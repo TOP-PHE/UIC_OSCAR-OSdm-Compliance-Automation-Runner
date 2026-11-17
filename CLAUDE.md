@@ -174,7 +174,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     auto-fed; unmet = WARNING) through lists (`isSetAlong()`). Capability
     `sale.replacement`; provider values `lostCard` (left out of a copy, the
     probe's made-up card kept) and `lostTicketHolder`; references declare
-    both tags. Left in #1266: NUTS, #227 without a trip, fares.
+    both tags.
+    **NUTS codes** (1.11.535 / OTST_V2.0.262, simulator 0.71.0; maintainer:
+    through the zones, made-up codes, a validity naming none asked a
+    WARNING, an unknown code an NHF, named else from `GET /zones`). Form
+    `NON_TRIP_NUTS` (`by: NUTS`, `nonTrip.nutsCodes`, 1–10 of
+    `/^[A-Z]{2}[A-Z0-9]{0,3}$/`), capability `offers.nonTripNuts`. None
+    named = the first zone of `GET /zones` listing `nutsCodes`
+    (`lookUpNutsCodes()`); `namesWhere()` is "a requirement names where"
+    for the exchange too. `Zone.nutsCode` of a validity is checked
+    (WARNING). `nutsCodeExpectRejection` at 01, before the departure
+    probe (`checkUnknownNutsRefused()`); provider value `nutsCodes` only
+    when named and not a probe. Simulator: SIM-CITY `XS111`, SIM-NORTH
+    `XS112` (its 0000042 is a wrong variant: use XS111), each admission a
+    Zone naming the code, an unknown code 400 pointing at it. The
+    reference adds the form only for a profile whose zones name codes.
+    Left in #1266: #227 without a trip, fares.
     **To regenerate *Checks by scenario* from a partial change**, record the
     scenarios it names in chunks and merge the recordings (the
     simulator's `replay.js record` keeps only its last call).

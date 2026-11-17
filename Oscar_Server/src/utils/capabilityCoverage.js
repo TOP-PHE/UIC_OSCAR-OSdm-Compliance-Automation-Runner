@@ -74,6 +74,7 @@ const CAPABILITY_FUNCTIONS = Object.freeze({
   'offers.search': ['offerRequestForm:SEARCH'], 'offers.specification': ['offerRequestForm:SPECIFICATION'],
   'offers.tripIds': ['offerRequestForm:TRIP_IDS'],
   'offers.nonTripPlaces': ['offerRequestForm:NON_TRIP_PLACES'], 'offers.nonTripZones': ['offerRequestForm:NON_TRIP_ZONES'],
+  'offers.nonTripNuts': ['offerRequestForm:NON_TRIP_NUTS'],
   'return.separate': ['returnModel:SEPARATE'], 'return.combined': ['returnModel:COMBINED'],
   'refund.full': ['salesFlow:REFUND_FULL'], 'refund.technical': ['salesFlow:REFUND_IROPS'],
   'refund.partial.fulfillment': ['partialRefund:FULFILLMENT'], 'refund.partial.passenger': ['partialRefund:PASSENGER'],
