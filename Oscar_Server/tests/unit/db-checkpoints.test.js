@@ -268,6 +268,11 @@ describe('when the thread copies the log (#1294)', () => {
     m.db.exec('INSERT INTO filler (x) VALUES (randomblob(4000))');
     await until(() => m.checkpointState().count >= 3);
     await until(() => m.checkpointState().last.checkpointed === m.checkpointState().last.log);
+    // Its age alone asked for them: the log stayed far under the size.
+    const state = m.checkpointState();
+    expect(state.count).toBeGreaterThanOrEqual(3);
+    expect(state.walBytes).toBeLessThan(state.limitBytes);
+    expect(state.last.checkpointed).toBe(state.last.log);
   });
 
   test('what a checkpoint could not copy is tried again at each look', async () => {
@@ -289,8 +294,11 @@ describe('when the thread copies the log (#1294)', () => {
       });
       const { count } = m.checkpointState();
       await until(() => m.checkpointState().count >= count + 3);
+      // Each of those tries was held back by the reader as well.
+      expect(m.checkpointState().last.checkpointed).toBeLessThan(m.checkpointState().last.log);
       reader.exec('COMMIT');
       await until(() => m.checkpointState().last.checkpointed === m.checkpointState().last.log);
+      expect(m.checkpointState().last.checkpointed).toBe(m.checkpointState().last.log);
     } finally {
       reader.close();
     }
