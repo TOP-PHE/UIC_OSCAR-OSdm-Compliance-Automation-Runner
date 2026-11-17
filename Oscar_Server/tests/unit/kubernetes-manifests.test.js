@@ -418,6 +418,23 @@ describe('pod mode (option 4)', () => {
     expect(byKind(runsDocs, 'ResourceQuota')).toBeDefined();
   });
 
+  test('the quota has room for as many run pods as it allows, each of the dispatcher\'s default size (#1307)', () => {
+    const { hard } = byKind(runsDocs, 'ResourceQuota').spec;
+    const size = require('../../src/run-dispatcher/dispatcher').settingsOf({});
+    const cpus = (value) => (String(value).endsWith('m') ? Number(String(value).slice(0, -1)) / 1000 : Number(value));
+    const gibibytes = (value) => (String(value).endsWith('Mi') ? Number(String(value).slice(0, -2)) / 1024 : Number(String(value).replace('Gi', '')));
+    const pods = Number(hard.pods);
+    expect(pods).toBe(50);
+    // What the pods may use: exactly that many pods at their limit.
+    expect(cpus(hard['limits.cpu'])).toBe(pods * cpus(size.cpuLimit));
+    expect(gibibytes(hard['limits.memory'])).toBe(pods * gibibytes(size.memoryLimit));
+    // What they ask for: room for all of them.
+    expect(cpus(hard['requests.cpu'])).toBeGreaterThanOrEqual(pods * cpus(size.cpuRequest));
+    expect(gibibytes(hard['requests.memory'])).toBeGreaterThanOrEqual(pods * gibibytes(size.memoryRequest));
+    // No setting of the component changes that size without this test seeing it.
+    expect(Object.keys(dispatcherSettings).filter((key) => /^RUN_(CPU|MEMORY)_/.test(key))).toEqual([]);
+  });
+
   test('the dispatcher may make and remove runs there, and nothing more', () => {
     const role = byKind(runsDocs, 'Role', 'oscar-dispatcher');
     const rights = role.rules.flatMap(r => r.resources.map(res => `${res}:${[...r.verbs].sort().join(',')}`)).sort();

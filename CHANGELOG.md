@@ -521,6 +521,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.540] — 2026-11-17
+
+Release 2026.579 (`current_release`). A run pod may use 2 CPUs, and its work folders are kept in memory (#1307). From the performance audit of 2026-11-17, once the server's thread was no longer the limit (#1294, #1295).
+
+### To do on a cluster, after the upgrade
+- **Upgrade between two batches.** The dispatcher restarts with the upgrade, and at its start it removes the runs going.
+- **Apply the runs' namespace again:** `kubectl apply -k OSCAR_Deploy/kubernetes/runs`. Its quota goes from 50 to 100 CPUs of limits. With the former quota, more than 25 runs at once would be refused.
+
+### What was measured
+The k3s test machine (16 CPUs, 64 GB, one disk), release 2026.576, six simulators at once, 15 runs going, about 18 runs ended a minute. A capture of the machine over about 200 s.
+
+- **Run pods held back by their CPU limit.** Each of the 15 run pods was throttled in 32 to 52 % of its periods, 1.4 to 10.5 s of CPU held back per pod. A run pod could use 1 CPU, and Bruno starts on several threads. The machine had CPUs to spare: the server's thread waited for a CPU 6 % of the time.
+- **Run pods the first writer on the disk.**
+
+  | Writer, over the capture | MB written |
+  |---|---|
+  | Run pods (counted under `systemd`, which inherits the counters of ended processes) | 671, about 11 MB a run |
+  | The OSCAR server | 248 |
+  | k3s (its database) | 145 |
+  | The file system's journal | 116 |
+  | journald | 78 |
+  | containerd | 71 |
+
+  Each run copies the collection (5.6 MB) into its work folder, an `emptyDir` on the node's disk, then writes its reports there. That disk took 7.3 ms a write. The machine had 52 GB of memory free.
+
+### Changed
+- **A run pod may use 2 CPUs** (`RUN_CPU_LIMIT`, 1 until now). What it asks for (200m) does not change. The quota of `oscar-runs` follows: 100 CPUs of limits, room for its 50 pods.
+- **A run pod's work folder and `/tmp` are kept in memory**, 256 MiB and 64 MiB at most. They count in the pod's memory limit (1 GiB): both full, Bruno keeps more than half of it.
+- **New setting `RUN_WORK_FOLDERS`** of the dispatcher: `memory` (default) or `disk`, for a cluster short of memory. Anything else stops the dispatcher's start.
+- **Documentation:** the *Kubernetes and OpenShift Deployment Guide* (size and work folders of a run pod); `CLAUDE.md`.
+
+### Checked
+- `run-dispatcher.test.js`: the Job a run gets (2 CPUs at most, both folders in memory with their sizes), the defaults, `RUN_WORK_FOLDERS=disk` giving the folders as they were, a wrong value refused at start.
+- `kubernetes-manifests.test.js`: the quota has room for exactly as many pods as it allows at the dispatcher's default limits, and the component sets no size of its own.
+
+### Not checked here
+The effect. To measure on the test machine with the same batch: the share of periods throttled and the CPU held back per run pod, the megabytes the run pods write, the time a pod takes to start (7 s at the median), and the runs ended a minute (about 18).
+
+---
+
 ## [server-1.11.539] / [collection-OTST_V2.0.263] — 2026-11-17
 
 Issue #1298, part of #1297. Release 2026.578. Every booking read after 07 is held to the fulfilments seen before. Server 1.11.539 for the news entry only; simulator unchanged (0.71.0).

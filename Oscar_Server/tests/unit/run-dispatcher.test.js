@@ -277,6 +277,13 @@ describe('a run in a pod of its own', () => {
     expect(c.securityContext).toEqual({ allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ['ALL'] } });
     expect(c.envFrom).toEqual([{ secretRef: { name: J.jobNameOf(req.runId) } }]);
     expect(c.env).toBeUndefined();
+    // #1307: 2 CPUs at most, and both folders in memory, each with its size.
+    expect(c.resources).toEqual({ requests: { cpu: '200m', memory: '256Mi' }, limits: { cpu: '2', memory: '1Gi' } });
+    expect(c.volumeMounts).toEqual([{ name: 'work', mountPath: '/work' }, { name: 'tmp', mountPath: '/tmp' }]);
+    expect(pod.volumes).toEqual([
+      { name: 'work', emptyDir: { medium: 'Memory', sizeLimit: '256Mi' } },
+      { name: 'tmp', emptyDir: { medium: 'Memory', sizeLimit: '64Mi' } },
+    ]);
     expect(pod.runtimeClassName).toBeUndefined();
     expect(api.s.calls).toContain(`PATCH /api/v1/namespaces/oscar-runs/secrets/${J.jobNameOf(req.runId)}`);
   });
@@ -674,6 +681,7 @@ describe('start-up', () => {
     ['no image', { RUN_IMAGE: '' }, /RUN_IMAGE/],
     ['no results address', { RUN_RESULTS_URL: 'oscar-internal' }, /RUN_RESULTS_URL/],
     ['a namespace that is not a name', { RUN_NAMESPACE: 'Runs!' }, /RUN_NAMESPACE/],
+    ['work folders kept nowhere it knows', { RUN_WORK_FOLDERS: 'ramdisk' }, /^RUN_WORK_FOLDERS is neither memory nor disk\.$/],
     ['a server secret', { ENCRYPTION_KEY: 'k' }, /ENCRYPTION_KEY/],
   ])('refused with %s', (_what, over, message) => {
     expect(D.startupProblem({ ...good, ...over }, undefined, () => false)).toMatch(message);
@@ -696,6 +704,24 @@ describe('the Kubernetes client', () => {
     fs.writeFileSync(tokenFile, 'renewed-but-unknown');
     await expect(kube.listJobs(J.MANAGED_SELECTOR)).rejects.toMatchObject({ status: 401 });
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('a run pod\'s size and folders: 2 CPUs and memory unless set (#1307)', () => {
+    const byDefault = D.settingsOf({});
+    expect([byDefault.cpuRequest, byDefault.cpuLimit, byDefault.memoryRequest, byDefault.memoryLimit]).toEqual(['200m', '2', '256Mi', '1Gi']);
+    expect(byDefault.workFolders).toBe('memory');
+    expect(J.WORK_FOLDERS).toEqual(['memory', 'disk']);
+    expect(D.settingsOf({ RUN_CPU_LIMIT: '1', RUN_WORK_FOLDERS: ' Disk ' })).toMatchObject({ cpuLimit: '1', workFolders: 'disk' });
+    // The folders and the pod's memory: both folders full still leave Bruno its memory.
+    const megabytes = (size) => Number(size.replace('Mi', ''));
+    expect(megabytes(J.FOLDER_SIZES.work) + megabytes(J.FOLDER_SIZES.tmp)).toBeLessThanOrEqual(1024 / 2);
+  });
+
+  test('on the node\'s disk when told so: the folders as they were before', () => {
+    const onDisk = D.settingsOf({ RUN_WORK_FOLDERS: 'disk' });
+    const job = J.runJob({ runId: randomUUID(), deadlineSeconds: 600 }, onDisk);
+    expect(job.spec.template.spec.volumes).toEqual([{ name: 'work', emptyDir: {} }, { name: 'tmp', emptyDir: {} }]);
+    expect(D.startupProblem({ RUN_AGENT_TOKEN: AGENT_TOKEN, RUN_IMAGE: 'r/oscar-run:1', RUN_RESULTS_URL: 'http://oscar-internal:3003', RUN_WORK_FOLDERS: 'disk' }, undefined, () => false)).toBeNull();
   });
 
   test('a sandboxed runtime is named when one is set', () => {

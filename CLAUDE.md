@@ -1616,6 +1616,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Everything it makes carries `app.kubernetes.io/managed-by=oscar-dispatcher`
   and is removed at its start. Tests use a stand-in API server
   (`run-dispatcher.test.js` `fakeApi()`): extend it, never mock the client.
+  **A run pod may use 2 CPUs and keeps its folders in memory** (#1307,
+  1.11.540). Measured on the test machine once the server's thread was no
+  longer the limit: at `RUN_CPU_LIMIT` 1 every run pod was throttled in 32
+  to 52 % of its periods (Bruno starts on several threads), which is what
+  the host's "CPU pressure 50 %" was; and the run pods were the first
+  writer on the node's disk (~11 MB a run: the collection copied into
+  `/work`). `work` and `tmp` are `emptyDir` `medium: Memory` with a
+  `sizeLimit` (`FOLDER_SIZES`, counted in the pod's memory limit);
+  `RUN_WORK_FOLDERS=disk` keeps them on the node. The quota of `oscar-runs`
+  is pinned to 50 pods at the dispatcher's default limits by
+  `kubernetes-manifests.test.js`: a new default size changes `runs/
+  quota.yaml` too, and an upgraded cluster applies `runs/` again. **The
+  kernel adds an ended process's I/O counters to whoever reaps it**: the
+  run pods' writes read as `systemd`'s.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

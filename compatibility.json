@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.578",
+  "current_release": "2026.579",
   "releases": [
+    {
+      "release": "2026.579",
+      "date": "2026-11-17",
+      "server": "1.11.540",
+      "collection": "OTST_V2.0.263",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.540: a run pod may use 2 CPUs, and its work folders are kept in memory (#1307, from the performance audit of 2026-11-17). On the k3s test machine, with the server's thread no longer the limit, each run pod was throttled in 32 to 52 % of its periods by its 1-CPU limit (1.4 to 10.5 s of CPU held back per run) on a machine with CPUs to spare, and the run pods were the first writer of the machine's one disk: 671 MB in 200 s, about 11 MB a run, against 248 MB for the server. RUN_CPU_LIMIT is 2 by default; the work folder and /tmp of a run pod are memory-backed (256 MiB and 64 MiB at most, within the pod's memory limit), RUN_WORK_FOLDERS=disk keeps them on the node's disk. ON A CLUSTER, AFTER THE UPGRADE: kubectl apply -k OSCAR_Deploy/kubernetes/runs (the quota of oscar-runs goes from 50 to 100 CPUs of limits). The dispatcher restarts with the upgrade and removes the runs going: upgrade between two batches."
+      ]
+    },
     {
       "release": "2026.578",
       "date": "2026-11-17",

@@ -37,6 +37,7 @@
  *   RUN_RESULTS_URL            the server's internal port, as a run pod reaches it
  *   RUN_SERVICE_ACCOUNT        the run pods' service account (default oscar-run, no rights)
  *   RUN_CPU_REQUEST/LIMIT, RUN_MEMORY_REQUEST/LIMIT  a run pod's resources
+ *   RUN_WORK_FOLDERS           memory (default) or disk: where a run pod's work folder and /tmp are kept
  *   RUN_RUNTIME_CLASS          a sandboxed runtime, where the cluster offers one
  *   RUN_DISPATCHER_MAX_RUNS    at most this many runs at once (default 50)
  *   RUN_POD_START_TIMEOUT_MS   how long a pod may take to start (default 5 min)
@@ -108,9 +109,12 @@ function settingsOf(env = process.env) {
     resultsUrl: env.RUN_RESULTS_URL || '',
     serviceAccount: env.RUN_SERVICE_ACCOUNT || 'oscar-run',
     cpuRequest: env.RUN_CPU_REQUEST || '200m',
-    cpuLimit: env.RUN_CPU_LIMIT || '1',
+    // 2 since #1307: at 1 CPU a run pod was throttled in 32 to 52 % of its
+    // periods on a machine with CPUs to spare (Bruno starts on several threads).
+    cpuLimit: env.RUN_CPU_LIMIT || '2',
     memoryRequest: env.RUN_MEMORY_REQUEST || '256Mi',
     memoryLimit: env.RUN_MEMORY_LIMIT || '1Gi',
+    workFolders: (env.RUN_WORK_FOLDERS || 'memory').trim().toLowerCase(),
     runtimeClass: env.RUN_RUNTIME_CLASS || '',
     maxRuns: int(env.RUN_DISPATCHER_MAX_RUNS, 50),
     startTimeoutMs: int(env.RUN_POD_START_TIMEOUT_MS, 300000),
@@ -126,6 +130,7 @@ function startupProblem(env = process.env, settings = settingsOf(env), exists = 
   try { results = new URL(settings.resultsUrl); } catch { results = null; }
   if (!results || !['http:', 'https:'].includes(results.protocol)) return 'RUN_RESULTS_URL is not the http(s) address of the server\'s internal port.';
   if (!NAME_RE.test(settings.serviceAccount)) return 'RUN_SERVICE_ACCOUNT is not a name.';
+  if (!J.WORK_FOLDERS.includes(settings.workFolders)) return `RUN_WORK_FOLDERS is neither ${J.WORK_FOLDERS.join(' nor ')}.`;
   if (settings.namespace && !NAME_RE.test(settings.namespace)) return 'RUN_NAMESPACE is not a name.';
   if (!Number.isInteger(settings.port) || settings.port < 1 || settings.port > 65535) return 'RUN_DISPATCHER_PORT is not a port.';
   const held = SERVER_SECRETS.filter((k) => env[k] !== undefined && env[k] !== '');
