@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.576",
+  "current_release": "2026.577",
   "releases": [
+    {
+      "release": "2026.577",
+      "date": "2026-11-17",
+      "server": "1.11.538",
+      "collection": "OTST_V2.0.262",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.538: the command that replaces the checks' index reads before it changes the database (#1305). Its first run on a server (the k3s test machine, 8.5 million checks) read the old index while it held the database: 442 s for the first part and about a quarter of an hour in all, every write of the server failing meanwhile, with nothing on the screen until a part had ended. It now reads what each part needs as an ordinary reader, which blocks nobody, then changes the database with those pages in memory; says each step before it starts, with its progress; stops before a change when a run started meanwhile; and writes what it says to check-indexes.log beside the database, since closing the window does not stop it. Run it in production only with this release or a later one."
+      ]
+    },
     {
       "release": "2026.576",
       "date": "2026-11-17",
