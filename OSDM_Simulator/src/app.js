@@ -288,7 +288,8 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
       const booking = createBooking(body, (offerId) => store.get('offer', scope, offerId), provider, now());
       store.put('booking', scope, booking.id, booking);
       // #1299: a variant may answer without the trips (the stored booking keeps them).
-      return { booking: variants.bookingAsAnswered(booking) };
+      // #1300: a price changed at pre-booking is said by a problem.
+      return { booking: variants.bookingAsAnswered(booking), ...variants.bookingProblems(booking) };
     });
   }
 
