@@ -521,6 +521,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.540] / [collection-OTST_V2.0.265] — 2026-11-17
+
+Issue #1300, part of #1297. Release 2026.579 (`current_release`). Simulator 0.73.0. A booked part is compared with its offer part member by member, and `OFFER_PART_PRICE_CHANGE` is read.
+
+The parts of a booking were paired with the offer's by content (#550), but some members were compared over all the parts together (the price), for their presence only (the validity) or not at all (the product, its flexibility and classes, the trip coverage, the passengers). OSDM:
+- osdm.io, *Processes*, "Creating a Booking Based on Offers": the booked offers "should look a lot like the offers as they were in the offer responses", except the places assigned to reservations and fares;
+- same page, "Price changes when creating a booking": "The price of an offer is not guaranteed before the pre-booking step"; the booked parts "will still be provided but have a different price", and "A warning (`OFFER_PART_PRICE_CHANGE`) should be added in the reply". osdm.io, *Errors & Problems*: `OFFER_PART_PRICE_CHANGE`, "A request to confirm an offer results in bookedofferparts with a price change";
+- same page, "Handling Partial Success of Pre-Booking": booked resources are assumed to have other ids than the offer's; passengers keep their references.
+
+### Added
+- **`library-bruno/bookedAsOffered.js`** (pure) `pairFindings()`: for each pair of parts, at every booking step (02, 05, 07, refund 12/14/16, exchange 13/15/17 on the parts held before the exchange), one `[WARNING] <part>[i] (id=…) is not booked as offered: …` line for each of:
+  - another price (as a value at its scale; the offer's plus a named place's fee, #766, passes), saying whether the provider said `OFFER_PART_PRICE_CHANGE`;
+  - another `validFrom` or `validUntil` instant;
+  - another product: the offer part's (`summaryProductId`, else its first product) against the booked part's, read through the offer's and the booked offer's `products` and compared by `code`; a product on one side only; another id for which the booking gives no product to read is said at `[INFO]`;
+  - another flexibility, travel class or service class type of those two products;
+  - a trip coverage on one side only, or other legs of the same trip (another trip id is #1299's);
+  - other passengers (the booked part's `passengerIds` read as `externalRef`).
+  No test is added: no number of checks moves.
+- **`OFFER_PART_PRICE_CHANGE`** is read in the answer of 02 (`priceChangeSaid()`: `problems`, or the deprecated `warnings`; a code or a URN ending in it) and kept for the later reads (`__bookingPriceChangeSaid`, both reset lists and `SUBRUN_SALE_STATE`).
+- **Simulator scenario** `SIM_VARIANT_BOOKING_PRICE_CHANGE_1ADT_38` and its version copies (in the run list), passenger list 42: no failed check, a WARNING at 02, 05 and 07.
+
+### Changed (for the maintainer to accept or drop)
+- **When the booking answer says `OFFER_PART_PRICE_CHANGE`**, "<part> prices have at least one member in common between offer and booking" no longer requires an amount in common (the currency and the scale still do), and a `provisionalPrice` below the offer's `minimalPrice` is a WARNING instead of a failure. OSDM allows a price changed at pre-booking when it is said. Without the warning, both fail as before. No simulator scenario but the new one has a changed price, so no count moves.
+
+### Simulator 0.73.0
+- **Variant `booking-price-change`** (last name `Simvariant-Booking-Price-Change`): each admission is booked 1.00 dearer than offered (its price object is replaced, never changed in place: it is the offer's own), `provisionalPrice` with them, and the answer of `POST /bookings` carries `problems: [{ code: OFFER_PART_PRICE_CHANGE, … }]` (`bookingProblems()`). The reads keep the new prices without the problem; the confirmed price follows them. No other answer changes.
+
+### Changed
+- *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`), from the replay of #1298, #1299 and #1300 together.
+- Every simulator reference changes (its run list): a company following one reads "not up to date" until it updates.
+- Docs: *What is tested* (step 02), *OSCAR - OSDM Simulator scenarios* (one row), CLAUDE.md, a welcome-page news entry.
+
+### Checked
+- **Replay**: being recorded; this line is replaced with its result before review.
+- **Collection**: `bruno-booked-as-offered.test.js` covers `OFFER_PART_PRICE_CHANGE` (problems, warnings, code, URN, a title that is not the code), each member (price, scale, currency, named place fee, validity instants, product by code and by id, flexibility, classes, trip coverage, passengers), the context, the WARNING lines (never a test), the price check and the minimal price with and without the warning, another currency still failing, and the simulator's own offer and booking with and without the variant, and with the variant's warning removed.
+- **Simulator**: `app.test.js` books with the variant, reads, confirms, and books the same offer again without it.
+- **Mutation checks**: each of the 30 rules of this change (collection and simulator), removed one by one, fails a test.
+
+---
+
 ## [server-1.11.539] / [collection-OTST_V2.0.264] — 2026-11-17
 
 Issue #1299, part of #1297. Release 2026.578. Simulator 0.72.0. The booking names the trip sold. Server 1.11.539 for the news entry only.
