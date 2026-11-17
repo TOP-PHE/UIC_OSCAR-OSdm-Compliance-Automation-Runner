@@ -521,9 +521,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.533] / [collection-OTST_V2.0.262] — 2026-11-17
+## [server-1.11.535] / [collection-OTST_V2.0.262] — 2026-11-17
 
-Issue #1266, part 2, third case. Release 2026.572 (`current_release`). Simulator 0.71.0. Offers without a trip in regions named by NUTS codes.
+Issue #1266, part 2, third case. Release 2026.574 (`current_release`). Simulator 0.71.0. Offers without a trip in regions named by NUTS codes.
 
 OSDM's `NonTripSearchCriteria` names where offers without a trip are valid by stop places, zones or `nutsCodes`; a provider lists the NUTS codes of its zones in `GET /zones` (`ZoneDefinition.nutsCodes`), and a regional validity's `Zone` may name one (`Zone.nutsCode`). OSDM's page on sales without a trip (osdm.io, *Non trip based sale*) asks offers valid "within the area specified", but calls the region a hint for the offer search: offers may be valid in a relevant part of it. So a validity naming none of the codes asked is a WARNING, never a failed check.
 
@@ -533,6 +533,8 @@ Decided with the maintainer:
 - an admission whose validity names none of the codes asked is a WARNING;
 - an NHF scenario asks a code the provider does not know, which must be refused or given no offer;
 - the codes are those the trip names, else those of the first zone of `GET /zones` that lists some.
+
+Version 1.11.535 / release 2026.574: #1292 took 1.11.534 / 2026.573 first, so 1.11.533 / 2026.572 are not used.
 
 ### Added
 - **The NUTS form of a request without a trip** (`library-bruno/nonTrip.js`): a NON_TRIP trip `by: NUTS` with `nonTrip.nutsCodes`, 1 to 10 codes of two capital letters then up to three letters or digits, each once (`withNutsCodes()`).
@@ -578,6 +580,30 @@ Decided with the maintainer:
 - **Server**: `non-trip-forms.test.js` covers the form, its declaration, capability, run filter, the expected refusal, the provider value and the reference; the page's `withNonTripValue()`.
 - **Mutation checks**: every collection rule (17) of this change, removed one by one, fails a test.
 - **Full local suites**: simulator 452 of 453 pass; the one failure is the known Windows file-mode test. Server: 6,388 of 6,414 pass (11 skipped). The failures are the known Windows-only ones (runner agent, MCP, `/metrics`, the answer-threats timing, the checkpoint thread), plus six files that failed under the full run's load and pass when run alone. `offer-request-forms.test.js` listed the non-trip entries and now names the two new ones.
+
+---
+
+## [server-1.11.534] — 2026-11-17
+
+Release 2026.573 (`current_release`). A run a server restart failed is not a test result, and says so (#1291).
+
+### Fixed
+- **Runs failed by a server restart counted as results.**
+  - **Seen:** on the k3s test machine (2026.571), the server was restarted during a campaign on the six simulators: about 15 runs going, about a thousand queued.
+  - **Why:** at start, `worker/reconcile.js` marks every run still `RUNNING` or `QUEUED` as `FAILED`, with "Interrupted by a server restart …" or "Cancelled by a server restart before this run started …". That is right: nothing resumes them. But two readers took them as results:
+    - **the coverage report** took them as each scenario's latest result. With no step stored, they read "not run" and hid the finished run before them. The two messages were not in `NOT_A_RESULT` (#1287).
+    - **the run page** showed them as an OAuth2 failure, with a link to update the credentials. It does so for any `error_message` it does not know when `auth_mode_used` is `oauth2`, and that field is written when the run is queued.
+- **The two messages move to `public/js/run-exit.js`** (`RESTART_INTERRUPTED`, `RESTART_CANCELLED`, `isRestarted()`), and `reconcile.js` takes them from there. Both join `NOT_A_RESULT`, so the coverage report leaves them out: the scenario's finished run before stands as its result, or none. Published reports and the certifier's coverage go through the same route. The text is unchanged, so the rows of earlier releases are left out too.
+- **The run page** has its own banner, *Stopped by a server restart — this is not a test result*, with the stored message (`restartedBannerHtml()`, escaped).
+- Unchanged: the Run page's *last run* facets, as for #1287. Such a run still reads failed there, so it is easy to select again.
+- Version 1.11.534: 1.11.533 / 2026.572 is left to the change in preparation for NUTS codes (#1266).
+- **Documentation:** the Tester User Guide's troubleshooting table, the Specification's banners (§12), a news entry, `CLAUDE.md`.
+
+### Checked
+- `run-exit.test.js`: both messages are in `NOT_A_RESULT` and `isRestarted()`, their text is pinned (earlier rows hold it), and the banner says what it is and escapes the message.
+- `reconcile.test.js`: the reconciliation writes run-exit.js's two messages.
+- `coverage-routes.test.js`: a later run with either message leaves the run before it as the result.
+- `runner.test.js`: the page's wiring (the banner, and no OAuth2 banner for such a run).
 
 ---
 

@@ -68,6 +68,16 @@ describe('reconcileOrphanedRuns — unit (injected db)', () => {
     expect(RUNNING_MSG).toMatch(/restart/i);
     expect(QUEUED_MSG).toMatch(/restart/i);
   });
+
+  // #1291: what the reconciliation writes is what the coverage report and the
+  // run page read as "not a test result".
+  test('the two messages are run-exit.js\'s, not a test result', () => {
+    const RunExit = require('../../public/js/run-exit');
+    expect(RUNNING_MSG).toBe(RunExit.RESTART_INTERRUPTED);
+    expect(QUEUED_MSG).toBe(RunExit.RESTART_CANCELLED);
+    expect(RunExit.isNotAResult(RUNNING_MSG)).toBe(true);
+    expect(RunExit.isNotAResult(QUEUED_MSG)).toBe(true);
+  });
 });
 
 describe('reconcileOrphanedRuns — against the real schema', () => {

@@ -175,7 +175,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `sale.replacement`; provider values `lostCard` (left out of a copy, the
     probe's made-up card kept) and `lostTicketHolder`; references declare
     both tags.
-    **NUTS codes** (1.11.533 / OTST_V2.0.262, simulator 0.71.0; maintainer:
+    **NUTS codes** (1.11.535 / OTST_V2.0.262, simulator 0.71.0; maintainer:
     through the zones, made-up codes, a validity naming none asked a
     WARNING, an unknown code an NHF, named else from `GET /zones`). Form
     `NON_TRIP_NUTS` (`by: NUTS`, `nonTrip.nutsCodes`, 1–10 of
@@ -1636,6 +1636,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   leaves out every `NOT_A_RESULT` run (`NO_CHECKS`, `RUN_PROCESS_ERROR`,
   `RUN_NOT_FINISHED`): the finished run before it stands. A new "not a
   result" sentinel goes in that list. Local mode still resolves a signal as 1.
+  **So do the two messages a server start writes** on the runs it finds
+  RUNNING or QUEUED (#1291, 1.11.534: `RESTART_INTERRUPTED` /
+  `RESTART_CANCELLED` in `run-exit.js`, taken by `reconcile.js`; the text
+  is pinned, since earlier rows hold it). A restart mid-campaign fails the
+  whole queue: those runs read "not run" in the coverage until then, and the
+  run page showed them as an OAuth2 failure (`auth_mode_used` is written at
+  queue time). **The run page's OAuth2 banner takes any `error_message` it
+  does not know**: a new message a run can carry needs its own banner.
   **A 409 is read by its reason** (#1276, 1.11.528): `KubeError.reason` keeps
   `Status.reason` when it is one word. `Conflict` (two writes of the runs'
   quota met, nothing made: 15 runs starting at once on k3s) is passing;

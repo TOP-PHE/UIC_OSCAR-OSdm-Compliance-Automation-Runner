@@ -8,6 +8,14 @@
     "content": "OSDM can ask offers without a trip for a region named by its NUTS codes (the European statistical regions), next to stop places and zones. A provider lists the NUTS codes of its zones in GET /zones.\n\nOSCAR asks the offers with the NUTS codes the trip names, or, when it names none, with those of the first zone of GET /zones that lists some. Each admission should say it is valid in a zone naming a code asked: one that does not gives a warning. The sale then goes on as any sale without a trip.\n\nIn Test Config, choose Valid where → In regions named by NUTS codes on a trip without a trip, and give the codes, or leave them empty. With Unknown NUTS code refused, the codes are ones the provider does not know: the offer request must be refused, or give no offer.\n\nTwo reference scenarios can be copied: OTST_NONTRIP_NUTS_1ADT and NHF_NONTRIP_NUTS_UNKNOWN_1ADT. Your Test Framework must declare offers without a trip by NUTS codes (Offer requests).\n\nIf your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
   },
   {
+    "id": "2026-11-17-server-restart-runs",
+    "date": "November 17, 2026",
+    "tag": "Bug Fix",
+    "title": "A run a server restart stopped is no longer counted as a result",
+    "summary": "When the OSCAR server restarts, the runs going or waiting are marked failed. They now say so on the run page, and the coverage report no longer takes them as the scenarios' result.",
+    "content": "Nothing resumes a run after the OSCAR server restarts, for an update or by an administrator. At start, the server marks every run that was going or waiting in the queue as failed.\n\nThe coverage report took those runs as each scenario's latest result. Having tested nothing, they read \"not run\" and hid the result before them. It now leaves them out: the scenario's finished run before stands, or none.\n\nThe run page showed such a run of a company using OAuth2 as an OAuth2 failure, with a link to update the credentials. It now shows the banner \"Stopped by a server restart — this is not a test result\".\n\nNo action is required. Run those scenarios again: on the Run page, Last run: failed selects them."
+  },
+  {
     "id": "2026-11-16-lost-ticket-card",
     "date": "November 16, 2026",
     "tag": "New",
