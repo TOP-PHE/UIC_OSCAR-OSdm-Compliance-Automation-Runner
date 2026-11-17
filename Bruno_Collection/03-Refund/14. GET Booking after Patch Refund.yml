@@ -59,6 +59,8 @@ runtime:
             loopbackOrStop("GET Booking after Patch Refund (missing booking)");
             return;
         }
+        // #1298: every fulfilment seen before is still listed (a WARNING when not).
+        require(bru.getEnvVar("library_base") + "confirmedFulfillments.js").checkBookingStillLists((jsonData && jsonData.booking) || jsonData, "14. GET Booking after Patch Refund");
         // #613 F2: a refund that leaves fulfillments out (partial, or one
         // fulfillment of several) must not expect the whole booking REFUNDED.
         // The generic checks then accept either state, and the scope check

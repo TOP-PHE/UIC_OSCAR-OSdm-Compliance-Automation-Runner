@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-fulfilments-later-reads",
+    "date": "November 17, 2026",
+    "tag": "Improvement",
+    "title": "Fulfilments the booking no longer lists, after the refund or exchange steps",
+    "summary": "OSCAR now says, at every booking read of a refund or an exchange, when the booking no longer lists a fulfilment it gave before.",
+    "content": "Some providers answer the confirmation with the fulfilments, then leave them out of the booking they give afterwards. OSCAR already said so at the booking read after the fulfilment (07).\n\nIt now says so at every later booking read too: before and after the refund is confirmed or withdrawn (12, 14, 16), and before and after the exchange is confirmed or withdrawn (13, 15, 17). A fulfilment given by the confirmation, listed at 07 or given by the exchange's confirmation, that the booking no longer lists, is a warning. OSDM does not require the booking to list its fulfilments, but these reads ask for everything (embed=ALL).\n\nAfter a refund, a refunded fulfilment the booking no longer lists keeps the parts the confirmation gave it, so its parts are no longer reported as left out of the refund.\n\nThese are warnings only: no result and no number of checks changes. If your company follows a simulator reference configuration, update it from Test Config (a new scenario is in its run list). Otherwise no action is required."
+  },
+  {
     "id": "2026-11-17-nuts-codes",
     "date": "November 17, 2026",
     "tag": "New",

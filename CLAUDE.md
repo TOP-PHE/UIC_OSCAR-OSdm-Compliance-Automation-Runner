@@ -2800,6 +2800,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   when the booking lists none: parts checked, their state not. **A replay's
   simulator must be the one just started**: an old one still on the port
   (`EADDRINUSE` in its log) answered the first recording of this change.
+  **Every booking read after 07 is held to the fulfilments seen before**
+  (#1298, OTST_V2.0.263): refund 12/14/16 and exchange 13/15/17 (which ask
+  `embed=ALL`) call `checkBookingStillLists()` (`confirmedFulfillments.js`)
+  against `__fulfillmentIdsSeen` (06's, then 07's and exchange 14's added;
+  06 starts it again; in both reset lists and `SUBRUN_SALE_STATE`): one
+  WARNING per read, never a test. The refund scope's own line is INFO now,
+  and a refunded fulfilment the booking dropped keeps its parts from the
+  confirmation (they read "left out of the refund" before).
+  `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_*` shows it on
+  the exchange. A FAIL there is the maintainer's call (#1297).
   **A searched trip may start at another stop place** (1.11.461 /
   OTST_V2.0.251, from a real provider's search: one trip started by tram
   from the tram stop by the station asked, then a walk and a train, and O8

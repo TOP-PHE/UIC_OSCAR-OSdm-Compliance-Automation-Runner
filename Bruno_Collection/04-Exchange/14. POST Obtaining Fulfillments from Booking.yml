@@ -56,6 +56,8 @@ runtime:
 
         // #671: parts the exchange made may be new here; step 15 checks them.
         validateFulfillments(jsonData.fulfillments, 0, ["EXCHANGED", "FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments, { deferUnknownParts: true });
+        // #1298: the booking reads after it are held to these fulfilments too.
+        require(bru.getEnvVar("library_base") + "confirmedFulfillments.js").rememberFulfillments(jsonData.fulfillments);
 
         console.log("Fulfillment status processing from CONFIRMED to FULFILLED");
         console.log("Waiting 2 secs before executing 15. GET Booking after Fulfillment...");
