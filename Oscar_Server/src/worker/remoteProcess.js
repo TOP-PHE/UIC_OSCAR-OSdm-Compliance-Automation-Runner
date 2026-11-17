@@ -46,6 +46,8 @@ class RemoteProcess extends EventEmitter {
     else if (msg?.t === 'err' && typeof msg.d === 'string') this.stderr.emit('data', Buffer.from(msg.d, 'utf8'));
     else if (msg?.t === 'exit') this._finish(Number.isInteger(msg.code) ? msg.code : null);
     else if (msg?.t === 'pod' && typeof msg.address === 'string') this.emit('pod', msg.address.slice(0, 64));
+    // The agent started the process; the dispatcher made the run's Secret and Job (#1312).
+    else if (msg?.t === 'started') this.emit('started');
     else if (msg?.t === 'refused') this._fail(`the runner agent refused: ${String(msg.reason || '').slice(0, 200)}`);
     return undefined;
   }

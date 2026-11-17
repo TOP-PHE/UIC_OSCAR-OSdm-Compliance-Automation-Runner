@@ -1642,6 +1642,26 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   quota.yaml` too, and an upgraded cluster applies `runs/` again. **The
   kernel adds an ended process's I/O counters to whoever reaps it**: the
   run pods' writes read as `systemd`'s.
+  **A run's time is measured step by step** (#1312, 1.11.544; first step
+  of #1309, a run pod kept for a session). `worker/runTimeline.js` (pure
+  but for the clock) keeps, per run in progress, the moments the server
+  sees itself (`MARKS`: slot, launched, job, pod, output, call, upload,
+  uploaded, exit, linked, done) and `stepsOf()` gives the steps between
+  them (`SPANS`; `STEP_NAMES`, pinned to `metrics.RUN_STEPS`). **Nothing
+  is read from what the run prints**: `output` is the moment the pod's
+  first line arrives (pod mode only), `call` / `upload` / `uploaded` are
+  noted by the run's routes in `server.js` once the run's own secret is
+  verified. The scenario's span is split with Bruno's own times of the
+  requests (`SUM(run_suites.duration_ms)`: Bruno's `runDuration` covers a
+  request's scripts and its answer), else given whole as `scenario`.
+  `noteRunTimes()` observes `oscar_run_step_seconds{step}` and writes one
+  line in the run's log, at the normal end only (a refused or cancelled
+  run gives none); `executeRun()` drops the run's entry in its `finally`.
+  The dispatcher looks at a pod once a second (`pollMs`): `pod` and `end`
+  are known to the second. **A new moment is a name in `MARKS` and a span
+  in `SPANS`; a new step is a label in `RUN_STEPS`, a word in
+  `STEP_WORDS`, a row in *Metrics and monitoring* and in the panel's
+  description** (`run-step-times.test.js` holds them together).
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

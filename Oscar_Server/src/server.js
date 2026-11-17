@@ -345,6 +345,9 @@ const SAFE_DATAFILE_RE = /^([a-z0-9][a-z0-9-]*)-datafile\.json$/;
 // live vendor token. Trust is now the secret, not the source address, so
 // nothing here reads req.ip.
 const runSecrets = require('./utils/runSecrets');
+// #1312: the moment of a run's first call, and of its result files, for the
+// run's time step by step. Noted only once the run's secret is verified.
+const runTimeline = require('./worker/runTimeline');
 
 // The authenticated fallback on GET /data: a signed-in Test Manager of the
 // company that owns the slug. Returns null when allowed, else the HTTP status
@@ -566,6 +569,7 @@ const runDatafileHandler = ({ runCaller, allowSession }) => (req, res) => {
   const runCompanyId = verifiedRunCompany(req, req.get('X-OSCAR-Run-Id'), runCaller);
   const denied = runDatafileDenial(req, company, runCompanyId, allowSession);
   if (denied) return res.status(denied).send(DENIAL_TEXT[denied]);
+  if (runCompanyId !== null) runTimeline.mark(req.get('X-OSCAR-Run-Id'), 'call');
 
   // Resolve, traversal-guard, decrypt, send.
   // The datafile is encrypted at rest (Phase 2 of issue #60). Bruno on the
@@ -638,6 +642,7 @@ const refreshAccessTokenHandler = ({ runCaller }) => async (req, res) => {
   if (runRow.company_id !== runCompanyId) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Run secret does not match the run.' });
   }
+  runTimeline.mark(runId, 'call');
   // #540: the user must still be allowed to use the run's company — access
   // withdrawn mid-run stops new tokens here, as it refuses a queued run.
   const runRowFull = dbGet('SELECT * FROM runs WHERE id = ?', [runId]);
@@ -702,10 +707,13 @@ const storeRunResultHandler = ({ runCaller }) => async (req, res) => {
   if (!runRow || runRow.company_id !== runCompanyId) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
   }
+  // #1312: the run's first result file arrives; the last one kept ends the sending.
+  runTimeline.mark(runId, 'upload');
   try {
     // A body that is not bytes (no raw body came) is an empty one: refused as such.
     const content = Buffer.isBuffer(req.body) ? Buffer.from(req.body) : Buffer.alloc(0);
     await storeRunResult(runId, String(name), content);
+    runTimeline.markAgain(runId, 'uploaded');
     return res.status(201).json({ stored: name });
   } catch (err) {
     if (err instanceof ResultRefusal) return res.status(err.status).json({ status: err.status, title: 'Refused', detail: err.message });

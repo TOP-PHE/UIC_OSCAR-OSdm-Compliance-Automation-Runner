@@ -310,6 +310,24 @@ const runPodsEnded = new promClient.Counter({
   registers: [register]
 });
 
+// ─── A run's time, step by step (#1312) ──────────────────────────────────────
+// The run's own clock, where oscar_run_work_seconds is the server's thread:
+// the time between the moments the server sees for a run, from its slot to its
+// final status (worker/runTimeline.js, whose STEP_NAMES these are). In pod
+// mode every step; in the other modes prepare, bruno_start, requests, reports,
+// link and store. `scenario` stands for requests + reports when Bruno's own
+// times of the requests were not stored.
+const RUN_STEPS = Object.freeze([
+  'prepare', 'job', 'pod', 'folder', 'bruno_start', 'requests', 'reports', 'scenario', 'send', 'end', 'link', 'store',
+]);
+const runStepSeconds = new promClient.Histogram({
+  name: 'oscar_run_step_seconds',
+  help: 'Seconds a run spent in each step, from its slot to its final status',
+  labelNames: ['step'],
+  buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8, 15, 30, 60, 120, 300],
+  registers: [register]
+});
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 const loginAttempts = new promClient.Counter({
   name: 'oscar_login_attempts_total',
@@ -408,6 +426,8 @@ module.exports = {
   RUN_POD_OUTCOMES,
   runPodStart,
   runPodsEnded,
+  RUN_STEPS,
+  runStepSeconds,
   loginAttempts,
   smtpSends
 };

@@ -32,6 +32,9 @@ Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
   server's one thread taken by the work done for each run, how long requests
   waited for the thread, the slowest addresses, one run's work (see
   *OSCAR's thread* below)
+- Row *A run's time, step by step* (#1312): the mean seconds of each step of
+  a run, from the slot it is given to its final status, and the 95th
+  percentile of each (see *A run's time, step by step* below)
 
 Which address is slow: Grafana → **Explore** → Prometheus, the 99th
 percentile by listener, method and route over the last 5 minutes:
@@ -587,6 +590,45 @@ key, has as many runs as `RUN_DISPATCHER_MAX_RUNS`, or the Kubernetes API
 did not answer for `RUN_DISPATCHER_API_WAIT_MS`, 2 minutes by default). Since
 #1272 the dispatcher waits for the API that long instead of refusing at
 once, and logs each refusal with its reason.
+
+### A run's time, step by step (#1312)
+
+`oscar_run_work_seconds` is the server's thread. `oscar_run_step_seconds{step}`
+is the run's own clock: the time between the moments the server sees for a
+run, from the slot it is given to its final status. The server notes those
+moments itself; nothing is read from what the run prints.
+
+| Step | From the step before, to | Modes |
+|---|---|---|
+| `prepare` | the run is handed to the launcher (the server's checks, the token, the run's environment) | all |
+| `job` | the dispatcher made the run's Secret and Job | pod |
+| `pod` | the pod's container runs | pod |
+| `folder` | the pod's first line: its work folder is ready and Bruno is being started | pod |
+| `bruno_start` | Bruno's first call to the server (the data file, or a token) | all |
+| `requests` | the scenario's requests, as Bruno timed each: its scripts and the provider's answers | all |
+| `reports` | the rest until the first result file reaches the server (pod), or Bruno's end (other modes): Bruno between requests, its reports, their merging | all |
+| `send` | the last result file is kept | pod |
+| `end` | the dispatcher reports the pod's end | pod |
+| `link` | the reports are linked to the run | all |
+| `store` | the checks are stored and the final status written | all |
+
+- `scenario` stands for `requests` and `reports` as one step, for a run whose
+  results were not stored (Bruno's own times are read from them).
+- A step is given only when both its ends were seen. A run refused before it
+  was launched, or stopped by an emergency stop, gives none.
+- The dispatcher looks at a pod once a second, so `pod` and `end` are known
+  to the second.
+- Not counted: the time a run waits in the queue (it depends on the batch),
+  and the removal of the Job and the Secret, which the dispatcher does after
+  the run's end.
+
+The row *A run's time, step by step* of *OSCAR · Overview* shows the mean
+per step, stacked (one run's mean time), and the 95th percentile of each. The
+same figures are in each run's log, in one line at its end:
+
+```
+[runner] Where this run's time went (37.0 s from its slot to its final status): preparing the run 0.5 s, asking for its pod 0.5 s, waiting for its pod 6.0 s, …
+```
 
 ### On Kubernetes (#1147)
 

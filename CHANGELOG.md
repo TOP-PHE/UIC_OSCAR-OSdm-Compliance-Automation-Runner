@@ -521,6 +521,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.544] — 2026-11-17
+
+Release 2026.583 (`current_release`). A run's time, step by step, in the metrics and in its log (#1312). First step of #1309 (a run pod kept for a session): measure before building. No change to how a run goes.
+
+### Why
+On the k3s test machine a run takes about 55 s from the moment it gets a slot (15 runs going, 15 to 17 ended a minute, #1310). Nothing said where those seconds go: `oscar_run_pod_start_seconds` covers one stretch (from the launch to the pod's container running), and `oscar_run_work_seconds` is the server's thread, not the run's clock. So nothing said what a kept pod would save.
+
+### Added
+- **`oscar_run_step_seconds{step}`**, a histogram: the time between the moments the server sees itself for a run, from its slot to its final status.
+
+  | Step | From the step before, to | Modes |
+  |---|---|---|
+  | `prepare` | the run is handed to the launcher (the server's checks, the token, the run's environment) | all |
+  | `job` | the dispatcher made the run's Secret and Job | pod |
+  | `pod` | the pod's container runs | pod |
+  | `folder` | the pod's first line: its work folder is ready, Bruno is being started | pod |
+  | `bruno_start` | Bruno's first call to the server (the data file, or a token) | all |
+  | `requests` | the scenario's requests, as Bruno timed each: its scripts and the provider's answers | all |
+  | `reports` | the rest until the first result file reaches the server (pod), or Bruno's end (other modes) | all |
+  | `send` | the last result file is kept | pod |
+  | `end` | the dispatcher reports the pod's end | pod |
+  | `link` | the reports are linked to the run | all |
+  | `store` | the checks are stored and the final status written | all |
+
+  `scenario` stands for `requests` and `reports` as one step, for a run whose results were not stored.
+- **One line at the end of each run's log**: `[runner] Where this run's time went (37.0 s from its slot to its final status): preparing the run 0.5 s, asking for its pod 0.5 s, waiting for its pod 6.0 s, …`.
+- **A row in *OSCAR · Overview***, *A run's time, step by step*: the mean seconds per step, stacked (one run's mean time), and the 95th percentile of each step.
+- **Documentation:** *Metrics and monitoring*, section *A run's time, step by step*; `CLAUDE.md`.
+
+### How
+- `worker/runTimeline.js` keeps the moments of each run in progress and gives the steps between them. A step is given only when both its ends were seen, and never when it would end before it started.
+- **Nothing is read from what the run prints.** The moments are the runner's own (slot, launch, the process's end, the reports linked, the final status), the dispatcher's messages (Job made, pod running), the arrival of the pod's first line (the moment only, never its words), and the run's calls to the server. A call is a moment of a run only when it carries that run's own secret: a signed-in read of the data file that names a run is not.
+- The requests' own times are Bruno's (`runDuration` of each request, stored with the run's results), never more than the span they are in.
+- A run refused before it is launched, or stopped by an emergency stop, gives no step and no line. A run's moments are forgotten when it ends, however it ends. A measure that fails never stops a run.
+- The dispatcher's `started` message (the run's Job is made) is now heard by the server; it was sent and ignored.
+
+### Not measured
+- The time a run waits in the queue: it depends on the batch's size.
+- The removal of the Job and the Secret, which the dispatcher does after the run's end.
+- The dispatcher looks at a pod once a second, so `pod` and `end` are known to the second.
+
+### Checked
+- `run-step-times.test.js`: the steps of a pod run and of a run in the other modes from fixed moments, the missing and reversed ends, the line of the log, the metric's steps held to the module's, the dashboard's expressions and the documentation naming every step.
+- `runner.test.js`: a pod run gives its eleven steps once each and one line; a run started here its six; a run refused or cancelled none; a failing measure does not stop a run.
+- `internal-run-port.test.js`, `server.test.js`: the data file, a token and the result files are moments only with the run's own secret.
+- 28 changes to the code, each made to fail a test.
+
+---
+
 ## [server-1.11.543] — 2026-11-17
 
 Release 2026.582 (`current_release`). A run pod's CPU limit is 1 again by default (#1310). The run pods' folders stay in memory.

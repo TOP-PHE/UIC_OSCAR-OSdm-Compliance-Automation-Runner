@@ -48,6 +48,7 @@ const { normalizeRole } = require('../api/middleware/auth');
 const { safeJoinUuid } = require('../utils/paths');
 const { templatesForRunner, runRefusal, frameworkRunRefusal } = require('../utils/datafileTemplates');
 const runSecrets = require('../utils/runSecrets');
+const runTimeline = require('./runTimeline');
 const { usableUrlRefusal } = require('../utils/urlPolicy');
 const { versionRefusal } = require('../utils/osdmVersion');
 const { frameworkConfigOf } = require('../api/helpers/configurationStore');
@@ -1122,10 +1123,29 @@ function refusedRunScope(runRow, companyId, userId) {
 // Every line the run logged is written before its caller goes on, however it
 // ended (#1210): the queue, the tests and every report read them afterwards.
 async function executeRun(job) {
+  // The run has its slot: its time is counted from here (#1312).
+  runTimeline.begin(job?.runId);
   try {
     return await runSteps(job);
   } finally {
+    runTimeline.drop(job?.runId);
     flushRunLogs();
+  }
+}
+
+// Where a run's time went (#1312): each step in oscar_run_step_seconds, and
+// one line in the run's log. The requests' own times are Bruno's, as stored
+// with the run's results (the sum of its requests, in run_suites). Called
+// once the final status is written; a measure never stops a run.
+function noteRunTimes(runId) {
+  try {
+    const stored = get('SELECT SUM(duration_ms) AS ms FROM run_suites WHERE run_id = ?', [runId]);
+    const requestSeconds = typeof stored?.ms === 'number' ? stored.ms / 1000 : undefined;
+    const times = runTimeline.stepsOf(runId, { requestSeconds });
+    for (const { step, seconds } of times.steps) metrics.runStepSeconds.observe({ step }, seconds);
+    if (times.steps.length > 0) logEvent(runId, 'info', `[runner] ${runTimeline.textOf(times)}`);
+  } catch (err) {
+    log.warn({ runId, err: err?.message }, 'the times of the run were not noted');
   }
 }
 
@@ -1395,6 +1415,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     // keeps the shell off unless BRU_CMD is a Windows batch wrapper.
     let proc;
     let podEnded = () => {};
+    runTimeline.mark(runId, 'launched');
     try {
       proc = podMode
         ? launchRun({
@@ -1405,6 +1426,9 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       if (podMode) {
         podEnded = watchRunPod(proc);
         proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
+        // #1312: the dispatcher made the run's Job, then its pod's container runs.
+        proc.once('started', () => runTimeline.mark(runId, 'job'));
+        proc.once('pod', () => runTimeline.mark(runId, 'pod'));
       }
     } catch (err) {
       if (podMode) metrics.runPodsEnded.inc({ outcome: 'refused' });
@@ -1502,6 +1526,9 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
 
     proc.stdout.on('data', chunk => {
       lastOutputAt = Date.now();
+      // #1312: a pod's first line comes once its work folder is ready. Only
+      // the moment is noted, never what the line says.
+      if (podMode) runTimeline.mark(runId, 'output');
       const lines = chunk.toString().split('\n');
       lines.forEach(line => {
         if (!line.trim()) return;
@@ -1528,6 +1555,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     });
 
     proc.on('close', code => {
+      runTimeline.mark(runId, 'exit');
       clearTimeout(timeout);
       stopIdleWatch();
       stopTokenWatchdog();
@@ -1537,6 +1565,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       resolve(code ?? 1);
     });
     proc.on('error', err => {
+      runTimeline.mark(runId, 'exit');
       clearTimeout(timeout);
       stopIdleWatch();
       stopTokenWatchdog();
@@ -1598,6 +1627,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     await cleanupWorkspace(runId);
     logEvent(runId, 'info', '[runner] Workspace cleaned up.');
   }
+  runTimeline.mark(runId, 'linked');
 
   // 10e. Extract structured assertion results into DB
   let checksStored = null;                       // null: not known (the extraction failed)
@@ -1657,6 +1687,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     _resetLineCounter(runId);
     return { exitCode };
   }
+  runTimeline.mark(runId, 'done');
 
   if (tokenFormatError) {
     dbRun(`UPDATE runs SET error_message = 'TOKEN_FORMAT_ERROR' WHERE id = ?`, [runId]);
@@ -1694,6 +1725,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   }
 
   logEvent(runId, 'info', `[runner] Run finished — status=${finalStatus} exit=${exitCode}`);
+  noteRunTimes(runId);
 
   // Free the per-run line counter to prevent unbounded Map growth
   _resetLineCounter(runId);
