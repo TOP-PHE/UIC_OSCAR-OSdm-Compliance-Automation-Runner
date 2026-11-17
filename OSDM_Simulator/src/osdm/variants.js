@@ -37,6 +37,11 @@
  *                           (#1045); POST /fulfillments, GET /fulfillments/{id}
  *                           and the refund still know them. OSDM does not
  *                           require Booking.fulfillments.
+ *   booking-without-trip    POST /bookings and GET /bookings/{id} answer
+ *                           without trips and without any trip coverage
+ *                           (booked offers, parts, fulfillments), as some
+ *                           real providers do (#1299); the stored booking
+ *                           keeps them. OSDM requires none of them.
  *   wrong-booking-price     provisionalPrice one cent off the sum of its parts
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
@@ -64,7 +69,7 @@
 
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
-  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request', 'booking-without-fulfillments',
+  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only', 'ignores-place-preferences', 'gives-other-place', 'ignores-reference-place', 'refuses-bare-place-selection', 'one-fulfillment-per-refund-request', 'booking-without-fulfillments', 'booking-without-trip',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount', 'wrong-exchange-keeps-trip',
   'fare-not-in-fulfillment', 'fare-fulfillment-document', 'fare-wrong-combining-fee', 'fare-ignores-refund-fee', 'fare-reservation-product-mode',
 ]);
@@ -141,12 +146,42 @@ function shapeIssuedFulfillments(booking) {
   }
 }
 
+// The members that say which trip a holder covers.
+const COVERAGE = ['tripCoverage', 'inboundTripCoverage'];
+const PART_LISTS = ['admissions', 'reservations', 'ancillaries', 'fees', 'fares'];
+
+function withoutCoverage(holder) {
+  const copy = { ...holder };
+  for (const key of COVERAGE) delete copy[key];
+  return copy;
+}
+
+/**
+ * The booking as an answer gives it (#1299): for booking-without-trip, a copy
+ * without trips and without any trip coverage. The stored booking is not
+ * changed.
+ */
+function bookingAsAnswered(booking) {
+  if (!has(booking, 'booking-without-trip')) return booking;
+  const copy = { ...booking };
+  delete copy.trips;
+  copy.bookedOffers = (booking.bookedOffers || []).map((bookedOffer) => {
+    const offer = withoutCoverage(bookedOffer);
+    for (const key of PART_LISTS) if (Array.isArray(bookedOffer[key])) offer[key] = bookedOffer[key].map(withoutCoverage);
+    return offer;
+  });
+  if (Array.isArray(booking.fulfillments)) copy.fulfillments = booking.fulfillments.map(withoutCoverage);
+  return copy;
+}
+
 /**
  * The booking as GET /bookings/{id} gives it: for booking-without-fulfillments,
- * a copy listing no fulfilment. The stored booking is not changed.
+ * a copy listing no fulfilment; for booking-without-trip (#1299), one without
+ * its trips. The stored booking is not changed.
  */
 function bookingAsRead(booking) {
-  return has(booking, 'booking-without-fulfillments') ? { ...booking, fulfillments: [] } : booking;
+  const answered = bookingAsAnswered(booking);
+  return has(booking, 'booking-without-fulfillments') ? { ...answered, fulfillments: [] } : answered;
 }
 
 /**
@@ -166,5 +201,5 @@ function scopedPartIds(booking, heldIds, spec, parts) {
 }
 
 module.exports = {
-  variantsOf, keepVariants, has, shapeNewBooking, shapePassengers, mayChangePassenger, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds, bookingAsRead,
+  variantsOf, keepVariants, has, shapeNewBooking, shapePassengers, mayChangePassenger, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds, bookingAsRead, bookingAsAnswered,
 };

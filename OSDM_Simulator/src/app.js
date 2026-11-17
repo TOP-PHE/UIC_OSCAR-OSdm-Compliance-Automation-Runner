@@ -287,7 +287,8 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
     return idempotent(req, provider, scope, 'POST /bookings', (body) => {
       const booking = createBooking(body, (offerId) => store.get('offer', scope, offerId), provider, now());
       store.put('booking', scope, booking.id, booking);
-      return { booking };
+      // #1299: a variant may answer without the trips (the stored booking keeps them).
+      return { booking: variants.bookingAsAnswered(booking) };
     });
   }
 

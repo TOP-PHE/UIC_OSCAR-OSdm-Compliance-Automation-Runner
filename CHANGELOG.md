@@ -521,9 +521,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.540] — 2026-11-17
+## [server-1.11.541] — 2026-11-17
 
-Release 2026.579 (`current_release`). A run pod may use 2 CPUs, and its work folders are kept in memory (#1307). From the performance audit of 2026-11-17, once the server's thread was no longer the limit (#1294, #1295).
+Release 2026.580 (`current_release`). A run pod may use 2 CPUs, and its work folders are kept in memory (#1307). From the performance audit of 2026-11-17, once the server's thread was no longer the limit (#1294, #1295).
 
 ### To do on a cluster, after the upgrade
 - **Upgrade between two batches.** The dispatcher restarts with the upgrade, and at its start it removes the runs going.
@@ -558,6 +558,37 @@ The k3s test machine (16 CPUs, 64 GB, one disk), release 2026.576, six simulator
 
 ### Not checked here
 The effect. To measure on the test machine with the same batch: the share of periods throttled and the CPU held back per run pod, the megabytes the run pods write, the time a pod takes to start (7 s at the median), and the runs ended a minute (about 18).
+
+---
+
+## [server-1.11.540] / [collection-OTST_V2.0.264] — 2026-11-17
+
+Issue #1299, part of #1297. Release 2026.579. Simulator 0.72.0. The booking names the trip sold. Server 1.11.540 for the news entry only.
+
+Some real providers give a booking with no trip, though the offer booked covers one. No step after 01 looked for the trip in the booking. OSDM requires none of `Booking.trips`, `BookedOffer.tripCoverage` and a booked part's `tripCoverage` (a `TripCoverage` requires `coveredTripId`), but `GET /bookings/{bookingId}` embeds everything by default (`embed`, "Default value: ALL", value `BOOKING_TRIPS`). Booked resources may carry other ids than the offer's (osdm.io, *Processes*, "Handling Partial Success of Pre-Booking": "it is assumed in the specifications that this is not the case"), so a trip is compared by what it is. Each finding is a WARNING, never a failed check.
+
+### Added
+- **`library-bruno/bookingTrip.js`**: step 01 keeps the trip ids the chosen offer covers (its own coverage, its inbound one, its parts') and what those trips of the answer are (`__offerTrips`: first and last stop places, start, end, number of legs; `keepOfferTrips()` in `selectAndSetOffer()`). Every `postCreateBookingResponse()` (02, 05, 07, refund 12/14/16, exchange 13/15/17) calls `checkBookingTrip()`, one `[WARNING] Trip of the booking: …` line for each of:
+  - the booking names no trip (no `Booking.trips`, no trip coverage on its booked offers or parts);
+  - none of its trips is the trip sold (stop places through `sameStopPlace()`, start and end as instants, number of legs), naming what differs in the closest;
+  - a booked offer or part covers a trip that is not in `Booking.trips`.
+- A sale without a trip (`isNonTripSale()`, #1258) is exempt. A booking of fares (`fareBooking.js`) is not checked. No test is added: no number of checks moves.
+- **Simulator scenario** `SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_38` and its version copies (in the run list), passenger list 41: no failed check, a WARNING at 02, 05 and 07.
+
+### Simulator 0.72.0
+- **Variant `booking-without-trip`** (last name `Simvariant-Booking-Without-Trip`): `POST /bookings` and `GET /bookings/{id}` answer without `trips` and without any trip coverage (booked offers, their parts, fulfilments) (`bookingAsAnswered()`, also used by `bookingAsRead()`). The stored booking keeps them, so the confirmation, the refund and the exchange work as usual. No other answer changes.
+
+### Changed
+- Every simulator reference changes (its run list): a company following one reads "not up to date" until it updates.
+- Docs: *What is tested* (step 02), *OSCAR - OSDM Simulator scenarios* (one row), CLAUDE.md, a welcome-page news entry.
+
+### Checked
+- **Replay** with the real Bruno CLI 4.2.1, recorded in chunks: before = `main` at 6b532427 on simulator 0.71.0, after = this PR with #1300 on top, on simulator 0.73.0 (recorded once for both). It covers the 220 scenarios of *Checks by scenario* and the three new ones.
+  - No existing scenario gains a "Trip of the booking" line: every simulator booking names its trip, the returns, exchanges, fares, cards and sales without a trip included.
+  - `SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_38` gives 245 checks (as `SIM_SALE_SEARCH_1ADT_38`), no failure, and one WARNING at 02, 05 and 07.
+- **Collection**: `bruno-booking-trip.test.js` covers the trips an offer covers, a trip read from its timed legs, the same trip under another id, a UIC code without its zeros and another offset of the same instant, each difference named, a booking naming no trip, a coverage alone, another trip, a coverage naming a trip the booking does not hold, the glue (WARNING lines only, a sale without a trip exempt), the wiring and the reset lists; and the simulator's own offer and booking with and without the variant.
+- **Simulator**: `app.test.js` books, reads, confirms and refunds with the variant; every answer is checked against the OSDM response schema of the provider's version.
+- **Mutation checks**: each of the 17 rules of this change (collection and simulator), removed one by one, fails a test.
 
 ---
 

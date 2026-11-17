@@ -1,17 +1,29 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.579",
+  "current_release": "2026.580",
   "releases": [
+    {
+      "release": "2026.580",
+      "date": "2026-11-17",
+      "server": "1.11.541",
+      "collection": "OTST_V2.0.264",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.541: a run pod may use 2 CPUs, and its work folders are kept in memory (#1307, from the performance audit of 2026-11-17). On the k3s test machine, with the server's thread no longer the limit, each run pod was throttled in 32 to 52 % of its periods by its 1-CPU limit (1.4 to 10.5 s of CPU held back per run) on a machine with CPUs to spare, and the run pods were the first writer of the machine's one disk: 671 MB in 200 s, about 11 MB a run, against 248 MB for the server. RUN_CPU_LIMIT is 2 by default; the work folder and /tmp of a run pod are memory-backed (256 MiB and 64 MiB at most, within the pod's memory limit), RUN_WORK_FOLDERS=disk keeps them on the node's disk. ON A CLUSTER, AFTER THE UPGRADE: kubectl apply -k OSCAR_Deploy/kubernetes/runs (the quota of oscar-runs goes from 50 to 100 CPUs of limits). The dispatcher restarts with the upgrade and removes the runs going: upgrade between two batches."
+      ]
+    },
     {
       "release": "2026.579",
       "date": "2026-11-17",
       "server": "1.11.540",
-      "collection": "OTST_V2.0.263",
+      "collection": "OTST_V2.0.264",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.540: a run pod may use 2 CPUs, and its work folders are kept in memory (#1307, from the performance audit of 2026-11-17). On the k3s test machine, with the server's thread no longer the limit, each run pod was throttled in 32 to 52 % of its periods by its 1-CPU limit (1.4 to 10.5 s of CPU held back per run) on a machine with CPUs to spare, and the run pods were the first writer of the machine's one disk: 671 MB in 200 s, about 11 MB a run, against 248 MB for the server. RUN_CPU_LIMIT is 2 by default; the work folder and /tmp of a run pod are memory-backed (256 MiB and 64 MiB at most, within the pod's memory limit), RUN_WORK_FOLDERS=disk keeps them on the node's disk. ON A CLUSTER, AFTER THE UPGRADE: kubectl apply -k OSCAR_Deploy/kubernetes/runs (the quota of oscar-runs goes from 50 to 100 CPUs of limits). The dispatcher restarts with the upgrade and removes the runs going: upgrade between two batches."
+        "Server 1.11.540 (news entry only), collection OTST_V2.0.264, simulator 0.72.0: the booking names the trip sold (#1299, part of #1297). At every booking step (02, 05, 07, the refund's 12, 14, 16, the exchange's 13, 15, 17), a sale of a trip gives one WARNING when the booking names no trip (no Booking.trips, no trip coverage on its booked offers or parts), when none of its trips is the trip sold (first and last stop places, start, end, number of legs), or when a coverage names a trip the booking does not hold. OSDM requires none of these members, so they are WARNINGs, not failed checks: no number of checks moves. A sale without a trip is exempt.",
+        "The simulator gets variant booking-without-trip (POST /bookings and GET /bookings/{id} answer without trips and trip coverage; the stored booking keeps them). New simulator scenario SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_* (in the run list). Every simulator reference changes (its run list): a company following one updates it from Test Config. Otherwise no action is required."
       ]
     },
     {

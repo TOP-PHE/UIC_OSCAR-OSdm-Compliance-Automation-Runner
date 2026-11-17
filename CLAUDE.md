@@ -1617,7 +1617,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   and is removed at its start. Tests use a stand-in API server
   (`run-dispatcher.test.js` `fakeApi()`): extend it, never mock the client.
   **A run pod may use 2 CPUs and keeps its folders in memory** (#1307,
-  1.11.540). Measured on the test machine once the server's thread was no
+  1.11.541). Measured on the test machine once the server's thread was no
   longer the limit: at `RUN_CPU_LIMIT` 1 every run pod was throttled in 32
   to 52 % of its periods (Bruno starts on several threads), which is what
   the host's "CPU pressure 50 %" was; and the run pods were the first
@@ -2414,6 +2414,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `refunds.js` `getBookingRefundResponse` is called by no request (its
   `bookedOffers[0]` / `refundOffers[0]` lookups would need the same treatment
   if it is wired in).
+- **The booking names the trip sold** (#1299, OTST_V2.0.264, simulator
+  0.72.0; tracking #1297). `library-bruno/bookingTrip.js`: 01 keeps the
+  chosen offer's covered trip ids and what those trips are (`__offerTrips`,
+  `keepOfferTrips()` in `selectAndSetOffer()`), every
+  `postCreateBookingResponse()` calls `checkBookingTrip()`: a booking naming
+  no trip (no `Booking.trips`, no trip coverage anywhere), none of its trips
+  the one sold (by content: stop places through `sameStopPlace()`, start and
+  end as instants, number of legs; booked ids may differ, osdm.io
+  *Processes*), or a coverage naming a trip it does not hold: one WARNING
+  line each, never a test. A sale without a trip is exempt; fare bookings
+  (`fareBooking.js`) are not checked. Simulator variant `booking-without-trip`
+  (`bookingAsAnswered()`, also used by `bookingAsRead()`: the answers lose
+  trips and coverage, the stored booking keeps them),
+  `SIM_VARIANT_BOOKING_WITHOUT_TRIP_1ADT_*`, passenger list 41.
 - **A refund can come as one refund offer per fulfillment, and every offer is
   confirmed** (#595, 1.11.225 / OTST_V2.0.110). Step 10 keeps the ids
   (`__refundOfferIds`, `__refundOfferIndex`); step 14, after checking the

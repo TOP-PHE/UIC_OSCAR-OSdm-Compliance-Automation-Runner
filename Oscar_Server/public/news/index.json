@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-booking-trip",
+    "date": "November 17, 2026",
+    "tag": "Improvement",
+    "title": "A booking that names no trip, or another trip",
+    "summary": "OSCAR now says when a booking names no trip, or not the trip of the offer booked.",
+    "content": "Some providers give a booking with no trip, although the offer booked covers one. OSCAR did not look for the trip in the booking.\n\nIt now does, at every booking step of a sale of a trip (the booking, its reads before and after the fulfilment, and the reads of a refund or an exchange). A warning says when the booking names no trip at all, when none of its trips is the trip sold (compared by its stops, times and number of legs, since a provider may give booked trips other ids), or when a part covers a trip the booking does not hold. OSDM does not require the booking to name its trip, but a booking read gives everything by default.\n\nSales without a trip are not concerned. These are warnings only: no result and no number of checks changes. If your company follows a simulator reference configuration, update it from Test Config (a new scenario is in its run list). Otherwise no action is required."
+  },
+  {
     "id": "2026-11-17-fulfilments-later-reads",
     "date": "November 17, 2026",
     "tag": "Improvement",
