@@ -607,11 +607,14 @@ Some real providers answer `POST /bookings/{id}/fulfillments` with the fulfilmen
 - Docs: *What is tested* (refund 12/14, exchange 13), *OSCAR - OSDM Simulator scenarios* (one row, two rows reworded), CLAUDE.md, a welcome-page news entry.
 
 ### Checked
-- **Replay**: being recorded; this line is replaced with its result before review.
+- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.71.0, recorded in chunks, before (`main` at 6b532427) and after (this branch). It covers every scenario of *Checks by scenario* that reaches the refund's or the exchange's booking reads (52), plus the new one:
+  - the 50 others give the same checks, results and warnings;
+  - `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_REFUND_1ADT_38` and `_FARE_REFUND_1ADT_38` give the same checks and results. They lose the refund scope WARNING at 14 (now INFO), and gain the new WARNING at 12 and 14;
+  - `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_38` gives 359 checks, no failure, and a WARNING at 07, 13 and 15.
+  The scenarios that end before 12 do not reach the new check. The replay of #1299 and #1300 covers all 223, these included.
 - **Collection**: `bruno-confirmed-fulfillments.test.js` covers the rule (nothing seen, all listed, none, some left out), what is held (06, then 07 and exchange 14 added, a new confirmation starting again), the log lines (WARNING only, never a test), the wiring of the six steps (after the answer is an object, under its own name, each asking `embed=ALL`) and exchange 14, the reset lists, and step 14 with a refunded fulfilment the booking dropped.
 - **Mutation checks**: each of the 11 rules of this change, removed one by one, fails a test.
 - **Suites**: the collection, data file, reference, catalogue and checklist tests (2,141): all pass but `bruno-answer-threats.test.js`, the known Windows-only timing failure. Simulator `datafile.test.js` passes.
-
 ---
 
 ## [server-1.11.537] — 2026-11-17
