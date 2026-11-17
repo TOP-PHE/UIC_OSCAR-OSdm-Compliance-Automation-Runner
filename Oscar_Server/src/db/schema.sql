@@ -406,11 +406,12 @@ CREATE TABLE IF NOT EXISTS run_assertions (
 -- count of a run's failed checks reads the index only (#1202, migration 53).
 CREATE INDEX IF NOT EXISTS idx_run_assertions_run_passed ON run_assertions(run_id, passed);
 CREATE INDEX IF NOT EXISTS idx_run_assertions_request   ON run_assertions(request_id);
--- company_id first: the trends read a company's checks by key, and deleting a
--- company finds its checks here. (company_id) alone, (company_id, category)
--- and (company_id, domain) went in migration 55 (#1239): no query read them,
--- and every stored check updated them.
-CREATE INDEX IF NOT EXISTS idx_run_assertions_key       ON run_assertions(company_id, assertion_key);
+-- The index a deleted company finds its checks by, idx_run_assertions_company
+-- (company_id), is made by migration 56 (#1295), not here: this file runs at
+-- every start, and on a large database making an index takes minutes. It
+-- replaces (company_id, assertion_key), sorted by the text of the check: each
+-- check of a run landed on a page of its own. (company_id, category) and
+-- (company_id, domain) went in migration 55 (#1239): no query read them.
 CREATE INDEX IF NOT EXISTS idx_run_assertions_suite     ON run_assertions(suite_id);
 
 -- ── Report Templates (certifier saved report configurations) ────────────────

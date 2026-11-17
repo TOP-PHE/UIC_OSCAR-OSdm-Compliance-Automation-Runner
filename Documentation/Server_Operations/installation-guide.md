@@ -167,7 +167,7 @@ You should see:
 [db] SQLite ready → /app/data/oscar.db (synchronous NORMAL, checkpoints thread)
 Server↔collection combination is a tested release
 OSCAR — OSDM Conformance Automation Runner started
-[db] checkpoints run in a thread of their own
+[db] checkpoints run in a thread of their own, when the log passes 16 MB or every 30 s
 ```
 
 If you see `Server↔collection combination is not in compatibility.json`,

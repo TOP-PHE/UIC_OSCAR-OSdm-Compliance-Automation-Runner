@@ -129,8 +129,12 @@ describe('the settings', () => {
     expect(src).toContain('db.exec(`PRAGMA cache_size = -${Number(CACHE_MB) * 1024}`);');
     expect(src).toContain('db.exec(`PRAGMA mmap_size = ${Number(MMAP_MB) * 1024 * 1024}`);');
     expect(src).toContain("db.exec(TEMP_STORE === 'FILE' ? 'PRAGMA temp_store = FILE' : 'PRAGMA temp_store = MEMORY');");
-    // Those two are the only PRAGMAs of db.js built from a value.
-    expect(src.match(/PRAGMA [a-z_]+ = -?\$\{/g)).toHaveLength(2);
+    // #1294: the size the log file is cut back to, a whole number that
+    // startCheckpointThread() makes from a checked setting.
+    expect(src).toContain('db.exec(`PRAGMA journal_size_limit = ${Number(state.limitBytes)}`);');
+    expect(src).toContain('const limit = Math.max(Math.floor(Number(limitBytes)) || 0, 0);');
+    // Those three are the only PRAGMAs of db.js built from a value.
+    expect(src.match(/PRAGMA [a-z_]+ = -?\$\{/g)).toHaveLength(3);
   });
 });
 

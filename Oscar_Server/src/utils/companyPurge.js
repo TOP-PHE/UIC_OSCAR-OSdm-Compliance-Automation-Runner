@@ -22,10 +22,17 @@ const { run, transaction } = require('../db/db');
 const path = require('node:path');
 const { liveDatafilePath, previousDatafilePath, DATAFILES_DIR } = require('./datafileWrite');
 
-// Rows that hang from the company's runs and findings: deleted first.
+// What a run stores names its company too, and is found through the run
+// (#1295): each of these tables has an index on run_id, where a run's rows are
+// neighbours. By company, run_requests has no index, and the checks' own was
+// sorted by the text of the check: it cost each stored run hundreds of pages.
+const THROUGH_RUNS = ['run_assertions', 'run_requests', 'run_suites'];
+// Rows that hang from the company's runs and findings: deleted first, the
+// checks before the requests and suites they point to.
 const BY_PARENT = [
   'DELETE FROM run_events WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)',
   'DELETE FROM run_artifacts WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)',
+  ...THROUGH_RUNS.map(table => `DELETE FROM ${table} WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)`),
   'DELETE FROM finding_comment WHERE finding_id IN (SELECT id FROM finding WHERE company_id = ?)',
 ];
 // Every table naming the company, children before the runs they point to.
@@ -38,7 +45,8 @@ const OWNED = [
 ];
 // Kept: the audit trail. The company row itself goes last.
 const KEPT = ['auth_events', 'companies'];
-const DELETE_OWNED = OWNED.map(table => `DELETE FROM ${table} WHERE company_id = ?`);
+const DELETE_OWNED = OWNED.filter(table => !THROUGH_RUNS.includes(table))
+  .map(table => `DELETE FROM ${table} WHERE company_id = ?`);
 
 /** Deletes every row of the company and its data files. The caller checks it may. */
 function purgeCompany(company) {
@@ -60,4 +68,4 @@ function purgeCompany(company) {
   }
 }
 
-module.exports = { purgeCompany, OWNED, KEPT };
+module.exports = { purgeCompany, OWNED, KEPT, THROUGH_RUNS, BY_PARENT };
