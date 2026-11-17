@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-17-nuts-codes",
+    "date": "November 17, 2026",
+    "tag": "New",
+    "title": "Without a trip: regions named by NUTS codes",
+    "summary": "OSCAR now tests offers without a trip asked for a region named by its NUTS codes, and a NUTS code the provider does not know.",
+    "content": "OSDM can ask offers without a trip for a region named by its NUTS codes (the European statistical regions), next to stop places and zones. A provider lists the NUTS codes of its zones in GET /zones.\n\nOSCAR asks the offers with the NUTS codes the trip names, or, when it names none, with those of the first zone of GET /zones that lists some. Each admission should say it is valid in a zone naming a code asked: one that does not gives a warning. The sale then goes on as any sale without a trip.\n\nIn Test Config, choose Valid where → In regions named by NUTS codes on a trip without a trip, and give the codes, or leave them empty. With Unknown NUTS code refused, the codes are ones the provider does not know: the offer request must be refused, or give no offer.\n\nTwo reference scenarios can be copied: OTST_NONTRIP_NUTS_1ADT and NHF_NONTRIP_NUTS_UNKNOWN_1ADT. Your Test Framework must declare offers without a trip by NUTS codes (Offer requests).\n\nIf your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
+  },
+  {
     "id": "2026-11-16-lost-ticket-card",
     "date": "November 16, 2026",
     "tag": "New",

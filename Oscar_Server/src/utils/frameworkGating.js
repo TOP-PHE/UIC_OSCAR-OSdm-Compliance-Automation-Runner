@@ -70,11 +70,12 @@ const PARTIAL_REFUND_SCOPES = ['FULFILLMENT', 'LEG', 'PASSENGER'];
 // (nonTripSearchCriteria), between stop places or in zones; declared only
 // when listed, since most rail providers sell none.
 const TRIP_REQUEST_FORMS = Object.freeze(['SEARCH', 'SPECIFICATION', 'TRIP_IDS']);
-const NON_TRIP_REQUEST_FORMS = Object.freeze(['NON_TRIP_PLACES', 'NON_TRIP_ZONES']);
+const NON_TRIP_REQUEST_FORMS = Object.freeze(['NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS']);
 const OFFER_REQUEST_FORMS = [...TRIP_REQUEST_FORMS, ...NON_TRIP_REQUEST_FORMS];
 const OFFER_REQUEST_TEXT = Object.freeze({
   SEARCH: 'by trip search', SPECIFICATION: 'by trip specification', TRIP_IDS: 'by trip id',
   NON_TRIP_PLACES: 'without a trip, between stop places', NON_TRIP_ZONES: 'without a trip, in zones',
+  NON_TRIP_NUTS: 'without a trip, in regions named by NUTS codes',
 });
 
 // #766: how a provider lets a place be chosen (framework.placeSelectionFlows),
@@ -225,9 +226,11 @@ function offerRequestFormOf(scenario, datafile) {
   return trip?.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH';
 }
 
-/** #1258: NON_TRIP_ZONES or NON_TRIP_PLACES (the default) for a NON_TRIP trip. */
+/** #1258: NON_TRIP_ZONES, (#1266) NON_TRIP_NUTS or NON_TRIP_PLACES (the default) for a NON_TRIP trip. */
 function nonTripFormOf(trip) {
-  return String(trip?.nonTrip?.by || '').toUpperCase() === 'ZONES' ? 'NON_TRIP_ZONES' : 'NON_TRIP_PLACES';
+  const by = String(trip?.nonTrip?.by || '').toUpperCase();
+  if (by === 'ZONES') return 'NON_TRIP_ZONES';
+  return by === 'NUTS' ? 'NON_TRIP_NUTS' : 'NON_TRIP_PLACES';
 }
 
 /**

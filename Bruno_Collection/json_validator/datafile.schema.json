@@ -367,6 +367,11 @@
               "issuer": { "type": ["string", "null"] }
             }
           },
+          "nutsCodeExpectRejection": {
+            "description": "Negative test (#1266). When on, the NUTS codes asked (nonTrip.nutsCodes) are ones the provider does not know: POST /offers must refuse them with a 4xx RFC-9457 Problem or give no offer, and the scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "lostCardExpectRejection": {
             "description": "Negative test (#1266). When on, the lost card (lostCard) is one the provider does not know: POST /bookings of the replacement must be refused with a 4xx RFC-9457 Problem, and the scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],
@@ -760,9 +765,10 @@
           },
           "nonTrip": {
             "type": "object",
-            "description": "For NON_TRIP trips (#1258): offers without a trip, valid between stop places or in zones (nonTripSearchCriteria).",
+            "description": "For NON_TRIP trips (#1258): offers without a trip, valid between stop places, in zones or (#1266) in regions named by NUTS codes (nonTripSearchCriteria).",
             "properties": {
-              "by": { "type": "string", "enum": ["PLACES", "ZONES"], "description": "Stop places (StopPlaceRef only) or zones." },
+              "by": { "type": "string", "enum": ["PLACES", "ZONES", "NUTS"], "description": "Stop places (StopPlaceRef only), zones, or (#1266) NUTS codes." },
+              "nutsCodes": { "type": "array", "description": "By NUTS (#1266): 1 to 10 NUTS codes; empty to take those of the first zone of GET /zones that lists some.", "items": { "type": "string" } },
               "places": { "type": "array", "description": "Two or more stop places (URN or UIC code); empty to take them from POST /places by placeLookup.", "items": { "type": "string" } },
               "placeLookup": { "type": ["string", "null"], "description": "A name to look the stop places up with (POST /places, type STOP)." },
               "zones": {

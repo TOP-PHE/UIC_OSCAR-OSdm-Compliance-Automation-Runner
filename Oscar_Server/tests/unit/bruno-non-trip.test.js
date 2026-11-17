@@ -69,7 +69,7 @@ describe('the trip requirement', () => {
   test('refused: no nonTrip, an unknown by, one place, a place that is no stop place, nothing to look up, a zone without carrier', () => {
     for (const requirement of [
       { tripType: 'NON_TRIP' },
-      { nonTrip: { by: 'NUTS' } },
+      { nonTrip: { by: 'LINES' } },
       { nonTrip: { places: [CENTRAL] } },
       { nonTrip: { places: [CENTRAL, 'Simtown Airport'] } },
       { nonTrip: { places: 'AUTO' } },
@@ -267,7 +267,7 @@ describe('the parser', () => {
     // A Czech station (54…): 20 November is winter time, +01:00 as written.
     nonTripRequest({ tripType: 'NON_TRIP', nonTrip: { places: ['5457076', 'urn:uic:stn:5400014'] } }, '2026-11-20');
     expect(JSON.parse(envStore.nonTripRequirement)).toEqual({
-      by: 'PLACES', places: [stop('urn:uic:stn:5457076'), stop('urn:uic:stn:5400014')], placeLookup: null, zones: [],
+      by: 'PLACES', places: [stop('urn:uic:stn:5457076'), stop('urn:uic:stn:5400014')], placeLookup: null, zones: [], nutsCodes: [],
       validFrom: '2026-11-20T00:00:00+01:00',
     });
     // In July the zone's offset is +02:00.
@@ -298,8 +298,8 @@ describe('the exchange (#1266)', () => {
       .toEqual({ validFrom: '2026-11-26T00:00:00+01:00', places: [stop(CENTRAL), stop(AIRPORT)] });
     expect(NT.exchangeNonTripCriteria({ zones: CITY }, null)).toEqual({ zones: CITY });
     expect(NT.exchangeNonTripCriteria(null, null)).toBeNull();
-    expect(NT.askedOfCriteria(sale)).toEqual({ by: 'ZONES', places: [], zones: CITY });
-    expect(NT.askedOfCriteria({ places: [stop(CENTRAL)] })).toEqual({ by: 'PLACES', places: [stop(CENTRAL)], zones: [] });
+    expect(NT.askedOfCriteria(sale)).toEqual({ by: 'ZONES', places: [], zones: CITY, nutsCodes: [] });
+    expect(NT.askedOfCriteria({ places: [stop(CENTRAL)] })).toEqual({ by: 'PLACES', places: [stop(CENTRAL)], zones: [], nutsCodes: [] });
     expect(NT.askedOfCriteria(undefined)).toBeNull();
   });
 
@@ -367,5 +367,131 @@ describe('the exchange (#1266)', () => {
       expect(envStore.exchangeTripType).toBeUndefined();
       expect(mockLogs.filter((l) => l.includes('is not tested'))).toHaveLength(2);
     });
+  });
+});
+
+// ── #1266: offers in regions named by NUTS codes ────────────────────────────
+
+describe('NUTS codes (#1266)', () => {
+  const recorded = [];
+  const test2 = (name, fn) => { try { fn(); recorded.push({ name, ok: true }); } catch (e) { recorded.push({ name, ok: false, message: e.message }); } };
+  const jestTest = global.test;
+  const NUTS = { by: 'NUTS', places: [], zones: [], nutsCodes: ['XS111'] };
+  const nutsZone = (nutsCode) => admission({ regionalValidities: [{ seqNb: 1, zone: { carrier: 'urn:c', name: 'City', zoneIds: [100], ...(nutsCode ? { nutsCode } : {}) } }] });
+  beforeEach(() => {
+    recorded.length = 0;
+    global.test = test2;
+    global.validationLogger = (line) => { mockLogs.push(line); };
+  });
+  afterEach(() => { global.test = jestTest; delete global.validationLogger; });
+
+  test('the requirement: codes named, or none to take them from GET /zones; codes not in NUTS form are refused', () => {
+    expect(NT.nonTripRequirementOf({ nonTrip: { by: 'nuts', nutsCodes: [' XS111 ', 'DE21'] } })).toMatchObject({ by: 'NUTS', nutsCodes: ['XS111', 'DE21'] });
+    expect(NT.nonTripRequirementOf({ nonTrip: { by: 'NUTS' } })).toMatchObject({ by: 'NUTS', nutsCodes: [] });
+    expect(NT.nonTripRequirementOf({ nonTrip: { by: 'NUTS', nutsCodes: 'AUTO' } })).toMatchObject({ by: 'NUTS', nutsCodes: [] });
+    for (const nutsCodes of [['xs111'], ['X1'], ['XS1111'], ['XS111', 'XS111'], [12], Array.from({ length: 11 }, (_, i) => 'XS' + i)]) {
+      expect(NT.nonTripRequirementOf({ nonTrip: { by: 'NUTS', nutsCodes } }).problem).toContain('NUTS codes');
+    }
+    expect(NT.namesWhere({ by: 'NUTS', nutsCodes: ['XS111'] })).toBe(true);
+    expect(NT.namesWhere({ by: 'NUTS', nutsCodes: [] })).toBe(false);
+    expect(NT.namesWhere({ by: 'ZONES', zones: [] })).toBe(false);
+    expect(NT.namesWhere({ by: 'PLACES', places: [stop(CENTRAL)] })).toBe(true);
+  });
+
+  test('the request sends the codes, and the codes read back from a request', () => {
+    expect(NT.nonTripCriteria({ ...NUTS, validFrom: '2026-11-20T00:00:00+01:00' })).toEqual({ validFrom: '2026-11-20T00:00:00+01:00', nutsCodes: ['XS111'] });
+    expect(NT.askedOfCriteria({ nutsCodes: ['XS111'] })).toEqual({ by: 'NUTS', places: [], zones: [], nutsCodes: ['XS111'] });
+  });
+
+  test('GET /zones: the first zone listing NUTS codes', () => {
+    const r = NT.checkZonesAnswer(200, { zones: [{ id: 'Z0', carrier: 'urn:c' }, { id: 'Z1', carrier: 'urn:c', nutsCodes: ['XS111'] }] });
+    expect(r.zone.id).toBe('Z0');
+    expect(r.nutsZone.id).toBe('Z1');
+    expect(NT.checkZonesAnswer(200, { zones: [{ id: 'Z0', carrier: 'urn:c', nutsCodes: [] }] }).nutsZone).toBeNull();
+    expect(NT.checkZonesAnswer(501, null).nutsZone).toBeNull();
+  });
+
+  test('a validity naming a code asked passes; another code, or none, warns', () => {
+    expect(warned(NT.checkNonTripOffers({ offers: [{ admissionOfferParts: [nutsZone('XS111')] }] }, NUTS, '3.8.0'))).toEqual([]);
+    for (const part of [nutsZone('XS112'), nutsZone(null), admission()]) {
+      const checks = NT.checkNonTripOffers({ offers: [{ admissionOfferParts: [part] }] }, NUTS, '3.8.0');
+      expect(failed(checks)).toEqual([]);
+      expect(warned(checks)).toEqual(['Non-trip offers: the regional validity names a NUTS code asked (Zone.nutsCode)']);
+    }
+    const booked = { bookedOffers: [{ admissions: [{ ...nutsZone('XS112'), objectType: 'Admission' }] }] };
+    expect(warned(NT.checkNonTripBooking(booked, NUTS, '3.8.0', 'Confirmed'))).toEqual(['Confirmed: non-trip booking: the regional validity names a NUTS code asked (Zone.nutsCode)']);
+  });
+
+  test('the run: codes from GET /zones; no zone listing any ends the scenario with a failed check', async () => {
+    envStore.TripType = 'NON_TRIP';
+    envStore.nonTripRequirement = JSON.stringify({ by: 'NUTS', places: [], zones: [], nutsCodes: [], validFrom: null });
+    envStore.OfferCollectionRequest = '{}';
+    answers.push({ status: 200, data: { zones: [{ id: 'SIM-CITY', carrier: 'urn:c', name: 'City', nutsCodes: ['XS111'] }] } });
+    await NT.prepareNonTripRequest();
+    expect(sent[0]).toMatchObject({ method: 'GET', url: 'https://provider.example/osdm/zones' });
+    expect(JSON.parse(envStore.OfferCollectionRequest).nonTripSearchCriteria).toEqual({ nutsCodes: ['XS111'] });
+    expect(JSON.parse(envStore.__nonTripAsked)).toEqual({ by: 'NUTS', places: [], zones: [], nutsCodes: ['XS111'] });
+    expect(NT.checkNonTripLookup(test2)).toBe(false);
+    expect(mockLogs.some((l) => l.includes('NUTS code(s) XS111, of zone SIM-CITY (City)'))).toBe(true);
+
+    for (const answer of [{ status: 200, data: { zones: [{ id: 'SIM-CITY', carrier: 'urn:c' }] } }, { status: 501, data: {} }]) {
+      recorded.length = 0;
+      answers.push(answer);
+      envStore.OfferCollectionRequest = '{}';
+      await NT.prepareNonTripRequest();
+      expect(NT.checkNonTripLookup(test2)).toBe(true);
+      expect(recorded.filter((r) => !r.ok).map((r) => r.name)).toEqual(['Non-trip offers: a NUTS code to ask offers in']);
+      expect(envStore.OfferCollectionRequest).toBe('{}');
+    }
+
+    // Codes named: nothing is looked up.
+    sent.length = 0;
+    envStore.nonTripRequirement = JSON.stringify({ by: 'NUTS', places: [], zones: [], nutsCodes: ['XS999'], validFrom: null });
+    await NT.prepareNonTripRequest();
+    expect(sent).toEqual([]);
+    expect(JSON.parse(envStore.OfferCollectionRequest).nonTripSearchCriteria).toEqual({ nutsCodes: ['XS999'] });
+  });
+
+  test('the unknown code probe: off does nothing; a refusal or no offer passes, offers fail', () => {
+    envStore.__nonTripAsked = JSON.stringify({ ...NUTS, nutsCodes: ['XS999'] });
+    envStore.nutsCodeExpectRejection = 'false';
+    expect(NT.checkUnknownNutsRefused(400, {})).toBe(false);
+    expect(recorded).toEqual([]);
+
+    envStore.nutsCodeExpectRejection = 'true';
+    expect(NT.checkUnknownNutsRefused(400, { code: 'NUTS_CODE_UNKNOWN', title: 'Unknown NUTS code', status: 400, detail: 'XS999' })).toBe(true);
+    expect(recorded.length).toBeGreaterThan(0);
+    expect(recorded.filter((r) => !r.ok)).toEqual([]);
+    expect(recorded.every((r) => r.name.startsWith('🧪 Unknown NUTS code probe'))).toBe(true);
+    // A refusal is graded as a Problem, not as an answer without offers.
+    expect(recorded.some((r) => r.name.includes('no offer is given'))).toBe(false);
+
+    recorded.length = 0;
+    mockLogs.length = 0;
+    expect(NT.checkUnknownNutsRefused(200, { offers: [] })).toBe(true);
+    expect(recorded).toEqual([{ name: '🧪 Unknown NUTS code probe [POST /offers]: no offer is given', ok: true }]);
+    expect(mockLogs.some((l) => l.startsWith('[WARNING] 🧪 Unknown NUTS code probe: no offer and no problem'))).toBe(true);
+    mockLogs.length = 0;
+    expect(NT.checkUnknownNutsRefused(200, { offers: [], problems: [{ code: 'OFFER_NO_RESULTS' }] })).toBe(true);
+    expect(mockLogs.some((l) => l.includes('explains it with 1 problem(s): OFFER_NO_RESULTS'))).toBe(true);
+
+    recorded.length = 0;
+    expect(NT.checkUnknownNutsRefused(200, { offers: [{ offerId: 'O1' }] })).toBe(true);
+    expect(recorded.filter((r) => !r.ok).map((r) => r.message)).toEqual(['POST /offers gave 1 offer(s) for NUTS code(s) XS999']);
+  });
+
+  test('the parser: the requirement by NUTS, and an exchange naming other codes', () => {
+    const { nonTripRequest, prepareExchangeTrip } = require('../../../Bruno_Collection/library-bruno/scenarioParser.js');
+    nonTripRequest({ tripType: 'NON_TRIP', nonTrip: { by: 'NUTS', nutsCodes: ['XS111'] } }, '2026-11-20');
+    expect(JSON.parse(envStore.nonTripRequirement)).toMatchObject({ by: 'NUTS', nutsCodes: ['XS111'], validFrom: '2026-11-20T00:00:00+01:00' });
+    envStore.__travelDay = '2026-11-25';
+    const trips = [
+      { id: 60, tripType: 'NON_TRIP', nonTrip: { by: 'NUTS', nutsCodes: [] } },
+      { id: 61, tripType: 'NON_TRIP', nonTrip: { by: 'NUTS', nutsCodes: ['XS112'] } },
+    ];
+    prepareExchangeTrip({ scenarioType: 'EXCHANGE', tripRequirementId: 60, exchange: { tripRequirementId: 61 } }, { tripRequirements: trips });
+    expect(JSON.parse(envStore.exchangeNonTrip)).toEqual({ validFrom: '2026-11-25T00:00:00+01:00', criteria: { nutsCodes: ['XS112'] } });
+    prepareExchangeTrip({ scenarioType: 'EXCHANGE', tripRequirementId: 61, exchange: { tripRequirementId: 60 } }, { tripRequirements: trips });
+    expect(JSON.parse(envStore.exchangeNonTrip).criteria).toBeNull();
   });
 });

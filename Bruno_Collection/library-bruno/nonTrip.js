@@ -16,6 +16,12 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   in its answer is a WARNING and is not used.
  * - Zones come from `GET /zones` when the scenario names none: the first
  *   zone, its id and carrier as given (OSCAR does not guess a carrier).
+ * - NUTS codes (#1266): those the scenario names, else those of the first
+ *   zone of `GET /zones` that lists some (ZoneDefinition.nutsCodes). OSDM:
+ *   the offers are valid "within the area specified", or "in a relevant part
+ *   of the region"; a validity naming no code asked (Zone.nutsCode) is a
+ *   WARNING, as for places and zones. `nutsCodeExpectRejection` expects an
+ *   unknown code refused or answered without an offer.
  * - The answer has no trip and no trip coverage; each admission says where it
  *   is valid: `regionalValidities` from OSDM 3.7 (the single
  *   `regionalValidity`, which 3.7 deprecated, is then a WARNING), the single
@@ -57,20 +63,23 @@ const isAuto = (value) => value === undefined || value === null || value === ''
   || (typeof value === 'string' && value.trim().toUpperCase() === 'AUTO')
   || (Array.isArray(value) && value.length === 0);
 
-const BY = new Set(['PLACES', 'ZONES']);
+const BY = new Set(['PLACES', 'ZONES', 'NUTS']);
+// A NUTS code: two letters of a country, then up to three letters or digits.
+const NUTS_CODE = /^[A-Z]{2}[A-Z0-9]{0,3}$/;
 
 /**
  * What a NON_TRIP trip requirement asks, read from the data file:
- * `{ by, places, placeLookup, zones, validFrom }` with places as
+ * `{ by, places, placeLookup, zones, nutsCodes, validFrom }` with places as
  * StopPlaceRefs, or `{ problem }` naming what is wrong.
  */
 function nonTripRequirementOf(requirement) {
   const nonTrip = isObject(requirement?.nonTrip) ? requirement.nonTrip : null;
   if (!nonTrip) return { problem: 'has tripType=NON_TRIP but no nonTrip object' };
   const by = String(nonTrip.by || 'PLACES').toUpperCase();
-  if (!BY.has(by)) return { problem: `nonTrip.by must be PLACES or ZONES (got ${JSON.stringify(nonTrip.by).slice(0, 40)})` };
+  if (!BY.has(by)) return { problem: `nonTrip.by must be PLACES, ZONES or NUTS (got ${JSON.stringify(nonTrip.by).slice(0, 40)})` };
   const lookup = typeof nonTrip.placeLookup === 'string' ? nonTrip.placeLookup.trim().slice(0, 120) : '';
-  const out = { by, validFrom: typeof nonTrip.validFrom === 'string' ? nonTrip.validFrom : null, places: [], placeLookup: lookup || null, zones: [] };
+  const out = { by, validFrom: typeof nonTrip.validFrom === 'string' ? nonTrip.validFrom : null, places: [], placeLookup: lookup || null, zones: [], nutsCodes: [] };
+  if (by === 'NUTS') return withNutsCodes(out, nonTrip.nutsCodes);
   if (by === 'PLACES') {
     if (!isAuto(nonTrip.places)) {
       const given = list(nonTrip.places);
@@ -94,11 +103,32 @@ function nonTripRequirementOf(requirement) {
   return out;
 }
 
-/** The criteria sent: places or zones, and the start of the validity. */
+// #1266: the NUTS codes a trip names (NUTS form, 1 to 10), or none to take
+// them from GET /zones.
+function withNutsCodes(out, given) {
+  if (isAuto(given)) return out;
+  const codes = list(given).map((c) => (typeof c === 'string' ? c.trim() : ''));
+  const wrong = codes.filter((c) => !NUTS_CODE.test(c));
+  if (wrong.length > 0 || codes.length > MAX_PLACES_ASKED || new Set(codes).size !== codes.length) {
+    return { problem: `nonTrip.nutsCodes must hold 1 to ${MAX_PLACES_ASKED} NUTS codes (two capital letters, then up to three letters or digits), each once, or none to take them from GET /zones` };
+  }
+  out.nutsCodes = codes;
+  return out;
+}
+
+/** Whether a requirement names where its offers are valid (none: a lookup gives it). */
+function namesWhere(want) {
+  if (want?.by === 'ZONES') return list(want.zones).length > 0;
+  if (want?.by === 'NUTS') return list(want.nutsCodes).length > 0;
+  return list(want?.places).length > 0;
+}
+
+/** The criteria sent: places, zones or NUTS codes, and the start of the validity. */
 function nonTripCriteria(asked) {
   const criteria = {};
   if (asked.validFrom) criteria.validFrom = asked.validFrom;
-  if (asked.by === 'ZONES') criteria.zones = asked.zones.map((z) => ({ id: z.id, carrier: z.carrier }));
+  if (asked.by === 'NUTS') criteria.nutsCodes = [...list(asked.nutsCodes)];
+  else if (asked.by === 'ZONES') criteria.zones = asked.zones.map((z) => ({ id: z.id, carrier: z.carrier }));
   else criteria.places = asked.places.map((p) => ({ objectType: 'StopPlaceRef', stopPlaceRef: p.stopPlaceRef }));
   return criteria;
 }
@@ -147,16 +177,17 @@ function checkPlaceAnswer(status, body, name) {
 }
 
 /**
- * The checks of a GET /zones answer, and the zone it gives:
- * `{ checks, zone, notImplemented }`.
+ * The checks of a GET /zones answer, the zone it gives and (#1266) the first
+ * zone that lists NUTS codes: `{ checks, zone, nutsZone, notImplemented }`.
  */
 function checkZonesAnswer(status, body) {
-  if (isNotImplemented(status)) return { checks: [], zone: null, notImplemented: true };
+  if (isNotImplemented(status)) return { checks: [], zone: null, nutsZone: null, notImplemented: true };
   const checks = [{ name: `GET /zones: HTTP 200 — actual ${status}`, ok: status === 200, message: `HTTP ${status}` }];
-  if (status !== 200) return { checks, zone: null };
+  if (status !== 200) return { checks, zone: null, nutsZone: null };
   const zones = list(body?.zones).filter((z) => isObject(z) && typeof z.id === 'string' && z.id.length > 0 && typeof z.carrier === 'string' && z.carrier.length > 0);
   checks.push({ name: 'GET /zones: at least one zone with its id and carrier (ZoneDefinition.id, .carrier required)', ok: zones.length > 0, message: `${list(body?.zones).length} zone(s), none with both` });
-  return { checks, zone: zones[0] || null };
+  const nutsZone = list(body?.zones).find((z) => isObject(z) && list(z.nutsCodes).some((c) => typeof c === 'string' && c.length > 0)) || null;
+  return { checks, zone: zones[0] || null, nutsZone };
 }
 
 // ── The answer to the offer request ─────────────────────────────────────────
@@ -223,7 +254,10 @@ function admissionValidityChecks(parts, asked, version, { label, summary }) {
     if (form === 'none') { none.push(where); continue; }
     if (form === 'single' && listExpected) deprecated.push(where);
     if (validities.some((v) => !isObject(v) || !VALIDITY_KINDS.some((k) => v[k] != null))) empty.push(where);
-    if (asked?.by === 'ZONES') {
+    if (asked?.by === 'NUTS') {
+      const named = validities.map((v) => v?.zone?.nutsCode).filter((c) => typeof c === 'string');
+      if (!list(asked.nutsCodes).some((c) => named.includes(c))) missing.push(`${where} (${named.length > 0 ? named.join(', ') : 'no Zone.nutsCode'})`);
+    } else if (asked?.by === 'ZONES') {
       const carriers = validities.map((v) => v?.zone?.carrier).filter(Boolean);
       const want = list(asked.zones).map((z) => z.carrier);
       if (!validities.some((v) => isObject(v?.zone)) || (carriers.length > 0 && !want.some((c) => carriers.includes(c)))) missing.push(where);
@@ -246,7 +280,7 @@ function admissionValidityChecks(parts, asked, version, { label, summary }) {
     checks.push({ name: `${label}: each regional validity names a zone, route, train link, line or polygon`, ok: false, message: firstFew(empty) });
   }
   if (missing.length > 0) {
-    const what = asked?.by === 'ZONES' ? 'a zone of the carrier asked' : 'every stop place asked';
+    const what = { ZONES: 'a zone of the carrier asked', NUTS: 'a NUTS code asked (Zone.nutsCode)' }[asked?.by] || 'every stop place asked';
     checks.push({ name: `${label}: the regional validity names ${what}`, ok: false, level: 'warn', message: firstFew(missing) });
   }
   if (summary) {
@@ -297,11 +331,12 @@ function exchangeNonTripCriteria(saleCriteria, plan) {
   return validFrom ? { validFrom, ...where } : where;
 }
 
-/** #1266: what a nonTripSearchCriteria asks, in the shape nonTripRequirementOf() gives (by, places, zones). Pure. */
+/** #1266: what a nonTripSearchCriteria asks, in the shape nonTripRequirementOf() gives (by, places, zones, nutsCodes). Pure. */
 function askedOfCriteria(criteria) {
   if (!isObject(criteria)) return null;
-  if (list(criteria.zones).length > 0) return { by: 'ZONES', places: [], zones: list(criteria.zones) };
-  return { by: 'PLACES', places: list(criteria.places), zones: [] };
+  if (list(criteria.nutsCodes).length > 0) return { by: 'NUTS', places: [], zones: [], nutsCodes: list(criteria.nutsCodes) };
+  if (list(criteria.zones).length > 0) return { by: 'ZONES', places: [], zones: list(criteria.zones), nutsCodes: [] };
+  return { by: 'PLACES', places: list(criteria.places), zones: [], nutsCodes: [] };
 }
 
 /**
@@ -409,11 +444,62 @@ async function prepareNonTripRequest() {
     want.zones = [{ id: found.zone.id, carrier: found.zone.carrier }];
     log(`[INFO] 🗺️ Non-trip offers — in zone ${found.zone.id}${found.zone.name ? ` (${found.zone.name})` : ''} of ${found.zone.carrier}`);
   }
+  if (want.by === 'NUTS' && list(want.nutsCodes).length === 0 && !(await lookUpNutsCodes(want, checks))) return;
   const criteria = nonTripCriteria(want);
   const request = parseJson(bruEnv('OfferCollectionRequest'), {}) || {};
   bru.setEnvVar('OfferCollectionRequest', JSON.stringify(nonTripOfferRequest(request, criteria)));
-  bru.setEnvVar('__nonTripAsked', JSON.stringify({ by: want.by, places: want.places, zones: want.zones }));
+  bru.setEnvVar('__nonTripAsked', JSON.stringify({ by: want.by, places: want.places, zones: want.zones, nutsCodes: list(want.nutsCodes) }));
   bru.setEnvVar('__nonTripOutcome', JSON.stringify({ checks }));
+}
+
+// #1266: the NUTS codes of the first zone of GET /zones that lists some.
+// False when none is found (the scenario ends at 01).
+async function lookUpNutsCodes(want, checks) {
+  log('[INFO] 🗺️ Non-trip offers — GET /zones, for its NUTS codes');
+  const { status, body } = await sendFromScript('GET', '/zones');
+  const found = checkZonesAnswer(status, body);
+  checks.push(...found.checks);
+  if (!found.nutsZone) {
+    checks.push({ name: 'Non-trip offers: a NUTS code to ask offers in', ok: false, message: found.notImplemented ? `GET /zones answered ${status} and the scenario names no NUTS code (nonTrip.nutsCodes)` : 'no zone of GET /zones lists NUTS codes (ZoneDefinition.nutsCodes), and the scenario names none (nonTrip.nutsCodes)' });
+    bru.setEnvVar('__nonTripOutcome', JSON.stringify({ checks, failed: true }));
+    return false;
+  }
+  want.nutsCodes = list(found.nutsZone.nutsCodes).filter((c) => typeof c === 'string' && c.length > 0).slice(0, MAX_PLACES_ASKED);
+  const zoneName = found.nutsZone.name ? ' (' + found.nutsZone.name + ')' : '';
+  log(`[INFO] 🗺️ Non-trip offers — NUTS code(s) ${want.nutsCodes.join(', ')}, of zone ${found.nutsZone.id}${zoneName}`);
+  return true;
+}
+
+// #1266: a NUTS code the provider does not know must be refused, or given no
+// offer. True when armed (the scenario ends at 01).
+function checkUnknownNutsRefused(status, body) {
+  if (String(bruEnv('nutsCodeExpectRejection')) !== 'true') return false;
+  const codes = list(asked()?.nutsCodes).join(', ') || '(none)';
+  log(`[INFO] 🧪 Unknown NUTS code probe — offers asked for NUTS code(s) ${codes}, which the provider should not know.`);
+  const offers = list(body?.offers);
+  if (typeof status === 'number' && status >= 300) {
+    const { validateProblemResponse } = require('./requestedInformation.js');
+    validateProblemResponse({
+      status,
+      body,
+      targets: [],
+      prefix: '🧪 Unknown NUTS code probe',
+      label: 'POST /offers',
+      assert: (name, ok, msg) => test(name, () => { if (!ok) throw new Error(msg); }),
+      log: (level, msg) => log(`[${level}] ${msg}`),
+    });
+    return true;
+  }
+  test('🧪 Unknown NUTS code probe [POST /offers]: no offer is given', () => {
+    if (offers.length > 0) throw new Error(`POST /offers gave ${offers.length} offer(s) for NUTS code(s) ${codes}`);
+  });
+  if (offers.length === 0) {
+    const problems = list(body?.problems);
+    log(problems.length
+      ? `[INFO] 🧪 Unknown NUTS code probe: the answer explains it with ${problems.length} problem(s): ${problems.map((p) => p?.code || p?.title).filter(Boolean).join(', ')}.`
+      : '[WARNING] 🧪 Unknown NUTS code probe: no offer and no problem saying why; a Problem naming the code helps a distributor.');
+  }
+  return true;
 }
 
 function record(checks, test) {
@@ -486,7 +572,7 @@ function recordNonTripBookingChecks(booking, step, test) {
 module.exports = {
   stopPlaceRefOf, sameStopPlace, isAuto, nonTripRequirementOf, nonTripCriteria, nonTripOfferRequest, placeRequest,
   checkPlaceAnswer, checkZonesAnswer, validityListExpected, validitiesOf, stopPlacesNamedIn, admissionValidityChecks,
-  checkNonTripOffers, checkNonTripBooking, exchangeNonTripCriteria, askedOfCriteria,
+  checkNonTripOffers, checkNonTripBooking, exchangeNonTripCriteria, askedOfCriteria, namesWhere, checkUnknownNutsRefused,
   isNonTripSale, prepareNonTripRequest, checkNonTripLookup, recordNonTripOfferChecks, recordNonTripBookingChecks,
   recordNonTripExchangeOfferChecks, recordNonTripExchangedPartsChecks,
 };

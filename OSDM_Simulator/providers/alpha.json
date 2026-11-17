@@ -231,8 +231,8 @@
       { "id": "urn:uic:stn:0000045", "name": "Simtown South" }
     ],
     "zones": [
-      { "id": "SIM-CITY", "name": "Simtown city", "zoneId": 100, "places": ["urn:uic:stn:0000040", "urn:uic:stn:0000041"] },
-      { "id": "SIM-NORTH", "name": "Simtown north", "zoneId": 101, "places": ["urn:uic:stn:0000042"] },
+      { "id": "SIM-CITY", "name": "Simtown city", "zoneId": 100, "nutsCodes": ["XS111"], "places": ["urn:uic:stn:0000040", "urn:uic:stn:0000041"] },
+      { "id": "SIM-NORTH", "name": "Simtown north", "zoneId": 101, "nutsCodes": ["XS112"], "places": ["urn:uic:stn:0000042"] },
       { "id": "SIM-SOUTH", "name": "Simtown south", "zoneId": 102, "places": ["urn:uic:stn:0000045"] }
     ],
     "products": [

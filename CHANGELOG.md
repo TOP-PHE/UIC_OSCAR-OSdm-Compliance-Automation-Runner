@@ -521,6 +521,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.533] / [collection-OTST_V2.0.262] — 2026-11-17
+
+Issue #1266, part 2, third case. Release 2026.572 (`current_release`). Simulator 0.71.0. Offers without a trip in regions named by NUTS codes.
+
+OSDM's `NonTripSearchCriteria` names where offers without a trip are valid by stop places, zones or `nutsCodes`; a provider lists the NUTS codes of its zones in `GET /zones` (`ZoneDefinition.nutsCodes`), and a regional validity's `Zone` may name one (`Zone.nutsCode`). OSDM's page on sales without a trip (osdm.io, *Non trip based sale*) asks offers valid "within the area specified", but calls the region a hint for the offer search: offers may be valid in a relevant part of it. So a validity naming none of the codes asked is a WARNING, never a failed check.
+
+Decided with the maintainer:
+- the simulator serves a NUTS code through the zone that names it;
+- its codes are made up, in the NUTS form (`XS111`, `XS112`);
+- an admission whose validity names none of the codes asked is a WARNING;
+- an NHF scenario asks a code the provider does not know, which must be refused or given no offer;
+- the codes are those the trip names, else those of the first zone of `GET /zones` that lists some.
+
+### Added
+- **The NUTS form of a request without a trip** (`library-bruno/nonTrip.js`): a NON_TRIP trip `by: NUTS` with `nonTrip.nutsCodes`, 1 to 10 codes of two capital letters then up to three letters or digits, each once (`withNutsCodes()`).
+  - With none named, step 01's before-request asks `GET /zones` and takes the codes of the first zone that lists some (`lookUpNutsCodes()`); none listed fails one check and ends the scenario.
+  - They are sent in `nonTripSearchCriteria.nutsCodes`.
+  - The offers and the booked admissions are checked as for zones. A validity naming none of the codes asked (`Zone.nutsCode`) is a WARNING: "the regional validity names a NUTS code asked".
+  - An exchange to another NUTS trip asks its codes (`namesWhere()`).
+- **The unknown NUTS code probe** (`nutsCodeExpectRejection`, `checkUnknownNutsRefused()`, at 01 before the departure probe). A refusal is graded as a Problem; no offer passes, with a WARNING when no problem says why; offers given fail. The scenario ends there.
+- **Data file schema**: `nonTrip.by` NUTS, `nonTrip.nutsCodes`, `nutsCodeExpectRejection`.
+- **Server**: offer request form `NON_TRIP_NUTS`, declared only when listed, like the other forms without a trip.
+  - It has its warning `offerRequestBy:NON_TRIP_NUTS`, its run filter *Without a trip: NUTS codes*, and its capability *Offers without a trip, in regions named by NUTS codes* (`offers.nonTripNuts`).
+  - The probe is an expected refusal.
+  - NUTS codes a trip names are a provider value (`nutsCodes`, to complete in a copy); a probe's made-up code is not.
+  - A simulator reference declares the form when its profile's zones name NUTS codes (`withNonTripForms()`).
+- **Test Config**: *Valid where → In regions named by NUTS codes* and its *NUTS codes* field (comma-separated, in capitals; empty: from `GET /zones`); *Unknown NUTS code refused*; the Test Framework's *Offer requests* list the form.
+- **Catalogue**: `OTST_NONTRIP_NUTS_1ADT` (243 checks) and `NHF_NONTRIP_NUTS_UNKNOWN_1ADT` (79).
+- **Simulator scenarios** (gamma, with their version copies, in the run list):
+  - `SIM_NONTRIP_NUTS_1ADT_38`, trip 52, the codes from `GET /zones`;
+  - `SIM_NHF_NONTRIP_NUTS_UNKNOWN_1ADT_38`, trip 53, `XS999`.
+- **Docs and page**:
+  - *What is tested* (step 01, the two catalogue rows);
+  - *OSCAR - OSDM Simulator scenarios* (two rows);
+  - a welcome-page news entry.
+
+### Simulator 0.71.0
+- **NUTS codes on the zones** of every profile: `SIM-CITY` names `XS111`, `SIM-NORTH` `XS112` (`nutsCodes`, checked: NUTS form, each in one zone only). `GET /zones` lists them.
+- **A request by `nutsCodes`** is served by the zone naming each code, with the products sold in a zone; each admission is valid in a `Zone` naming the code asked (`nutsCode`, `zoneIds`).
+- A request names exactly one of places, zones and NUTS codes.
+- An unknown code is refused: 400 `VALIDATION_ERROR`, pointing at it (`/nonTripSearchCriteria/nutsCodes/<i>`).
+- No other answer changes.
+
+### Changed
+- *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`).
+- Every simulator reference changes (the form declared, the run list). A company following one reads "not up to date" until it updates.
+
+### Checked
+- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.71.0, of the 220 scenarios of *Checks by scenario*, recorded in chunks:
+  - the two new ones pass with no failed check and no warning (243 and 79 checks);
+  - the 218 others give the same checks, results and warnings as the last recording, but for the dates five check texts carry (it ran a day later). The lost ticket and card scenarios give 236 checks, as in the catalogue: that recording predated their final data in #1290;
+  - `replay.js catalogue` agrees with all 110 entries.
+- **Simulator**: `non-trip.test.js` covers the profiles' codes and wrong profiles, the offers by NUTS code, two codes, the refusals, and the request and booking over HTTP in each provider's version, where every answer is checked against the OSDM response schema of that version.
+- **Collection**: `bruno-non-trip.test.js` covers the requirement, the request, the lookup, the warning, the probe, and the parser with an exchange.
+- **Server**: `non-trip-forms.test.js` covers the form, its declaration, capability, run filter, the expected refusal, the provider value and the reference; the page's `withNonTripValue()`.
+- **Mutation checks**: every collection rule (17) of this change, removed one by one, fails a test.
+- **Full local suites**: simulator 452 of 453 pass; the one failure is the known Windows file-mode test. Server: 6,388 of 6,414 pass (11 skipped). The failures are the known Windows-only ones (runner agent, MCP, `/metrics`, the answer-threats timing, the checkpoint thread), plus six files that failed under the full run's load and pass when run alone. `offer-request-forms.test.js` listed the non-trip entries and now names the two new ones.
+
+---
+
 ## [server-1.11.532] / [collection-OTST_V2.0.261] — 2026-11-16
 
 Issue #1266, part 2, second case. Release 2026.571 (`current_release`). Simulator 0.70.0. The replacement of a lost ticket or card (TICKET_LOST / CARD_LOST).

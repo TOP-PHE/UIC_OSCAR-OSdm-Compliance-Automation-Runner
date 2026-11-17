@@ -140,6 +140,10 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
   if (arr(n.providerValues).includes('nonTripZones')) {
     toComplete.push('a zone of the provider, its id and carrier (Trip → Zone; empty: the first of GET /zones)');
   }
+  // #1266: the simulator's NUTS codes are made up.
+  if (arr(n.providerValues).includes('nutsCodes')) {
+    toComplete.push('the NUTS codes of the provider\'s regions (Trip → NUTS codes; empty: those of the first zone of GET /zones that lists some)');
+  }
   // #1266: the simulator's lost card is no card of the provider's, and the
   // holder of a lost ticket must be one the provider knows. (The unknown card
   // of the refusal probe is made up, and stays unknown: kept.)

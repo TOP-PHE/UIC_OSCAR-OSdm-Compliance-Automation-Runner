@@ -57,6 +57,7 @@ const CAPABILITIES = Object.freeze([
   { id: 'offers.tripIds', group: 'Offers', label: 'Offers by trip id', goal: [OFFER_GOAL] },
   { id: 'offers.nonTripPlaces', group: 'Offers', label: 'Offers without a trip, between stop places', goal: [OFFER_GOAL] },
   { id: 'offers.nonTripZones', group: 'Offers', label: 'Offers without a trip, in zones', goal: [OFFER_GOAL] },
+  { id: 'offers.nonTripNuts', group: 'Offers', label: 'Offers without a trip, in regions named by NUTS codes', goal: [OFFER_GOAL] },
   { id: 'offers.tripParameters', group: 'Offers', label: 'Trip search parameters (train filter, transfers, vias…)', stage: 'offer' },
   { id: 'offers.options', group: 'Offers', label: 'Offer search options (classes, flexibility, offer parts…)', stage: 'offer' },
   { id: 'offers.requestOptions', group: 'Offers', label: 'Optional parameters of the offer request', stage: 'offer' },
@@ -166,7 +167,7 @@ const STAGE_GOAL = Object.freeze({ offer: OFFER_GOAL, sale: SALE_GOAL });
 
 const OFFER_FORM_CAPABILITY = Object.freeze({
   SEARCH: 'offers.search', SPECIFICATION: 'offers.specification', TRIP_IDS: 'offers.tripIds',
-  NON_TRIP_PLACES: 'offers.nonTripPlaces', NON_TRIP_ZONES: 'offers.nonTripZones',
+  NON_TRIP_PLACES: 'offers.nonTripPlaces', NON_TRIP_ZONES: 'offers.nonTripZones', NON_TRIP_NUTS: 'offers.nonTripNuts',
 });
 const PLACE_FLOW_CAPABILITY = Object.freeze({
   AUTOMATIC_PLACE_SELECTION_PREFERENCES: 'reservation.preferences', AUTOMATIC_PLACE_SELECTION_NEARBY: 'reservation.nearby',
@@ -180,7 +181,7 @@ const NO_OVERRULE = new Set(['', 'null', 'CODE_DOES_NOT_EXIST']);
 const REFUSAL_FLAGS = Object.freeze([
   'passengerLimitExpectRejection', 'departureExpectRejection', 'emptyPassengersExpectRejection', 'overruleCodeExpectRejection',
   'tripIdsExpectRejection', 'currencyExpectRejection', 'offerOptionExpectRejection', 'expectedProductAbsent',
-  'refundAgainProbe', 'exchangeRefundedProbe', 'confirmAgainProbe', 'lostCardExpectRejection',
+  'refundAgainProbe', 'exchangeRefundedProbe', 'confirmAgainProbe', 'lostCardExpectRejection', 'nutsCodeExpectRejection',
   'expiredOfferTest', 'expiredBookingTest', 'expiredRefundOfferTest', 'expiredExchangeOfferTest',
 ]);
 

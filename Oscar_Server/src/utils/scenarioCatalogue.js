@@ -437,6 +437,9 @@ function dataNeedsOf(scenario, datafile, facts) {
     ...(nonTrip && arr(nonTrip.places).length ? ['nonTripPlaces'] : []),
     ...(nonTrip && typeof nonTrip.placeLookup === 'string' && nonTrip.placeLookup.trim() ? ['placeLookup'] : []),
     ...(nonTrip && arr(nonTrip.zones).length ? ['nonTripZones'] : []),
+    // #1266: NUTS codes named (none: those of GET /zones); a probe's unknown
+    // code is made up, and stays unknown.
+    ...(nonTrip && arr(nonTrip.nutsCodes).length && !ARMED.has(scenario.nutsCodeExpectRejection) ? ['nutsCodes'] : []),
     ...(overrule ? ['overruleCode'] : []),
     ...(scenario.expectedProduct ? ['expectedProduct'] : []),
     // #1266: a product selected by its code names one of the simulator's.
@@ -482,7 +485,7 @@ const RETURN_TEXT = { COMBINED: 'one offer for both directions', SEPARATE: 'one 
 // The phrase of each need, in the order of NEEDS_KEYS; null when it says nothing.
 // #1258: the provider's values of a non-trip request, in words.
 const PROVIDER_VALUE_TEXT = Object.freeze({
-  nonTripPlaces: 'stop places to sell between', placeLookup: 'name for POST /places', nonTripZones: 'zone',
+  nonTripPlaces: 'stop places to sell between', placeLookup: 'name for POST /places', nonTripZones: 'zone', nutsCodes: 'NUTS codes',
   productCode: 'product code (Product selections)',
   lostCard: 'lost card (lostCard: its number and code)',
   lostTicketHolder: "holder of a lost ticket (the passenger's last name and date of birth)",

@@ -150,7 +150,7 @@ test('the wrong variant: from its stop place, or in its zone, the admissions say
   }
 });
 
-test('refused: a trip besides, one place, another kind of place, a place twice, unknown or foreign zones, NUTS codes, both or neither', () => {
+test('refused: a trip besides, one place, another kind of place, a place twice, unknown or foreign zones, unknown NUTS codes, two kinds or none', () => {
   const refused = (body, pattern) => assert.throws(() => buildOfferCollection(body, gamma, NOW), (e) => e.status === 400 && pattern.test(e.detail), JSON.stringify(body));
   refused(byPlaces([CENTRAL, AIRPORT], { tripSearchCriteria: {} }), /cannot go with tripSearchCriteria/);
   refused(byPlaces([CENTRAL]), /2 to 10 stop places/);
@@ -158,9 +158,12 @@ test('refused: a trip besides, one place, another kind of place, a place twice, 
   refused(byPlaces([CENTRAL, CENTRAL]), /twice/);
   refused(byZones([{ id: 'NOWHERE', carrier: gamma.carrier.ref }]), /not a zone of this provider/);
   refused(byZones([{ id: 'SIM-CITY', carrier: 'urn:x_other:carrier' }]), /is defined by/);
-  refused({ nonTripSearchCriteria: { nutsCodes: ['CZ010'] }, anonymousPassengerSpecifications: PAX }, /NUTS/);
-  refused({ nonTripSearchCriteria: { places: [stop(CENTRAL), stop(AIRPORT)], zones: [{ id: 'SIM-CITY', carrier: gamma.carrier.ref }] }, anonymousPassengerSpecifications: PAX }, /either places or zones/);
-  refused({ nonTripSearchCriteria: {}, anonymousPassengerSpecifications: PAX }, /either places or zones/);
+  refused({ nonTripSearchCriteria: { nutsCodes: ['CZ010'] }, anonymousPassengerSpecifications: PAX }, /no NUTS code of this provider/);
+  refused({ nonTripSearchCriteria: { nutsCodes: ['XS111', 'XS111'] }, anonymousPassengerSpecifications: PAX }, /twice/);
+  refused({ nonTripSearchCriteria: { nutsCodes: [] }, anonymousPassengerSpecifications: PAX }, /1 to 10 codes/);
+  refused({ nonTripSearchCriteria: { nutsCodes: ['XS111'], zones: [{ id: 'SIM-CITY', carrier: gamma.carrier.ref }] }, anonymousPassengerSpecifications: PAX }, /either places, zones or nutsCodes/);
+  refused({ nonTripSearchCriteria: { places: [stop(CENTRAL), stop(AIRPORT)], zones: [{ id: 'SIM-CITY', carrier: gamma.carrier.ref }] }, anonymousPassengerSpecifications: PAX }, /either places, zones or nutsCodes/);
+  refused({ nonTripSearchCriteria: {}, anonymousPassengerSpecifications: PAX }, /either places, zones or nutsCodes/);
   assert.throws(() => buildOfferCollection(byPlaces([CENTRAL, AIRPORT]), plain, NOW), (e) => /trips only/.test(e.detail));
 });
 
@@ -334,5 +337,70 @@ test('over HTTP, in each provider\'s version: a pass asked by tag, and the wrong
       assert.equal(offers.status, 200, `${key} ${JSON.stringify(offers.body).slice(0, 300)}`);
       assert.ok(offers.body.offers.length > 0, key);
     }
+  }
+});
+
+// ── #1266: NUTS codes ────────────────────────────────────────────────────────
+
+const byNuts = (codes, extra = {}) => ({
+  nonTripSearchCriteria: { validFrom: '2026-11-20T00:00:00+01:00', nutsCodes: codes },
+  anonymousPassengerSpecifications: PAX,
+  ...extra,
+});
+
+test('NUTS: the zones name made-up NUTS codes, each in one zone; a wrong one stops the start', () => {
+  assert.deepEqual(gamma.nonTrip.zones.map((z) => [z.id, z.nutsCodes]), [['SIM-CITY', ['XS111']], ['SIM-NORTH', ['XS112']], ['SIM-SOUTH', undefined]]);
+  const base = { ...JSON.parse(JSON.stringify(gamma)), key: undefined };
+  const withZones = (zones) => ({ ...base, carrier: gamma.carrier, nonTrip: { ...base.nonTrip, zones } });
+  const [city, north] = gamma.nonTrip.zones;
+  for (const wrong of [
+    [{ ...city, nutsCodes: ['xs111'] }, north],
+    [{ ...city, nutsCodes: ['X1'] }, north],
+    [{ ...city, nutsCodes: [] }, north],
+    [{ ...city, nutsCodes: ['XS111'] }, { ...north, nutsCodes: ['XS111'] }],
+  ]) {
+    assert.throws(() => checkProvider('gamma', withZones(wrong)), /nonTrip/, JSON.stringify(wrong));
+  }
+});
+
+test('NUTS: a region asked by its code is sold what its zone is; each admission is valid in a Zone naming the code', () => {
+  const { response } = buildOfferCollection(byNuts(['XS111']), gamma, NOW);
+  assert.equal(response.trips, undefined);
+  assert.deepEqual(codesOf(response.offers), ['SIM_SINGLE_RIDE/SECOND', 'SIM_DAY_PASS/SECOND', 'SIM_TEN_RIDES/SECOND']);
+  for (const part of admissionsOf(response.offers)) {
+    assert.deepEqual(part.regionalValidities, [{ seqNb: 1, zone: { carrier: gamma.carrier.ref, name: 'Simtown city', zoneIds: [100], nutsCode: 'XS111' } }]);
+    assert.ok(part.regionalValiditySummary.description.includes('in Simtown city (XS111)'), part.regionalValiditySummary.description);
+  }
+  // Two codes: a Zone each.
+  const two = admissionsOf(buildOfferCollection(byNuts(['XS111', 'XS112']), gamma, NOW).response.offers)[0];
+  assert.deepEqual(two.regionalValidities.map((v) => v.zone.nutsCode), ['XS111', 'XS112']);
+});
+
+test('NUTS: the region by code and the zone sell the same products', () => {
+  const nuts = buildOfferCollection(byNuts(['XS111']), gamma, NOW).response.offers;
+  const zone = buildOfferCollection(byZones([CITY]), gamma, NOW).response.offers;
+  assert.deepEqual(codesOf(nuts), codesOf(zone));
+});
+
+test("over HTTP, in each provider's version: GET /zones names the NUTS codes; a sale by NUTS code; an unknown code refused", async () => {
+  for (const key of REAL) {
+    const token = await tokenFor(sim.base, key, SECRETS[key][0]);
+    const zones = await call(sim.base, token, 'GET', `/${key}/zones`);
+    assert.deepEqual(zones.body.zones.map((z) => z.nutsCodes), [['XS111'], ['XS112'], undefined], key);
+    const offers = await call(sim.base, token, 'POST', `/${key}/offers`, byNuts(['XS111']));
+    assert.equal(offers.status, 200, `${key} ${JSON.stringify(offers.body).slice(0, 300)}`);
+    const offer = offers.body.offers[0];
+    const booked = await call(sim.base, token, 'POST', `/${key}/bookings`, bookingRequest(offer));
+    assert.equal(booked.status, 200, `${key} ${JSON.stringify(booked.body).slice(0, 300)}`);
+    const confirmed = await call(sim.base, token, 'POST', `/${key}/bookings/${booked.body.booking.id}/fulfillments`, {});
+    assert.equal(confirmed.status, 200, key);
+    const read = await call(sim.base, token, 'GET', `/${key}/bookings/${booked.body.booking.id}`);
+    const admission = read.body.booking.bookedOffers[0].admissions[0];
+    const validity = admission.regionalValidities ? admission.regionalValidities[0] : admission.regionalValidity;
+    assert.equal(validity.zone.nutsCode, 'XS111', key);
+    const unknown = await call(sim.base, token, 'POST', `/${key}/offers`, byNuts(['XS999']));
+    assert.equal(unknown.status, 400, key);
+    // The Problem points at the code refused.
+    assert.deepEqual(unknown.body.pointers, [{ requestPointer: '/nonTripSearchCriteria/nutsCodes/0' }], key);
   }
 });
