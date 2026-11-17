@@ -556,8 +556,6 @@ Issue #1298, part of #1297. Release 2026.577. Every booking read after 07 is hel
 
 Some real providers answer `POST /bookings/{id}/fulfillments` with the fulfilments, then leave them out of the booking they give afterwards. Since 1.11.447 (#1045) step 07 said so; the refund's 12, 14, 16 and the exchange's 13, 15, 17 said nothing (12 and 16 wrote a `[DEBUG]` line, the exchange steps nothing). OSDM does not require `Booking.fulfillments` (`Booking` requires `id`, `createdOn`, `passengers`), but `GET /bookings/{bookingId}` embeds everything by default (`embed`, "Default value: ALL", value `BOOKING_FULFILLMENTS`), and these six steps ask `embed=ALL`. So it is a WARNING, never a failed check.
 
-Version 1.11.538 / release 2026.577: 1.11.536–1.11.537 and 2026.575–2026.576 are taken by #1294 / #1295, not merged when this was written.
-
 ### Added
 - **The fulfilments seen before, at every booking read after 07** (`checkBookingStillLists()`, `confirmedFulfillments.js`): those the confirmation gave (06), those 07 listed, and those the exchange's confirmation gave (exchange 14, `rememberFulfillments()`), in `__fulfillmentIdsSeen` (a new confirmation starts it again; in both reset lists and `SUBRUN_SALE_STATE`). A booking listing none of them, or no longer listing some, gives one `[WARNING]` naming the step and the ids. No test is added: no number of checks moves.
 - **Simulator scenario** `SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_38` and its version copies (in the run list): the existing `booking-without-fulfillments` variant on an exchange. No failed check; a WARNING at 07, 13 and 15.
@@ -573,6 +571,92 @@ Version 1.11.538 / release 2026.577: 1.11.536–1.11.537 and 2026.575–2026.576
 - **Collection**: `bruno-confirmed-fulfillments.test.js` covers the rule (nothing seen, all listed, none, some left out), what is held (06, then 07 and exchange 14 added, a new confirmation starting again), the log lines (WARNING only, never a test), the wiring of the six steps (after the answer is an object, under its own name, each asking `embed=ALL`) and exchange 14, the reset lists, and step 14 with a refunded fulfilment the booking dropped.
 - **Mutation checks**: each of the 11 rules of this change, removed one by one, fails a test.
 - **Suites**: the collection, data file, reference, catalogue and checklist tests (2,141): all pass but `bruno-answer-threats.test.js`, the known Windows-only timing failure. Simulator `datafile.test.js` passes.
+
+---
+
+## [server-1.11.537] — 2026-11-17
+
+Release 2026.576 (`current_release`). The checks are indexed by company, no longer by company and text of the check (#1295). Step 2 of the performance audit of 2026-11-17.
+
+### To do after deployment, on a large database
+A database of more than 500,000 checks (the test machine, production) keeps the old index until an administrator of the machine runs one command, once, at a quiet time. Until then nothing changes there, and each start says so in one line.
+
+```bash
+sudo docker exec oscar node --no-warnings src/db/checkIndexes.js --apply
+```
+
+On Kubernetes: `kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings src/db/checkIndexes.js --apply`. Without `--apply` the command says what there is and changes nothing. *metrics-and-monitoring.md*, **The checks' index**, says what to know before running it.
+
+### Changed
+- **Storing a run wrote nine times the pages it needed.**
+  - **Why:** `run_assertions` had an index by company and text of the check (`idx_run_assertions_key`). Sorted by that text, it gave each of a run's 250 to 400 checks a page of its own, in an index of more than a gigabyte.
+  - **Measured** with the server's own `extractStructuredResults()` on a database of 7.7 million checks (4.7 GB), 36 runs of 242 checks:
+
+    | Index of the checks by company | Pages of log per run | Time to store a run |
+    |---|---|---|
+    | By company and text of the check (until now) | 860 | 119 ms |
+    | By company alone | 94 | 24 ms |
+    | None | 82 | 16 ms |
+
+  - That index held 1.2 GB of the 4.7 GB.
+- **An index by company alone replaces it** (`idx_run_assertions_company`). A deleted company's cascade needs one: without any, it read the whole table (7.5 s on that database, on a fast disk).
+- **The two trend routes read by run** (`api/helpers/checkTrends.js`). They were the old index's readers.
+  - `GET /v1/reports/trends/summary`: the finished runs queued in the last 30 days, the latest 500 at most, ten runs at a time, the thread given back between two slices. It read every check the company had ever stored, in one block: 11 to 21 s for a company of 5,300 runs on that database; 0.3 to 1 s now, in slices.
+  - `GET /v1/reports/trends`: the company's latest 500 finished runs, newest first, until it has the results asked.
+  - Both answers add `runs_read` and `more_runs`. A limit that is not a whole number from 1 up is the default, where it was an error.
+  - No page of OSCAR calls either route.
+- **A company is deleted through its runs** (`companyPurge.js`): its checks, requests and suites are found by run, where each table has an index. By company, `run_requests` has none.
+
+### How the index is replaced
+- Replacing it reads the old index and every check: seconds on a small database, minutes on a large one, too long for a start (a server that does not answer for two minutes is restarted).
+- **At start (migration 56):** only on a database of at most 500,000 checks, a new one included. Not in `schema.sql`, which runs at every start.
+- **On a larger database:** the command above (`src/db/checkIndexes.js`, a connection of its own). The old index goes first, so the new one is written in the pages it frees and the file does not grow. Both in one transaction.
+  - It refuses while a run is queued or running, and when the database's disk has less free than it needs (about 150 bytes per check).
+  - SQLite's sort files go beside the database, not in `/tmp`, which a container keeps small.
+  - On the 7.7-million-check database, two runs: 5 and 10 s to remove the old index, 33 and 47 s to make the new one; 1.2 GB freed for the next data.
+- While the swap is not made, the old index serves the cascade, and the trend routes and the deletion work the same.
+
+### Checked
+- `check-trends.test.js`: the same counts and the same results as the two former queries, on drawn runs; the order; the roles (a tester's own runs and the Test Managers', a certifier's shared runs, never another company's); 500 runs at most and `more_runs`; the thread given back between slices; the plans (by run, no sort). The test database's old index is dropped first.
+- `check-indexes.test.js`: a new database; a small one swapped at start; a large one kept, its cascade still served, the line at each start; the swap all or nothing; the file not growing; the command's refusals, `--force`, a second run, a wrong argument, no database, another database, and run as a program; a company deleted with either index.
+- `db-indexes.test.js`: the four indexes of the checks; no statement of the server names the old one.
+- The command, run twice on the bench database with the old index put back.
+
+### Not checked here
+The command on a Linux server, and how long it takes there: on the test machine first.
+
+---
+
+## [server-1.11.536] — 2026-11-17
+
+Release 2026.575 (`current_release`). The database's log is copied when it passes a size or an age, not every second (#1294). Step 1 of the performance audit of 2026-11-17, which follows the review #1233.
+
+### Changed
+- **The server's thread waited for the disk about once a second during a batch.**
+  - **Seen:** on the k3s test machine (2026.571, six simulators, 15 slots), about 200 COMMITs over 0.1 s per 5 minutes, 367 ms at the 99th percentile for a median of 1.7 ms. Requests waited up to 2.1 s for the thread.
+  - **Why:** with `synchronous = NORMAL` (#1224) an ordinary COMMIT does not wait for the disk. But the first write after a *complete* checkpoint starts the write-ahead log again from its beginning, and SQLite then syncs the log to the disk. That write is the server's. The checkpoint thread of #1230 ran every second: during a batch the log was emptied about once a second, and the next COMMIT, a run log flush or a slice of results, paid the sync.
+  - **Reproduced** with two connections, one writing and one running `PRAGMA wal_checkpoint(PASSIVE)` every 10 COMMITs: the COMMIT right after a checkpoint took 1.32 ms, the others 0.026 ms. A COMMIT with `synchronous = FULL` takes 1.22 ms; with `OFF`, the one after a checkpoint 0.085 ms.
+- **The checkpoint thread looks at the log every second, and copies it only when it is worth it** (`checkpointWorker.js` `isDue()`):
+  - the log file is larger than `OSCAR_DB_CHECKPOINT_MB` (16 by default, 1 to 1024) and was written since the last checkpoint;
+  - or the last checkpoint is older than `OSCAR_DB_CHECKPOINT_SECONDS` (30 by default, 1 to 600);
+  - or the last checkpoint could not copy everything (a reader still used some pages): tried again at the next look.
+- **The server's connection sets `journal_size_limit` to the same size** while the thread checkpoints: the log file is cut back when the log starts again, so its size says how much it holds. It is put back to SQLite's default when the thread is let go.
+- Both settings are read before the database opens: a wrong value stops the start.
+- **New gauge `oscar_db_wal_bytes`**: the size of the log file at each look. The thread's looks are also what the watchdog listens for.
+- **Documentation:** `metrics-and-monitoring.md`, `OSCAR_Deploy/.env.example`, the installation guide's start-up lines, the panel's text in *OSCAR · Overview*, `CLAUDE.md`.
+
+### To check after deployment
+During a batch, the COMMITs over 0.1 s in 5 minutes (panel *Database commits* of *OSCAR · Overview*) should fall from about 200 to a handful.
+
+### Checked
+- `db-checkpoints.test.js`:
+  - the two settings, their bounds, and a wrong value refused before the database is opened;
+  - the settings reach the thread, `journal_size_limit` is set, and put back when the thread stops;
+  - a log under the size with a recent checkpoint is looked at and left;
+  - a log past the size is copied without waiting, then left alone;
+  - an old checkpoint is made again;
+  - what a checkpoint could not copy, because of a reader, is tried again at each look.
+- The tests that count checkpoints now ask for one at every look. The test of a silent thread waits a second, not 0.2 s: on a busy machine the thread took longer than that to start.
 
 ---
 

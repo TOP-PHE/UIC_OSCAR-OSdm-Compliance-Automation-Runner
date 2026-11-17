@@ -17,6 +17,7 @@ const path   = require('node:path');
 const fs     = require('node:fs');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const checkIndexes = require('./checkIndexes');
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 // OSCAR_DB_PATH env var overrides the default DB location — used by test
@@ -102,12 +103,12 @@ const SLOW_MS = slowStatementSetting(process.env.OSCAR_DB_SLOW_MS);
 //   cache of the database file, not a second copy.
 // - OSCAR_DB_TEMP_STORE, temporary storage: MEMORY (the default) or FILE.
 // Read here, so a wrong value stops the start before the database is opened.
-function wholeNumberSetting(name, value, fallback, min, max) {
+function wholeNumberSetting(name, value, fallback, min, max, unit = 'megabytes') {
   if (value === undefined || value === '') return fallback;
   const text = String(value).trim();
   const n = /^\d{1,4}$/.test(text) ? Number(text) : Number.NaN;
   if (n >= min && n <= max) return n;
-  throw new Error(`${name} must be a whole number of megabytes from ${min} to ${max}, not "${value}"`);
+  throw new Error(`${name} must be a whole number of ${unit} from ${min} to ${max}, not "${value}"`);
 }
 
 function cacheSetting(value) {
@@ -128,6 +129,30 @@ function tempStoreSetting(value) {
 const CACHE_MB = cacheSetting(process.env.OSCAR_DB_CACHE_MB);
 const MMAP_MB = mmapSetting(process.env.OSCAR_DB_MMAP_MB);
 const TEMP_STORE = tempStoreSetting(process.env.OSCAR_DB_TEMP_STORE);
+
+// ── When the checkpoint thread copies the log (#1294) ─────────────────────────
+// The first write after a complete checkpoint starts the write-ahead log again
+// from its beginning, and SQLite then syncs the log to the disk, with
+// synchronous NORMAL too. That write is the server's: a checkpoint every
+// second (#1230) made one disk sync a second on the server's thread, 0.1 to
+// 0.4 s each during a batch on the k3s test machine (about 200 COMMITs over
+// 0.1 s per 5 minutes). The thread still looks at the log every second, but
+// copies it only when it is worth it:
+// - OSCAR_DB_CHECKPOINT_MB, when the log file is larger: 16 by default, 1 to
+//   1024;
+// - OSCAR_DB_CHECKPOINT_SECONDS, when the last checkpoint is older: 30 by
+//   default, 1 to 600.
+// Read here, so a wrong value stops the start before the database is opened.
+function checkpointSizeSetting(value) {
+  return wholeNumberSetting('OSCAR_DB_CHECKPOINT_MB', value, 16, 1, 1024);
+}
+
+function checkpointWaitSetting(value) {
+  return wholeNumberSetting('OSCAR_DB_CHECKPOINT_SECONDS', value, 30, 1, 600, 'seconds');
+}
+
+const CHECKPOINT_MB = checkpointSizeSetting(process.env.OSCAR_DB_CHECKPOINT_MB);
+const CHECKPOINT_SECONDS = checkpointWaitSetting(process.env.OSCAR_DB_CHECKPOINT_SECONDS);
 
 // The encryption key as last read (#1241, _key() below). Here, before the
 // migrations: some encrypt rows while this file loads (migration 27), and a
@@ -1243,6 +1268,19 @@ const MIGRATIONS = [
       db.exec('DROP INDEX IF EXISTS idx_run_assertions_category');
       db.exec('DROP INDEX IF EXISTS idx_run_assertions_domain');
   }},
+  { version: 56, name: 'checks-indexed-by-company-not-by-text', up: () => {
+      // #1295. The checks' index (company_id, assertion_key) is sorted by the
+      // text of the check: each check of a run landed on a page of its own, 860
+      // pages of log a run on a database of 7.7 million checks, 94 without it.
+      // The trends read by run now (checkTrends.js); the cascade from a deleted
+      // company takes (company_id) alone, which migration 55 had removed as a
+      // prefix of the other. The swap reads the old index and every check, so
+      // it is made here only on a database small enough (checkIndexes.js): a
+      // larger one keeps the old index, and an operator runs the command. Not
+      // in schema.sql, which runs at every start and would make the new index,
+      // or the old one again, on a database of any size.
+      checkIndexes.swapAtStart(db);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
@@ -1314,6 +1352,11 @@ function _safeAlter(sql) {
     }
   }
 })();
+
+// A large database whose checks are still indexed by their text: said at
+// each start, until an operator has run the command (#1295).
+const CHECK_INDEXES_PENDING = checkIndexes.pendingText(checkIndexes.stateOf(db));
+if (CHECK_INDEXES_PENDING) console.warn(CHECK_INDEXES_PENDING);
 
 const STARTED_WITH = memorySettings();
 console.log(`[db] SQLite ready → ${DB_PATH} (synchronous ${SYNCHRONOUS_NAMES[db.prepare('PRAGMA synchronous').get().synchronous]}, checkpoints ${CHECKPOINTS}, statistics ${CHECKPOINTS === 'thread' ? OPTIMIZE : 'off'}, cache ${megabytes(STARTED_WITH.cacheBytes)}, memory map ${megabytes(STARTED_WITH.mmapBytes)}, temporary storage ${TEMP_STORE_NAMES[STARTED_WITH.tempStore]})`);
@@ -1566,11 +1609,13 @@ function timedCommit() {
 // database file and waits for the disk, 0.1 to 0.26 s on the server's one
 // thread (k3s test machine, 2026.548). startCheckpointThread() (server.js)
 // turns it off on this connection once a worker thread, with a connection of
-// its own, checkpoints every second (checkpointWorker.js): a passive
-// checkpoint never blocks a reader or a writer. When that thread fails, ends
-// or reports nothing for `staleMs`, this connection checkpoints by itself
-// again (checkpointsInline()), so the log never grows without bound. Scripts
-// and tests that only load this file keep checkpointing in their COMMITs.
+// its own, checkpoints (checkpointWorker.js): a passive checkpoint never
+// blocks a reader or a writer. The thread looks at the log every second and
+// copies it when it passes a size or an age (#1294, the settings above), not
+// at every look. When that thread fails, ends or reports nothing for
+// `staleMs`, this connection checkpoints by itself again
+// (checkpointsInline()), so the log never grows without bound. Scripts and
+// tests that only load this file keep checkpointing in their COMMITs.
 let checkpointer = null;
 
 function checkpointMetric(name) {
@@ -1590,9 +1635,12 @@ function onCheckpointMessage(state, msg) {
   state.lastSeen = Date.now();
   if (msg?.type === 'ready') {
     db.exec('PRAGMA wal_autocheckpoint = 0');
+    // #1294: the log file is cut back to the limit when it starts again, so
+    // its size says how much it holds, which is what the thread looks at.
+    db.exec(`PRAGMA journal_size_limit = ${Number(state.limitBytes)}`);
     state.running = true;
     setCheckpointThreadGauge(true);
-    console.log('[db] checkpoints run in a thread of their own');
+    console.log(`[db] checkpoints run in a thread of their own, when the log passes ${megabytes(state.limitBytes)} or every ${state.maxWaitMs / 1000} s`);
     return;
   }
   // #1269: the thread runs one ANALYZE and posts nothing until it ends, which
@@ -1607,6 +1655,12 @@ function onCheckpointMessage(state, msg) {
   if (msg?.type === 'optimized') {
     onStatistics(state, msg);
     return;
+  }
+  // #1294: at each look the thread says the size of the log file, whether it
+  // copied it ('checkpoint') or left it for later ('waiting').
+  if (msg?.type === 'waiting' || msg?.type === 'checkpoint') {
+    state.walBytes = Math.max(Number(msg.walBytes) || 0, 0);
+    try { checkpointMetric('dbWalBytes')?.set(state.walBytes); } catch { /* a metric never stops the database */ }
   }
   if (msg?.type !== 'checkpoint') return;
   const log = Number(msg.log);
@@ -1668,7 +1722,10 @@ function release(state) {
   checkpointer = null;
   state.stopping = true;
   clearInterval(state.watchdog);
-  try { db.exec('PRAGMA wal_autocheckpoint = 1000'); } catch { /* the connection is closed */ }
+  try {
+    db.exec('PRAGMA wal_autocheckpoint = 1000');
+    db.exec('PRAGMA journal_size_limit = -1');
+  } catch { /* the connection is closed */ }
   setCheckpointThreadGauge(false);
 }
 
@@ -1699,25 +1756,35 @@ function checkpointsInline(state, reason) {
 /**
  * Starts the checkpoint thread (OSCAR_DB_CHECKPOINTS=thread, the default, in
  * WAL mode). Gives the Worker, or null when the COMMITs keep checkpointing.
+ * The thread looks at the log every `intervalMs` and copies it when its file
+ * is larger than `limitBytes` or its last checkpoint older than `maxWaitMs`
+ * (#1294; 0 for either: at every look, as before).
  * With OSCAR_DB_OPTIMIZE=daily (off by default since #1269) the same thread
  * updates SQLite's statistics `optimizeDelayMs` after the start, then every
  * `optimizeEveryMs`, pausing `optimizePauseMs` after each table (#1238).
  */
 function startCheckpointThread({
   intervalMs = 1000, staleMs = 60000,
+  limitBytes = CHECKPOINT_MB * 1024 * 1024, maxWaitMs = CHECKPOINT_SECONDS * 1000,
   optimizeDelayMs = 60000, optimizeEveryMs = 24 * 3600 * 1000, optimizePauseMs = 250,
 } = {}) {
   if (checkpointer) return checkpointer.worker;
   if (CHECKPOINTS !== 'thread') return null;
   if (db.prepare('PRAGMA journal_mode').get().journal_mode !== 'wal') return null;
+  // Whole numbers, whatever a caller gives: one goes into a PRAGMA's text.
+  const limit = Math.max(Math.floor(Number(limitBytes)) || 0, 0);
+  const wait = Math.max(Math.floor(Number(maxWaitMs)) || 0, 0);
   const { Worker } = require('node:worker_threads');
   const worker = new Worker(path.join(__dirname, 'checkpointWorker.js'), {
     workerData: {
-      dbPath: DB_PATH, intervalMs, busyMs: BUSY_TIMEOUT_MS,
+      dbPath: DB_PATH, intervalMs, busyMs: BUSY_TIMEOUT_MS, limitBytes: limit, maxWaitMs: wait,
       optimize: OPTIMIZE === 'daily', optimizeDelayMs, optimizeEveryMs, optimizePauseMs,
     },
   });
-  const state = { worker, running: false, stopping: false, exited: false, lastSeen: Date.now(), last: null, count: 0, watchdog: null, statistics: null, analyzing: null };
+  const state = {
+    worker, running: false, stopping: false, exited: false, lastSeen: Date.now(), last: null, count: 0, watchdog: null,
+    statistics: null, analyzing: null, limitBytes: limit, maxWaitMs: wait, walBytes: 0,
+  };
   checkpointer = state;
   worker.unref();
   worker.on('message', (msg) => onCheckpointMessage(state, msg));
@@ -1756,12 +1823,14 @@ function checkpointState() {
   return {
     mode: CHECKPOINTS, running: Boolean(state?.running), count: state?.count ?? 0, last: state?.last ?? null,
     optimize: OPTIMIZE, statistics: state?.statistics ?? null, analyzing: state?.analyzing?.table ?? null,
+    limitBytes: state?.limitBytes ?? null, maxWaitMs: state?.maxWaitMs ?? null, walBytes: state?.walBytes ?? null,
   };
 }
 
 module.exports = {
   db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig, synchronousSetting,
   checkpointsSetting, startCheckpointThread, stopCheckpointThread, checkpointState,
+  checkpointSizeSetting, checkpointWaitSetting,
   slowStatementSetting, observeStatements, sqlShape, callerOf,
   cacheSetting, mmapSetting, tempStoreSetting, memorySettings, optimizeSetting,
   keepStatements, keptStatements, STATEMENT_CACHE_SIZE,

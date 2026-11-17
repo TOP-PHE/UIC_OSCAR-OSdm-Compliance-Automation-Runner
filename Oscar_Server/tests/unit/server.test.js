@@ -180,7 +180,7 @@ describe('GET /metrics', () => {
   test('#1230: the checkpoint thread\'s metrics are written', async () => {
     const res = await request(app).get('/metrics');
     expect(res.status).toBe(200);
-    for (const name of ['oscar_db_checkpoint_seconds', 'oscar_db_wal_frames', 'oscar_db_wal_frames_not_copied', 'oscar_db_checkpoint_thread']) {
+    for (const name of ['oscar_db_checkpoint_seconds', 'oscar_db_wal_frames', 'oscar_db_wal_frames_not_copied', 'oscar_db_checkpoint_thread', 'oscar_db_wal_bytes']) {
       expect(res.text).toContain(`# TYPE ${name} `);
     }
   });

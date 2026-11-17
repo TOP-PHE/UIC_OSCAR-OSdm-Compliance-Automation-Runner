@@ -25,8 +25,29 @@
       "notes": [
         "Server 1.11.538 (news entry only), collection OTST_V2.0.263: every booking read after 07 is held to the fulfilments seen before (#1298, part of #1297). Refund 12, 14, 16 and exchange 13, 15, 17 (which ask embed=ALL) give one WARNING when the booking lists none, or no longer lists some, of the fulfilments the confirmation gave, 07 listed or the exchange's confirmation gave. OSDM does not require Booking.fulfillments, so it is a WARNING, not a failed check: no number of checks moves.",
         "At 14 the refund scope check's line about a booking listing no fulfilment is INFO now (the WARNING is the step's own), and a refunded fulfilment the booking no longer lists keeps the parts the confirmation gave it: its parts read \"left out of the refund\" before.",
-        "New simulator scenario SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_* (in the run list), the existing booking-without-fulfillments variant on an exchange. Every simulator reference changes (its run list): a company following one updates it from Test Config. Otherwise no action is required.",
-        "Server 1.11.538 / release 2026.577: 1.11.536–1.11.537 and 2026.575–2026.576 are taken by #1294 / #1295, not merged when this was written."
+        "New simulator scenario SIM_VARIANT_BOOKING_WITHOUT_FULFILLMENTS_EXCHANGE_1ADT_* (in the run list), the existing booking-without-fulfillments variant on an exchange. Every simulator reference changes (its run list): a company following one updates it from Test Config. Otherwise no action is required."
+      ]
+    },
+    {
+      "release": "2026.576",
+      "date": "2026-11-17",
+      "server": "1.11.537",
+      "collection": "OTST_V2.0.262",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.537: the checks are indexed by company, no longer by company and text of the check (#1295, step 2 of the performance audit of 2026-11-17). Sorted by the text of the check, that index gave each check of a run a page of its own: 860 pages of log per stored run on a database of 7.7 million checks, 94 with an index by company alone, and 1.2 GB of a 4.7 GB database. The two trend routes, its readers, now read the company's latest 500 finished runs, a few at a time (the summary held the server's thread 11 to 21 s for a company of 5,300 runs; 0.3 to 1 s now, in slices of a few milliseconds), and answer runs_read and more_runs. A company is deleted through its runs. TO DO ON A LARGE DATABASE: the swap is made at start only up to 500,000 checks; a larger database keeps the old index, says so at each start, and an administrator runs once, at a quiet time: docker exec oscar node --no-warnings src/db/checkIndexes.js --apply (metrics-and-monitoring.md, The checks' index)."
+      ]
+    },
+    {
+      "release": "2026.575",
+      "date": "2026-11-17",
+      "server": "1.11.536",
+      "collection": "OTST_V2.0.262",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.536: the database's log is copied when it passes a size or an age, not every second (#1294, step 1 of the performance audit of 2026-11-17). With synchronous NORMAL, SQLite still syncs the write-ahead log to the disk at the first write after a complete checkpoint, and that write is the server's. The checkpoint thread of #1230 ran every second, so the server's thread waited for the disk about once a second during a batch: about 200 COMMITs over 0.1 s per 5 minutes on the k3s test machine (367 ms at the 99th percentile). The thread now looks every second but copies the log only when its file is larger than OSCAR_DB_CHECKPOINT_MB (16) or its last checkpoint older than OSCAR_DB_CHECKPOINT_SECONDS (30); the server's connection sets journal_size_limit to that size. New gauge oscar_db_wal_bytes."
       ]
     },
     {

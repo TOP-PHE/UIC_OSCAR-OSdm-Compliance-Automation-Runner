@@ -28,6 +28,7 @@ const { requireAuth, isPlatformRole } = require('../middleware/auth');
 // administrator → null (operations role only), certifier → only runs the
 // test_manager explicitly shared, tester/test_manager → own company.
 const { canUserSeeRun, runScopeSql } = require('../helpers/run-access');
+const { topFailures, resultsOfCheck, limitOf } = require('../helpers/checkTrends');
 // #227 part 3: the offer request options report of each run (shared with the coverage, #995).
 const { offerOptionReportsOf } = require('../helpers/offerOptionReports');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
@@ -616,84 +617,42 @@ router.delete('/templates/:id', (req, res) => {
 });
 
 // ── GET /v1/reports/trends/summary ────────────────────────────────────────────
-// Returns top-20 most-failing assertions for the company (last 30 days).
+// The checks that failed most in the company's finished runs of the last 30
+// days, read from its latest runs (checkTrends.js, #1295).
 // Must be defined BEFORE /trends to avoid Express treating "summary" as a param.
-router.get('/trends/summary', (req, res) => {
+router.get('/trends/summary', async (req, res) => {
   const companyId = scopedCompanyId(req);
   if (!companyId) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Company scope required.' });
   // S4: req.companyId is caller-supplied for platform roles (?company_id=),
   // so these aggregates were readable for any tenant. An administrator has no
-  // test-data read at all; a certifier only aggregates over shared runs.
+  // test-data read at all; a certifier only aggregates over shared runs, a
+  // tester over their own and the Test Managers' (1.11.477): the runs are
+  // chosen with runScopeSql().
   if (req.user.role === 'administrator') {
     return res.json({ company_id: companyId, top_failures: [] });
   }
-  // A certifier reads the shared runs only, a tester their own (1.11.477).
-  const scope = runScopeSql(req.user, 'r');
-
-  const limit = Math.min(Number.parseInt(req.query.limit || '20', 10), 50);
-
-  const rows = all(`
-    SELECT ra.assertion_key, ra.assertion_name, ra.category, ra.domain, ra.severity,
-           COUNT(*) as run_count,
-           SUM(CASE WHEN ra.passed = 0 THEN 1 ELSE 0 END) as fail_count,
-           ROUND(100.0 * SUM(ra.passed) / COUNT(*), 1) as pass_rate
-    FROM run_assertions ra
-    JOIN runs r ON r.id = ra.run_id
-    WHERE ra.company_id = ?
-      AND r.status IN ('COMPLETED', 'FAILED')
-      AND r.queued_at >= datetime('now', '-30 days')
-      ${scope.sql}
-    GROUP BY ra.assertion_key
-    HAVING fail_count > 0
-    ORDER BY fail_count DESC, pass_rate ASC
-    LIMIT ?
-  `, [companyId, ...scope.params, limit]);
-
-  return res.json({ company_id: companyId, top_failures: rows });
+  const read = await topFailures(companyId, req.user, limitOf(req.query.limit, 20, 50));
+  return res.json({ company_id: companyId, ...read });
 });
 
 // ── GET /v1/reports/trends ───────────────────────────────────────────────────
-// Returns last N pass/fail results for a specific assertion key across runs.
-router.get('/trends', (req, res) => {
-  const { assertion_key, limit: limitStr } = req.query;
-  if (!assertion_key) {
+// The last results of one check, newest run first, read from the company's
+// latest finished runs (checkTrends.js, #1295).
+router.get('/trends', async (req, res) => {
+  const assertionKey = req.query.assertion_key;
+  if (!assertionKey || typeof assertionKey !== 'string') {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'assertion_key query param is required.' });
   }
-  const limit = Math.min(Number.parseInt(limitStr || '20', 10), 100);
   const companyId = scopedCompanyId(req);
   if (!companyId) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Company scope required.' });
   // S4: same caller-supplied company scope as /trends/summary — apply the
   // same role rules. error_msg here is assertion text from another tenant's
   // run, so this is not just a count.
   if (req.user.role === 'administrator') {
-    return res.json({ assertion_key, points: [] });
+    return res.json({ assertion_key: assertionKey, points: [] });
   }
-  // A certifier reads the shared runs only, a tester their own (1.11.477).
-  const scope = runScopeSql(req.user, 'r');
-
-  const rows = all(`
-    SELECT ra.run_id, ra.passed, ra.error_msg, ra.category, ra.severity,
-           r.queued_at, r.completed_at, r.scenario_code
-    FROM run_assertions ra
-    JOIN runs r ON r.id = ra.run_id
-    WHERE ra.company_id = ? AND ra.assertion_key = ? AND r.status IN ('COMPLETED', 'FAILED')
-      ${scope.sql}
-    ORDER BY r.queued_at DESC
-    LIMIT ?
-  `, [companyId, assertion_key, ...scope.params, limit]);
-
-  return res.json({
-    assertion_key,
-    points: rows.map(r => ({
-      run_id: r.run_id,
-      passed: !!r.passed,
-      error: r.error_msg,
-      category: r.category,
-      severity: r.severity,
-      scenario_code: r.scenario_code,
-      completed_at: r.completed_at
-    }))
-  });
+  const read = await resultsOfCheck(companyId, req.user, assertionKey, limitOf(req.query.limit, 20, 100));
+  return res.json({ assertion_key: assertionKey, ...read });
 });
 
 module.exports = router;

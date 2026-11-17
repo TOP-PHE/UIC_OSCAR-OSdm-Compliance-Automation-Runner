@@ -161,6 +161,13 @@ const dbCheckpointThread = new promClient.Gauge({
   help: "1 while a thread of its own checkpoints the database, 0 when the server's connection does in its COMMITs",
   registers: [register]
 });
+// #1294: the thread looks at the log file every second and copies it only
+// past a size or an age; this is the size it last saw, copied or not.
+const dbWalBytes = new promClient.Gauge({
+  name: 'oscar_db_wal_bytes',
+  help: 'Size of the write-ahead log file as the checkpoint thread last saw it, in bytes',
+  registers: [register]
+});
 
 // The database's statistics (#1238, db.js onStatistics()): each table the
 // checkpoint thread analyzed, off the server's thread, and each run of
@@ -385,6 +392,7 @@ module.exports = {
   dbWalFrames,
   dbWalFramesNotCopied,
   dbCheckpointThread,
+  dbWalBytes,
   dbStatementSeconds,
   dbSlowStatements,
   runDatafileReads,

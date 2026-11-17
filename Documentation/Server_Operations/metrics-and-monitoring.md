@@ -224,6 +224,8 @@ work is measured where it runs:
   - `oscar_db_checkpoint_thread`, a gauge: 1 while that thread checkpoints,
     0 when the server's connection does in its COMMITs
     (`OSCAR_DB_CHECKPOINTS=inline`, or the thread stopped);
+  - from 1.11.536 (#1294), `oscar_db_wal_bytes`, a gauge: the size of the
+    log file as that thread last saw it, each second, copied or not;
 - from 1.11.511 (#1234), every statement of the database helpers `all`,
   `get` and `run` (most of OSCAR's statements):
   - `oscar_db_statement_seconds`, a histogram: each one's time on the
@@ -359,13 +361,104 @@ Read millisecond by millisecond, those stretches held:
   `oscar_results_slice_seconds` shows their lengths.
 
 From server 1.11.510 a thread of its own checkpoints, with a connection of
-its own, every second. It runs a passive checkpoint, which never blocks a
+its own. It runs a passive checkpoint, which never blocks a
 reader or a writer, and the server's connection no longer checkpoints in its
 COMMITs (`PRAGMA wal_autocheckpoint = 0`). If that thread fails, ends or
 reports nothing for a minute, the server's connection checkpoints by itself
 again, so the log never grows without bound. `OSCAR_DB_CHECKPOINTS=inline`
 keeps the old way. The start-up line says which:
 `[db] SQLite ready → … (synchronous NORMAL, checkpoints thread)`.
+
+**When the thread checkpoints** (#1294, server 1.11.536). Until then it did
+every second. The performance audit of 2026-11-17 found the cost of that on
+the server's thread: the first write after a complete checkpoint starts the
+log again from its beginning, and SQLite then syncs the log to the disk, with
+`synchronous = NORMAL` too. That write is the server's. During a batch the
+log was emptied about once a second, so the server's thread waited for the
+disk about once a second: about 200 COMMITs over 0.1 s per 5 minutes on the
+k3s test machine, 367 ms at the 99th percentile. Reproduced with two
+connections: the COMMIT right after a checkpoint took 1.32 ms, the others
+0.026 ms, and a COMMIT with `synchronous = FULL` 1.22 ms.
+
+The thread still looks at the log every second, but copies it only:
+- when the log file is larger than `OSCAR_DB_CHECKPOINT_MB` (16 by default,
+  1 to 1024), and was written since the last checkpoint;
+- when its last checkpoint is older than `OSCAR_DB_CHECKPOINT_SECONDS` (30 by
+  default, 1 to 600);
+- at the next look, when the last checkpoint could not copy everything (a
+  reader still used some pages).
+
+The server's connection sets `journal_size_limit` to the same size: the log
+file is cut back when it starts again, so its size says how much it holds.
+A wrong value of either setting stops the start. To check on a batch: the
+COMMITs over 0.1 s in 5 minutes (panel *Database commits*) should fall from
+about 200 to a handful.
+
+**The checks' index** (#1295, server 1.11.537). The checks of every run
+(`run_assertions`) had an index by company and text of the check. Sorted by
+that text, it gave each of a run's 250 to 400 checks a page of its own, in an
+index of more than a gigabyte. Measured with the server's own code on a
+database of 7.7 million checks:
+
+| | Pages of log written per run | Time to store a run |
+|---|---|---|
+| With that index | 860 | 119 ms |
+| With an index by company alone | 94 | 24 ms |
+
+It held 1.2 GB of a 4.7 GB database. Its two readers were the trend routes
+(`GET /v1/reports/trends` and `/trends/summary`), which now read the
+company's latest finished runs, a few at a time, and a deleted company's
+cascade, which the index by company alone serves.
+
+Replacing one index by the other reads the old index and every check. So:
+
+- **A new database, or one of at most 500,000 checks** (about 2,000 runs):
+  done at the first start of 1.11.537, in a moment.
+- **A larger database** keeps the old index, which still works, and each
+  start says so in one line: `[db] the checks are still indexed by their
+  text (about N checks) …`. An administrator of the machine then runs one
+  command, once, at a quiet time.
+
+What there is, and what the command would do (changes nothing):
+
+```bash
+sudo docker exec oscar node --no-warnings src/db/checkIndexes.js
+```
+
+The swap:
+
+```bash
+sudo docker exec oscar node --no-warnings src/db/checkIndexes.js --apply
+```
+
+On Kubernetes, the same in the server's container:
+
+```bash
+kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings src/db/checkIndexes.js --apply
+```
+
+What to know before running it:
+
+- **The server stays up.** Pages are read as usual. Whatever *writes* to the
+  database while the swap runs (a sign-in, a save, a run) waits five
+  seconds, then fails. Choose a time when nobody works, and no run is
+  going: the command refuses while a run is queued or running.
+- **How long:** 5 to 10 s to remove the old index and 33 to 47 s to make the
+  new one for 7.7 million checks on a fast disk (two runs). Count a few
+  minutes on a server. The command prints the time of each part.
+- **All or nothing:** one transaction. Stopped midway, it changed nothing.
+- **Disk:** it needs about 150 bytes per check free beside the database
+  while it runs (1.1 GB for 7.7 million checks), and refuses with less. The
+  database file does not grow: the new index is written in the pages the
+  old one frees, and the rest of those pages hold the next data stored.
+- **With the server stopped** (a container of the same image and volume),
+  the runs the server left marked running make it refuse: add `--force`.
+
+It ends with `done. The database file keeps its size; N MB of it are free
+and will hold the next data stored.` A second run answers `nothing to do`,
+and the start-up line is gone at the next start. To check on a batch
+afterwards: `oscar_run_work_seconds{work="results_store"}` per run and the
+growth of `oscar_db_wal_bytes` should both fall.
 
 **SQLite's memory** (#1237, server 1.11.517). SQLite's defaults were a page
 cache of 2 MB, no memory map, and temporary sorts and groupings in files.
