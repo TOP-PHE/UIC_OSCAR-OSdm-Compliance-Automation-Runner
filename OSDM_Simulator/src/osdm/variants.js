@@ -115,19 +115,23 @@ function shapeNewBooking(booking) {
     }
   }
   if (has(booking, 'wrong-booking-price')) booking.provisionalPrice.amount += 1;
-  // #1300: a price changed at pre-booking. The part's price is replaced, never
-  // changed in place: it is the offer's own object.
-  if (has(booking, 'booking-price-change')) {
-    let added = 0;
-    for (const bookedOffer of booking.bookedOffers) {
-      for (const part of bookedOffer.admissions) {
-        part.price = { ...part.price, amount: part.price.amount + PRICE_CHANGE };
-        added += PRICE_CHANGE;
-      }
-    }
-    booking.provisionalPrice = { ...booking.provisionalPrice, amount: booking.provisionalPrice.amount + added };
-  }
+  if (has(booking, 'booking-price-change')) changePrices(booking);
   shapePassengers(booking);
+}
+
+/**
+ * #1300 (booking-price-change): a price changed at pre-booking. The part's
+ * price is replaced, never changed in place: it is the offer's own object.
+ */
+function changePrices(booking) {
+  let added = 0;
+  for (const bookedOffer of booking.bookedOffers) {
+    for (const part of bookedOffer.admissions) {
+      part.price = { ...part.price, amount: part.price.amount + PRICE_CHANGE };
+      added += PRICE_CHANGE;
+    }
+  }
+  booking.provisionalPrice = { ...booking.provisionalPrice, amount: booking.provisionalPrice.amount + added };
 }
 
 /**

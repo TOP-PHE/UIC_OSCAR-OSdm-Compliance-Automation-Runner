@@ -86,26 +86,54 @@ function productIdOf(part) {
 
 const serviceClassOf = (product) => product?.serviceClass?.type ?? product?.serviceClass ?? null;
 
+// The members of a product compared, each with its words (booked value first).
+const PRODUCT_MEMBERS = [
+  { read: (p) => p?.code, say: (b, o) => `another product: ${b}, the offer sold ${o}` },
+  { read: (p) => p?.flexibility, say: (b, o) => `flexibility ${b}, the offer sold ${o}` },
+  { read: (p) => p?.travelClass, say: (b, o) => `travel class ${b}, the offer sold ${o}` },
+  { read: serviceClassOf, say: (b, o) => `service class ${JSON.stringify(b)}, the offer sold ${JSON.stringify(o)}` },
+];
+
+/** What differs between the product sold and the product booked, as words. */
+function productDifferences(sold, booked) {
+  return PRODUCT_MEMBERS.flatMap(({ read, say }) => {
+    const o = read(sold);
+    const b = read(booked);
+    return o != null && b != null && JSON.stringify(o) !== JSON.stringify(b) ? [say(b, o)] : [];
+  });
+}
+
+const noFinding = () => ({ warn: [], info: [] });
+
 function productFindings(offerPart, bookedPart, ctx) {
   const oId = productIdOf(offerPart);
   const bId = productIdOf(bookedPart);
-  if (!oId && !bId) return { warn: [], info: [] };
-  if (!oId || !bId) return { warn: [`the product is named in the ${oId ? 'offer' : 'booking'} (${oId || bId}) but not in the ${oId ? 'booking' : 'offer'}`], info: [] };
+  if (!oId && !bId) return noFinding();
+  if (!oId || !bId) {
+    const [side, other] = oId ? ['offer', 'booking'] : ['booking', 'offer'];
+    return { warn: [`the product is named in the ${side} (${oId || bId}) but not in the ${other}`], info: [] };
+  }
   const o = list(ctx.offerProducts).find((p) => p?.id === oId);
   const b = list(ctx.bookedProducts).find((p) => p?.id === bId);
-  if (!o || !b) {
-    if (oId === bId) return { warn: [], info: [] };
-    return { warn: [], info: [`the product ids differ (offer ${oId}, booking ${bId}) and the ${o ? 'booked offer' : 'offer'} gives no product ${o ? bId : oId} to compare them by`] };
-  }
-  const warn = [];
-  if (o.code != null && b.code != null && o.code !== b.code) warn.push(`another product: ${b.code}, the offer sold ${o.code}`);
-  const sameValue = (x, y) => JSON.stringify(x) === JSON.stringify(y);
-  if (o.flexibility != null && b.flexibility != null && o.flexibility !== b.flexibility) warn.push(`flexibility ${b.flexibility}, the offer sold ${o.flexibility}`);
-  if (o.travelClass != null && b.travelClass != null && o.travelClass !== b.travelClass) warn.push(`travel class ${b.travelClass}, the offer sold ${o.travelClass}`);
-  const os = serviceClassOf(o);
-  const bs = serviceClassOf(b);
-  if (os != null && bs != null && !sameValue(os, bs)) warn.push(`service class ${JSON.stringify(bs)}, the offer sold ${JSON.stringify(os)}`);
-  return { warn, info: [] };
+  if (o && b) return { warn: productDifferences(o, b), info: [] };
+  if (oId === bId) return noFinding();
+  const [holder, missing] = o ? ['booked offer', bId] : ['offer', oId];
+  return { warn: [], info: [`the product ids differ (offer ${oId}, booking ${bId}) and the ${holder} gives no product ${missing} to compare them by`] };
+}
+
+// Text in a stable order, for the messages.
+const byText = (a, b) => a.localeCompare(b);
+
+/** True when two lists hold the same values as often (order aside). */
+function sameMembers(a, b) {
+  if (a.length !== b.length) return false;
+  const count = new Map();
+  a.forEach((v) => count.set(v, (count.get(v) || 0) + 1));
+  return b.every((v) => {
+    const left = count.get(v) || 0;
+    count.set(v, left - 1);
+    return left > 0;
+  });
 }
 
 function coverageFindings(offerPart, bookedPart) {
@@ -114,10 +142,10 @@ function coverageFindings(offerPart, bookedPart) {
   if (!o && !b) return [];
   if (!o || !b) return [`a trip coverage is in the ${o ? 'offer' : 'booking'} but not in the ${o ? 'booking' : 'offer'}`];
   if (o.coveredTripId !== b.coveredTripId) return [];
-  const ol = list(o.coveredLegIds).map(String).sort();
-  const bl = list(b.coveredLegIds).map(String).sort();
-  if (ol.length === 0 || bl.length === 0 || JSON.stringify(ol) === JSON.stringify(bl)) return [];
-  return [`it covers legs ${bl.join(', ')} of trip ${b.coveredTripId}, the offer part ${ol.join(', ')}`];
+  const ol = list(o.coveredLegIds).map(String);
+  const bl = list(b.coveredLegIds).map(String);
+  if (ol.length === 0 || bl.length === 0 || sameMembers(ol, bl)) return [];
+  return [`it covers legs ${[...bl].sort(byText).join(', ')} of trip ${b.coveredTripId}, the offer part ${[...ol].sort(byText).join(', ')}`];
 }
 
 function passengerFindings(offerPart, bookedPart, ctx) {
@@ -126,10 +154,9 @@ function passengerFindings(offerPart, bookedPart, ctx) {
   if (refs.length === 0 || ids.length === 0) return [];
   const refOf = ctx.passengerRefs || {};
   if (!ids.every((id) => typeof refOf[id] === 'string')) return [];
-  const booked = ids.map((id) => refOf[id]).sort();
-  const sold = [...refs].sort();
-  if (JSON.stringify(booked) === JSON.stringify(sold)) return [];
-  return [`it is for passengers ${booked.join(', ')} (by externalRef), the offer part for ${sold.join(', ')}`];
+  const booked = ids.map((id) => refOf[id]);
+  if (sameMembers(booked, refs)) return [];
+  return [`it is for passengers ${[...booked].sort(byText).join(', ')} (by externalRef), the offer part for ${[...refs].sort(byText).join(', ')}`];
 }
 
 /**

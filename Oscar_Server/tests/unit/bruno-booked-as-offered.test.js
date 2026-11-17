@@ -133,6 +133,10 @@ describe('the rules', () => {
   test('the trip coverage: one side only, or other legs of the same trip; another trip id is #1299\'s', () => {
     expect(A.pairFindings(OFFER_PART, BOOKED({ tripCoverage: undefined }), CTX()).warn).toEqual(['a trip coverage is in the offer but not in the booking']);
     expect(A.pairFindings(OFFER_PART, BOOKED({ tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L2'] } }), CTX()).warn).toEqual(['it covers legs L2 of trip T1, the offer part L1']);
+    // The same legs in another order are the same; a leg given twice instead of another is not.
+    const two = { ...OFFER_PART, tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L2', 'L1'] } };
+    expect(A.pairFindings(two, BOOKED({ tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L1', 'L2'] } }), CTX()).warn).toEqual([]);
+    expect(A.pairFindings(two, BOOKED({ tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L1', 'L1'] } }), CTX()).warn).toEqual(['it covers legs L1, L1 of trip T1, the offer part L1, L2']);
     expect(A.pairFindings(OFFER_PART, BOOKED({ tripCoverage: { coveredTripId: 'BT1', coveredLegIds: ['BL1'] } }), CTX()).warn).toEqual([]);
     expect(A.pairFindings(OFFER_PART, BOOKED({ tripCoverage: { coveredTripId: 'T1' } }), CTX()).warn).toEqual([]);
   });
