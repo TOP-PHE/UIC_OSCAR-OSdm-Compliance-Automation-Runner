@@ -342,6 +342,7 @@ function checkNonTrip(value, bad) {
   if (new Set(zones.map((z) => z.id)).size !== zones.length) throw bad('nonTrip');
   if (withoutValidityFrom !== undefined && !ids.includes(withoutValidityFrom)) throw bad('nonTrip');
   const variants = checkNonTripVariants(value.variants, ids, withoutValidityFrom, bad);
+  const replacements = checkNonTripReplacements(value.replacements, bad);
   return {
     nonTrip: {
       places: places.map((p) => ({ id: p.id, name: p.name })),
@@ -349,7 +350,36 @@ function checkNonTrip(value, bad) {
       products: checkNonTripProducts(value.products, bad),
       ...(withoutValidityFrom === undefined ? {} : { withoutValidityFrom }),
       ...(variants ? { variants } : {}),
+      ...(replacements ? { replacements } : {}),
     },
+  };
+}
+
+// #1266: the replacement of a lost ticket or card (TICKET_LOST / CARD_LOST):
+// the fee in hundredths before the price factor, the ticket replaced (its
+// product, validity and the holders known, by last name and date of birth)
+// and the card replaced (its validity and the card numbers known). Absent:
+// the tags are not sold (PARAMETER_NOT_SUPPORTED).
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+function checkNonTripReplacements(value, bad) {
+  if (value === undefined) return null;
+  const { fee, ticket, card } = value && typeof value === 'object' ? value : {};
+  const minutesOk = (m) => Number.isInteger(m) && m >= 30 && m <= 525600;
+  const listOk = (list, ok) => Array.isArray(list) && list.length > 0 && list.length <= 20 && list.every((item) => ok(item));
+  const ok = Number.isInteger(fee) && fee >= 1 && fee <= 10000
+    && ticket && OVERRULE_CODE.test(ticket.code) && isText(ticket.name, 1, 80) && NON_TRIP_TYPES.has(ticket.type) && minutesOk(ticket.validityMinutes)
+    && listOk(ticket.holders, (h) => h && isText(h.lastName, 1, 80) && DATE.test(h.dateOfBirth))
+    && card && OVERRULE_CODE.test(card.code) && isText(card.name, 1, 80) && minutesOk(card.validityMinutes)
+    && listOk(card.cards, (c) => c && OVERRULE_CODE.test(c.code) && isText(c.number, 1, 40))
+    && ticket.code !== card.code;
+  if (!ok) throw bad('nonTrip');
+  return {
+    fee,
+    ticket: {
+      code: ticket.code, name: ticket.name, type: ticket.type, validityMinutes: ticket.validityMinutes,
+      holders: ticket.holders.map((h) => ({ lastName: h.lastName, dateOfBirth: h.dateOfBirth })),
+    },
+    card: { code: card.code, name: card.name, validityMinutes: card.validityMinutes, cards: card.cards.map((c) => ({ code: c.code, number: c.number })) },
   };
 }
 

@@ -521,6 +521,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.532] / [collection-OTST_V2.0.261] — 2026-11-16
+
+Issue #1266, part 2, second case. Release 2026.571 (`current_release`). Simulator 0.70.0. The replacement of a lost ticket or card (TICKET_LOST / CARD_LOST).
+
+OSDM's after-sales page ("Replacement of lost tickets and cards") says the replacement is asked as a non-trip offer whose search tags hold `TICKET_LOST` or `CARD_LOST`, for physical tickets and cards only. The provider asks for the data of the lost card or ticket, the offer may include a fee, and it is booked as a usual offer. OSDM names no member for that data.
+
+Decided with the maintainer:
+- the replacement is an admission replacing the lost item, plus a fee;
+- for a card, the scenario gives a card the simulator knows, and an NHF scenario gives one it does not know;
+- for a ticket, the provider asks for the holder's last name and date of birth;
+- the data is sent at booking, and an offer that asks for nothing is a WARNING;
+- the refusal of an electronic or anonymous ticket is left for later.
+
+### Added
+- **The replacement offer is checked at 01** (`library-bruno/lostItems.js`, `recordReplacementChecks()`) when the request asks a lost tag (`offerSearchCriteria.productTags`, or a product selection's tag).
+  - The chosen offer asks for the lost item's data in its `requestedInformation`: the holder's name or date of birth for a ticket, `cards.number` for a card. When it asks nothing it is a WARNING, since OSDM says so in prose only.
+  - Its fees are said at INFO.
+  - A card replacement whose scenario names no lost card fails one check: the booking could not give the number.
+- **The lost card goes in the booking**: the scenario's `lostCard` (`{ number, code, issuer }`) goes in the first passenger's cards (`withLostCard()` in `buildBookingRequest()`).
+  - `requestedInformation.js` reads a `cards.number` leaf as the scenario's `lostCard`. It is never auto-fed; when unmet it is a WARNING, not a failed check.
+  - A leaf whose path crosses a list (a passenger's cards) is met by any of its items (`isSetAlong()`).
+- **The unknown lost card probe** (`lostCardExpectRejection`): the booking must be refused with a 4xx Problem (`checkLostCardRefused()`, at 02, before the other probes). The scenario ends there.
+- **Data file schema**: `lostCard` and `lostCardExpectRejection`.
+- **Test Config**: *Scenario Parameters → Lost card number*, *Lost card code* and *Unknown lost card refused*.
+- **Coverage**: a capability of its own, *Replacement of a lost ticket or card* (`sale.replacement`, group Sale). The unknown card probe is an expected refusal.
+- **Catalogue**:
+  - `OTST_NONTRIP_TICKET_LOST_1ADT` (236 checks);
+  - `OTST_NONTRIP_CARD_LOST_1ADT` (236);
+  - `NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT` (115).
+
+  Provider values `lostTicketHolder` and `lostCard`: a copy leaves out the simulator's lost card, to complete in the editor. The probe's card number is made up, and is kept.
+- **Simulator scenarios** (gamma, with their version copies, in the run list):
+  - `SIM_NONTRIP_TICKET_LOST_1ADT_38`;
+  - `SIM_NONTRIP_CARD_LOST_1ADT_38`;
+  - `SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_38`.
+
+  None names a flexibility: the replacement's flexibility is the provider's.
+- **Docs and page**:
+  - *What is tested* (steps 01 and 02, the three catalogue rows);
+  - *OSCAR - OSDM Simulator scenarios* (the replacements and the three rows);
+  - a welcome-page news entry.
+
+### Simulator 0.70.0
+- **The replacement of a lost ticket or card** (`nonTrip.replacements` in every profile, checked by `checkNonTripReplacements()`, `src/osdm/replacements.js`). Asked the tag `TICKET_LOST` or `CARD_LOST` (or a product selection of that tag), the answer holds the replacement only: one offer per kind and class asked.
+  - Each offer holds an admission priced 0 (product `SIM_LOST_TICKET`, type ADMISSION_MULTI_RIDE, or `SIM_LOST_CARD`, type REDUCTION_CARD), tagged with the kind.
+  - Its `requestedInformation` asks for the holder's last name and date of birth, or for `cards.number`.
+  - It holds a fee in `Offer.fees`: 500 hundredths times the price factor.
+- **At booking**, a holder or card number the profile does not know is refused before anything is booked: 400 `LOST_TICKET_NOT_FOUND`, or `LOST_CARD_NOT_FOUND`. When nothing is given: `REQUESTED_INFORMATION_MISSING`.
+- **The fee** is booked PREBOOKED, confirmed with the booking, and counts in `provisionalPrice` and `confirmedPrice` (`pricedPartsOf()`). It is no part of `partsOf()`, since FeeStatus has no RELEASED.
+- **`GET /products`** lists both replacements, tagged. A product built with `productTags` keeps its tag (`tagOf()`).
+- No other answer changes.
+
+### Changed
+- *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`).
+- Every simulator reference changes (run list; the product tags declared now include `TICKET_LOST` and `CARD_LOST`). A company following one reads "not up to date" until it updates.
+
+### Checked
+- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.70.0, of the 218 scenarios of *Checks by scenario*, recorded in chunks:
+  - the three new ones pass with no failed check and no warning (236, 236 and 115 checks);
+  - the 215 others give the same checks, results and warnings as the last recording, but for the dates some check texts carry (it ran a day later);
+  - `replay.js catalogue` agrees with all 108 entries.
+- **Simulator**: `replacements.test.js` covers the profiles, both kinds, the refusals and the products. It also runs over HTTP in each provider's version, where every answer is checked against the OSDM response schema of that version.
+- **Collection**: `bruno-lost-items.test.js` covers `lostItems.js`, the card number in `requestedInformation`, the lost card in the booking request, and the Test Config fields.
+- **Server**: `catalogue-match.test.js` checks that the copy leaves out the lost card and keeps the probe's, and that the capability and the expected refusal are right.
+- **Mutation checks**: every collection rule (8) and server rule (5) of this change, removed one by one, fails a test.
+- **Full local suites**: simulator 448 of 449 pass; the one failure is the known Windows file-mode test. Server: the failures are the known Windows-only ones (runner agent, MCP, `/metrics`, script-reason timing, the checkpoint thread). Three integration files that failed under the full run's load pass when run alone.
+
+---
+
 ## [server-1.11.531] — 2026-11-16
 
 Release 2026.570 (`current_release`). A run Bruno ends with a code other than 0 or 1 is not a test result, and says so (#1287).

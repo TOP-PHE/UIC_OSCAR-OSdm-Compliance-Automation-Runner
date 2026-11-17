@@ -25,6 +25,8 @@
  * ADMISSION_POINT2POINT, pass ADMISSION_PASS, multi-ride ADMISSION_MULTI_RIDE).
  * Without a trip, a tag is sold when an offer of the answer holds it, so a
  * pass asked between two stop places gets the usual offers and the problem.
+ * A lost ticket or card (TICKET_LOST, CARD_LOST) is answered with its
+ * replacement, whose product carries its tag (replacements.js).
  */
 
 const TAG_OF_TYPE = Object.freeze({
@@ -55,7 +57,9 @@ function productsAsked(criteria) {
   return { tags, selectionTags, codes };
 }
 
-const tagOf = (product) => TAG_OF_TYPE[product?.type];
+// A replacement (#1266: TICKET_LOST, CARD_LOST) is built with its tag; any
+// other product takes the tag of its type.
+const tagOf = (product) => (Array.isArray(product?.productTags) && product.productTags[0]) || TAG_OF_TYPE[product?.type];
 
 function holds(offer, tags, codes) {
   return (offer.products || []).some((p) => tags.includes(tagOf(p)) || codes.includes(p.code));

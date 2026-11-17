@@ -239,6 +239,11 @@
       { "code": "SIM_TEN_RIDES", "name": "Ten-ride card", "type": "ADMISSION_MULTI_RIDE", "flexibility": "FULL_FLEXIBLE", "factor": 2, "validityMinutes": 43200, "by": ["PLACES", "ZONES"] }
     ],
     "withoutValidityFrom": "urn:uic:stn:0000042",
-    "variants": { "tripCoverage": "urn:uic:stn:0000043", "otherPlaces": "urn:uic:stn:0000044", "otherCarrier": "urn:uic:stn:0000045" }
+    "variants": { "tripCoverage": "urn:uic:stn:0000043", "otherPlaces": "urn:uic:stn:0000044", "otherCarrier": "urn:uic:stn:0000045" },
+    "replacements": {
+      "fee": 500,
+      "ticket": { "code": "SIM_LOST_TICKET", "name": "Replacement of a lost ten-ride card", "type": "ADMISSION_MULTI_RIDE", "validityMinutes": 43200, "holders": [{ "lastName": "Example", "dateOfBirth": "1990-01-15" }] },
+      "card": { "code": "SIM_LOST_CARD", "name": "Replacement of a lost reduction card", "validityMinutes": 525600, "cards": [{ "code": "SIM_CARD_25", "number": "SIM-CARD-0001" }] }
+    }
   }
 }

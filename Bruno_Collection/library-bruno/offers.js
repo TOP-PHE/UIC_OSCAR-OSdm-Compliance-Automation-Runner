@@ -1147,7 +1147,9 @@ function validateOfferParts(selectedOffer) {
     if (raw === null || raw === undefined || raw === '') return [];
     try { return typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (_e) { return []; }
   };
-  const _riSpecs = _riReadJson('offerPassengerSpecifications');
+  // #1266: the lost card the booking will give counts as given.
+  const _lostItems = require('./lostItems.js');
+  const _riSpecs = _lostItems.withLostCard(_riReadJson('offerPassengerSpecifications'), _lostItems.scenarioLostCard());
   let _riAdditional = _riReadJson('passengerAdditionalData');
   const _riCount = Number(bru.getEnvVar('offerPassengerNumber')) || _riAdditional.length || 0;
   const _riProbe = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase();

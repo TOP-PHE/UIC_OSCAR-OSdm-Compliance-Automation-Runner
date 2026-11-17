@@ -244,6 +244,8 @@ runtime:
         displayOfferResponse(jsonData);
         // #1258: no trip, no trip coverage, and where each admission is valid.
         require(bru.getEnvVar("library_base") + "nonTrip.js").recordNonTripOfferChecks(jsonData, bruTest);
+        // #1266: the replacement of a lost ticket or card: it asks for the lost item's data.
+        require(bru.getEnvVar("library_base") + "lostItems.js").recordReplacementChecks(bruTest);
 
         // #598: no offer holds the product the scenario expects (already a
         // failed check): booking another tariff would test nothing. #599: a

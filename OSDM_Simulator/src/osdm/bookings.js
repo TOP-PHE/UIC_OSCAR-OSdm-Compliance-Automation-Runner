@@ -48,6 +48,7 @@ function reservationOptions(part, selection, trips, provider, chosen) {
 const { issueDocuments, attachTicket } = require('./documents');
 const variants = require('./variants');
 const persons = require('./persons');
+const replacements = require('./replacements');
 const ticketing = require('./ticketing');
 
 const MAX_OFFERS_PER_BOOKING = 4;
@@ -124,6 +125,10 @@ const faresOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => booke
 const fareReservationsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.reservations.filter(isFarePlace));
 const productPartsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...bookedOffer.reservations.filter((r) => !isFarePlace(r))]);
 const partsOf = (booking) => [...productPartsOf(booking), ...faresOf(booking), ...fareReservationsOf(booking)];
+// #1266: a booking's fees (a replacement's). FeeStatus has no RELEASED, so a
+// fee is no part of partsOf(); it counts in the booking's prices.
+const feesOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.fees || []);
+const pricedPartsOf = (booking) => [...partsOf(booking), ...feesOf(booking)];
 // A booked part's price: a fare gives a list of prices, the first one counts (#906).
 const priceOf = (part) => part.price || (Array.isArray(part.prices) ? part.prices[0] : undefined);
 // #906: a fulfilment of fares only, which OSDM gives no document, control number or issuer.
@@ -219,7 +224,11 @@ function createBooking(body, findOffer, provider, nowMs) {
   // #793: a provider refusing a placeSelection that asks nothing.
   if (chosenVariants.has('refuses-bare-place-selection')) refuseBarePlaceSelections(selections);
   for (const selection of selections) {
-    const { offer, trips: offerTrips, oneFulfillment: single } = bookableOffer(selection, findOffer, nowMs);
+    const { offer, trips: offerTrips, oneFulfillment: single, replacement } = bookableOffer(selection, findOffer, nowMs);
+    // #1266: a replacement is booked for a lost ticket or card the provider knows.
+    if (replacement) {
+      replacements.checkBooking(replacement, offer.passengerRefs.map((ref) => ({ spec: specByRef.get(ref), index: specs.indexOf(specByRef.get(ref)) })), provider);
+    }
     const reserved = reservationsToBook(offer, selection);
     oneFulfillment = oneFulfillment && single === true;
     for (const trip of offerTrips) trips.set(trip.id, trip);
@@ -236,6 +245,8 @@ function createBooking(body, findOffer, provider, nowMs) {
         reservationOptions(part, selection, offerTrips, provider, chosenVariants))),
       ancillaries: [],
     };
+    // #1266: an offer's fees are booked with it.
+    if (Array.isArray(offer.fees) && offer.fees.length > 0) bookedOffer.fees = offer.fees.map((fee) => ({ ...fee, status: 'PREBOOKED' }));
     // #906: an offer of fares books its fares.
     if (Array.isArray(offer.fares) && offer.fares.length > 0) bookedOffer.fares = offer.fares.map((fare) => fareFrom(fare, passengers));
     // #255: the wrong variant books a fare reservation without its mode.
@@ -259,7 +270,7 @@ function createBooking(body, findOffer, provider, nowMs) {
   if (body.purchaser !== undefined) booking.purchaser = { detail: personDetail(body.purchaser?.detail) };
   const externalRef = text(body.externalRef);
   if (externalRef) booking.externalRef = externalRef;
-  booking.provisionalPrice = sumOf(partsOf(booking).map(priceOf), currencyOf(booking, provider));
+  booking.provisionalPrice = sumOf(pricedPartsOf(booking).map(priceOf), currencyOf(booking, provider));
   Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
   Object.defineProperty(booking, SHORT_LIVED, { value: shortLivedMs });
   // #611: a booking of offers that asked for information keeps asking while it is missing.
@@ -326,7 +337,9 @@ function confirmBooking(booking, provider, nowMs) {
     reservation.confirmedOn = confirmedOn;
     delete reservation.confirmableUntil;
   }
-  booking.confirmedPrice = sumOf(partsOf(booking).map(priceOf), currencyOf(booking, provider));
+  // #1266: a fee is confirmed with the booking.
+  for (const fee of feesOf(booking)) fee.status = 'CONFIRMED';
+  booking.confirmedPrice = sumOf(pricedPartsOf(booking).map(priceOf), currencyOf(booking, provider));
   booking.provisionalPrice = { amount: 0, currency: currencyOf(booking, provider), scale: 2 };
   delete booking.confirmationTimeLimit;
   let groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
@@ -407,7 +420,7 @@ function addOfferParts(booking, bookedOfferId, body, findOffer, provider) {
   bookedOffer.reservations.push(...added.map((part) => reservationFrom(part, passengerIdOf, found.trips, createdOn, booking.confirmationTimeLimit,
     reservationOptions(part, body, found.trips, provider, kept))));
   linkReservations(bookedOffer);
-  booking.provisionalPrice = sumOf(partsOf(booking).map(priceOf), booking.provisionalPrice.currency);
+  booking.provisionalPrice = sumOf(pricedPartsOf(booking).map(priceOf), booking.provisionalPrice.currency);
   return { bookedOffers: [bookedOffer] };
 }
 

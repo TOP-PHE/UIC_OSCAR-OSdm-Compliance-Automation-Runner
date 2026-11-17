@@ -72,6 +72,7 @@ const ENUMS = {
   tripIdsExpectRejection:            ['off', 'on'],
   // #699: negative test, one passenger over the provider's maximum must be refused.
   passengerLimitExpectRejection:     ['off', 'on'],
+  lostCardExpectRejection:           ['off', 'on'],
   // #703: negative test, an offer request with no passenger must be refused.
   emptyPassengersExpectRejection:    ['off', 'on'],
   // #704: negative test, a departure in the past or beyond the sales horizon must be refused.
@@ -2279,6 +2280,7 @@ function buildDetailHTML(idx) {
           'Negative test (#703). On: POST /offers is sent with no passenger (OSDM requires at least one) and must be refused (4xx + RFC-9457 Problem); the scenario ends there.')}
         ${buildSelect(idx, 'passengerLimitExpectRejection', 'Over the passenger limit', ENUMS.passengerLimitExpectRejection,
           'Negative test (#699). On: the scenario\'s passengers are one more than the provider\'s maximum (Test Framework → Passenger Types). POST /offers must refuse them (4xx + RFC-9457 Problem, or no offer), or else POST /bookings must; the scenario ends at the refusal, and a booking made over the limit fails.')}
+        ${buildLostCardFields(idx)}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE
@@ -3148,6 +3150,48 @@ function inputRequestedSection(action, el) {
   const sc = state.scenarios[idx];
   if (!sc) return true;
   sc.requestedSections = withRequestedSection(sc, end, el.value);
+  markDirty();
+  return true;
+}
+
+// #1266: the lost card a CARD_LOST replacement gives at booking (lostCard),
+// and the probe that expects an unknown one refused.
+function buildLostCardFields(idx) {
+  const card = state.scenarios[idx]?.lostCard || {};
+  const hint = 'Replacement of a lost card (#1266): with Offer search → Product tags CARD_LOST, the booking gives this card in the first passenger\'s cards (its number, and its code), as the provider asks in requestedInformation. TICKET_LOST needs no card: the passenger\'s last name and date of birth are the holder\'s. Empty: no lost card.';
+  const input = (part, label, placeholder, hintText) => {
+    const hintHtml = hintText ? '<span class="param-hint">' + esc(hintText) + '</span>' : '';
+    return `
+  <div class="param-field">
+    <span class="param-label">${esc(label)}${hintHtml}</span>
+    <input class="param-input" type="text" value="${esc(card[part] || '')}" placeholder="${esc(placeholder)}"
+      data-action="set-scenario-lost-card" data-idx="${esc(idx)}" data-part="${esc(part)}">
+  </div>`;
+  };
+  return `${input('number', 'Lost card number', 'the number of a lost card the provider knows', hint)}
+  ${input('code', 'Lost card code', 'its card type, e.g. a code from GET /reduction-cards', '')}
+  ${buildSelect(idx, 'lostCardExpectRejection', 'Unknown lost card refused', ENUMS.lostCardExpectRejection,
+    'Negative test (#1266). On: the lost card above is one the provider does not know; POST /bookings of the replacement must be refused (4xx + RFC-9457 Problem). The scenario ends there.')}`;
+}
+
+// A scenario's lost card with one part (number, code, issuer) set or
+// emptied; null when nothing is left.
+function withLostCardPart(card, part, value) {
+  const out = card && typeof card === 'object' && !Array.isArray(card) ? { ...card } : {};
+  if (!['number', 'code', 'issuer'].includes(part)) return Object.keys(out).length ? out : null;
+  const text = String(value ?? '').trim();
+  if (text) out[part] = text;
+  else delete out[part];
+  return Object.keys(out).length ? out : null;
+}
+
+function inputLostCard(action, el) {
+  if (action !== 'set-scenario-lost-card') return false;
+  const sc = state.scenarios[Number.parseInt(el.dataset.idx)];
+  if (!sc) return true;
+  const next = withLostCardPart(sc.lostCard, el.dataset.part, el.value);
+  if (next) sc.lostCard = next;
+  else delete sc.lostCard;
   markDirty();
   return true;
 }
@@ -9603,6 +9647,7 @@ document.body.addEventListener('input', function(e) {
   if (changeExchange(action, el)) return;
   if (changeNonTrip(action, el)) return;
   if (inputTraceState(action, el)) return;
+  if (inputLostCard(action, el)) return;
   if (inputRequestedSection(action, el)) return;
   if (inputFareRefundFee(action, el)) return;
 

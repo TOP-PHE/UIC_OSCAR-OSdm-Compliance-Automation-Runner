@@ -449,3 +449,43 @@ describe('the catalogue copied on a simulator reference', () => {
     expect(journey).toMatchObject({ legs: 2, origin: 'urn:uic:stn:0000095', destination: 'urn:uic:stn:0000002' });
   });
 });
+
+describe('#1266 the replacement of a lost ticket or card', () => {
+  const entry = (code) => catalogue.entries.find((e) => e.code === code);
+  const source = (code) => simulator.scenarios.find((s) => s.code === entry(code).source);
+
+  test('a lost card is the provider\'s to give: left out of the copy, and said so', () => {
+    const r = adaptReferenceScenario(source('OTST_NONTRIP_CARD_LOST_1ADT'), entry('OTST_NONTRIP_CARD_LOST_1ADT').needs, {});
+    expect(r.scenario).not.toHaveProperty('lostCard');
+    expect(r.toComplete.join(' ')).toMatch(/Lost card number and code, now the simulator's SIM-CARD-0001/);
+    expect(source('OTST_NONTRIP_CARD_LOST_1ADT').lostCard).toEqual({ code: 'SIM_CARD_25', number: 'SIM-CARD-0001' });
+  });
+
+  test('a lost ticket\'s holder must be one the provider knows', () => {
+    const r = adaptReferenceScenario(source('OTST_NONTRIP_TICKET_LOST_1ADT'), entry('OTST_NONTRIP_TICKET_LOST_1ADT').needs, {});
+    expect(r.toComplete.join(' ')).toMatch(/holder of a lost ticket the provider knows/);
+  });
+
+  test('the probe\'s unknown card is made up, and kept', () => {
+    const probe = entry('NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT');
+    expect(probe.needs.providerValues).toBeUndefined();
+    const r = adaptReferenceScenario(source('NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT'), probe.needs, {});
+    expect(r.scenario.lostCard).toEqual({ code: 'SIM_CARD_25', number: 'SIM-CARD-9999' });
+    expect(r.toComplete.join(' ')).not.toMatch(/lost card/i);
+  });
+});
+
+describe('#1266 the replacement in the coverage', () => {
+  const { derivedCapability, isRefusalTest } = require('../../src/utils/capabilities');
+  const sim = (code) => simulator.scenarios.find((s) => s.code === code);
+
+  test('its own capability; the unknown card is an expected refusal, the others are not', () => {
+    for (const code of ['SIM_NONTRIP_TICKET_LOST_1ADT_38', 'SIM_NONTRIP_CARD_LOST_1ADT_38', 'SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_38']) {
+      expect([code, derivedCapability(sim(code), simulator)]).toEqual([code, 'sale.replacement']);
+    }
+    expect(isRefusalTest(sim('SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_38'))).toBe(true);
+    expect(isRefusalTest(sim('SIM_NONTRIP_CARD_LOST_1ADT_38'))).toBe(false);
+    // A sale without a trip that asks nothing lost keeps its form's capability.
+    expect(derivedCapability(sim('SIM_NONTRIP_ZONES_1ADT_38'), simulator)).toBe('offers.nonTripZones');
+  });
+});

@@ -1348,6 +1348,45 @@
         "tariff": "EXCHANGEABLE",
         "passengers": 1
       }
+    },
+    {
+      "code": "OTST_NONTRIP_TICKET_LOST_1ADT",
+      "source": "SIM_NONTRIP_TICKET_LOST_1ADT_38",
+      "checks": 236,
+      "purpose": "Replacement of a lost ticket (#1266): one adult asks offers by product tag TICKET_LOST (offerSearchCriteria.productTags) in the first zone of GET /zones. OSDM: the replacement is asked as a non-trip offer, the provider asks for the data of the lost ticket, and the offer may include a fee. The chosen offer should ask for the holder in its requestedInformation (a WARNING when it asks nothing); booked with the passenger's name and date of birth, a holder the provider knows, then fulfilled. Its fee is said.",
+      "capability": "sale.replacement",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "lostTicketHolder"
+        ]
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_CARD_LOST_1ADT",
+      "source": "SIM_NONTRIP_CARD_LOST_1ADT_38",
+      "checks": 236,
+      "purpose": "Replacement of a lost card (#1266): one adult asks offers by product tag CARD_LOST in the first zone of GET /zones. OSDM: the provider asks for the data of the lost card (its number), and the offer may include a fee. The chosen offer should ask for the card in its requestedInformation (a WARNING when it asks nothing); the booking gives the lost card (lostCard: its number and code) in the passenger's cards, then it is fulfilled. Its fee is said.",
+      "capability": "sale.replacement",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "lostCard"
+        ]
+      }
+    },
+    {
+      "code": "NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT",
+      "source": "SIM_NHF_NONTRIP_CARD_LOST_UNKNOWN_1ADT_38",
+      "checks": 115,
+      "purpose": "Negative test (#1266): the replacement of a lost card the provider does not know. One adult asks offers by product tag CARD_LOST, then books the replacement with a card number no provider issued (lostCard, lostCardExpectRejection): the booking must be refused with a 4xx Problem. The scenario ends there.",
+      "capability": "sale.replacement",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1
+      }
     }
   ]
 }

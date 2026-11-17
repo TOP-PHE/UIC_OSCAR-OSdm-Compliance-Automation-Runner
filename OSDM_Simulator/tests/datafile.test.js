@@ -534,7 +534,8 @@ test('every trip of the data file is one the simulator answers, on every provide
         ...tripRequest(requirement),
         anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }],
       }, provider, Date.parse('2026-11-02T09:00:00Z'));
-      const wanted = new Set(datafile.scenarios.filter((s) => s.tripRequirementId === requirement.id).map((s) => s.desiredFlexibility));
+      // #1266: a replacement of a lost ticket or card names no flexibility (the provider's).
+      const wanted = new Set(datafile.scenarios.filter((s) => s.tripRequirementId === requirement.id && s.desiredFlexibility).map((s) => s.desiredFlexibility));
       const offered = new Set(response.offers.map((o) => o.offerSummary.overallFlexibility));
       for (const flexibility of wanted) assert.ok(offered.has(flexibility), `${provider.key}: ${flexibility}`);
     }

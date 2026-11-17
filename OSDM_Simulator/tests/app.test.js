@@ -218,6 +218,8 @@ test('products: gamma lists its named products in both classes and gives one by 
     // #1266: what is sold without a trip, in both classes.
     'GAMMA-PRD-SIM_SINGLE_RIDE-SECOND', 'GAMMA-PRD-SIM_SINGLE_RIDE-FIRST', 'GAMMA-PRD-SIM_DAY_PASS-SECOND',
     'GAMMA-PRD-SIM_DAY_PASS-FIRST', 'GAMMA-PRD-SIM_TEN_RIDES-SECOND', 'GAMMA-PRD-SIM_TEN_RIDES-FIRST',
+    // #1266: the replacement of a lost ticket and of a lost card.
+    'GAMMA-PRD-SIM_LOST_TICKET-SECOND', 'GAMMA-PRD-SIM_LOST_CARD-SECOND',
   ]);
   for (const p of list.body.products) for (const field of ['id', 'code', 'owner', 'flexibility']) assert.ok(p[field], `${p.id} ${field}`);
   const one = await call(sim.base, token, 'GET', '/gamma/products/GAMMA-PRD-SIM_TRAIN_BOUND-FIRST');

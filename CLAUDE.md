@@ -153,8 +153,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     places or zones unless left to a lookup). A trip and a non-trip are never
     mixed (WARNING). 10 runs "Non-trip exchange offers: …", 13/15 "Exchanged
     parts (…): non-trip booking …"; no `__exchangeTripAsked` is set, so the
-    #959 trip checks stay off. Left in #1266: lost tickets/cards, NUTS, #227
-    without a trip, fares.
+    #959 trip checks stay off.
+    **Lost tickets and cards** (1.11.532 / OTST_V2.0.261, simulator 0.70.0;
+    OSDM's after-sales page: a non-trip offer tagged TICKET_LOST /
+    CARD_LOST, physical only, the provider asks for the lost item's data, a
+    fee may come; maintainer: an admission replacing the item plus a fee, the
+    card given at booking, known in the HF scenario, unknown in an NHF one;
+    TICKET_LOST asks name + date of birth; an offer asking nothing is a
+    WARNING; electronic / anonymous refusal later). Simulator
+    `nonTrip.replacements` (every profile, `replacements.js`): asked such a
+    tag, the replacement only (admission priced 0, `requestedInformation`,
+    `Offer.fees`); the booking checks the holder or `cards[].number` (400
+    `LOST_*_NOT_FOUND`); fees are not in `partsOf()` (FeeStatus has no
+    RELEASED) but in `pricedPartsOf()`. A product built with `productTags`
+    keeps its tag (`tagOf()`). Collection `lostItems.js`: 01 checks the
+    chosen offer asks for the data, 02 puts scenario `lostCard` in the first
+    passenger's cards (`withLostCard()`, also counted at 01's
+    `requestedInformation`), `lostCardExpectRejection` graded at 02.
+    `requestedInformation` reads `cards.number` as `lostCard` (never
+    auto-fed; unmet = WARNING) through lists (`isSetAlong()`). Capability
+    `sale.replacement`; provider values `lostCard` (left out of a copy, the
+    probe's made-up card kept) and `lostTicketHolder`; references declare
+    both tags. Left in #1266: NUTS, #227 without a trip, fares.
     **To regenerate *Checks by scenario* from a partial change**, record the
     scenarios it names in chunks and merge the recordings (the
     simulator's `replay.js record` keeps only its last call).

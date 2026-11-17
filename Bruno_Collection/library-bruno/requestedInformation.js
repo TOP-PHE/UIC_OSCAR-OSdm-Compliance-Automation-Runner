@@ -62,8 +62,13 @@ const SCENARIO_FIELDS = {
   type:        'type',
 };
 
+// #1266: a card's number (CardReference.number), which the replacement of a
+// lost card asks for; the scenario gives it as `lostCard`.
+const isCardNumber = (path) => path[path.length - 1] === 'number' && path.includes('cards');
+
 function fieldInfo(path) {
   const last = path[path.length - 1];
+  if (isCardNumber(path)) return { label: 'card number', scenarioField: 'lostCard' };
   return {
     label:         FIELD_LABELS[last] || path.join('.'),
     scenarioField: SCENARIO_FIELDS[last] || null,
@@ -286,8 +291,13 @@ function isSet(v) {
   return v !== undefined && v !== null && v !== '';
 }
 
-function getByPath(obj, pathArr) {
-  return pathArr.reduce((o, k) => (o === null || o === undefined ? undefined : o[k]), obj);
+// Whether a path is set; a list on the way (a passenger's cards, #1266) is
+// set when one of its items is.
+function isSetAlong(obj, pathArr) {
+  if (pathArr.length === 0) return isSet(obj);
+  if (obj === null || obj === undefined) return false;
+  if (Array.isArray(obj)) return obj.some((item) => isSetAlong(item, pathArr));
+  return isSetAlong(obj[pathArr[0]], pathArr.slice(1));
 }
 
 // Candidate locations for a leaf so a demand for the 3.1+ contact path is also
@@ -301,7 +311,7 @@ function leafCandidatePaths(path) {
 
 function leafSatisfiedFor(passenger, leaf) {
   if (!passenger) return false;
-  return leafCandidatePaths(leaf.path).some((p) => isSet(getByPath(passenger, p)));
+  return leafCandidatePaths(leaf.path).some((p) => isSetAlong(passenger, p));
 }
 
 function collectionFor(model, root) {
@@ -394,6 +404,8 @@ function buildPassengerModelFromAdditionalData(additionalArr, specsArr) {
     const pick = (...vals) => { for (const v of vals) { if (v !== undefined && v !== null) return v; } return null; };
     return {
       type: pick(spec.type, a.type),
+      // #1266: the cards the booking gives (a lost card's number among them).
+      cards: Array.isArray(spec.cards) ? spec.cards : [],
       dateOfBirth: pick(a.updateDateOfBirth, spec.dateOfBirth),
       gender: pick(a.updateGender, spec.gender),
       detail: {
@@ -476,7 +488,7 @@ function staticIssues(ast, passengerCount) {
       indexErrors.push({ index: l.index, passengerCount, path: l.path.join('.') });
     }
     const last = l.path[l.path.length - 1];
-    if (!KNOWN_LAST_SEGMENTS.has(last)) unknownPaths.push(l.path.join('.'));
+    if (!KNOWN_LAST_SEGMENTS.has(last) && !isCardNumber(l.path)) unknownPaths.push(l.path.join('.'));
     if (kind === 'other') unknownRoots.push(l.root);
   });
   return { indexErrors, unknownPaths, unknownRoots };
@@ -690,7 +702,11 @@ function processRequestedInformation(o) {
           log('INFO', `Auto-provided '${p.scenarioField}' (${p.fieldLabel}) = '${p.value}' for ${p.passengerRef} to satisfy ${tag}.requestedInformation`);
         });
         unmet = evalNow().unmetLeaves.filter((u) => u.kind === 'passenger');
-        const mappableRemaining = unmet.filter((u) => u.scenarioField);
+        // #1266: a card number is not auto-provided: the scenario names the lost card.
+        unmet.filter((u) => u.scenarioField === 'lostCard').forEach((u) => {
+          log('WARNING', `${tag}: the provider asks for a card number for ${u.passengerRef}; set the scenario's lostCard (the card to replace) — booking/confirmation may be rejected.`);
+        });
+        const mappableRemaining = unmet.filter((u) => u.scenarioField && u.scenarioField !== 'lostCard');
         assert(`${tag}.requestedInformation is satisfiable from OSCAR scenario fields (auto-fed)`,
           mappableRemaining.length === 0,
           `still unmet after auto-feed: ${mappableRemaining.map(unmetText).join(', ')}`);

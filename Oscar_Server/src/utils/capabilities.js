@@ -68,6 +68,7 @@ const CAPABILITIES = Object.freeze([
   { id: 'sale.currencies', group: 'Sale', label: 'Currencies', stage: 'offer' },
   { id: 'sale.limits', group: 'Sale', label: 'Limits: passengers, sales horizon, departure date', stage: 'sale' },
   { id: 'sale.idempotency', group: 'Sale', label: 'Idempotency-Key', optional: true, stage: 'sale' },
+  { id: 'sale.replacement', group: 'Sale', label: 'Replacement of a lost ticket or card', stage: 'sale' },
   { id: 'passengers.ages', group: 'Passengers', label: 'Passenger type from the age', stage: 'offer' },
   { id: 'passengers.names', group: 'Passengers', label: 'Accented and long names', stage: 'sale' },
   { id: 'passengers.update', group: 'Passengers', label: 'Passenger details updated after the booking', goal: ['03. PATCH Multi Passenger'] },
@@ -179,7 +180,7 @@ const NO_OVERRULE = new Set(['', 'null', 'CODE_DOES_NOT_EXIST']);
 const REFUSAL_FLAGS = Object.freeze([
   'passengerLimitExpectRejection', 'departureExpectRejection', 'emptyPassengersExpectRejection', 'overruleCodeExpectRejection',
   'tripIdsExpectRejection', 'currencyExpectRejection', 'offerOptionExpectRejection', 'expectedProductAbsent',
-  'refundAgainProbe', 'exchangeRefundedProbe', 'confirmAgainProbe',
+  'refundAgainProbe', 'exchangeRefundedProbe', 'confirmAgainProbe', 'lostCardExpectRejection',
   'expiredOfferTest', 'expiredBookingTest', 'expiredRefundOfferTest', 'expiredExchangeOfferTest',
 ]);
 
@@ -228,6 +229,14 @@ function reservationCapability(scenario) {
 }
 
 // The capability a sale scenario is for, from its fields, most specific first.
+// #1266: the product tags that ask for the replacement of a lost ticket or card.
+const LOST_TAGS = Object.freeze(['TICKET_LOST', 'CARD_LOST']);
+function asksLostItem(scenario, datafile) {
+  const criteria = scenarioOfferCriteria(scenario, datafile);
+  return [...arr(criteria?.productTags), ...arr(criteria?.productSelections).map((s) => s?.productTag)]
+    .some((tag) => LOST_TAGS.includes(text(tag)));
+}
+
 const SALE_RULES = [
   [(s) => armed(s.idempotencyCheck), 'sale.idempotency'],
   [(s) => armed(s.confirmAgainProbe) || armed(s.emptyPassengersExpectRejection), 'sale'],
@@ -241,6 +250,8 @@ const SALE_RULES = [
   [(s) => text(s.requestedInformationProbe), 'passengers.update'],
   [(s) => text(s.bookingPurchaserMode), 'purchaser'],
   [(s, df) => armed(s.currencyExpectRejection) || text(s.expectedCurrency) || text(scenarioOfferCriteria(s, df)?.currency), 'sale.currencies'],
+  // #1266: the replacement of a lost ticket or card (TICKET_LOST / CARD_LOST asked).
+  [(s, df) => asksLostItem(s, df), 'sale.replacement'],
   // #1258: a sale without a trip is for its offer request form.
   [(s, df) => NON_TRIP_REQUEST_FORMS.includes(offerRequestFormOf(s, df)), (s, df) => OFFER_FORM_CAPABILITY[offerRequestFormOf(s, df)]],
   [(s) => armed(s.offersByTripIds) || armed(s.tripIdsExpectRejection), 'offers.tripIds'],
