@@ -261,9 +261,11 @@ function handRun(batch, run) {
 }
 
 /** The batch has nothing left: its waiting pods stop now, the others after their run. */
+// stop() removes the entry it is given: a Map's iteration goes on past an
+// entry removed during it.
 function endBatch(batch) {
   checkBatch(batch, 'endBatch');
-  for (const entry of [..._byId.values()]) {
+  for (const entry of _byId.values()) {
     if (!inBatch(entry, batch)) continue;
     entry.closing = true;
     if (entry.state !== 'running') stop(entry, STOP.BATCH_DONE);
@@ -272,7 +274,7 @@ function endBatch(batch) {
 
 function revokeWhere(match) {
   let count = 0;
-  for (const entry of [..._byId.values()]) {
+  for (const entry of _byId.values()) {
     if (!match(entry)) continue;
     stop(entry, STOP.REVOKED);
     count += 1;

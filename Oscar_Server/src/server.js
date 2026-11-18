@@ -756,7 +756,8 @@ function podCallOf(body) {
   if (keys.length === 0) return { ended: null };
   if (keys.length !== 1 || keys[0] !== 'ended') return null;
   const e = body.ended;
-  if (!e || typeof e !== 'object' || Array.isArray(e) || Object.keys(e).sort().join(',') !== 'code,runId') return null;
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+  if (Object.keys(e).length !== 2 || !Object.hasOwn(e, 'runId') || !Object.hasOwn(e, 'code')) return null;
   if (typeof e.runId !== 'string' || !SAFE_RUNID_RE_FOR_REFRESH.test(e.runId)) return null;
   if (!Number.isInteger(e.code) || e.code < 0 || e.code > 255) return null;
   return { ended: { runId: e.runId, code: e.code } };
