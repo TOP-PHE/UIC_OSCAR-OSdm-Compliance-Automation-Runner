@@ -21,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Guide** (*OSCAR - k3s on one VPS*):
     - a disk that writes quickly to the end (section 1);
     - the disk checked with `fio` before the install, 99 % of the syncs under 10 ms as etcd's FAQ asks (section 3);
-    - `get nodes` shows `control-plane,etcd`;
     - section 9, *k3s on etcd*: look first; convert with no run going, a root-only copy of k3s's state kept first; how to go back to SQLite from that copy; the check under a batch (`NRestarts`, no `Slow SQL`); removing the copy and the old file;
     - k3s's own snapshots: what they hold, the token that opens them, never copied off the machine together;
     - two rows in section 11;
@@ -29,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **CI** (job "k3s on one machine"): k3s starts without `cluster-init`, so on SQLite, then a step converts it with the guide's own line. It checks:
     - the etcd folder;
     - the renamed SQLite file;
-    - the node's `etcd` role;
+    - `k3s etcd-snapshot ls` answering, which it does on etcd only. k3s 1.36 gives a converted node no `etcd` role label: the first CI run checked one and failed, with k3s on etcd;
     - a Secret made on SQLite still readable;
     - Secrets encryption still enabled.
   - **Checked:** `kubernetes-manifests.test.js` pins the key, the conversion line in both the guide and the CI (in that order in the CI) and the CI's checks. The CI run of this PR is the first conversion.

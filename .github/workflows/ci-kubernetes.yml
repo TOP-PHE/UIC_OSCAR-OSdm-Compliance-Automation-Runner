@@ -456,11 +456,12 @@ jobs:
           sudo ls -la /var/lib/rancher/k3s/server/db/
           kubectl get nodes --show-labels
           sudo journalctl -u k3s --since -10min | grep -iE 'migrat|sqlite|etcd for new cluster|kine' | grep -v 'Migrating etcd key' | cut -c1-240 | head -20 || true
-          # On etcd now: its folder, the SQLite file renamed, the node's etcd role.
+          # On etcd now: its folder, the SQLite file renamed, its snapshots listed
+          # (k3s 1.36 gives a converted node no etcd role label).
           sudo test -d /var/lib/rancher/k3s/server/db/etcd/member
           sudo test -f /var/lib/rancher/k3s/server/db/state.db.migrated
           sudo test ! -e /var/lib/rancher/k3s/server/db/state.db
-          test "$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.node-role\.kubernetes\.io/etcd}')" = true
+          sudo k3s etcd-snapshot ls
           echo "keys copied: $(sudo journalctl -u k3s --since -10min | grep -c 'Migrating etcd key')"
           test "$(kubectl -n convert-check get secret marker -o jsonpath='{.data.value}' | base64 -d)" = made-on-sqlite
           sudo k3s secrets-encrypt status | grep -q 'Encryption Status: Enabled'
