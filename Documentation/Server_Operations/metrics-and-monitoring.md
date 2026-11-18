@@ -630,6 +630,35 @@ same figures are in each run's log, in one line at its end:
 [runner] Where this run's time went (37.0 s from its slot to its final status): preparing the run 0.5 s, asking for its pod 0.5 s, waiting for its pod 6.0 s, …
 ```
 
+### Kept run pods (#1309)
+
+With `RUN_KEPT_PODS=on` (pod mode; *OSCAR - k3s on one VPS*, section 9,
+*Kept run pods*) the runs of one batch go one after another to a pod kept
+for that batch. Three more metrics; with `off` they stay at 0:
+
+- `oscar_kept_pods{state}`: the kept pods now, `new` (made, not called yet),
+  `waiting` (for its batch's next run, 30 s at most) or `running`.
+- `oscar_kept_pod_runs_total{pod}`: each run handed to a kept pod, `first`
+  (the pod's first run, made for it) or `again` (a pod that ran before: its
+  start saved).
+- `oscar_kept_pods_stopped_total{reason}`: each pod given up, by reason:
+  `batch-done`, `idle`, `max-runs` (the usual ends), `abnormal-end` (a run
+  ended otherwise than with Bruno's 0 or 1, or sent no result), `not-clean`
+  (a run left a process behind), `not-started`, `pod-ended`, `deadline`,
+  `stopped` (the runner stopped the run), `revoked` (an intrusion, another
+  endpoint, new credentials) and `protocol` (below).
+
+The row *Kept run pods* of *OSCAR · Overview* shows all three. With kept
+pods, a run handed again shows near 0 in *Run pods* (time for a run's pod to
+start) and in the steps `job` and `pod` of *A run's time, step by step*.
+
+One alert, critical: `OscarKeptPodProtocolFault`. A kept pod called the
+internal port in a way its program never does (a second call while one was
+held, a call during a run, the end of another run, another address). The
+server has stopped that pod and every pod of its company already: something
+in the pod read its secret, so a run there may have been compromised by the
+provider under test. The server's log names the company.
+
 ### On Kubernetes (#1147)
 
 This page's stack is the VPS's (`docker-compose.metrics.yml`). On a cluster:

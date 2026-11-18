@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-18-kept-run-pods",
+    "date": "November 18, 2026",
+    "tag": "Operations",
+    "title": "Servers on a cluster: the runs of a batch can share one run pod",
+    "summary": "On an OSCAR server that runs each test in a pod of its own, the runs of one batch can now go one after another to a pod kept for that batch, which saves each run the time of making its pod. Off by default.",
+    "content": "Some OSCAR servers run on a cluster and give each test run a pod of its own: a small, separate machine the cluster makes for the run and removes after it. Making and removing that pod took about 8 seconds of a run's 30 on our test server.\n\nSuch a server can now keep a pod for the runs of one batch. The pod takes the batch's runs one after another, each in a clean folder of its own with only its own credentials, and ends when the batch has nothing left. A pod serves one batch only, so never another user or another company, and is replaced after 20 runs. A pod that behaves as its program never does is stopped at once, with every pod of its company, and the administrators are alerted.\n\nThe runs, their checks and their reports are the same. A run whose pod stopped under it reads \"The run did not go to its end — this is not a test result\", never a failure of the provider.\n\nThis is off by default. Administrators of a server on a cluster switch it on with the setting RUN_KEPT_PODS (see \"OSCAR - k3s on one VPS\", section 9). No action is required from testers or Test Managers."
+  },
+  {
     "id": "2026-11-18-scenario-search",
     "date": "November 18, 2026",
     "tag": "Improvement",

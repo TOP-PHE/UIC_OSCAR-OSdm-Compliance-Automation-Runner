@@ -30,6 +30,7 @@ const keptPods = require('./keptPods');
 const launcher = require('./launcher');
 const P = require('../runner-agent/protocol');
 const baseLog = require('../utils/logger').child({ module: 'kept-pods' });
+const metrics = require('../utils/metrics');
 
 const { STOP } = keptPods;
 // Stopped for these, a pod is removed at once.
@@ -50,6 +51,7 @@ function removePod(pod) {
 
 // The server gave a pod up: the dispatcher removes it.
 function onStop({ podId, reason }) {
+  try { metrics.keptPodsStopped.inc({ reason }); } catch { /* a metric never stops anything */ }
   const pod = _started.get(podId);
   if (!pod || pod.ended) return;
   if (AT_ONCE.has(reason)) {

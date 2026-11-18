@@ -39,6 +39,7 @@ const keptPods = require('./keptPods');
 const starter = require('./keptPodStarter');
 const runOutput = require('./runOutput');
 const { RUN_ENV_KEYS } = require('./childEnv');
+const metrics = require('../utils/metrics');
 
 const { STOP, MAX_RUNS } = keptPods;
 // A run's process ends with these when its pod is given up under it.
@@ -126,7 +127,10 @@ function giveToWaitingPod(kept) {
   const podId = keptPods.handRun(kept.state.batch, kept.run);
   if (!podId) return false;
   kept.podId = podId;
-  const address = keptPods.snapshot().find((p) => p.podId === podId)?.address;
+  const pod = keptPods.snapshot().find((p) => p.podId === podId);
+  const address = pod?.address;
+  // #1324: a pod that ran before saved its start for this run.
+  try { metrics.keptPodRuns.inc({ pod: pod?.runs > 1 ? 'again' : 'first' }); } catch { /* a metric never stops a run */ }
   // As the dispatcher's messages come for a pod of its own: after the
   // runner has listened.
   setImmediate(() => {

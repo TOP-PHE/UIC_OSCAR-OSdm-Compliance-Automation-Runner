@@ -905,15 +905,17 @@ cd /opt/oscar
 diff -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
 ```
 
-It shows your name and the release, nothing else. Any other line is a change
-of yours: make it again in `overlays/site` after the next block, then run its
-`apply` again.
+It shows your name, the release and, if you switched them on, kept run pods
+(`RUN_KEPT_PODS`, below), nothing else. Any other line is a change of yours:
+make it again in `overlays/site` after the next block, then run its `apply`
+again.
 
 **2. OSCAR, on the new release:**
 
 ```bash
 HOST=oscar-test.example.org     # ← yours: this machine's DNS name
 RELEASE=release-YYYY.NNN        # ← yours: the release to move to
+KEPT_PODS=off                   # ← yours: on keeps a run pod for a batch (Kept run pods, below)
 cd /opt/oscar
 git fetch --tags origin
 git checkout "$RELEASE"
@@ -921,7 +923,8 @@ rm -rf OSCAR_Deploy/kubernetes/overlays/site
 cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
 sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
 sed -i "s/release-[0-9]*\.[0-9]*/$RELEASE/" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
-grep -n "release-\|$HOST" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
+sed -i "s/RUN_KEPT_PODS=o[nf]*/RUN_KEPT_PODS=$KEPT_PODS/" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+grep -n "release-\|$HOST\|RUN_KEPT_PODS=" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
 sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
 sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
 curl -sS -w '\nHTTP %{http_code}\n' "https://$HOST/health"
@@ -935,7 +938,9 @@ curl -sS -w '\nHTTP %{http_code}\n' "https://$HOST/health"
   (sections 2 to 6) moves to the tag the same way, and takes its releases by
   tag from then on.
 - The `grep` shows your release twice (`newTag`, `RUN_IMAGE`) and your name
-  three times, as in 6a step 4. `YYYY` there means `RELEASE` was not changed.
+  three times, as in 6a step 4, and `RUN_KEPT_PODS` with your choice.
+  `YYYY` there means `RELEASE` was not changed. A release from before
+  2026.589 has no `RUN_KEPT_PODS` line: nothing to show.
 - `rollout status` ends with *successfully rolled out*. *0 of 1 updated
   replicas*, then *exceeded its progress deadline*, with `ImagePullBackOff` in
   `sudo kubectl -n oscar get pods`: the release's images are not published
@@ -963,6 +968,64 @@ sudo kubectl apply -k OSCAR_Deploy/kubernetes/monitoring/oscar
   k3s within minutes; new dashboards and alert rules come with
   `monitoring/oscar`.
 - Alertmanager's Secret is not in these files: it stays as 8a step 1 made it.
+
+### Kept run pods
+
+Off by default. With `RUN_KEPT_PODS=on`, the runs of one batch go one after
+another to a pod kept for that batch, instead of a pod each (#1309). On the
+test machine, about 8 s of a run's 30 s were its pod's making and removal
+(#1312): a kept pod pays them once for its batch. The runs, their checks and
+their reports are the same.
+
+What it keeps to:
+
+- A pod serves one batch: one user, one company or provider. It takes at
+  most 20 runs, waits 30 s at most for its batch's next run, and stops as
+  soon as the batch has nothing left.
+- Each run starts clean: a folder and a home of its own, the run's
+  credentials only. A process a run leaves behind ends the pod.
+- A call the pod's program never makes stops the pod and every pod of its
+  company, and fires the critical alert `OscarKeptPodProtocolFault`:
+  something in that pod read its secret. Look at that company's last runs
+  before you go on.
+- An intrusion, another endpoint or new credentials stop the pods concerned.
+- A run alone, not in a batch, keeps a pod of its own.
+
+**To switch it on, or off again,** with no run going (OSCAR restarts, about
+a minute):
+
+```bash
+KEPT_PODS=on                    # ← yours: on, or off to go back
+cd /opt/oscar
+GOING=$(sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e 'const { DatabaseSync } = require("node:sqlite"); const db = new DatabaseSync("/app/data/oscar.db", { readOnly: true }); process.stdout.write(String(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE status IN (?, ?)").get("QUEUED", "RUNNING").n));')
+if [ "$GOING" != "0" ]; then echo "STOP: '$GOING' runs are still queued or running. Nothing was changed."; else
+  sed -i "s/RUN_KEPT_PODS=o[nf]*/RUN_KEPT_PODS=$KEPT_PODS/" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+  grep -n "RUN_KEPT_PODS=" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+  sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
+  sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
+  sudo kubectl -n oscar exec deploy/oscar -c oscar -- printenv RUN_KEPT_PODS
+fi
+```
+
+- `STOP` changes nothing: wait for the runs to end, then run it again.
+- The `grep` and `printenv` show your choice. A `grep` that shows nothing:
+  the overlay was made from a release before 2026.589. Move to a newer one
+  first (the release block above).
+- The release block asks for it again (`KEPT_PODS`): give the same answer,
+  or the new release goes back to off.
+
+**What to watch**, in Grafana's *OSCAR · Overview* (8a):
+
+- *Kept run pods*: the pods by state; the runs handed `again` (each saved a
+  pod's start) or `first`; why pods were given up (`batch-done`, `idle` and
+  `max-runs` are the usual ends; `abnormal-end` a run that did not end with
+  Bruno's 0 or 1).
+- *Run pods*: the time for a run's pod to start falls near 0 for a run
+  handed again.
+- *A run's time, step by step*: `job` and `pod` near 0, `end` short.
+
+A run whose pod was given up under it reads *Run not finished*, never as the
+provider's failure. To compare, run the same batch with `off`, then `on`.
 
 ### The rest
 

@@ -33,6 +33,10 @@ configMapGenerator:
     literals:
       - APP_URL=https://oscar.example.org
       - ALLOWED_REDIRECT_HOSTS=oscar.example.org
+      # on: the runs of a batch one after another in a pod kept for them
+      # (#1309), which saves each run its pod's start. The k3s guide, section
+      # 9, "Kept run pods": how to switch it on, what to watch.
+      - RUN_KEPT_PODS=off
 
 patches:
   # The volume (k3s's local-path, a folder of the machine) written by the
