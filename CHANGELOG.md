@@ -521,6 +521,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.546] — 2026-11-18
+
+Kept run pods, part 1 (#1316, of #1309): the internal port gives a kept pod its next run. Not released on its own: listed in `compatibility.json` (2026.585) without moving `current_release`, so no release tag is made. Nothing calls it yet: the dispatcher makes no kept pod before part 3, and the server hands no run to one before part 4. How runs go today does not change.
+
+### Why
+Measured on the k3s test machine (#1312, 2026-11-18), a run takes about 30 s, of which about 8 s are its pod's making and removal (`job`, `pod`, `folder`, `end`). A pod kept for the runs of one batch pays them once. #1309 holds the design and the choices made on 2026-11-18.
+
+### Added
+- **`worker/keptPods.js`**, the server's record of the run pods kept for a batch. In memory, like the runs' secrets: nothing outlives a restart, and a pod cannot either.
+  - `open()` records a pod for one batch and gives its secret once (32 random bytes, kept as their SHA-256); `bindAddress()` binds it to the pod's address (the dispatcher's word, part 3).
+  - `ask()` is the pod's call; `handRun()` gives a run to a waiting pod of its batch; `endBatch()`, `revokeCompany()`, `revokeUser()`.
+  - Events `waiting`, `ended` (the run's exit code and whether its results were received) and `stop`, for the parts to come.
+- **`POST /v1/run-pods/next`, on the internal port only**, with the pod's secret in `X-OSCAR-Pod-Secret`.
+  - Body: nothing on the pod's first call, `{ "ended": { "runId", "code" } }` after each run; any other body is a 400, a body over 1 KB a 413.
+  - Answer: `{ "action": "run", "run" }` (the run's inputs) or `{ "action": "stop", "reason" }`, held until a run is handed or the wait ends. Every refusal is the same 403, a call through a proxy included.
+
+### The rules (#1309, decided on 2026-11-18)
+- **A pod belongs to one batch**: one user, one company or provider. It is never given another batch's run.
+- **20 runs per pod**, each after a run that ended normally: Bruno's exit 0 or 1, reported for the run it was given, and result files received by the internal port.
+- **Stop** when the batch has nothing left, after 30 s of waiting, after 20 runs, after any other end. A pod that never calls is given up after 5 minutes; one that never reports its run's end, 60 s past the run's deadline.
+- **The secrets are bound to the pod's address**: the pod's own at its first call (or the dispatcher's word), the run's when the run is handed to it.
+- **A call the pod's program never makes stops the pod and every pod of its company**, logged as an error: a second call while one is held, a call during a run that does not report its end, the end of another run, an end with no run, a call from another address. A compromised Bruno that read its pod's secret would make one. The pod's program (part 2) never calls again after a call that got no answer.
+- **Stopped as well**: every pod of a company or provider at an intrusion (`recordIntrusion()`, first, whatever happens to the record) and when another endpoint is saved for it (`PATCH /v1/company`); a user's pods for a company when that user saves credentials again (`PATCH /v1/me/credentials`).
+- A run's credentials and secret reach a pod only in a *run* answer, never with the pod's start.
+
+### Checked
+- `kept-pods.test.js` (31 tests): each rule, the waits on a fake clock, each tripwire with another pod of the same company (stopped) and one of another company (kept), a closed connection, the listeners.
+- `kept-pods-port.test.js`: the route through the internal port, a whole run with its results sent through the port, its refusals (no secret, a run's secret, a proxy), its bodies, a closed connection; the public port has no such route.
+- `kept-pods-revocation.test.js`: an intrusion (recorded or not), another endpoint (not the same one sent back), new credentials (that user, that company only).
+- 44 changes to the code, each made to fail a test.
+
+---
+
 ## [server-1.11.545] — 2026-11-18
 
 Release 2026.584 (`current_release`). Test Config: search the scenario list (#1314).

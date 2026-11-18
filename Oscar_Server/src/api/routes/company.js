@@ -40,6 +40,7 @@ const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { endpointSuspension, resumeEndpoint } = require('../../utils/intrusion');
+const keptPods = require('../../worker/keptPods');
 const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange, familyEndpointClash } = require('../helpers/shared');
 const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
 const { templatesAddedBy, saveRefusal, frameworkTemplateProblem } = require('../../utils/datafileTemplates');
@@ -451,6 +452,8 @@ router.patch('/', (req, res) => {
   if (endpoint.write !== null && endpoint.write !== company.api_base) {
     run(`UPDATE tester_credentials SET cached_token_enc = NULL, cached_token_expires_at = NULL, cached_token_cred_fp = NULL
          WHERE company_id = ?`, [targetCompanyId]);
+    // Nor does a run pod kept for the old one serve the new one (#1309).
+    keptPods.revokeCompany(targetCompanyId);
   }
   // Another endpoint saved ends a suspension after an intrusion attempt.
   if (endpoint.write !== null && endpoint.write !== company.api_base && company.endpoint_suspended_at) {

@@ -29,6 +29,7 @@
 
 const { get, all, run, transaction } = require('../db/db');
 const log = require('./logger').child({ module: 'intrusion' });
+const keptPods = require('../worker/keptPods');
 
 const INTRUSION_MARK = '[INTRUSION] ';
 const KINDS = new Set(['template', 'script', 'redirect']);
@@ -85,6 +86,13 @@ function resumeEndpoint(companyId, byEmail) {
  * by the collection anyway.
  */
 function recordIntrusion({ runId, companyId, userId, kind, step }, notify = notifyAdministrators) {
+  // Every run pod kept for this company or provider is stopped first, whatever
+  // happens to the record (#1309): it may have met the same answers.
+  try {
+    keptPods.revokeCompany(companyId);
+  } catch (err) {
+    log.error({ err: err.message, runId }, 'kept run pods not stopped');
+  }
   try {
     if (get('SELECT id FROM security_event WHERE run_id = ?', [runId])) return null;
     const id = require('node:crypto').randomUUID();

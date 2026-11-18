@@ -689,7 +689,7 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, refreshAcc
 // A run's results (its reports, Bruno's results) come back here when the run
 // shares no folder with the server: kept in a folder the server owns
 // (utils/runResults.js) until the runner links them.
-const { storeRunResult, ResultRefusal, MAX_RESULT_BYTES } = require('./utils/runResults');
+const { storeRunResult, listRunResults, ResultRefusal, MAX_RESULT_BYTES } = require('./utils/runResults');
 const runCallLimiter = require('express-rate-limit')({
   windowMs: 60 * 1000,
   max: 600,
@@ -731,6 +731,50 @@ function internalRunCaller(req, runId) {
   if (isolationMode() !== 'pod' || req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return false;
   return runSecrets.fromRunAddress(runId, req.socket?.remoteAddress);
 }
+// ── Kept run pods (#1309; part 1 = #1316) ───────────────────────────────────
+// A pod kept for the runs of one batch asks here what comes next, with its own
+// secret (never a run's). The answer is a run's inputs or "stop", held until a
+// run is handed to it or its wait ends (worker/keptPods.js). Nothing makes
+// such a pod before the dispatcher's part (#1309, part 3).
+const keptPods = require('./worker/keptPods');
+keptPods.configure({ hasResults: async (runId) => (await listRunResults(runId)).length > 0 });
+keptPods.on('stop', ({ podId, companyId, batchId, reason, why }) => {
+  const fields = { podId, companyId, batchId, reason, ...(why ? { why } : {}) };
+  if (reason === keptPods.STOP.PROTOCOL) {
+    log.error(fields, '[run-pods] a kept pod made a call its program never makes: it and every pod of its company are stopped');
+  } else {
+    log.info(fields, '[run-pods] a kept pod is stopped');
+  }
+});
+// The body of a pod's call: nothing on its first call, else the end of the
+// run it was given. { ended } (null on a first call), or null when it is
+// anything else.
+function podCallOf(body) {
+  if (body === undefined || body === null) return { ended: null };
+  if (typeof body !== 'object' || Array.isArray(body)) return null;
+  const keys = Object.keys(body);
+  if (keys.length === 0) return { ended: null };
+  if (keys.length !== 1 || keys[0] !== 'ended') return null;
+  const e = body.ended;
+  if (!e || typeof e !== 'object' || Array.isArray(e) || Object.keys(e).sort().join(',') !== 'code,runId') return null;
+  if (typeof e.runId !== 'string' || !SAFE_RUNID_RE_FOR_REFRESH.test(e.runId)) return null;
+  if (!Number.isInteger(e.code) || e.code < 0 || e.code > 255) return null;
+  return { ended: { runId: e.runId, code: e.code } };
+}
+async function keptPodNextHandler(req, res) {
+  const refuse = () => res.status(403).json({ status: 403, title: 'Forbidden', detail: "This endpoint requires a run pod's secret." });
+  if (req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return refuse();
+  const call = podCallOf(req.body);
+  if (!call) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The body is empty, or { "ended": { "runId", "code" } }.' });
+  }
+  const closed = new AbortController();
+  res.on('close', () => { if (!res.writableFinished) closed.abort(); });
+  const answer = await keptPods.ask(req.get('X-OSCAR-Pod-Secret'), req.socket?.remoteAddress, call.ended, { signal: closed.signal });
+  if (closed.signal.aborted) return undefined;
+  if (!answer) return refuse();
+  return res.json(answer);
+}
 const internalApp = express();
 internalApp.disable('x-powered-by');
 internalApp.set('trust proxy', false);
@@ -742,6 +786,7 @@ internalApp.get('/json_validator/datafile.schema.json', runCallLimiter, sendData
 internalApp.post('/v1/runs/:runId/refresh-access-token', runCallLimiter, refreshAccessTokenHandler({ runCaller: internalRunCaller }));
 internalApp.put('/v1/runs/:runId/results/:name', runCallLimiter,
   express.raw({ type: () => true, limit: MAX_RESULT_BYTES }), storeRunResultHandler({ runCaller: internalRunCaller }));
+internalApp.post('/v1/run-pods/next', runCallLimiter, express.json({ limit: '1kb' }), keptPodNextHandler);
 internalApp.use((req, res) => res.status(404).json({ status: 404, title: 'Not Found', detail: 'Not a run call.' }));
 // Express tells an error handler by its four parameters.
 internalApp.use((err, req, res, _next) => {
@@ -1066,3 +1111,4 @@ module.exports = app;
 module.exports.internalApp = internalApp;
 // Tests only: where a run's secret is taken from, which supertest cannot vary.
 module.exports._runCallers = { verifiedRunCompany, internalRunCaller };
+module.exports._podCallOf = podCallOf;
