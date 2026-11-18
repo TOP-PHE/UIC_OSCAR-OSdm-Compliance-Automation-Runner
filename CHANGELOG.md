@@ -521,6 +521,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.547] — 2026-11-18
+
+Kept run pods, part 2 (#1318, of #1309): the run image takes the runs of its batch one after another, clean between two, and sends each run's output itself. Not released on its own: listed in `compatibility.json` (2026.586) without moving `current_release`. Nothing makes a kept pod yet (part 3, the dispatcher). A run pod of today is unchanged.
+
+### The choice of this part: how a run's output reaches the server
+#1309 left two ways open. **Taken: the pod's program sends the output to the internal port itself**, in numbered batches, with the run's own secret. Not taken: the dispatcher reading the pod's log and cutting it by run on tagged marks. With the first way the dispatcher leaves a run's path, stdout and stderr stay apart and in order, and a restart of the Kubernetes API no longer cuts a run's output (#1272).
+
+### Added
+- **`run-pod/keptPod.js`**: with `OSCAR_POD_SECRET` in its environment, the run image's entrypoint is a kept pod. Its inputs hold nothing of a run: the pod's secret and the internal port. Its loop:
+  - asks `POST /v1/run-pods/next` (part 1) for its next run;
+  - runs it in a work folder of its own (`/work/<runId>`) and a home folder of its own; Bruno gets the run's credentials and nothing else of the pod, its secret above all;
+  - sends Bruno's and `mergeReport.js`'s output as it comes, then the result files (as a pod of one run does), and stops Bruno past the run's deadline (exit 124);
+  - cleans before the next run: the run's process group stopped, its work folder removed, `/tmp` emptied;
+  - reports the run's end on its next call;
+  - ends on *stop* (0); on no answer, a refusal or an answer it cannot read (1), never calling again; on wrong inputs (2).
+  - A run it cannot start (a wrong environment name, no deadline, a key other than the run's credentials in its environment…) is reported with code 2, not started.
+- **`run-pod/outputSender.js`**: each stream decoded as UTF-8 on its own (a character cut between two chunks arrives whole), parts in the order they came, a batch every 0.5 s or every 64 KB, one at a time, numbered from 0. A batch the server cannot take yet is sent again for about 15 s; then, or on any refusal, the rest of the run's output is not sent, and the pod says how many bytes.
+- **`POST /v1/runs/:runId/output`, on the internal port only**, with the run's secret (bound to its pod's address): `{ seq, parts: [["out" | "err", text], …] }`. `worker/runOutput.js` hands each part to where the run's output was opened (part 4 opens it when it hands the run). A batch already used is answered again and not used twice; one before its turn is a 409; 64 MB a run, then 413.
+- **The end of a run says whether the pod is still clean** (`ended.clean`, optional, true by default). After each run the pod lists the processes of its pod (only when it is the pod's first process: elsewhere `/proc` shows other processes). One the run left behind is stopped, and the pod reports `clean: false`. The server records the run's end as it is and stops the pod (`not-clean`).
+- `runProcess()` (`runPod.js`) takes `onOutput`: the process gets a group of its own, stopped once it ends; its exit is enough when a process it left behind holds the output open (2 s for the output to arrive); `deadlineMs` stops it with SIGTERM, then SIGKILL.
+
+### Fixed on the way
+- `piecesOf()` would have looped for ever on a piece of one code unit ending inside a character of two; found by its own test before any release.
+
+### Left open on purpose (Sonar)
+- Three `await` inside a loop (S9382): `keptPod()`'s loop (ask for a run, run it, ask again) and the sending of one output batch again (`OutputSender.send()`) are one step after the other by their nature. `emptyFolder()` removes its entries together instead.
+
+### Checked
+- `kept-pod.test.js`: the loop against a stand-in for the internal port: two runs with their own credentials, home and folder; output, results and their order before the end is reported; exit codes and the deadline; a process left behind (stopped, not clean); a process holding the output open; every answer it cannot use (one call, never another); a run it cannot start; the pod's inputs; the entrypoint's two modes. One test runs on Linux only: a process the run left behind ends with its group.
+- `output-sender.test.js`, `run-output.test.js`: order, batches, characters cut between chunks, retries and refusals, limits.
+- `kept-pods-port.test.js`: the output route through the internal port (its refusals, a full batch of characters JSON writes as six), an end that says the pod is no longer clean.
+- `kept-pod-end-to-end.test.js`: the pod's program against the server's own internal port: two runs of a batch, their output, their results, then the batch ends.
+- 56 changes to the code: 54 made a test fail here. The other two (the drain when a process left behind holds the output, the run's group stopped at its end) are Linux behaviour: their tests run in CI, the mutations were not run there.
+
+---
+
 ## [server-1.11.546] — 2026-11-18
 
 Kept run pods, part 1 (#1316, of #1309): the internal port gives a kept pod its next run. Not released on its own: listed in `compatibility.json` (2026.585) without moving `current_release`, so no release tag is made. Nothing calls it yet: the dispatcher makes no kept pod before part 3, and the server hands no run to one before part 4. How runs go today does not change.

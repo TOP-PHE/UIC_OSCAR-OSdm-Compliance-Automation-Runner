@@ -55,6 +55,7 @@ const STOP = Object.freeze({
   IDLE: 'idle',
   MAX_RUNS: 'max-runs',
   ABNORMAL_END: 'abnormal-end',
+  NOT_CLEAN: 'not-clean',
   NOT_STARTED: 'not-started',
   DEADLINE: 'deadline',
   REVOKED: 'revoked',
@@ -154,10 +155,16 @@ async function afterRun(entry, ended) {
   if (!ended) return violation(entry, 'a call during a run that does not report its end');
   if (ended.runId !== entry.runId) return violation(entry, 'the end of another run');
   const received = await resultsReceived(ended.runId);
-  emit('ended', { podId: entry.id, ...batchOf(entry), runId: ended.runId, code: ended.code, resultsReceived: received });
+  const clean = ended.clean !== false;
+  emit('ended', { podId: entry.id, ...batchOf(entry), runId: ended.runId, code: ended.code, resultsReceived: received, clean });
   if (entry.stopped) return stopAnswer(entry.stopped);
   entry.runId = null;
   entry.state = 'waiting';
+  // The run's end stands as it is; a pod that is no longer clean takes no other run (#1318).
+  if (!clean) {
+    stop(entry, STOP.NOT_CLEAN);
+    return stopAnswer(STOP.NOT_CLEAN);
+  }
   if (!((ended.code === 0 || ended.code === 1) && received)) {
     stop(entry, STOP.ABNORMAL_END);
     return stopAnswer(STOP.ABNORMAL_END);
@@ -179,7 +186,8 @@ async function settle(entry, ended) {
 
 /**
  * A pod's call: `secret` from X-OSCAR-Pod-Secret, `address` the caller's,
- * `ended` null on a first call, else { runId, code } of the run it was given.
+ * `ended` null on a first call, else { runId, code, clean } of the run it was
+ * given (clean false: the pod is no longer clean, #1318).
  * Resolves to { action: 'run', run }, { action: 'stop', reason }, or null
  * when the call is refused (no such pod, or another address). Held until a
  * run is handed to the pod or its wait ends; `signal` ends the hold when the
@@ -295,7 +303,7 @@ function revokeUser(userId, companyId) {
 /**
  * Listens to 'stop' (a pod is given up: { podId, companyId, userId, batchId,
  * runId, reason, why? }), 'ended' (a pod reported its run's end: { podId, …,
- * runId, code, resultsReceived }) or 'waiting' (a pod waits for a run).
+ * runId, code, resultsReceived, clean }) or 'waiting' (a pod waits for a run).
  * Returns the function that stops listening.
  */
 function on(event, fn) {

@@ -112,22 +112,81 @@ async function prepareWork({ collectionDir, workDir, envName, yml }) {
   await fs.promises.writeFile(path.join(workDir, L.ENVIRONMENTS_DIR, `${envName}.yml`), yml, { mode: 0o600 });
 }
 
-/** Starts a process and resolves with its exit code (127 when it cannot start). */
-function runProcess(command, args, { cwd, env, stdio, log }) {
+// A run that outlives its deadline ends with this code, as the dispatcher's.
+const DEADLINE_CODE = 124;
+const KILL_GRACE_MS = 10 * 1000;
+// Once the process has exited, how long its output may still take to arrive.
+const OUTPUT_DRAIN_MS = 2000;
+// Where processes form groups: a run's processes are stopped together.
+const GROUPS = process.platform !== 'win32';
+
+/** Stops a process and, where there are groups, every process of its group. */
+function stopProcess(child, signal) {
+  try {
+    if (GROUPS && child.pid) process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch { /* already gone */ }
+}
+
+/**
+ * Starts a process and resolves with its exit code (127 when it cannot start).
+ * With `onOutput(stream, chunk)` its stdout ('out') and stderr ('err') are
+ * piped there, and it is started in a group of its own, which is stopped once
+ * it ends: a process it left behind ends with it. With `deadlineMs` it is
+ * stopped after that time, and resolves with DEADLINE_CODE.
+ */
+function runProcess(command, args, { cwd, env, stdio, log, onOutput, deadlineMs = 0, killGraceMs = KILL_GRACE_MS }) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(command, args, { cwd, env, stdio, shell: false });
+      child = spawn(command, args, {
+        cwd, env, stdio: onOutput ? ['ignore', 'pipe', 'pipe'] : stdio, shell: false, detached: Boolean(onOutput) && GROUPS,
+      });
     } catch (err) {
       log(`[run-pod] ${path.basename(command)} could not start: ${err.message}`);
       resolve(127);
       return;
     }
+    let done = false;
+    let timedOut = false;
+    let deadline = null;
+    let drain = null;
+    const finish = (code) => {
+      if (done) return;
+      done = true;
+      clearTimeout(deadline);
+      clearTimeout(drain);
+      if (onOutput) stopProcess(child, 'SIGKILL');
+      resolve(timedOut ? DEADLINE_CODE : code);
+    };
+    if (onOutput) {
+      child.stdout.on('data', (chunk) => onOutput('out', chunk));
+      child.stderr.on('data', (chunk) => onOutput('err', chunk));
+      // A process left behind may hold the output open: the exit is enough.
+      child.on('exit', (code, signal) => {
+        drain = setTimeout(() => {
+          child.stdout.destroy();
+          child.stderr.destroy();
+          finish(code ?? (signal ? 128 : 1));
+        }, OUTPUT_DRAIN_MS);
+      });
+    }
+    if (deadlineMs > 0) {
+      deadline = setTimeout(() => {
+        timedOut = true;
+        log(`[run-pod] ${path.basename(command)} stopped: its deadline passed`);
+        stopProcess(child, 'SIGTERM');
+        setTimeout(() => stopProcess(child, 'SIGKILL'), killGraceMs).unref?.();
+      }, deadlineMs);
+    }
     child.on('error', (err) => {
       log(`[run-pod] ${path.basename(command)} could not start: ${err.message}`);
+      if (done) return;
+      done = true;
+      clearTimeout(deadline);
       resolve(127);
     });
-    child.on('close', (code, signal) => resolve(code ?? (signal ? 128 : 1)));
+    child.on('close', (code, signal) => finish(code ?? (signal ? 128 : 1)));
   });
 }
 
@@ -276,4 +335,7 @@ async function runPod({
   return exitCode;
 }
 
-module.exports = { runPod, runInputs, childEnv, reasonOf, RUN_CREDENTIALS, BASE_ENV, RETRY_DELAYS_MS };
+module.exports = {
+  runPod, runInputs, childEnv, reasonOf, prepareWork, runProcess, sendResults, ignoreMissing, defaultSleep,
+  RUN_CREDENTIALS, BASE_ENV, RETRY_DELAYS_MS, DEADLINE_CODE, KILL_GRACE_MS,
+};

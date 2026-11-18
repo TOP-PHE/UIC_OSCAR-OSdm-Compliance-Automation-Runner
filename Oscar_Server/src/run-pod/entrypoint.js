@@ -8,12 +8,16 @@
 'use strict';
 
 /**
- * The run image's entrypoint (run isolation, option 4, #1130): one run, then
- * the pod ends with Bruno's exit code. See runPod.js.
+ * The run image's entrypoint (run isolation, option 4, #1130). With a pod's
+ * secret in its environment it is a pod kept for the runs of one batch
+ * (keptPod.js, #1309); without, one run, then the pod ends with Bruno's exit
+ * code (runPod.js).
  */
 
 /* istanbul ignore next: the process entry point */
-require('./runPod').runPod().then(
+const start = process.env.OSCAR_POD_SECRET ? require('./keptPod').keptPod : require('./runPod').runPod;
+/* istanbul ignore next: the process entry point */
+start().then(
   (code) => process.exit(code),
   (err) => {
     process.stderr.write(`[run-pod] Failed: ${err?.message || err}\n`);
