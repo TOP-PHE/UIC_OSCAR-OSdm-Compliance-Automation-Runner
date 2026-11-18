@@ -1184,6 +1184,38 @@ describe('executeRun — intrusion lines carry the run\'s tag', () => {
   });
 });
 
+// #1327: the collection renews the run's first token before it expires, from
+// the expiry the runner writes when OSCAR knows it.
+describe('executeRun — the first token\'s expiry', () => {
+  async function envOfRun(resolve) {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockImplementationOnce(resolve);
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    const { readEnvYml } = require('../helpers/env-yml');
+    const envFile = fs.readdirSync(ENVS_DIR).find(f => f.includes(runId.slice(0, 8)));
+    const file = readEnvYml(fs.readFileSync(path.join(ENVS_DIR, envFile), 'utf8'));
+    fakeProc.emit('close', 0);
+    await p;
+    return file;
+  }
+
+  test('written in ms since the epoch when OSCAR knows it', async () => {
+    const { valueIn } = require('../helpers/env-yml');
+    const file = await envOfRun(async (_row, _log, opts) => { opts.onExpiry('2026-11-18T20:30:00.000Z'); return 'tok'; });
+    expect(valueIn(file, '__tokenExpiresAt')).toBe(String(Date.parse('2026-11-18T20:30:00.000Z')));
+  });
+
+  test('left out when it is not known (a static token)', async () => {
+    const { valueIn } = require('../helpers/env-yml');
+    const file = await envOfRun(async () => 'tok');
+    expect(valueIn(file, '__tokenExpiresAt')).toBeUndefined();
+  });
+});
+
 // ── Detected auth/format errors surfaced onto the run row ─────────────────────
 describe('executeRun — auth/token-format error detection from CLI output', () => {
   test('sets error_message = TOKEN_AUTH_ERROR when a 401 appears in stdout', async () => {

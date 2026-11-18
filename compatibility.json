@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.552 / collection OTST_V2.0.267 (#1327): a run renews its token before it expires. The run's token refresh answers expires_in, the seconds the token handed out has left, when OSCAR knows it (an OAuth token whose provider gave expires_in); the collection keeps when to renew (expires_in less 55 s, never sooner than 10 s) and its before-request renews only once that time has passed: about one call a minute on a provider with 2-minute tokens, none with a static token. On beta (2-minute tokens), a refund 74 s after step 01 was refused with 401 in 7 of 35 runs of SIM_REFUND_PAX_THIRD_19PAX_37."
+        "Server 1.11.552 / collection OTST_V2.0.267 (#1327): a run renews its token before it expires. The run's token refresh answers expires_in, the seconds the token handed out has left, when OSCAR knows it (an OAuth token whose provider gave expires_in); the collection keeps when to renew (expires_in less 55 s, never sooner than 10 s) and its before-request renews only once that time has passed: about one call a minute on a provider with 2-minute tokens, none with a static token. On beta (2-minute tokens), a refund 74 s after step 01 was refused with 401 in 7 of 35 runs of SIM_REFUND_PAX_THIRD_19PAX_37.",
+        "Also the run's first token: the runner writes when it expires (__tokenExpiresAt, when known) and the collection renews it before then, until step 01's renewal replaces it. A k3s restart had frozen every run for 2 min and one was refused at step 09, before 01."
       ]
     },
     {

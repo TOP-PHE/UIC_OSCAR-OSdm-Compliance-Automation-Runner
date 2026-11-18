@@ -1219,8 +1219,12 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   //    The oauth2/bearer logic + token cache live in access-token.js so the
   //    Timetable Discovery endpoint reuses the exact same path (issue #157).
   let accessToken;
+  // #1327: when the token expires, if OSCAR knows (an OAuth token whose
+  // provider gave expires_in): the collection renews it before then, from
+  // the run's first request on, not only once step 01 has asked again.
+  let tokenExpiresAt = null;
   try {
-    accessToken = await resolveAccessToken(userRow, _authLogger(runId));
+    accessToken = await resolveAccessToken(userRow, _authLogger(runId), { onExpiry: (at) => { tokenExpiresAt = at; } });
     if (userRow.auth_mode !== 'oauth2') {
       logEvent(runId, 'info', '[runner] Bearer token resolved.');
     }
@@ -1354,6 +1358,8 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     ...envVar('__runId', runId),
     ...envVar('__intrusionTag', intrusionTag),
     ...envVar('oscar_loopback_base', serverUrls().loopback),
+    // #1327: ms since the epoch; the collection renews before it.
+    ...(Number.isFinite(Date.parse(tokenExpiresAt)) ? envVar('__tokenExpiresAt', Date.parse(tokenExpiresAt)) : []),
   ].join('\n') + '\n';
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);

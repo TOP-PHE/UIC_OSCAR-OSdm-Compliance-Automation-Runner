@@ -306,6 +306,11 @@ async function refreshAccessTokenIfNeeded(opts) {
 const RENEW_MARGIN_S = 55;
 const MIN_RENEWAL_GAP_S = 10;
 const RENEW_AFTER_VAR = '__tokenRenewAfter';
+// The run's first token, given by the runner at its start: when it expires,
+// in ms since the epoch, when OSCAR knows. It holds until the first renewal,
+// so a run that waits before step 01 (a slow provider, a cluster that
+// restarts) renews that token too.
+const FIRST_EXPIRY_VAR = '__tokenExpiresAt';
 
 /** When to renew, in ms since the epoch, from OSCAR's `expires_in`; null when it gave none. */
 function renewalTime(expiresIn, now) {
@@ -316,8 +321,17 @@ function renewalTime(expiresIn, now) {
 
 function rememberRenewal(expiresIn, now) {
   const at = renewalTime(expiresIn, now);
+  bru.deleteEnvVar(FIRST_EXPIRY_VAR);                       // the first token is replaced
   if (at === null) bru.deleteEnvVar(RENEW_AFTER_VAR);
   else bru.setEnvVar(RENEW_AFTER_VAR, String(at));
+}
+
+/** When to renew: the time kept, else from the first token's expiry; 0 when none is known. */
+function renewalDue() {
+  const kept = Number(bru.getEnvVar(RENEW_AFTER_VAR) || 0);
+  if (kept) return kept;
+  const first = Number(bru.getEnvVar(FIRST_EXPIRY_VAR) || 0);
+  return first > 0 ? first - RENEW_MARGIN_S * 1000 : 0;
 }
 
 /**
@@ -328,7 +342,7 @@ function rememberRenewal(expiresIn, now) {
  * @returns {Promise<boolean>} true when the token was renewed
  */
 async function renewTokenWhenDue(callerLabel) {
-  const at = Number(bru.getEnvVar(RENEW_AFTER_VAR) || 0);
+  const at = renewalDue();
   const now = Date.now();
   if (!at || now < at) return false;
   bru.setEnvVar(RENEW_AFTER_VAR, String(now + MIN_RENEWAL_GAP_S * 1000));
@@ -337,7 +351,7 @@ async function renewTokenWhenDue(callerLabel) {
 
 module.exports = {
   handleAccessTokenResponse, checkAuthRejection, refreshAccessTokenIfNeeded, isOptionalReadProbe,
-  renewTokenWhenDue, renewalTime, RENEW_MARGIN_S, MIN_RENEWAL_GAP_S, RENEW_AFTER_VAR,
+  renewTokenWhenDue, renewalTime, RENEW_MARGIN_S, MIN_RENEWAL_GAP_S, RENEW_AFTER_VAR, FIRST_EXPIRY_VAR,
 };
 
 // Expose to global for the eval/require loader flows (matches the other modules).

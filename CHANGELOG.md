@@ -539,6 +539,9 @@ Release 2026.591 (`current_release`). **A run renews its token before it expires
   - OSCAR then gives a new token, since its own has less than 60 s left.
   - A renewal that fails is tried again 10 s later at the soonest, not before each request.
   - On a provider with 2-minute tokens this makes about one call a minute per run. With 15-minute tokens a run hardly ever makes one; with a static token, none. Before, the alternative was one call before every request.
+- **The run's first token too.** The runner writes when the token it hands out at the start expires (`__tokenExpiresAt`, ms since the epoch, only when known), and the collection renews it the same way until a first renewal replaces it.
+  - Seen in the campaign with kept pods: a k3s restart (kine's compaction, #1271) froze every run for 2 min.
+  - `SIM_OFFER_PROBE_SERVICE_CLASS_HIGH_312`, still before step 01, was then refused with 401 at step 09.
 - **Left as it is:** requests a step's own script sends (`bru.sendRequest`) use the token of the step's start. A single step lasting more than 55 s, with a 2-minute token, can still meet an expired one.
 
 ### Checked
@@ -554,8 +557,10 @@ Release 2026.591 (`current_release`). **A run renews its token before it expires
   - no call before the time, one after it, and the new time kept;
   - a failed renewal tried again 10 s later, not before each request;
   - no token in the log;
-  - the before-request calls the renewal once, after the run filter.
-- Taking out the time kept (3 tests), the 10 s gap (1) or `expires_in` (1) each fails a test.
+  - the before-request calls the renewal once, after the run filter;
+  - the first token is renewed before 01 from its expiry, step 01's renewal replaces it, and a failed try waits 10 s.
+- `runner.test.js`: `__tokenExpiresAt` in the environment file when the expiry is known, absent for a static token.
+- Taking out the time kept (3 tests), the 10 s gap (1), `expires_in` (1), the first token's expiry in the collection (2) or in the runner (1) each fails a test.
 
 ---
 

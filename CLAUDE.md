@@ -3199,7 +3199,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     that time. The margin must stay under the cache's 60 s, or OSCAR hands
     back the same token. A step's own `bru.sendRequest` calls keep the
     token of the step's start. Beta's 2-minute tokens had failed a long
-    refund 74 s after 01 (7 of 35 runs).
+    refund 74 s after 01 (7 of 35 runs). The first token too: the runner writes
+    `__tokenExpiresAt` (ms since the epoch) when known, read until a first
+    renewal replaces it (`renewalDue()`): a k3s restart froze runs 2 min
+    before 01.
   - **Query parameters go in the URL** (#648, OTST_V2.0.129). Bruno 4.2.1
     ignores a request file's `http.params` list; the seat map went without
     its four required parameters for months. `bruno-request-files.test.js`

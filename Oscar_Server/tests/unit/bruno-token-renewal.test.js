@@ -106,6 +106,41 @@ describe('before each request', () => {
   });
 });
 
+// The runner writes the first token's expiry; it holds until a renewal, so a
+// run that waits before step 01 renews that token too (a k3s restart froze
+// every run for 2 min and one was refused at step 09).
+describe('the run\'s first token, before step 01', () => {
+  test('renewed once its expiry, less the margin, has passed; then the answer\'s time holds', async () => {
+    env[A.FIRST_EXPIRY_VAR] = String(clock + 90 * 1000);
+    expect(await A.renewTokenWhenDue('05. GET Promotion Codes')).toBe(false);
+    expect(sent).toHaveLength(0);
+    clock += (90 - A.RENEW_MARGIN_S) * 1000;
+    answers = [oscarAnswer({ access_token: 'renewed', expires_in: 300 })];
+    expect(await A.renewTokenWhenDue('09. GET Product By ProductId')).toBe(true);
+    expect(env.access_token).toBe('renewed');
+    expect(env).not.toHaveProperty(A.FIRST_EXPIRY_VAR);
+    expect(env[A.RENEW_AFTER_VAR]).toBe(String(clock + (300 - A.RENEW_MARGIN_S) * 1000));
+  });
+
+  test('step 01\'s renewal replaces it', async () => {
+    env[A.FIRST_EXPIRY_VAR] = String(clock + 70 * 1000);
+    answers = [oscarAnswer({ access_token: 't01', expires_in: 120 })];
+    await A.refreshAccessTokenIfNeeded({ callerLabel: '01' });
+    expect(env).not.toHaveProperty(A.FIRST_EXPIRY_VAR);
+    clock += 30 * 1000;                                         // past the first token's time, not the new one's
+    expect(await A.renewTokenWhenDue('02')).toBe(false);
+    expect(sent).toHaveLength(1);
+  });
+
+  test('a renewal that fails keeps trying 10 s apart, not before each request', async () => {
+    env[A.FIRST_EXPIRY_VAR] = String(clock + 10 * 1000);
+    answers = [{ status: 502, body: '{}' }];
+    expect(await A.renewTokenWhenDue('03')).toBe(false);
+    expect(await A.renewTokenWhenDue('04')).toBe(false);
+    expect(sent).toHaveLength(1);
+  });
+});
+
 test('the collection\'s before-request renews when due, after the run filter, for every request', () => {
   const yml = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'opencollection.yml'), 'utf8');
   const normal = yml.indexOf('── 2. Normal before-request');
