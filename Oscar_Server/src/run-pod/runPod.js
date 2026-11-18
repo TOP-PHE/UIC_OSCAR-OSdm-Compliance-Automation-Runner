@@ -32,6 +32,7 @@
  */
 
 const fs = require('node:fs');
+const net = require('node:net');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const L = require('./runLayout');
@@ -50,6 +51,18 @@ const SEND_TIMEOUT_MS = 60 * 1000;
 // run, so a server that stays away costs one minute, not one per file.
 const RETRY_DELAYS_MS = Object.freeze([1000, 2000, 4000, 8000, 15000, 30000]);
 const RETRY_STATUSES = new Set([502, 503, 504]);
+// A connection that was never made: tried again after the pauses, about 30 s
+// in all. A new pod's network may need a moment: on k3s its network policy is
+// in place a little after the pod starts, and until then OSCAR's internal
+// port refuses it, while the provider is already reached. A kept pod's first
+// call was refused half a second in (#1324); a pod of one run had its data
+// file refused for 2.5 s, 19 s in, under a batch (#1326).
+const NOT_CONNECTED = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT']);
+const CONNECT_RETRY_DELAYS_MS = Object.freeze([500, 1000, 2000, 4000, 8000, 15000]);
+// waitForServer() opens a connection only, so its own timeout (ETIMEDOUT) is
+// one never made too.
+const CONNECT_TIMEOUT_MS = 5000;
+const NOT_REACHED = new Set([...NOT_CONNECTED, 'ETIMEDOUT']);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ENV_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,199}$/;
@@ -291,6 +304,59 @@ function defaultSleep(ms) {
 }
 
 /**
+ * Opens a TCP connection to the address and closes it at once: no request is
+ * sent. Resolves once connected, rejects with the error (its `code` set, and
+ * ETIMEDOUT after `timeoutMs`).
+ */
+function tcpConnect(host, port, timeoutMs = CONNECT_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect({ host, port });
+    socket.setTimeout(timeoutMs, () => {
+      const err = new Error(`no connection in ${timeoutMs / 1000} s`);
+      err.code = 'ETIMEDOUT';
+      socket.destroy(err);
+    });
+    socket.once('connect', () => { socket.destroy(); resolve(); });
+    socket.once('error', reject);
+  });
+}
+
+/** The host and port of an http(s) address: IPv6 without its brackets. */
+function hostAndPort(base) {
+  const url = new URL(base);
+  const host = url.hostname.startsWith('[') ? url.hostname.slice(1, -1) : url.hostname;
+  const port = Number(url.port) || (url.protocol === 'https:' ? 443 : 80);
+  return { host, port };
+}
+
+/**
+ * Waits until OSCAR's internal port takes a connection, trying again after
+ * each pause while it is not reached (NOT_REACHED). Bruno's first call to
+ * OSCAR is the collection's read of the data file, which is not tried again
+ * (#1326). Resolves true once reached, false when the pauses are over: Bruno
+ * then starts as it would have, and says what it meets. One pause a level,
+ * as the kept pod's untilConnected(): at most as deep as the pauses are many.
+ */
+async function waitForServer({ base, connect = tcpConnect, pauses = CONNECT_RETRY_DELAYS_MS, sleep = defaultSleep, log, waited = 0 }) {
+  const { host, port } = hostAndPort(base);
+  try {
+    await connect(host, port);
+    if (waited > 0) log(`[run-pod] OSCAR reached after ${waited / 1000} s`);
+    return true;
+  } catch (err) {
+    const code = err?.code || err?.message || String(err);
+    const pause = NOT_REACHED.has(err?.code) ? pauses[0] : undefined;
+    if (pause === undefined) {
+      log(`[run-pod] OSCAR not reached (${code}); bru starts anyway`);
+      return false;
+    }
+    log(`[run-pod] OSCAR not reached yet (${code}); tried again in ${pause / 1000} s`);
+    await sleep(pause);
+    return waitForServer({ base, connect, pauses: pauses.slice(1), sleep, log, waited: waited + pause });
+  }
+}
+
+/**
  * Runs the run in this pod and resolves with the exit code to end with:
  * Bruno's, 2 when the inputs are wrong (nothing started), 127 when Bruno
  * cannot start.
@@ -306,6 +372,8 @@ async function runPod({
   log = (line) => process.stderr.write(`${line}\n`),
   retryDelaysMs = RETRY_DELAYS_MS,
   sleep = defaultSleep,
+  connect = tcpConnect,
+  connectRetryDelaysMs = CONNECT_RETRY_DELAYS_MS,
 } = {}) {
   const input = runInputs(env);
   if (input.problem) {
@@ -314,6 +382,7 @@ async function runPod({
   }
   const { runId, envName, yml, resultsBase } = input;
   await prepareWork({ collectionDir, workDir, envName, yml });
+  await waitForServer({ base: resultsBase, connect, pauses: connectRetryDelaysMs, sleep, log });
   log(`[run-pod] started bru in ${runId}`);
 
   const [bruCommand, ...bruPrefix] = bru;
@@ -337,5 +406,7 @@ async function runPod({
 
 module.exports = {
   runPod, runInputs, childEnv, reasonOf, prepareWork, runProcess, sendResults, ignoreMissing, defaultSleep,
+  tcpConnect, hostAndPort, waitForServer,
   RUN_CREDENTIALS, BASE_ENV, RETRY_DELAYS_MS, DEADLINE_CODE, KILL_GRACE_MS,
+  NOT_CONNECTED, CONNECT_RETRY_DELAYS_MS, CONNECT_TIMEOUT_MS,
 };

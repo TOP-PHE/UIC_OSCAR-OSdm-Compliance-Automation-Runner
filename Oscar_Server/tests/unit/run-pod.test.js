@@ -18,7 +18,10 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { randomUUID, randomBytes } = require('node:crypto');
-const { runPod, runInputs, reasonOf, RUN_CREDENTIALS, BASE_ENV, RETRY_DELAYS_MS } = require('../../src/run-pod/runPod');
+const {
+  runPod, runInputs, reasonOf, tcpConnect, hostAndPort, waitForServer,
+  RUN_CREDENTIALS, BASE_ENV, RETRY_DELAYS_MS, NOT_CONNECTED, CONNECT_RETRY_DELAYS_MS,
+} = require('../../src/run-pod/runPod');
 const L = require('../../src/run-pod/runLayout');
 const { RUN_ENV_KEYS } = require('../../src/worker/childEnv');
 
@@ -95,7 +98,7 @@ let n = 0;
 // The pauses between two sends of a result are recorded, not waited.
 let pausesTaken = [];
 beforeEach(() => { pausesTaken = []; });
-async function run(env, { exitCode = 0, linkTarget = '-', retryDelaysMs = [] } = {}) {
+async function run(env, { exitCode = 0, linkTarget = '-', retryDelaysMs = [], connect, connectRetryDelaysMs = [] } = {}) {
   n += 1;
   const workDir = path.join(root, `work-${n}`);
   const lines = [];
@@ -103,6 +106,7 @@ async function run(env, { exitCode = 0, linkTarget = '-', retryDelaysMs = [] } =
     env, collectionDir, workDir, bru: [process.execPath, fakeBru, String(exitCode), linkTarget],
     stdio: 'ignore', log: (l) => lines.push(l),
     retryDelaysMs, sleep: async (ms) => { pausesTaken.push(ms); },
+    connectRetryDelaysMs, ...(connect ? { connect } : {}),
   });
   const read = (f) => (fs.existsSync(path.join(workDir, f)) ? JSON.parse(fs.readFileSync(path.join(workDir, f), 'utf8')) : null);
   return { code, workDir, lines, bru: read('bru-call.json'), merge: read('merge-call.json') };
@@ -244,6 +248,96 @@ describe('inputs', () => {
 
   test('the address is kept without trailing slashes', () => {
     expect(runInputs(podEnv({ OSCAR_RESULTS_URL: 'http://oscar-internal:3003///' })).resultsBase).toBe('http://oscar-internal:3003');
+  });
+});
+
+// #1326: on k3s, a new pod's network policy is in place a little after the
+// pod starts, and OSCAR's internal port refuses it until then.
+describe('Bruno starts once OSCAR\'s internal port is reached', () => {
+  const refusedThen = (times, code = 'ECONNREFUSED') => {
+    const calls = [];
+    const connect = async (host, port) => {
+      calls.push(`${host}:${port}`);
+      if (calls.length <= times) throw Object.assign(new Error(code), { code });
+    };
+    return { connect, calls };
+  };
+
+  test('a refused connection is tried again after each pause, then Bruno starts', async () => {
+    const { connect, calls } = refusedThen(2);
+    const { code, lines, bru } = await run(podEnv({ OSCAR_RESULTS_URL: 'http://oscar-internal.oscar.svc:3003/' }),
+      { connect, connectRetryDelaysMs: [500, 1000, 2000] });
+    expect(code).toBe(0);
+    expect(calls).toEqual(Array(3).fill('oscar-internal.oscar.svc:3003'));
+    expect(pausesTaken.slice(0, 2)).toEqual([500, 1000]);
+    expect(lines).toContain('[run-pod] OSCAR not reached yet (ECONNREFUSED); tried again in 0.5 s');
+    const reached = lines.indexOf('[run-pod] OSCAR reached after 1.5 s');
+    expect(reached).toBeGreaterThanOrEqual(0);
+    expect(reached).toBeLessThan(lines.findIndex((l) => l.startsWith('[run-pod] started bru')));
+    expect(bru).not.toBeNull();
+  });
+
+  test('reached at once: no pause and no line', async () => {
+    const { connect, calls } = refusedThen(0);
+    const { lines } = await run(podEnv(), { connect, connectRetryDelaysMs: [500] });
+    expect(calls).toHaveLength(1);
+    expect(lines.some((l) => l.includes('OSCAR'))).toBe(false);
+  });
+
+  test('still refused when the pauses are over: Bruno starts anyway, as before', async () => {
+    const { connect, calls } = refusedThen(99, 'ETIMEDOUT');
+    const { code, lines, bru } = await run(podEnv(), { connect, connectRetryDelaysMs: [500, 1000] });
+    expect(calls).toHaveLength(3);
+    expect(lines).toContain('[run-pod] OSCAR not reached (ETIMEDOUT); bru starts anyway');
+    expect(bru).not.toBeNull();
+    expect(code).toBe(0);
+  });
+
+  test('an error that is not "not reached" is not waited on', async () => {
+    const { connect, calls } = refusedThen(99, 'EACCES');
+    const { lines, bru } = await run(podEnv(), { connect, connectRetryDelaysMs: [500, 1000] });
+    expect(calls).toHaveLength(1);
+    expect(pausesTaken).toEqual([]);
+    expect(lines).toContain('[run-pod] OSCAR not reached (EACCES); bru starts anyway');
+    expect(bru).not.toBeNull();
+  });
+
+  test('the codes are the kept pod\'s, and the default pauses last about 30 s', () => {
+    expect(require('../../src/run-pod/keptPod').NOT_CONNECTED).toBe(NOT_CONNECTED);
+    expect(require('../../src/run-pod/keptPod').CONNECT_RETRY_DELAYS_MS).toBe(CONNECT_RETRY_DELAYS_MS);
+    const total = CONNECT_RETRY_DELAYS_MS.reduce((a, b) => a + b, 0);
+    expect(total).toBeGreaterThanOrEqual(20 * 1000);
+    expect(total).toBeLessThanOrEqual(45 * 1000);
+  });
+
+  test('the connection opens and closes, and sends no request', async () => {
+    await tcpConnect('127.0.0.1', server.address().port);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(received).toEqual([]);
+  });
+
+  test('a closed port is refused with its code', async () => {
+    const closed = http.createServer();
+    await new Promise((resolve) => closed.listen(0, '127.0.0.1', resolve));
+    const port = closed.address().port;
+    await new Promise((resolve) => closed.close(resolve));
+    await expect(tcpConnect('127.0.0.1', port)).rejects.toMatchObject({ code: 'ECONNREFUSED' });
+    const lines = [];
+    const sleeps = [];
+    expect(await waitForServer({ base: `http://127.0.0.1:${port}`, pauses: [500], sleep: async (ms) => { sleeps.push(ms); }, log: (l) => lines.push(l) }))
+      .toBe(false);
+    expect(sleeps).toEqual([500]);
+    expect(lines).toEqual([
+      '[run-pod] OSCAR not reached yet (ECONNREFUSED); tried again in 0.5 s',
+      '[run-pod] OSCAR not reached (ECONNREFUSED); bru starts anyway',
+    ]);
+  });
+
+  test('host and port of the internal address', () => {
+    expect(hostAndPort('http://oscar-internal.oscar.svc:3003')).toEqual({ host: 'oscar-internal.oscar.svc', port: 3003 });
+    expect(hostAndPort('http://oscar')).toEqual({ host: 'oscar', port: 80 });
+    expect(hostAndPort('https://oscar')).toEqual({ host: 'oscar', port: 443 });
+    expect(hostAndPort('http://[fd00::1]:3003')).toEqual({ host: 'fd00::1', port: 3003 });
   });
 });
 

@@ -73,6 +73,15 @@ runtime:
         const scenarioCode = bru.getEnvVar("scenarioCode") || "N/A";
         
         if (!expectedVersion) {
+          // #1326: the data file could not be read at the scenario's start (on k3s,
+          // a new pod's network may refuse OSCAR for a moment). The next step
+          // reads it again: either that works and the run tests what it should,
+          // or step 01 fails on it. Said, not failed here.
+          const loadError = bru.getEnvVar("__scenarioLoadError");
+          if (loadError) {
+            validationLogger(`[WARNING] The data file could not be read at the scenario's start (${loadError}): the OSDM version check is skipped, and the next step reads the data file again.`);
+            return;
+          }
           validationLogger(`[INFO] osdmVersion not set in environment — skipping consistency check`);
           bruTest("osdmVersion is available for consistency check", () => {
             expect(expectedVersion, "osdmVersion should be set by scenario parser").to.exist;

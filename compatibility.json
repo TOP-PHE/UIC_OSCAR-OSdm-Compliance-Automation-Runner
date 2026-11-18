@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.589",
+  "current_release": "2026.590",
   "releases": [
+    {
+      "release": "2026.590",
+      "date": "2026-11-18",
+      "server": "1.11.551",
+      "collection": "OTST_V2.0.266",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.551 / collection OTST_V2.0.266 (#1326): a pod of one run waits until OSCAR's internal port takes a connection before Bruno starts (a TCP connection only, tried again for about 30 s with the kept pod's codes and pauses, then Bruno starts anyway). On k3s a new pod's network policy is in place a little after the pod starts, and the data file read at a scenario's start was refused (seen once in 939 runs). The collection says a data file not read at the scenario's start in a WARNING at step 00, with the reason, instead of failing \"osdmVersion is available for consistency check\": the next step reads it again."
+      ]
+    },
     {
       "release": "2026.589",
       "date": "2026-11-18",

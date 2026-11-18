@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-18-run-pod-waits",
+    "date": "November 18, 2026",
+    "tag": "Bug Fix",
+    "title": "Servers on a cluster: a run no longer fails because its pod could not reach OSCAR at once",
+    "summary": "On a server that runs each test in a pod of its own, the pod now waits until it can reach OSCAR before the test starts. Once in 939 runs, a scenario failed a check because its data file could not be read in its first seconds.",
+    "content": "On a server that runs each test in a pod of its own, the cluster lets a new pod reach OSCAR a moment after the pod starts. Under a large batch, that moment can come after the test has started: the test could not read its data file in its first seconds. It read the file again at the next step, and every check passed but one, \"osdmVersion is available for consistency check\", at the first request. That check did not say the real reason. On our test server this happened once in 939 runs.\n\nThe pod now waits until it can reach OSCAR before the test starts, for about 30 seconds at most. A data file that still cannot be read at the scenario’s start is now a warning saying why, not a failed check: the next step reads it again, and fails if it cannot.\n\nNo action is required."
+  },
+  {
     "id": "2026-11-18-kept-run-pods",
     "date": "November 18, 2026",
     "tag": "Operations",

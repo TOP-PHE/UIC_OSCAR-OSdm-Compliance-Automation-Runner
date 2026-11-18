@@ -521,6 +521,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.551] / [collection-OTST_V2.0.266] — 2026-11-18
+
+Release 2026.590 (`current_release`). **A pod of one run waits for OSCAR before Bruno starts** (#1326).
+
+### Fixed
+- **Seen:** in a campaign on the k3s test machine (2026.589, kept pods off, 939 runs), `SIM_NHF_PURCHASER_INVALID_AT_BOOKING_1ADT_37` failed one check.
+  - For about 2.5 s after Bruno started, 19 s after the run, every read of the data file got `connect ECONNREFUSED` from `oscar-internal`. Calls to the provider already went out.
+  - The read at `01. POST Get Offer` went through, and every other check passed.
+  - The failed check, at `00. GET System Version Check`, read "osdmVersion should be set by scenario parser".
+- **Why:** this is the fault #1324 found for kept pods. k3s puts a new pod's network policy in place a little after the pod starts. A pod of one run makes no call before Bruno, and the collection's read of the data file is not tried again. 1.11.550's note that a pod of one run never meets it was wrong: under a batch, it does.
+- **Now, in the pod:** before Bruno, the pod of one run opens a TCP connection to the internal port, and closes it at once without sending a request (`waitForServer()`, `run-pod/runPod.js`).
+  - While it is refused, it tries again after the kept pod's pauses, about 30 s in all. `NOT_CONNECTED` and `CONNECT_RETRY_DELAYS_MS` are now defined in `runPod.js`, and `keptPod.js` takes them from there.
+  - Its own 5 s time-out counts as not reached.
+  - Each refusal is a line of the run's log, and so is the wait once over.
+  - Still refused after that, Bruno starts anyway, as before.
+- **Now, in the collection:** a data file not read at the scenario's start is said, not failed.
+  - The collection keeps the reason (`__scenarioLoadError`, in both reset lists).
+  - Step 00 logs "[WARNING] The data file could not be read at the scenario's start (…): the OSDM version check is skipped, and the next step reads the data file again." Before, it failed "osdmVersion is available for consistency check".
+  - The next step reads the file again: either that works and the run tests what it should, or step 01 fails on it.
+  - A data file read without an OSDM version still fails that check.
+
+### Checked
+- `run-pod.test.js`:
+  - a connection refused twice, then reached: two pauses, then Bruno;
+  - reached at once: no pause and no line;
+  - still refused, or an error that is not "not reached": Bruno starts anyway;
+  - a real connection sends no request;
+  - a closed port is refused with its code;
+  - the codes are the kept pod's.
+- Taking the wait out, or not counting the time-out, each fails a test.
+- No simulator scenario moves: the warning replaces a check that only showed when the data file could not be read.
+
+---
+
 ## [server-1.11.550] — 2026-11-18
 
 Release 2026.589 (`current_release`). Kept run pods, part 5 (#1324, of #1309), and the release of kept run pods as a whole: parts 1 to 4 (1.11.546 to 1.11.549, listed as 2026.585 to 2026.588) and this one. **Off by default**: nothing changes until `RUN_KEPT_PODS` is set to `on`, on a server in pod mode.

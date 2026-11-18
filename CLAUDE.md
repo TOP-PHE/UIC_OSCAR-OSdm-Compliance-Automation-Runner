@@ -1736,6 +1736,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   30 s (`CONNECT_RETRY_DELAYS_MS`, `keptPod.js`). k3s puts a new pod's
   network policy in place a little after it starts, and the pod's first
   call, half a second in, was refused. Any other failure still ends the pod.
+  **A pod of one run meets it too** (#1326, 1.11.551 / OTST_V2.0.266):
+  under a batch its data file read, 19 s after the run started, was refused
+  for 2.5 s, while the provider was already reached (OSCAR's side of the
+  policy names pods). `waitForServer()` (`runPod.js`, which now holds
+  `NOT_CONNECTED` and the pauses) opens a TCP connection to the internal
+  port before Bruno, no request, and starts Bruno anyway once the pauses are
+  over. A data file not read at the scenario's start is a WARNING at step
+  00 (`__scenarioLoadError`), no longer the failed "osdmVersion is
+  available" check: the next step reads it again.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`
