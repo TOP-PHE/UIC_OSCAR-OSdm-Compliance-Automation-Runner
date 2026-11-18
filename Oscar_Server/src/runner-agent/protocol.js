@@ -120,6 +120,27 @@ function checkRunRequest(msg, { token }) {
   return { request: { runId: msg.runId.toLowerCase(), envName: msg.envName, envYml: msg.envYml, deadlineSeconds: deadline, env } };
 }
 
+// A kept pod request (#1309; part 3 = #1320): a pod kept for the runs of one
+// batch, which asks the server's internal port for them itself. Its secret
+// and its deadline, nothing of a run.
+const POD_KIND = 'pod';
+const POD_SECRET_RE = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Checks a kept pod request line (already parsed) for the dispatcher. Returns
+ * { request: { podId, podSecret, deadlineSeconds } } or { reason }.
+ */
+function checkPodRequest(msg, { token }) {
+  if (!isObj(msg) || msg.v !== VERSION) return { reason: 'not a request of this protocol' };
+  if (!sameToken(msg.token, token)) return { reason: 'not authorised' };
+  if (msg.kind !== POD_KIND) return { reason: 'unknown kind' };
+  if (typeof msg.podId !== 'string' || !RUN_DIR_RE.test(msg.podId)) return { reason: 'not a pod id' };
+  if (typeof msg.podSecret !== 'string' || !POD_SECRET_RE.test(msg.podSecret)) return { reason: 'not a pod secret' };
+  const deadline = msg.deadlineSeconds;
+  if (!Number.isInteger(deadline) || deadline < MIN_DEADLINE_S || deadline > MAX_DEADLINE_S) return { reason: 'deadline refused' };
+  return { request: { podId: msg.podId.toLowerCase(), podSecret: msg.podSecret, deadlineSeconds: deadline } };
+}
+
 /** A kill message's signal, if it is one the agent sends on. */
 function killSignalOf(msg) {
   return isObj(msg) && msg.t === 'kill' && SIGNALS.includes(msg.signal) ? msg.signal : null;
@@ -151,6 +172,6 @@ function lineReader(onLine, onTooLong, max = MAX_LINE) {
 }
 
 module.exports = {
-  VERSION, KINDS, RUN_KIND, SIGNALS, MAX_LINE, MIN_TOKEN_LENGTH,
-  sameToken, runFolderOf, checkRequest, checkRunRequest, killSignalOf, line, lineReader,
+  VERSION, KINDS, RUN_KIND, POD_KIND, SIGNALS, MAX_LINE, MIN_TOKEN_LENGTH,
+  sameToken, runFolderOf, checkRequest, checkRunRequest, checkPodRequest, killSignalOf, line, lineReader,
 };

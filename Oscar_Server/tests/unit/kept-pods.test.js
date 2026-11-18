@@ -460,6 +460,34 @@ describe('revocation', () => {
   });
 });
 
+describe('the dispatcher\'s word (#1320)', () => {
+  test('forget(): a pod that ended is given up, a run it held named; once', async () => {
+    const batch = batchOf();
+    const { pod, run } = await podWithRun(batch);
+    expect(keptPods.forget(pod.podId)).toBe(true);
+    expect(stops).toEqual([expect.objectContaining({ podId: pod.podId, runId: run.runId, reason: STOP.POD_ENDED })]);
+    expect(keptPods.forget(pod.podId)).toBe(false);
+    const never = keptPods.open(batchOf());
+    expect(keptPods.forget(never.podId, STOP.NOT_STARTED)).toBe(true);
+    expect(stops.at(-1)).toMatchObject({ podId: never.podId, reason: STOP.NOT_STARTED });
+    expect(keptPods.snapshot()).toEqual([]);
+  });
+
+  test('fault(): the pod and every pod of its company are stopped, its waiting call told so', async () => {
+    const batch = batchOf();
+    const pod = keptPods.open(batch);
+    const { answer } = await hold(pod, null);
+    const colleague = keptPods.open({ ...batchOf(), companyId: batch.companyId });
+    const other = keptPods.open(batchOf());
+    expect(keptPods.fault(pod.podId, 'its secret came from another address than its pod\'s')).toBe(true);
+    expect(await answer).toEqual({ action: 'stop', reason: STOP.PROTOCOL });
+    expect(stops.find((s) => s.podId === pod.podId)).toMatchObject({ reason: STOP.PROTOCOL, why: 'its secret came from another address than its pod\'s' });
+    expect(stops.find((s) => s.podId === colleague.podId)).toMatchObject({ reason: STOP.REVOKED });
+    expect(keptPods.snapshot().map((p) => p.podId)).toEqual([other.podId]);
+    expect(keptPods.fault(pod.podId, 'again')).toBe(false);
+  });
+});
+
 describe('listeners', () => {
   test('a pod handed a run from its own "waiting" event gets it', async () => {
     const batch = batchOf();

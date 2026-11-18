@@ -131,8 +131,43 @@ describe('pod mode', () => {
     expect(request.env).toEqual({ OSCAR_ACCESS_TOKEN: 'tok', OSCAR_RUN_SECRET: 's' });
   });
 
+  test('a kept pod goes to the dispatcher with its id, its secret and its deadline, nothing else (#1320)', async () => {
+    let request;
+    const server = net.createServer((socket) => {
+      socket.once('data', (chunk) => {
+        request = JSON.parse(chunk.toString().split('\n')[0]);
+        socket.write(`${JSON.stringify({ t: 'started' })}\n${JSON.stringify({ t: 'pod', address: '10.1.0.9' })}\n`);
+        socket.write(`${JSON.stringify({ t: 'out', d: '[kept-pod] ends after 0 run(s)\n' })}\n`);
+        socket.end(`${JSON.stringify({ t: 'exit', code: 0 })}\n`);
+      });
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    process.env.RUN_AGENT_HOST = '127.0.0.1';
+    process.env.RUN_AGENT_PORT = String(server.address().port);
+    const podSecret = 'a'.repeat(43);
+    const proc = L.launchPod({ podId: '11111111-2222-3333-4444-666666666666', podSecret, deadlineSeconds: 3600 });
+    const pod = new Promise((resolve) => proc.on('pod', resolve));
+    let output = '';
+    proc.stdout.on('data', (d) => { output += d.toString(); });
+    const code = await new Promise((resolve) => proc.on('close', resolve));
+    server.close();
+    expect(await pod).toBe('10.1.0.9');
+    expect([code, output]).toEqual([0, '[kept-pod] ends after 0 run(s)\n']);
+    expect(request).toEqual({
+      v: 1, token: 't'.repeat(40), kind: 'pod', podId: '11111111-2222-3333-4444-666666666666', podSecret, deadlineSeconds: 3600,
+    });
+  });
+
   test('outside pod mode, a whole run is refused', () => {
     process.env.RUN_ISOLATION = 'local';
     expect(() => L.launchRun({ runId: 'x', envName: 'e', envYml: 'e', deadlineSeconds: 60, env: {} })).toThrow(/pod mode only/);
+  });
+
+  test('outside pod mode, or with a setting missing, a kept pod is refused', () => {
+    process.env.RUN_ISOLATION = 'local';
+    expect(() => L.launchPod({ podId: 'x', podSecret: 's', deadlineSeconds: 60 })).toThrow(/pod mode only/);
+    process.env.RUN_ISOLATION = 'pod';
+    process.env.INTERNAL_PORT = '';
+    expect(() => L.launchPod({ podId: 'x', podSecret: 's', deadlineSeconds: 60 })).toThrow(/INTERNAL_PORT/);
   });
 });

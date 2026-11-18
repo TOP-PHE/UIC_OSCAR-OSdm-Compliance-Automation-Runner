@@ -79,8 +79,11 @@ function folderOf(name, where) {
 }
 
 function runJob({ runId, deadlineSeconds }, settings) {
-  const name = jobNameOf(runId);
-  const labels = { ...LABELS, [RUN_ID_LABEL]: runId };
+  return jobOf(jobNameOf(runId), { ...LABELS, [RUN_ID_LABEL]: runId }, deadlineSeconds, settings);
+}
+
+// The Job of a run, or of a kept pod: one pod spec for both.
+function jobOf(name, labels, deadlineSeconds, settings) {
   const podSpec = {
     restartPolicy: 'Never',
     serviceAccountName: settings.serviceAccount,
@@ -118,6 +121,32 @@ function runJob({ runId, deadlineSeconds }, settings) {
   };
 }
 
+// A pod kept for the runs of one batch (#1309; part 3 = #1320): the same
+// image, whose entrypoint is then a kept pod (run-pod/keptPod.js), the same
+// pod spec, and a Secret that holds nothing of a run.
+const POD_ID_LABEL = 'oscar.uic.org/pod-id';
+
+/** The name of a kept pod's Job and Secret. */
+function podJobNameOf(podId) {
+  return `oscar-pod-${podId}`;
+}
+
+/** The Secret holding a kept pod's inputs: its secret and the internal port. */
+function keptPodSecret({ podId, podSecret, resultsUrl }) {
+  return {
+    apiVersion: 'v1',
+    kind: 'Secret',
+    metadata: { name: podJobNameOf(podId), labels: { ...LABELS, [POD_ID_LABEL]: podId } },
+    type: 'Opaque',
+    stringData: { OSCAR_POD_SECRET: podSecret, OSCAR_RESULTS_URL: resultsUrl },
+  };
+}
+
+/** The Job of a kept pod, ending at its deadline. */
+function keptPodJob({ podId, deadlineSeconds }, settings) {
+  return jobOf(podJobNameOf(podId), { ...LABELS, [POD_ID_LABEL]: podId }, deadlineSeconds, settings);
+}
+
 /** The Secret's owner: the Job, so that removing the Job removes it too. */
 function ownedBy(job) {
   return {
@@ -128,7 +157,7 @@ function ownedBy(job) {
 }
 
 module.exports = {
-  runSecret, runJob, ownedBy, jobNameOf,
-  LABELS, RUN_ID_LABEL, CONTAINER, MANAGED_SELECTOR, DEADLINE_MARGIN_S, TTL_AFTER_FINISHED_S,
+  runSecret, runJob, ownedBy, jobNameOf, keptPodSecret, keptPodJob, podJobNameOf,
+  LABELS, RUN_ID_LABEL, POD_ID_LABEL, CONTAINER, MANAGED_SELECTOR, DEADLINE_MARGIN_S, TTL_AFTER_FINISHED_S,
   WORK_FOLDERS, FOLDER_SIZES,
 };

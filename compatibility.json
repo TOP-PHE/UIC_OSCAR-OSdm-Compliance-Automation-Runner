@@ -4,6 +4,17 @@
   "current_release": "2026.584",
   "releases": [
     {
+      "release": "2026.587",
+      "date": "2026-11-18",
+      "server": "1.11.548",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.548: kept run pods, part 3 (#1320, of #1309): the dispatcher makes and removes a kept pod, and the server starts one for a batch and follows it. A request of kind pod (podId, podSecret, deadlineSeconds) makes a Secret oscar-pod-<podId> holding the pod's secret and the internal port's address, nothing of a run, and a Job with a run's pod spec, which ends at its deadline; it then goes as a run (started, address, log, exit, stop, the API wait of #1272) and takes one of the dispatcher's places. On the server, launcher.launchPod() and worker/keptPodStarter.js startKeptPod(batch, { deadlineSeconds }): the pod recorded, its address bound to its secret (another one stops it and its company's pods), its end forgotten (pod-ended, or not-started), the dispatcher asked to remove a pod the server gave up (at once after a revocation, a protocol fault, a pod no longer clean, a deadline; after 30 s otherwise), its own lines logged as data, 64 KB a pod. Nothing calls startKeptPod() yet. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.586",
       "date": "2026-11-18",
       "server": "1.11.547",
