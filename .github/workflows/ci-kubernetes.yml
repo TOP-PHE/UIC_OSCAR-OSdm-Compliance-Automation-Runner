@@ -451,6 +451,11 @@ jobs:
             sleep 2
           done
           kubectl wait node --all --for=condition=Ready --timeout=180s
+          # What there is, before it is checked: a failed check below says
+          # nothing by itself.
+          sudo ls -la /var/lib/rancher/k3s/server/db/
+          kubectl get nodes --show-labels
+          sudo journalctl -u k3s --since -10min | grep -iE 'migrat|sqlite|etcd for new cluster|kine' | grep -v 'Migrating etcd key' | cut -c1-240 | head -20 || true
           # On etcd now: its folder, the SQLite file renamed, the node's etcd role.
           sudo test -d /var/lib/rancher/k3s/server/db/etcd/member
           sudo test -f /var/lib/rancher/k3s/server/db/state.db.migrated
