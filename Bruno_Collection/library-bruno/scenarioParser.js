@@ -148,7 +148,7 @@ function resetScenarioEnvVars() {
   const deleteList = [
     // Scenario / trip
     "scenario_override",
-    "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
+    "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "__scenarioLoadError", "stepFailurePolicy",
     "selectedAccommodation",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "__passengerSweepIndex", "__passengerSweepTotal", "__passengerSweepTarget",

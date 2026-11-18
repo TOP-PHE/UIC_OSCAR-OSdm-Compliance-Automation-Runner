@@ -56,9 +56,9 @@ const NOT_STARTED_CODE = 2;
 // made again: no answer can have been lost, and the server cannot read it as a
 // second call. A new pod's network may need a moment: on k3s its network
 // policy is in place a little after the pod starts, and the first call, half a
-// second in, was refused (#1324, the k3s CI's first run of kept pods).
-const NOT_CONNECTED = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT']);
-const CONNECT_RETRY_DELAYS_MS = Object.freeze([500, 1000, 2000, 4000, 8000, 15000]);
+// second in, was refused (#1324, the k3s CI's first run of kept pods). The
+// codes and pauses are the pod of one run's too (runPod.js, #1326).
+const { NOT_CONNECTED, CONNECT_RETRY_DELAYS_MS } = R;
 
 /** The server's internal port, without trailing slashes, or null. */
 function baseOf(text) {
