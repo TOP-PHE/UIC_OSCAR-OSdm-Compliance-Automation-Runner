@@ -521,6 +521,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.548] — 2026-11-18
+
+Kept run pods, part 3 (#1320, of #1309): the dispatcher makes and removes a kept pod, and the server starts one for a batch and follows it. Not released on its own: listed in `compatibility.json` (2026.587) without moving `current_release`. Nothing calls `startKeptPod()` yet (part 4, the queue). A run in a pod of its own is unchanged.
+
+### Added
+- **The dispatcher's `pod` request** (`{ kind: 'pod', podId, podSecret, deadlineSeconds }`, `checkPodRequest()` in the runner agent's protocol):
+  - a Secret `oscar-pod-<podId>` holding the pod's secret and the internal port's address, and nothing of a run (`keptPodSecret()`);
+  - a Job with a run's pod spec (`keptPodJob()`; one `jobOf()` for both), labelled `oscar.uic.org/pod-id`, ending at its deadline plus the usual margin;
+  - then as a run: `started`, the pod's address, its log (its own lines), its exit code; a stop request or a dropped connection deletes the Job; the wait for the Kubernetes API (#1272) applies. A kept pod takes one of the dispatcher's places.
+- **`launcher.launchPod()`**, in pod mode only, with the dispatcher's settings.
+- **`worker/keptPodStarter.js`**: `startKeptPod(batch, { deadlineSeconds })` records the pod (`keptPods.open()`), hands its secret to the dispatcher, and follows it:
+  - its address goes to `keptPods.bindAddress()`; another address than the one its secret already came from stops the pod and every pod of its company (`keptPods.fault()`);
+  - its end makes the server forget it (`keptPods.forget()`: `pod-ended`, or `not-started` when it never ran); a run it held then ends with it (part 4);
+  - a pod the server gave up is removed by the dispatcher: at once after a revocation, a protocol fault, a pod no longer clean, a deadline or a pod not started; after 30 s otherwise, in which a pod told *stop* ends by itself;
+  - its own lines go to the server's log as data (`line`, 500 characters), 64 KB a pod, then one warning.
+
+### Checked
+- `run-dispatcher.test.js`: a kept pod's Secret (its secret and the internal port only), its Job (a run's pod spec, its own name and labels, its deadline), its messages, a stop, a pod that never starts, the requests refused, the places it takes.
+- `kept-pod-starter.test.js`: the pod recorded and its secret handed once, never logged; the address bound or faulted; the ends; each reason removed at once; the others after the grace; the pod's lines and their limit.
+- `launcher.test.js`: the request sent (its id, secret and deadline, nothing else), refused outside pod mode or with a setting missing. `kept-pods.test.js`: `forget()` and `fault()`.
+- 28 changes to the code, each made to fail a test.
+
+---
+
 ## [server-1.11.547] — 2026-11-18
 
 Kept run pods, part 2 (#1318, of #1309): the run image takes the runs of its batch one after another, clean between two, and sends each run's output itself. Not released on its own: listed in `compatibility.json` (2026.586) without moving `current_release`. Nothing makes a kept pod yet (part 3, the dispatcher). A run pod of today is unchanged.

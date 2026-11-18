@@ -1697,6 +1697,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   when the program is pid 1) makes the pod report `ended.clean: false`,
   and the server stops it (`not-clean`). Bruno's output no longer reaches
   the pod's log in that mode.
+  **Part 3 = #1320 (1.11.548, listed): the dispatcher's `pod` request**
+  (`checkPodRequest()`: podId, podSecret, deadlineSeconds) makes Secret
+  `oscar-pod-<podId>` (pod secret + internal port only) and a Job with a
+  run's pod spec (`jobOf()` shared); then as a run. The server side is
+  `launcher.launchPod()` and `worker/keptPodStarter.js`
+  `startKeptPod(batch, { deadlineSeconds })`: the dispatcher's address
+  goes to `keptPods.bindAddress()` (mismatch: `keptPods.fault()`), its end
+  to `keptPods.forget()` (`pod-ended` / `not-started`), and a pod the
+  server gives up is removed: at once for `AT_ONCE` reasons, after
+  `GRACE_MS` (30 s) otherwise. The pod's lines are logged as data, 64 KB.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`
