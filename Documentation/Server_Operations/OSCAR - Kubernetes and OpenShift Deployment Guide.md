@@ -559,6 +559,16 @@ To switch:
 
 Details to know:
 
+- **Kept run pods** (`RUN_KEPT_PODS`, off by default, #1309). With `on` in
+  `oscar-settings`, the runs of one batch go one after another to a pod kept
+  for that batch, instead of a pod each, which saves each run its pod's start
+  (about 8 s of 30 on the k3s test machine). Set it with a merge into
+  `oscar-settings` in your overlay (`- RUN_KEPT_PODS=on`): the component
+  does not set this key. It is read in pod mode only; another value, or `on`
+  without pod mode, stops every run. What it keeps to, how to switch it and
+  what to watch: *OSCAR - k3s on one VPS*, section 9, *Kept run pods*. The
+  CI checks it on kind and k3s (`ci/kept-pods.sh`: a batch of three runs in
+  one pod).
 - **OSCAR's namespace is named in four places**: the dispatcher's
   RoleBinding and the network policy in `runs/`, and `RUN_SERVER_URL` and
   `RUN_RESULTS_URL` in the component. They say `oscar`; patch all four for

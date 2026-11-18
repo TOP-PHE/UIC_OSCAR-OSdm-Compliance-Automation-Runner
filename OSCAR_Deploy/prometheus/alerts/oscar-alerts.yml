@@ -198,3 +198,18 @@ groups:
           summary: "The run dispatcher refused or lost {{ $value | humanize }} run(s) in 15 minutes"
           description: "The server could not have a run's pod made: the dispatcher is down, refuses the server's key (RUN_AGENT_TOKEN), has reached RUN_DISPATCHER_MAX_RUNS, or the Kubernetes API did not answer for RUN_DISPATCHER_API_WAIT_MS (2 minutes by default). The dispatcher logs each refusal: see `kubectl -n oscar logs deploy/oscar-dispatcher`."
           runbook: "Documentation/Server_Operations/OSCAR - Kubernetes and OpenShift Deployment Guide.md#10a-each-run-in-a-pod-of-its-own-pod-mode"
+
+  # Kept run pods (RUN_KEPT_PODS, #1309): a pod that called the internal port
+  # in a way its own program never does. Its secret was used by something
+  # else in the pod: a sign of a compromised run.
+  - name: oscar.kept-pods
+    interval: 30s
+    rules:
+      - alert: OscarKeptPodProtocolFault
+        expr: sum(increase(oscar_kept_pods_stopped_total{reason="protocol"}[15m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "A kept run pod made a call its own program never makes"
+          description: "A pod kept for the runs of a batch (RUN_KEPT_PODS=on) called the server's internal port as its program never does: a second call while one was held, a call during a run, the end of another run, or a call from another address. The server stopped that pod and every pod of its company at once. Something in that pod read the pod's secret: a run there may have been compromised by the provider under test. The server's log names the company and the call: `[run-pods] a kept pod made a call its program never makes`. Look at that company's last runs before switching kept pods on again."
+          runbook: "Documentation/Server_Operations/OSCAR - k3s on one VPS.md#kept-run-pods"

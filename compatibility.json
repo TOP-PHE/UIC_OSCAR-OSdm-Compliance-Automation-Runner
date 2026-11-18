@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.584",
+  "current_release": "2026.589",
   "releases": [
+    {
+      "release": "2026.589",
+      "date": "2026-11-18",
+      "server": "1.11.550",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.550: kept run pods, part 5 (#1324, of #1309): RUN_KEPT_PODS=off in the base settings and the k3s overlay, and asked with each release by the k3s guide; ci/kept-pods.sh on kind and k3s (a batch of three runs in one kept pod, nothing left after); metrics oscar_kept_pods{state}, oscar_kept_pod_runs_total{pod} and oscar_kept_pods_stopped_total{reason}, a row Kept run pods in OSCAR · Overview, the critical alert OscarKeptPodProtocolFault (group oscar.kept-pods); the guides and a news entry. Found by its first run on k3s: a kept pod's first call, half a second after its start, was refused (k3s puts a new pod's network policy in place a little later) and the pod ended; a call whose connection was never made is now made again for about 30 s, any other failed call still ends the pod.",
+        "Releases kept run pods (#1309) as a whole: 2026.585 (1.11.546), 2026.586 (1.11.547), 2026.587 (1.11.548), 2026.588 (1.11.549) and this one. Off by default: nothing changes until RUN_KEPT_PODS is set to on, on a server in pod mode."
+      ]
+    },
     {
       "release": "2026.588",
       "date": "2026-11-18",

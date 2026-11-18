@@ -1718,6 +1718,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   waiting pod is told stop when the queue holds nothing of its batch
   (`queue.queuedOf()`, wired by `queue.js`), nothing is announced and
   nothing waits. A run alone (no `batch_id`) keeps a pod of its own.
+  **Part 5 = #1324 (1.11.550, release 2026.589: the whole released, still
+  off by default).** `RUN_KEPT_PODS=off` in `base/settings.env` and the k3s
+  overlay (a merge into `oscar-settings`, which the component leaves alone);
+  the k3s guide's release block asks `KEPT_PODS` (else a new release goes
+  back to off). `ci/kept-pods.sh` (kind pod mode and k3s, `kubectl set env`
+  then a new port-forward) proves a batch of three in ONE kept pod.
+  Metrics `oscar_kept_pods{state}` (collect from `keptPods.snapshot()`),
+  `oscar_kept_pod_runs_total{pod}` (`first`/`again`, in the pool),
+  `oscar_kept_pods_stopped_total{reason}` (in the starter's stop listener);
+  row *Kept run pods*; alert `OscarKeptPodProtocolFault` in a group of its
+  own, `oscar.kept-pods` (`run-pod-metrics.test.js` pins `oscar.run-pods`
+  to its two alerts). `kept-pod-metrics.test.js` holds them together.
+  **One exception to "never call again"** (found by this PR's first k3s
+  run): a call whose connection was never made (`NOT_CONNECTED`: refused,
+  name not found, unreachable, connect time-out) is made again for about
+  30 s (`CONNECT_RETRY_DELAYS_MS`, `keptPod.js`). k3s puts a new pod's
+  network policy in place a little after it starts, and the pod's first
+  call, half a second in, was refused. Any other failure still ends the pod.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

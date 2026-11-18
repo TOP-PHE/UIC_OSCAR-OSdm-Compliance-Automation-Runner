@@ -310,6 +310,41 @@ const runPodsEnded = new promClient.Counter({
   registers: [register]
 });
 
+// ─── Kept run pods (RUN_KEPT_PODS, #1309; part 5 = #1324) ───────────────────
+// The pods kept for the runs of one batch: how many by state, read from
+// worker/keptPods.js at each scrape; each run handed, to a pod's first run or
+// to a pod that ran before (a pod's start saved); each pod given up, by reason
+// (keptPods.STOP). Empty unless RUN_KEPT_PODS is on.
+const KEPT_POD_STATES = Object.freeze(['new', 'waiting', 'running']);
+const KEPT_POD_RUNS = Object.freeze(['first', 'again']);
+const keptPodsByState = new promClient.Gauge({
+  name: 'oscar_kept_pods',
+  help: 'Pods kept for the runs of one batch, by state: new (not called yet), waiting (for a run), running',
+  labelNames: ['state'],
+  registers: [register],
+  collect() {
+    const counts = Object.fromEntries(KEPT_POD_STATES.map((s) => [s, 0]));
+    try {
+      for (const pod of require('../worker/keptPods').snapshot()) {
+        if (pod.state in counts) counts[pod.state] += 1;
+      }
+    } catch { /* a metric never stops anything */ }
+    for (const state of KEPT_POD_STATES) this.set({ state }, counts[state]);
+  }
+});
+const keptPodRuns = new promClient.Counter({
+  name: 'oscar_kept_pod_runs_total',
+  help: 'Runs handed to a kept pod: first (the pod\'s first run) or again (a pod that ran before: its start saved)',
+  labelNames: ['pod'],
+  registers: [register]
+});
+const keptPodsStopped = new promClient.Counter({
+  name: 'oscar_kept_pods_stopped_total',
+  help: 'Kept pods given up, by reason (worker/keptPods.js STOP); protocol: a call its program never makes',
+  labelNames: ['reason'],
+  registers: [register]
+});
+
 // ─── A run's time, step by step (#1312) ──────────────────────────────────────
 // The run's own clock, where oscar_run_work_seconds is the server's thread:
 // the time between the moments the server sees for a run, from its slot to its
@@ -423,6 +458,11 @@ module.exports = {
   companyRunsQueued,
   companyRunsFinished,
   companyRunRequests,
+  KEPT_POD_STATES,
+  KEPT_POD_RUNS,
+  keptPodsByState,
+  keptPodRuns,
+  keptPodsStopped,
   RUN_POD_OUTCOMES,
   runPodStart,
   runPodsEnded,

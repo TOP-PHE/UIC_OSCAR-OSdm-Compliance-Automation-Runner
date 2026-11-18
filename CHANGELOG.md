@@ -521,6 +521,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.550] — 2026-11-18
+
+Release 2026.589 (`current_release`). Kept run pods, part 5 (#1324, of #1309), and the release of kept run pods as a whole: parts 1 to 4 (1.11.546 to 1.11.549, listed as 2026.585 to 2026.588) and this one. **Off by default**: nothing changes until `RUN_KEPT_PODS` is set to `on`, on a server in pod mode.
+
+### Added
+- **Manifests**: `RUN_KEPT_PODS=off` in the base settings and in the k3s overlay (a merge into `oscar-settings`: the component does not set it), with what it does.
+- **The proof on a cluster**: `ci/kept-pods.sh`, in the kind job (pod mode) and in the k3s job, after the server was switched to `on`. A batch of three gamma scenarios: each run passed with its checks and says it went to a kept pod; the dispatcher started one kept pod and no pod of a single run; the metrics read 1 run `first` and 2 `again`; nothing is left in the runs' namespace once the batch has ended.
+- **Metrics**: `oscar_kept_pods{state}` (new, waiting, running; read from the pods' record at each scrape), `oscar_kept_pod_runs_total{pod}` (`first`, or `again`: a pod's start saved), `oscar_kept_pods_stopped_total{reason}`. A row *Kept run pods* in *OSCAR · Overview*.
+- **Alert** `OscarKeptPodProtocolFault`, critical (group `oscar.kept-pods`, and the cluster's rules generated again): a kept pod made a call its program never makes, the sign of a compromised run.
+- **Guides**: *OSCAR - k3s on one VPS*, section 9: `KEPT_PODS` in the release block, so a new release does not switch it back to off, and *Kept run pods* (what it keeps to, a block to switch it on or off with no run going, what to watch). *OSCAR - Kubernetes and OpenShift Deployment Guide*, 10a; *Metrics and monitoring*.
+- **News**: "Servers on a cluster: the runs of a batch can share one run pod" (Operations).
+
+### Fixed, found by this PR's first run of kept pods on k3s
+- **A kept pod's first call was refused, and the pod ended at once.** It calls the internal port half a second after it starts; on k3s a new pod's network policy is in place a little later, and the call ended `fetch failed (ECONNREFUSED)`. Every pod of the batch ended so, and its runs read *Run not finished*. A pod of one run never met it: Bruno's start takes seconds before its first call. Now a call whose connection was never made (refused, a name not found yet, an address or network not reachable, a connection time-out) is made again, for about 30 s (`NOT_CONNECTED`, `CONNECT_RETRY_DELAYS_MS` in `run-pod/keptPod.js`). It never reached the server, so no answer can have been lost and the server cannot read it as a second call: part 1's rule, never to call again after a call that got no answer, holds for every other failure.
+
+### Checked
+- `kept-pod-metrics.test.js`: the three metrics and their labels, the pods by state read at a scrape, the counters where they are written, the row's panels and their expressions, no two panels in one place, the alert by the reason the server writes, the runbook's section, the cluster's copy of the rule.
+- `kept-pod.test.js`: a call refused twice is made again and the pod runs; each way a connection is not made; refused past the pauses, the pod ends; a connection cut after the call was sent is still not made again.
+- The kind and k3s runs of `ci/kept-pods.sh` are this PR's CI: the first time kept pods run on a cluster. The first run on k3s found the fault above.
+- 11 changes to the code and to the files it reads, and 2 to the fix, each made to fail a test.
+
+---
+
 ## [server-1.11.549] — 2026-11-18
 
 Kept run pods, part 4 (#1322, of #1309): the runs of a batch go to pods kept for it. Not released on its own: listed in `compatibility.json` (2026.588) without moving `current_release`. Off by default (`RUN_KEPT_PODS`): nothing changes until it is set.

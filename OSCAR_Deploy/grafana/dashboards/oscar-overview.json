@@ -1131,6 +1131,53 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 92 },
+      "id": 41,
+      "panels": [],
+      "title": "Kept run pods, RUN_KEPT_PODS=on (#1309)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Pods kept for the runs of one batch: new (made, not called yet), waiting (for its batch's next run, 30 s at most), running. Empty unless RUN_KEPT_PODS is on.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "short" } },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 93 },
+      "id": 42,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (state) (oscar_kept_pods)", "legendFormat": "{{state}}", "refId": "A" }
+      ],
+      "title": "Kept pods, by state",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "again: a pod that ran before took the run, so its start was saved (about 8 s a run on the test machine, #1312). first: the pod's first run, made for it. The runs' own steps are in the row A run's time, step by step.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "short" } },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 93 },
+      "id": 43,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (pod) (rate(oscar_kept_pod_runs_total[5m])) * 60", "legendFormat": "{{pod}}", "refId": "A" }
+      ],
+      "title": "Runs handed to a kept pod, a minute",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "batch-done, idle and max-runs are the usual ends. abnormal-end: a run ended otherwise than with Bruno's 0 or 1, or sent no result. protocol: a call its program never makes (alert OscarKeptPodProtocolFault). revoked: an intrusion, another endpoint, new credentials.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "short" } },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 93 },
+      "id": 44,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (reason) (increase(oscar_kept_pods_stopped_total[15m]))", "legendFormat": "{{reason}}", "refId": "A" }
+      ],
+      "title": "Kept pods given up, by reason, in 15 minutes",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 101 },
       "id": 29,
       "panels": [],
       "title": "OSCAR's thread: what each run costs it (#1205)",
@@ -1140,7 +1187,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "Share of the server's one thread taken, a second, by the work done for each run: its data file copy, its results stored, its log lines. Near 100 % in all, every page waits behind them.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true, "stacking": { "mode": "normal" } }, "unit": "percentunit" } },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 93 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 102 },
       "id": 30,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -1154,7 +1201,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "How long a request waited before the server's thread could start on it: the worst, and the 99th percentile, since the last reading. Seconds here mean every page waited that long.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" } },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 93 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 102 },
       "id": 31,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -1168,7 +1215,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "The ten slowest addresses over 5 minutes (99th percentile), with the listener: public (pages, API) or internal (the run pods' calls). A long wait everywhere at once is the thread; one address alone is that address.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" } },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 101 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 110 },
       "id": 32,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -1181,7 +1228,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "How long one run's work takes on the thread (95th percentile over 15 minutes), and how many log lines runs store a second. results_read is one block a run (the results file decrypted and read, #1218): its line is that block's length.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "log lines a second" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 101 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 110 },
       "id": 33,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -1195,7 +1242,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "How big a run's Bruno results file is (median and 95th percentile over 15 minutes). The server decrypts and reads it in one block, results_read in One run's work, before storing it in slices (#1218): a bigger file, a longer block.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "bytes" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 109 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 118 },
       "id": 34,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -1209,7 +1256,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "How long each database COMMIT of a transaction holds the thread (median and 99th percentile over 5 minutes), and how many took over 0.1 s in 5 minutes (#1221). The results slices and the log line batches end with one: their time is part of results_store and of the log lines'. With synchronous FULL each COMMIT waits for the disk; with NORMAL, the default since server 1.11.508 (#1224), only the one that copies the journal into the database file (a checkpoint) does. Since server 1.11.510 (#1230) a thread of its own checkpoints, and a COMMIT over 0.1 s should be rare; with OSCAR_DB_CHECKPOINTS=inline, or when that thread stopped (oscar_db_checkpoint_thread 0), the COMMITs checkpoint again.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "over 0.1 s, in 5 minutes" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 109 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 118 },
       "id": 35,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -1224,7 +1271,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "The checkpoints of the database, in a thread of their own since server 1.11.510 (#1230): each copies the write-ahead log into the database file, off the server's thread. From 1.11.536 (#1294) the thread copies the log when it passes 16 MB or every 30 s, not every second, so the points are further apart. The time of one (99th percentile over 5 minutes), the log's size at the last one and what it could not copy (pages a reader still used), in frames of one page. A log that keeps growing means the checkpoints do not keep up. oscar_db_checkpoint_thread (Explore) is 1 while the thread checkpoints, 0 when the server's connection does it in its COMMITs.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "log, frames" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] }, { "matcher": { "id": "byName", "options": "not copied, frames" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 117 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 126 },
       "id": 36,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -1239,7 +1286,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "Every statement of the database helpers all/get/run, on the server's thread (#1234): the median and 99th percentile over 5 minutes, and how many took OSCAR_DB_SLOW_MS (50 ms by default) or more in 5 minutes. Each of those is logged as \"slow database statement\" with its SQL and the place in the code that ran it: OSCAR · Logs, panel Slow database statements.",
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "showPoints": "never", "spanNulls": true }, "unit": "s" }, "overrides": [ { "matcher": { "id": "byName", "options": "slow, in 5 minutes" }, "properties": [ { "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" } ] } ] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 117 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 126 },
       "id": 37,
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [

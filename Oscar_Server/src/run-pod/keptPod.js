@@ -33,7 +33,9 @@
  *   - reports the run's end on its next call.
  * It ends on stop (0), and on no answer, a refusal or an answer it cannot read
  * (1): it never calls again after a call that got no answer, since the server
- * would read that call as one made during a run. Wrong inputs: 2.
+ * would read that call as one made during a run. A call whose connection was
+ * never made is the one exception: it never reached the server, so it is made
+ * again for about 30 s (NOT_CONNECTED). Wrong inputs: 2.
  * Node only: no dependency, nothing of the server.
  */
 
@@ -50,6 +52,13 @@ const NEXT_TIMEOUT_MS = 90 * 1000;
 const MAX_DEADLINE_SECONDS = 24 * 60 * 60;
 // A run that could not be started: the server answers it with stop.
 const NOT_STARTED_CODE = 2;
+// A call whose connection was never made did not reach the server, so it is
+// made again: no answer can have been lost, and the server cannot read it as a
+// second call. A new pod's network may need a moment: on k3s its network
+// policy is in place a little after the pod starts, and the first call, half a
+// second in, was refused (#1324, the k3s CI's first run of kept pods).
+const NOT_CONNECTED = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT']);
+const CONNECT_RETRY_DELAYS_MS = Object.freeze([500, 1000, 2000, 4000, 8000, 15000]);
 
 /** The server's internal port, without trailing slashes, or null. */
 function baseOf(text) {
@@ -78,19 +87,38 @@ function podInputs(env) {
  * Asks the server for the pod's next run, reporting the end of the last one.
  * { action: 'run', run }, { action: 'stop', reason }, or { failed: why }.
  */
-async function askNext({ base, podSecret, ended, fetchImpl, timeoutMs }) {
-  let res;
+async function askNext({ base, podSecret, ended, fetchImpl, timeoutMs, connectRetryDelaysMs = CONNECT_RETRY_DELAYS_MS, sleep = R.defaultSleep, log = () => {} }) {
+  const call = () => fetchImpl(`${base}/v1/run-pods/next`, {
+    method: 'POST',
+    headers: { 'X-OSCAR-Pod-Secret': podSecret, 'Content-Type': 'application/json' },
+    body: JSON.stringify(ended ? { ended } : {}),
+    redirect: 'manual',
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const sent = await untilConnected(call, connectRetryDelaysMs, { sleep, log });
+  if (sent.failed) return sent;
+  return answerOf(sent.res);
+}
+
+/**
+ * Makes the call, and makes it again after each pause while its connection
+ * was never made (NOT_CONNECTED): { res } or { failed: why }. One pause a
+ * level, so at most as deep as the pauses are many.
+ */
+async function untilConnected(call, pauses, { sleep, log }) {
   try {
-    res = await fetchImpl(`${base}/v1/run-pods/next`, {
-      method: 'POST',
-      headers: { 'X-OSCAR-Pod-Secret': podSecret, 'Content-Type': 'application/json' },
-      body: JSON.stringify(ended ? { ended } : {}),
-      redirect: 'manual',
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    return { res: await call() };
   } catch (err) {
-    return { failed: R.reasonOf(err) };
+    const pause = NOT_CONNECTED.has(err?.cause?.code) ? pauses[0] : undefined;
+    if (pause === undefined) return { failed: R.reasonOf(err) };
+    log(`[kept-pod] the server was not reached (${R.reasonOf(err)}); asked again in ${pause / 1000} s`);
+    await sleep(pause);
+    return untilConnected(call, pauses.slice(1), { sleep, log });
   }
+}
+
+/** The server's answer to a next call, read and checked. */
+async function answerOf(res) {
   if (res.status !== 200) return { failed: `HTTP ${res.status}` };
   let body;
   try {
@@ -247,6 +275,7 @@ async function keptPod({
   outputRetryDelaysMs = undefined,
   outputFlushMs = undefined,
   killGraceMs = R.KILL_GRACE_MS,
+  connectRetryDelaysMs = CONNECT_RETRY_DELAYS_MS,
   sleep = R.defaultSleep,
 } = {}) {
   const pod = podInputs(env);
@@ -262,7 +291,9 @@ async function keptPod({
   let ended = null;
   let runs = 0;
   for (;;) {
-    const answer = await askNext({ base: pod.base, podSecret: pod.podSecret, ended, fetchImpl, timeoutMs: nextTimeoutMs });
+    const answer = await askNext({
+      base: pod.base, podSecret: pod.podSecret, ended, fetchImpl, timeoutMs: nextTimeoutMs, connectRetryDelaysMs, sleep, log,
+    });
     if (answer.failed) {
       log(`[kept-pod] ends after ${runs} run(s): ${answer.failed}`);
       return 1;
@@ -292,4 +323,7 @@ async function keptPod({
   }
 }
 
-module.exports = { keptPod, podInputs, askNext, runOfAnswer, podProcesses, emptyFolder, NEXT_TIMEOUT_MS, NOT_STARTED_CODE };
+module.exports = {
+  keptPod, podInputs, askNext, runOfAnswer, podProcesses, emptyFolder,
+  NEXT_TIMEOUT_MS, NOT_STARTED_CODE, NOT_CONNECTED, CONNECT_RETRY_DELAYS_MS,
+};

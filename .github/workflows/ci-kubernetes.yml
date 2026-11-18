@@ -308,7 +308,7 @@ jobs:
             if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
             sleep 1
           done
-          OSCAR_URL=http://127.0.0.1:3001 OSCAR_Deploy/kubernetes/ci/smoke.sh
+          OSCAR_URL=http://127.0.0.1:3001 SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account-pod.json" OSCAR_Deploy/kubernetes/ci/smoke.sh
           kubectl -n oscar logs deploy/oscar-dispatcher | grep -q 'started oscar-run-'
           # The run's Job, pod and Secret are removed once it has ended.
           left=1
@@ -326,6 +326,19 @@ jobs:
           test "$($p probe-internal oscar-internal.oscar.svc.cluster.local 3003)" = open
           test "$($p probe-public oscar.oscar.svc.cluster.local 3001)" = closed
           test "$($p probe-dispatcher oscar-dispatcher.oscar.svc.cluster.local 3002)" = closed
+
+      # #1324: with RUN_KEPT_PODS=on, the runs of a batch in one kept pod.
+      - name: Pod mode, the runs of a batch in one kept pod (ci/kept-pods.sh)
+        run: |
+          pkill -f 'port-forward service/oscar 3001:3001' || true
+          kubectl -n oscar set env deployment/oscar RUN_KEPT_PODS=on
+          kubectl -n oscar rollout status deployment/oscar --timeout=300s
+          kubectl -n oscar port-forward service/oscar 3001:3001 > "$RUNNER_TEMP/port-forward-kept.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
+            sleep 1
+          done
+          OSCAR_URL=http://127.0.0.1:3001 SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account-pod.json" OSCAR_Deploy/kubernetes/ci/kept-pods.sh
 
       - name: What the cluster shows (on failure)
         if: failure()
@@ -569,6 +582,20 @@ jobs:
 
       - name: Monitoring, what it reads and who reaches it (ci/check-monitoring.sh)
         run: SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json" OSCAR_Deploy/kubernetes/ci/check-monitoring.sh
+
+      # #1324: with RUN_KEPT_PODS=on, the runs of a batch in one kept pod, as
+      # the guide switches it on (section 9): last, the server restarts.
+      - name: The runs of a batch in one kept pod (ci/kept-pods.sh)
+        run: |
+          pkill -f 'port-forward service/oscar 3001:3001' || true
+          kubectl -n oscar set env deployment/oscar RUN_KEPT_PODS=on
+          kubectl -n oscar rollout status deployment/oscar --timeout=300s
+          kubectl -n oscar port-forward service/oscar 3001:3001 > "$RUNNER_TEMP/port-forward-kept.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
+            sleep 1
+          done
+          OSCAR_URL=http://127.0.0.1:3001 SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json" OSCAR_Deploy/kubernetes/ci/kept-pods.sh
 
       - name: What the cluster shows (on failure)
         if: failure()
