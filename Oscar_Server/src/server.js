@@ -621,6 +621,12 @@ app.get('/data/:filename', fileDownloadLimiter, runDatafileHandler({ runCaller: 
 // The SAFE_RUNID_RE used below is defined further down for the
 // /artifacts/:runId path — declared inline here so the order doesn't matter.
 const SAFE_RUNID_RE_FOR_REFRESH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Whole seconds from `now` (ms) to the ISO time `at`, never below 0; null without a time. */
+function secondsLeft(at, now) {
+  const t = at ? Date.parse(at) : Number.NaN;
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((t - now) / 1000));
+}
 const refreshAccessTokenHandler = ({ runCaller }) => async (req, res) => {
   const { runId } = req.params;
   if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
@@ -665,13 +671,19 @@ const refreshAccessTokenHandler = ({ runCaller }) => async (req, res) => {
   const force = req.query.force === '1' || String(req.query.force).toLowerCase() === 'true';
   try {
     const { resolveAccessToken } = require('./worker/access-token');
+    let expiresAt = null;
     const accessToken = await resolveAccessToken(
       userRow,
       { info: (m) => log.info({ runId }, m), error: (m) => log.error({ runId }, m) },
-      { forceRefresh: force }
+      { forceRefresh: force, onExpiry: (at) => { expiresAt = at; } }
     );
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ access_token: accessToken, forced: force });
+    // #1327: the seconds the token has left, when known, so the run renews it
+    // before it expires instead of at a few fixed steps only.
+    const body = { access_token: accessToken, forced: force };
+    const left = secondsLeft(expiresAt, Date.now());
+    if (left !== null) body.expires_in = left;
+    return res.json(body);
   } catch (err) {
     const detail = require('./utils/tokenErrors').tokenErrorText(err, userRow);
     log.error({ runId, err: detail }, '[refresh-access-token] resolveAccessToken failed');

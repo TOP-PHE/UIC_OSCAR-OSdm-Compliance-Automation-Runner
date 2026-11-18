@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-18-token-renewed-before-expiry",
+    "date": "November 18, 2026",
+    "tag": "Bug Fix",
+    "title": "A long scenario no longer fails because its access token expired",
+    "summary": "A run now renews its access token shortly before it expires, at any step, instead of at the scenario start only. On a provider whose tokens last two minutes, a long scenario was refused with 401 near its end.",
+    "content": "A run asks OSCAR for a fresh access token at the start of each scenario. OSCAR hands out a token with at least one minute left. On a provider whose tokens last two minutes, a scenario that went on for more than about a minute after its start could send a token that had expired. The provider then answered 401 and the run ended as an authentication error, which is not the provider’s fault. On a simulator, one long refund scenario failed so in one run out of five.\n\nOSCAR now tells the run how long the token it gives has left, and the run asks for a new one just before that time, at whatever step it is. This costs about one request to OSCAR a minute on such a provider, and none with tokens that last longer than the scenario or with a static token.\n\nNo action is required."
+  },
+  {
     "id": "2026-11-18-run-pod-waits",
     "date": "November 18, 2026",
     "tag": "Bug Fix",

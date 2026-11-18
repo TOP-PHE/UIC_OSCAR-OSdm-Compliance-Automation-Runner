@@ -277,6 +277,7 @@ async function refreshAccessTokenIfNeeded(opts) {
     try { body = typeof resp.body === 'string' ? JSON.parse(resp.body) : (resp.body || resp.data || null); } catch (_e) { body = null; }
     if (status >= 200 && status < 300 && body?.access_token) {
       bru.setEnvVar('access_token', body.access_token);
+      rememberRenewal(body.expires_in, Date.now());
       if (force) {
         validationLogger(`[INFO] auth: access_token force-refreshed via OSCAR loopback before ${callerLabel}.`);
       }
@@ -292,7 +293,52 @@ async function refreshAccessTokenIfNeeded(opts) {
   }
 }
 
-module.exports = { handleAccessTokenResponse, checkAuthRejection, refreshAccessTokenIfNeeded, isOptionalReadProbe };
+// #1327: a scenario can outlive the token renewed at its start. OSCAR hands
+// out a token with more than 60 s left, and a provider's tokens may last two
+// minutes (beta): a refund 74 s after step 01 was refused with 401. OSCAR's
+// answer says how long the token it gave has left (`expires_in`, when it
+// knows), and the run renews once that time, less RENEW_MARGIN_S, is passed:
+// OSCAR then gives a new token, since its own has less than 60 s left. Never
+// sooner than MIN_RENEWAL_GAP_S after the last try, so a token that lives
+// less than the margin, or a renewal that fails, costs one call every 10 s
+// at most, not one per request. A static token has no `expires_in`: never
+// renewed by time.
+const RENEW_MARGIN_S = 55;
+const MIN_RENEWAL_GAP_S = 10;
+const RENEW_AFTER_VAR = '__tokenRenewAfter';
+
+/** When to renew, in ms since the epoch, from OSCAR's `expires_in`; null when it gave none. */
+function renewalTime(expiresIn, now) {
+  const left = Number(expiresIn);
+  if (expiresIn === null || expiresIn === undefined || expiresIn === '' || !Number.isFinite(left)) return null;
+  return now + Math.max(MIN_RENEWAL_GAP_S, left - RENEW_MARGIN_S) * 1000;
+}
+
+function rememberRenewal(expiresIn, now) {
+  const at = renewalTime(expiresIn, now);
+  if (at === null) bru.deleteEnvVar(RENEW_AFTER_VAR);
+  else bru.setEnvVar(RENEW_AFTER_VAR, String(at));
+}
+
+/**
+ * Renews the run's token when its renewal time has passed (the collection's
+ * before-request, before every request). Nothing to do, and no call, while
+ * the time is not passed or none is known. The time moves MIN_RENEWAL_GAP_S
+ * on first, so a renewal that fails is tried again 10 s later at the soonest.
+ * @returns {Promise<boolean>} true when the token was renewed
+ */
+async function renewTokenWhenDue(callerLabel) {
+  const at = Number(bru.getEnvVar(RENEW_AFTER_VAR) || 0);
+  const now = Date.now();
+  if (!at || now < at) return false;
+  bru.setEnvVar(RENEW_AFTER_VAR, String(now + MIN_RENEWAL_GAP_S * 1000));
+  return refreshAccessTokenIfNeeded({ callerLabel });
+}
+
+module.exports = {
+  handleAccessTokenResponse, checkAuthRejection, refreshAccessTokenIfNeeded, isOptionalReadProbe,
+  renewTokenWhenDue, renewalTime, RENEW_MARGIN_S, MIN_RENEWAL_GAP_S, RENEW_AFTER_VAR,
+};
 
 // Expose to global for the eval/require loader flows (matches the other modules).
 try {

@@ -754,11 +754,34 @@ describe('POST /v1/runs/:runId/refresh-access-token', () => {
       expect(res.status).toBe(200);
       expect(res.body.access_token).toBe('fresh-token-xyz');
       expect(res.body.forced).toBe(false);
+      expect(res.body).not.toHaveProperty('expires_in');       // no expiry known (#1327)
       expect(resolveAccessToken).toHaveBeenCalledWith(
         expect.objectContaining({ id: userId }),
         expect.anything(),
         expect.objectContaining({ forceRefresh: false })
       );
+    } finally {
+      runSecrets.revoke(runId);
+    }
+  });
+
+  // #1327: a run renews its token before it expires.
+  test('the answer says how many seconds the token has left, when known', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = uuidv4();
+    run(`INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'RUNNING')`, [runId, companyId, userId]);
+    const secret = runSecrets.issue(runId, companyId);
+    resolveAccessToken.mockImplementationOnce(async (_row, _log, opts) => {
+      opts.onExpiry(new Date(Date.now() + 90 * 1000).toISOString());
+      return 'token-with-expiry';
+    });
+    try {
+      const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(200);
+      expect(res.body.access_token).toBe('token-with-expiry');
+      expect(res.body.expires_in).toBeGreaterThanOrEqual(88);
+      expect(res.body.expires_in).toBeLessThanOrEqual(90);
     } finally {
       runSecrets.revoke(runId);
     }
