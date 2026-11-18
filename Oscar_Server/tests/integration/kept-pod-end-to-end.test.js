@@ -17,7 +17,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { randomUUID: uuidv4, randomBytes } = require('node:crypto');
+const { randomUUID: uuidv4 } = require('node:crypto');
 
 process.env.PORT = '0';
 process.env.INTERNAL_PORT = '0';
