@@ -287,6 +287,29 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #1312: only a call carrying a run's own secret is a moment of that run.
+  test('a session\'s read that names a run in progress is not that run\'s first call', async () => {
+    const runTimeline = require('../../src/worker/runTimeline');
+    const { companyId, userId, slug } = seedCompanyUser('test_manager');
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(JSON.stringify({ scenarios: [] })), filePath);
+    const runId = uuidv4();
+    runTimeline.begin(runId);
+    runTimeline.mark(runId, 'launched');
+    try {
+      const res = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-Forwarded-For', '1.2.3.4')
+        .set('X-OSCAR-Run-Id', runId)
+        .set('Cookie', `oscar_session=${makeToken('test_manager', userId, companyId)}`);
+      expect(res.status).toBe(200);
+      expect(runTimeline.stepsOf(runId).steps.map((s) => s.step)).toEqual(['prepare']);
+    } finally {
+      runTimeline.drop(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   // v1.11.197: this returned the whole unfiltered file — every tester's private
   // scenarios included — to any tester of the company, undoing the filtered
   // view GET /v1/company/datafile gives them. It used to be this test's 200.

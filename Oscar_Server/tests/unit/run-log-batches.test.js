@@ -179,7 +179,8 @@ describe('the runner and the live log write the waiting lines first', () => {
   });
 
   test('executeRun() writes them however the run ended', () => {
-    expect(runner).toMatch(/async function executeRun\(job\) \{\s+try \{\s+return await runSteps\(job\);\s+\} finally \{\s+flushRunLogs\(\);/);
+    // Around the run's steps, only the run's moments are started and forgotten (#1312).
+    expect(runner).toMatch(/async function executeRun\(job\) \{\s+(?:\/\/[^\n]*\s+)?runTimeline\.begin\(job\?\.runId\);\s+try \{\s+return await runSteps\(job\);\s+\} finally \{\s+runTimeline\.drop\(job\?\.runId\);\s+flushRunLogs\(\);\s+\}\s+\}/);
   });
 
   test('the live log route writes them before it reads', () => {

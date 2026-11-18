@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.582",
+  "current_release": "2026.583",
   "releases": [
+    {
+      "release": "2026.583",
+      "date": "2026-11-17",
+      "server": "1.11.544",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.544: a run's time, step by step (#1312, first step of #1309). The server notes the moments it sees itself for each run, from the slot it is given to its final status, and gives the time between them: oscar_run_step_seconds{step} (prepare, job, pod, folder, bruno_start, requests, reports, send, end, link, store; job, pod, folder, send and end in pod mode only), one line at the end of each run's log, and a row in OSCAR · Overview (mean seconds per step, stacked, and the 95th percentile). The requests' own times are Bruno's, as stored with the run's results. Nothing is read from what the run prints, and only a call carrying the run's own secret is a moment of the run. No change to how a run goes."
+      ]
+    },
     {
       "release": "2026.582",
       "date": "2026-11-17",

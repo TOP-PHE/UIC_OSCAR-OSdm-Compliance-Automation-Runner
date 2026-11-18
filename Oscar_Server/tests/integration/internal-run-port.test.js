@@ -136,6 +136,67 @@ describe('a run sends its result files', () => {
   });
 });
 
+// #1312: the server notes when a run in progress first calls it and when its
+// result files arrive, for the run's time step by step (worker/runTimeline.js).
+// Only a call carrying the run's own secret is a moment of the run.
+describe('the moments of a run\'s calls', () => {
+  const runTimeline = require('../../src/worker/runTimeline');
+  const NAME = '.bru_results_1a2b3c4d.json';
+  // A run in progress, launched: the steps its calls end are then given.
+  function runInProgress() {
+    const seeded = seedRun();
+    runTimeline.begin(seeded.runId);
+    runTimeline.mark(seeded.runId, 'launched');
+    return seeded;
+  }
+  const stepsOf = (runId) => runTimeline.stepsOf(runId).steps.map((s) => s.step);
+  const made = [];
+  afterEach(() => { while (made.length) runTimeline.drop(made.pop()); });
+
+  test('the data file read with the run\'s secret is Bruno\'s first call; a refused read is not', async () => {
+    const { runId, slug, secret } = runInProgress();
+    made.push(runId);
+    const url = `/data/${slug}-datafile.json`;
+    expect((await request(internalApp).get(url).set('X-OSCAR-Run-Id', runId)).status).toBe(403);
+    expect((await request(internalApp).get(url).set('X-OSCAR-Run-Id', runId).set('X-OSCAR-Run-Secret', 'f'.repeat(64))).status).toBe(403);
+    expect(stepsOf(runId)).toEqual(['prepare']);
+    expect((await request(internalApp).get(url).set('X-OSCAR-Run-Id', runId).set('X-OSCAR-Run-Secret', secret)).status).toBe(200);
+    expect(stepsOf(runId)).toEqual(['prepare', 'bruno_start']);
+  });
+
+  test('so is a token asked with the run\'s secret', async () => {
+    const { runId, secret } = runInProgress();
+    made.push(runId);
+    resolveAccessToken.mockResolvedValue('fresh-token');
+    expect((await request(internalApp).post(`/v1/runs/${runId}/refresh-access-token`)).status).toBe(403);
+    expect(stepsOf(runId)).toEqual(['prepare']);
+    expect((await request(internalApp).post(`/v1/runs/${runId}/refresh-access-token`).set('X-OSCAR-Run-Secret', secret)).status).toBe(200);
+    expect(stepsOf(runId)).toEqual(['prepare', 'bruno_start']);
+  });
+
+  test('the result files: the first one arriving, then the last one kept', async () => {
+    const { runId, secret } = runInProgress();
+    made.push(runId);
+    const put = (name, withSecret) => request(internalApp).put(`/v1/runs/${runId}/results/${name}`)
+      .set('X-OSCAR-Run-Secret', withSecret || '').set('Content-Type', 'application/octet-stream').send(Buffer.from('{"results":[1]}'));
+    expect((await put(NAME)).status).toBe(403);
+    expect(stepsOf(runId)).toEqual(['prepare']);
+    // A file refused for its name has arrived, and is not kept: the sending has no end yet.
+    expect((await put('oscar.db', secret)).status).toBe(400);
+    expect(stepsOf(runId)).toEqual(['prepare']);
+    expect((await put(NAME, secret)).status).toBe(201);
+    expect(stepsOf(runId)).toEqual(['prepare', 'send']);
+  });
+
+  test('a call for a run that is not in progress notes nothing', async () => {
+    const { runId, slug, secret } = seedRun();
+    const going = runTimeline._going();
+    expect((await request(internalApp).get(`/data/${slug}-datafile.json`).set('X-OSCAR-Run-Id', runId).set('X-OSCAR-Run-Secret', secret)).status).toBe(200);
+    expect(runTimeline._going()).toBe(going);
+    expect(stepsOf(runId)).toEqual([]);
+  });
+});
+
 // Pod mode (#1130): a run's pod calls the internal port from its own address.
 // supertest always calls from this machine, so the checks are run on requests
 // made up here, from other addresses.

@@ -151,6 +151,21 @@ function getDecryptedEvents(runId) {
   return rows.map(r => ({ level: r.level, message: colDecrypt(r.message) }));
 }
 
+// #1312: how many times each step of a run was observed, the steps observed
+// once more between two readings, and the line a run's log gets.
+const runTimeline = require('../../src/worker/runTimeline');
+const stepMetrics = require('../../src/utils/metrics');
+async function stepCounts() {
+  const values = (await stepMetrics.runStepSeconds.get()).values;
+  return Object.fromEntries(values.filter((v) => v.metricName === 'oscar_run_step_seconds_count').map((v) => [v.labels.step, v.value]));
+}
+const stepsMoved = (before, after) => stepMetrics.RUN_STEPS.filter((step) => (after[step] || 0) === (before[step] || 0) + 1);
+const timeLines = (runId) => getDecryptedEvents(runId).map((e) => e.message).filter((m) => m.includes('Where this run\'s time went'));
+// Bruno's own times of the requests, as the run's results store them.
+function storeRequestTimes(runId, ms) {
+  run(`INSERT INTO run_suites (run_id, company_id, suite_name, duration_ms) VALUES (?, ?, 'suite', ?)`, [runId, getRunRow(runId).company_id, ms]);
+}
+
 // The fake Bruno writes no results: unless a test says otherwise, the run
 // stored one check, as a real run does (a run with none ends FAILED).
 const structureResults = require('../../src/reports/structureResults');
@@ -953,6 +968,52 @@ describe('executeRun — RUN_ISOLATION=pod (#1130)', () => {
     });
   });
 
+  // #1312: the moments the server sees for a pod run, and the steps between them.
+  describe('the run\'s time, step by step', () => {
+    test('a pod run gives its eleven steps once each, and one line in its log', async () => {
+      const before = await stepCounts();
+      const { runId, proc, done } = await startPodRun();
+      proc.emit('started');
+      proc.emit('started');
+      proc.emit('pod', '10.1.0.9');
+      proc.stdout.emit('data', Buffer.from('[run-pod] started bru\n'));
+      expect(runTimeline._marksOf(runId)).toEqual(['slot', 'launched', 'job', 'pod', 'output']);
+      // What the run's routes note once its secret is verified (internal-run-port.test.js).
+      runTimeline.mark(runId, 'call');
+      runTimeline.mark(runId, 'upload');
+      runTimeline.markAgain(runId, 'uploaded');
+      storeRequestTimes(runId, 0);
+      proc.emit('close', 0);
+      await done;
+      expect(stepsMoved(before, await stepCounts()))
+        .toEqual(['prepare', 'job', 'pod', 'folder', 'bruno_start', 'requests', 'reports', 'send', 'end', 'link', 'store']);
+      const lines = timeLines(runId);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatch(/^\[runner\] Where this run's time went \(\d+\.\d s from its slot to its final status\): preparing the run \d+\.\d s, asking for its pod \d+\.\d s, waiting for its pod \d+\.\d s, its pod preparing the work folder \d+\.\d s, Bruno starting \d+\.\d s, the requests 0\.0 s, the reports \d+\.\d s, sending the results \d+\.\d s, its pod ending \d+\.\d s, linking the reports \d+\.\d s, storing the checks \d+\.\d s\.$/);
+      expect(runTimeline.stepsOf(runId).steps).toEqual([]);     // the run ended: nothing is kept
+    });
+
+    test('what the dispatcher writes of itself is not the pod\'s first line', async () => {
+      const before = await stepCounts();
+      const { proc, done } = await startPodRun();
+      proc.emit('started');
+      proc.emit('pod', '10.1.0.9');
+      proc.stderr.emit('data', Buffer.from('[run-dispatcher] The run\'s log was cut\n'));
+      proc.emit('close', 1);
+      await done;
+      expect(stepsMoved(before, await stepCounts())).toEqual(['prepare', 'job', 'pod', 'link', 'store']);
+    });
+
+    test('a run the dispatcher refused gives what was seen: it was prepared, then stored', async () => {
+      const before = await stepCounts();
+      const { runId, proc, done } = await startPodRun();
+      proc.emit('error', new Error('the runner agent refused: too many runs'));
+      await done;
+      expect(stepsMoved(before, await stepCounts())).toEqual(['prepare', 'link', 'store']);
+      expect(timeLines(runId)).toHaveLength(1);
+    });
+  });
+
   test('a mode set to pod without its settings starts nothing', async () => {
     delete process.env.RUN_SERVER_URL;
     const { companyId, userId } = seedCompanyUser();
@@ -1139,6 +1200,79 @@ describe('executeRun — does not resurrect an already-terminal run', () => {
 
     expect(result.exitCode).toBe(0);
     expect(getRunRow(runId).status).toBe('CANCELLED'); // NOT overwritten to COMPLETED
+  });
+});
+
+// ── #1312: a run's time, step by step, outside pod mode ───────────────────────
+describe('executeRun — the run\'s time, step by step (#1312)', () => {
+  async function startRun() {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const done = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    return { runId, fakeProc, done };
+  }
+
+  test('a run started here: prepared, Bruno\'s start, the requests and the reports, then linked and stored', async () => {
+    const before = await stepCounts();
+    const { runId, fakeProc, done } = await startRun();
+    fakeProc.stdout.emit('data', Buffer.from('Running Tests...\n'));
+    // Outside pod mode a first line is Bruno's own, not a moment of the run:
+    // Bruno's start is counted from the launch.
+    expect(runTimeline._marksOf(runId)).toEqual(['slot', 'launched']);
+    runTimeline.mark(runId, 'call');
+    storeRequestTimes(runId, 0);
+    fakeProc.emit('close', 0);
+    await done;
+    expect(stepsMoved(before, await stepCounts())).toEqual(['prepare', 'bruno_start', 'requests', 'reports', 'link', 'store']);
+    expect(timeLines(runId)).toHaveLength(1);
+    expect(timeLines(runId)[0]).not.toMatch(/pod/);
+  });
+
+  test('a run whose results were not stored: the requests and the reports as one step', async () => {
+    const before = await stepCounts();
+    const { runId, fakeProc, done } = await startRun();
+    runTimeline.mark(runId, 'call');
+    fakeProc.emit('close', 1);
+    await done;
+    expect(stepsMoved(before, await stepCounts())).toEqual(['prepare', 'bruno_start', 'scenario', 'link', 'store']);
+    expect(timeLines(runId)[0]).toMatch(/the requests and the reports \d+\.\d s/);
+  });
+
+  test('a run refused before it starts, or stopped by an emergency stop, gives no step and no line', async () => {
+    const before = await stepCounts();
+    const going = runTimeline._going();
+
+    const { companyId, userId } = seedCompanyUser();
+    run(`UPDATE companies SET datafile_path = NULL WHERE id = ?`, [companyId]);
+    const refused = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    expect((await executeRun({ runId: refused, companyId, userId })).exitCode).toBe(1);
+
+    const { runId, fakeProc, done } = await startRun();
+    run(`UPDATE runs SET status = 'CANCELLED' WHERE id = ?`, [runId]);
+    fakeProc.emit('close', 0);
+    await done;
+
+    expect(stepsMoved(before, await stepCounts())).toEqual([]);
+    expect([...timeLines(refused), ...timeLines(runId)]).toEqual([]);
+    expect(runTimeline._going()).toBe(going);          // nothing is kept of a run that ended
+  });
+
+  test('a measure that fails never stops a run', async () => {
+    const observe = jest.spyOn(stepMetrics.runStepSeconds, 'observe').mockImplementation(() => { throw new Error('no metric'); });
+    try {
+      const { runId, fakeProc, done } = await startRun();
+      fakeProc.emit('close', 0);
+      expect((await done).exitCode).toBe(0);
+      expect(getRunRow(runId).status).toBe('COMPLETED');
+      expect(observe).toHaveBeenCalled();
+    } finally {
+      observe.mockRestore();
+    }
   });
 });
 
