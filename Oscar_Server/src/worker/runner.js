@@ -25,7 +25,8 @@ const path        = require('node:path');
 const net         = require('node:net');
 const { tokenErrorText } = require('../utils/tokenErrors');
 const fs          = require('node:fs');
-const { launch, launchRun, launcherProblem, isolationMode } = require('./launcher');
+const { launch, launchRun, launcherProblem, isolationMode, keptPodsOn } = require('./launcher');
+const keptRunPool = require('./keptRunPool');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require('../db/db');
 const { encryptToFileAsync } = require('../utils/at-rest');
@@ -1119,6 +1120,16 @@ function refusedRunScope(runRow, companyId, userId) {
   }
 }
 
+// The run's process: in a pod kept for its batch (#1322), in a pod of its own
+// (podRun, pod mode), or here. Each behaves as a child process.
+function startRunProcess(runId, { keptBatch, podRun, args, cwd, env }) {
+  if (keptBatch) {
+    logEvent(runId, 'info', '[runner] The run goes to a pod kept for its batch (RUN_KEPT_PODS=on).');
+    return keptRunPool.launchKeptRun({ batch: keptBatch, run: podRun });
+  }
+  return podRun ? launchRun(podRun) : launch('bru', { args, cwd, env });
+}
+
 // ── Main execution function ────────────────────────────────────────────────────
 // Every line the run logged is written before its caller goes on, however it
 // ended (#1210): the queue, the tests and every report read them afterwards.
@@ -1129,6 +1140,7 @@ async function executeRun(job) {
     return await runSteps(job);
   } finally {
     runTimeline.drop(job?.runId);
+    keptRunPool.release(job?.runId);
     flushRunLogs();
   }
 }
@@ -1170,6 +1182,11 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     [runId]
   );
   logEvent(runId, 'info', `[runner] Run started — company=${companyRow.slug} user=${userRow.email} auth_mode=${userRow.auth_mode}`);
+  // #1322: a run of a batch goes to a pod kept for that batch (RUN_KEPT_PODS);
+  // a run alone keeps a pod of its own. Said at once, so that the batch's
+  // waiting pods are not told to stop while this run is on its way.
+  const keptBatch = keptPodsOn() && runRow.batch_id ? { companyId, userId: effectiveUserId, batchId: runRow.batch_id } : null;
+  if (keptBatch) keptRunPool.announce(runId, keptBatch);
 
   // 2. Prepare artifact directory — inline path-traversal guard (Sonar S6549)
   if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
@@ -1417,12 +1434,11 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     let podEnded = () => {};
     runTimeline.mark(runId, 'launched');
     try {
-      proc = podMode
-        ? launchRun({
-          runId, envName, envYml: Buffer.from(envYmlOut, 'utf8').toString('base64'),
-          deadlineSeconds: Math.max(60, Math.ceil(_runBudget.effectiveMs / 1000)), env: safeEnv,
-        })
-        : launch('bru', { args, cwd: runCwd, env: safeEnv });
+      const podRun = podMode ? {
+        runId, envName, envYml: Buffer.from(envYmlOut, 'utf8').toString('base64'),
+        deadlineSeconds: Math.max(60, Math.ceil(_runBudget.effectiveMs / 1000)), env: safeEnv,
+      } : null;
+      proc = startRunProcess(runId, { keptBatch, podRun, args, cwd: runCwd, env: safeEnv });
       if (podMode) {
         podEnded = watchRunPod(proc);
         proc.on('pod', (address) => onRunPodAddress(runId, address, proc));

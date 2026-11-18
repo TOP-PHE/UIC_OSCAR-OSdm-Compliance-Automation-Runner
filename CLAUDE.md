@@ -1707,6 +1707,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   to `keptPods.forget()` (`pod-ended` / `not-started`), and a pod the
   server gives up is removed: at once for `AT_ONCE` reasons, after
   `GRACE_MS` (30 s) otherwise. The pod's lines are logged as data, 64 KB.
+  **Part 4 = #1322 (1.11.549, listed): `RUN_KEPT_PODS=on`** (pod mode
+  only, off by default; another value refuses the runs) sends a run of a
+  batch to `worker/keptRunPool.js` `launchKeptRun()`, an object that
+  behaves as `launchRun()`'s, so nothing else of the runner changed. A
+  waiting pod of the batch takes it, else one is started (unless enough
+  are starting); a pod given up under a run ends it with 124/125/137/143
+  (never 0 or 1, #1287). **The runner announces a kept run at once
+  (`announce()`) and releases it in `executeRun()`'s `finally`**: a
+  waiting pod is told stop when the queue holds nothing of its batch
+  (`queue.queuedOf()`, wired by `queue.js`), nothing is announced and
+  nothing waits. A run alone (no `batch_id`) keeps a pod of its own.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

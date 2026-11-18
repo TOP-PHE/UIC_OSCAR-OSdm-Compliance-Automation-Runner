@@ -53,9 +53,33 @@ function agentSettings() {
   };
 }
 
+// Pods kept for the runs of one batch (#1309; part 4 = #1322): RUN_KEPT_PODS,
+// on or off (the default), read in pod mode only.
+const KEPT_PODS_VALUES = Object.freeze(['on', 'off']);
+const keptPodsSetting = () => String(process.env.RUN_KEPT_PODS || 'off').trim().toLowerCase() || 'off';
+
+/** Whether the runs of a batch go to kept pods: pod mode and RUN_KEPT_PODS=on. */
+function keptPodsOn() {
+  return isolationMode() === 'pod' && keptPodsSetting() === 'on';
+}
+
+// RUN_KEPT_PODS as written: on or off, and on in pod mode only.
+function keptPodsProblem(mode) {
+  const value = keptPodsSetting();
+  if (!KEPT_PODS_VALUES.includes(value)) {
+    return `RUN_KEPT_PODS="${value.slice(0, 40)}" is neither on nor off: no run is started. Ask the administrator to correct the server's settings.`;
+  }
+  if (value === 'on' && mode !== 'pod') {
+    return `RUN_KEPT_PODS is "on" but RUN_ISOLATION is "${mode.slice(0, 40)}": kept pods are a pod mode setting. No run is started. Ask the administrator to correct the server's settings.`;
+  }
+  return null;
+}
+
 /** Why runs cannot start in the configured mode, or null. */
 function launcherProblem() {
   const mode = isolationMode();
+  const kept = keptPodsProblem(mode);
+  if (kept) return kept;
   if (mode === 'isolated') {
     const { port, token } = agentSettings();
     if (token.length < MIN_TOKEN_LENGTH) return `RUN_ISOLATION is "isolated" but RUN_AGENT_TOKEN is missing or shorter than ${MIN_TOKEN_LENGTH} characters: no run is started. Ask the administrator to correct the server's settings.`;
@@ -153,4 +177,6 @@ function launchLocal(kind, { args, cwd, env }) {
   return spawn(process.execPath, [script, ...args], { cwd, shell: false, env });
 }
 
-module.exports = { launch, launchRun, launchPod, launchLocal, launcherProblem, isolationMode, agentSettings, MODES, KINDS };
+module.exports = {
+  launch, launchRun, launchPod, launchLocal, launcherProblem, isolationMode, keptPodsOn, agentSettings, MODES, KINDS,
+};

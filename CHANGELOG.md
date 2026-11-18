@@ -521,6 +521,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.549] — 2026-11-18
+
+Kept run pods, part 4 (#1322, of #1309): the runs of a batch go to pods kept for it. Not released on its own: listed in `compatibility.json` (2026.588) without moving `current_release`. Off by default (`RUN_KEPT_PODS`): nothing changes until it is set.
+
+### Added
+- **`RUN_KEPT_PODS`**: `on` or `off` (the default), read with `RUN_ISOLATION=pod` only (`launcher.keptPodsOn()`). Any other value refuses the runs, as an unknown `RUN_ISOLATION` does; `on` outside pod mode refuses them too.
+- **`worker/keptRunPool.js`**: `launchKeptRun({ batch, run })` gives the runner an object that behaves as a run's process in pod mode (output, `started`, `pod`, `close`, `error`, `kill()`), so the runner keeps the rest as it is: the run's secret bound to the pod's address, the timeouts, the stop on silence, the emergency stop, the results linked from the internal port, the step times of #1312.
+  - A pod of the batch that waits takes the run at once; else the run waits, and a pod is started for it unless enough pods are starting for the runs waiting.
+  - The run's output comes from `POST /v1/runs/:runId/output` (opened for the run here), its end from the pod's next call: Bruno's own exit code. Only the run's credentials go to the pod (`RUN_ENV_KEYS`).
+  - A pod given up under a run ends that run with a code that is not a test result (#1287): 124 at its deadline, 125 when it never started, 137 when it ended, 143 when it was stopped; one line says why. A pod meant for waiting runs that never starts fails as many of them as pods are missing.
+  - `kill()`: a waiting run is taken off; a run in a pod has its pod removed at once (new reason `stopped`, removed at once by the dispatcher).
+  - **The end of a batch**: a waiting pod is told *stop* once its batch has nothing queued (`queue.queuedOf()`), nothing on its way (the runner announces each run as it starts and releases it at its end) and nothing waiting. Before, it waited its 30 s.
+- **The runner**: a run of a batch (`runs.batch_id`) goes to the pool when `RUN_KEPT_PODS` is on; a run alone keeps a pod of its own (rule 6). The run's log says so.
+- What a reused pod saves shows on the existing panels: the time for a run's pod to start (from its launch to its pod's address) and the steps `job` and `pod` of #1312.
+
+### Known
+- Between the queue taking the last run of a batch and the runner announcing it there is one turn of the event loop. A pod finishing another run of that batch in that turn is told *stop*, and the last run starts a pod of its own: one pod start more, nothing lost.
+
+### Checked
+- `kept-run-pool.test.js` (24): runs handed, pods started or not, output and ends, each way a pod is given up, kill, the end of a batch (queued, on its way, released, a queue that cannot be read), the queue's count and its wiring.
+- `kept-run-pool-end-to-end.test.js`: two runs of a batch through the pool, a kept pod's real program and the server's own internal port, in one pod; then the batch ends and the pod with it.
+- `runner.test.js`: a run of a batch goes to the pool (announced, released, its secret bound to the pod), a run alone to a pod of its own, a run refused released all the same. `launcher.test.js`: `RUN_KEPT_PODS`. `run-log-batches.test.js` follows `executeRun()`'s new line.
+- 32 changes to the code, each made to fail a test.
+
+---
+
 ## [server-1.11.548] — 2026-11-18
 
 Kept run pods, part 3 (#1320, of #1309): the dispatcher makes and removes a kept pod, and the server starts one for a batch and follows it. Not released on its own: listed in `compatibility.json` (2026.587) without moving `current_release`. Nothing calls `startKeptPod()` yet (part 4, the queue). A run in a pod of its own is unchanged.

@@ -224,9 +224,17 @@ class RunQueue extends EventEmitter {
     return counts;
   }
 
+  /** How many runs of one batch of a company the queue still holds (kept pods, #1322). */
+  queuedOf({ companyId, batchId }) {
+    return this._queue.filter((j) => j.batchId === batchId && j.companyId === companyId).length;
+  }
+
   get depth()   { return this._queue.length; }
   get running() { return this._running; }
 }
 
-module.exports = new RunQueue();
+const queue = new RunQueue();
+// A pod kept for a batch is told to stop once the batch has nothing left (#1322).
+require('./keptRunPool').configure({ queuedOf: (batch) => queue.queuedOf(batch) });
+module.exports = queue;
 module.exports.nextJobIndex = nextJobIndex;
