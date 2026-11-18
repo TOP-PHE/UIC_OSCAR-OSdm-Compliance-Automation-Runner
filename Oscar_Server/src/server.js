@@ -747,8 +747,9 @@ keptPods.on('stop', ({ podId, companyId, batchId, reason, why }) => {
   }
 });
 // The body of a pod's call: nothing on its first call, else the end of the
-// run it was given. { ended } (null on a first call), or null when it is
-// anything else.
+// run it was given, and whether the pod is still clean after it (#1318).
+// { ended } (null on a first call), or null when it is anything else.
+const ENDED_KEYS = new Set(['runId', 'code', 'clean']);
 function podCallOf(body) {
   if (body === undefined || body === null) return { ended: null };
   if (typeof body !== 'object' || Array.isArray(body)) return null;
@@ -757,11 +758,31 @@ function podCallOf(body) {
   if (keys.length !== 1 || keys[0] !== 'ended') return null;
   const e = body.ended;
   if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
-  if (Object.keys(e).length !== 2 || !Object.hasOwn(e, 'runId') || !Object.hasOwn(e, 'code')) return null;
+  if (!Object.keys(e).every((k) => ENDED_KEYS.has(k)) || !Object.hasOwn(e, 'runId') || !Object.hasOwn(e, 'code')) return null;
   if (typeof e.runId !== 'string' || !SAFE_RUNID_RE_FOR_REFRESH.test(e.runId)) return null;
   if (!Number.isInteger(e.code) || e.code < 0 || e.code > 255) return null;
-  return { ended: { runId: e.runId, code: e.code } };
+  if (Object.hasOwn(e, 'clean') && typeof e.clean !== 'boolean') return null;
+  return { ended: { runId: e.runId, code: e.code, clean: e.clean !== false } };
 }
+// A run's output, sent by the kept pod that runs it (#1318), with the run's
+// own secret. Used in order, once each batch (worker/runOutput.js).
+const runOutput = require('./worker/runOutput');
+const runOutputHandler = ({ runCaller }) => (req, res) => {
+  const { runId } = req.params;
+  if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid runId format.' });
+  }
+  if (verifiedRunCompany(req, runId, runCaller) === null) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
+  }
+  const batch = runOutput.batchOf(req.body);
+  if (!batch) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The body is { "seq", "parts": [["out" | "err", text], …] }.' });
+  }
+  const out = runOutput.deliver(runId, batch);
+  if (out.status === 200) return res.json({ seq: batch.seq, used: out.used });
+  return res.status(out.status).json({ status: out.status, title: 'Refused', detail: out.detail });
+};
 async function keptPodNextHandler(req, res) {
   const refuse = () => res.status(403).json({ status: 403, title: 'Forbidden', detail: "This endpoint requires a run pod's secret." });
   if (req.get('X-Forwarded-For') || req.get('Forwarded') || req.get('X-Real-IP')) return refuse();
@@ -788,6 +809,8 @@ internalApp.post('/v1/runs/:runId/refresh-access-token', runCallLimiter, refresh
 internalApp.put('/v1/runs/:runId/results/:name', runCallLimiter,
   express.raw({ type: () => true, limit: MAX_RESULT_BYTES }), storeRunResultHandler({ runCaller: internalRunCaller }));
 internalApp.post('/v1/run-pods/next', runCallLimiter, express.json({ limit: '1kb' }), keptPodNextHandler);
+// A batch is at most 64 KB of text; JSON may write a character as six.
+internalApp.post('/v1/runs/:runId/output', runCallLimiter, express.json({ limit: '512kb' }), runOutputHandler({ runCaller: internalRunCaller }));
 internalApp.use((req, res) => res.status(404).json({ status: 404, title: 'Not Found', detail: 'Not a run call.' }));
 // Express tells an error handler by its four parameters.
 internalApp.use((err, req, res, _next) => {

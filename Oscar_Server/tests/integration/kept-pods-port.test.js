@@ -139,16 +139,34 @@ describe('POST /v1/run-pods/next', () => {
     expect(keptPods.snapshot()[0]).toMatchObject({ state: 'new', address: '' });
   });
 
-  test('podCallOf(): nothing, or one end of a run', () => {
+  test('podCallOf(): nothing, or one end of a run, which may say the pod is no longer clean', () => {
     const runId = uuidv4();
     expect(podCallOf(undefined)).toEqual({ ended: null });
     expect(podCallOf({})).toEqual({ ended: null });
-    expect(podCallOf({ ended: { runId, code: 0 } })).toEqual({ ended: { runId, code: 0 } });
-    expect(podCallOf({ ended: { code: 255, runId } })).toEqual({ ended: { runId, code: 255 } });
+    expect(podCallOf({ ended: { runId, code: 0 } })).toEqual({ ended: { runId, code: 0, clean: true } });
+    expect(podCallOf({ ended: { code: 255, runId } })).toEqual({ ended: { runId, code: 255, clean: true } });
+    expect(podCallOf({ ended: { runId, code: 0, clean: true } })).toEqual({ ended: { runId, code: 0, clean: true } });
+    expect(podCallOf({ ended: { runId, code: 0, clean: false } })).toEqual({ ended: { runId, code: 0, clean: false } });
     expect(podCallOf('text')).toBeNull();
     expect(podCallOf({ ended: { runId, code: -1 } })).toBeNull();
     expect(podCallOf({ ended: { runId, code: '0' } })).toBeNull();
     expect(podCallOf({ ended: [runId, 0] })).toBeNull();
+    expect(podCallOf({ ended: { runId, code: 0, clean: 'no' } })).toBeNull();
+    expect(podCallOf({ ended: { runId, clean: false } })).toBeNull();
+    expect(podCallOf({ ended: { code: 0, clean: false } })).toBeNull();
+  });
+
+  test('an end that says the pod is no longer clean: stop', async () => {
+    const { batch, run: theRun, runSecret } = seedBatch();
+    const pod = keptPods.open(batch);
+    const first = await call(pod);
+    keptPods.handRun(batch, theRun);
+    await first.answer;
+    await request(internalApp).put(`/v1/runs/${theRun.runId}/results/.bru_results_1a2b3c4d.json`)
+      .set('X-OSCAR-Run-Secret', runSecret).set('Content-Type', 'application/octet-stream').send(Buffer.from('{}'));
+    const res = await request(internalApp).post(URL).set('X-OSCAR-Pod-Secret', pod.secret)
+      .send({ ended: { runId: theRun.runId, code: 0, clean: false } });
+    expect(res.body).toEqual({ action: 'stop', reason: 'not-clean' });
   });
 
   test('a call whose connection closes lets go of the pod: no run is handed to it', async () => {
@@ -169,5 +187,46 @@ describe('POST /v1/run-pods/next', () => {
     const res = await request(app).post(URL).set('X-OSCAR-Pod-Secret', pod.secret).send({});
     expect(res.status).toBe(404);
     expect(keptPods.snapshot()[0].state).toBe('new');
+  });
+});
+
+describe('POST /v1/runs/:runId/output (#1318)', () => {
+  const runOutput = require('../../src/worker/runOutput');
+  const outputUrl = (runId) => `/v1/runs/${runId}/output`;
+
+  test('a run\'s output, with its secret, goes to its sink in order, once each batch', async () => {
+    const { run: theRun, runSecret } = seedBatch();
+    const got = [];
+    runOutput.open(theRun.runId, (s, t) => got.push([s, t]));
+    const send = (body) => request(internalApp).post(outputUrl(theRun.runId)).set('X-OSCAR-Run-Secret', runSecret).send(body);
+    expect((await send({ seq: 0, parts: [['out', 'a\n'], ['err', 'b\n']] })).body).toEqual({ seq: 0, used: true });
+    expect((await send({ seq: 0, parts: [['out', 'a\n']] })).body).toEqual({ seq: 0, used: false });
+    const ahead = await send({ seq: 2, parts: [['out', 'c']] });
+    expect([ahead.status, ahead.body.detail]).toEqual([409, 'Batch 2 came before batch 1.']);
+    expect(got).toEqual([['out', 'a\n'], ['err', 'b\n']]);
+    // A full batch whose characters JSON writes as six each still goes.
+    const control = String.fromCodePoint(1).repeat(64 * 1024);
+    expect((await send({ seq: 1, parts: [['out', control]] })).body).toEqual({ seq: 1, used: true });
+    runOutput.close(theRun.runId);
+    expect((await send({ seq: 2, parts: [['out', 'c']] })).status).toBe(409);
+  });
+
+  test('refused without the run\'s own secret, through a proxy, or for a body that is not a batch', async () => {
+    const one = seedBatch();
+    const other = seedBatch();
+    const got = [];
+    runOutput.open(one.run.runId, (s, t) => got.push([s, t]));
+    const body = { seq: 0, parts: [['out', 'x']] };
+    const post = () => request(internalApp).post(outputUrl(one.run.runId));
+    expect((await post().send(body)).status).toBe(403);
+    expect((await post().set('X-OSCAR-Run-Secret', other.runSecret).send(body)).status).toBe(403);
+    expect((await post().set('X-OSCAR-Run-Secret', one.runSecret).set('X-Forwarded-For', '203.0.113.9').send(body)).status).toBe(403);
+    const notABatch = await post().set('X-OSCAR-Run-Secret', one.runSecret).send({ seq: 0, parts: [['in', 'x']] });
+    expect([notABatch.status, notABatch.body.detail]).toEqual([400, 'The body is { "seq", "parts": [["out" | "err", text], …] }.']);
+    expect((await request(internalApp).post(outputUrl('nope')).set('X-OSCAR-Run-Secret', one.runSecret).send(body)).status).toBe(400);
+    // The public port has no output route: its /v1/runs asks for a session first.
+    expect((await request(app).post(outputUrl(one.run.runId)).set('X-OSCAR-Run-Secret', one.runSecret).send(body)).status).toBe(401);
+    expect(got).toEqual([]);
+    runOutput.close(one.run.runId);
   });
 });

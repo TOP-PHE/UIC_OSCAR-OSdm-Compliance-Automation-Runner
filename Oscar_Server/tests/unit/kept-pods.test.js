@@ -152,7 +152,7 @@ describe('after a run', () => {
     const { pod, run } = await podWithRun(batch);
     results.add(run.runId);
     const { answer: next } = await hold(pod, { runId: run.runId, code: 1 });
-    expect(ended).toEqual([{ podId: pod.podId, ...batch, runId: run.runId, code: 1, resultsReceived: true }]);
+    expect(ended).toEqual([{ podId: pod.podId, ...batch, runId: run.runId, code: 1, resultsReceived: true, clean: true }]);
     const second = runOf(batch);
     expect(keptPods.handRun(batch, second)).toBe(pod.podId);
     expect(await next).toEqual({ action: 'run', run: second });
@@ -182,6 +182,29 @@ describe('after a run', () => {
       expect(await keptPods.ask(pod.secret, POD, { runId: run.runId, code })).toEqual({ action: 'stop', reason: STOP.ABNORMAL_END });
       expect(keptPods.snapshot()).toEqual([]);
       expect(stops.at(-1)).toMatchObject({ podId: pod.podId, reason: STOP.ABNORMAL_END });
+    }
+  });
+
+  test('a pod no longer clean after a run: the run\'s end stands, the pod stops (#1318)', async () => {
+    const batch = batchOf();
+    const { pod, run } = await podWithRun(batch);
+    results.add(run.runId);
+    expect(await keptPods.ask(pod.secret, POD, { runId: run.runId, code: 0, clean: false }))
+      .toEqual({ action: 'stop', reason: STOP.NOT_CLEAN });
+    expect(ended).toEqual([expect.objectContaining({ runId: run.runId, code: 0, resultsReceived: true, clean: false })]);
+    expect(stops).toEqual([expect.objectContaining({ podId: pod.podId, reason: STOP.NOT_CLEAN })]);
+    expect(keptPods.snapshot()).toEqual([]);
+  });
+
+  test('an end that does not say, or says clean: the pod goes on', async () => {
+    for (const clean of [undefined, true]) {
+      const batch = batchOf();
+      const { pod, run } = await podWithRun(batch);
+      results.add(run.runId);
+      const { answer } = await hold(pod, { runId: run.runId, code: 0, ...(clean === undefined ? {} : { clean }) });
+      expect(keptPods.snapshot().find((p) => p.podId === pod.podId)).toMatchObject({ state: 'waiting', waiting: true });
+      keptPods.endBatch(batch);
+      expect(await answer).toEqual({ action: 'stop', reason: STOP.BATCH_DONE });
     }
   });
 
