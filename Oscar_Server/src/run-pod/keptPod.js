@@ -88,25 +88,37 @@ function podInputs(env) {
  * { action: 'run', run }, { action: 'stop', reason }, or { failed: why }.
  */
 async function askNext({ base, podSecret, ended, fetchImpl, timeoutMs, connectRetryDelaysMs = CONNECT_RETRY_DELAYS_MS, sleep = R.defaultSleep, log = () => {} }) {
-  const pauses = [...connectRetryDelaysMs];
-  let res;
-  for (;;) {
-    try {
-      res = await fetchImpl(`${base}/v1/run-pods/next`, {
-        method: 'POST',
-        headers: { 'X-OSCAR-Pod-Secret': podSecret, 'Content-Type': 'application/json' },
-        body: JSON.stringify(ended ? { ended } : {}),
-        redirect: 'manual',
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      break;
-    } catch (err) {
-      const pause = NOT_CONNECTED.has(err?.cause?.code) ? pauses.shift() : undefined;
-      if (pause === undefined) return { failed: R.reasonOf(err) };
-      log(`[kept-pod] the server was not reached (${R.reasonOf(err)}); asked again in ${pause / 1000} s`);
-      await sleep(pause);
-    }
+  const call = () => fetchImpl(`${base}/v1/run-pods/next`, {
+    method: 'POST',
+    headers: { 'X-OSCAR-Pod-Secret': podSecret, 'Content-Type': 'application/json' },
+    body: JSON.stringify(ended ? { ended } : {}),
+    redirect: 'manual',
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const sent = await untilConnected(call, connectRetryDelaysMs, { sleep, log });
+  if (sent.failed) return sent;
+  return answerOf(sent.res);
+}
+
+/**
+ * Makes the call, and makes it again after each pause while its connection
+ * was never made (NOT_CONNECTED): { res } or { failed: why }. One pause a
+ * level, so at most as deep as the pauses are many.
+ */
+async function untilConnected(call, pauses, { sleep, log }) {
+  try {
+    return { res: await call() };
+  } catch (err) {
+    const pause = NOT_CONNECTED.has(err?.cause?.code) ? pauses[0] : undefined;
+    if (pause === undefined) return { failed: R.reasonOf(err) };
+    log(`[kept-pod] the server was not reached (${R.reasonOf(err)}); asked again in ${pause / 1000} s`);
+    await sleep(pause);
+    return untilConnected(call, pauses.slice(1), { sleep, log });
   }
+}
+
+/** The server's answer to a next call, read and checked. */
+async function answerOf(res) {
   if (res.status !== 200) return { failed: `HTTP ${res.status}` };
   let body;
   try {
