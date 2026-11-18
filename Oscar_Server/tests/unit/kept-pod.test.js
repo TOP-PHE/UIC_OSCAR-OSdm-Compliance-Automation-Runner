@@ -91,7 +91,9 @@ function podEnv(over = {}) {
 }
 
 let n = 0;
-async function startPod({ env = podEnv(), processes = () => [], nextTimeoutMs = 10_000, outputFlushMs = 20 } = {}) {
+async function startPod({
+  env = podEnv(), processes = () => [], nextTimeoutMs = 10_000, outputFlushMs = 20, fetchImpl = globalThis.fetch, connectRetryDelaysMs,
+} = {}) {
   n += 1;
   const workRoot = path.join(root, `work-${n}`);
   const tmpDir = path.join(root, `tmp-${n}`);
@@ -99,13 +101,29 @@ async function startPod({ env = podEnv(), processes = () => [], nextTimeoutMs = 
   fs.mkdirSync(tmpDir, { recursive: true });
   const lines = [];
   const killed = [];
+  const pauses = [];
   const code = await keptPod({
-    env, collectionDir: fakes.collectionDir, workRoot, tmpDir, bru: fakes.bru,
+    env, collectionDir: fakes.collectionDir, workRoot, tmpDir, bru: fakes.bru, fetchImpl,
     log: (l) => lines.push(l), processes, kill: (pid, signal) => killed.push([pid, signal]),
     nextTimeoutMs, retryDelaysMs: [], outputRetryDelaysMs: [], outputFlushMs, killGraceMs: 200,
-    sleep: async () => {},
+    ...(connectRetryDelaysMs ? { connectRetryDelaysMs } : {}),
+    sleep: async (ms) => { pauses.push(ms); },
   });
-  return { code, workRoot, tmpDir, lines, killed };
+  return { code, workRoot, tmpDir, lines, killed, pauses };
+}
+
+// A connection refused before the request was sent, as fetch reports it.
+const refused = (code = 'ECONNREFUSED') => new TypeError('fetch failed', { cause: Object.assign(new Error(code), { code }) });
+// fetch, refusing the first `times` calls for a next run.
+function refusingFirst(times, code) {
+  let left = times;
+  return async (url, init) => {
+    if (url.endsWith('/v1/run-pods/next') && left > 0) {
+      left -= 1;
+      throw refused(code);
+    }
+    return globalThis.fetch(url, init);
+  };
 }
 
 describe('a pod kept for the runs of one batch', () => {
@@ -235,11 +253,41 @@ describe('an answer the pod cannot use: it ends, and never calls again', () => {
     expect(pod.lines.at(-1)).toBe(`[kept-pod] ends after 0 run(s): ${why}`);
   });
 
-  test('a connection cut', async () => {
+  test('a call whose connection was never made is made again (a new pod\'s network, #1324); the pod then runs', async () => {
+    const a = runAnswer();
+    script = [a.answer];
+    const pod = await startPod({ fetchImpl: refusingFirst(2) });
+    expect(pod.code).toBe(0);
+    expect(pod.pauses.slice(0, 2)).toEqual([500, 1000]);
+    expect(pod.lines.filter((l) => /was not reached/.test(l))).toEqual([
+      '[kept-pod] the server was not reached (fetch failed (ECONNREFUSED)); asked again in 0.5 s',
+      '[kept-pod] the server was not reached (fetch failed (ECONNREFUSED)); asked again in 1 s',
+    ]);
+    expect(nextCalls()).toHaveLength(2);                       // the run, then the end: the refused ones never arrived
+    expect(endedOf(nextCalls()[1])).toEqual({ runId: a.run.runId, code: 0, clean: true });
+  });
+
+  test('each way the connection is not made is made again; a name not found too', async () => {
+    for (const code of ['ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT']) {
+      calls = [];
+      script = [];
+      const pod = await startPod({ fetchImpl: refusingFirst(1, code) });
+      expect([code, pod.code, nextCalls().length]).toEqual([code, 0, 1]);
+    }
+  });
+
+  test('a connection refused past the pauses: the pod ends', async () => {
+    const pod = await startPod({ fetchImpl: refusingFirst(10), connectRetryDelaysMs: [1, 2] });
+    expect([pod.code, pod.pauses]).toEqual([1, [1, 2]]);
+    expect(pod.lines.at(-1)).toBe('[kept-pod] ends after 0 run(s): fetch failed (ECONNREFUSED)');
+  });
+
+  test('a connection cut: the call reached the server, so it is not made again', async () => {
     script = ['reset'];
     const pod = await startPod();
     expect(pod.code).toBe(1);
     expect(nextCalls()).toHaveLength(1);
+    expect(pod.pauses).toEqual([]);
   });
 
   test('no answer in time', async () => {

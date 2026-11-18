@@ -1730,6 +1730,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   row *Kept run pods*; alert `OscarKeptPodProtocolFault` in a group of its
   own, `oscar.kept-pods` (`run-pod-metrics.test.js` pins `oscar.run-pods`
   to its two alerts). `kept-pod-metrics.test.js` holds them together.
+  **One exception to "never call again"** (found by this PR's first k3s
+  run): a call whose connection was never made (`NOT_CONNECTED`: refused,
+  name not found, unreachable, connect time-out) is made again for about
+  30 s (`CONNECT_RETRY_DELAYS_MS`, `keptPod.js`). k3s puts a new pod's
+  network policy in place a little after it starts, and the pod's first
+  call, half a second in, was refused. Any other failure still ends the pod.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

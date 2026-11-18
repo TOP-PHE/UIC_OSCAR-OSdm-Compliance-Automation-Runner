@@ -533,10 +533,14 @@ Release 2026.589 (`current_release`). Kept run pods, part 5 (#1324, of #1309), a
 - **Guides**: *OSCAR - k3s on one VPS*, section 9: `KEPT_PODS` in the release block, so a new release does not switch it back to off, and *Kept run pods* (what it keeps to, a block to switch it on or off with no run going, what to watch). *OSCAR - Kubernetes and OpenShift Deployment Guide*, 10a; *Metrics and monitoring*.
 - **News**: "Servers on a cluster: the runs of a batch can share one run pod" (Operations).
 
+### Fixed, found by this PR's first run of kept pods on k3s
+- **A kept pod's first call was refused, and the pod ended at once.** It calls the internal port half a second after it starts; on k3s a new pod's network policy is in place a little later, and the call ended `fetch failed (ECONNREFUSED)`. Every pod of the batch ended so, and its runs read *Run not finished*. A pod of one run never met it: Bruno's start takes seconds before its first call. Now a call whose connection was never made (refused, a name not found yet, an address or network not reachable, a connection time-out) is made again, for about 30 s (`NOT_CONNECTED`, `CONNECT_RETRY_DELAYS_MS` in `run-pod/keptPod.js`). It never reached the server, so no answer can have been lost and the server cannot read it as a second call: part 1's rule, never to call again after a call that got no answer, holds for every other failure.
+
 ### Checked
 - `kept-pod-metrics.test.js`: the three metrics and their labels, the pods by state read at a scrape, the counters where they are written, the row's panels and their expressions, no two panels in one place, the alert by the reason the server writes, the runbook's section, the cluster's copy of the rule.
-- The kind and k3s runs of `ci/kept-pods.sh` are this PR's CI: the first time kept pods run on a cluster.
-- 11 changes to the code and to the files it reads, each made to fail a test.
+- `kept-pod.test.js`: a call refused twice is made again and the pod runs; each way a connection is not made; refused past the pauses, the pod ends; a connection cut after the call was sent is still not made again.
+- The kind and k3s runs of `ci/kept-pods.sh` are this PR's CI: the first time kept pods run on a cluster. The first run on k3s found the fault above.
+- 11 changes to the code and to the files it reads, and 2 to the fix, each made to fail a test.
 
 ---
 
