@@ -521,6 +521,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.552] / [collection-OTST_V2.0.267] — 2026-11-18
+
+Release 2026.591 (`current_release`). **A run renews its token before it expires** (#1327).
+
+### Fixed
+- **Seen:** `SIM_REFUND_PAX_THIRD_19PAX_37` (19 passengers) ended `TOKEN_AUTH_ERROR` in 7 of its 35 runs over 30 days on beta, whose tokens last 2 minutes.
+  - In the campaign of 2026-11-18 on the k3s test machine, step 01 renewed the token at 15:43:54.9.
+  - `13. PATCH Refund Offer` was refused with 401 at 15:45:09.4, 74 s later.
+- **Why:** the run renewed its token at a few points only: at 01, in the expiry flows, and before each read of the refund receipt. OSCAR's cache hands out a token with more than 60 s left. A scenario going on for more than about 60 s after 01 could therefore send an expired token.
+- **Now, on the server:** the run's token refresh (`POST /v1/runs/:runId/refresh-access-token`, both ports) answers `expires_in`, the whole seconds the token handed out has left.
+  - It is given only when OSCAR knows it: an OAuth token whose provider gave `expires_in`, cached or just fetched.
+  - A static token gets none.
+  - `resolveAccessToken()` tells it through `opts.onExpiry`. Its other callers are unchanged.
+- **Now, in the collection:** the collection keeps when to renew, `__tokenRenewAfter`: `expires_in` less 55 s, and never sooner than 10 s (`renewalTime()`, `auth.js`).
+  - Its before-request calls `renewTokenWhenDue()` before every request the run filter keeps. That makes no call before the time, and one OSCAR refresh after it.
+  - OSCAR then gives a new token, since its own has less than 60 s left.
+  - A renewal that fails is tried again 10 s later at the soonest, not before each request.
+  - On a provider with 2-minute tokens this makes about one call a minute per run. With 15-minute tokens a run hardly ever makes one; with a static token, none. Before, the alternative was one call before every request.
+- **Left as it is:** requests a step's own script sends (`bru.sendRequest`) use the token of the step's start. A single step lasting more than 55 s, with a 2-minute token, can still meet an expired one.
+
+### Checked
+- `access-token.test.js`, `onExpiry`:
+  - a cached token gives the cache's expiry;
+  - a token fetched with `expires_in` gives the expiry it is cached with;
+  - no expiry without `expires_in`, nor for a static token;
+  - a caller that throws changes nothing.
+- `server.test.js`: `expires_in` when the expiry is known, none otherwise.
+- `bruno-token-renewal.test.js`:
+  - when to renew;
+  - the time kept at 01, none for a static token;
+  - no call before the time, one after it, and the new time kept;
+  - a failed renewal tried again 10 s later, not before each request;
+  - no token in the log;
+  - the before-request calls the renewal once, after the run filter.
+- Taking out the time kept (3 tests), the 10 s gap (1) or `expires_in` (1) each fails a test.
+
+---
+
 ## [server-1.11.551] / [collection-OTST_V2.0.266] — 2026-11-18
 
 Release 2026.590 (`current_release`). **A pod of one run waits for OSCAR before Bruno starts** (#1326).

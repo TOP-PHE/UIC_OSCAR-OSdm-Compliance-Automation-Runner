@@ -216,3 +216,57 @@ describe('resolveAccessToken — oauth2 cache', () => {
     expect(log.error).toHaveBeenCalled();
   });
 });
+
+// #1327: the run's token refresh answers how long the token has left, so a
+// run renews it before it expires.
+describe('resolveAccessToken — onExpiry', () => {
+  const base = {
+    id: 'u1', user_id: 'u1', company_id: 'c1', auth_mode: 'oauth2', oauth_profile: 'oauth2_basic',
+    token_url: 'https://token', client_id_enc: 'enc:cid', client_secret_enc: 'enc:secret',
+    oauth_scope: '',
+  };
+  async function fingerprint() {
+    fetchToken.mockResolvedValue({ token: 'seed', expiresIn: 3600 });
+    await resolveAccessToken({ ...base }, log);
+    const persist = db.run.mock.calls.find(([sql]) => sql.includes('tester_credentials') && sql.includes('cached_token_cred_fp'));
+    fetchToken.mockClear();
+    return persist[1][4];
+  }
+
+  test('a cached token: the cache\'s expiry', async () => {
+    const fp = await fingerprint();
+    const at = new Date(Date.now() + 90 * 1000).toISOString();
+    const told = [];
+    await resolveAccessToken({ ...base, cached_token_enc: 'enc:c', cached_token_expires_at: at, cached_token_cred_fp: fp },
+      log, { onExpiry: (t) => told.push(t) });
+    expect(fetchToken).not.toHaveBeenCalled();
+    expect(told).toEqual([at]);
+  });
+
+  test('a token fetched with expires_in: now plus expires_in, as cached', async () => {
+    fetchToken.mockResolvedValue({ token: 'fresh', expiresIn: 120 });
+    const told = [];
+    const before = Date.now();
+    await resolveAccessToken({ ...base }, log, { forceRefresh: true, onExpiry: (t) => told.push(t) });
+    expect(told).toHaveLength(1);
+    const ms = Date.parse(told[0]) - before;
+    expect(ms).toBeGreaterThanOrEqual(119 * 1000);
+    expect(ms).toBeLessThanOrEqual(121 * 1000);
+    const persist = db.run.mock.calls.find(([sql]) => sql.includes('cached_token_cred_fp'));
+    expect(persist[1][3]).toBe(told[0]);
+  });
+
+  test('no expiry known: a fetch without expires_in, a static token', async () => {
+    const told = [];
+    fetchToken.mockResolvedValue({ token: 'fresh', expiresIn: null });
+    await resolveAccessToken({ ...base }, log, { onExpiry: (t) => told.push(t) });
+    await resolveAccessToken({ auth_mode: 'bearer', access_token_enc: 'enc:abc' }, log, { onExpiry: (t) => told.push(t) });
+    expect(told).toEqual([]);
+  });
+
+  test('a caller that throws changes nothing: the token is returned', async () => {
+    fetchToken.mockResolvedValue({ token: 'fresh', expiresIn: 120 });
+    const tok = await resolveAccessToken({ ...base }, log, { onExpiry: () => { throw new Error('boom'); } });
+    expect(tok).toBe('fresh');
+  });
+});

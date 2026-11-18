@@ -44,7 +44,7 @@ module.exports = {
   },
   '/v1/runs/{runId}/refresh-access-token': {
     post: { tags: ['Internal'], summary: 'A fresh OSDM access token for a running run', security: open,
-      description: `Called by a run's Bruno process only, with the run's own secret in X-OSCAR-Run-Secret (no session): before a scenario, and after a long wait that may outlive the token. The token is resolved from the credentials of the run's user for the run's company, refused when that user may no longer use the company. Answer { access_token, forced }, not cached. ${FILE_LIMIT}`,
+      description: `Called by a run's Bruno process only, with the run's own secret in X-OSCAR-Run-Secret (no session): before a scenario, after a long wait that may outlive the token, and once the time the last answer gave has passed (#1327). The token is resolved from the credentials of the run's user for the run's company, refused when that user may no longer use the company. Answer { access_token, forced, expires_in }, not cached: expires_in, the whole seconds the token has left, only when OSCAR knows it (an OAuth token whose provider gave expires_in; never a static token). ${FILE_LIMIT}`,
       parameters: [pathParam('runId', 'The run'), queryParam('force', '1 or true: fetch a new token even when the cached one is still valid'), RUN_SECRET],
       responses: { 200: { description: 'The token' }, 400: { description: 'Not a run id' }, 403: { description: 'No run secret, a secret of another run, or the user may no longer use the company' }, 404: { description: 'No such run, or no credentials for its user' }, 429: { description: 'Too many requests' }, 502: { description: 'The provider\'s token endpoint refused or did not answer' } } },
   },

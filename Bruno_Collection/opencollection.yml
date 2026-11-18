@@ -275,6 +275,16 @@ request:
 
         const { getScenarioData } = require(bru.getEnvVar("library_base") + "scenarioParser.js");
 
+        // ── #1327: renew the run's token once its renewal time has passed ──────
+        // Before every request the filter keeps: OSCAR said how long the token it
+        // gave at step 01 (or at a later renewal) has left. No call before that.
+        try {
+          const { renewTokenWhenDue } = require(bru.getEnvVar("library_base") + "auth.js");
+          await renewTokenWhenDue(String(req.getName ? req.getName() : "request"));
+        } catch (_rtErr) {
+          console.log("[WARNING] Token renewal check failed: " + (_rtErr?.message || _rtErr));
+        }
+
         // ── Reset test accumulator for this request ───────────────────────────
         // bruTest() in library files accumulates results into bru.setVar('__rptTests').
         // bru.setVar is shared across ALL script phases for a single request,
