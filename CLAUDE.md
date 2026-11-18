@@ -1685,6 +1685,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   and new credentials (`PATCH /v1/me/credentials`: that user's pods). Parts
   2–5: the pod's program, the dispatcher, the queue and the setting (the
   present mode stays the default until the new one is measured), manifests.
+  **Part 2 = #1318 (1.11.547, listed): the run image's loop.**
+  `OSCAR_POD_SECRET` in the pod's environment makes `entrypoint.js` start
+  `run-pod/keptPod.js`, else `runPod.js` as before. **A run's output goes
+  to the internal port, sent by the pod itself** (the choice #1309 left
+  open): `POST /v1/runs/:runId/output`, run secret, `{ seq, parts }`
+  (`outputSender.js`), used once and in order by `worker/runOutput.js`,
+  which part 4 opens for a run it hands. Each run: `/work/<runId>`, its own
+  HOME, the run's credentials only, a process group of its own stopped at
+  its end, `/tmp` emptied after. A process left behind (looked for only
+  when the program is pid 1) makes the pod report `ended.clean: false`,
+  and the server stops it (`not-clean`). Bruno's output no longer reaches
+  the pod's log in that mode.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

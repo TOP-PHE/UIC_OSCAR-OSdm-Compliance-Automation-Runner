@@ -4,6 +4,17 @@
   "current_release": "2026.584",
   "releases": [
     {
+      "release": "2026.586",
+      "date": "2026-11-18",
+      "server": "1.11.547",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.547: kept run pods, part 2 (#1318, of #1309): the run image takes the runs of its batch one after another. With OSCAR_POD_SECRET in its environment the run image's entrypoint is a kept pod (run-pod/keptPod.js): it asks the internal port for its next run, runs it in a work folder and home folder of its own with the run's credentials only, sends Bruno's and mergeReport.js's output to the new POST /v1/runs/:runId/output (with the run's secret, numbered batches used once and in order, 64 MB a run) and the result files, keeps the run's deadline, then cleans (the run's process group stopped, its folder removed, /tmp emptied) and reports the run's end. A process the run left behind is stopped and the pod says it is no longer clean (ended.clean false): the server records the run's end and stops the pod. Without OSCAR_POD_SECRET, a pod of one run as before. Nothing makes a kept pod yet. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.585",
       "date": "2026-11-18",
       "server": "1.11.546",
