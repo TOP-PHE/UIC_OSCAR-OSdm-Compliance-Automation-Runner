@@ -253,6 +253,15 @@ function resumeFrom(lastOutputAt) {
   return new Date(at).toISOString().replace('.000Z', 'Z');
 }
 
+// How a run, or a kept pod, ended; a pod stopped for its memory or its
+// deadline says so to the server.
+function endedWith(ended, send, run) {
+  if (ended.reason === 'OOMKilled' || ended.reason === 'DeadlineExceeded') {
+    send({ t: 'err', d: `[run-dispatcher] ${run.words.pod} was stopped: ${ended.reason}\n` });
+  }
+  return ended;
+}
+
 /** Removes the Jobs and Secrets the dispatcher made before (a restart ends their runs). */
 async function removeLeftovers(kube, log = console) {
   const jobs = (await kube.listJobs(J.MANAGED_SELECTOR))?.items || [];
@@ -401,13 +410,6 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
     const podName = started.pod.metadata.name;
     if (started.pod.status?.podIP) send({ t: 'pod', address: started.pod.status.podIP });
     return followToTheEnd(run, k, podName, send);
-  }
-
-  function endedWith(ended, send, run) {
-    if (ended.reason === 'OOMKilled' || ended.reason === 'DeadlineExceeded') {
-      send({ t: 'err', d: `[run-dispatcher] ${run.words.pod} was stopped: ${ended.reason}\n` });
-    }
-    return ended;
   }
 
   return net.createServer((socket) => {
