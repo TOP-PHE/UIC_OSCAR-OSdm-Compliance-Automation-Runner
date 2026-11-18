@@ -53,7 +53,9 @@ const keyOf = (b) => `${b.companyId}|${b.userId}|${b.batchId}`;
 const batchOf = (b) => ({ companyId: b.companyId, userId: b.userId, batchId: b.batchId });
 const _batches = new Map();   // batch key -> { batch, pending: KeptRun[], starting: Set<podId>, announced: Set<runId>, runs: Set<runId> }
 const _byRun = new Map();     // runId -> KeptRun
-let _queuedOf = () => 0;
+// Until the queue says otherwise (queue.js configures it), a batch holds nothing queued.
+const NOTHING_QUEUED = (_batch) => 0;
+let _queuedOf = NOTHING_QUEUED;
 let _offs = null;
 
 class KeptRun extends EventEmitter {
@@ -253,7 +255,7 @@ function _clear() {
   _offs = null;
   _batches.clear();
   _byRun.clear();
-  _queuedOf = () => 0;
+  _queuedOf = NOTHING_QUEUED;
 }
 
 module.exports = {

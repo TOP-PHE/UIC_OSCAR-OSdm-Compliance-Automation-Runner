@@ -1120,6 +1120,16 @@ function refusedRunScope(runRow, companyId, userId) {
   }
 }
 
+// The run's process: in a pod kept for its batch (#1322), in a pod of its own
+// (podRun, pod mode), or here. Each behaves as a child process.
+function startRunProcess(runId, { keptBatch, podRun, args, cwd, env }) {
+  if (keptBatch) {
+    logEvent(runId, 'info', '[runner] The run goes to a pod kept for its batch (RUN_KEPT_PODS=on).');
+    return keptRunPool.launchKeptRun({ batch: keptBatch, run: podRun });
+  }
+  return podRun ? launchRun(podRun) : launch('bru', { args, cwd, env });
+}
+
 // ── Main execution function ────────────────────────────────────────────────────
 // Every line the run logged is written before its caller goes on, however it
 // ended (#1210): the queue, the tests and every report read them afterwards.
@@ -1428,12 +1438,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
         runId, envName, envYml: Buffer.from(envYmlOut, 'utf8').toString('base64'),
         deadlineSeconds: Math.max(60, Math.ceil(_runBudget.effectiveMs / 1000)), env: safeEnv,
       } : null;
-      if (keptBatch) {
-        logEvent(runId, 'info', '[runner] The run goes to a pod kept for its batch (RUN_KEPT_PODS=on).');
-        proc = keptRunPool.launchKeptRun({ batch: keptBatch, run: podRun });
-      } else {
-        proc = podMode ? launchRun(podRun) : launch('bru', { args, cwd: runCwd, env: safeEnv });
-      }
+      proc = startRunProcess(runId, { keptBatch, podRun, args, cwd: runCwd, env: safeEnv });
       if (podMode) {
         podEnded = watchRunPod(proc);
         proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
