@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.583",
+  "current_release": "2026.584",
   "releases": [
+    {
+      "release": "2026.584",
+      "date": "2026-11-18",
+      "server": "1.11.545",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.545: Test Config can search the scenario list (#1314). A search above the list filters it as you type, case-insensitive, on the scenario code and its description (every word must be found); Clear shows every scenario again, a line says how many are shown and how many are in the run, and Show only ticked lists the run list. Select All and Deselect All act on the scenarios shown, and the hidden ones keep their ticks; without a search they act on every scenario, as before. The section badge follows the ticks. The search is display only: it changes neither the data file nor the run list."
+      ]
+    },
     {
       "release": "2026.583",
       "date": "2026-11-17",

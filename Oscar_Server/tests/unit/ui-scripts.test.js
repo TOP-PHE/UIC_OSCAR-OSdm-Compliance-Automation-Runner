@@ -2307,3 +2307,180 @@ describe('the Report Builder: a certifier\'s live coverage (#1043)', () => {
     expect(src).toContain("if (isCertifier) {\n  // A .btn rule sets display, so `hidden` alone does not hide it.\n  document.getElementById('coverage-publish-btn').style.display = 'none';");
   });
 });
+
+describe('scenarios.js — searching the scenario list (#1314)', () => {
+  const page = 'js/scenarios.js';
+  const escHtml = require('../../public/js/esc.js').esc;
+  const words = loadFunction(page, 'scenarioSearchWords');
+  const matches = loadFunction(page, 'scenarioMatchesSearch');
+  const afterSelect = loadFunction(page, 'runListAfterSelectShown');
+  const countText = loadFunction(page, 'scenarioSearchCountText');
+  const selectAllLabel = loadFunction(page, 'selectAllLabel');
+  const sale = {
+    code: 'SIM_SALE_SEARCH_1ADT_38',
+    description: 'Simulated provider: sale of a searched trip for one adult. OSDM 3.8.0, for gamma.',
+  };
+  const none = new Set();
+
+  test('a search is its words, lower-cased, whatever the blanks', () => {
+    expect(words('  Booking  WITHOUT\tfulfillments\n')).toEqual(['booking', 'without', 'fulfillments']);
+    expect(words('')).toEqual([]);
+    expect(words('   ')).toEqual([]);
+    expect(words(null)).toEqual([]);
+    expect(words(undefined)).toEqual([]);
+  });
+
+  test('a scenario is shown when every word is in its code or its description, in any case', () => {
+    expect(matches(sale, words('sim_sale_search'), false, none)).toBe(true);
+    expect(matches(sale, words('SIMULATED Adult'), false, none)).toBe(true);
+    expect(matches(sale, words('1adt gamma'), false, none)).toBe(true);   // one word in each
+    expect(matches(sale, words('search refund'), false, none)).toBe(false);
+    expect(matches(sale, words('_38 _37'), false, none)).toBe(false);
+    expect(matches(sale, [], false, none)).toBe(true);
+  });
+
+  test('a word never matches across the code and the description, nor a missing one', () => {
+    expect(matches({ code: 'ABC', description: 'DEF' }, ['cdef'], false, none)).toBe(false);
+    expect(matches({ code: 'ABC' }, ['undefined'], false, none)).toBe(false);
+    expect(matches({ code: 'ABC', description: null }, ['null'], false, none)).toBe(false);
+    expect(matches(null, ['x'], false, none)).toBe(false);
+    expect(matches({ code: 42 }, ['42'], false, none)).toBe(true);
+  });
+
+  test('"Show only ticked" keeps the ticked scenarios, with the words', () => {
+    const toRun = new Set([sale.code]);
+    expect(matches(sale, [], true, toRun)).toBe(true);
+    expect(matches(sale, [], true, none)).toBe(false);
+    expect(matches(sale, words('refund'), true, toRun)).toBe(false);
+    expect(matches(null, [], true, toRun)).toBe(false);
+  });
+
+  test('Select All and Deselect All change the scenarios shown, and the hidden ones keep their ticks', () => {
+    const toRun = ['HIDDEN_1', 'SHOWN_1'];
+    expect(afterSelect(toRun, ['SHOWN_1', 'SHOWN_2'], true)).toEqual(['HIDDEN_1', 'SHOWN_1', 'SHOWN_2']);
+    expect(afterSelect(toRun, ['SHOWN_1', 'SHOWN_2'], false)).toEqual(['HIDDEN_1']);
+    expect(toRun).toEqual(['HIDDEN_1', 'SHOWN_1']);   // not changed in place
+  });
+
+  test('without a search, Select All and Deselect All do what they did before', () => {
+    const all = ['A', 'B', 'C'];
+    expect(afterSelect(['C'], all, true)).toEqual(['A', 'B', 'C']);
+    expect(afterSelect(['C', 'A'], all, false)).toEqual([]);
+    expect(afterSelect([], [], true)).toEqual([]);
+  });
+
+  test('the count says how many are shown, of how many, and how many are in the run', () => {
+    expect(countText(12, 245, 11, true)).toBe('12 of 245 scenarios · 11 in run');
+    expect(countText(0, 245, 3, true)).toBe('0 of 245 scenarios · 3 in run');
+    expect(countText(245, 245, 0, false)).toBe('245 scenarios · 0 in run');
+    expect(countText(1, 1, 1, false)).toBe('1 scenario · 1 in run');
+    expect(selectAllLabel(true, false, 245)).toBe('Select All');
+    expect(selectAllLabel(false, false, 245)).toBe('Deselect All');
+    expect(selectAllLabel(true, true, 11)).toBe('Select the 11 shown');
+    expect(selectAllLabel(false, true, 11)).toBe('Deselect the 11 shown');
+  });
+
+  test('the search bar escapes the text kept and shows "Show only ticked" as kept', () => {
+    const html = (scenarioSearch) => loadFunction(page, 'scenarioSearchHtml', { esc: escHtml, scenarioSearch })();
+    const typed = html({ text: '"><img src=x onerror=alert(1)>', onlyTicked: true });
+    expect(typed).not.toContain('<img');
+    expect(typed).toContain(`value="${escHtml('"><img src=x onerror=alert(1)>')}"`);
+    expect(typed).toContain('data-action="search-only-ticked" checked>');
+    expect(html({ text: '', onlyTicked: false })).toContain('data-action="search-only-ticked">');
+  });
+
+  // A list of rows as renderAll() draws them, and what the search does to them.
+  function listPage(scenarios, scenariosToRun, scenarioSearch) {
+    const rows = scenarios.map((_, i) => ({ dataset: { scCard: String(i) }, hidden: false }));
+    const count = { textContent: '' };
+    const noneShown = { hidden: true };
+    const buttons = [{ dataset: { checked: 'true' }, textContent: 'Select All' }, { dataset: { checked: 'false' }, textContent: 'Deselect All' }];
+    const list = { querySelectorAll: (sel) => (sel === '.scenario-item[data-sc-card]' ? rows : []) };
+    const badge = { textContent: '✅ 3 scenario(s) · 3 in run' };
+    const summary = { textContent: '3 scenario(s) defined, 3 selected for next run' };
+    const byId = { 'scenario-list': list, 'scenario-search-count': count, 'scenario-search-none': noneShown, 'badge-scenarios': badge, 'summary-scenarios': summary };
+    const document = {
+      getElementById: (id) => byId[id] || null,
+      querySelectorAll: (sel) => (sel === '[data-action="select-all"]' ? buttons : []),
+    };
+    const state = { scenarios, scenariosToRun };
+    const showRunListCounts = loadFunction(page, 'showRunListCounts', { document });
+    const helpers = { scenarioSearchWords: words, scenarioMatchesSearch: matches, scenarioSearchCountText: countText, selectAllLabel, showRunListCounts };
+    const apply = loadFunction(page, 'applyScenarioSearch', { document, state, scenarioSearch, Set, Number, ...helpers });
+    return { apply, rows, count, noneShown, buttons, badge, summary, state };
+  }
+
+  test('the search hides rows and says how many are shown, and changes nothing else', () => {
+    const scenarios = [
+      sale,
+      { code: 'SIM_REFUND_RETURN_1ADT_38', description: 'Refund of a return.' },
+      { code: 'SIM_EXCHANGE_1ADT_38', description: 'Exchange.' },
+    ];
+    const search = { text: 'refund', onlyTicked: false };
+    const p = listPage(scenarios, ['SIM_EXCHANGE_1ADT_38'], search);
+    const before = JSON.stringify(p.state);
+    p.apply();
+    expect(p.rows.map(r => r.hidden)).toEqual([true, false, true]);
+    expect(p.count.textContent).toBe('1 of 3 scenarios · 1 in run');
+    expect(p.buttons.map(b => b.textContent)).toEqual(['Select the 1 shown', 'Deselect the 1 shown']);
+    expect(p.noneShown.hidden).toBe(true);
+    // The section's badge and summary follow the run list, not the load.
+    expect(p.badge.textContent).toBe('✅ 3 scenario(s) · 1 in run');
+    expect(p.summary.textContent).toBe('3 scenario(s) defined, 1 selected for next run');
+    expect(JSON.stringify(p.state)).toBe(before);   // display only: the hidden tick stays
+
+    search.text = 'nothing like it';
+    p.apply();
+    expect(p.rows.every(r => r.hidden)).toBe(true);
+    expect(p.noneShown.hidden).toBe(false);
+
+    search.text = '';
+    search.onlyTicked = true;
+    p.apply();
+    expect(p.rows.map(r => r.hidden)).toEqual([true, true, false]);
+
+    search.onlyTicked = false;
+    p.apply();
+    expect(p.rows.some(r => r.hidden)).toBe(false);
+    expect(p.count.textContent).toBe('3 scenarios · 1 in run');
+    expect(p.buttons.map(b => b.textContent)).toEqual(['Select All', 'Deselect All']);
+    expect(JSON.stringify(p.state)).toBe(before);
+  });
+
+  test('Select All acts on the scenarios shown, through the same rule as the rows', () => {
+    const scenarios = [sale, { code: 'SIM_REFUND_RETURN_1ADT_38', description: 'Refund of a return.' }];
+    const state = { scenarios, scenariosToRun: ['SIM_SALE_SEARCH_1ADT_38'] };
+    const calls = [];
+    const scenarioSearch = { text: 'refund', onlyTicked: false };
+    const shownScenarioCodes = loadFunction(page, 'shownScenarioCodes', { state, scenarioSearch, scenarioSearchWords: words, scenarioMatchesSearch: matches, Set });
+    const selectAll = loadFunction(page, 'selectAll', {
+      state, shownScenarioCodes, runListAfterSelectShown: afterSelect,
+      renderAll: () => calls.push('renderAll'), markDirty: () => calls.push('markDirty'),
+    });
+    selectAll(false);
+    expect(state.scenariosToRun).toEqual(['SIM_SALE_SEARCH_1ADT_38']);   // hidden: kept
+    selectAll(true);
+    expect(state.scenariosToRun).toEqual(['SIM_SALE_SEARCH_1ADT_38', 'SIM_REFUND_RETURN_1ADT_38']);
+    expect(calls).toEqual(['renderAll', 'markDirty', 'renderAll', 'markDirty']);
+  });
+
+  test('the search controls never mark the page as changed, and are handled before the switches', () => {
+    const src = read(page);
+    for (const name of ['scenarioSearchHtml', 'applyScenarioSearch', 'showRunListCounts', 'inputScenarioSearch', 'changeScenarioSearch', 'clickScenarioSearch']) {
+      const body = loadFunction(page, name, {}).toString();
+      expect(body).not.toContain('markDirty');
+      expect(body).not.toMatch(/state\.\w+\s*=/);
+      expect(body).not.toContain('innerHTML');
+    }
+    expect(src).toContain('if (clickScenarioSearch(action)) return;   // #1314');
+    expect(src).toContain('if (changeScenarioSearch(action, el)) return;   // #1314');
+    expect(src).toContain('if (inputScenarioSearch(action, el)) return;   // #1314');
+    // renderAll() draws every row, then the search hides the ones it does not keep.
+    const renderAll = loadFunction(page, 'renderAll', {}).toString();
+    expect(renderAll.match(/applyScenarioSearch\(\);/g)).toHaveLength(2);
+    // The search bar sits outside every scenario card, so no card lock reaches it.
+    const bar = src.indexOf('${scenarioSearchHtml()}');
+    expect(bar).toBeGreaterThan(src.indexOf('data-action="select-all" data-checked="false"'));
+    expect(bar).toBeLessThan(src.indexOf('<div id="scenario-list"></div>'));
+  });
+});

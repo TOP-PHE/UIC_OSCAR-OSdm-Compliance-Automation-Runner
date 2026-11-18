@@ -1623,6 +1623,7 @@ function renderScenariosSection(framework, resources, datafile) {
             <button class="btn btn-sm btn-secondary" data-action="select-all" data-checked="false">Deselect All</button>
           </div>
         </div>
+        ${scenarioSearchHtml()}
         <div id="scenario-list"></div>
       </div>
 
@@ -2025,6 +2026,131 @@ async function deleteDatafile() {
   }
 }
 
+// ── Scenario search (#1314) ──────────────────────────────────────────────────
+// A data file may hold 200+ scenarios: the search narrows the list to find and
+// tick a few. Display only: it lives in this variable, never in `state`, and
+// changes neither the run list nor the unsaved state. A hidden scenario keeps
+// its tick. Select All / Deselect All act on the scenarios shown.
+const scenarioSearch = { text: '', onlyTicked: false };
+
+// The words of a search, lower-cased.
+function scenarioSearchWords(text) {
+  return String(text ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+// True when the search shows this scenario: every word is in its code or its
+// description, and it is ticked when only the ticked ones are shown.
+function scenarioMatchesSearch(sc, words, onlyTicked, toRun) {
+  if (onlyTicked && !toRun.has(sc?.code)) return false;
+  const text = `${sc?.code ?? ''}\n${sc?.description ?? ''}`.toLowerCase();
+  return words.every(w => text.includes(w));
+}
+
+// The run list after Select All (checked) or Deselect All on the codes shown:
+// the codes not shown keep their ticks.
+function runListAfterSelectShown(toRun, shownCodes, checked) {
+  const shown = new Set(shownCodes);
+  const kept = toRun.filter(c => !shown.has(c));
+  return checked ? [...kept, ...shownCodes] : kept;
+}
+
+// "12 of 245 scenarios · 11 in run", or "245 scenarios · 11 in run" unfiltered.
+function scenarioSearchCountText(shown, total, inRun, filtered) {
+  const all = `${total} scenario${total === 1 ? '' : 's'}`;
+  const head = filtered ? `${shown} of ${all}` : all;
+  return `${head} · ${inRun} in run`;
+}
+
+function selectAllLabel(checked, filtered, shown) {
+  if (!filtered) return checked ? 'Select All' : 'Deselect All';
+  return `${checked ? 'Select' : 'Deselect'} the ${shown} shown`;
+}
+
+function scenarioSearchHtml() {
+  return `
+        <div class="scenario-search">
+          <input type="search" id="scenario-search-input" data-action="search-scenarios" value="${esc(scenarioSearch.text)}"
+            placeholder="🔍 Search by code or description (every word must match)"
+            aria-label="Search the scenarios by code or description" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn btn-sm btn-secondary" data-action="clear-scenario-search" title="Show every scenario again">✕ Clear</button>
+          <label class="scenario-search-ticked"><input type="checkbox" data-action="search-only-ticked"${scenarioSearch.onlyTicked ? ' checked' : ''}> Show only ticked</label>
+          <span id="scenario-search-count" class="scenario-search-count" aria-live="polite"></span>
+        </div>
+        <div id="scenario-search-none" class="scenario-search-none" hidden>No scenario matches the search. A hidden scenario keeps its tick.</div>`;
+}
+
+// The codes of the scenarios the search shows, in the list's order.
+function shownScenarioCodes() {
+  const toRun = new Set(state.scenariosToRun || []);
+  const words = scenarioSearchWords(scenarioSearch.text);
+  return (state.scenarios || [])
+    .filter(sc => scenarioMatchesSearch(sc, words, scenarioSearch.onlyTicked, toRun))
+    .map(sc => sc.code);
+}
+
+// Shows the rows the search keeps and says how many. It hides rows, never
+// redraws them: an open card stays open, with what is typed in it.
+function applyScenarioSearch() {
+  const listEl = document.getElementById('scenario-list');
+  if (!listEl || !state) return;
+  const all = state.scenarios || [];
+  const inRun = state.scenariosToRun || [];
+  const toRun = new Set(inRun);
+  const words = scenarioSearchWords(scenarioSearch.text);
+  const filtered = words.length > 0 || scenarioSearch.onlyTicked;
+  let shown = 0;
+  listEl.querySelectorAll('.scenario-item[data-sc-card]').forEach(row => {
+    const keep = scenarioMatchesSearch(all[Number.parseInt(row.dataset.scCard, 10)], words, scenarioSearch.onlyTicked, toRun);
+    row.hidden = !keep;
+    if (keep) shown += 1;
+  });
+  const count = document.getElementById('scenario-search-count');
+  if (count) count.textContent = scenarioSearchCountText(shown, all.length, inRun.length, filtered);
+  const none = document.getElementById('scenario-search-none');
+  if (none) none.hidden = !(filtered && shown === 0 && all.length > 0);
+  document.querySelectorAll('[data-action="select-all"]').forEach(btn => {
+    btn.textContent = selectAllLabel(btn.dataset.checked === 'true', filtered, shown);
+  });
+  showRunListCounts(all.length, inRun.length);
+}
+
+// The section's badge and summary follow the ticks (they were drawn once, at
+// load, and kept the loaded count until the next save).
+function showRunListCounts(total, inRun) {
+  if (!total) return;
+  const badge = document.getElementById('badge-scenarios');
+  if (badge) badge.textContent = `✅ ${total} scenario(s) · ${inRun} in run`;
+  const summary = document.getElementById('summary-scenarios');
+  if (summary) summary.textContent = `${total} scenario(s) defined, ${inRun} selected for next run`;
+}
+
+// The search's own controls. None of them marks the page as changed.
+function inputScenarioSearch(action, el) {
+  if (action !== 'search-scenarios') return false;
+  scenarioSearch.text = el.value;
+  applyScenarioSearch();
+  return true;
+}
+
+function changeScenarioSearch(action, el) {
+  if (action !== 'search-only-ticked') return false;
+  scenarioSearch.onlyTicked = el.checked;
+  applyScenarioSearch();
+  return true;
+}
+
+function clickScenarioSearch(action) {
+  if (action !== 'clear-scenario-search') return false;
+  scenarioSearch.text = '';
+  scenarioSearch.onlyTicked = false;
+  const input = document.getElementById('scenario-search-input');
+  if (input) { input.value = ''; input.focus(); }
+  const ticked = document.querySelector('[data-action="search-only-ticked"]');
+  if (ticked) ticked.checked = false;
+  applyScenarioSearch();
+  return true;
+}
+
 // ── Render everything ─────────────────────────────────────────────────────────
 function renderAll() {
   const all   = state.scenarios || [];
@@ -2034,6 +2160,7 @@ function renderAll() {
 
   if (!all.length) {
     listEl.innerHTML = '<div class="placeholder">No scenarios defined in the data file.</div>';
+    applyScenarioSearch();
     return;
   }
 
@@ -2075,7 +2202,7 @@ function renderAll() {
           data-action="toggle-scenario" data-code="${esc(sc.code)}"
           title="${inRun ? 'Remove from run' : 'Add to run'}"
           style="accent-color:#0090D4;width:18px;height:18px;flex-shrink:0;cursor:pointer">
-        <div style="flex:1;min-width:0;cursor:pointer" data-action="toggle-detail" data-idx="${esc(idx)}">
+        <div style="flex:1;min-width:0;cursor:pointer" data-action="toggle-detail" data-idx="${esc(idx)}" title="${esc(sc.description)}">
           <div style="font-weight:700;color:#1a2e40;font-size:13px">${esc(scenarioTitle(sc))} ${ownerBadge} ${versionBadge}</div>
           <div style="font-size:11px;color:#90a4ae;font-family:'Courier New',monospace">${esc(sc.code)}</div>
         </div>
@@ -2095,6 +2222,7 @@ function renderAll() {
       <div class="scenario-detail" id="detail-${esc(idx)}"></div>
     </div>`;
   }).join('');
+  applyScenarioSearch();
 }
 
 function toggleScenario(code, checked) {
@@ -2112,11 +2240,14 @@ function toggleScenario(code, checked) {
     badge.textContent = checked ? '✓ In run' : 'Not in run';
   }
   markDirty();
+  applyScenarioSearch();   // #1314: the count, and "Show only ticked"
 }
 
+// #1314: on the scenarios the search shows (all of them without a search); a
+// hidden scenario keeps its tick.
 function selectAll(checked) {
   if (!state) return;
-  state.scenariosToRun = checked ? (state.scenarios || []).map(s => s.code) : [];
+  state.scenariosToRun = runListAfterSelectShown(state.scenariosToRun || [], shownScenarioCodes(), checked);
   renderAll();
   markDirty();
 }
@@ -8630,6 +8761,7 @@ document.body.addEventListener('click', function(e) {
   if (clickFwList(action, el)) return;   // #887, before the switch (Sonar S1479)
   if (clickDistributionMode(action, el)) return;   // #936, likewise
   if (clickFarePanel(action, el)) return;   // #937, likewise
+  if (clickScenarioSearch(action)) return;   // #1314, likewise
 
   switch (action) {
     // ── Static / section actions ──────────────────────────────────────────────
@@ -9193,6 +9325,7 @@ document.body.addEventListener('change', function(e) {
   if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el) || changeTraceContext(action, el)) return;
   // #1258: a NON_TRIP trip's fields.
   if (changeNonTrip(action, el)) return;
+  if (changeScenarioSearch(action, el)) return;   // #1314
 
   switch (action) {
     case 'file-upload':
@@ -9668,6 +9801,7 @@ document.body.addEventListener('input', function(e) {
   if (changeNonTrip(action, el)) return;
   if (inputTraceState(action, el)) return;
   if (inputLostCard(action, el)) return;
+  if (inputScenarioSearch(action, el)) return;   // #1314
   if (inputRequestedSection(action, el)) return;
   if (inputFareRefundFee(action, el)) return;
 

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-18-scenario-search",
+    "date": "November 18, 2026",
+    "tag": "Improvement",
+    "title": "Test Config: search the scenario list",
+    "summary": "A search above Test Config's scenario list finds scenarios by code or description, so a few can be ticked for a run among hundreds without scrolling.",
+    "content": "A data file following a simulator reference holds over 200 scenarios, and the scenarios of your run list are ticked in Test Config. Finding a few of them meant scrolling the whole list.\n\nA search field now sits above the list. It filters as you type, on the scenario's code and its description, in any case. With several words, a scenario must contain every one of them: \"booking without\" finds the booking-without variants. A code may also find the scenarios whose description names it. Clear shows every scenario again. A line beside it says how many scenarios are shown and how many are in your run list, and Show only ticked lists your run list, to check it before a run.\n\nThe search only changes what you see. A scenario hidden by it keeps its tick, and nothing is saved until you click Save & Apply. With a search, Select All and Deselect All act on the scenarios shown (\"Select the 12 shown\"), and leave the hidden ones as they are. Without a search they act on every scenario, as before.\n\nTo run a few named scenarios: Deselect All, then search each code and tick it, check with Show only ticked, Save & Apply, and on New Run choose My run list. No action is required."
+  },
+  {
     "id": "2026-11-17-booked-as-offered",
     "date": "November 17, 2026",
     "tag": "Improvement",
