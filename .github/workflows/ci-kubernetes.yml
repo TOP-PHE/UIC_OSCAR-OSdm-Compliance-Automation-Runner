@@ -405,6 +405,10 @@ jobs:
           echo "NODE_IP=$node_ip" >> "$GITHUB_ENV"
           sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
           sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
+          # #1271: k3s starts on its default datastore (SQLite) first, as a
+          # machine installed before etcd; the next step converts it as the
+          # guide does, so the conversion is proved, not only a new install.
+          sudo sed -i '/^cluster-init:/d' /etc/rancher/k3s/config.yaml
           sudo cp OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
           # k3s comes from GitHub's releases: a download that times out there
           # ("Download failed") is tried again, as the guide says to.
@@ -430,6 +434,33 @@ jobs:
           # Secrets are encrypted in k3s's datastore (k3s/config.yaml).
           sudo k3s secrets-encrypt status | tee "$RUNNER_TEMP/encryption.txt"
           grep -q 'Encryption Status: Enabled' "$RUNNER_TEMP/encryption.txt"
+
+      - name: k3s converted to etcd, as the guide converts a machine (#1271)
+        run: |
+          set -euo pipefail
+          sudo test -f /var/lib/rancher/k3s/server/db/state.db
+          # Something made on SQLite must come along: a Secret, encrypted at rest.
+          kubectl create namespace convert-check
+          kubectl -n convert-check create secret generic marker --from-literal=value=made-on-sqlite
+          # The guide's conversion (section 9, "k3s on etcd").
+          sudo systemctl stop k3s
+          grep -q '^cluster-init:' /etc/rancher/k3s/config.yaml || echo 'cluster-init: true' | sudo tee -a /etc/rancher/k3s/config.yaml
+          sudo systemctl start k3s
+          for _ in $(seq 1 90); do
+            if kubectl get --raw /readyz > /dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          kubectl wait node --all --for=condition=Ready --timeout=180s
+          # On etcd now: its folder, the SQLite file renamed, the node's etcd role.
+          sudo test -d /var/lib/rancher/k3s/server/db/etcd/member
+          sudo test -f /var/lib/rancher/k3s/server/db/state.db.migrated
+          sudo test ! -e /var/lib/rancher/k3s/server/db/state.db
+          test "$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.node-role\.kubernetes\.io/etcd}')" = true
+          echo "keys copied: $(sudo journalctl -u k3s --since -10min | grep -c 'Migrating etcd key')"
+          test "$(kubectl -n convert-check get secret marker -o jsonpath='{.data.value}' | base64 -d)" = made-on-sqlite
+          sudo k3s secrets-encrypt status | grep -q 'Encryption Status: Enabled'
+          kubectl delete namespace convert-check --wait=false
+          kubectl -n kube-system rollout status deployment/traefik --timeout=300s
 
       - name: The runs' namespace, and the simulator for the run pods
         run: |

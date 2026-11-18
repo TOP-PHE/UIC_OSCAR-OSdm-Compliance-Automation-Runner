@@ -15,3 +15,11 @@ write-kubeconfig-mode: "0600"
 # Kubernetes Secrets encrypted in k3s's datastore: oscar-secrets holds
 # ENCRYPTION_KEY. It can only be switched on at a k3s start.
 secrets-encryption: true
+
+# Embedded etcd, not k3s's default (kine over SQLite). Under a batch, kine's
+# compaction did not finish in time and k3s exited ("Transaction commit
+# failed"): new runs failed and the runs going froze for two minutes (#1271).
+# A machine installed on SQLite is converted at the first k3s start that reads
+# this key: k3s copies its content into etcd and renames server/db/state.db
+# to state.db.migrated (guide, section 9, "k3s on etcd").
+cluster-init: true

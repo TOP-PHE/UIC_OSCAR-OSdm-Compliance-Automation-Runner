@@ -776,8 +776,24 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
     expect(doc).toContain('`server-memory.yaml`');
   });
 
-  test('k3s keeps the kubeconfig root\'s and encrypts Secrets', () => {
-    expect(k3sConfig).toEqual({ 'write-kubeconfig-mode': '0600', 'secrets-encryption': true });
+  test('k3s keeps the kubeconfig root\'s, encrypts Secrets and keeps its state in etcd', () => {
+    expect(k3sConfig).toEqual({ 'write-kubeconfig-mode': '0600', 'secrets-encryption': true, 'cluster-init': true });
+  });
+
+  // #1271: under a batch, kine over SQLite stopped k3s. The guide converts a
+  // machine installed before; the CI starts k3s on SQLite and converts it the
+  // same way, with the same line, then checks it is on etcd.
+  test('the guide and the CI convert a machine on SQLite to etcd the same way', () => {
+    const convert = "grep -q '^cluster-init:' /etc/rancher/k3s/config.yaml || echo 'cluster-init: true' | sudo tee -a /etc/rancher/k3s/config.yaml";
+    expect(doc).toContain(convert);
+    expect(steps).toContain(convert);
+    expect(steps).toContain("sudo sed -i '/^cluster-init:/d' /etc/rancher/k3s/config.yaml");
+    expect(steps.indexOf("sudo sed -i '/^cluster-init:/d'")).toBeLessThan(steps.indexOf(convert));
+    for (const check of ['state.db.migrated', 'db/etcd/member', 'node-role\\.kubernetes\\.io/etcd', 'made-on-sqlite']) {
+      expect(steps).toContain(check);
+    }
+    expect(doc).toContain('### k3s on etcd');
+    expect(doc).toContain('`control-plane,etcd`');
   });
 
   test('the guide and the CI install the same k3s, with the same files, in the same places', () => {

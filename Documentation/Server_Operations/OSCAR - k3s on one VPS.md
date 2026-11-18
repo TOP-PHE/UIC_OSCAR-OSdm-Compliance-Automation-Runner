@@ -16,6 +16,8 @@ machine. The details behind each step are in the
 "k3s on one machine" of `.github/workflows/ci-kubernetes.yml` follows this
 document on a fresh machine:
 - the same k3s version and files;
+- k3s started on SQLite, then converted to etcd as section 9 does, a Secret
+  made before still readable after;
 - a scenario run on the OSDM simulator, in a pod of its own;
 - Traefik's redirect, body limit and client address;
 - what a run pod may reach;
@@ -74,6 +76,9 @@ block sets them again, because a value is lost when the SSH session ends.
   SQLite's page cache (64 MB) and its memory map (256 MB, pages of that same
   kernel cache), from server 1.11.517 (#1237): keep at least 1 GiB above
   them. The monitoring takes about 1.5 GB more (section 8a).
+- **A disk that writes quickly to the end** (SSD or NVMe). k3s keeps the
+  cluster's state in etcd, which waits for each of its writes to reach the
+  disk. Section 3 checks the disk before k3s is installed.
 - **Nothing else on ports 80 and 443**: no nginx, no OSCAR Docker stack on
   this machine.
 - **A DNS name pointing at the machine**, before section 6 (below).
@@ -221,6 +226,23 @@ and run the block again (it copies the file again first). Let's Encrypt
 refuses such an address, and nothing says so until the browser warns about
 Traefik's own certificate at section 6.
 
+Then the disk, for etcd. k3s keeps the cluster's state in etcd (below), which
+waits for each of its writes to reach the disk; etcd's FAQ asks for 99 % of
+those waits under 10 ms. This is the test etcd's FAQ points to, run where k3s
+will keep its data, while nothing else works the disk:
+
+```bash
+sudo apt-get install -y fio
+sudo mkdir -p /var/lib/rancher/disk-check
+sudo fio --rw=write --ioengine=sync --fdatasync=1 --directory=/var/lib/rancher/disk-check --size=22m --bs=2300 --name=etcd-disk | grep -A7 'fsync/fdatasync'
+sudo rm -rf /var/lib/rancher/disk-check
+```
+
+Read the line `sync percentiles`, then `99.00th=[ … ]`: the unit is on that
+line (`usec`, microseconds, or `msec`). Under 10 ms (10000 usec): go on.
+Above: k3s works, but under a batch etcd waits for the disk and logs *slow
+fdatasync*; choose a machine with a faster disk if you can.
+
 Then k3s's settings, and the pinned k3s:
 
 ```bash
@@ -234,10 +256,17 @@ The `if` line prints `resolv-conf: /etc/rancher/k3s/resolv.conf` when you
 wrote the pods' resolvers above, and nothing otherwise.
 
 What the two files do:
-- [`k3s/config.yaml`](../../OSCAR_Deploy/kubernetes/k3s/config.yaml): the
-  kubeconfig, which holds every right on the cluster, is root's only, and
-  Kubernetes Secrets (OSCAR's `ENCRYPTION_KEY` among them) are encrypted on
-  disk. This one must be in place before the first start.
+- [`k3s/config.yaml`](../../OSCAR_Deploy/kubernetes/k3s/config.yaml):
+  - the kubeconfig, which holds every right on the cluster, is root's only;
+  - Kubernetes Secrets (OSCAR's `ENCRYPTION_KEY` among them) are encrypted
+    on disk;
+  - the cluster's state is kept in etcd (`cluster-init`), not in k3s's
+    default, kine over SQLite. Under a batch, kine's clean-up of old versions
+    did not finish in time, and k3s stopped: the runs going froze for two
+    minutes and new ones failed (#1271). A machine installed before is
+    converted in section 9, *k3s on etcd*.
+
+  This file must be in place before the first start.
 - [`k3s/traefik-config.yaml`](../../OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml):
   - `http` is sent to `https`;
   - Let's Encrypt certificates, by the TLS challenge on port 443, kept on the
@@ -257,7 +286,7 @@ sudo kubectl -n kube-system get pods
 
 | Command | The right answer | Otherwise |
 |---|---|---|
-| `get nodes` | One line: the machine's name, `Ready`, `control-plane`, `v1.36.6+k3s1` | `NotReady`: k3s is still starting; ask again in a minute. Still `NotReady` after 5 minutes: `sudo journalctl -u k3s --since -10min \| tail -n 50` says why. *The connection to the server 127.0.0.1:6443 was refused*: k3s is not running, `sudo systemctl status k3s`. |
+| `get nodes` | One line: the machine's name, `Ready`, `control-plane,etcd`, `v1.36.6+k3s1` | `NotReady`: k3s is still starting; ask again in a minute. Still `NotReady` after 5 minutes: `sudo journalctl -u k3s --since -10min \| tail -n 50` says why. *The connection to the server 127.0.0.1:6443 was refused*: k3s is not running, `sudo systemctl status k3s`. |
 | `rollout status … traefik` | `deployment "traefik" successfully rolled out` | *deployments.apps "traefik" not found*: k3s has not installed Traefik yet (its `helm-install-traefik` job); ask again in a minute. *timed out waiting*: the next command says which pod waits. |
 | `get pods` | Every pod `Running` (READY `1/1`, `2/2` for `svclb-traefik-…`) or `Completed` (the two `helm-install-traefik…` jobs). The list: `coredns`, `local-path-provisioner`, `metrics-server`, `svclb-traefik`, `traefik`, `helm-install-traefik`, `helm-install-traefik-crd`. A job may show `RESTARTS` 1 or 2: it waited for Traefik's resource types. | `ImagePullBackOff` or `ErrImagePull` (often `svclb-traefik` and a `helper-pod-create-pvc-…`), Traefik `Pending`: k3s could not download an image, see section 11. `CrashLoopBackOff` on `traefik`: `sudo kubectl -n kube-system logs deploy/traefik --tail=30` says why, usually a typo in `traefik-config.yaml`. |
 
@@ -1026,6 +1055,103 @@ fi
 
 A run whose pod was given up under it reads *Run not finished*, never as the
 provider's failure. To compare, run the same batch with `off`, then `on`.
+On the 6 vCPU test machine (2026-11-18, 939 runs on six simulators) it gave
+no gain: 23.7 runs a minute off, 23.0 on. The CPU was the limit, Bruno's
+start above all, not the making of pods.
+
+### k3s on etcd (a machine installed before #1271)
+
+A machine installed with this guide before #1271 keeps k3s's state in kine
+over SQLite, k3s's default. Under a batch, kine's clean-up of old versions did
+not finish in time and k3s stopped:
+- its journal shows `Slow SQL` lines, then `level=fatal msg="Transaction
+  commit failed"`;
+- the runs going froze for about two minutes, new runs failed, and a run
+  whose token expired meanwhile read `TOKEN_AUTH_ERROR`.
+
+k3s converts such a machine itself, at the first start that reads
+`cluster-init`. It copies the cluster's content into etcd and renames
+`server/db/state.db` to `state.db.migrated`. OSCAR's own data is not in it
+and does not move. Nothing is lost, but k3s stops for about a minute: no run
+must be going.
+
+**1. Look first** (reads only):
+
+```bash
+sudo ls /var/lib/rancher/k3s/server/db/
+sudo du -sh /var/lib/rancher/k3s/server
+df -h /root
+grep -n 'cluster-init' /etc/rancher/k3s/config.yaml || echo "not on etcd yet"
+```
+
+- `ls` shows `state.db` and no `etcd`: on SQLite, go on. It shows `etcd`:
+  already converted, nothing to do.
+- `df` must show more free space than `du` shows: step 2 keeps a copy.
+- Check the disk as section 3 does (`fio`), while no batch runs.
+
+**2. Convert**, with no run going. A copy of k3s's state is kept first: it
+holds the cluster's keys, so it is root's only.
+
+```bash
+HOST=oscar-test.example.org     # ← yours: this machine's DNS name
+cd /opt/oscar
+GOING=$(sudo kubectl -n oscar exec deploy/oscar -c oscar -- node --no-warnings -e 'const { DatabaseSync } = require("node:sqlite"); const db = new DatabaseSync("/app/data/oscar.db", { readOnly: true }); process.stdout.write(String(db.prepare("SELECT COUNT(*) AS n FROM runs WHERE status IN (?, ?)").get("QUEUED", "RUNNING").n));')
+if [ "$GOING" != "0" ]; then echo "STOP: '$GOING' runs are still queued or running. Nothing was changed."; else
+  sudo systemctl stop k3s
+  sudo sh -c 'umask 077; tar -C /var/lib/rancher/k3s -czf /root/k3s-server-before-etcd.tar.gz server'
+  grep -q '^cluster-init:' /etc/rancher/k3s/config.yaml || echo 'cluster-init: true' | sudo tee -a /etc/rancher/k3s/config.yaml
+  sudo systemctl start k3s
+  for _ in $(seq 1 90); do sudo kubectl get --raw /readyz > /dev/null 2>&1 && break; sleep 2; done
+  sudo kubectl wait node --all --for=condition=Ready --timeout=180s
+  sudo ls /var/lib/rancher/k3s/server/db/
+  echo "keys copied: $(sudo journalctl -u k3s --since -15min | grep -c 'Migrating etcd key')"
+  sudo kubectl get nodes
+  sudo kubectl -n oscar rollout status deployment/oscar --timeout=600s
+  curl -sS -w '\nHTTP %{http_code}\n' "https://$HOST/health"
+fi
+```
+
+What you should see:
+- **`ls`:** `etcd` and `state.db.migrated`, no `state.db`.
+- **`keys copied`:** a few hundred to a few thousand.
+- **`get nodes`:** `Ready`, `control-plane,etcd`.
+- **`/health`:** `HTTP 200`.
+
+OSCAR's pods kept running while k3s was stopped: none restarts.
+
+**If k3s does not come back** (`get nodes` refused after a few minutes), go
+back to SQLite from the copy:
+
+```bash
+sudo systemctl stop k3s
+sudo sed -i '/^cluster-init:/d' /etc/rancher/k3s/config.yaml
+sudo rm -rf /var/lib/rancher/k3s/server
+sudo tar -C /var/lib/rancher/k3s -xzf /root/k3s-server-before-etcd.tar.gz
+sudo systemctl start k3s
+```
+
+Then send `sudo journalctl -u k3s --since -30min | tail -n 80`.
+
+**3. Check under a batch.** Run a campaign as usual. Afterwards:
+
+```bash
+systemctl show k3s -p NRestarts
+sudo journalctl -u k3s --since -3h | grep -c 'Slow SQL'
+sudo journalctl -u k3s --since -3h | grep -ciE 'slow fdatasync|apply request took too long'
+```
+
+- **`NRestarts`:** the same as before the batch.
+- **`Slow SQL`:** 0, since kine is gone.
+- **etcd's own warnings:** a few are harmless. Many, during the batch,
+  mean the disk is slow for etcd (section 3's check).
+
+**4. A few days later**, once all is well, remove the copy and the old file:
+
+```bash
+sudo rm -f /root/k3s-server-before-etcd.tar.gz /var/lib/rancher/k3s/server/db/state.db.migrated /var/lib/rancher/k3s/server/db/state.db-wal /var/lib/rancher/k3s/server/db/state.db-shm
+```
+
+The copy holds the cluster's keys: do not leave it on the machine.
 
 ### The rest
 
@@ -1035,6 +1161,7 @@ provider's failure. To compare, run the same batch with `off`, then `on`.
 | **A k3s update** | a patch about once a month, a new minor version about every 4 months (each is maintained about a year) | the install command of step 3 again, with the new `INSTALL_K3S_VERSION` (one minor version at a time). The settings stay. A minute without OSCAR. |
 | **k3s's own certificates** | they last a year | renewed when k3s starts within 90 days of their end: an update does it, otherwise `sudo systemctl restart k3s` once a year. |
 | **Backups** | as on the VPS | `sudo OSCAR_Deploy/kubernetes/oscar-data.sh save /root/oscar-save-$(date +%F)`: OSCAR stops for a minute, then the database, data files and reports are in that folder. Encrypt it and copy it off the machine. `ENCRYPTION_KEY` stays in your password manager. To restore: section 6a from its step 2, with the key from your password manager (a saved folder has no `.env`) and `oscar-data.sh load <folder>`. |
+| **k3s's own snapshots** | by themselves, at 00:00 and 12:00 | k3s on etcd keeps the last 5, in `/var/lib/rancher/k3s/server/db/snapshots` (`sudo k3s etcd-snapshot ls`). They hold the cluster's objects, OSCAR's Secrets (`ENCRYPTION_KEY` among them), the cluster's keys and those that encrypt the Secrets, all encrypted with a key made from the server's token (`/var/lib/rancher/k3s/server/token`). A snapshot and the token together open every Secret: never copy them off the machine together. OSCAR's data is not in them: its backup stays the row above. |
 | **Disk** | now and then | `df -h /var/lib/rancher`. Old images are removed only near 85 % full; `sudo k3s crictl rmi --prune` removes the unused ones. |
 | **Logs** | when something is wrong | Grafana's *OSCAR · Logs* (section 8a), or `sudo kubectl -n oscar logs deploy/oscar`, `… logs deploy/oscar-dispatcher`, `sudo kubectl -n oscar-runs get events`, `sudo kubectl -n kube-system logs deploy/traefik`. |
 | **Monitoring** | with each release | the third block above. |
@@ -1054,6 +1181,8 @@ if you need it.
 
 | What you see | Why, and what to do |
 |---|---|
+| During a batch, every run stops for a minute or two, some fail (`RUN_PROCESS_ERROR`, `TOKEN_AUTH_ERROR`), and `sudo journalctl -u k3s` shows `Slow SQL` lines, then `level=fatal msg="Transaction commit failed"` | k3s stopped: the machine still keeps its state in kine over SQLite (#1271). Convert it to etcd: section 9, *k3s on etcd*. |
+| k3s's journal shows many `slow fdatasync` or `apply request took too long` during a batch | etcd waits for the disk. Check it as section 3 does, with no batch running; OSCAR's own database shares that disk. A disk over 10 ms at the 99th percentile is too slow for etcd: choose a faster one. |
 | Step 2 or 3 stops: *Could not resolve host: github.com*, or k3s's install says *Download failed* | The machine reached GitHub badly: its name lookup (`getent hosts github.com`) or GitHub itself ([githubstatus.com](https://www.githubstatus.com)). Run the same command again; if names keep failing, give the machine and the pods public resolvers (section 3, first step): k3s's pods find the providers through those resolvers too. |
 | After k3s's install, pods stay in `ImagePullBackOff` (`svclb-traefik`, `helper-pod-create-pvc-…`), Traefik and its volume `Pending`, and port 443 does not answer from your PC | k3s could not download those images. `sudo kubectl -n kube-system get events \| grep -i pull` says why. *lookup … Try again* or *i/o timeout*: the machine's resolvers are slow or down (`time getent hosts auth.docker.io` takes seconds); give the machine and the pods public resolvers (section 3, first step: both files). k3s is already installed, so name the pods' file in its settings yourself: add the line `resolv-conf: /etc/rancher/k3s/resolv.conf` to `/etc/rancher/k3s/config.yaml` if it is not there (`sudo grep resolv-conf /etc/rancher/k3s/config.yaml`), then `sudo systemctl restart k3s` and `sudo kubectl -n kube-system rollout restart deployment/coredns`: CoreDNS, which every pod asks, keeps the resolvers it started with. A minute later, section 3's last check lists no other address than `10.43.0.10`, `1.1.1.1` and `9.9.9.9`. *429 Too Many Requests*: Docker Hub's limit for this address; wait an hour. A pod waiting for its image tries again within 5 minutes. |
 | The browser warns about Traefik's own certificate (`curl`: *SSL certificate problem: self-signed certificate*) | Let's Encrypt did not give one yet. `sudo kubectl -n kube-system logs deploy/traefik \| grep -i acme \| tail -n 5` says why. *invalidContact … forbidden domain "example.org"* (or the e-mail is still `CHANGE-ME`): the e-mail of section 3 was not changed. Put yours in with `LE_EMAIL=` your address, then `sudo sed -i "s/^\( *email:\).*/\1 $LE_EMAIL/" /var/lib/rancher/k3s/server/manifests/traefik-config.yaml`; `grep -n 'email:'` on that file shows it, and k3s restarts Traefik within a minute. *tls: unrecognized name* right after Traefik restarted: Let's Encrypt's check reached the Traefik that was stopping. Make Traefik ask again without restarting it: `sudo kubectl -n oscar rollout restart deployment/oscar` (a minute without OSCAR), then `curl` again. Otherwise, check that the name points at the machine and port 443 is open (section 1). Let's Encrypt refuses a name after five failed checks in an hour. |
