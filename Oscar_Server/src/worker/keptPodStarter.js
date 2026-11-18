@@ -33,7 +33,7 @@ const baseLog = require('../utils/logger').child({ module: 'kept-pods' });
 
 const { STOP } = keptPods;
 // Stopped for these, a pod is removed at once.
-const AT_ONCE = new Set([STOP.REVOKED, STOP.PROTOCOL, STOP.NOT_CLEAN, STOP.DEADLINE, STOP.NOT_STARTED]);
+const AT_ONCE = new Set([STOP.REVOKED, STOP.PROTOCOL, STOP.NOT_CLEAN, STOP.DEADLINE, STOP.NOT_STARTED, STOP.STOPPED]);
 const GRACE_MS = 30 * 1000;
 const MAX_LOG_BYTES = 64 * 1024;
 const MAX_LINE_CHARS = 500;

@@ -80,6 +80,50 @@ describe('RUN_WORKSPACES_DIR', () => {
   });
 });
 
+// #1322: RUN_KEPT_PODS, on or off, read in pod mode only.
+describe('RUN_KEPT_PODS', () => {
+  const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_SERVER_URL', 'INTERNAL_PORT', 'RUN_KEPT_PODS'];
+  const saved = {};
+  beforeEach(() => {
+    for (const k of keys) saved[k] = process.env[k];
+    Object.assign(process.env, { RUN_ISOLATION: 'pod', RUN_AGENT_TOKEN: 't'.repeat(40), RUN_SERVER_URL: 'http://oscar-internal:3003', INTERNAL_PORT: '3003' });
+    delete process.env.RUN_KEPT_PODS;
+  });
+  afterEach(() => { for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
+
+  test('off unless set to on, in pod mode', () => {
+    expect([L.keptPodsOn(), L.launcherProblem()]).toEqual([false, null]);
+    for (const value of ['off', ' OFF ', '']) {
+      process.env.RUN_KEPT_PODS = value;
+      expect([value, L.keptPodsOn(), L.launcherProblem()]).toEqual([value, false, null]);
+    }
+    for (const value of ['on', ' On ']) {
+      process.env.RUN_KEPT_PODS = value;
+      expect([value, L.keptPodsOn(), L.launcherProblem()]).toEqual([value, true, null]);
+    }
+  });
+
+  test('any other value refuses the runs', () => {
+    for (const value of ['yes', 'true', '1']) {
+      process.env.RUN_KEPT_PODS = value;
+      expect(L.keptPodsOn()).toBe(false);
+      expect(L.launcherProblem()).toBe(`RUN_KEPT_PODS="${value}" is neither on nor off: no run is started. Ask the administrator to correct the server's settings.`);
+    }
+  });
+
+  test('on outside pod mode refuses the runs; off there changes nothing', () => {
+    process.env.RUN_KEPT_PODS = 'on';
+    for (const mode of ['local', 'isolated']) {
+      process.env.RUN_ISOLATION = mode;
+      expect(L.keptPodsOn()).toBe(false);
+      expect(L.launcherProblem()).toMatch(new RegExp(`^RUN_KEPT_PODS is "on" but RUN_ISOLATION is "${mode}"`));
+    }
+    process.env.RUN_KEPT_PODS = 'off';
+    process.env.RUN_ISOLATION = 'local';
+    expect(L.launcherProblem()).toBeNull();
+  });
+});
+
 // Option 4 (#1130): pod mode, a whole run per request to the run dispatcher.
 describe('pod mode', () => {
   const net = require('node:net');

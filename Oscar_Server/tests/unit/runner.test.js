@@ -1026,6 +1026,97 @@ describe('executeRun — RUN_ISOLATION=pod (#1130)', () => {
   });
 });
 
+// #1322: with RUN_KEPT_PODS=on, the runs of a batch go to pods kept for it.
+describe('executeRun — RUN_KEPT_PODS=on (#1322)', () => {
+  const runSecrets = require('../../src/utils/runSecrets');
+  const keptRunPool = require('../../src/worker/keptRunPool');
+  const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_AGENT_HOST', 'RUN_SERVER_URL', 'INTERNAL_PORT', 'RUN_KEPT_PODS'];
+  const saved = {};
+  beforeEach(() => {
+    for (const k of keys) saved[k] = process.env[k];
+    Object.assign(process.env, {
+      RUN_ISOLATION: 'pod', RUN_AGENT_TOKEN: 't'.repeat(40), RUN_AGENT_HOST: 'oscar-dispatcher',
+      RUN_SERVER_URL: 'http://oscar-internal:3003', INTERNAL_PORT: '3003', RUN_KEPT_PODS: 'on',
+    });
+  });
+  afterEach(() => {
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+    RemoteProcess.mockReset();
+    // Only this block's own spies: the file's stub of the results' extraction stays.
+    for (const name of ['announce', 'release', 'launchKeptRun']) keptRunPool[name].mockRestore?.();
+  });
+
+  async function waitFor(check) {
+    const start = Date.now();
+    while (!check() && Date.now() - start < 4000) await new Promise((r) => setTimeout(r, 10));
+  }
+
+  test('a run of a batch goes to the pool, said on its way first and released at its end; nothing to the dispatcher for it', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    const batchId = uuidv4();
+    run('UPDATE runs SET batch_id = ? WHERE id = ?', [batchId, runId]);
+    resolveAccessToken.mockResolvedValueOnce('tok-kept');
+    const announce = jest.spyOn(keptRunPool, 'announce');
+    const release = jest.spyOn(keptRunPool, 'release');
+    const calls = [];
+    jest.spyOn(keptRunPool, 'launchKeptRun').mockImplementation((args) => {
+      const proc = makeFakeProc();
+      calls.push({ args, proc });
+      return proc;
+    });
+    const done = executeRun({ runId, companyId, userId });
+    await waitFor(() => calls.length > 0);
+    expect(calls).toHaveLength(1);
+    const { args, proc } = calls[0];
+    expect(args.batch).toEqual({ companyId, userId, batchId });
+    expect(args.run).toMatchObject({ runId, deadlineSeconds: 600 });
+    expect(Buffer.from(args.run.envYml, 'base64').toString('utf8')).toContain(args.run.envName);
+    expect(args.run.env.OSCAR_ACCESS_TOKEN).toBe('tok-kept');
+    expect(runSecrets.verify(runId, args.run.env.OSCAR_RUN_SECRET)).toBe(companyId);
+    expect(announce).toHaveBeenCalledWith(runId, { companyId, userId, batchId });
+    expect(RemoteProcess).not.toHaveBeenCalled();
+    proc.emit('pod', '10.1.0.9');
+    expect(runSecrets.fromRunAddress(runId, '10.1.0.10')).toBe(false);
+    proc.emit('close', 0);
+    expect((await done).exitCode).toBe(0);
+    expect(release).toHaveBeenCalledWith(runId);
+    expect(getDecryptedEvents(runId).some((e) => /goes to a pod kept for its batch/.test(e.message))).toBe(true);
+  });
+
+  test('a run alone keeps a pod of its own', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-alone');
+    const launchKept = jest.spyOn(keptRunPool, 'launchKeptRun');
+    const announce = jest.spyOn(keptRunPool, 'announce');
+    const procs = [];
+    RemoteProcess.mockImplementation(function FakeRemote(agent, request) {
+      const proc = makeFakeProc();
+      procs.push({ request, proc });
+      return proc;
+    });
+    const done = executeRun({ runId, companyId, userId });
+    await waitFor(() => procs.length > 0);
+    expect(procs[0].request).toMatchObject({ kind: 'run', runId });
+    expect(launchKept).not.toHaveBeenCalled();
+    expect(announce).not.toHaveBeenCalled();
+    procs[0].proc.emit('close', 0);
+    expect((await done).exitCode).toBe(0);
+  });
+
+  test('a run refused before it needs a pod is released all the same', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    run('UPDATE runs SET batch_id = ? WHERE id = ?', [uuidv4(), runId]);
+    process.env.RUN_KEPT_PODS = 'maybe';
+    const release = jest.spyOn(keptRunPool, 'release');
+    const out = await executeRun({ runId, companyId, userId });
+    expect(out.error).toMatch(/^RUN_KEPT_PODS="maybe" is neither on nor off/);
+    expect(release).toHaveBeenCalledWith(runId);
+  });
+});
+
 // Option 2b: a mode the server does not know starts no run, and spawns nothing.
 describe('executeRun — RUN_ISOLATION', () => {
   test('an unknown mode refuses the run before a token is asked for', async () => {

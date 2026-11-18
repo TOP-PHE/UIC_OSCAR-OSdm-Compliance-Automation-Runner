@@ -61,6 +61,8 @@ const STOP = Object.freeze({
   DEADLINE: 'deadline',
   REVOKED: 'revoked',
   PROTOCOL: 'protocol',
+  // The runner stopped the run the pod held (#1322: timeout, silence, emergency stop).
+  STOPPED: 'stopped',
 });
 
 // The secret: 32 random bytes in base64url, 43 characters.

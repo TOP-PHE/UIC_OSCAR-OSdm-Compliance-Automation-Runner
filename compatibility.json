@@ -4,6 +4,17 @@
   "current_release": "2026.584",
   "releases": [
     {
+      "release": "2026.588",
+      "date": "2026-11-18",
+      "server": "1.11.549",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.549: kept run pods, part 4 (#1322, of #1309): the runs of a batch go to pods kept for it, with RUN_KEPT_PODS=on (off by default; read in pod mode only; another value, or on outside pod mode, refuses the runs). worker/keptRunPool.js gives the runner, for a run of a batch, an object that behaves as a run's process in pod mode: a pod of the batch that waits takes the run at once, else one is started for it unless enough are starting; the output comes from POST /v1/runs/:runId/output, the end from the pod's next call. A pod given up under a run ends it with 124, 125, 137 or 143, never a test result (#1287); kill() takes a waiting run off or removes its pod at once (new reason stopped). A waiting pod is told stop once its batch has nothing queued, on its way (the runner announces and releases each run) or waiting. A run alone keeps a pod of its own. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.587",
       "date": "2026-11-18",
       "server": "1.11.548",
