@@ -164,15 +164,8 @@ async function emptyFolder(dir) {
   } catch (err) {
     return err.code === 'ENOENT';
   }
-  let all = true;
-  for (const name of names) {
-    try {
-      await fs.promises.rm(path.join(dir, name), { recursive: true, force: true });
-    } catch {
-      all = false;
-    }
-  }
-  return all;
+  const removed = await Promise.allSettled(names.map((name) => fs.promises.rm(path.join(dir, name), { recursive: true, force: true })));
+  return removed.every((r) => r.status === 'fulfilled');
 }
 
 /** One run, from its work folder to its result files sent. Resolves with Bruno's code. */

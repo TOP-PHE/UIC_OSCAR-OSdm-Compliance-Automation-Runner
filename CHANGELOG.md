@@ -545,6 +545,9 @@ Kept run pods, part 2 (#1318, of #1309): the run image takes the runs of its bat
 ### Fixed on the way
 - `piecesOf()` would have looped for ever on a piece of one code unit ending inside a character of two; found by its own test before any release.
 
+### Left open on purpose (Sonar)
+- Three `await` inside a loop (S9382): `keptPod()`'s loop (ask for a run, run it, ask again) and the sending of one output batch again (`OutputSender.send()`) are one step after the other by their nature. `emptyFolder()` removes its entries together instead.
+
 ### Checked
 - `kept-pod.test.js`: the loop against a stand-in for the internal port: two runs with their own credentials, home and folder; output, results and their order before the end is reported; exit codes and the deadline; a process left behind (stopped, not clean); a process holding the output open; every answer it cannot use (one call, never another); a run it cannot start; the pod's inputs; the entrypoint's two modes. One test runs on Linux only: a process the run left behind ends with its group.
 - `output-sender.test.js`, `run-output.test.js`: order, batches, characters cut between chunks, retries and refusals, limits.
