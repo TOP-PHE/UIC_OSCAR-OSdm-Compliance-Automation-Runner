@@ -334,28 +334,25 @@ function hostAndPort(base) {
  * each pause while it is not reached (NOT_REACHED). Bruno's first call to
  * OSCAR is the collection's read of the data file, which is not tried again
  * (#1326). Resolves true once reached, false when the pauses are over: Bruno
- * then starts as it would have, and says what it meets.
+ * then starts as it would have, and says what it meets. One pause a level,
+ * as the kept pod's untilConnected(): at most as deep as the pauses are many.
  */
-async function waitForServer({ base, connect = tcpConnect, pauses = CONNECT_RETRY_DELAYS_MS, sleep = defaultSleep, log }) {
+async function waitForServer({ base, connect = tcpConnect, pauses = CONNECT_RETRY_DELAYS_MS, sleep = defaultSleep, log, waited = 0 }) {
   const { host, port } = hostAndPort(base);
-  const left = [...pauses];
-  let waited = 0;
-  for (;;) {
-    try {
-      await connect(host, port);
-      if (waited > 0) log(`[run-pod] OSCAR reached after ${waited / 1000} s`);
-      return true;
-    } catch (err) {
-      const code = err?.code || err?.message || String(err);
-      const pause = NOT_REACHED.has(err?.code) ? left.shift() : undefined;
-      if (pause === undefined) {
-        log(`[run-pod] OSCAR not reached (${code}); bru starts anyway`);
-        return false;
-      }
-      log(`[run-pod] OSCAR not reached yet (${code}); tried again in ${pause / 1000} s`);
-      await sleep(pause);
-      waited += pause;
+  try {
+    await connect(host, port);
+    if (waited > 0) log(`[run-pod] OSCAR reached after ${waited / 1000} s`);
+    return true;
+  } catch (err) {
+    const code = err?.code || err?.message || String(err);
+    const pause = NOT_REACHED.has(err?.code) ? pauses[0] : undefined;
+    if (pause === undefined) {
+      log(`[run-pod] OSCAR not reached (${code}); bru starts anyway`);
+      return false;
     }
+    log(`[run-pod] OSCAR not reached yet (${code}); tried again in ${pause / 1000} s`);
+    await sleep(pause);
+    return waitForServer({ base, connect, pauses: pauses.slice(1), sleep, log, waited: waited + pause });
   }
 }
 
