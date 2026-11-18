@@ -21,6 +21,12 @@
  * secret to it), then its exit code. A stop request or a dropped connection
  * deletes the Job; at start, the Jobs and Secrets it made before are removed.
  *
+ * A kept pod (#1309; part 3 = #1320) goes the same way: a `pod` request, a
+ * Secret holding the pod's secret and the internal port's address (nothing of
+ * a run), a Job running the same image, whose entrypoint then takes the runs
+ * of one batch from the internal port itself (run-pod/keptPod.js). Its log is
+ * its own lines, its exit code its own; a kept pod takes a place as a run does.
+ *
  * The Kubernetes API may stop answering for a while (#1272: k3s restarting,
  * 27 s on the test machine). A run then waits for it, keeping its place, for
  * up to RUN_DISPATCHER_API_WAIT_MS, and a run already running keeps running:
@@ -66,6 +72,9 @@ const RETRY_MAX_MS = 8000;      // the longest pause between two tries of the AP
 const EXIT_TRIES = 30;          // polls for the container's end once its log stream closed
 const MAX_RESUMES = 20;         // times a run's log is followed again after being cut
 const RESUME_MARGIN_MS = 2000;  // a resumed log starts this much earlier: lines may repeat, none is lost
+// What a run, or a kept pod, is called in the lines sent to the server.
+const RUN_WORDS = Object.freeze({ pod: "The run's pod", log: "The run's log" });
+const KEPT_POD_WORDS = Object.freeze({ pod: 'The kept pod', log: "The kept pod's log" });
 
 // Kubernetes API errors that waiting can cure (#1272): no answer at all (a
 // refused, reset or timed-out connection: a system error code), or what the
@@ -312,7 +321,8 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
   }
 
   async function createObjects(run, k) {
-    const secret = J.runSecret({ ...run.request, resultsUrl: settings.resultsUrl });
+    const inputs = { ...run.request, resultsUrl: settings.resultsUrl };
+    const secret = run.kept ? J.keptPodSecret(inputs) : J.runSecret(inputs);
     try {
       await k.createSecret(secret);
     } catch (err) {
@@ -323,7 +333,8 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
       await removeRun(run);
       await k.createSecret(secret);
     }
-    const job = await createRunJob(run, k, J.runJob(run.request, settings), Date.now() + apiWaitMs);
+    const spec = run.kept ? J.keptPodJob(run.request, settings) : J.runJob(run.request, settings);
+    const job = await createRunJob(run, k, spec, Date.now() + apiWaitMs);
     // The Secret goes with the Job (best effort: the dispatcher removes it too).
     k.patchSecret(run.name, J.ownedBy(job)).catch(() => {});
   }
@@ -365,12 +376,12 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
       const cut = await followLog(k, podName, sinceTime, onData);
       if (run.stopped) return { code: EXIT_STOPPED };
       const ended = await exitOf(k, run.name, podName, { pollMs });
-      if (!ended.running && !cut) return endedWith(ended, send);
+      if (!ended.running && !cut) return endedWith(ended, send, run);
       if (reads > MAX_RESUMES) {
-        return ended.running ? { code: 1, reason: `the run's log was cut ${reads} times` } : endedWith(ended, send);
+        return ended.running ? { code: 1, reason: `the run's log was cut ${reads} times` } : endedWith(ended, send, run);
       }
       sinceTime = resumeFrom(lastOutputAt);
-      send({ t: 'err', d: `[run-dispatcher] The run's log was cut; it is read again from ${sinceTime}: a line may show twice.\n` });
+      send({ t: 'err', d: `[run-dispatcher] ${run.words.log} was cut; it is read again from ${sinceTime}: a line may show twice.\n` });
       log.info?.(`[run-dispatcher] ${run.name}: its log was cut, read again from ${sinceTime}`);
     }
   }
@@ -383,18 +394,18 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
     log.info?.(`[run-dispatcher] started ${run.name}`);
     const started = await waitForPod(k, run.name, { pollMs, startTimeoutMs: settings.startTimeoutMs, isStopped: () => run.stopped });
     if (started.failed) {
-      if (!run.stopped) send({ t: 'err', d: `[run-dispatcher] The run's pod did not start: ${started.failed}\n` });
+      if (!run.stopped) send({ t: 'err', d: `[run-dispatcher] ${run.words.pod} did not start: ${started.failed}\n` });
       return { code: run.stopped ? EXIT_STOPPED : EXIT_NOT_STARTED };
     }
-    if (started.ended) return endedWith(started.ended, send);
+    if (started.ended) return endedWith(started.ended, send, run);
     const podName = started.pod.metadata.name;
     if (started.pod.status?.podIP) send({ t: 'pod', address: started.pod.status.podIP });
     return followToTheEnd(run, k, podName, send);
   }
 
-  function endedWith(ended, send) {
+  function endedWith(ended, send, run) {
     if (ended.reason === 'OOMKilled' || ended.reason === 'DeadlineExceeded') {
-      send({ t: 'err', d: `[run-dispatcher] The run's pod was stopped: ${ended.reason}\n` });
+      send({ t: 'err', d: `[run-dispatcher] ${run.words.pod} was stopped: ${ended.reason}\n` });
     }
     return ended;
   }
@@ -423,10 +434,18 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
         if (P.killSignalOf(msg)) stop();
         return undefined;
       }
-      const checked = P.checkRunRequest(msg, { token: settings.token });
+      const kept = msg?.kind === P.POD_KIND;
+      const checked = kept ? P.checkPodRequest(msg, { token: settings.token }) : P.checkRunRequest(msg, { token: settings.token });
       if (!checked.request) return refuse(checked.reason);
       if (running.size >= settings.maxRuns) return refuse('too many runs');
-      run = { request: checked.request, name: J.jobNameOf(checked.request.runId), stopped: false, done: false };
+      run = {
+        request: checked.request,
+        name: kept ? J.podJobNameOf(checked.request.podId) : J.jobNameOf(checked.request.runId),
+        kept,
+        words: kept ? KEPT_POD_WORDS : RUN_WORDS,
+        stopped: false,
+        done: false,
+      };
       running.add(run);
       execute(run, send).then(
         ({ code, reason }) => finish({ t: 'exit', code, signal: null, reason: reason || undefined }),

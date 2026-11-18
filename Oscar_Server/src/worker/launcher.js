@@ -126,6 +126,20 @@ function launchRun({ runId, envName, envYml, deadlineSeconds, env }) {
   return new RemoteProcess(agentSettings(), { kind: 'run', runId, envName, envYml, deadlineSeconds, env: runEnv });
 }
 
+/**
+ * Starts a pod kept for the runs of one batch (pod mode, #1309; part 3 =
+ * #1320): the dispatcher makes it with its secret and deadline, nothing of a
+ * run. Returns an object that behaves like a child process: its output is the
+ * pod's own lines, 'pod' (address) once it has one, 'close' (code) at its end.
+ */
+function launchPod({ podId, podSecret, deadlineSeconds }) {
+  if (isolationMode() !== 'pod') throw new Error('launcher: a kept pod is started in pod mode only');
+  const problem = launcherProblem();
+  if (problem) throw new Error(problem);
+  RemoteProcess ??= require('./remoteProcess').RemoteProcess;
+  return new RemoteProcess(agentSettings(), { kind: 'pod', podId, podSecret, deadlineSeconds });
+}
+
 /** Starts a process of `kind` here, as a child process (the agent uses it too). */
 function launchLocal(kind, { args, cwd, env }) {
   if (!KINDS.includes(kind)) throw new Error(`launcher: unknown kind "${kind}"`);
@@ -139,4 +153,4 @@ function launchLocal(kind, { args, cwd, env }) {
   return spawn(process.execPath, [script, ...args], { cwd, shell: false, env });
 }
 
-module.exports = { launch, launchRun, launchLocal, launcherProblem, isolationMode, agentSettings, MODES, KINDS };
+module.exports = { launch, launchRun, launchPod, launchLocal, launcherProblem, isolationMode, agentSettings, MODES, KINDS };

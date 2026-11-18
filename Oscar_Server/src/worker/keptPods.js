@@ -57,6 +57,7 @@ const STOP = Object.freeze({
   ABNORMAL_END: 'abnormal-end',
   NOT_CLEAN: 'not-clean',
   NOT_STARTED: 'not-started',
+  POD_ENDED: 'pod-ended',
   DEADLINE: 'deadline',
   REVOKED: 'revoked',
   PROTOCOL: 'protocol',
@@ -280,6 +281,30 @@ function endBatch(batch) {
   }
 }
 
+/**
+ * The pod's end, as the dispatcher reports it (#1320): the pod is forgotten,
+ * `reason` NOT_STARTED when it never ran, else POD_ENDED; a run it held ends
+ * with it. False when it was already given up.
+ */
+function forget(podId, reason = STOP.POD_ENDED) {
+  const entry = _byId.get(podId);
+  if (!entry) return false;
+  stop(entry, reason);
+  return true;
+}
+
+/**
+ * A fault seen from outside that only a pod's secret used elsewhere explains
+ * (#1320: the dispatcher names another address than the one it came from):
+ * the pod and every pod of its company are stopped. False when it is not known.
+ */
+function fault(podId, why) {
+  const entry = _byId.get(podId);
+  if (!entry) return false;
+  violation(entry, why);
+  return true;
+}
+
 function revokeWhere(match) {
   let count = 0;
   for (const entry of _byId.values()) {
@@ -336,5 +361,5 @@ function _clear() {
 
 module.exports = {
   MAX_RUNS, IDLE_MS, FIRST_CALL_MS, RUN_MARGIN_MS, STOP,
-  open, bindAddress, ask, handRun, endBatch, revokeCompany, revokeUser, on, configure, snapshot, _clear,
+  open, bindAddress, ask, handRun, endBatch, forget, fault, revokeCompany, revokeUser, on, configure, snapshot, _clear,
 };

@@ -55,7 +55,8 @@ function fakeApi() {
     for (const res of log.watchers) res.write(line);
   }
   function startPod(job) {
-    const runId = job.metadata.labels[J.RUN_ID_LABEL];
+    // A run's script, or a kept pod's (#1320), by its id.
+    const runId = job.metadata.labels[J.RUN_ID_LABEL] ?? job.metadata.labels[J.POD_ID_LABEL];
     const script = s.scripts.get(runId) || { lines: ['bru output\n'], exitCode: 0 };
     const startsAfterMs = script.startsAfterMs ?? 20;
     if (script.gone) {                          // the Job ended before its pod was ever seen running
@@ -398,6 +399,105 @@ describe('what the dispatcher refuses', () => {
 
   test('the runner agent refuses a run request', () => {
     expect(P.checkRequest(runRequest(), { token: AGENT_TOKEN, workspacesDir: os.tmpdir() })).toEqual({ reason: 'unknown kind' });
+  });
+});
+
+// ── A pod kept for the runs of one batch (#1309; part 3 = #1320) ─────────────
+describe('a kept pod', () => {
+  const podRequest = (over = {}) => ({
+    v: P.VERSION, token: AGENT_TOKEN, kind: 'pod', podId: randomUUID(), podSecret: randomBytes(32).toString('base64url'),
+    deadlineSeconds: 7200, ...over,
+  });
+  // The tests before may still hold the dispatcher's two places for a moment.
+  async function askWhenFree(req, options) {
+    const end = Date.now() + 5000;
+    for (;;) {
+      const messages = await ask(req, options);
+      if (messages[0]?.reason !== 'too many runs' || Date.now() > end) return messages;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+
+  test('its Secret holds its secret and the internal port only; its Job is a run\'s, under its own name', async () => {
+    const req = podRequest();
+    api.s.scripts.set(req.podId, { lines: ['[kept-pod] ends after 0 run(s): told to stop (batch-done)\n'], exitCode: 0 });
+    const podMessages = await askWhenFree(req);
+    const name = J.podJobNameOf(req.podId);
+    expect(name).toBe(`oscar-pod-${req.podId}`);
+    const secret = api.s.created.secrets.find((x) => x.metadata.name === name);
+    expect(secret.stringData).toEqual({ OSCAR_POD_SECRET: req.podSecret, OSCAR_RESULTS_URL: 'http://oscar-internal:3003' });
+    expect(secret.metadata.labels).toEqual({ ...J.LABELS, [J.POD_ID_LABEL]: req.podId });
+    const job = api.s.created.jobs.find((x) => x.metadata.name === name);
+    const runId = randomUUID();
+    const runJob = J.runJob({ runId, deadlineSeconds: 7200 }, settings);
+    expect(job.metadata.labels).toEqual({ ...J.LABELS, [J.POD_ID_LABEL]: req.podId });
+    expect(job.spec).toMatchObject({ backoffLimit: 0, activeDeadlineSeconds: 7200 + J.DEADLINE_MARGIN_S, ttlSecondsAfterFinished: J.TTL_AFTER_FINISHED_S });
+    // The same pod as a run's, but for the Secret it reads and its labels.
+    const sameAs = (spec, secretName) => JSON.parse(JSON.stringify(spec).replaceAll(secretName, 'SECRET'));
+    expect(sameAs(job.spec.template.spec, name)).toEqual(sameAs(runJob.spec.template.spec, J.jobNameOf(runId)));
+    expect(job.spec.template.metadata.labels).toEqual({ ...J.LABELS, [J.POD_ID_LABEL]: req.podId });
+    expect(podMessages[0]).toEqual({ t: 'started' });
+    expect(podMessages).toContainEqual({ t: 'pod', address: '10.1.0.9' });
+    expect(out(podMessages)).toBe('[kept-pod] ends after 0 run(s): told to stop (batch-done)\n');
+    expect(last(podMessages)).toMatchObject({ t: 'exit', code: 0 });
+    await until(() => !api.s.jobs.has(name) && !api.s.secrets.has(name));
+  });
+
+  test('a stop request removes it', async () => {
+    const req = podRequest();
+    api.s.scripts.set(req.podId, { lines: ['[kept-pod] waiting\n'], hang: true });
+    const messages = await askWhenFree(req, {
+      onMessage: (m, socket) => { if (m.t === 'out') socket.write(P.line({ t: 'kill', signal: 'SIGTERM' })); },
+    });
+    expect(last(messages)).toMatchObject({ t: 'exit', code: D.EXIT_STOPPED });
+    expect(api.s.jobs.has(J.podJobNameOf(req.podId))).toBe(false);
+  });
+
+  test('one that never starts says so as a kept pod', async () => {
+    const req = podRequest();
+    api.s.scripts.set(req.podId, { waiting: 'ImagePullBackOff' });
+    const messages = await askWhenFree(req);
+    expect(messages.filter((m) => m.t === 'err').map((m) => m.d).join('')).toMatch(/^\[run-dispatcher\] The kept pod did not start: ImagePullBackOff/);
+    expect(last(messages)).toMatchObject({ t: 'exit', code: D.EXIT_NOT_STARTED });
+  });
+
+  test.each([
+    ['another token', { token: 'x'.repeat(48) }, 'not authorised'],
+    ['a pod id that is not one', { podId: '../x' }, 'not a pod id'],
+    ['a run\'s secret for a pod\'s', { podSecret: randomBytes(32).toString('hex') }, 'not a pod secret'],
+    ['no secret', { podSecret: undefined }, 'not a pod secret'],
+    ['a deadline out of range', { deadlineSeconds: 59 }, 'deadline refused'],
+    ['a deadline past a day', { deadlineSeconds: 86401 }, 'deadline refused'],
+    ['a deadline that is not whole', { deadlineSeconds: 600.5 }, 'deadline refused'],
+  ])('refused: %s', async (_what, over, reason) => {
+    const before = api.s.created.jobs.length;
+    expect(await ask(podRequest(over))).toEqual([{ t: 'refused', reason }]);
+    expect(api.s.created.jobs.length).toBe(before);
+  });
+
+  test('the request is checked for itself', () => {
+    const req = podRequest({ podId: randomUUID().toUpperCase() });
+    expect(P.checkPodRequest(req, { token: AGENT_TOKEN })).toEqual({
+      request: { podId: req.podId.toLowerCase(), podSecret: req.podSecret, deadlineSeconds: 7200 },
+    });
+    expect(P.checkPodRequest({ ...req, kind: 'run' }, { token: AGENT_TOKEN })).toEqual({ reason: 'unknown kind' });
+    expect(P.checkPodRequest({ ...req, v: 2 }, { token: AGENT_TOKEN })).toEqual({ reason: 'not a request of this protocol' });
+    expect(P.checkRunRequest(req, { token: AGENT_TOKEN })).toEqual({ reason: 'unknown kind' });
+    expect(P.checkRequest(req, { token: AGENT_TOKEN, workspacesDir: os.tmpdir() })).toEqual({ reason: 'unknown kind' });
+  });
+
+  test('it takes one of the dispatcher\'s places, as a run does', async () => {
+    const a = podRequest();
+    const b = runRequest();
+    api.s.scripts.set(a.podId, { lines: ['a\n'], hang: true });
+    api.s.scripts.set(b.runId, { lines: ['b\n'], hang: true });
+    const sockets = [];
+    const keep = (m, socket) => { if (m.t === 'started') sockets.push(socket); };
+    const running = [ask(a, { onMessage: keep }), ask(b, { onMessage: keep })];
+    await until(() => sockets.length === 2);
+    expect(await ask(podRequest())).toEqual([{ t: 'refused', reason: 'too many runs' }]);
+    for (const socket of sockets) socket.destroy();
+    await Promise.all(running);
   });
 });
 
