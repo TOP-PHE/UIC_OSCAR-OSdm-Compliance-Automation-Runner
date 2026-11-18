@@ -4,6 +4,17 @@
   "current_release": "2026.584",
   "releases": [
     {
+      "release": "2026.585",
+      "date": "2026-11-18",
+      "server": "1.11.546",
+      "collection": "OTST_V2.0.265",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.546: kept run pods, part 1 (#1316, of #1309): the internal port gives a run pod kept for a batch its next run. POST /v1/run-pods/next, on the internal port only, with the pod's own secret (X-OSCAR-Pod-Secret): the answer is a run's inputs or stop, held until a run is handed to the pod or its wait ends. worker/keptPods.js keeps the rules decided on #1309: one batch per pod, 20 runs, another run only after a run that ended normally (Bruno's exit 0 or 1 and its results received), 30 s of waiting at most, the secrets bound to the pod's address, and a call the pod's program never makes stops it and every pod of its company. An intrusion, another endpoint or new credentials stop the pods concerned. Nothing calls it yet: no kept pod is made before part 3, no run handed to one before part 4. Listed, not released: current_release stays until the kept pods are released as a whole."
+      ]
+    },
+    {
       "release": "2026.584",
       "date": "2026-11-18",
       "server": "1.11.545",

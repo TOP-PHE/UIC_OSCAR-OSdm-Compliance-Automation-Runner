@@ -1669,6 +1669,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   in `SPANS`; a new step is a label in `RUN_STEPS`, a word in
   `STEP_WORDS`, a row in *Metrics and monitoring* and in the panel's
   description** (`run-step-times.test.js` holds them together).
+  **Kept run pods** (#1309, decided 2026-11-18 from that measure: about 8 s
+  of a run's 30 are its pod's making and removal). Part 1 = #1316
+  (1.11.546, listed, not released): a pod kept for the runs of one batch
+  asks the internal port `POST /v1/run-pods/next` (header
+  `X-OSCAR-Pod-Secret`, body nothing or `{ ended: { runId, code } }`) and is
+  told *run* (the run's inputs) or *stop*. `worker/keptPods.js`, in memory
+  like `runSecrets`: one batch, 20 runs, 30 s of waiting, another run only
+  after Bruno's 0 or 1 and results received (`listRunResults()`), the run's
+  secret bound to the pod's address at `handRun()`. **A call the pod's
+  program never makes stops it and every pod of its company**, so the
+  program never calls again after a call that got no answer (a retry would
+  read as a call during a run). Stopped too by `recordIntrusion()` (first,
+  whatever happens to the record), another endpoint (`PATCH /v1/company`)
+  and new credentials (`PATCH /v1/me/credentials`: that user's pods). Parts
+  2–5: the pod's program, the dispatcher, the queue and the setting (the
+  present mode stays the default until the new one is measured), manifests.
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

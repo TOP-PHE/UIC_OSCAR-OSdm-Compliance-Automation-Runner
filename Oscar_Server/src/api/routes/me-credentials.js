@@ -32,6 +32,7 @@ const { isValidProfile, PROFILES } = require('../../worker/auth-profiles');
 const { auditLog, denyAdminAndCertifier } = require('../helpers/shared');
 const { testCredentials } = require('../../services/credentialTest');
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
+const keptPods = require('../../worker/keptPods');
 
 const router = express.Router();
 // #540: credentials are per (user, company). The company is the one the
@@ -164,6 +165,8 @@ router.patch('/', (req, res) => {
   const company = get('SELECT api_base FROM companies WHERE id = ?', [companyId]);
   fields.credentials_endpoint = endpointOrigin(company?.api_base);
   setCredentials(req.user.id, companyId, fields);
+  // A run pod kept for this user's runs there never serves new credentials (#1309).
+  keptPods.revokeUser(req.user.id, companyId);
 
   auditLog(req.user.id, companyId, req.user.email, `me_credential_update:${changedFields.join(',')}`);
 
