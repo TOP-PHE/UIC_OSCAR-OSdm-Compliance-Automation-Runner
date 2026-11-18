@@ -68,6 +68,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 /* ── Scenario library (expandable) ─────────────────────────────────────── */
 .scenario-item{border-bottom:1px solid #f0f0f0}
 .scenario-item:last-child{border-bottom:none}
+.scenario-item[hidden]{display:none}
+/* #1314: the search above the scenario list (display only) */
+.scenario-search{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;border-bottom:1px solid #e3eaf5;background:#fafcff}
+.scenario-search input[type=search]{flex:1 1 280px;min-width:0;padding:6px 10px;border:1px solid #b0bec5;border-radius:6px;font-size:13px}
+.scenario-search-ticked{display:flex;align-items:center;gap:6px;font-size:12px;color:#455a64;cursor:pointer}
+.scenario-search-ticked input{width:16px;height:16px;accent-color:#0090D4;cursor:pointer}
+.scenario-search-count{margin-left:auto;font-size:12px;color:#455a64}
+.scenario-search-none{text-align:center;padding:24px;color:#455a64;font-size:13px}
 .scenario-toggle{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;transition:background .1s;user-select:none}
 .scenario-toggle:hover{background:#f5f8ff}
 .toggle-arrow{color:#90a4ae;font-size:13px;transition:transform .2s;flex-shrink:0}

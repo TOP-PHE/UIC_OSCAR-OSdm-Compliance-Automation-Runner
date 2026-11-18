@@ -1368,6 +1368,19 @@ log volume only — never assertion outcomes.
   are your own selection, taken from your scenarios and the shared ones. Another
   tester's ticks never change what you run, and yours never change theirs. Until
   you tick anything, you start from your Test Manager's selection.
+- **Find the scenarios to tick with the search** (issue #1314). The field above
+  Test Config's scenario list filters it as you type, on the scenario's code
+  and its description, in any case; with several words, a scenario must contain
+  every one (`booking without`). A code also finds the scenarios whose
+  description names it. **✕ Clear** shows every scenario again, the line beside
+  it says how many are shown and how many are in your run list, and **Show
+  only ticked** lists your run list. The search only changes what you see: a
+  hidden scenario keeps its tick, and nothing is saved before **Save & Apply**.
+  With a search, **Select All** and **Deselect All** act on the scenarios shown
+  ("Select the 12 shown") and leave the hidden ones as they are; without one,
+  on every scenario. To run a few named scenarios among hundreds: **Deselect
+  All**, search each code and tick it, check with **Show only ticked**, **Save &
+  Apply**, then choose **My run list** on New Run.
 - **Choose what a batch runs on New Run, without ticking scenarios one by
   one.** The **Launch** card starts from **Every scenario of the data file**
   you see, or from **My run list**, and narrows it with five filters. Within a

@@ -521,6 +521,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.545] — 2026-11-18
+
+Release 2026.584 (`current_release`). Test Config: search the scenario list (#1314).
+
+### Why
+A company following a simulator reference holds over 200 scenarios (212 for `simulator-gamma`). To run a few of them, for example the 11 that check release 2026.580's booking rules, they are ticked in Test Config's scenario list, which could only be scrolled. The Run page's selection (#1029) has no filter by code, and Test Config is the only place where the run list (`scenariosToRun`, a tester's own list) is ticked.
+
+### Added
+- **A search above the scenario list.** It filters as you type, case-insensitive, on the scenario's code and its description; with several words, every one must be found. **✕ Clear** shows every scenario again, and a line says "12 of 212 scenarios · 11 in run".
+- **Show only ticked**, to check the run list before a run.
+- The row's tooltip is the scenario's description, so a scenario found by its description says why.
+
+### Changed
+- **Select All and Deselect All act on the scenarios shown** ("Select the 12 shown"), and the hidden ones keep their ticks. Without a search they act on every scenario, as before.
+- The section's badge and summary ("212 scenario(s) · 11 in run") follow the ticks. They were drawn at load and kept the loaded count until the next save.
+
+### How
+- The search is display only: a page variable (`scenarioSearch`), never the data file, the run list or the unsaved state. It hides rows and never redraws them, so an open card stays open with what is typed in it. It is kept when the section is drawn again (after a save).
+- The rule is `scenarioMatchesSearch()` in `scenarios.js`, used for the rows and for Select All / Deselect All alike.
+- The search bar sits outside every scenario card: the read-only lock of #515 is unchanged.
+
+### Checked
+- `ui-scripts.test.js`: the matching (words, case, code and description, a missing description), "Show only ticked", Select All / Deselect All on the shown scenarios, the count and the labels, the escaping of the text kept, and that the search changes neither the data file nor the unsaved state. 18 changes to the code, each made to fail a test.
+- In a browser on a throwaway server following `simulator-gamma` (212 scenarios): the 11 scenarios of 2026.580 found and ticked one by one, 10 of them hidden at the end and still ticked; Show only ticked listing exactly those 11; saved, the stored run list is those 11. Deselect the 13 shown with "exchange" removed the 2 ticked exchange scenarios and kept the 9 others. As a tester, a shared card found by the search stays read-only, and its tick works.
+
+---
+
 ## [server-1.11.544] — 2026-11-17
 
 Release 2026.583 (`current_release`). A run's time, step by step, in the metrics and in its log (#1312). First step of #1309 (a run pod kept for a session): measure before building. No change to how a run goes.

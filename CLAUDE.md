@@ -1415,6 +1415,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `purchaserListId`, which made the next save report an untouched scenario
     as not kept. That lookup now lives in `purchaserEntryForCard()`, which
     returns before any write for a read-only scenario.
+  - **The scenario list's search is display only** (#1314, 1.11.545):
+    `scenarioSearch` is a page variable, never `state`; `applyScenarioSearch()`
+    sets `hidden` on rows and never redraws them, at the end of `renderAll()`
+    and after each tick. One rule, `scenarioMatchesSearch()`, for the rows and
+    for Select All / Deselect All, which act on the scenarios shown
+    (`runListAfterSelectShown()`). A new control that changes the run list
+    calls `applyScenarioSearch()` after it (count, badge, "Show only ticked").
 - **The company's OSDM endpoint is the Test Manager's to change** (#544,
   v1.11.207). `companies.api_base` is company-wide: every run of every tester
   goes to it with that tester's token, and `PATCH /v1/company` used to take it
