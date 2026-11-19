@@ -1757,6 +1757,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   inotify instances are 8192 (`k3s/sysctl-oscar.conf`, guide section 3 and
   9): at 128 a campaign cut run pods' logs ("failed to create fsnotify
   watcher").
+  **An empty Server Config number field is the default, never 0** (#1338,
+  1.11.555). The page sends every field, a setting never stored is `''`,
+  and `Number('')` is 0: the first save after 2026.593 turned the new limit
+  off, and very likely gave production `RUN_IDLE_TIMEOUT_MS = 0`. `PATCH
+  /v1/admin/config` deletes the row for an empty number (`isEmptyField()`,
+  `backToDefault()`, reported `KEY=default`); a typed 0 still stores 0.
+  Every number setting of `CONFIG_SCHEMA` carries its `default`, pinned to
+  the readers' own by `admin-routes.test.js`: **a new number setting needs
+  its `default` there**. The page's empty field shows it
+  (`configPlaceholder()`).
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

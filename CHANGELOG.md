@@ -550,9 +550,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.555] — 2026-11-19
+
+Release 2026.594 (`current_release`). **Server Config: an empty number field is the default, never 0** (#1338).
+
+### Fixed
+- **Seen:** on the k3s test machine, right after 2026.593, an administrator saved Admin → Server Config. "Run Pod First Line Limit" (#1336) had never been set: its field was empty, showing the setting's description, and the save very likely stored `0`, which turns it off.
+- **Why:**
+  - `GET /v1/admin/config` gives `''` for a setting with no stored row and no environment variable.
+  - The page's `saveConfig()` sends every field, empty ones included.
+  - `PATCH /v1/admin/config` read a number with `Number(rawValue)`; `Number('')` is `0`, which passes `min: 0`.
+  - Three runner settings are never seeded, so their fields start empty on any database. `RUN_IDLE_TIMEOUT_MS` was turned off by any save of the page: very likely how production got `RUN_IDLE_TIMEOUT_MS = 0`, which let a stalled run hold its slot for an hour (#1336). `RUN_FIRST_LINE_TIMEOUT_MS` was turned off the same way. `RUN_HARD_MAX_TIMEOUT_MS`'s `0` is below its minimum, so every save answered "Saved with errors".
+- **Now:**
+  - An empty number field (empty, blank or `null`) removes the stored value (`isEmptyField()`, `backToDefault()`). The setting reads its environment variable, else its default, again, and the answer lists it as `KEY=default` when there was a value to remove (audit-logged as such).
+  - A typed `0` still stores 0, so a limit can still be turned off.
+  - Every number setting of `CONFIG_SCHEMA` carries its `default`, and the page shows it in the empty field: *Empty = default (180000)* (`configPlaceholder()`), not the description, which is already beside the field.
+- **To do after the upgrade:** check *Silent Run Limit* and *Run Pod First Line Limit* in Server Config. A 0 you did not choose came from this defect: clear the field, or type the default, and save.
+
+### Checked
+- `admin-routes.test.js`:
+  - the page's whole save, sent as the page sends it, stores no 0 for the three settings never set, and answers no error;
+  - an emptied field removes the stored value, blank and `null` count as empty, and nothing stored gives no `updated` line;
+  - a typed 0 still stores 0;
+  - every number setting gives a numeric default, equal to its readers' own (`runIdleLimitMs()`, `runFirstLineLimitMs()`, `computeEffectiveRunTimeoutMs()`, the queue's and the mailer's literal defaults).
+- `ui-scripts.test.js`: `configPlaceholder()`.
+- Putting back the old save fails 2 of those tests.
+
+---
+
 ## [server-1.11.554] — 2026-11-19
 
-Release 2026.593 (`current_release`). **A run whose pod stays silent is stopped after 3 minutes, and the k3s machine's inotify limit is raised** (#1336).
+Release 2026.593. **A run whose pod stays silent is stopped after 3 minutes, and the k3s machine's inotify limit is raised** (#1336).
 
 ### Fixed
 - **Seen:** in a campaign with kept run pods on the k3s test machine (2026-11-19, etcd, 939 runs), `SIM_REFUND_RETURN_1ADT_310` was handed to kept pod `1b28be26` at 07:17:48 local time, half a second after that pod reported the end of its first run.

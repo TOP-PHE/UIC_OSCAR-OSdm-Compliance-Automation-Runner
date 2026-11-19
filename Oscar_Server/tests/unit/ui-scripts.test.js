@@ -812,6 +812,16 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
       .toEqual(['password', 'password', 'number', 'text']);
   });
 
+  // #1338: an empty number field showed the description, and saving it stored 0.
+  test('admin.html configPlaceholder: a number with a default shows it; anything else its description', () => {
+    const configPlaceholder = loadFunction('admin.html', 'configPlaceholder');
+    expect(configPlaceholder({ type: 'number', default: 180000, description: 'Stop a run…' })).toBe('Empty = default (180000)');
+    expect(configPlaceholder({ type: 'number', default: 0, description: 'd' })).toBe('Empty = default (0)');
+    expect(configPlaceholder({ type: 'number', description: 'No default' })).toBe('No default');
+    expect(configPlaceholder({ type: 'string', description: 'SMTP server hostname' })).toBe('SMTP server hostname');
+    expect(configPlaceholder({ type: 'string' })).toBe('');
+  });
+
   describe('admin.html — Alertmanager on Kubernetes (#1175)', () => {
     const esc = require('../../public/js/esc.js').esc;
     const alertingParts = loadFunction('admin.html', 'alertingParts', { esc });

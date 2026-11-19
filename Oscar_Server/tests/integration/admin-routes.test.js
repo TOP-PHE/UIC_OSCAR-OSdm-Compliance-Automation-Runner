@@ -1259,6 +1259,87 @@ describe('PATCH /v1/admin/config', () => {
   });
 });
 
+// ── An empty number field (#1338) ─────────────────────────────────────────────
+// The page sends every field; a setting never stored is an empty one, and
+// Number('') is 0: a save turned the silent run limit and #1336's first-line
+// limit off on the k3s test machine.
+describe('Server Config: an empty number field is the default, never 0 (#1338)', () => {
+  const UNSEEDED = ['RUN_IDLE_TIMEOUT_MS', 'RUN_FIRST_LINE_TIMEOUT_MS', 'RUN_HARD_MAX_TIMEOUT_MS'];
+  const stored = (key) => get('SELECT value FROM server_config WHERE key = ?', [key])?.value;
+  const store = (key, value) => run(`INSERT INTO server_config (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [key, value]);
+  const patch = (body) => request(app).patch('/v1/admin/config')
+    .set('Authorization', `Bearer ${makeToken('administrator')}`).send(body);
+  const read = () => request(app).get('/v1/admin/config')
+    .set('Authorization', `Bearer ${makeToken('administrator')}`);
+  let saved;
+  beforeAll(() => { saved = Object.fromEntries(['RUN_TIMEOUT_MS', ...UNSEEDED].map((k) => [k, stored(k)])); });
+  afterAll(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) run('DELETE FROM server_config WHERE key = ?', [key]);
+      else store(key, value);
+    }
+  });
+
+  test('the page\'s whole save, as it sends it, stores no 0 for a setting never set', async () => {
+    for (const key of UNSEEDED) run('DELETE FROM server_config WHERE key = ?', [key]);
+    const before = await read();
+    expect(before.status).toBe(200);
+    // What saveConfig() sends: every field, as the page drew it.
+    const body = Object.fromEntries(Object.entries(before.body.config)
+      .filter(([, cfg]) => cfg.type !== 'string' || !cfg.sensitive)
+      .map(([key, cfg]) => [key, cfg.value]));
+    for (const key of UNSEEDED) expect(body[key]).toBe('');
+    const res = await patch(body);
+    expect(res.status).toBe(200);
+    expect(res.body.errors).toEqual([]);
+    for (const key of UNSEEDED) expect(stored(key)).toBeUndefined();
+  });
+
+  test('an emptied field removes the stored value; blank and null count as empty', async () => {
+    store('RUN_FIRST_LINE_TIMEOUT_MS', '0');
+    store('RUN_IDLE_TIMEOUT_MS', '3000');
+    const res = await patch({ RUN_FIRST_LINE_TIMEOUT_MS: '', RUN_IDLE_TIMEOUT_MS: '   ', RUN_HARD_MAX_TIMEOUT_MS: null });
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toEqual(expect.arrayContaining([
+      { key: 'RUN_FIRST_LINE_TIMEOUT_MS', value: 'default' },
+      { key: 'RUN_IDLE_TIMEOUT_MS', value: 'default' },
+    ]));
+    expect(res.body.updated).toHaveLength(2);    // nothing was stored for the third
+    expect(stored('RUN_FIRST_LINE_TIMEOUT_MS')).toBeUndefined();
+    expect(stored('RUN_IDLE_TIMEOUT_MS')).toBeUndefined();
+  });
+
+  test('a typed 0 still means 0 (off)', async () => {
+    const res = await patch({ RUN_FIRST_LINE_TIMEOUT_MS: '0', RUN_IDLE_TIMEOUT_MS: 0 });
+    expect(res.status).toBe(200);
+    expect(stored('RUN_FIRST_LINE_TIMEOUT_MS')).toBe('0');
+    expect(stored('RUN_IDLE_TIMEOUT_MS')).toBe('0');
+  });
+
+  test('every number setting gives its default, and it is the code\'s own', async () => {
+    const res = await read();
+    const numbers = Object.entries(res.body.config).filter(([, cfg]) => cfg.type === 'number');
+    expect(numbers.length).toBeGreaterThan(0);
+    for (const [key, cfg] of numbers) expect([key, typeof cfg.default]).toEqual([key, 'number']);
+    const defaults = Object.fromEntries(numbers.map(([key, cfg]) => [key, cfg.default]));
+    // With nothing stored, each reader falls back to its own default.
+    for (const key of ['RUN_TIMEOUT_MS', ...UNSEEDED]) run('DELETE FROM server_config WHERE key = ?', [key]);
+    const runner = require('../../src/worker/runner');
+    expect(runner.runIdleLimitMs({ requestedMs: 0, armedTimers: 0 })).toBe(defaults.RUN_IDLE_TIMEOUT_MS);
+    expect(runner.runFirstLineLimitMs()).toBe(defaults.RUN_FIRST_LINE_TIMEOUT_MS);
+    const budget = await runner.computeEffectiveRunTimeoutMs(null, null);
+    expect(budget.baseMs).toBe(defaults.RUN_TIMEOUT_MS);
+    expect(budget.hardMaxMs).toBe(defaults.RUN_HARD_MAX_TIMEOUT_MS);
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const src = (file) => fs.readFileSync(path.join(__dirname, '../../src', file), 'utf8');
+    expect(src('worker/queue.js')).toContain(`getConfig('MAX_CONCURRENT_RUNS', '${defaults.MAX_CONCURRENT_RUNS}')`);
+    expect(src('worker/queue.js')).toContain(`getConfig('PARALLEL_STAGGER_MS', '${defaults.PARALLEL_STAGGER_MS}')`);
+    expect(src('utils/mailer.js')).toContain(`getConfig('SMTP_PORT', '${defaults.SMTP_PORT}')`);
+  });
+});
+
 // ── POST /v1/admin/alertmanager/apply ─────────────────────────────────────────
 
 describe('POST /v1/admin/alertmanager/apply', () => {

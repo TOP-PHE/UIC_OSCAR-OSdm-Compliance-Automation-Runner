@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.593",
+  "current_release": "2026.594",
   "releases": [
+    {
+      "release": "2026.594",
+      "date": "2026-11-19",
+      "server": "1.11.555",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.555 (#1338): in Admin → Server Config an empty number field means the default. Saving the page sends every field, and a setting never stored is an empty one; the server read it as Number('') = 0, so a save turned the Silent Run Limit and the Run Pod First Line Limit off (seen on the k3s test machine after 2026.593, and very likely how production got RUN_IDLE_TIMEOUT_MS = 0). An empty number field now removes the stored value (the .env value, else the default, applies again); a typed 0 still means off. Each number setting shows its default in its empty field."
+      ]
+    },
     {
       "release": "2026.593",
       "date": "2026-11-19",

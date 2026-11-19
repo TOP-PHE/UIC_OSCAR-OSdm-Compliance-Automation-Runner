@@ -717,6 +717,7 @@ Once you log in as **administrator**, the top navigation exposes a set of admin-
 `/admin.html?tab=config`. Two cards:
 
 - **Runtime Config** — change `MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL`, and all `SMTP_*` settings. Save applies immediately — the worker queue re-reads on every drain, the runner re-reads per run, and `LOG_LEVEL` swaps the active pino sink. **No restart needed.** Audit-logged.
+  - **An empty number field means the default** (#1338). Saving it empty removes the stored value, and the setting reads its `.env` value, else its default, again; the empty field shows that default (*Empty = default (…)*). Type `0` to turn a limit off. Before 1.11.555 an empty field was stored as `0`. A save of the page turned the *Silent Run Limit* and the *Run Pod First Line Limit* off wherever they had never been set: check both after an upgrade.
 - **Server Info** — read-only: version, Node version, platform, uptime, collection path, Bruno binary path, DB path. Useful when filing a bug or talking to support.
 
 There is also a **Send test email** button — exercises the current SMTP config end-to-end and shows the verbatim SMTP error if delivery fails. Closes the diagnostic gap that issue #14 surfaced.

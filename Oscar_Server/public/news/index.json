@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-19-server-config-empty-field",
+    "date": "November 19, 2026",
+    "tag": "Bug Fix",
+    "title": "Server Config: an empty number field keeps its default, it is no longer saved as 0",
+    "summary": "Saving Admin → Server Config stored every number field left empty as 0, which turned the silent run limit and the run pod first line limit off. An empty field now keeps the default.",
+    "content": "The Server Config page sends every field when you save it. A setting that had never been saved shows an empty field, and OSCAR stored that empty field as 0. For the silent run limit and the run pod first line limit, 0 means off: one save of the page, even to change something else, switched both protections off. That is how a stalled run could hold a run slot for an hour on a test server.\n\nAn empty number field now means the setting’s default. Saving it empty removes the stored value, and the field shows the default it will use. To turn a limit off, type 0.\n\nAdministrators: open Server Config and check the Silent Run Limit (300000 by default) and the Run Pod First Line Limit (180000 by default). If either reads 0 and you did not choose it, clear the field or type the default, then save."
+  },
+  {
     "id": "2026-11-19-run-pod-first-line",
     "date": "November 19, 2026",
     "tag": "Operations",
