@@ -789,15 +789,19 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
     expect(steps).toContain(convert);
     expect(steps).toContain("sudo sed -i '/^cluster-init:/d' /etc/rancher/k3s/config.yaml");
     expect(steps.indexOf("sudo sed -i '/^cluster-init:/d'")).toBeLessThan(steps.indexOf(convert));
-    // k3s 1.36 gives a converted node no etcd role label: its snapshot
-    // list, which answers on etcd only, is the check (the first CI run).
+    // k3s adds the node's etcd role a little after its start: the first CI
+    // run read it too early and failed (#1332). The snapshot list, which
+    // answers on etcd only, is the check.
     for (const check of ['state.db.migrated', 'db/etcd/member', 'sudo k3s etcd-snapshot ls', 'made-on-sqlite']) {
       expect(steps).toContain(check);
     }
     expect(steps).not.toContain('node-role');
     expect(doc).toContain('### k3s on etcd');
     expect(doc).toContain('sudo k3s etcd-snapshot ls');
-    expect(doc).not.toContain('control-plane,etcd');
+    // What the test machine showed after its conversion (#1332).
+    expect(doc).toContain('`control-plane,etcd`');
+    expect(doc).not.toContain('stays `control-plane`');
+    expect(doc).toContain('Unknown flag');
   });
 
   test('the guide and the CI install the same k3s, with the same files, in the same places', () => {
