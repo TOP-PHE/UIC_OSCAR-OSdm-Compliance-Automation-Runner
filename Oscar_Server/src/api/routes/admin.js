@@ -811,20 +811,20 @@ const CONFIG_SCHEMA = {
   // #1004: up to 50. Each run is a Bruno process on this host: raise it in
   // steps and watch the host's memory and CPU, which the server's own metrics
   // do not show. Each company stays at its own Concurrent Session Limit (≤ 10).
-  MAX_CONCURRENT_RUNS: { description: 'Max parallel runs (server-wide). Each run is a Bruno process on this host: raise it in steps and watch the host\'s memory and CPU', type: 'number', min: 1, max: 50 },
-  PARALLEL_STAGGER_MS: { description: 'Delay between batch launches (ms)', type: 'number', min: 0, max: 30000 },
-  RUN_TIMEOUT_MS:      { description: 'Hard timeout per run (ms) — the effective budget is additionally clamped at the Run Budget Ceiling below', type: 'number', min: 60000, max: 3600000 },
+  MAX_CONCURRENT_RUNS: { description: 'Max parallel runs (server-wide). Each run is a Bruno process on this host: raise it in steps and watch the host\'s memory and CPU', type: 'number', default: 10, min: 1, max: 50 },
+  PARALLEL_STAGGER_MS: { description: 'Delay between batch launches (ms)', type: 'number', default: 2000, min: 0, max: 30000 },
+  RUN_TIMEOUT_MS:      { description: 'Hard timeout per run (ms) — the effective budget is additionally clamped at the Run Budget Ceiling below', type: 'number', default: 600000, min: 60000, max: 3600000 },
   // #394: the runner's hard ceiling was env-only and invisible here, so the
   // panel accepted RUN_TIMEOUT_MS up to 3.6M while everything above 1.8M
   // silently did nothing (min(max(base, scenario waits), ceiling)). Exposing
   // it makes the clamp visible and editable; the DB value overrides the env.
-  RUN_HARD_MAX_TIMEOUT_MS: { description: 'Server-wide ceiling (ms) on the per-run budget, including expired-flow Max-wait extensions — the runner clamps anything above it (default 1800000 = 30 min). E.g. an expired-offer test against a provider whose offers stay bookable for 30 min needs ≥ 1920000.', type: 'number', min: 60000, max: 7200000 },
+  RUN_HARD_MAX_TIMEOUT_MS: { description: 'Server-wide ceiling (ms) on the per-run budget, including expired-flow Max-wait extensions — the runner clamps anything above it (default 1800000 = 30 min). E.g. an expired-offer test against a provider whose offers stay bookable for 30 min needs ≥ 1920000.', type: 'number', default: 1800000, min: 60000, max: 7200000 },
   // #646: a run whose Bruno stays silent this long (a request the provider
   // never answers) is stopped. 0 turns it off.
-  RUN_IDLE_TIMEOUT_MS: { description: 'Stop a run whose Bruno writes nothing for this long (ms): a request the provider never answers (default 300000 = 5 min, 0 = off). Not applied to scenarios that wait on purpose (expiry tests, refund receipts).', type: 'number', min: 0, max: 3600000 },
+  RUN_IDLE_TIMEOUT_MS: { description: 'Stop a run whose Bruno writes nothing for this long (ms): a request the provider never answers (default 300000 = 5 min, 0 = off). Not applied to scenarios that wait on purpose (expiry tests, refund receipts).', type: 'number', default: 300000, min: 0, max: 3600000 },
   // #1336: on a cluster, a run's pod that took the run and writes no line is
   // given up, whatever the limit above says. 0 turns it off.
-  RUN_FIRST_LINE_TIMEOUT_MS: { description: 'On a cluster (pods for runs), stop a run whose pod writes no line this long after taking it (ms; default 180000 = 3 min, 0 = off). Applied even when the Silent Run Limit is off: every scenario writes its first lines at once.', type: 'number', min: 0, max: 3600000 },
+  RUN_FIRST_LINE_TIMEOUT_MS: { description: 'On a cluster (pods for runs), stop a run whose pod writes no line this long after taking it (ms; default 180000 = 3 min, 0 = off). Applied even when the Silent Run Limit is off: every scenario writes its first lines at once.', type: 'number', default: 180000, min: 0, max: 3600000 },
   // Logging — applied immediately on save
   LOG_LEVEL: {
     description: 'Server log verbosity (info = production-friendly, debug = verbose for troubleshooting)',
@@ -837,7 +837,7 @@ const CONFIG_SCHEMA = {
   // "Apply alerting config" in the Alerting section, which regenerates
   // alertmanager.yml from these same values).
   SMTP_HOST:   { description: 'SMTP server hostname (e.g. smtp-relay.brevo.com)',      type: 'string', group: 'smtp' },
-  SMTP_PORT:   { description: 'SMTP port (587 for STARTTLS, 465 for SSL)',             type: 'number', min: 1, max: 65535, group: 'smtp' },
+  SMTP_PORT:   { description: 'SMTP port (587 for STARTTLS, 465 for SSL)',             type: 'number', default: 587, min: 1, max: 65535, group: 'smtp' },
   SMTP_SECURE: { description: 'Use SSL/TLS — "true" for port 465, "false" for 587 (STARTTLS)', type: 'string', group: 'smtp' },
   SMTP_USER:   { description: 'SMTP authentication identity (often a relay-internal id like a731f1001@smtp-brevo.com — NOT the address recipients see)', type: 'string', group: 'smtp', label: 'SMTP login' },
   SMTP_PASS:   { description: 'SMTP password / API key (e.g. Brevo SMTP key starting with xsmtpsib-...)', type: 'string', group: 'smtp', sensitive: true, label: 'SMTP password' },
@@ -897,6 +897,20 @@ function smtpFromWarnings(value, allValues) {
   return w;
 }
 
+// #1338: an empty number field is no value. The page sends every field, and
+// a setting never stored is an empty one; Number('') is 0, so a save of the
+// page turned the silent run limit and #1336's first-line limit off. Its
+// stored value goes instead: the setting reads its environment variable,
+// else its default, again. A typed 0 still means 0.
+function isEmptyField(rawValue) {
+  return rawValue === null || rawValue === undefined || String(rawValue).trim() === '';
+}
+
+/** Removes a setting's stored value. True when there was one. */
+function backToDefault(key) {
+  return run('DELETE FROM server_config WHERE key = ?', [key]).changes > 0;
+}
+
 router.patch('/config', (req, res) => {
   const body = req.body || {};
   const updated = [];
@@ -907,6 +921,11 @@ router.patch('/config', (req, res) => {
     const schema = CONFIG_SCHEMA[key];
     if (!schema) {
       errors.push(`Unknown config key: ${key}`);
+      continue;
+    }
+
+    if (schema.type === 'number' && isEmptyField(rawValue)) {
+      if (backToDefault(key)) updated.push({ key, value: 'default' });
       continue;
     }
 

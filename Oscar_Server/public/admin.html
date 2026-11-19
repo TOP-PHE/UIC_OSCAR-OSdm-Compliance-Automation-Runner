@@ -1379,6 +1379,14 @@ function configInputType(isSensitive, isNum) {
   return isNum ? 'number' : 'text';
 }
 
+// What an empty Server Config field shows (#1338). A number with a default
+// shows it: saving the field empty keeps that default. The description is
+// beside the field already.
+function configPlaceholder(cfg) {
+  if (cfg.type === 'number' && cfg.default != null) return `Empty = default (${cfg.default})`;
+  return cfg.description || '';
+}
+
 // How Alertmanager gets the SMTP and Alerting values (#1175): 'file' on the
 // VPS (the Apply button writes its file), 'kubernetes' on a cluster, where
 // the administrator makes its Secret with the commands the server gives.
@@ -1461,7 +1469,7 @@ async function loadConfig() {
     } else {
       const inputType = configInputType(isSensitive, isNum);
       const attrs = isNum ? `min="${cfg.min}" max="${cfg.max}"` : '';
-      control = `<input id="cfg-${key}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(cfg.description || '')}">`;
+      control = `<input id="cfg-${key}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(configPlaceholder(cfg))}">`;
     }
 
     return `
