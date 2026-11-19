@@ -1745,6 +1745,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   over. A data file not read at the scenario's start is a WARNING at step
   00 (`__scenarioLoadError`), no longer the failed "osdmVersion is
   available" check: the next step reads it again.
+  **A pod's first line within 3 minutes** (#1336, 1.11.554): on etcd a
+  kept pod took a run, then sat idle before Bruno (25 MB, no CPU) for an
+  hour, the deadline of a database where `RUN_IDLE_TIMEOUT_MS` is 0
+  (production's). `watchFirstLine()` (`runner.js`) arms at `'pod'`, is
+  disarmed by the first stdout chunk (the dispatcher's words are stderr) or
+  the end, and calls `killRun()`; `RUN_FIRST_LINE_TIMEOUT_MS` (180000, 0 =
+  off, whatever the silence limit says). **A runner test of a stopped run
+  uses `--forceExit` when the stop is taken out**: the run's own timers keep
+  Jest from exiting, and a mutation check hung there. The k3s machine's
+  inotify instances are 8192 (`k3s/sysctl-oscar.conf`, guide section 3 and
+  9): at 128 a campaign cut run pods' logs ("failed to create fsnotify
+  watcher").
   **A run waits for the API** (#1272, 1.11.525): a 27 s k3s restart had
   failed 454 queued runs (any API error was final, and each freed slot took
   the next run at once). Every call of a run goes through `patiently()`

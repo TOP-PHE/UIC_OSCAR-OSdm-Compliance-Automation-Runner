@@ -243,19 +243,29 @@ line (`usec`, microseconds, or `msec`). Under 10 ms (10000 usec): go on.
 Above: k3s works, but under a batch etcd waits for the disk and logs *slow
 fdatasync*; choose a machine with a faster disk if you can.
 
-Then k3s's settings, and the pinned k3s:
+Then the machine's kernel settings, k3s's settings, and the pinned k3s:
 
 ```bash
 cd /opt/oscar
+sudo cp OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf /etc/sysctl.d/90-oscar-k3s.conf
+sudo sysctl --system > /dev/null
+sysctl fs.inotify.max_user_instances
 sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
 if [ -f /etc/rancher/k3s/resolv.conf ]; then echo 'resolv-conf: /etc/rancher/k3s/resolv.conf' | sudo tee -a /etc/rancher/k3s/config.yaml; fi
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -
 ```
 
-The `if` line prints `resolv-conf: /etc/rancher/k3s/resolv.conf` when you
-wrote the pods' resolvers above, and nothing otherwise.
+The `sysctl` line prints `fs.inotify.max_user_instances = 8192`. The `if`
+line prints `resolv-conf: /etc/rancher/k3s/resolv.conf` when you wrote the
+pods' resolvers above, and nothing otherwise.
 
-What the two files do:
+What the three files do:
+- [`k3s/sysctl-oscar.conf`](../../OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf):
+  the machine's inotify instances go from Ubuntu's 128 to 8192, the usual
+  value on Kubernetes nodes. k3s and each container hold some, and the kubelet
+  takes one more for each pod log it follows. Under a campaign of 15 runs the
+  limit was reached and run pods' logs were cut ("failed to create fsnotify
+  watcher: too many open files", #1336). Read again at every boot.
 - [`k3s/config.yaml`](../../OSCAR_Deploy/kubernetes/k3s/config.yaml):
   - the kubeconfig, which holds every right on the cluster, is root's only;
   - Kubernetes Secrets (OSCAR's `ENCRYPTION_KEY` among them) are encrypted
@@ -1019,6 +1029,11 @@ What it keeps to:
   before you go on.
 - An intrusion, another endpoint or new credentials stop the pods concerned.
 - A run alone, not in a batch, keeps a pod of its own.
+- A pod that took a run and writes no line within 3 minutes is given up, and
+  the run reads *Run not finished* (Server Config → *Run Pod First Line
+  Limit*, #1336). It holds for a pod of one run too, and whatever the *Silent
+  Run Limit* says: on the test machine a kept pod stalled before Bruno, and
+  with that limit off (production's setting) its run held a slot for an hour.
 
 **To switch it on, or off again,** with no run going (OSCAR restarts, about
 a minute):
@@ -1057,7 +1072,30 @@ A run whose pod was given up under it reads *Run not finished*, never as the
 provider's failure. To compare, run the same batch with `off`, then `on`.
 On the 6 vCPU test machine (2026-11-18, 939 runs on six simulators) it gave
 no gain: 23.7 runs a minute off, 23.0 on. The CPU was the limit, Bruno's
-start above all, not the making of pods.
+start above all, not the making of pods. On etcd (2026-11-19, the same
+batch), 95 % of the runs ended at 14.9 runs a minute off and 28.6 on: a pod
+for each run made etcd write, and its disk waited (14,558 slow-request
+warnings off, 559 on).
+
+### The node's inotify limit (a machine installed before #1336)
+
+Section 3 now raises the machine's inotify instances from Ubuntu's 128 to
+8192. On a machine installed before, a campaign may cut run pods' logs:
+OSCAR's log then shows `failed to create fsnotify watcher: too many open
+files` in a line of a pod. The dispatcher reads the log again, so no line is
+lost, but the limit is too low for a node running OSCAR's runs. It takes
+effect at once, with nothing restarted:
+
+```bash
+cd /opt/oscar
+sysctl fs.inotify.max_user_instances
+sudo cp OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf /etc/sysctl.d/90-oscar-k3s.conf
+sudo sysctl --system > /dev/null
+sysctl fs.inotify.max_user_instances
+```
+
+The first `sysctl` shows the value before (`128` on Ubuntu), the last
+`8192`. The file is read again at every boot.
 
 ### k3s on etcd (a machine installed before #1271)
 

@@ -403,6 +403,10 @@ jobs:
           node_ip=$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')
           test -n "$node_ip"
           echo "NODE_IP=$node_ip" >> "$GITHUB_ENV"
+          # #1336: the machine's inotify instances, as the guide sets them.
+          sudo cp OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf /etc/sysctl.d/90-oscar-k3s.conf
+          sudo sysctl --system > /dev/null
+          test "$(sysctl -n fs.inotify.max_user_instances)" = 8192
           sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
           sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
           # #1271: k3s starts on its default datastore (SQLite) first, as a

@@ -514,6 +514,44 @@ function runIdleLimitMs(runBudget) {
   return Number.isInteger(ms) && ms > 0 ? ms : 0;
 }
 
+// #1336: in pod mode, how long the run's pod may take, once it holds the run,
+// to write its first line (RUN_FIRST_LINE_TIMEOUT_MS, default 3 min, 0 =
+// off). Applied whatever the silence limit says, expiry tests included:
+// every scenario writes its first lines at once, and its waits come later.
+// The pod's work folder and Bruno's start took 28 s at most in the campaigns
+// measured (#1312). A kept pod that stalled before Bruno held a run slot for
+// an hour, the deadline of a server whose silence limit was off.
+const FIRST_LINE_DEFAULT_MS = 180000;
+function runFirstLineLimitMs() {
+  const ms = Number.parseInt(getConfig('RUN_FIRST_LINE_TIMEOUT_MS', String(FIRST_LINE_DEFAULT_MS)), 10);
+  return Number.isInteger(ms) && ms >= 0 ? ms : FIRST_LINE_DEFAULT_MS;
+}
+
+/**
+ * Stops a pod run whose pod writes nothing within `limitMs` of holding the
+ * run (#1336): armed when the dispatcher, or the kept pods' record, names
+ * the run's pod ('pod'). Returns the function that disarms it, called on the
+ * pod's first line and at the run's end.
+ */
+function watchFirstLine(runId, proc, limitMs) {
+  if (!(limitMs > 0)) return () => {};
+  let timer = null;
+  let over = false;
+  proc.once('pod', () => {
+    if (over) return;
+    timer = setTimeout(() => {
+      if (over) return;
+      over = true;
+      logEvent(runId, 'error', `[runner] The run's pod wrote no line ${Math.round(limitMs / 1000)} s after it took the run: the run is stopped and its pod given up.`);
+      killRun(runId);
+    }, limitMs);
+  });
+  return () => {
+    over = true;
+    clearTimeout(timer);
+  };
+}
+
 async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   const baseMs    = Number.parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
   const hardMaxMs = Number.parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
@@ -1438,6 +1476,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     // keeps the shell off unless BRU_CMD is a Windows batch wrapper.
     let proc;
     let podEnded = () => {};
+    let firstLineSeen = () => {};
     runTimeline.mark(runId, 'launched');
     try {
       const podRun = podMode ? {
@@ -1447,6 +1486,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       proc = startRunProcess(runId, { keptBatch, podRun, args, cwd: runCwd, env: safeEnv });
       if (podMode) {
         podEnded = watchRunPod(proc);
+        firstLineSeen = watchFirstLine(runId, proc, runFirstLineLimitMs());
         proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
         // #1312: the dispatcher made the run's Job, then its pod's container runs.
         proc.once('started', () => runTimeline.mark(runId, 'job'));
@@ -1549,8 +1589,10 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     proc.stdout.on('data', chunk => {
       lastOutputAt = Date.now();
       // #1312: a pod's first line comes once its work folder is ready. Only
-      // the moment is noted, never what the line says.
+      // the moment is noted, never what the line says. The dispatcher's own
+      // words come on stderr: only the pod's line disarms #1336's limit.
       if (podMode) runTimeline.mark(runId, 'output');
+      firstLineSeen();
       const lines = chunk.toString().split('\n');
       lines.forEach(line => {
         if (!line.trim()) return;
@@ -1580,6 +1622,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       runTimeline.mark(runId, 'exit');
       clearTimeout(timeout);
       stopIdleWatch();
+      firstLineSeen();
       stopTokenWatchdog();
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: the child is gone; no more loopback calls
@@ -1590,6 +1633,7 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       runTimeline.mark(runId, 'exit');
       clearTimeout(timeout);
       stopIdleWatch();
+      firstLineSeen();
       stopTokenWatchdog();
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: no child, no valid secret
@@ -1755,4 +1799,4 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, refusedRunScope, podOutcomeOf, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, WORKSPACES_DIR, serverUrls };
+module.exports = { executeRun, killRun, refusedRunScope, podOutcomeOf, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, runFirstLineLimitMs, WORKSPACES_DIR, serverUrls };

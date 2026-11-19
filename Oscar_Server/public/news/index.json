@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-19-run-pod-first-line",
+    "date": "November 19, 2026",
+    "tag": "Operations",
+    "title": "Servers on a cluster: a run whose pod stays silent is stopped after 3 minutes",
+    "summary": "On a cluster, a run whose pod writes nothing within 3 minutes of taking the run is now stopped as not finished, whatever the silent run limit says. One such run held a run slot for an hour.",
+    "content": "On a server that runs each test in a pod of a cluster, a pod that has taken a run writes its first lines within half a minute. In one campaign on a test machine, a pod took a run and then wrote nothing at all, and the run waited until its one-hour deadline: the limit that stops a silent run was turned off on that server, as it is on the production server. That run held one of the server’s run slots for the whole hour.\n\nA run whose pod writes no line within 3 minutes of taking it is now stopped. It reads “Run not finished”, which is not a result of the test: run the scenario again. The limit holds whatever the silent run limit says, because every scenario writes its first lines at once, even one that waits on purpose later. An administrator can change it, or turn it off, in Server Config (“Run Pod First Line Limit”).\n\nAdministrators of a cluster on one machine: the k3s guide now raises the machine’s inotify limit, which a campaign of 15 runs reached. A machine installed before applies it with one block of the guide (section 9).\n\nNo action is required from testers."
+  },
+  {
     "id": "2026-11-19-refund-offer-clock-tolerance",
     "date": "November 19, 2026",
     "tag": "Bug Fix",
