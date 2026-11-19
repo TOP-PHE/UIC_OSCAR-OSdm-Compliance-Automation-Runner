@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **k3s on one VPS keeps its state in etcd, not in kine over SQLite** (#1271). Deployment files, guide, CI and a test only, no version.
+  - **Seen:** on the k3s test machine, k3s exited under a batch three times: twice on 2026-11-15 and once on 2026-11-18 at 20:27:39 UTC.
+    - Each time the journal shows `Slow SQL` lines from kine, k3s's default datastore over SQLite, then `level=fatal msg="Transaction commit failed"`.
+    - On 2026-11-18 every run going froze for about two minutes, 6 of 939 runs failed, and two kept pods could not reach OSCAR for 30 s.
+  - **Now:** `k3s/config.yaml` sets `cluster-init: true`, so k3s keeps the cluster's state in embedded etcd.
+    - A new machine starts on etcd.
+    - A machine installed before is converted at the first k3s start that reads the key. k3s itself copies every `/registry/` key into etcd and renames `server/db/state.db` to `state.db.migrated` (`migrateFromSQLite()` in k3s's `pkg/etcd/etcd.go`, read at the pinned v1.36.6+k3s1).
+  - **Guide** (*OSCAR - k3s on one VPS*):
+    - a disk that writes quickly to the end (section 1);
+    - the disk checked with `fio` before the install, 99 % of the syncs under 10 ms as etcd's FAQ asks (section 3);
+    - section 9, *k3s on etcd*: look first; convert with no run going, a root-only copy of k3s's state kept first; how to go back to SQLite from that copy; the check under a batch (`NRestarts`, no `Slow SQL`); removing the copy and the old file;
+    - k3s's own snapshots: what they hold, the token that opens them, never copied off the machine together;
+    - two rows in section 11;
+    - the kept pods' measurement: no gain on the 6 vCPU machine.
+  - **CI** (job "k3s on one machine"): k3s starts without `cluster-init`, so on SQLite, then a step converts it with the guide's own line. It checks:
+    - the etcd folder;
+    - the renamed SQLite file;
+    - `k3s etcd-snapshot ls` answering, which it does on etcd only. k3s 1.36 gives a converted node no `etcd` role label: the first CI run checked one and failed, with k3s on etcd;
+    - a Secret made on SQLite still readable;
+    - Secrets encryption still enabled.
+  - **Checked:** `kubernetes-manifests.test.js` pins the key, the conversion line in both the guide and the CI (in that order in the CI) and the CI's checks. The CI run of this PR is the first conversion.
+  - **To apply on the test machine:** section 9, *k3s on etcd*, then a campaign of the same size, and `NRestarts` and `Slow SQL` read after it.
+
 - **Two alert rules compared `oscar_runs_total` across its `status` label** (#1286). Deployment files and a test only, no version.
   - **Seen:** on 2026-11-16 at 18:42 the k3s test machine sent `OscarRunFailureRateHigh`, "More than 50% of Bruno runs failing (100%)". Two deliberately wrong `SIM_WRONG_…` scenarios had failed out of about twenty runs.
   - **Why:** Prometheus matches the two sides of a binary operation label by label.

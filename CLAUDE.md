@@ -4212,6 +4212,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     pinned `K3S_VERSION` (equal to the guide's, a test) on the runner and
     checks the redirect, the 413, the client address in `auth_events.ip`
     and the run pods' network.
+    **k3s keeps its state in embedded etcd** (#1271, `cluster-init: true`
+    in `k3s/config.yaml`): on kine over SQLite, k3s's default, a compaction
+    under a batch ended "Transaction commit failed" and k3s exited, runs
+    frozen 2 min, new ones failed. k3s converts a machine on SQLite at the
+    first start reading the key (`migrateFromSQLite()` in its etcd.go:
+    every /registry/ key copied, `state.db` renamed `state.db.migrated`);
+    the CI job starts k3s without the key and converts it with the guide's
+    own line (section 9, *k3s on etcd*), a test pinning both. A machine is
+    converted only with no run going.
   - **Pod mode holds about one run per vCPU** (#1150, measured on the 6
     vCPU k3s test machine with production's data): Bruno's start takes 0.4
     to 0.7 CPU, then about 0.25, plus the pod's making and removal. 10 and
