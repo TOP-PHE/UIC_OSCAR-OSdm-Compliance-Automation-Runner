@@ -28,11 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **CI** (job "k3s on one machine"): k3s starts without `cluster-init`, so on SQLite, then a step converts it with the guide's own line. It checks:
     - the etcd folder;
     - the renamed SQLite file;
-    - `k3s etcd-snapshot ls` answering, which it does on etcd only. k3s 1.36 gives a converted node no `etcd` role label: the first CI run checked one and failed, with k3s on etcd;
+    - `k3s etcd-snapshot ls` answering, which it does on etcd only. Not the node's `etcd` role: k3s adds it a little after its start, and the first CI run read it too early and failed, with k3s on etcd (#1332);
     - a Secret made on SQLite still readable;
     - Secrets encryption still enabled.
   - **Checked:** `kubernetes-manifests.test.js` pins the key, the conversion line in both the guide and the CI (in that order in the CI) and the CI's checks. The CI run of this PR is the first conversion.
   - **To apply on the test machine:** section 9, *k3s on etcd*, then a campaign of the same size, and `NRestarts` and `Slow SQL` read after it.
+- **The k3s guide says what a machine on etcd shows** (#1332). Guide, a CI comment and a test only, no version.
+  - **Seen** on the test machine's conversion (2026-11-19, 696 keys copied):
+    - `get nodes` read `control-plane,etcd`, where the guide said `ROLES` stays `control-plane`;
+    - `k3s etcd-snapshot ls` printed four `WARN … Unknown flag … found in config.yaml, skipping` lines, which the guide did not mention.
+  - **Now:** section 9 and section 3's `get nodes` row give `control-plane,etcd` (or `control-plane` alone for a moment), and section 9 says the four warnings are expected: the command reads `config.yaml` and leaves out the server's settings.
+  - **Checked:** `kubernetes-manifests.test.js` asks the guide for `control-plane,etcd` and the warnings, and no longer for "stays `control-plane`". The CI still does not check the role, which may come after its check.
 
 - **Two alert rules compared `oscar_runs_total` across its `status` label** (#1286). Deployment files and a test only, no version.
   - **Seen:** on 2026-11-16 at 18:42 the k3s test machine sent `OscarRunFailureRateHigh`, "More than 50% of Bruno runs failing (100%)". Two deliberately wrong `SIM_WRONG_…` scenarios had failed out of about twenty runs.

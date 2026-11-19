@@ -456,8 +456,9 @@ jobs:
           sudo ls -la /var/lib/rancher/k3s/server/db/
           kubectl get nodes --show-labels
           sudo journalctl -u k3s --since -10min | grep -iE 'migrat|sqlite|etcd for new cluster|kine' | grep -v 'Migrating etcd key' | cut -c1-240 | head -20 || true
-          # On etcd now: its folder, the SQLite file renamed, its snapshots listed
-          # (k3s 1.36 gives a converted node no etcd role label).
+          # On etcd now: its folder, the SQLite file renamed, its snapshots listed.
+          # Not the node's etcd role: k3s adds it a little after its start, and
+          # the first CI run read it too early (#1332).
           sudo test -d /var/lib/rancher/k3s/server/db/etcd/member
           sudo test -f /var/lib/rancher/k3s/server/db/state.db.migrated
           sudo test ! -e /var/lib/rancher/k3s/server/db/state.db

@@ -286,7 +286,7 @@ sudo kubectl -n kube-system get pods
 
 | Command | The right answer | Otherwise |
 |---|---|---|
-| `get nodes` | One line: the machine's name, `Ready`, `control-plane`, `v1.36.6+k3s1` | `NotReady`: k3s is still starting; ask again in a minute. Still `NotReady` after 5 minutes: `sudo journalctl -u k3s --since -10min \| tail -n 50` says why. *The connection to the server 127.0.0.1:6443 was refused*: k3s is not running, `sudo systemctl status k3s`. |
+| `get nodes` | One line: the machine's name, `Ready`, `control-plane,etcd` (`control-plane` alone for a moment: k3s adds the etcd role a little after its start), `v1.36.6+k3s1` | `NotReady`: k3s is still starting; ask again in a minute. Still `NotReady` after 5 minutes: `sudo journalctl -u k3s --since -10min \| tail -n 50` says why. *The connection to the server 127.0.0.1:6443 was refused*: k3s is not running, `sudo systemctl status k3s`. |
 | `rollout status … traefik` | `deployment "traefik" successfully rolled out` | *deployments.apps "traefik" not found*: k3s has not installed Traefik yet (its `helm-install-traefik` job); ask again in a minute. *timed out waiting*: the next command says which pod waits. |
 | `get pods` | Every pod `Running` (READY `1/1`, `2/2` for `svclb-traefik-…`) or `Completed` (the two `helm-install-traefik…` jobs). The list: `coredns`, `local-path-provisioner`, `metrics-server`, `svclb-traefik`, `traefik`, `helm-install-traefik`, `helm-install-traefik-crd`. A job may show `RESTARTS` 1 or 2: it waited for Traefik's resource types. | `ImagePullBackOff` or `ErrImagePull` (often `svclb-traefik` and a `helper-pod-create-pvc-…`), Traefik `Pending`: k3s could not download an image, see section 11. `CrashLoopBackOff` on `traefik`: `sudo kubectl -n kube-system logs deploy/traefik --tail=30` says why, usually a typo in `traefik-config.yaml`. |
 
@@ -1115,10 +1115,14 @@ fi
 What you should see:
 - **`ls`:** `etcd` and `state.db.migrated`, no `state.db`.
 - **`keys copied`:** a few hundred to a few thousand.
-- **`get nodes`:** `Ready`. `ROLES` stays `control-plane`: k3s gives a
-  converted machine no `etcd` role.
-- **`etcd-snapshot ls`:** a list, maybe empty, and no error. It answers on
-  etcd only.
+- **`get nodes`:** `Ready`. `ROLES` reads `control-plane,etcd`, or
+  `control-plane` alone for a moment: k3s adds the etcd role a little after
+  its start.
+- **`etcd-snapshot ls`:** a list, maybe empty (k3s makes the first snapshot
+  at the next 00:00 or 12:00), and no error. It answers on etcd only. Four
+  lines `WARN[0000] Unknown flag --… found in config.yaml, skipping` come
+  first, one for each server setting of `config.yaml`: they are expected,
+  this command reads that file and leaves out what is not its own.
 - **`/health`:** `HTTP 200`.
 
 OSCAR's pods kept running while k3s was stopped: none restarts.
