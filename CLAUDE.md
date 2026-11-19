@@ -3165,8 +3165,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   only show on a real system. Rules that came out of those first runs:
   - **A deadline is checked only in the state where OSDM requires it.**
     `confirmableUntil` is ignored after PREBOOKED; step 07 logs it at INFO.
-  - **"At or before now" allows `CLOCK_TOLERANCE_MS`** (2 min, `bookings.js`):
-    the provider's clock is not OSCAR's. Use it for any new such check.
+  - **"At or before now" allows `CLOCK_TOLERANCE_MS`** (2 min,
+    `library-bruno/clockTolerance.js`): the provider's clock is not OSCAR's.
+    Use it for any new such check. The refund offer's `createdOn` had none
+    until #1334 (1.11.553 / OTST_V2.0.268): a simulator a few milliseconds
+    ahead failed 18 refunds of one campaign. Its title was kept (#735 keys).
   - **A by-id system-information request without an id is skipped**
     (`bru.runner.skipRequest()`, the last bru call), never sent as `/null`.
   - **`purchaser` may go without an index in `requestedInformation`**; every

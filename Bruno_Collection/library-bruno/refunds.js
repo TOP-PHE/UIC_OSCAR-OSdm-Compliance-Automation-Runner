@@ -8,6 +8,7 @@
 // Import needed library files
 require('./displays.js');
 const { bruTest: test, expectScale } = require('./testCapture.js');
+const { CLOCK_TOLERANCE_MS } = require('./clockTolerance.js');
 
 module.exports = {
   postPatchRefundOfferResponse,
@@ -644,13 +645,16 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     return true;
   }
 
-  // Validate createdOn
+  // Validate createdOn. The provider's clock is not the run's: a createdOn up
+  // to CLOCK_TOLERANCE_MS after now passes (#644, #1334: a simulator a few
+  // milliseconds ahead failed 18 refunds). The title stays as it was: the
+  // #735 keys and the comparisons of published reports read the check's text.
   if (_checkDatePresent('createdOn', refundOffer.createdOn, createdOn)) {
     const _label = _withLocal(refundOffer.createdOn, createdOn);
     test(`Refund offer[${index}] createdOn is valid and in the past: ${_label}`, () => {
       expect(createdOn.getTime(),
-        `createdOn (${refundOffer.createdOn}) is in the future relative to now (${currentDate.toISOString()})`
-      ).to.be.at.most(currentDate.getTime());
+        `createdOn (${refundOffer.createdOn}) is more than ${CLOCK_TOLERANCE_MS / 1000} s (the clock tolerance) after now (${currentDate.toISOString()})`
+      ).to.be.at.most(currentDate.getTime() + CLOCK_TOLERANCE_MS);
       validationLogger(`[DEBUG] Refund offer[${index}] createdOn is valid and in the past: ${_label}`);
     });
   }

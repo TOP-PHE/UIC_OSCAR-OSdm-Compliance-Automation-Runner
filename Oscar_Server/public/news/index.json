@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-19-refund-offer-clock-tolerance",
+    "date": "November 19, 2026",
+    "tag": "Bug Fix",
+    "title": "A refund offer no longer fails because the provider’s clock is a little ahead",
+    "summary": "A refund offer may now be dated up to two minutes after OSCAR’s clock, as a fulfilment already may. A provider whose clock was a few milliseconds ahead of OSCAR’s had its refunds failed.",
+    "content": "Each refund offer says when it was created, and OSCAR checked that this time was not later than its own clock. The provider’s clock and OSCAR’s are never exactly the same: when the provider’s was a few milliseconds ahead and its answer came back quickly, the check “Refund offer createdOn is valid and in the past” failed, although the provider had done nothing wrong. In one campaign on the simulators, 18 refund scenarios failed so within twelve minutes.\n\nA refund offer may now be dated up to two minutes after OSCAR’s clock, the tolerance OSCAR already gives a fulfilment’s creation time. A time later than that still fails, and the failure now says so. The check keeps its name, so test findings and published coverage reports still recognise it.\n\nNo action is required. A refund scenario that failed only this check can be run again."
+  },
+  {
     "id": "2026-11-18-token-renewed-before-expiry",
     "date": "November 18, 2026",
     "tag": "Bug Fix",

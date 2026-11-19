@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.591",
+  "current_release": "2026.592",
   "releases": [
+    {
+      "release": "2026.592",
+      "date": "2026-11-19",
+      "server": "1.11.553",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.553 / collection OTST_V2.0.268 (#1334): a refund offer's createdOn may be up to the clock tolerance (2 minutes, #644) after the run's clock, as a fulfilment's already may. In a campaign on the k3s test machine, the simulator's clock was 1 to 14 ms ahead of the test machine's, and 18 refund scenarios failed \"Refund offer[0] createdOn is valid and in the past\". The tolerance is one value for both checks (library-bruno/clockTolerance.js); the check keeps its title, read by the #735 keys and the comparisons of published reports."
+      ]
+    },
     {
       "release": "2026.591",
       "date": "2026-11-18",

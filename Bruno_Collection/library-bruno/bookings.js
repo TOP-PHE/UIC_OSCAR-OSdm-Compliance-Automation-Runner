@@ -847,8 +847,8 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
 // `13. GET Booking before Fulfillment` keeps asserting provisionalPrice.
 const POST_CONFIRMATION_STAGE_RE = /CONFIRMED|FULFILLED|REFUNDED|EXCHANGED/i;
 // How far a provider's clock may be ahead of OSCAR's before a time it says is
-// "now" counts as in the future.
-const CLOCK_TOLERANCE_MS = 120000;
+// "now" counts as in the future: one value for every such check (#1334).
+const { CLOCK_TOLERANCE_MS } = require('./clockTolerance.js');
 
 function isPostConfirmationStage(expectedBookedOffersStatus) {
   return POST_CONFIRMATION_STAGE_RE.test(String(expectedBookedOffersStatus || ''));
