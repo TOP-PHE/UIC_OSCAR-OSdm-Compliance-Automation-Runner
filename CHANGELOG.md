@@ -54,6 +54,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OSCAR on Kubernetes as built, and what the test campaigns measured** (#1340). Documentation, four read-only scripts and a test, no version.
+  - **New document, *OSCAR - Kubernetes run campaigns*:**
+    - the series (939 runs on six simulators) and the machine;
+    - the six campaigns of 18 and 19 November: kine/SQLite or etcd, a pod per run or kept pods, before and after #1334, #1336 and #1338;
+    - what each showed and the fix it led to, and the earlier rounds of 17 November (#1233);
+    - why two identical campaigns differed by a third (each step slower; the simulator, the disk and the rest of the machine ruled out; more CPU time per run on a shared VPS);
+    - the settings in use, and how to run and read a campaign.
+  - **`OSCAR_Deploy/kubernetes/measure/`:** the read-only scripts used, run in OSCAR's pod with the script on standard input:
+    - `campaign.js`: runs a minute by window, to the last run and to 95 %;
+    - `step-times.js`: a run's time per step, from the line each run logs (#1312);
+    - `failures.js`: the runs not completed, and the longest run;
+    - `run-log.js`: one run in detail.
+
+    They open the database read only. Two of them decrypt log lines with the server's own key, inside its pod. `campaign-readouts.test.js` runs each one as the guide does, on a small database whose lines are encrypted by `colEncrypt()`, and fails on a script that writes.
+  - **Solution Architecture:**
+    - section 14.10 says the "Kubernetes Job per run" row is done (#1130, #1309);
+    - a new section 14.12 describes the runs on Kubernetes as built: the server and its internal port, the dispatcher and its rights, the run pods and their network policy, a run's path one pod per run or in a kept pod, the limits that stop a run that goes wrong, the monitoring, and the measured capacity and its limits.
+  - **k3s guide, *Kept run pods*:** the results on SQLite, on etcd and with 2026.593's fixes, and a link to the new document.
 - **k3s on one VPS, section 9: a new OSCAR release in three blocks, with
   their checks** (#1190). Documentation only. In the recovery drill the move
   of the test machine to release 2026.535 was one table cell: `git pull` or a
