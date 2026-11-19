@@ -550,6 +550,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.553] / [collection-OTST_V2.0.268] — 2026-11-19
+
+Release 2026.592 (`current_release`). **A refund offer's creation time allows for the provider's clock** (#1334).
+
+### Fixed
+- **Seen:** in a campaign on the k3s test machine (2026-11-19, six simulators, 939 runs), 18 refund scenarios of five providers failed "Refund offer[0] createdOn is valid and in the past", all between 06:37 and 06:49 UTC.
+  - Each refund offer was created 1 to 14 ms after the run's "now".
+  - The simulator's clock was a few milliseconds ahead of the test machine's, and the answer came back faster than that.
+- **Why:** `validateRefundOfferResponse()` (`refunds.js`) compared `createdOn` with the run's clock with no margin. OSCAR's rule since #644 is that "at or before now" allows `CLOCK_TOLERANCE_MS` (2 minutes): the fulfilment's `createdOn` check had it, this one never had.
+- **Now:** a refund offer's `createdOn` may be up to 2 minutes after now.
+  - The value comes from one module, `library-bruno/clockTolerance.js`, which `bookings.js` reads too.
+  - The check keeps its title, because the #735 keys and the comparisons of published reports read the check's text. Its failure message names the tolerance.
+- **Left as it is:** the deadline checks ("validUntil … in the future", `confirmableUntil`, `preBookableUntil`) have no tolerance. A deadline is minutes away, so a few milliseconds change nothing.
+
+### Checked
+- `bruno-refund-clock-tolerance.test.js` runs the real `validateRefundOfferResponse()`:
+  - 1 ms and 14 ms after now pass;
+  - before now and exactly now pass;
+  - 5 s inside the tolerance passes;
+  - a minute past it fails and names the tolerance;
+  - the title is unchanged;
+  - `bookings.js` reads the shared value.
+- Putting back the old comparison fails 2 of its tests.
+
+---
+
 ## [server-1.11.552] / [collection-OTST_V2.0.267] — 2026-11-18
 
 Release 2026.591 (`current_release`). **A run renews its token before it expires** (#1327).
