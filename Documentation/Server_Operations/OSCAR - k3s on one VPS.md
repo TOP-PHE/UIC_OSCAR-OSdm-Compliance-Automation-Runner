@@ -255,9 +255,13 @@ if [ -f /etc/rancher/k3s/resolv.conf ]; then echo 'resolv-conf: /etc/rancher/k3s
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -
 ```
 
-The `sysctl` line prints `fs.inotify.max_user_instances = 8192`. The `if`
-line prints `resolv-conf: /etc/rancher/k3s/resolv.conf` when you wrote the
-pods' resolvers above, and nothing otherwise.
+The `sysctl` line prints `fs.inotify.max_user_instances = 8192`. Another
+value means a line of `/etc/sysctl.conf` sets the same key: that file is read
+last, so its line wins (GitHub's build machines have one). Remove that line
+(`sudo sed -i '/^[[:space:]]*fs\.inotify\.max_user_instances/d' /etc/sysctl.conf`),
+then run `sudo sysctl --system > /dev/null` again. The `if` line prints
+`resolv-conf: /etc/rancher/k3s/resolv.conf` when you wrote the pods'
+resolvers above, and nothing otherwise.
 
 What the three files do:
 - [`k3s/sysctl-oscar.conf`](../../OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf):
@@ -1106,7 +1110,9 @@ sysctl fs.inotify.max_user_instances
 ```
 
 The first `sysctl` shows the value before (`128` on Ubuntu), the last
-`8192`. The file is read again at every boot.
+`8192`. The file is read again at every boot. If the last shows another
+value, a line of `/etc/sysctl.conf` sets the same key and wins: remove it as
+section 3 says, then run the block again.
 
 ### k3s on etcd (a machine installed before #1271)
 

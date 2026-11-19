@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The CI job "k3s on one machine" failed since #1336** (#1340). CI, guide and a test, no version.
+  - **Seen:** the job stopped at once at its inotify check, on #1336's PR and on `main` after it. The job is not a required check, so #1336 merged with it red.
+  - **Why:** GitHub's runner image sets `fs.inotify.max_user_instances` in `/etc/sysctl.conf`, which `sysctl --system` reads after every file of `/etc/sysctl.d`. Its value wins over the guide's 8192.
+  - **Now:**
+    - the job prints where the key is set, removes that line from `/etc/sysctl.conf`, then follows the guide;
+    - the guide (sections 3 and 9) says what another value means and how to remove that line on a machine that has one;
+    - `kubernetes-manifests.test.js` pins the removal, before `sysctl --system`, and the guide's sentence.
+
 - **k3s on one VPS keeps its state in etcd, not in kine over SQLite** (#1271). Deployment files, guide, CI and a test only, no version.
   - **Seen:** on the k3s test machine, k3s exited under a batch three times: twice on 2026-11-15 and once on 2026-11-18 at 20:27:39 UTC.
     - Each time the journal shows `Slow SQL` lines from kine, k3s's default datastore over SQLite, then `level=fatal msg="Transaction commit failed"`.

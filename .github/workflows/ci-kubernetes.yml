@@ -404,8 +404,14 @@ jobs:
           test -n "$node_ip"
           echo "NODE_IP=$node_ip" >> "$GITHUB_ENV"
           # #1336: the machine's inotify instances, as the guide sets them.
+          # GitHub's runner image sets the same key in /etc/sysctl.conf, which
+          # "sysctl --system" reads last: that line goes first, as the guide
+          # tells a machine where the check shows another value to do (#1340).
+          grep -rn 'max_user_instances' /etc/sysctl.conf /etc/sysctl.d /usr/lib/sysctl.d 2>/dev/null || true
+          sudo sed -i '/^[[:space:]]*fs\.inotify\.max_user_instances/d' /etc/sysctl.conf
           sudo cp OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf /etc/sysctl.d/90-oscar-k3s.conf
           sudo sysctl --system > /dev/null
+          sysctl fs.inotify.max_user_instances
           test "$(sysctl -n fs.inotify.max_user_instances)" = 8192
           sudo mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s/server/manifests
           sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
