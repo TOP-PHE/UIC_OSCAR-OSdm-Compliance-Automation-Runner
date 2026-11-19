@@ -824,6 +824,12 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
     expect(doc.indexOf('sudo cp OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf')).toBeLessThan(doc.indexOf('curl -sfL https://get.k3s.io'));
     expect(steps.indexOf('sysctl-oscar.conf')).toBeLessThan(steps.indexOf('curl -sfL https://get.k3s.io'));
     expect(steps).toContain('test "$(sysctl -n fs.inotify.max_user_instances)" = 8192');
+    // GitHub's runner sets the key in /etc/sysctl.conf, read last (#1340): the
+    // CI removes that line first, and the guide says what to do when it is there.
+    const removeLine = "sudo sed -i '/^[[:space:]]*fs\\.inotify\\.max_user_instances/d' /etc/sysctl.conf";
+    expect(steps).toContain(removeLine);
+    expect(steps.indexOf(removeLine)).toBeLessThan(steps.indexOf('sudo sysctl --system'));
+    expect(doc).toContain(removeLine.replace('sudo sed', '`sudo sed').replace('/etc/sysctl.conf', '/etc/sysctl.conf`'));
     expect(doc).toContain('### The node\'s inotify limit (a machine installed before #1336)');
     // The guide's e-mail is a value of the reader's, set first in the block (#1171).
     expect(doc).toMatch(/^LE_EMAIL=\S+ +# ← yours/m);

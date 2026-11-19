@@ -812,6 +812,12 @@ Because all application code calls generic interfaces (SQL, filesystem path, HTT
 
 *Update 2026-11-02 (#1059, server 1.11.443):* the MVP stack itself now runs on Kubernetes and OpenShift, as **one pod** (SQLite on a persistent volume, the in-process queue, Bruno as child processes): `OSCAR_Deploy/kubernetes/` and *OSCAR - Kubernetes and OpenShift Deployment Guide*. None of the rows above is done by it; running more than one pod still needs the Phase 2 database and queue.
 
+*Update 2026-11-19 (#1340):* the row "child_process runner → Kubernetes Job per run" is done.
+- Since #1130 (release 2026.529), each run can be a Kubernetes Job of its own (pod mode).
+- Since #1309 (release 2026.589), the runs of a batch can share a pod kept for that batch.
+
+Section 14.12 describes it as built. The server is still one process, with SQLite and the in-process queue: the Phase 2 rows stay open.
+
 ### 14.11 User Management and Access Control (Updated 2026-04-05)
 
 This chapter formalizes the user and role model implemented in the MVP server to support platform governance and tenant isolation, including all UI and registration enhancements delivered to date.
@@ -1046,3 +1052,139 @@ Required environment variables:
 5. Audit and future extension
 - Registration confirmations are logged in `auth_events` with event type `register_confirmed`.
 - The same role model is compatible with future OIDC federation by mapping external claims to the three internal roles.
+
+### 14.12 Runs on Kubernetes, as built (November 2026)
+
+Where a run executes is chosen by `RUN_ISOLATION`:
+- `local`: the VPS, the default. Bruno is a child process of the server.
+- `isolated`: a runner container beside the server (in the same pod on
+  Kubernetes).
+- `pod`: a pod of its own on a cluster. This section describes it.
+
+How to install it:
+- on any cluster: *OSCAR - Kubernetes and OpenShift Deployment Guide*;
+- on one machine with k3s: *OSCAR - k3s on one VPS*.
+
+What was measured on it: *OSCAR - Kubernetes run campaigns*.
+
+#### 14.12.1 The parts
+
+```
+                 Traefik (k3s) / Ingress / Route
+                              │ https
+ namespace oscar              ▼
+ ┌──────────────────────────────────────────────┐
+ │ oscar (1 replica)                            │       ┌─────────────────────────┐
+ │  API, pages, SQLite on a volume, queue       │ agent │ oscar-dispatcher        │
+ │  public port ── people                       │──────▶│ the only Kubernetes     │
+ │  internal port 3003 ── the runs' calls       │  TCP  │ rights: Jobs, Secrets,  │
+ └──────────────────────▲───────────────────────┘       │ pod logs in oscar-runs  │
+                        │ data file, token,             └───────────┬─────────────┘
+                        │ output, results                           │ creates, follows,
+ namespace oscar-runs   │                                           │ removes
+ ┌──────────────────────┴───────────────────────────────────────────▼─────────────┐
+ │ run pods (image oscar-run: Bruno + the collection), one per run or one per batch │
+ │ ──▶ the provider (public addresses only)                                       │
+ └─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **The server** (`oscar`, one replica, `Recreate`). It has no Kubernetes
+  right: a compromise of the internet-facing server does not reach the
+  cluster.
+  - Its public port serves people.
+  - Its internal port (`INTERNAL_PORT`, Service `oscar-internal`, never
+    published outside the cluster) serves only a run's calls: the data file,
+    the data file schema, a fresh access token, the run's output and its
+    result files, and a kept pod's request for its next run.
+- **The dispatcher** (`oscar-dispatcher`). It alone holds the Role in
+  `oscar-runs`. The server asks it, over a TCP protocol with a token of its
+  own, to start a run or a kept pod.
+  - It makes the Secret and the Job, follows the pod's log, and reports the
+    pod's address and its end.
+  - It removes everything it made when it starts.
+  - It waits up to 2 minutes for the Kubernetes API when it does not answer
+    (#1272), instead of failing the runs.
+- **The run pods** (`oscar-runs`): image `oscar-run`, Bruno and the
+  collection, running as uid 1000.
+  - A run's work folder is in memory (#1307), with one CPU and 1 GiB of
+    memory at most.
+  - A network policy lets a run pod reach DNS, OSCAR's internal port, and
+    public addresses only (the providers).
+  - A quota caps the namespace: 50 pods, 60 Jobs, 60 Secrets.
+
+#### 14.12.2 A run in a pod
+
+1. The queue gives the run a slot. The runner resolves the tester's token
+   and writes the run's environment.
+2. **One pod per run** (default): the dispatcher makes a Secret with the
+   run's inputs and a Job `oscar-run-<runId>`.
+   **Kept pods** (`RUN_KEPT_PODS=on`, #1309): the run goes to a pod kept for
+   its batch (one user, one company or provider), started for the first run
+   and asking the internal port for the next.
+3. The run's secret is bound to its pod's address: a call from another
+   address is refused, and a secret already used from an address that is
+   not its pod's is withdrawn and the run stopped. A kept pod has a
+   secret of its own, bound the same way: a call its own program never
+   makes stops every pod of that company and fires the alert
+   `OscarKeptPodProtocolFault`.
+4. Bruno reads the data file and its token from the internal port, sends
+   the requests to the provider, and its output reaches the run's log: a
+   kept pod sends it to the internal port, the dispatcher reads a one-run
+   pod's log.
+5. The pod sends its result files to the internal port. They are stored
+   encrypted, then the runner links the reports and stores the checks, in
+   slices of the server's thread (#1214).
+6. A kept pod cleans its folder, its home and `/tmp` before the next run.
+   It stops after 20 runs, after 30 s with nothing to take, when its batch
+   has nothing left, or when a run left a process behind.
+
+#### 14.12.3 What stops a run that goes wrong
+
+| Limit | Setting | What it catches |
+|---|---|---|
+| Run deadline | `RUN_TIMEOUT_MS`, at most `RUN_HARD_MAX_TIMEOUT_MS` | A run that never ends |
+| Silent run limit | `RUN_IDLE_TIMEOUT_MS` (5 min) | Bruno writing nothing, most often a provider that does not answer; not for scenarios that wait on purpose |
+| Pod first line limit | `RUN_FIRST_LINE_TIMEOUT_MS` (3 min, #1336) | A pod that took the run and writes no line, whatever the silent run limit says |
+| Not a test result | — (#1287) | Bruno ending with anything but 0 or 1, or a pod given up under its run: the run reads *Run not finished*, to run again, and the coverage report leaves it out |
+| Pod that never starts | `RUN_POD_START_TIMEOUT_MS` (5 min) | An image that cannot be pulled, no room in the quota |
+
+On one machine, k3s keeps its state in etcd (#1271), not in kine over SQLite,
+whose clean-up stopped k3s under a batch. The machine's inotify instances
+are raised to 8192 (#1336): at Ubuntu's 128, following the run pods' logs
+ran out of them.
+
+#### 14.12.4 Monitoring
+
+- kube-prometheus-stack, Loki and Alloy.
+- Grafana behind OSCAR's sign-in, a ForwardAuth (#1148).
+- Alloy reads the logs of OSCAR's namespace only, never a run pod's: a run's
+  output is test data, and it reaches the run's own log.
+- OSCAR's dashboards show:
+  - the run pods' start time and how they ended;
+  - the kept pods by state;
+  - each run's time step by step (#1312);
+  - the work each run costs the server's thread (#1205).
+
+#### 14.12.5 Measured capacity, and what limits it
+
+On the k3s test machine, the same series of 939 runs on six simulators took:
+- 39.6 minutes with a pod per run on kine/SQLite (23.5 runs a minute,
+  measured on 95 % of the runs);
+- 29.1 minutes with kept pods on etcd (32.3 runs a minute), the best
+  setting measured.
+
+What limits it:
+- **The CPU of the machine**, Bruno's start above all. Kept pods start
+  Bruno's pod once per batch, not once per run.
+- **On a disk with slow syncs, etcd.** A pod per run is a Job, a Secret and
+  a pod written to etcd, and fell to 14.9 runs a minute.
+- **On a shared VPS, its neighbours.** Two identical campaigns gave 32.3 and
+  22.4 runs a minute.
+
+The details are in *OSCAR - Kubernetes run campaigns*.
+
+The server stays one process. That is why there is one replica, `Recreate`,
+and the in-process data file lock. Its thread's per-run work (storing the
+results, the log lines, the commits and checkpoints) was measured and
+reduced in #1233. More than one replica still needs the Phase 2 database and
+queue of section 14.10.
