@@ -810,12 +810,21 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
     expect(doc).toContain(`curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${version} sh -`);
     expect(steps).toContain('curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="$K3S_VERSION" sh -');
     for (const copy of [
+      'OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf /etc/sysctl.d/90-oscar-k3s.conf',
       'OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml',
       'OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml',
     ]) {
       expect(doc).toContain(`sudo cp ${copy}`);
       expect(steps).toContain(`sudo cp ${copy}`);
     }
+    // #1336: the kernel settings come before k3s, and say what they set.
+    const sysctlConf = fs.readFileSync(path.join(REPO, 'OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf'), 'utf8');
+    const settings = sysctlConf.split('\n').filter((l) => l.trim() && !l.startsWith('#'));
+    expect(settings).toEqual(['fs.inotify.max_user_instances = 8192']);
+    expect(doc.indexOf('sudo cp OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf')).toBeLessThan(doc.indexOf('curl -sfL https://get.k3s.io'));
+    expect(steps.indexOf('sysctl-oscar.conf')).toBeLessThan(steps.indexOf('curl -sfL https://get.k3s.io'));
+    expect(steps).toContain('test "$(sysctl -n fs.inotify.max_user_instances)" = 8192');
+    expect(doc).toContain('### The node\'s inotify limit (a machine installed before #1336)');
     // The guide's e-mail is a value of the reader's, set first in the block (#1171).
     expect(doc).toMatch(/^LE_EMAIL=\S+ +# ← yours/m);
     expect(doc).toContain('sed -i "s/CHANGE-ME@example.org/$LE_EMAIL/"');

@@ -550,9 +550,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.554] — 2026-11-19
+
+Release 2026.593 (`current_release`). **A run whose pod stays silent is stopped after 3 minutes, and the k3s machine's inotify limit is raised** (#1336).
+
+### Fixed
+- **Seen:** in a campaign with kept run pods on the k3s test machine (2026-11-19, etcd, 939 runs), `SIM_REFUND_RETURN_1ADT_310` was handed to kept pod `1b28be26` at 07:17:48 local time, half a second after that pod reported the end of its first run.
+  - No line came from it after that: no "started bru", no error, no Bruno output.
+  - Grafana showed the pod's container alive until 08:18, at 25 MB (the pod's program alone) and almost no CPU: idle between the hand-over and Bruno's start. Where exactly is not known; its log file went with the pod.
+  - The run took exactly 60 minutes and ended `RUN_NOT_FINISHED` (exit 143), holding a run slot all that time. The test machine's database comes from production: `RUN_TIMEOUT_MS` 3,600,000, and `RUN_IDLE_TIMEOUT_MS` 0, so the stop on silence was off.
+- **Now:** in pod mode the runner arms a limit when the run's pod is named (`'pod'`, the dispatcher's or the kept pods' record), `watchFirstLine()` in `runner.js`.
+  - The pod's first line on stdout disarms it, and so does the run's end. The dispatcher's own words come on stderr and do not count.
+  - Past the limit, the log says "The run's pod wrote no line N s after it took the run: the run is stopped and its pod given up." `killRun()` then stops the run: a kept pod is given up (`STOP.STOPPED`, removed at once) and a pod of one run removed by the dispatcher. The run reads *Run not finished* (#1287), to run again.
+  - `RUN_FIRST_LINE_TIMEOUT_MS`, default 180,000 (3 min), `0` = off, Server Config → *Run Pod First Line Limit (ms)*. It applies whatever `RUN_IDLE_TIMEOUT_MS` says, expiry tests included: every scenario writes its first lines at once, and the step from the hand-over to the first line (`folder`, #1312) took 28 s at most.
+- **The machine's inotify instances** (k3s on one VPS):
+  - **Seen:** at 07:17:35 two kept pods' logs were cut by "failed to create fsnotify watcher: too many open files". The node's `fs.inotify.max_user_instances` was Ubuntu's 128. Out of a campaign, `k3s-server` holds 23 instances and each `containerd-shim` 2 to 4; the kubelet takes one more for each pod log it follows.
+  - **Now:** `OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf` sets 8192, copied to `/etc/sysctl.d/90-oscar-k3s.conf` before k3s's install (guide section 3), and the CI's k3s job does the same and checks it. A machine installed before applies it with section 9, *The node's inotify limit*, with nothing restarted.
+- **Left out:** the dispatcher's log following has no idle timeout. It did not matter here: the container was alive, and the dispatcher was right not to report an end.
+
+### Checked
+- `runner.test.js`, pod mode:
+  - no line once the pod is named: the run is stopped and the log says why, with the silence limit off;
+  - a first line disarms it;
+  - nothing is armed before a pod holds the run;
+  - a dispatcher line on stderr does not disarm it;
+  - a run that ends first disarms it, and `0` turns it off;
+  - the default, `0` and a value that is not a number.
+- Taking out the arming fails 2 of those tests; taking out the disarming on the first line fails 1.
+- `kubernetes-manifests.test.js`: the guide and the CI copy the same sysctl file before installing k3s, the file sets only `fs.inotify.max_user_instances = 8192`, the CI checks the value, and the guide has the section for a machine installed before.
+
+---
+
 ## [server-1.11.553] / [collection-OTST_V2.0.268] — 2026-11-19
 
-Release 2026.592 (`current_release`). **A refund offer's creation time allows for the provider's clock** (#1334).
+Release 2026.592. **A refund offer's creation time allows for the provider's clock** (#1334).
 
 ### Fixed
 - **Seen:** in a campaign on the k3s test machine (2026-11-19, six simulators, 939 runs), 18 refund scenarios of five providers failed "Refund offer[0] createdOn is valid and in the past", all between 06:37 and 06:49 UTC.

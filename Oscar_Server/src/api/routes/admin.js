@@ -822,6 +822,9 @@ const CONFIG_SCHEMA = {
   // #646: a run whose Bruno stays silent this long (a request the provider
   // never answers) is stopped. 0 turns it off.
   RUN_IDLE_TIMEOUT_MS: { description: 'Stop a run whose Bruno writes nothing for this long (ms): a request the provider never answers (default 300000 = 5 min, 0 = off). Not applied to scenarios that wait on purpose (expiry tests, refund receipts).', type: 'number', min: 0, max: 3600000 },
+  // #1336: on a cluster, a run's pod that took the run and writes no line is
+  // given up, whatever the limit above says. 0 turns it off.
+  RUN_FIRST_LINE_TIMEOUT_MS: { description: 'On a cluster (pods for runs), stop a run whose pod writes no line this long after taking it (ms; default 180000 = 3 min, 0 = off). Applied even when the Silent Run Limit is off: every scenario writes its first lines at once.', type: 'number', min: 0, max: 3600000 },
   // Logging — applied immediately on save
   LOG_LEVEL: {
     description: 'Server log verbosity (info = production-friendly, debug = verbose for troubleshooting)',

@@ -905,6 +905,94 @@ describe('executeRun — RUN_ISOLATION=pod (#1130)', () => {
     expect(getDecryptedEvents(runId).some((e) => e.level === 'error' && /not its pod's/.test(e.message))).toBe(true);
   });
 
+  // #1336: a kept pod took a run and stalled before Bruno; with the silence
+  // limit off (production's setting), the run held its slot for an hour.
+  describe('the pod\'s first line within a bounded time (#1336)', () => {
+    const setConfig = (key, value) => run(`INSERT INTO server_config (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [key, value]);
+    const clearConfig = (...keys) => keys.forEach((k) => run('DELETE FROM server_config WHERE key = ?', [k]));
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const NO_LINE = /The run's pod wrote no line \d+ s after it took the run: the run is stopped and its pod given up\./;
+    afterEach(() => clearConfig('RUN_FIRST_LINE_TIMEOUT_MS', 'RUN_IDLE_TIMEOUT_MS'));
+
+    test('no line after the pod took the run: stopped, and the log says why, even with the silence limit off', async () => {
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '80');
+      setConfig('RUN_IDLE_TIMEOUT_MS', '0');
+      const { runId, proc, done } = await startPodRun();
+      proc.emit('pod', '10.1.0.9');
+      await waitForKillCall(proc);
+      expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
+      proc.emit('close', 143);
+      await done;
+      expect(getDecryptedEvents(runId).some((e) => e.level === 'error' && NO_LINE.test(e.message))).toBe(true);
+    });
+
+    test('the pod\'s first line disarms it', async () => {
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '80');
+      setConfig('RUN_IDLE_TIMEOUT_MS', '0');
+      const { runId, proc, done } = await startPodRun();
+      proc.emit('pod', '10.1.0.9');
+      proc.stdout.emit('data', Buffer.from('[run-pod] started bru\n'));
+      await wait(300);
+      expect(proc.kill).not.toHaveBeenCalled();
+      proc.emit('close', 0);
+      await done;
+      expect(getDecryptedEvents(runId).some((e) => NO_LINE.test(e.message))).toBe(false);
+    });
+
+    test('not armed before a pod holds the run: the wait for a pod has its own limits', async () => {
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '80');
+      setConfig('RUN_IDLE_TIMEOUT_MS', '0');
+      const { proc, done } = await startPodRun();
+      await wait(300);
+      expect(proc.kill).not.toHaveBeenCalled();
+      proc.emit('close', 0);
+      await done;
+    });
+
+    test('the dispatcher\'s own words (stderr) are not the pod\'s first line', async () => {
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '80');
+      setConfig('RUN_IDLE_TIMEOUT_MS', '0');
+      const { proc, done } = await startPodRun();
+      proc.emit('pod', '10.1.0.9');
+      proc.stderr.emit('data', Buffer.from('[run-dispatcher] The kept pod\'s log was cut; it is read again.\n'));
+      await waitForKillCall(proc);
+      proc.emit('close', 143);
+      await done;
+    });
+
+    test('a run that ends first disarms it; 0 turns it off', async () => {
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '80');
+      const first = await startPodRun();
+      first.proc.emit('pod', '10.1.0.9');
+      first.proc.emit('close', 1);
+      await first.done;
+      await wait(300);
+      expect(first.proc.kill).not.toHaveBeenCalled();
+
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '0');
+      setConfig('RUN_IDLE_TIMEOUT_MS', '0');
+      const second = await startPodRun();
+      second.proc.emit('pod', '10.1.0.9');
+      await wait(300);
+      expect(second.proc.kill).not.toHaveBeenCalled();
+      second.proc.emit('close', 0);
+      await second.done;
+    });
+
+    test('runFirstLineLimitMs: three minutes by default, off at 0, the default for what is not a number', () => {
+      const { runFirstLineLimitMs } = require('../../src/worker/runner');
+      clearConfig('RUN_FIRST_LINE_TIMEOUT_MS');
+      expect(runFirstLineLimitMs()).toBe(180000);
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '0');
+      expect(runFirstLineLimitMs()).toBe(0);
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', '45000');
+      expect(runFirstLineLimitMs()).toBe(45000);
+      setConfig('RUN_FIRST_LINE_TIMEOUT_MS', 'soon');
+      expect(runFirstLineLimitMs()).toBe(180000);
+    });
+  });
+
   test('the results the pod sent are linked as the run\'s artifacts, then removed', async () => {
     const { runId, request, proc, done } = await startPodRun();
     const env = shortEnv(request.envName);

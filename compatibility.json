@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.592",
+  "current_release": "2026.593",
   "releases": [
+    {
+      "release": "2026.593",
+      "date": "2026-11-19",
+      "server": "1.11.554",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.554 (#1336): on a cluster, a run whose pod writes no line within 3 minutes of holding the run is stopped and its pod given up (RUN_FIRST_LINE_TIMEOUT_MS, Server Config → Run Pod First Line Limit; 0 = off). It applies whatever the silent run limit says: on the k3s test machine a kept pod stalled before Bruno and, with that limit off (production's setting), its run held a slot for an hour. The run reads Run not finished, to run again.",
+        "The k3s guide and its CI raise the machine's inotify instances from 128 to 8192 (OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf, in /etc/sysctl.d): under a campaign of 15 runs, run pods' logs were cut by \"failed to create fsnotify watcher: too many open files\". A machine installed before applies it with section 9 of the guide."
+      ]
+    },
     {
       "release": "2026.592",
       "date": "2026-11-19",
