@@ -118,6 +118,8 @@ async function codesFor(request, companyId, datafile, seen, user) {
 async function plansFor(request, req) {
   const account = req.apiAccount;
   const plans = [];
+  // One provider at a time, on purpose: each decrypts its data file and reads its
+  // runs' facets in slices (#1256); all at once would hold the server's thread longer.
   for (const companyId of request.providers) {
     if (!canUseCompany(req.user, companyId)) {
       return { refusal: [404, { status: 404, title: 'Not Found', detail: `Unknown company or provider, or one this account is not given: ${companyId}.`, provider: companyId }] };
@@ -156,8 +158,9 @@ async function launchHandler(req, res) {
   const account = req.apiAccount;
   const request = TR.requestOf(req.body);
   if (request.error) return problem(res, 400, 'Bad Request', request.error);
-  const key = TR.idempotencyKeyOf(req.get('Idempotency-Key'));
-  if (key?.error) return problem(res, 400, 'Bad Request', key.error);
+  const idempotency = TR.idempotencyKeyOf(req.get('Idempotency-Key'));
+  if (idempotency.error) return problem(res, 400, 'Bad Request', idempotency.error);
+  const key = idempotency.key;
   const hash = TR.hashOf(request);
   const base = Tokens.oscarBase(req);
 

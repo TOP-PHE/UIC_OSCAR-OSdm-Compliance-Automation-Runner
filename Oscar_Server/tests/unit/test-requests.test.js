@@ -58,8 +58,8 @@ describe('the same request, asked again', () => {
   });
 
   test('idempotencyKeyOf(): absent, accepted, refused', () => {
-    expect(TR.idempotencyKeyOf(undefined)).toBeNull();
-    expect(TR.idempotencyKeyOf('ci-build-1001')).toBe('ci-build-1001');
+    expect(TR.idempotencyKeyOf(undefined)).toEqual({ key: null });
+    expect(TR.idempotencyKeyOf('ci-build-1001')).toEqual({ key: 'ci-build-1001' });
     for (const bad of ['short', 'x'.repeat(101), 'has space here', 'quote"inside', ['ci-build-1001']]) {
       expect(TR.idempotencyKeyOf(bad).error).toEqual(expect.any(String));
     }

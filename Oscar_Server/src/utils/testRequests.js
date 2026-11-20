@@ -73,24 +73,30 @@ function requestOf(body) {
   return out;
 }
 
+// Text order, by code unit: the same for every locale.
+const byText = (a, b) => {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+};
+
 /** The same request asked again (Idempotency-Key): a hash of what it asks. */
 function hashOf(request) {
   const canonical = JSON.stringify({
-    providers: [...request.providers].sort(),
-    scenarios: request.scenarios ? [...request.scenarios].sort() : null,
+    providers: [...request.providers].sort(byText),
+    scenarios: request.scenarios ? [...request.scenarios].sort(byText) : null,
     selection: request.selection || null,
     reference: request.reference,
   });
   return crypto.createHash('sha256').update(canonical).digest('hex');
 }
 
-/** An Idempotency-Key header: the key, null when absent, or { error }. */
+/** An Idempotency-Key header: { key } (null when absent), or { error }. */
 function idempotencyKeyOf(value) {
-  if (value === undefined) return null;
+  if (value === undefined) return { key: null };
   if (typeof value !== 'string' || value.length < 8 || value.length > 100 || !/^[\w.:-]+$/.test(value)) {
     return { error: 'Idempotency-Key must be 8 to 100 letters, digits or . _ : -' };
   }
-  return value;
+  return { key: value };
 }
 
 /**
