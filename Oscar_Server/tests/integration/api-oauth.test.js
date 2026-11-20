@@ -47,6 +47,9 @@ const session = u => `Bearer ${jwt.sign({ sub: u.id, email: u.email, companyId: 
 const ec = () => crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
 const pemOf = key => key.export({ type: 'spki', format: 'pem' });
 
+// The public half of a 1024-bit RSA key, below the 2048 bits accepted.
+const RSA_1024_PUBLIC = "-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDS0B7jXNyAm3gQKlSSiexzlwFE\nP6XKpbQwIAjDHRjFMRd4mT+Bk813nbGML9wyhHKVyWkl+KC52yl+25BoGL7GbQUq\nIc9awvxmbNC2m9pccXBHDBKnI1+dFSv7RZFciHOZQcJNJ221O5S0dpPDMBfy5HAG\nA4g19GV41eXReeJbVQIDAQAB\n-----END PUBLIC KEY-----\n";
+
 const KEY = ec();
 const OTHER_KEY = ec();
 let account;
@@ -94,8 +97,10 @@ describe('the account\'s public keys', () => {
     expect(refused.status).toBe(400);
     expect(refused.body.detail).toContain('private key');
     expect((await manage('post', `/${account.id}/keys`).send({ public_key: 'hello' })).status).toBe(400);
-    const small = crypto.generateKeyPairSync('rsa', { modulusLength: 1024 });
-    expect((await manage('post', `/${account.id}/keys`).send({ public_key: pemOf(small.publicKey) })).status).toBe(400);
+    // A short RSA key, written out: refused for its size, whatever made it.
+    expect((await manage('post', `/${account.id}/keys`).send({ public_key: RSA_1024_PUBLIC })).status).toBe(400);
+    const p384 = crypto.generateKeyPairSync('ec', { namedCurve: 'P-384' });
+    expect((await manage('post', `/${account.id}/keys`).send({ public_key: pemOf(p384.publicKey) })).status).toBe(400);
     expect((await manage('post', `/${account.id}/keys`).send({ public_key: pemOf(KEY.publicKey) })).status).toBe(409);
     const second = await manage('post', `/${account.id}/keys`).send({ public_key: pemOf(OTHER_KEY.publicKey) });
     expect(second.status).toBe(201);
