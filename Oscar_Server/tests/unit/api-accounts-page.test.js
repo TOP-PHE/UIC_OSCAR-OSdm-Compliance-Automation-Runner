@@ -85,3 +85,36 @@ test('the menu offers the page to Test Managers only, and the page loads its scr
   expect(page).toContain('<script src="/js/api-accounts.js"></script>');
   expect(page).toContain("renderOscarNav('oscar-nav', 'api-accounts')");
 });
+
+describe('signing in (#1342 PR 2)', () => {
+  const keysSectionHtml = lift('keysSectionHtml', { esc, whenText });
+  const KEYS = { client_id: 'a1', token_url: 'https://oscar.example/v1/api/oauth/token', active_keys: 1, max_active_keys: 2,
+    keys: [{ id: 'k1', alg: 'ES256', fingerprint: 'fp<1>', state: 'active', created_by: 'tm@x.test', created_at: '2026-11-20 10:00:00' },
+      { id: 'k0', alg: 'PS256', fingerprint: 'fp0', state: 'revoked' }] };
+
+  test('the client id, the token endpoint, each key escaped, Revoke for the active one only, a box for one more', () => {
+    const html = keysSectionHtml(ACCOUNT, KEYS);
+    expect(html).toContain('client_id <code>a1</code>');
+    expect(html).toContain('https://oscar.example/v1/api/oauth/token');
+    expect(html).toContain('fp&lt;1&gt;');
+    expect(html.match(/data-action="revoke-key"/g)).toHaveLength(1);
+    expect(html).toContain('data-key="k1"');
+    expect(html).toContain('data-action="add-key" data-id="a1"');
+  });
+
+  test('two active keys: no box until one is revoked; none: the account cannot sign in', () => {
+    expect(keysSectionHtml(ACCOUNT, { ...KEYS, active_keys: 2 })).not.toContain('data-action="add-key"');
+    expect(keysSectionHtml(ACCOUNT, { ...KEYS, keys: [], active_keys: 0 })).toContain('cannot sign in');
+  });
+
+  test('without APP_URL the page says so instead of an address', () => {
+    expect(keysSectionHtml(ACCOUNT, { ...KEYS, token_url: null })).toContain('APP_URL is not set');
+  });
+});
+
+test('only a UUID read from an answer goes in a request address (S8476)', () => {
+  const ID = SOURCE.find(l => l.startsWith('const ACCOUNT_ID = '));
+  const accountIdOf = vm.runInNewContext(`${ID}\n(${SOURCE.slice(SOURCE.findIndex(l => l.startsWith('function accountIdOf(')), SOURCE.findIndex((l, i) => i > SOURCE.findIndex(x => x.startsWith('function accountIdOf(')) && l === '}') + 1).join('\n')})`);
+  expect(accountIdOf('3F2A91C0-1D2E-4C5B-8A9F-0123456789AB')).toBe('3f2a91c0-1d2e-4c5b-8a9f-0123456789ab');
+  for (const bad of ['../admin', '1', '', null, { id: 'x' }, '3f2a91c0-1d2e-4c5b-8a9f-0123456789ab/keys']) expect(accountIdOf(bad)).toBeNull();
+});

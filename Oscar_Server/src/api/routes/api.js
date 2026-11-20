@@ -8,7 +8,11 @@
 'use strict';
 
 /**
- * api.js — the read-only API, by API key (#503).
+ * api.js — the API, by read-only API key (#503) or by a Company API account's
+ * access token (#1342; POST /v1/api/oauth/token, api-oauth.js).
+ *
+ * A key reads the runs of its company or provider; an account reads the runs
+ * it launched (callerScope()). Every route needs the scope runs:read.
  *
  *   GET /v1/api/key                     — the key's own name, company, scopes and expiry
  *   GET /v1/api/runs                    — the company's runs, newest first (#503 PR 2)
@@ -33,7 +37,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { get, all } = require('../../db/db');
-const { requireApiKey } = require('../middleware/apiKey');
+const { requireApiCaller, needScope } = require('../middleware/apiCaller');
 const { canUserSeeRun } = require('../helpers/run-access');
 
 const router = express.Router();
@@ -45,13 +49,40 @@ const guessLimiter = rateLimit({
 });
 const perKeyLimiter = rateLimit({
   windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false,
-  keyGenerator: (req) => `api-key:${req.apiKey.id}`,
+  keyGenerator: (req) => (req.apiAccount ? `api-account:${req.apiAccount.id}` : `api-key:${req.apiKey.id}`),
   message: { status: 429, title: 'Too Many Requests', detail: 'This API key made too many requests in a short window — please wait a moment.' },
 });
 
-router.use(guessLimiter, requireApiKey, perKeyLimiter);
+router.use(guessLimiter, requireApiCaller, perKeyLimiter, needScope('runs:read'));
+
+// What the caller reads among the runs: a key, its company's or provider's;
+// a Company API account (#1342), the runs it launched. Each run then goes
+// through canUserSeeRun() all the same.
+function callerScope(req, alias = 'r') {
+  if (req.apiAccount) return { sql: `${alias}.user_id = ?`, params: [req.apiAccount.id] };
+  return { sql: `${alias}.company_id = ?`, params: [req.user.keyCompanyId] };
+}
+
+// GET /key for a Company API account: the account, its company and providers, its token's scopes.
+function accountAnswer(req, res) {
+  const row = get(`SELECT a.name, a.created_at, c.id AS company_id, c.name AS company_name
+                     FROM api_account a JOIN companies c ON c.id = a.company_id WHERE a.user_id = ?`, [req.apiAccount.id]);
+  if (!row) return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Missing, invalid, expired or revoked API key.' });
+  const providers = all(`SELECT c.id, c.name FROM provider_access pa JOIN companies c ON c.id = pa.company_id
+                          WHERE pa.user_id = ? AND c.parent_id = ? ORDER BY c.name`, [req.apiAccount.id, row.company_id]);
+  return res.json({
+    kind: 'company_api_account',
+    name: row.name,
+    client_id: req.apiAccount.id,
+    company: { id: row.company_id, name: row.company_name },
+    providers,
+    scopes: req.apiAccount.scopes,
+    created_at: row.created_at,
+  });
+}
 
 router.get('/key', (req, res) => {
+  if (req.apiAccount) return accountAnswer(req, res);
   const row = get(`SELECT k.name, k.prefix, k.scopes, k.created_at, k.expires_at, c.id AS company_id, c.name AS company_name
                    FROM api_key k JOIN companies c ON c.id = k.company_id WHERE k.id = ?`, [req.apiKey.id]);
   if (!row) return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Missing, invalid, expired or revoked API key.' });
@@ -143,8 +174,9 @@ router.get('/runs', (req, res) => {
   const scenario = textParam(req.query.scenario_code, 'scenario_code');
   if (scenario.error) return badRequest(res, scenario.error);
 
-  const where = [`r.company_id = ?`, `r.status NOT IN (${[...HIDDEN_STATUSES].map(() => '?').join(', ')})`];
-  const params = [req.user.keyCompanyId, ...HIDDEN_STATUSES];
+  const scope = callerScope(req);
+  const where = [scope.sql, `r.status NOT IN (${[...HIDDEN_STATUSES].map(() => '?').join(', ')})`];
+  const params = [...scope.params, ...HIDDEN_STATUSES];
   if (status.value !== null) { where.push('r.status = ?'); params.push(status.value); }
   if (batch.value !== null) { where.push('r.batch_id = ?'); params.push(batch.value); }
   if (scenario.value !== null) { where.push('r.scenario_code = ?'); params.push(scenario.value); }
@@ -235,8 +267,9 @@ router.get('/runs/:id/assertions', (req, res) => {
 router.get('/batches/:batchId', (req, res) => {
   const batchId = req.params.batchId;
   if (batchId.length > MAX_TEXT) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No such batch.' });
-  const rows = all(`SELECT id FROM runs WHERE batch_id = ? AND company_id = ? ORDER BY queued_at ASC, id ASC`,
-    [batchId, req.user.keyCompanyId]);
+  const scope = callerScope(req, 'runs');
+  const rows = all(`SELECT id FROM runs WHERE batch_id = ? AND ${scope.sql} ORDER BY queued_at ASC, id ASC`,
+    [batchId, ...scope.params]);
   const runs = [];
   for (const { id } of rows) {
     const run = visibleRun(id, req);
@@ -248,8 +281,9 @@ router.get('/batches/:batchId', (req, res) => {
 });
 
 router.get('/queue', (req, res) => {
-  const rows = all(`SELECT id FROM runs WHERE company_id = ? AND status IN ('QUEUED', 'RUNNING') ORDER BY queued_at ASC, id ASC`,
-    [req.user.keyCompanyId]);
+  const scope = callerScope(req, 'runs');
+  const rows = all(`SELECT id FROM runs WHERE ${scope.sql} AND status IN ('QUEUED', 'RUNNING') ORDER BY queued_at ASC, id ASC`,
+    scope.params);
   const runs = rows.map(({ id }) => visibleRun(id, req)).filter(Boolean);
   const queued = runs.filter(r => r.status === 'QUEUED');
   return res.json({

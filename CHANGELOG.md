@@ -576,6 +576,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.557] — 2026-11-20
+
+API for test automation, part 2 (#1342): a Company API account signs in to the API. Not released on its own: listed in `compatibility.json` (2026.596) without moving `current_release`.
+
+### Why
+The maintainer decided (#1342, D2) that an account authenticates by OAuth 2.0 client credentials with `private_key_jwt` (RFC 7523), no client secret: nothing reusable travels, OSCAR holds public keys only, and the private key can stay in the company's vault. It is what FAPI 2.0 accepts, with mutual TLS.
+
+### Added
+- **An account's public keys** (migration 58, `api_account_key`): a Test Manager adds a PEM public key, EC P-256 (ES256) or RSA of 2048 bits or more (PS256), and revokes it (`GET` / `POST /v1/company/api-accounts/:id/keys`, `DELETE …/keys/:keyId`). A private key is refused; two keys are active at most, for a rotation; each is known by the SHA-256 of its key (`fingerprint`, usable as `kid`). The account's view now names its `client_id` (its id) and `token_url`.
+- **`POST /v1/api/oauth/token`** (`api-oauth.js`, mounted before `/v1/api`), `application/x-www-form-urlencoded`: `grant_type=client_credentials`, `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`, `client_assertion`, `scope` (optional).
+  - The assertion (`utils/clientAssertion.js`): ES256 or PS256 only, checked against the account's active keys, `iss` = `sub` = the account, `aud` = the token endpoint or OSCAR's address (`APP_URL`; without it in production the endpoint answers 503), `exp` at most 5 minutes after `iat` with 60 s of clock tolerance, and a `jti` accepted once (`api_assertion_jti`, kept until the assertion expires). The account must be active.
+  - The answer is RFC 6749 §5.1, `Cache-Control: no-store`: a 15-minute bearer token (`utils/apiAccessTokens.js`: HS256 with a key derived from `JWT_SECRET` for this use only, `aud` "oscar-api") and its scopes (`runs:read`, `runs:write`; both by default). Errors are §5.2; a client that is not accepted is always the same `invalid_client`. 30 requests a minute per address. Each token given is audited.
+- **`/v1/api` takes either caller** (`middleware/apiCaller.js`): a read-only key as before, or an account's access token. The account is read again at each call (active, of its company, the token issued after any suspension). Every route needs `runs:read` (403 `insufficient_scope`). An account reads the runs it launched (`callerScope()`); `GET /v1/api/key` describes the account (`kind: company_api_account`, its company, providers and scopes).
+- **The API Accounts page** has a card *Signing in to the API*: each account's client id and token endpoint, its keys (fingerprint, state, last used, Revoke), a box for a public key, and the two `openssl` commands that make an EC key pair.
+
+### Security
+- An access token never opens a page: `requireAuth` verifies with `JWT_SECRET`, which does not verify it, and `sessionUser()` refuses the account's role. A session token opens no `/v1/api` route.
+- Algorithm confusion is refused: an assertion signed HS256 with the public key as secret, or unsigned, is `invalid_client`.
+
 ## [server-1.11.556] — 2026-11-20
 
 API for test automation, part 1 (#1342): Company API accounts. Not released on its own: listed in `compatibility.json` (2026.595) without moving `current_release`, so no release tag is made. The parts that let an account sign in to the API (OAuth with `private_key_jwt`) and launch tests follow; the programme is released as a whole by its last part, with the news entry and the guide.

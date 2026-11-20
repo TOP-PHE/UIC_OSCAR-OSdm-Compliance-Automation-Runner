@@ -27,6 +27,10 @@ td.actions{white-space:nowrap}
 .empty{padding:18px;text-align:center;color:#90a4ae;font-size:13px}
 .state{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase}
 .box{display:inline-block;margin:2px 10px 2px 0;font-size:13px;white-space:nowrap}
+section.keys{border-top:1px solid #eceff1;padding:12px 0}
+section.keys h4{margin:0 0 4px}
+section.keys textarea{width:100%;font-family:Consolas,monospace;font-size:12px;margin:6px 0}
+code{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -71,6 +75,20 @@ td.actions{white-space:nowrap}
   <div class="card">
     <h3>Accounts</h3>
     <div id="accounts-list"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="card" id="keys-card">
+    <h3>Signing in to the API</h3>
+    <p class="muted" style="font-size:13px;color:#546e7a;line-height:1.6">
+      An account signs in with OAuth 2.0 client credentials and <code>private_key_jwt</code>: your company
+      makes a key pair, keeps the private key where its CI keeps its secrets, and gives OSCAR the public key
+      here. At each token request the CI signs a one-minute assertion with the private key and sends it to the
+      token endpoint below. OSCAR never sees the private key. EC P-256 (ES256) or RSA of 2048 bits or more (PS256);
+      two keys at once, to change one without a stop. For example:
+      <code>openssl ecparam -name prime256v1 -genkey -noout -out oscar-ci.key</code>, then
+      <code>openssl ec -in oscar-ci.key -pubout -out oscar-ci.pub</code>, and paste <code>oscar-ci.pub</code>.
+    </p>
+    <div id="keys-list"><div class="empty">Loading…</div></div>
   </div>
 </div>
 
