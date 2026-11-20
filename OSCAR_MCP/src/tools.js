@@ -102,6 +102,18 @@ const TOOLS = Object.freeze([
     path: (a) => `/v1/api/test-requests/${encodeURIComponent(a.test_request_id)}${a.wait === undefined ? '' : '?wait=' + a.wait}`,
   },
   {
+    name: 'oscar_get_test_request_results',
+    title: 'Results of an OSCAR test request',
+    description: `Where each run of a test request failed and warned (#1342): each failed check (step, check, message, expected, actual, HTTP status, OSDM problem code), each warning, each known deviation applied. Format junit gives JUnit XML. ${DATA_NOTE}`,
+    inputSchema: {
+      type: 'object',
+      properties: { test_request_id: idProperty('test request'), format: { type: 'string', enum: ['json', 'junit'] } },
+      required: ['test_request_id'],
+      additionalProperties: false,
+    },
+    path: (a) => `/v1/api/test-requests/${encodeURIComponent(a.test_request_id)}/results${a.format ? '?format=' + a.format : ''}`,
+  },
+  {
     name: 'oscar_list_suites',
     title: 'OSCAR named suites',
     description: `The named suites of the company a Company API account may ask by name (#1342): each a selection of the Run page, a list of scenario codes, or both. ${DATA_NOTE}`,

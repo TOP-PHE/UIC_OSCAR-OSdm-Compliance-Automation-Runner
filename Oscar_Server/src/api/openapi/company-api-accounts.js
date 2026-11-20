@@ -98,7 +98,7 @@ module.exports = {
   },
   '/v1/api/test-requests/{id}': {
     get: { tags: ['API'], summary: 'A test request\'s state and verdicts (#1342)', security: [{ apiAccountAuth: ['runs:read'] }],
-      description: 'The account\'s own test requests only (another\'s, or a key, is 404). ?wait=<seconds> (0 to 60) answers as soon as the request is finished, or at the end of the wait; an account holds five waits at a time, and a sixth call answers at once. { id, reference, created_at, asked, state (queued | running | finished), verdict (null until finished; passed | failed | incomplete), counts: { queued, running, passed, failed, not_a_result, cancelled }, providers: [{ id, name, batch_id, not_found, state, verdict, counts, runs: [{ id, scenario_code, state, verdict (passed | failed | not_a_result | cancelled), reason, checks: { total, passed, failed }, queued_at, started_at, completed_at, run_url }] }] }. A pipeline is green on verdict passed only. No body, log or person is answered: run_url opens the run in OSCAR.',
+      description: 'The account\'s own test requests only (another\'s, or a key, is 404). ?wait=<seconds> (0 to 60) answers as soon as the request is finished, or at the end of the wait; an account holds five waits at a time, and a sixth call answers at once. { id, reference, created_at, asked, state (queued | running | finished), verdict (null until finished; passed | failed | incomplete; a known deviation is accepted and still passes), counts: { queued, running, passed, passed_with_deviation, failed, not_a_result, cancelled }, providers: [{ id, name, batch_id, not_found, state, verdict, counts, runs: [{ id, scenario_code, state, verdict (passed | passed_with_deviation | failed | not_a_result | cancelled), reason, checks: { total, passed, failed }, queued_at, started_at, completed_at, run_url }] }] }. A pipeline is green on verdict passed only. No body, log or person is answered: run_url opens the run in OSCAR.',
       parameters: [pathParam('id', 'The test request')],
       responses: { 200: { description: 'The test request' }, 400: { description: 'wait is not 0 to 60' }, 401: { description: 'No valid token' }, 404: { description: 'No such test request of this account' } } },
   },
@@ -125,5 +125,11 @@ module.exports = {
       description: 'Test Managers only. Test requests already made keep what they asked.',
       parameters: [pathParam('id', 'The suite')],
       responses: { 200: { description: 'Deleted' }, 403: { description: 'Not a Test Manager' }, 404: { description: 'No such suite here' } } },
+  },
+  '/v1/api/test-requests/{id}/results': {
+    get: { tags: ['API'], summary: 'Where each run of a test request failed and warned, as JSON or JUnit XML (#1342)', security: [{ apiAccountAuth: ['runs:read'] }],
+      description: 'The account\'s own test requests only. The answer of GET /v1/api/test-requests/{id} with, for each run, failures: [{ step, check, message, expected, actual, http_status, problem_code }], warnings: [{ step, message }] (its [WARNING] log lines), deviations: [{ step, status, note }] (the known deviations it applied) and truncated: { failures, warnings } (50 of each at most; texts one line of 500 characters). Results only: no request or response body, no other log line. ?format=junit answers JUnit XML (application/xml): a testsuite per provider, a testcase per run, <failure> for failed checks, <error> for a run without result, <skipped> for a cancelled or unfinished one, warnings and deviations in <system-out>, the verdict and run_url as properties.',
+      parameters: [pathParam('id', 'The test request'), { name: 'format', in: 'query', required: false, schema: { type: 'string', enum: ['json', 'junit'] } }],
+      responses: { 200: { description: 'The results' }, 400: { description: 'format is not json or junit' }, 401: { description: 'No valid token' }, 404: { description: 'No such test request of this account' } } },
   },
 };

@@ -314,6 +314,7 @@ router.get('/queue', read, (req, res) => {
 const TestRequests = require('./api-test-requests');
 router.post('/test-requests', write, TestRequests.launchLimiter, TestRequests.launchHandler);
 router.get('/test-requests/:id', read, TestRequests.readHandler);
+router.get('/test-requests/:id/results', read, TestRequests.resultsHandler);
 
 // The named suites a Company API account may ask by name (#1342 PR 4).
 router.get('/suites', read, (req, res) => {
