@@ -1325,6 +1325,28 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_api_assertion_jti_expiry ON api_assertion_jti(expires_at)');
   }},
+  { version: 59, name: 'test-requests', up: () => {
+      // #1342 PR 3 - a test request: one call of POST /v1/api/test-requests by
+      // a Company API account, one batch per provider it names. `request` is
+      // what it asked (providers, scenarios or selection), `batches` per
+      // provider its batch id and the codes it did not find there. An
+      // Idempotency-Key is the account's own: asked again, the same request
+      // answers the same test request.
+      db.exec(`CREATE TABLE IF NOT EXISTS test_request (
+        id               TEXT PRIMARY KEY,
+        user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        company_id       TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        reference        TEXT,
+        idempotency_key  TEXT,
+        request_hash     TEXT NOT NULL,
+        request          TEXT NOT NULL,
+        batches          TEXT,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_test_request_key ON test_request(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_test_request_user ON test_request(user_id, created_at)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_test_request_company ON test_request(company_id)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

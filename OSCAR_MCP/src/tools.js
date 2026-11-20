@@ -90,6 +90,18 @@ const TOOLS = Object.freeze([
     path: (a) => `/v1/api/batches/${encodeURIComponent(a.batch_id)}`,
   },
   {
+    name: 'oscar_get_test_request',
+    title: 'One OSCAR test request',
+    description: `A test request a Company API account made (#1342): its state, its verdict (passed, failed or incomplete once finished) and, per provider, each run's verdict, reason and check counts, with the address of the run in OSCAR. Use wait (seconds, up to 60) to have the answer as soon as it is finished. ${DATA_NOTE}`,
+    inputSchema: {
+      type: 'object',
+      properties: { test_request_id: idProperty('test request'), wait: { type: 'integer', minimum: 0, maximum: 60, description: 'Seconds to wait for the request to finish (0 by default).' } },
+      required: ['test_request_id'],
+      additionalProperties: false,
+    },
+    path: (a) => `/v1/api/test-requests/${encodeURIComponent(a.test_request_id)}${a.wait === undefined ? '' : '?wait=' + a.wait}`,
+  },
+  {
     name: 'oscar_get_queue',
     title: 'OSCAR queue',
     description: "The runs of the key's company or provider that are waiting or running, in order, with their place in the queue.",

@@ -4,6 +4,17 @@
   "current_release": "2026.594",
   "releases": [
     {
+      "release": "2026.597",
+      "date": "2026-11-20",
+      "server": "1.11.558",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.558: API for test automation, part 3 (#1342): a Company API account launches tests and reads their verdicts. POST /v1/api/test-requests (runs:write; a read-only key gets 403): providers (1 to 20), scenarios by code (1 to 500) or the Run page's selection, a reference; Idempotency-Key answers the same request again (422 for another). Every provider is checked before anything is queued (404 not given, 409 suspended endpoint or missing credentials / endpoint / data file); the account runs the company's shared scenarios, never a tester's own; codes a provider lacks are listed; one batch per provider (test_request, migration 59). GET /v1/api/test-requests/:id (runs:read, ?wait up to 60 s): state, verdict (passed / failed / incomplete) and per run passed / failed / not_a_result (with its reason) / cancelled, check counts and the run's address in OSCAR. The runner refuses the queued runs of an account suspended since. POST /v1/runs' checks moved to api/helpers/runLaunch.js, shared. MCP tool oscar_get_test_request. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.596",
       "date": "2026-11-20",
       "server": "1.11.557",
