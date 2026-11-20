@@ -31,7 +31,7 @@ async function main() {
     return 0;
   }
   try {
-    const pem = settings.keyText ? settings.keyText.split('\\n').join('\n') : fs.readFileSync(settings.key, 'utf8');
+    const pem = settings.keyText ? settings.keyText.replaceAll(String.raw`\n`, '\n') : fs.readFileSync(settings.key, 'utf8');
     const client = clientFor({
       origin: originOf(settings.oscar),
       clientId: settings.clientId.trim(),
@@ -47,7 +47,8 @@ async function main() {
     return code;
   } catch (e) {
     if (e instanceof OscarError || e?.code === 'ENOENT') {
-      process.stderr.write(`${e.code === 'ENOENT' ? `File not found: ${e.path}` : e.message}\n`);
+      const text = e.code === 'ENOENT' ? 'File not found: ' + e.path : e.message;
+      process.stderr.write(text + '\n');
       return EXIT.error;
     }
     throw e;

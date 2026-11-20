@@ -73,18 +73,43 @@ async function waitForVerdict(client, id, { deadline, out, now = () => Date.now(
   }
 }
 
+// One provider's line.
+function providerLine(p) {
+  const missing = p.not_found?.length ? ' — not on this provider: ' + p.not_found.join(', ') : '';
+  return `  ${p.name || p.id}: ${p.verdict || p.state} (${countsText(p.counts)})${missing}`;
+}
+
+// One failed check's line.
+function failureLine(f) {
+  const step = f.step ? f.step + ': ' : '';
+  const code = f.problem_code ? ' ' + f.problem_code : '';
+  const status = f.http_status ? ' [HTTP ' + f.http_status + code + ']' : '';
+  const message = f.message ? ' — ' + f.message : '';
+  return `      ✗ ${step}${f.check}${status}${message}`;
+}
+
+// One known deviation's line.
+function deviationLine(d) {
+  const note = d.note ? ' — ' + d.note : '';
+  return `      ~ known deviation: ${d.step} returned HTTP ${d.status}${note}`;
+}
+
+// The lines of a run that did not pass: its verdict, failed checks and known deviations.
+function runLines(r) {
+  const reason = r.reason ? ' (' + r.reason + ')' : '';
+  const lines = [`    ${r.scenario_code}: ${r.verdict || r.state}${reason}  ${r.run_url || ''}`.trimEnd()];
+  for (const f of r.failures || []) lines.push(failureLine(f));
+  for (const d of r.deviations || []) lines.push(deviationLine(d));
+  return lines;
+}
+
 /** The report of the results: lines for a person. */
 function reportOf(results) {
   const lines = [`Verdict: ${String(results.verdict).toUpperCase()} (${countsText(results.counts)})`];
   for (const p of results.providers || []) {
-    lines.push(`  ${p.name || p.id}: ${p.verdict || p.state} (${countsText(p.counts)})${p.not_found?.length ? ` — not on this provider: ${p.not_found.join(', ')}` : ''}`);
+    lines.push(providerLine(p));
     for (const r of p.runs || []) {
-      if (r.verdict === 'passed') continue;
-      lines.push(`    ${r.scenario_code}: ${r.verdict || r.state}${r.reason ? ` (${r.reason})` : ''}  ${r.run_url || ''}`.trimEnd());
-      for (const f of r.failures || []) {
-        lines.push(`      ✗ ${f.step ? f.step + ': ' : ''}${f.check}${f.http_status ? ` [HTTP ${f.http_status}${f.problem_code ? ' ' + f.problem_code : ''}]` : ''}${f.message ? ' — ' + f.message : ''}`);
-      }
-      for (const d of r.deviations || []) lines.push(`      ~ known deviation: ${d.step} returned HTTP ${d.status}${d.note ? ' — ' + d.note : ''}`);
+      if (r.verdict !== 'passed') lines.push(...runLines(r));
     }
   }
   return lines;

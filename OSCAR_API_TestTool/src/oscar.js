@@ -111,7 +111,8 @@ function clientFor({ origin, clientId, privateKey, scope = 'runs:read runs:write
     });
     const body = await res.json().catch(() => null);
     if (res.status !== 200 || typeof body?.access_token !== 'string') {
-      const said = body?.error ? ` ${body.error}${body.error_description ? ': ' + body.error_description : ''}` : '';
+      const described = body?.error_description ? ': ' + body.error_description : '';
+      const said = body?.error ? ' ' + body.error + described : '';
       throw new OscarError(`OSCAR refused the token request (HTTP ${res.status}).${said}`, res.status, body);
     }
     const lifetime = Number.isFinite(body.expires_in) ? body.expires_in : 900;

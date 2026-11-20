@@ -24,9 +24,9 @@
  *   --help
  */
 
-const USAGE = `oscar-test — ask OSCAR for tests as a Company API account, wait, read the verdict.
+const USAGE = String.raw`oscar-test — ask OSCAR for tests as a Company API account, wait, read the verdict.
 
-  node oscar-test.js --oscar https://<oscar> --client-id <id> --key <private key file> \\
+  node oscar-test.js --oscar https://<oscar> --client-id <id> --key <private key file> \
     --provider alpha --provider beta --suite smoke [--junit result.xml]
 
 What to run (one of):
@@ -60,8 +60,20 @@ const FLAGS = new Set(['whoami', 'suites', 'help']);
 
 const list = value => String(value).split(',').map(s => s.trim()).filter(Boolean);
 
-/** The command line and environment as { …settings } or { error }. */
-function argsOf(argv, env = {}) {
+// One option and its value into o: an error text, or null.
+function setOption(o, name, value) {
+  if (name === 'provider') o.providers.push(...list(value));
+  else if (name === 'scenarios') o.scenarios = list(value);
+  else if (name === 'timeout') {
+    const minutes = Number(value);
+    if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) return '--timeout is a number of minutes, 1 to 1440.';
+    o.timeoutMinutes = minutes;
+  } else o[name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = value;
+  return null;
+}
+
+// The command line's options: { …settings } or { error }.
+function optionsOf(argv) {
   const o = { providers: [], timeoutMinutes: 60 };
   for (let i = 0; i < argv.length; i += 1) {
     const raw = argv[i];
@@ -72,27 +84,34 @@ function argsOf(argv, env = {}) {
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) return { error: `--${name} needs a value.` };
     i += 1;
-    if (name === 'provider') o.providers.push(...list(value));
-    else if (name === 'scenarios') o.scenarios = list(value);
-    else if (name === 'timeout') {
-      const minutes = Number(value);
-      if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) return { error: '--timeout is a number of minutes, 1 to 1440.' };
-      o.timeoutMinutes = minutes;
-    } else o[name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = value;
+    const error = setOption(o, name, value);
+    if (error) return { error };
   }
-  if (o.help) return o;
+  return o;
+}
+
+// What the settings lack or say twice: an error text, or null.
+function problemOf(o) {
+  if (!o.oscar) return 'Say which OSCAR: --oscar https://<oscar host> (or OSCAR_URL).';
+  if (!o.clientId) return 'Say which account: --client-id <the account\'s client id> (or OSCAR_CLIENT_ID).';
+  if (!o.key && !o.keyText) return 'Say where the private key is: --key <file> (or OSCAR_PRIVATE_KEY_FILE).';
+  if (o.whoami || o.suites || o.status) return null;
+  const chosen = ['suite', 'scenarios', 'selection'].filter(k => o[k] !== undefined);
+  if (chosen.length !== 1) return 'Say what to run: exactly one of --suite, --scenarios and --selection.';
+  if (o.providers.length === 0) return 'Say where to run it: --provider <name or id> (one or more).';
+  return null;
+}
+
+/** The command line and environment as { …settings } or { error }. */
+function argsOf(argv, env = {}) {
+  const o = optionsOf(argv);
+  if (o.error || o.help) return o;
   o.oscar = o.oscar || env.OSCAR_URL;
   o.clientId = o.clientId || env.OSCAR_CLIENT_ID;
   o.key = o.key || env.OSCAR_PRIVATE_KEY_FILE;
   o.keyText = o.key ? null : env.OSCAR_PRIVATE_KEY || null;
-  if (!o.oscar) return { error: 'Say which OSCAR: --oscar https://<oscar host> (or OSCAR_URL).' };
-  if (!o.clientId) return { error: 'Say which account: --client-id <the account\'s client id> (or OSCAR_CLIENT_ID).' };
-  if (!o.key && !o.keyText) return { error: 'Say where the private key is: --key <file> (or OSCAR_PRIVATE_KEY_FILE).' };
-  if (o.whoami || o.suites || o.status) return o;
-  const chosen = ['suite', 'scenarios', 'selection'].filter(k => o[k] !== undefined);
-  if (chosen.length !== 1) return { error: 'Say what to run: exactly one of --suite, --scenarios and --selection.' };
-  if (o.providers.length === 0) return { error: 'Say where to run it: --provider <name or id> (one or more).' };
-  return o;
+  const error = problemOf(o);
+  return error ? { error } : o;
 }
 
 module.exports = { argsOf, USAGE };
