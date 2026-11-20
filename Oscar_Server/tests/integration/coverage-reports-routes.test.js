@@ -195,7 +195,7 @@ describe('published coverage reports (#972 part 4)', () => {
 
   test('a provider numbers its own reports, and the certifier sees whose they are', async () => {
     addRun(ids.P1, '2026-10-21 10:00:00', null, 'COMPLETED');
-    const res = await request(app).post('/v1/company/coverage/reports').set(as('TM', 'P1')).send({ days: 30 });
+    const res = await request(app).post('/v1/company/coverage/reports').set(as('TM', 'P1')).send({ days: 365 });
     expect(res.body).toMatchObject({ number: 1, comparedWith: null });
     expect((await request(app).post(`/v1/company/coverage/reports/${res.body.id}/share`).set(as('TM', 'P1'))).status).toBe(200);
     // The distributor's own list does not hold it.

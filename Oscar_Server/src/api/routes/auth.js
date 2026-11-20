@@ -27,6 +27,7 @@ const { get, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole, END_SESSIONS_SQL } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../../utils/mailer');
 const AccessRequests = require('../../utils/accessRequests');
+const { isApiAccountRole } = require('../../utils/apiAccounts');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
 const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
@@ -247,11 +248,14 @@ router.post('/password-reset/request',
       message: 'If an account exists for this email, a password-reset link has been sent.'
     };
 
-    const user = get('SELECT id, email FROM users WHERE email = ?', [lowerEmail]);
+    const user = get('SELECT id, email, role FROM users WHERE email = ?', [lowerEmail]);
     if (!user) {
       log.warn({ email: lowerEmail }, 'Password-reset request for non-existent email — returning generic success');
       return res.json(genericResponse);
     }
+    // A Company API account (#1342) has no password anyone may choose: no
+    // link is made for it, and the answer is the same as for any address.
+    if (isApiAccountRole(normalizeRole(user.role))) return res.json(genericResponse);
 
     // Wipe any previous outstanding token for this user (one active link at a time)
     run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
@@ -444,6 +448,15 @@ router.post('/login',
 
   const match = await bcrypt.compare(password, user.password_hash);
   if (!match) {
+    logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
+    loginAttempts.inc({ result: 'failure' });
+    return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
+  }
+
+  // A Company API account (#1342) signs in to no page. Its password is made
+  // up and known to nobody; should one ever match, the answer is the same as
+  // for a wrong password.
+  if (isApiAccountRole(normalizeRole(user.role))) {
     logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
     loginAttempts.inc({ result: 'failure' });
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });

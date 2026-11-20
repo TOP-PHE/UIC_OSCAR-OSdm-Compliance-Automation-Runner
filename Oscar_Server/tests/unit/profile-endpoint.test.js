@@ -49,6 +49,7 @@ function declarationOf(name) {
 }
 
 const OWN = 'company-own';
+const ACCOUNT = '3f2a91c0-1d2e-4c5b-8a9f-0123456789ab';
 const ALPHA = 'provider-alpha';
 const BETA = 'provider-beta';
 const NAMES = { [OWN]: 'PENTEST', [ALPHA]: 'Alpha', [BETA]: 'Beta' };
@@ -83,10 +84,11 @@ function makeCard(id) {
 
 // Opens the page as `role`. `server` answers the requests; by default every
 // company or provider exists and the user has a bearer token for each.
-function openPage(role, { selected = null, failing = () => false } = {}) {
+function openPage(role, { selected = null, failing = () => false, search = '' } = {}) {
   const calls = [];
   const messages = [];
   const pageMessages = [];
+  const notices = {};
   const fetch = async (url, opts = {}) => {
     const method = opts.method || 'GET';
     const headers = opts.headers || {};
@@ -102,6 +104,10 @@ function openPage(role, { selected = null, failing = () => false } = {}) {
         return { id, name: NAMES[id], parent_id: id === OWN ? null : OWN, api_base: endpointOf(id), extra_headers: [], datafile_updated_at: '2026-10-06' };
       }
       if (url === '/v1/me/credentials') return { auth_mode: 'bearer', has_token: true };
+      if (url === `/v1/company/api-accounts/${ACCOUNT}/credentials`) return { auth_mode: 'bearer', has_token: false };
+      if (url === `/v1/company/api-accounts/${ACCOUNT}`) {
+        return { id: ACCOUNT, name: 'Nightly <CI>', credentials: [{ company_id: OWN, company_name: 'PENTEST', set: false }, { company_id: BETA, company_name: 'Beta', set: false }] };
+      }
       return {};
     };
     return { ok: status >= 200 && status < 300, status, json };
@@ -109,8 +115,13 @@ function openPage(role, { selected = null, failing = () => false } = {}) {
   const context = vm.createContext({
     console,
     user: { role },
+    location: { search },
+    URLSearchParams,
     fetch,
-    document: { createElement: tag => ({ tag, textContent: '', innerHTML: '' }) },
+    document: {
+      createElement: tag => ({ tag, textContent: '', innerHTML: '' }),
+      getElementById: id => notices[id] || (notices[id] = { id, children: [], style: {}, replaceChildren(...c) { this.children = c; } }),
+    },
     confirm: () => true,
     esc: s => String(s),
     oscarSelectedProvider: () => selected,
@@ -123,8 +134,9 @@ function openPage(role, { selected = null, failing = () => false } = {}) {
     renderSummary: () => {},
   });
   const code = [
+    declarationOf('API_ACCOUNT_ID'),
     declarationOf('CAN_EDIT_HEADERS'), declarationOf('CAN_EDIT_ENDPOINT'), declarationOf('targets'),
-    ...['field', 'inTarget', 'credentialsSet', 'badge', 'markUnsaved', 'nameTarget', 'fillShared', 'showSuspension', 'fillCredentials', 'showEndpointChanged',
+    ...['apiAccountIdOf', 'credentialsUrl', 'whoseCredentials', 'listAccountTargets', 'showAccountNotice', 'field', 'inTarget', 'credentialsSet', 'badge', 'markUnsaved', 'nameTarget', 'fillShared', 'showSuspension', 'fillCredentials', 'showEndpointChanged',
       'fillTarget', 'targetUnavailable', 'loadTarget', 'sharedPayload', 'credentialsPayload', 'saveShared',
       'saveTarget', 'clearCredentials', 'listTargets',
       'lifetimeText', 'credentialTestLines', 'showTestResult', 'testSavedCredentials'].map(sourceOf),
@@ -133,7 +145,7 @@ function openPage(role, { selected = null, failing = () => false } = {}) {
   ].join('\n\n');
   vm.runInContext(code, context, { filename: 'profile.html (extract)' });
   const cards = Object.fromEntries([OWN, ALPHA, BETA].map(id => [id, makeCard(id)]));
-  return { context, cards, calls, messages, pageMessages };
+  return { context, cards, calls, messages, pageMessages, notices };
 }
 
 const sent = page => page.calls.map(c => `${c.method} ${c.url} @${c.target}`);
@@ -455,7 +467,7 @@ describe('API Config page — one section per company or provider (#580)', () =>
 
     test('the script finds a field inside its section, never by id across the page', () => {
       const byId = [...script.matchAll(/getElementById\('([^']+)'\)/g)].map(m => m[1]);
-      expect([...new Set(byId)].sort()).toEqual(['msg', 'page-hint', 'providers-link', 'target-template', 'targets', 'targets-summary', 'targets-summary-rows']);
+      expect([...new Set(byId)].sort()).toEqual(['account-notice', 'msg', 'page-hint', 'providers-link', 'target-template', 'targets', 'targets-summary', 'targets-summary-rows']);
       expect(script).not.toMatch(/querySelector\('#/);
     });
   });
@@ -588,5 +600,60 @@ describe('API Config page — test my credentials (#872)', () => {
       .toEqual(['x', 'Token: obtained (bearer token, expired).', 'GET /versions: HTTP 501.']);
     expect(credentialTestLines(null)).toEqual(['Token: not obtained (bearer token).']);
     expect([0, 59, 600, 7200].map(lifetimeText)).toEqual(['expired', 'valid 59 s', 'valid 10 min', 'valid 2 h']);
+  });
+});
+
+describe('API Config page — a Company API account\'s credentials (#1342)', () => {
+  const search = `?api_account=${ACCOUNT}`;
+
+  test('a Test Manager opens it for an account: the sections are the places the account lists, under a notice naming it', async () => {
+    const page = openPage('test_manager', { search });
+    const list = await page.context.listTargets();
+    expect(list).toEqual([{ id: OWN, name: 'PENTEST', provider: false }, { id: BETA, name: 'Beta', provider: true }]);
+    expect(sent(page)).toEqual([`GET /v1/company/api-accounts/${ACCOUNT} @`]);
+    const notice = page.notices['account-notice'];
+    expect(notice.style.display).toBe('block');
+    expect(notice.children[0].textContent).toContain('Nightly <CI>');
+  });
+
+  test('it reads and saves the account\'s credentials, and sends nothing to the company', async () => {
+    const page = openPage('test_manager', { search });
+    const card = page.cards[BETA];
+    await page.context.loadTarget(card);
+    expect(card.element('api_base').readOnly).toBe(true);
+    card.element('api_base').value = 'https://elsewhere.example/osdm';
+    card.element('auth_mode').value = 'bearer';
+    card.element('access_token').value = 'account-token';
+    page.calls.length = 0;
+
+    await page.context.saveTarget(card);
+
+    expect(page.calls.filter(c => c.method !== 'GET').map(c => `${c.method} ${c.url} @${c.target}`))
+      .toEqual([`PATCH /v1/company/api-accounts/${ACCOUNT}/credentials @${BETA}`]);
+    expect(page.calls.some(c => c.url === '/v1/me/credentials')).toBe(false);
+  });
+
+  test('the test and the clearing are the account\'s, and say so', async () => {
+    const page = openPage('test_manager', { search });
+    const card = page.cards[OWN];
+    await page.context.loadTarget(card);
+    expect(card.element('test-creds-btn').textContent).toContain('the account\'s credentials');
+    page.calls.length = 0;
+    await page.context.testSavedCredentials(card);
+    expect(page.calls.find(c => c.method === 'POST').url).toBe(`/v1/company/api-accounts/${ACCOUNT}/credentials/test`);
+    await page.context.clearCredentials(card);
+    expect(page.messages.at(-1).text).toBe('The account\'s credentials for PENTEST were cleared.');
+  });
+
+  test.each([['company_user'], ['certification_user'], [undefined]])('opened as %s, the parameter changes nothing', async (role) => {
+    const page = openPage(role, { search });
+    expect(page.context.credentialsUrl()).toBe('/v1/me/credentials');
+  });
+
+  test('a value that is not an id changes nothing', () => {
+    for (const bad of ['?api_account=../../v1/admin', '?api_account=1', '?api_account=']) {
+      const page = openPage('test_manager', { search: bad });
+      expect(page.context.credentialsUrl('/test')).toBe('/v1/me/credentials/test');
+    }
   });
 });

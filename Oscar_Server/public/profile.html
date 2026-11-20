@@ -65,6 +65,8 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
 <div class="container">
   <h2>⚙️ API Config</h2>
   <div id="msg" class="msg"></div>
+  <!-- #1342: shown when the page is opened for a Company API account. -->
+  <div class="card" id="account-notice" style="display:none;border-left:4px solid #1565c0"></div>
   <p class="page-hint" id="page-hint" style="display:none">
     One section for your company and one for each provider you may use.
     Each section is saved on its own, with its own button.
@@ -243,6 +245,31 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
 if (!localStorage.getItem('oscar_user')) window.location.href = '/';
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 
+// #1342: a Test Manager saves a Company API account's OSDM credentials here,
+// opened from the API Accounts page as profile.html?api_account=<id>. Only
+// the credentials change then: the shared part (endpoint, dedicated headers)
+// is the company's and stays read-only on this page.
+const API_ACCOUNT_ID = apiAccountIdOf(location.search, user.role);
+
+// The account's id when a Test Manager opens the page for one, else null.
+function apiAccountIdOf(search, role) {
+  if (role !== 'test_manager') return null;
+  const id = new URLSearchParams(search).get('api_account') || '';
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id) ? id : null;
+}
+
+// Where this page reads and saves credentials: the user's own, or the account's.
+function credentialsUrl(suffix) {
+  const base = API_ACCOUNT_ID ? '/v1/company/api-accounts/' + API_ACCOUNT_ID + '/credentials' : '/v1/me/credentials';
+  return base + (suffix || '');
+}
+
+// Whose credentials a sentence speaks of.
+function whoseCredentials(capital) {
+  if (API_ACCOUNT_ID) return capital ? 'The account\'s' : 'the account\'s';
+  return capital ? 'Your' : 'your';
+}
+
 // logout() provided by nav.js
 
 function showMsg(text, ok) {
@@ -350,12 +377,12 @@ function switchProfile(card) {
 // or provider. Editable by Test Managers only; other testers see them
 // read-only. Each row = header name + value (literal or a {{var}} template
 // resolved per tester at request time).
-const CAN_EDIT_HEADERS = (user.role === 'test_manager');
+const CAN_EDIT_HEADERS = (user.role === 'test_manager') && !API_ACCOUNT_ID;
 
 // The shared endpoint (#544). Every run of every tester goes to it, so it is
 // the Test Manager's to change. Everyone else sees it read-only, and the server
 // refuses the change from anyone else.
-const CAN_EDIT_ENDPOINT = (user.role === 'test_manager');
+const CAN_EDIT_ENDPOINT = (user.role === 'test_manager') && !API_ACCOUNT_ID;
 
 function makeHeaderRow(name, value) {
   const row = document.createElement('div');
@@ -445,8 +472,9 @@ function nameTarget(card, c) {
     ? 'Shared with everyone in your company who may use ' + name + '. Editing it changes the OSDM endpoint of all their runs on ' + name + '.'
     : 'Shared with everyone in your company. Editing it changes the OSDM endpoint for all testers.';
   field(card, 'save-btn').textContent = '💾 Save configuration for ' + name;
-  field(card, 'clear-creds-btn').textContent = '🗑 Clear my credentials for ' + name;
-  field(card, 'test-creds-btn').textContent = '🔌 Test my credentials for ' + name;
+  const whose = API_ACCOUNT_ID ? 'the account\'s' : 'my';
+  field(card, 'clear-creds-btn').textContent = '🗑 Clear ' + whose + ' credentials for ' + name;
+  field(card, 'test-creds-btn').textContent = '🔌 Test ' + whose + ' credentials for ' + name;
 }
 
 // The shared part of a section: the endpoint and the dedicated headers.
@@ -569,7 +597,7 @@ function targetUnavailable(card, gone) {
 async function loadTarget(card) {
   const [companyRes, credsRes] = await Promise.all([
     fetch('/v1/company',        inTarget(card)),
-    fetch('/v1/me/credentials', inTarget(card))
+    fetch(credentialsUrl(), inTarget(card))
   ]);
   if (!companyRes.ok || !credsRes.ok) {
     targetUnavailable(card, companyRes.status === 404 || credsRes.status === 404);
@@ -647,7 +675,7 @@ async function saveTarget(card) {
   // an error in either surfaces clearly.
   if (!(await saveShared(card))) return;
 
-  const r2 = await fetch('/v1/me/credentials', inTarget(card, {
+  const r2 = await fetch(credentialsUrl(), inTarget(card, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentialsPayload(card))
@@ -665,10 +693,10 @@ async function saveTarget(card) {
 
 async function clearCredentials(card) {
   const name = field(card, 'name').textContent;
-  if (!confirm('Wipe your stored credentials for ' + name + '?\n\n' +
+  if (!confirm('Wipe ' + whoseCredentials(false) + ' stored credentials for ' + name + '?\n\n' +
                'This removes: bearer token, OAuth client id/secret, OAuth extra, ' +
                'requestor, subscription key, and any cached access token.\n\n' +
-               'Your credentials for any other company or provider are not touched.')) {
+               whoseCredentials(true) + ' credentials for any other company or provider are not touched.')) {
     return;
   }
   // Send null for every credential field so the server clears each one.
@@ -684,7 +712,7 @@ async function clearCredentials(card) {
     requestor: null,
     subscription_key: null
   };
-  const r = await fetch('/v1/me/credentials', inTarget(card, {
+  const r = await fetch(credentialsUrl(), inTarget(card, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(wipe)
@@ -695,7 +723,7 @@ async function clearCredentials(card) {
     return;
   }
   await loadTarget(card);
-  showTargetMsg(card, 'Your credentials for ' + name + ' were cleared.', true);
+  showTargetMsg(card, whoseCredentials(true) + ' credentials for ' + name + ' were cleared.', true);
 }
 
 // ── Test my credentials (#872) ────────────────────────────────────────────────
@@ -755,7 +783,7 @@ async function testSavedCredentials(card) {
   button.disabled = true;
   showTestResult(card, ['Testing the credentials saved for ' + name + '…'], null);
   try {
-    const r = await fetch('/v1/me/credentials/test', inTarget(card, { method: 'POST' }));
+    const r = await fetch(credentialsUrl('/test'), inTarget(card, { method: 'POST' }));
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       showTestResult(card, [d.detail || d.title || ('The test could not be run (HTTP ' + r.status + ').')], false);
@@ -805,6 +833,7 @@ function addTarget(target, index) {
 // The sections of this page: the user's company first, then the providers
 // they may use. null when the company itself could not be read.
 async function listTargets() {
+  if (API_ACCOUNT_ID) return listAccountTargets();
   // '' names no provider: the user's own company, whatever "Working on" says.
   const [ownRes, listRes] = await Promise.all([
     fetch('/v1/company', { headers: { 'X-Provider-Id': '' } }),
@@ -824,6 +853,31 @@ async function listTargets() {
   return list;
 }
 
+// The sections of a Company API account (#1342): its company and the
+// providers it is given, as the account's own answer lists them.
+async function listAccountTargets() {
+  const res = await fetch('/v1/company/api-accounts/' + encodeURIComponent(API_ACCOUNT_ID), { headers: { 'X-Provider-Id': '' } });
+  if (!res.ok) return null;
+  const account = await res.json();
+  showAccountNotice(account);
+  return (account.credentials || []).map((c, i) => ({ id: c.company_id, name: c.company_name, provider: i > 0 }));
+}
+
+// Says, above the sections, whose credentials they are. Text only.
+function showAccountNotice(account) {
+  const box = document.getElementById('account-notice');
+  const title = document.createElement('strong');
+  title.textContent = '🤖 OSDM credentials of the Company API account “' + (account.name || '') + '”';
+  const text = document.createElement('p');
+  text.className = 'muted';
+  text.textContent = 'What you save here is the account\'s, not yours: its runs use it. The endpoint and the dedicated headers are your company\'s; change them on this page opened from the menu.';
+  const back = document.createElement('a');
+  back.href = '/api-accounts.html';
+  back.textContent = '← Back to API Accounts';
+  box.replaceChildren(title, text, back);
+  box.style.display = 'block';
+}
+
 function openTarget(id) {
   const card = document.getElementById('target-' + id);
   if (!card) return;
@@ -833,7 +887,12 @@ function openTarget(id) {
 
 async function buildPage() {
   const list = await listTargets();
-  if (!list) { showMsg('Your company could not be loaded. Reload the page to try again.', false); return; }
+  if (!list) {
+    showMsg(API_ACCOUNT_ID
+      ? 'This Company API account could not be loaded: it may have been deleted. Open it again from API Accounts.'
+      : 'Your company could not be loaded. Reload the page to try again.', false);
+    return;
+  }
   // The section of the menu's "Working on" choice is the one opened.
   const working = (typeof oscarSelectedProvider === 'function' && oscarSelectedProvider()) || null;
   const current = list.some(t => t.id === working?.id) ? working.id : list[0].id;

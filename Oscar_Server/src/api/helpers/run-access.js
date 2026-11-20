@@ -46,10 +46,15 @@ const { canUseCompany } = require('./provider-access');
 
 const isTester = (user) => user?.role === 'tester' || user?.role === 'company_user';
 
-// A tester reads their own runs and those a Test Manager launched.
+// The roles whose runs every member of the company reads: a Test Manager's
+// campaigns, and the company's own automation, a Company API account (#1342).
+const COMPANY_WIDE_RUNNERS = new Set(['test_manager', 'api_client']);
+
+// A tester reads their own runs, those a Test Manager launched and those of
+// the company's API accounts.
 function testerReads(run, user) {
   if (run.user_id === user.id) return true;
-  return get('SELECT role FROM users WHERE id = ?', [run.user_id])?.role === 'test_manager';
+  return COMPANY_WIDE_RUNNERS.has(get('SELECT role FROM users WHERE id = ?', [run.user_id])?.role);
 }
 
 /**
@@ -61,9 +66,11 @@ function testerReads(run, user) {
 function runScopeSql(user, alias = 'r') {
   const col = alias ? `${alias}.` : '';
   if (isTester(user)) {
-    return { sql: ` AND (${col}user_id = ? OR ${col}user_id IN (SELECT id FROM users WHERE role = 'test_manager'))`, params: [user.id] };
+    return { sql: ` AND (${col}user_id = ? OR ${col}user_id IN (SELECT id FROM users WHERE role IN ('test_manager', 'api_client')))`, params: [user.id] };
   }
   if (user?.role === 'certification_user') return { sql: ` AND ${col}shared_with_certifier_at IS NOT NULL`, params: [] };
+  // A Company API account (#1342) reads the runs it launched, nothing else.
+  if (user?.role === 'api_client') return { sql: ` AND ${col}user_id = ?`, params: [user.id] };
   return { sql: '', params: [] };
 }
 
@@ -96,6 +103,10 @@ function mayRead(run, user) {
   // Test Manager every run of the company.
   if (user.role === 'test_manager') return canUseCompany(user, run.company_id);
   if (isTester(user)) return canUseCompany(user, run.company_id) && testerReads(run, user);
+
+  // Company API account (#1342): the runs it launched itself, in a company or
+  // provider it may still use. Never a person's run.
+  if (user.role === 'api_client') return run.user_id === user.id && canUseCompany(user, run.company_id);
 
   // API key (#503): the runs of the one company or provider the key was made
   // for, never its providers. requireApiKey has checked that the key's

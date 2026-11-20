@@ -275,7 +275,7 @@ router.get('/:id/access', (req, res) => {
   const rows = all(
     `SELECT u.id, u.email, pa.granted_at, pa.granted_by
        FROM provider_access pa JOIN users u ON u.id = pa.user_id
-      WHERE pa.company_id = ?
+      WHERE pa.company_id = ? AND u.role != 'api_client'
       ORDER BY u.email ASC`, [provider.id]);
   return res.json({ provider_id: provider.id, testers: rows });
 });

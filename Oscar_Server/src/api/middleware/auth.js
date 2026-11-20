@@ -26,6 +26,7 @@
 const jwt = require('jsonwebtoken');
 const { get } = require('../../db/db');
 const { looksLikeKey } = require('../../utils/apiKeys');
+const { ROLE: API_ACCOUNT_ROLE } = require('../../utils/apiAccounts');
 
 const ROLE_MAP = {
   admin: 'company_user',
@@ -80,6 +81,10 @@ function sessionUser(payload) {
   const row = get(SESSION_ROW_SQL, [payload.sub]);
   if (row?.status !== 'active') return null;
   const role = normalizeRole(row.role);
+  // A Company API account (#1342) never has a session: it signs in to no
+  // page, whatever a token says. Many page routes only refuse administrators
+  // and certifiers; this keeps the account away from all of them.
+  if (role === API_ACCOUNT_ROLE) return null;
   if (role !== normalizeRole(payload.role)) return null;
   if (row.company_id !== payload.companyId) return null;
   const validAfter = Number(row.sessions_valid_after) || 0;

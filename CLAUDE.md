@@ -1234,6 +1234,35 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `src/protocol.js` (initialize, ping, tools/list, tools/call), no SDK.
   **A new `/v1/api` GET needs its tool**: `mcp-end-to-end.test.js` pins the
   tools to the OpenAPI paths and runs the server against the real router.
+- **The API for test automation (#1342; decisions D1–D4 in the issue, all
+  the maintainer's, 2026-11-20).** A company's own CI launches tests and
+  reads their results through `/v1/api`, as a **Company API account**,
+  authenticated by OAuth client credentials with `private_key_jwt`; polling
+  only (no webhook); results only (where it failed and warned, never bodies
+  or logs). Six PRs, each listed in `compatibility.json` without moving
+  `current_release`; the last one releases the programme with the news and
+  the guide. **PR 1 (1.11.556): the account.** A user of role `api_client`
+  plus `api_account` (migration 57: name, created_by, suspended_at/by;
+  suspended = `users.status 'suspended'`), its company the distributor, its
+  providers in `provider_access` (`MEMBER_ROLES` includes it, so
+  `canUseCompany()` treats it as a tester). **It never has a session**:
+  `sessionUser()` returns null for its role whatever the token, which is
+  what keeps it from the ~30 page routes guarded only by
+  `denyAdminAndCertifier()` (a deny-list); its password is a random bcrypt
+  nobody knows, its e-mail `<slug>.<8 hex>@api-account.invalid`, sign-in
+  answers 401 and `sendPasswordReset()` / the reset request make no link.
+  `company-users.js` filters it out of every lookup (`role != 'api_client'`),
+  `admin.js` answers 409 to any change of one (`router.use('/users/:id')`).
+  Runs: it reads its own (`mayRead()`, `runScopeSql()`), testers read its
+  runs (`COMPANY_WIDE_RUNNERS`). `/v1/company/api-accounts` (Test Managers;
+  the distributor of the request's company) manages it; its OSDM
+  credentials go through `api/helpers/credentialsInput.js`, shared with
+  `PATCH /v1/me/credentials`, for the company the request names, which the
+  account must be given (409). Page `api-accounts.html`; API Config opened
+  as `profile.html?api_account=<uuid>` (`API_ACCOUNT_ID`,
+  `credentialsUrl()`) edits only that account's credentials. **A new route
+  that reads users by company decides whether an API account belongs in its
+  answer.**
 - **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
   The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
   read "100 scenarios". `whole_batches=1` adds the rest of each batch on the

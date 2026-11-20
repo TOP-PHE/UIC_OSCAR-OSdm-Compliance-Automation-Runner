@@ -76,6 +76,18 @@ router.use((req, res, next) => {
   next();
 });
 
+// A Company API account (#1342) is its company's Test Managers' to manage:
+// the administrator lists it with the users and changes nothing of it (no
+// role, e-mail, company, password, link, approval or deletion here). A
+// company's deletion still removes it with the rest.
+router.use('/users/:id', (req, res, next) => {
+  if (req.method === 'GET') return next();
+  const target = get('SELECT role FROM users WHERE id = ?', [String(req.params.id)]);
+  if (target?.role !== 'api_client') return next();
+  return res.status(409).json({ status: 409, title: 'Conflict',
+    detail: "A Company API account is managed by its company's Test Managers, on their API Accounts page." });
+});
+
 function sanitizeUserRow(row) {
   return {
     id: row.id,
