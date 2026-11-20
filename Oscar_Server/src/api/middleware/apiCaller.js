@@ -44,7 +44,10 @@ function accountOf(token, now = new Date()) {
                       WHERE u.id = ?`, [claims.accountId]);
     if (row?.role !== 'api_client' || row.status !== 'active') return null;
     const validAfter = Number(row.sessions_valid_after) || 0;
-    if (validAfter && !(Number(claims.iat) >= validAfter)) return null;
+    // A token issued before a suspension stays refused, and one without a
+    // numeric issue time too.
+    const issuedAt = Number(claims.iat);
+    if (validAfter && (!Number.isFinite(issuedAt) || issuedAt < validAfter)) return null;
     return { row, scopes: claims.scopes };
   } catch {
     return null;

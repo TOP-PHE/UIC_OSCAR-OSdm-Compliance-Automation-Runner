@@ -111,3 +111,10 @@ describe('signing in (#1342 PR 2)', () => {
     expect(keysSectionHtml(ACCOUNT, { ...KEYS, token_url: null })).toContain('APP_URL is not set');
   });
 });
+
+test('only a UUID read from an answer goes in a request address (S8476)', () => {
+  const ID = SOURCE.find(l => l.startsWith('const ACCOUNT_ID = '));
+  const accountIdOf = vm.runInNewContext(`${ID}\n(${SOURCE.slice(SOURCE.findIndex(l => l.startsWith('function accountIdOf(')), SOURCE.findIndex((l, i) => i > SOURCE.findIndex(x => x.startsWith('function accountIdOf(')) && l === '}') + 1).join('\n')})`);
+  expect(accountIdOf('3F2A91C0-1D2E-4C5B-8A9F-0123456789AB')).toBe('3f2a91c0-1d2e-4c5b-8a9f-0123456789ab');
+  for (const bad of ['../admin', '1', '', null, { id: 'x' }, '3f2a91c0-1d2e-4c5b-8a9f-0123456789ab/keys']) expect(accountIdOf(bad)).toBeNull();
+});

@@ -24,6 +24,14 @@
  * rest is wiring.
  */
 
+// An id read from an answer, before it goes in a request address: a UUID, else
+// null (Sonar S8476: ids in OSCAR are UUIDs, never trusted as they come).
+const ACCOUNT_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+function accountIdOf(value) {
+  const text = typeof value === 'string' ? value : '';
+  return ACCOUNT_ID.test(text) ? text.toLowerCase() : null;
+}
+
 const ACCOUNT_STATE_STYLE = {
   active:    'background:#e8f5e9;color:#1b5e20',
   suspended: 'background:#fff3e0;color:#e65100',
@@ -130,7 +138,13 @@ function keysSectionHtml(a, k) {
   }
   function reportError(e) { showMsg(e?.message || 'Something went wrong.', false); }
   const json = (method, body) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
-  const accountUrl = id => '/v1/company/api-accounts/' + encodeURIComponent(id);
+  // Only a UUID goes in an address; anything else stops the action with a message.
+  const idOrStop = (value) => {
+    const id = accountIdOf(value);
+    if (!id) throw new Error('This is not an id OSCAR gave: reload the page.');
+    return id;
+  };
+  const accountUrl = id => '/v1/company/api-accounts/' + idOrStop(id);
 
   async function load() {
     const [provRes, accRes] = await Promise.all([fetch('/v1/company/providers', {}), fetch('/v1/company/api-accounts')]);
@@ -150,7 +164,7 @@ function keysSectionHtml(a, k) {
   async function loadKeys() {
     const box = document.getElementById('keys-list');
     if (!accounts.length) { box.innerHTML = '<div class="empty">Make an account first.</div>'; return; }
-    const answers = await Promise.all(accounts.map(a => fetch(accountUrl(a.id) + '/keys')
+    const answers = await Promise.all(accounts.map(a => (accountIdOf(a.id) ? fetch(accountUrl(a.id) + '/keys') : Promise.reject(new Error('id')))
       .then(r => (r.ok ? r.json() : null)).catch(() => null)));
     box.innerHTML = accounts.map((a, i) => (answers[i]
       ? keysSectionHtml(a, answers[i])
@@ -169,7 +183,7 @@ function keysSectionHtml(a, k) {
 
   async function revokeKey(id, keyId) {
     if (!confirm('Revoke this key? No new token is given with it; a token already given lives its 15 minutes.')) return;
-    const res = await fetch(accountUrl(id) + '/keys/' + encodeURIComponent(keyId), { method: 'DELETE' });
+    const res = await fetch(accountUrl(id) + '/keys/' + idOrStop(keyId), { method: 'DELETE' });
     if (!res.ok) { showMsg(await readError(res, 'The key was not revoked.'), false); return; }
     showMsg('Key revoked.', true);
     await loadKeys();

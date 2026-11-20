@@ -67,36 +67,47 @@ function firstUse(accountId, jti, exp, now) {
   return Number(done?.changes) === 1;
 }
 
+// The form's own refusal, as [status, error, description], or null.
+function formRefusal(req, body) {
+  if (!req.is('application/x-www-form-urlencoded')) {
+    return [400, 'invalid_request', 'Send the request as application/x-www-form-urlencoded (RFC 6749).'];
+  }
+  if (body.grant_type !== 'client_credentials') return [400, 'unsupported_grant_type', 'grant_type must be client_credentials.'];
+  if (body.client_assertion_type !== CA.ASSERTION_TYPE || typeof body.client_assertion !== 'string') {
+    return [401, 'invalid_client', `Authenticate with private_key_jwt: client_assertion_type=${CA.ASSERTION_TYPE} and a client_assertion.`];
+  }
+  return null;
+}
+
+// The client the assertion authenticates: { account, checked } with
+// checked.ok, or null when it names no account at all.
+function authenticated(body, base, now) {
+  const claimed = CA.peek(body.client_assertion)?.payload?.iss;
+  const clientId = typeof claimed === 'string' && /^[0-9a-fA-F-]{36}$/.test(claimed) ? claimed : null;
+  if (!clientId || (body.client_id !== undefined && body.client_id !== clientId)) return null;
+  const account = get(`SELECT u.id, u.email, u.status, u.company_id FROM users u
+                         JOIN api_account a ON a.user_id = u.id AND a.company_id = u.company_id
+                        WHERE u.id = ? AND u.role = 'api_client'`, [clientId]);
+  if (account?.status !== 'active') return { account, checked: { ok: false, why: account ? 'account suspended' : 'no such account' } };
+  const checked = CA.verifyAssertion(body.client_assertion, { clientId, keys: keysOf(clientId), audiences: [`${base}${Tokens.TOKEN_PATH}`, base], now });
+  if (checked.ok && !firstUse(clientId, checked.jti, checked.exp, now)) return { account, checked: { ok: false, why: 'jti used before' } };
+  return { account, checked };
+}
+
 router.post('/token', tokenLimiter, (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  if (!req.is('application/x-www-form-urlencoded')) {
-    return oauthError(res, 400, 'invalid_request', 'Send the request as application/x-www-form-urlencoded (RFC 6749).');
-  }
-  if (body.grant_type !== 'client_credentials') {
-    return oauthError(res, 400, 'unsupported_grant_type', 'grant_type must be client_credentials.');
-  }
-  if (body.client_assertion_type !== CA.ASSERTION_TYPE || typeof body.client_assertion !== 'string') {
-    return oauthError(res, 401, 'invalid_client', `Authenticate with private_key_jwt: client_assertion_type=${CA.ASSERTION_TYPE} and a client_assertion.`);
-  }
+  const refusal = formRefusal(req, body);
+  if (refusal) return oauthError(res, ...refusal);
   const base = Tokens.oscarBase(req);
   if (!base) return oauthError(res, 503, 'temporarily_unavailable', 'APP_URL is not set on the server: the token endpoint cannot check an assertion\'s aud.');
 
   const now = new Date();
-  const claimed = CA.peek(body.client_assertion)?.payload?.iss;
-  const clientId = typeof claimed === 'string' && /^[0-9a-fA-F-]{36}$/.test(claimed) ? claimed : null;
-  if (!clientId || (body.client_id !== undefined && body.client_id !== clientId)) {
+  const client = authenticated(body, base, now);
+  if (!client?.checked.ok) {
+    if (client) log.info({ client: client.account?.id || null, why: client.checked.why }, 'client assertion refused');
     return oauthError(res, 401, 'invalid_client', INVALID_CLIENT);
   }
-  const account = get(`SELECT u.id, u.email, u.status, u.company_id FROM users u
-                         JOIN api_account a ON a.user_id = u.id AND a.company_id = u.company_id
-                        WHERE u.id = ? AND u.role = 'api_client'`, [clientId]);
-  const checked = account?.status === 'active'
-    ? CA.verifyAssertion(body.client_assertion, { clientId, keys: keysOf(clientId), audiences: [`${base}${Tokens.TOKEN_PATH}`, base], now })
-    : { ok: false, why: account ? 'account suspended' : 'no such account' };
-  if (!checked.ok || !firstUse(clientId, checked.jti, checked.exp, now)) {
-    log.info({ client: clientId, why: checked.ok ? 'jti used before' : checked.why }, 'client assertion refused');
-    return oauthError(res, 401, 'invalid_client', INVALID_CLIENT);
-  }
+  const { account, checked } = client;
   const scopes = Tokens.scopesOf(body.scope);
   if (scopes.error) return oauthError(res, 400, 'invalid_scope', `scope must be one or more of: ${Tokens.SCOPES.join(' ')}.`);
 
