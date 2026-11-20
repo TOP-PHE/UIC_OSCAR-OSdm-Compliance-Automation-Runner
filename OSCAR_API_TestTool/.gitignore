@@ -1,0 +1,5 @@
+# Never commit a private key, nor what a run wrote.
+*.pem
+*.key
+result*.xml
+result*.json

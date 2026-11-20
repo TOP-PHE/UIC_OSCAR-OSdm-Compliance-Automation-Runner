@@ -62,6 +62,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **An example client of the test automation API, and how to check a set-up with it** (#1349). A tool, CI, documentation, no version.
+  - **New folder `OSCAR_API_TestTool/`**, next to `OSCAR_MCP/`: `oscar-test` (Node 22+, no dependency), a command-line client of #1342's API.
+    - It signs in with `private_key_jwt` (ES256 or PS256 by the key) and asks for tests on named providers, by suite, codes or selection.
+    - It takes a reference and an Idempotency-Key, waits with the long poll and prints each run's verdict and failed checks.
+    - It writes the JUnit XML and the JSON results. `--whoami`, `--suites` and `--status <id>` only read, with a `runs:read` token.
+    - Exit codes: 0 passed, 1 failed, 2 incomplete, 3 not finished in time, 4 an error.
+    - Its 8 tests drive it against a stand-in OSCAR on loopback that checks each signed assertion with the public key.
+    - It is linted and tested in the required job, as the MCP server is, and its coverage counts in Sonar.
+  - ***OSCAR - Test Automation API Guide*:**
+    - New § 10: checking a set-up step by step with the client, from signing in to a real run on each provider. For each step, what it proves and what each refusal means.
+    - § 3: the key pair made with Node, for a PC without OpenSSL (Windows has none by default), in a folder no repository or synchronised drive holds.
+
 - **OSCAR on Kubernetes as built, and what the test campaigns measured** (#1340). Documentation, four read-only scripts and a test, no version.
   - **New document, *OSCAR - Kubernetes run campaigns*:**
     - the series (939 runs on six simulators) and the machine;

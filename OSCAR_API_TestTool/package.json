@@ -1,0 +1,11 @@
+{
+  "name": "oscar-api-testtool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ask OSCAR for conformance tests as a Company API account, wait for the verdict, write JUnit XML (OSCAR #1342).",
+  "bin": { "oscar-test": "oscar-test.js" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\""
+  }
+}
