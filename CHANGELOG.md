@@ -596,6 +596,9 @@ A company that develops its OSDM system with its own test automation asks OSCAR 
 - **The administrator lists a Company API account and changes nothing of it** (`/v1/admin/users/:id`: 409 for any change, reset, link or deletion). A company's deletion still removes it.
 - **`PATCH /v1/me/credentials`** checks and stores through `api/helpers/credentialsInput.js`, now shared with the account's credentials. Same answers and same stored values.
 
+### Fixed
+- **A coverage report test depended on the date** (`coverage-reports-routes.test.js`, test only). It published a provider's report over the last 30 days around a run dated 2026-10-21; from 2026-11-20 the run was out of the window, the report shared no run, and the certifier's live coverage of that provider was empty. It failed on `main` too from that day. The report now covers 365 days, as the file's other reports do.
+
 ## [server-1.11.555] — 2026-11-19
 
 Release 2026.594 (`current_release`). **Server Config: an empty number field is the default, never 0** (#1338).
