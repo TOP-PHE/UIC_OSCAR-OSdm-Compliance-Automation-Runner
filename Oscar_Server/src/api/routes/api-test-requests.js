@@ -17,7 +17,8 @@
  *     { providers: [id], scenarios: [code] | selection: {…}, reference }
  *     Idempotency-Key: <key>  (optional: asked again, the same answer)
  *   GET  /v1/api/test-requests/:id    — its state and verdicts (runs:read)
- *     ?wait=<seconds>  (at most 60: answers as soon as it is finished)
+ *     ?wait=<seconds>  (at most 60: answers as soon as it is finished; five
+ *     waits at a time an account, a cheap count while waiting)
  *
  * Only a Company API account launches; a read-only key gets 403. Everything
  * is checked for every provider before anything is queued: a provider the
@@ -193,28 +194,55 @@ async function launchHandler(req, res) {
 
 const pause = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
+// Long polls an account holds at once: beyond, a call answers at once.
+const MAX_WAITING = 5;
+const waiting = new Map();
+
+// The test request's runs still queued or running: one indexed count per
+// provider (runs(company_id, batch_id)), never the whole answer.
+function runsGoing(row) {
+  let going = 0;
+  for (const b of JSON.parse(row.batches || '[]')) {
+    if (!b.batch_id) continue;
+    going += get(`SELECT COUNT(*) AS n FROM runs WHERE company_id = ? AND batch_id = ? AND user_id = ? AND status IN ('QUEUED', 'RUNNING')`,
+      [b.company_id, b.batch_id, row.user_id]).n;
+  }
+  return going;
+}
+
+// Waits until the request's runs are all finished, the wait ends or the
+// caller leaves (`gone()`), looking every 2 s.
+async function waitFor(row, deadline, gone) {
+  while (runsGoing(row) > 0 && Date.now() < deadline && !gone()) {
+    await pause(Math.min(2000, Math.max(0, deadline - Date.now())));
+  }
+}
+
 async function readHandler(req, res) {
   if (!req.apiAccount) return res.status(404).json(NOT_FOUND);
   const wait = TR.waitOf(req.query.wait);
   if (wait === null) return problem(res, 400, 'Bad Request', `wait must be a whole number of seconds from 0 to ${TR.MAX_WAIT_S}.`);
   const id = String(req.params.id);
-  const base = Tokens.oscarBase(req);
-  let row = requestRow(id, req.apiAccount.id);
-  if (!row?.batches) return res.status(404).json(NOT_FOUND);
-  // The response's close before it is sent is the caller leaving.
-  let closed = false;
-  res.on('close', () => { closed = true; });
-  const deadline = Date.now() + wait * 1000;
-  let answer = requestAnswer(row, base);
-  // The long poll: read again every 2 s until finished, the wait ends or the caller leaves.
-  while (answer.state !== 'finished' && Date.now() < deadline && !closed) {
-    await pause(Math.min(2000, Math.max(0, deadline - Date.now())));
-    row = requestRow(id, req.apiAccount.id);
-    if (!row) return res.status(404).json(NOT_FOUND);
-    answer = requestAnswer(row, base);
+  const accountId = req.apiAccount.id;
+  if (!requestRow(id, accountId)?.batches) return res.status(404).json(NOT_FOUND);
+  const held = waiting.get(accountId) || 0;
+  if (wait > 0 && held < MAX_WAITING) {
+    // The response's close before it is sent is the caller leaving.
+    let closed = false;
+    res.on('close', () => { closed = true; });
+    waiting.set(accountId, held + 1);
+    try {
+      await waitFor(requestRow(id, accountId), Date.now() + wait * 1000, () => closed);
+    } finally {
+      const left = (waiting.get(accountId) || 1) - 1;
+      if (left > 0) waiting.set(accountId, left); else waiting.delete(accountId);
+    }
+    if (closed) return undefined;
   }
-  if (closed) return undefined;
-  return res.json(answer);
+  // The answer is built once, as the request is now.
+  const row = requestRow(id, accountId);
+  if (!row) return res.status(404).json(NOT_FOUND);
+  return res.json(requestAnswer(row, Tokens.oscarBase(req)));
 }
 
 module.exports = { launchLimiter, launchHandler, readHandler };

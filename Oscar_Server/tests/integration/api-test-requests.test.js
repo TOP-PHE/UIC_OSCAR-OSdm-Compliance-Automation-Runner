@@ -209,6 +209,20 @@ describe('reading the verdicts', () => {
     expect((await read(res.body.id, '?wait=61')).status).toBe(400);
   });
 
+  test('an account holds five waits at a time; a sixth call answers at once', async () => {
+    const res = await launch({ providers: [P1], scenarios: ['OTST_SALE_A'] });
+    const runId = runsOf(res.body)[0].id;
+    // Five waits, each held open until the run finishes.
+    const held = Array.from({ length: 5 }, () => read(res.body.id, '?wait=20').then(r => r));
+    await new Promise(r => setTimeout(r, 300));
+    const started = Date.now();
+    const sixth = await read(res.body.id, '?wait=20');
+    expect(Date.now() - started).toBeLessThan(1500);
+    expect(sixth.body.state).toBe('queued');
+    finish(runId, 'COMPLETED', { checks: [1] });
+    for (const r of await Promise.all(held)) expect(r.body).toMatchObject({ state: 'finished', verdict: 'passed' });
+  });
+
   test('another account, or a read-only key, reads none; an unknown id is a 404', async () => {
     const res = await launch({ providers: [P1], scenarios: ['OTST_SALE_A'] });
     const other = (await request(app).post('/v1/company/api-accounts').set('Authorization', session(TM)).send({ name: 'Other CI' })).body;

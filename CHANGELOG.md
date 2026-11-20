@@ -591,7 +591,7 @@ API for test automation, part 3 (#1342): a Company API account launches tests an
   - `state` (queued, running, finished) and `verdict` once finished: **failed** when a run failed, **incomplete** when a run gave no result or was cancelled, **passed** otherwise. A pipeline is green on passed only.
   - Per provider and per run: the verdict (passed, failed, `not_a_result` with its reason, cancelled), the check counts, the times, and `run_url`, the run's page in OSCAR.
   - A run that ended without a result (`NO_CHECKS`, `RUN_PROCESS_ERROR`, `RUN_NOT_FINISHED`, or failed with no check) is never the provider's failure (#1287).
-  - `?wait=<seconds>` (0 to 60): the long poll answers as soon as the request is finished, reading again every 2 s, and stops when the caller leaves.
+  - `?wait=<seconds>` (0 to 60): the long poll answers as soon as the request is finished, and stops when the caller leaves. While it waits it looks every 2 s at one indexed count per provider of the runs still going, and builds the answer once, at the end: a request of hundreds of runs costs the server's thread a few queries a wait, not hundreds every 2 s. An account holds five waits at a time; a sixth call answers at once.
 - **MCP tool `oscar_get_test_request`** for the new read route (`OSCAR_MCP`; every `/v1/api` GET has its tool).
 
 ### Changed
