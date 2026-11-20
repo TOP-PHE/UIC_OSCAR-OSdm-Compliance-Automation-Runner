@@ -21,6 +21,7 @@ on:
       - 'OSCAR_Deploy/**'
       - 'OSDM_Simulator/**'
       - 'OSCAR_MCP/**'
+      - 'OSCAR_API_TestTool/**'
       - 'compatibility.json'
       - '.github/workflows/ci-server.yml'
   pull_request:
@@ -88,6 +89,15 @@ jobs:
 
       - name: OSCAR MCP server — tests
         working-directory: OSCAR_MCP
+        run: npm test
+
+      # The example API client (#1349): no dependency either, same treatment.
+      - name: OSCAR API test tool — lint
+        working-directory: OSCAR_API_TestTool
+        run: node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
+
+      - name: OSCAR API test tool — tests
+        working-directory: OSCAR_API_TestTool
         run: npm test
 
   docker-build:

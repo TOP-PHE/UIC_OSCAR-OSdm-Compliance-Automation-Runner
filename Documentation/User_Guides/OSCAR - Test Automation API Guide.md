@@ -15,6 +15,8 @@ conformance tests through an API and reads their results. Issue #1342.
   content stay in OSCAR's pages, and each run gives the address of its page.
 - **How it learns a request is finished:** by polling, with a long poll of up
   to 60 seconds. There is no webhook.
+- **A working client to start from:** `OSCAR_API_TestTool/` in the repository.
+  § 10 uses it to check a set-up step by step, before the CI uses it.
 
 ---
 
@@ -63,7 +65,15 @@ openssl ecparam -name prime256v1 -genkey -noout -out oscar-ci.key
 openssl ec -in oscar-ci.key -pubout -out oscar-ci.pub
 ```
 
-Keep `oscar-ci.key` where your CI keeps its secrets. Give OSCAR
+Without OpenSSL (Windows has none by default), Node 22 or later makes the
+same pair. In PowerShell:
+
+```powershell
+node -e "const c=require('crypto'),fs=require('fs');const k=c.generateKeyPairSync('ec',{namedCurve:'P-256'});fs.writeFileSync('oscar-ci.key',k.privateKey.export({type:'pkcs8',format:'pem'}),{mode:0o600});fs.writeFileSync('oscar-ci.pub',k.publicKey.export({type:'spki',format:'pem'}));console.log('oscar-ci.key and oscar-ci.pub written')"
+```
+
+Make the pair in a folder that no repository and no shared or synchronised
+drive holds: whatever is there can be copied elsewhere. Keep `oscar-ci.key` where your CI keeps its secrets. Give OSCAR
 `oscar-ci.pub` only: OSCAR refuses a private key. An account holds two active
 keys at most, so you can change a key without a stop: add the new key, switch
 the automation to it, then revoke the old one.
@@ -261,3 +271,116 @@ the scope `runs:read` only, so it never launches anything. See its README.
   to an account or its keys.
 - **The API's other routes** (`/v1/api/runs`, `…/batches`, `…/queue`) answer an
   account's own runs; a read-only API key keeps its company's or provider's.
+
+## 10. Checking a set-up with the example client
+
+The repository holds a working client, **`OSCAR_API_TestTool/`**
+(`oscar-test`). It does what a CI pipeline does: it signs in, asks for tests,
+waits for the verdict, prints where each run failed and writes JUnit XML.
+
+- **Before handing the account to the company's CI,** a Test Manager runs it
+  from their own PC to check the set-up of § 1, step by step.
+- **For integrators,** it is an example: `src/oscar.js` signs in, `src/run.js`
+  asks, waits and reports.
+
+It needs Node 22 or later and nothing else: copy the folder anywhere. Its
+`README.md` lists every option.
+
+### 10.1 Settings
+
+In PowerShell, in the tool's folder. The private key of § 3 stays in its own
+folder: give its full path.
+
+```powershell
+$env:OSCAR_URL = "https://<oscar host>"; $env:OSCAR_CLIENT_ID = "<the account's client id>"; $env:OSCAR_PRIVATE_KEY_FILE = "<the key's folder>\oscar-ci.key"
+```
+
+`OSCAR_URL` is **exactly** the address on the account's card (the token
+endpoint without `/v1/api/oauth/token`). It is the server's `APP_URL`, and the
+signed assertion names it: another name for the same server is refused.
+
+### 10.2 The checks, in order
+
+Each step checks what the step before could not. Stop at the first that
+fails, fix what its message points to, and run it again.
+
+**Step 1: signing in.**
+
+```powershell
+node oscar-test.js --whoami
+```
+
+It answers with the account's name, its company and every provider it may
+test, with their ids. That proves:
+- the server knows the API (1.11.561 or later) and has `APP_URL`;
+- the address is the right one;
+- the key OSCAR holds matches yours;
+- the account is active.
+
+| Refused with | Check |
+|---|---|
+| `OSCAR could not be reached` | `OSCAR_URL`, the network, a proxy |
+| `OSCAR answered with a redirect` | `OSCAR_URL` uses `https://` and the exact host |
+| `OSCAR refused the token request (HTTP 404)` | the server is older than 1.11.561 |
+| `(HTTP 503). temporarily_unavailable` | the server's `APP_URL` is not set |
+| `(HTTP 401). invalid_client` | the client id; the public key pasted on the card matches your private key and is not revoked; the account is not suspended; `OSCAR_URL` is the card's address; your PC's clock is right (the assertion lives one minute) |
+| `The private key must be EC P-256 or RSA of 2048 bits or more` | make the key as § 3 does |
+
+**Step 2: the providers.** The list of step 1 must hold every provider the
+automation will test. If one is missing, tick it on the account's row (§ 1,
+step 1).
+
+**Step 3: the suites** (only if you use them):
+
+```powershell
+node oscar-test.js --suites
+```
+
+Each named suite with what it holds. An empty list: save one on the Run page
+(§ 1, step 4).
+
+**Step 4: a real run, on each provider.** One scenario you know passes, with a
+short wait:
+
+```powershell
+node oscar-test.js --provider alpha --scenarios <a scenario code> --timeout 15 --junit result.xml
+```
+
+The scenario code is one the provider holds (Test Config). This step proves:
+- the account's OSDM credentials for that provider;
+- the provider's endpoint and data file;
+- the runner;
+- the verdict and the JUnit report.
+
+| Answer | Check |
+|---|---|
+| `HTTP 409 — <provider>: Cannot start run — missing: Bearer token (your credentials)` (or OAuth2 fields) | the account's OSDM credentials for that provider: *Set its OSDM credentials* on its row, then *Test the account's credentials* |
+| `HTTP 409 — <provider>: … endpoint is suspended` | a Test Manager resumes it on API Config, once the provider is checked |
+| `HTTP 409 — … missing: OSDM API endpoint` or `data file` | the provider's set-up in API Config and Test Config |
+| `"x" is not a company or provider this account may test` | step 2 |
+| `not on this provider: <code>` and nothing runs | a code the provider does not hold, or a tester's own scenario (the account runs the shared ones only) |
+| exit code 3, `Not finished after 15 minute(s)` | the queue is busy or a run hangs: `--status <id>` waits again; the Dashboard shows the runs |
+| exit code 2, a run `not_a_result` | the run ended without a result (its `reason`): open its `run_url` in OSCAR, as for any run |
+| exit code 1, a run `failed` | the set-up works: the provider failed a check. The failed check is printed, and `run_url` opens the run |
+| exit code 0 | the set-up works and the provider passed |
+
+Then `result.xml` holds the JUnit report your CI will publish.
+
+**Step 5: the same, as the CI will run it.** Put the three settings in the
+CI's secret variables. `OSCAR_PRIVATE_KEY` may hold the PEM text itself, with
+line breaks written `\n`. Give each pipeline run a reference and an
+Idempotency-Key, so a retried job runs nothing twice:
+
+```powershell
+node oscar-test.js --provider alpha --provider beta --suite smoke --reference "pipeline 4812" --idempotency-key "ci-4812-1" --junit oscar-junit.xml
+```
+
+The exit code tells the CI the verdict: 0 passed, 1 failed, 2 incomplete,
+3 not finished in time, 4 an error.
+
+### 10.3 What the client never does
+
+It reads results only (§ 7) and never prints the private key, the assertion or
+the token. `--whoami`, `--suites` and `--status` ask a token holding
+`runs:read` only, and so does the MCP server (§ 8). The tool's own tests run
+it against a stand-in OSCAR that checks each signed assertion as OSCAR does.

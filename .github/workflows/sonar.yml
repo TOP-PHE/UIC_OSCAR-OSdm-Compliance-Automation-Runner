@@ -29,6 +29,7 @@ on:
       - 'Oscar_Server/**'
       - 'OSDM_Simulator/**'
       - 'OSCAR_MCP/**'
+      - 'OSCAR_API_TestTool/**'
       - 'sonar-project.properties'
       - '.github/workflows/sonar.yml'
   # No paths: filter on pull_request — Sonar is a required check in branch
@@ -105,6 +106,13 @@ jobs:
         run: |
           mkdir -p OSCAR_MCP/coverage
           node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=OSCAR_MCP/coverage/lcov.info "OSCAR_MCP/tests/*.test.js"
+
+      - name: Run OSCAR API test tool tests with coverage
+        # The example API client (#1349), as the MCP server.
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        run: |
+          mkdir -p OSCAR_API_TestTool/coverage
+          node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=OSCAR_API_TestTool/coverage/lcov.info "OSCAR_API_TestTool/tests/*.test.js"
 
       - name: SonarCloud Scan
         if: ${{ github.actor != 'dependabot[bot]' }}

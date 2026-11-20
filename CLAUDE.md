@@ -1321,6 +1321,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   endpoint), scope `runs:read` only. Guide *OSCAR - Test Automation API
   Guide*. **Each part's server version was listed without moving
   `current_release`; this one moved it.**
+  **The example client, `OSCAR_API_TestTool/`** (#1349, no version, like
+  `OSCAR_MCP`: own `package.json`, no dependency, linted and tested in the
+  required job, in Sonar; not in `compatibility.json`). `src/oscar.js` signs
+  in as the MCP server does, `src/run.js` asks, waits and reports; guide
+  § 10 checks a set-up with it step by step and quotes its messages and the
+  server's refusals (`runLaunch.js`, `api-oauth.js`): change those texts,
+  change § 10 too.
 - **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
   The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
   read "100 scenarios". `whole_batches=1` adds the rest of each batch on the
