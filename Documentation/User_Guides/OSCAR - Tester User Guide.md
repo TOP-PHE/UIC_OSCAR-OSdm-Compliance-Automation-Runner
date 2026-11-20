@@ -246,6 +246,17 @@ chosen in **Working on**.
   follow [OSCAR_MCP/README.md](../../OSCAR_MCP/README.md). Revoking the key
   stops it.
 
+**Launching tests from your own test automation** (#1342): an API key only
+reads. To let a CI pipeline or a test tool *ask* for tests and read their
+verdicts, a Test Manager makes a **Company API account** (menu **API
+Accounts**): a user of its own kind that never signs in to these pages, with
+its own OSDM credentials and the providers you give it, signing in with a key
+pair (OAuth 2.0, `private_key_jwt`). It asks for scenarios by code, by a
+selection or by a named suite (Run page, card *Named suites*), and reads the
+verdicts and where each run failed and warned, as JSON or JUnit XML. Its runs
+appear in OSCAR as any Test Manager's do. See
+[OSCAR - Test Automation API Guide](OSCAR%20-%20Test%20Automation%20API%20Guide.md).
+
 ### 2.4 AI analysis of results (Test Managers)
 
 An AI service your company chooses reads the failed checks of a batch, groups

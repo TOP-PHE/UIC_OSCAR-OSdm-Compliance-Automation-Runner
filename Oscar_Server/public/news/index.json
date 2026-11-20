@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-20-test-automation-api",
+    "date": "November 20, 2026",
+    "tag": "New Feature",
+    "title": "Launch OSCAR tests from your own test automation, and read their verdicts through the API",
+    "summary": "A Company API account lets a CI pipeline or a test tool ask OSCAR for tests on one or more providers, by scenario, selection or named suite, and read the verdicts and where each run failed and warned, as JSON or JUnit XML.",
+    "content": "Until now a program could only read OSCAR's results, with a read-only API key. A Test Manager can now make a Company API account (menu API Accounts): the user your company's own test automation acts as. It never signs in to OSCAR's pages and never acts as a person. It has its own OSDM credentials, set on API Config opened for it, and tests your company and the providers you give it. It signs in with a key pair: your company keeps the private key and gives OSCAR the public key only (OAuth 2.0 client credentials with private_key_jwt), so no secret is shared.\n\nThe account asks for tests on one or more providers: scenarios by code, a selection as the Run page makes it, or a named suite. A Test Manager saves the Run page's selection as a suite in the new card Named suites. Every provider is checked before anything is queued. The account then reads the state and verdict of its request, waiting up to a minute for it to finish. For each run it reads where the run failed and warned, with the messages, as JSON or as JUnit XML that CI tools show directly. A run that ended without a result is never counted as the provider's failure, and a known deviation your company documented is accepted. Logs and message content stay in OSCAR: each run gives the address of its page.\n\nIts runs appear in OSCAR as a Test Manager's do, for the company's Test Managers and testers. Suspend an account to stop it at once. The OSCAR MCP server can also read as such an account.\n\nNothing to do if you do not use it. To start, see the new Test Automation API Guide in the documentation."
+  },
+  {
     "id": "2026-11-19-server-config-empty-field",
     "date": "November 19, 2026",
     "tag": "Bug Fix",

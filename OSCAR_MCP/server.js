@@ -12,7 +12,8 @@
  * server.js — the OSCAR MCP server (#503 PR 3), over stdio.
  *
  * An MCP client (Claude Desktop, Claude Code, another assistant) starts it
- * with OSCAR_URL and OSCAR_API_KEY in its environment. It reads one JSON-RPC
+ * with OSCAR_URL and OSCAR_API_KEY (or a Company API account's OSCAR_CLIENT_ID
+ * and OSCAR_PRIVATE_KEY, #1342) in its environment. It reads one JSON-RPC
  * message per line on stdin and writes each answer as one line on stdout;
  * stdout carries nothing else. Its few messages go to stderr, without the key.
  */

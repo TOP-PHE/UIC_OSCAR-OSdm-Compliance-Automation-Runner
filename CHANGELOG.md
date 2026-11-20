@@ -576,6 +576,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.561] — 2026-11-20
+
+Release 2026.600 (`current_release`). API for test automation, part 6 (#1342), and the release of the programme as a whole: parts 1 to 5 (1.11.556 to 1.11.560, listed as 2026.595 to 2026.599) and this one. Nothing changes for a company that makes no Company API account.
+
+### Added
+- **The OSCAR MCP server reads as a Company API account** (`OSCAR_MCP` 0.2.0). Set `OSCAR_CLIENT_ID` and `OSCAR_PRIVATE_KEY` (PEM; line breaks may be written `\n`) instead of `OSCAR_API_KEY`, never both.
+  - It signs a one-minute ES256 or PS256 assertion with `node:crypto` (`src/auth.js`, still no dependency) and asks the token endpoint for a token holding `runs:read` only, so it never launches a test. It keeps the token until a minute before it expires.
+  - The private key never leaves the process, and no secret is in an answer or an error.
+  - Three more tools: `oscar_get_test_request`, `oscar_get_test_request_results`, `oscar_list_suites`.
+  - `mcp-account.test.js` runs the MCP's own modules against OSCAR's real token endpoint, ES256 and PS256.
+- **`Documentation/User_Guides/OSCAR - Test Automation API Guide.md`**, for Test Managers and integrators:
+  - setting up an account, its credentials, keys and suites;
+  - the key pair, and getting a token, in Node.js and Python;
+  - asking for tests, every answer, and waiting;
+  - the verdicts, the results and JUnit XML;
+  - a CI step, and security in short.
+- **The Tester User Guide** (§ 2.3) points to it, and **a news entry** announces it.
+
+### Changed
+- **`utils/junitReport.js` is written without nested template literals or a nested ternary** (SonarCloud S4624, S3358 on part 5). Same XML: the tests that hold it exactly pass unchanged.
+
+### The programme, in one place
+- **Accounts** (1.11.556): a user of role `api_client` that never signs in to pages, with its own OSDM credentials and providers; menu **API Accounts**.
+- **Signing in** (1.11.557): OAuth 2.0 client credentials with `private_key_jwt`, public keys only on OSCAR's side, `POST /v1/api/oauth/token`.
+- **Test requests** (1.11.558): `POST /v1/api/test-requests` on one or more providers, `GET …/{id}?wait=` for the verdicts, `Idempotency-Key`.
+- **Named suites** (1.11.559): saved on the Run page, asked by name.
+- **Results** (1.11.560): failures, warnings and known deviations per run, JSON or JUnit XML; `passed_with_deviation`.
+
 ## [server-1.11.560] — 2026-11-20
 
 API for test automation, part 5 (#1342): where each run failed and warned. Not released on its own: listed in `compatibility.json` (2026.599) without moving `current_release`.

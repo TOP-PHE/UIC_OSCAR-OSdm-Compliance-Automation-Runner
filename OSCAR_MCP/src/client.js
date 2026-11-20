@@ -8,7 +8,8 @@
 'use strict';
 
 /**
- * client.js — one GET to OSCAR's read-only API (#503 PR 3).
+ * client.js — one GET to OSCAR's API (#503 PR 3), as a key or a Company API
+ * account (#1342: its token from auth.js, the one POST this server makes).
  *
  * GET only, to the configured OSCAR only: a redirect is never followed (it
  * would carry the key elsewhere), an answer is read up to MAX_ANSWER_BYTES,
@@ -17,6 +18,7 @@
  */
 
 const { version } = require('../package.json');
+const { bearerFor } = require('./auth');
 
 const TIMEOUT_MS = 30 * 1000;
 const MAX_ANSWER_BYTES = 4 * 1024 * 1024;
@@ -44,12 +46,15 @@ async function getFromOscar(config, path, { fetchImpl = fetch, timeoutMs = TIMEO
   if (typeof path !== 'string' || !path.startsWith('/v1/api/')) return { failure: 'Only the read-only API of OSCAR is called.' };
   const url = new URL(path, config.origin);
   if (url.origin !== config.origin || !url.pathname.startsWith('/v1/api/')) return { failure: 'Only the read-only API of the configured OSCAR is called.' };
+  // A key as it is, or a Company API account's token (#1342), asked first.
+  const auth = await bearerFor(config, { fetchImpl, timeoutMs });
+  if (auth.failure) return { failure: auth.failure };
   let response;
   try {
     response = await fetchImpl(url, {
       method: 'GET',
       redirect: 'manual',
-      headers: { Authorization: `Bearer ${config.key}`, Accept: 'application/json', 'User-Agent': `oscar-mcp/${version}` },
+      headers: { Authorization: `Bearer ${auth.bearer}`, Accept: 'application/json', 'User-Agent': `oscar-mcp/${version}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
