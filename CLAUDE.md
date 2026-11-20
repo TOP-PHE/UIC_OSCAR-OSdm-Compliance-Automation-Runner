@@ -1278,7 +1278,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   account's own runs. Suspension sets `sessions_valid_after`: tokens issued
   before it stay dead after a resume. **Every refusal on `/v1/api` keeps the
   key's text** ("Missing, invalid, expired or revoked API key."), pinned by
-  `api-keys.test.js`.
+  `api-keys.test.js`. **PR 3 (1.11.558): test requests.**
+  `POST /v1/api/test-requests` / `GET /v1/api/test-requests/:id`
+  (`api-test-requests.js`'s handlers, **registered on `api.js`'s own
+  router**: `openapi-coverage.test.js` walks one router's stack, so a nested
+  router's routes count as missing). Each `/v1/api` route names its scope
+  (`read` / `write` in `api.js`); a method-wide check turned unknown
+  routes into 403 and broke `api-keys.test.js`'s 404s. Every provider is
+  checked first (`launchReadiness()` in `api/helpers/runLaunch.js`, shared
+  with `POST /v1/runs`), then one batch per provider (`enqueueBatch()`);
+  the account sees `visibleCodes()` (shared and ownerless scenarios).
+  `test_request` (migration 59) holds the request and `batches` JSON; the
+  Idempotency-Key row is inserted before queueing (unique (user, key)).
+  Verdicts are `utils/testRequests.js` (pure): `not_a_result` for the
+  runner's sentinels or a run with no check. The runner refuses a suspended
+  account's queued runs. **An `/v1/api` path with a GET has no other
+  method** (`mcp-end-to-end.test.js`), hence POST on
+  `/test-requests` and GET on `/test-requests/{id}`; each new GET needs its
+  MCP tool, and `OSCAR_MCP/tests` count and list the tools.
 - **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
   The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
   read "100 scenarios". `whole_batches=1` adds the rest of each batch on the

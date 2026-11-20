@@ -576,6 +576,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.558] — 2026-11-20
+
+API for test automation, part 3 (#1342): a Company API account launches tests and reads their verdicts. Not released on its own: listed in `compatibility.json` (2026.597) without moving `current_release`.
+
+### Added
+- **`POST /v1/api/test-requests`** (scope `runs:write`; a read-only key gets 403). Body: `providers` (1 to 20 company or provider ids), `scenarios` (1 to 500 codes) **or** `selection` (the Run page's object, #1029: categories, groups, forms, modes, last run; always cut from every scenario seen), and `reference` (the caller's own id). 30 requests in 10 minutes per account.
+  - **Everything is checked before anything is queued.** A provider the account is not given is 404. One that cannot run is 409, naming the provider: endpoint suspended, or the endpoint, the account's credentials or the data file missing.
+  - **The account sees the company's shared scenarios** and the old ones without an owner, never a tester's own (`visibleCodes()`, the rule of a tester's view). A code a provider does not have is listed in its `not_found`; the request is refused only when nothing at all would run.
+  - **One batch per provider**, queued as the account, with its selection kept as the Run page's batches are. A **test request** (`test_request`, migration 59) records what was asked and each provider's batch.
+  - **`Idempotency-Key`** (8 to 100 of letters, digits, `. _ : -`): the same key and request answer the same test request (200), the same key with another request 422. The key is taken before anything is queued, so two calls at once queue once.
+  - The answer is 202, `Location` naming the test request.
+- **`GET /v1/api/test-requests/:id`** (scope `runs:read`), the account's own only:
+  - `state` (queued, running, finished) and `verdict` once finished: **failed** when a run failed, **incomplete** when a run gave no result or was cancelled, **passed** otherwise. A pipeline is green on passed only.
+  - Per provider and per run: the verdict (passed, failed, `not_a_result` with its reason, cancelled), the check counts, the times, and `run_url`, the run's page in OSCAR.
+  - A run that ended without a result (`NO_CHECKS`, `RUN_PROCESS_ERROR`, `RUN_NOT_FINISHED`, or failed with no check) is never the provider's failure (#1287).
+  - `?wait=<seconds>` (0 to 60): the long poll answers as soon as the request is finished, and stops when the caller leaves. While it waits it looks every 2 s at one indexed count per provider of the runs still going, and builds the answer once, at the end: a request of hundreds of runs costs the server's thread a few queries a wait, not hundreds every 2 s. An account holds five waits at a time; a sixth call answers at once.
+- **MCP tool `oscar_get_test_request`** for the new read route (`OSCAR_MCP`; every `/v1/api` GET has its tool).
+
+### Changed
+- **`POST /v1/runs`'s checks and queueing are `api/helpers/runLaunch.js`** (`launchReadiness()`, `enqueueBatch()`), shared with the test requests. Same answers, same rows.
+- **`/v1/api`'s routes each name their scope** (`runs:read` for a read, `runs:write` to launch); any other path or method is still the API's 404.
+- **The runner refuses the queued runs of a Company API account suspended since** (`refusedRunScope()`).
+
 ## [server-1.11.557] — 2026-11-20
 
 API for test automation, part 2 (#1342): a Company API account signs in to the API. Not released on its own: listed in `compatibility.json` (2026.596) without moving `current_release`.

@@ -12,7 +12,9 @@
  * access token (#1342; POST /v1/api/oauth/token, api-oauth.js).
  *
  * A key reads the runs of its company or provider; an account reads the runs
- * it launched (callerScope()). Every route needs the scope runs:read.
+ * it launched (callerScope()). A read needs the scope runs:read; an account
+ * launches tests with runs:write (POST /v1/api/test-requests,
+ * api-test-requests.js).
  *
  *   GET /v1/api/key                     — the key's own name, company, scopes and expiry
  *   GET /v1/api/runs                    — the company's runs, newest first (#503 PR 2)
@@ -53,7 +55,12 @@ const perKeyLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'This API key made too many requests in a short window — please wait a moment.' },
 });
 
-router.use(guessLimiter, requireApiCaller, perKeyLimiter, needScope('runs:read'));
+router.use(guessLimiter, requireApiCaller, perKeyLimiter);
+
+// Each route names its scope: a read needs runs:read, launching tests
+// (POST /test-requests) runs:write. Any other path or method is the API's 404.
+const read = needScope('runs:read');
+const write = needScope('runs:write');
 
 // What the caller reads among the runs: a key, its company's or provider's;
 // a Company API account (#1342), the runs it launched. Each run then goes
@@ -81,7 +88,7 @@ function accountAnswer(req, res) {
   });
 }
 
-router.get('/key', (req, res) => {
+router.get('/key', read, (req, res) => {
   if (req.apiAccount) return accountAnswer(req, res);
   const row = get(`SELECT k.name, k.prefix, k.scopes, k.created_at, k.expires_at, c.id AS company_id, c.name AS company_name
                    FROM api_key k JOIN companies c ON c.id = k.company_id WHERE k.id = ?`, [req.apiKey.id]);
@@ -159,7 +166,7 @@ function countsFor(runId) {
   return get(COUNTS_SQL, [runId]);
 }
 
-router.get('/runs', (req, res) => {
+router.get('/runs', read, (req, res) => {
   const limit = wholeNumber(req.query.limit, 50, 1, MAX_LIMIT);
   if (limit === null) return badRequest(res, `limit must be a whole number from 1 to ${MAX_LIMIT}.`);
   const offset = wholeNumber(req.query.offset, 0, 0, 1e9);
@@ -195,13 +202,13 @@ router.get('/runs', (req, res) => {
   return res.json({ total: total?.n || 0, limit, offset, runs });
 });
 
-router.get('/runs/:id', (req, res) => {
+router.get('/runs/:id', read, (req, res) => {
   const run = visibleRun(req.params.id, req);
   if (!run) return res.status(404).json(NOT_FOUND);
   return res.json(runView(run, countsFor(run.id)));
 });
 
-router.get('/runs/:id/assertions', (req, res) => {
+router.get('/runs/:id/assertions', read, (req, res) => {
   const run = visibleRun(req.params.id, req);
   if (!run) return res.status(404).json(NOT_FOUND);
   const result = textParam(req.query.result, 'result');
@@ -264,7 +271,7 @@ router.get('/runs/:id/assertions', (req, res) => {
   });
 });
 
-router.get('/batches/:batchId', (req, res) => {
+router.get('/batches/:batchId', read, (req, res) => {
   const batchId = req.params.batchId;
   if (batchId.length > MAX_TEXT) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No such batch.' });
   const scope = callerScope(req, 'runs');
@@ -280,7 +287,7 @@ router.get('/batches/:batchId', (req, res) => {
   return res.json({ batch_id: batchId, total: runs.length, ...byStatus, runs });
 });
 
-router.get('/queue', (req, res) => {
+router.get('/queue', read, (req, res) => {
   const scope = callerScope(req, 'runs');
   const rows = all(`SELECT id FROM runs WHERE ${scope.sql} AND status IN ('QUEUED', 'RUNNING') ORDER BY queued_at ASC, id ASC`,
     scope.params);
@@ -303,6 +310,11 @@ router.get('/queue', (req, res) => {
 
 // Anything not listed above, whatever the method: the request ends here and
 // never reaches another router or the page fallback.
+// A Company API account's test requests (#1342 PR 3).
+const TestRequests = require('./api-test-requests');
+router.post('/test-requests', write, TestRequests.launchLimiter, TestRequests.launchHandler);
+router.get('/test-requests/:id', read, TestRequests.readHandler);
+
 router.use((req, res) => {
   res.status(404).json({ status: 404, title: 'Not Found', detail: 'The API has no such route.' });
 });

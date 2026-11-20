@@ -38,7 +38,6 @@ const fs      = require('node:fs');
 const path    = require('node:path');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
-const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run: dbRun, transaction, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
@@ -46,13 +45,12 @@ const { auditLog } = require('../helpers/shared');
 const queue = require('../../worker/queue');
 const { resolveRunList, visibleCodes } = require('../../utils/datafileOwnership');
 const { getRunSelection } = require('../../utils/runSelections');
-const { credentialsFor } = require('../../utils/testerCredentials');
 const runner = require('../../worker/runner');
 const { flushRunLogs } = require('../../worker/runLog');
 const RF = require('../../utils/runFilters');
 const { facetsFor } = require('../helpers/runCandidates');
+const { launchReadiness, enqueueBatch } = require('../helpers/runLaunch');
 
-const { endpointSuspension } = require('../../utils/intrusion');
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
 
@@ -263,44 +261,11 @@ async function queueBatch(req, res, { company, targetCompanyId, user, datafile, 
     return res.status(400).json({ status: 400, title: 'Bad Request', detail });
   }
 
-  const batchId = uuidv4();
-  const runs = [];
-
-  transaction(() => {
-    for (const code of scenarioList) {
-      const runId = uuidv4();
-      dbRun(
-        `INSERT INTO runs (id, company_id, user_id, status, auth_mode_used, api_base_used, datafile_hash_used, env_name_used, batch_id, scenario_code)
-         VALUES (?, ?, ?, 'QUEUED', ?, ?, ?, ?, ?, ?)`,
-        [runId, targetCompanyId, req.user.id, user.auth_mode, company.api_base, company.datafile_hash || null,
-         `OTST_${company.slug}_Env`, batchId, code]
-      );
-      runs.push({ runId, code });
-    }
+  const { batchId, runs: createdRuns } = enqueueBatch({
+    companyId: targetCompanyId, userId: req.user.id, company, credentials: user, codes: scenarioList, concurrentLimit,
     // #1029 PR 3: what the batch was chosen by, for the dashboard to say it.
-    if (req.body?.selection !== undefined) {
-      dbRun('INSERT INTO run_batch (batch_id, company_id, selection) VALUES (?, ?, ?)',
-        [batchId, targetCompanyId, JSON.stringify(RF.withDefaults(req.body.selection))]);
-    }
+    selection: req.body?.selection,
   });
-
-  // Enqueue all jobs (queue will respect concurrentLimit)
-  for (const { runId, code } of runs) {
-    queue.enqueue({
-      runId,
-      companyId:        targetCompanyId,
-      scenarioOverride: code,
-      concurrentLimit,
-      batchId,
-      scenarioCode:     code,
-      userId:           req.user.id
-    });
-  }
-
-  const createdRuns = all(
-    `SELECT id, status, scenario_code, batch_id, queued_at FROM runs WHERE company_id = ? AND batch_id = ? ORDER BY +queued_at ASC`,
-    [targetCompanyId, batchId]
-  );
   return res.status(202).json({ batch_id: batchId, parallel: true, concurrent_limit: concurrentLimit, runs: createdRuns });
 }
 
@@ -309,75 +274,11 @@ router.post('/', runSubmitLimiter, (req, res) => {
   const launch = launchCompany(req);
   if (launch.refusal) return res.status(launch.refusal[0]).json(launch.refusal[1]);
   const { company, targetCompanyId } = launch;
-  // An endpoint suspended after an intrusion attempt takes no run (utils/intrusion.js).
-  if (endpointSuspension(targetCompanyId)) {
-    return res.status(409).json({ status: 409, title: 'Conflict', endpoint_suspended: true,
-      detail: 'The OSDM endpoint is suspended: an answer meant to attack OSCAR was detected during a run. A Test Manager resumes it on the API Config page once the provider is checked.' });
-  }
-
-  // Per-tester credentials, for the company the run targets (#540: per user
-  // and company). The runner reads the same row when the job is dequeued;
-  // checking here gives the operator an immediate field-level error instead
-  // of a delayed run-failure.
-  const user = credentialsFor(req.user.id, targetCompanyId);
-  if (!user) return res.status(404).json({ status: 404, title: 'User not found.' });
-
-  const missing = [];
-  if (!company.api_base) missing.push('OSDM API endpoint (set on the Company tab)');
-  if (user.auth_mode === 'bearer' && !user.access_token_enc) {
-    missing.push('Bearer token (your credentials)');
-  }
-  if (user.auth_mode === 'oauth2') {
-    if (!user.token_url)         missing.push('OAuth2 token URL (your credentials)');
-    if (!user.client_id_enc)     missing.push('OAuth2 client_id (your credentials)');
-    if (!user.client_secret_enc) missing.push('OAuth2 client_secret (your credentials)');
-    if (user.oauth_profile === 'sqills_extension' && !user.oauth_extra_enc) {
-      missing.push('OAuth2 extra credential (your Sqills Basic auth value)');
-    }
-    if (user.oauth_profile === 'custom' && !user.oauth_custom_template) {
-      missing.push('OAuth2 custom request template (your credentials)');
-    }
-  }
-  if (!company.datafile_path || !fs.existsSync(company.datafile_path)) {
-    missing.push('data file');
-  }
-  if (missing.length > 0) {
-    return res.status(400).json({
-      status: 400,
-      title: 'Bad Request',
-      detail: `Cannot start run — missing: ${missing.join(', ')}.`,
-      missing
-    });
-  }
-
-  // Read concurrent session limit from test framework config.
-  // The config column is encrypted at rest (Phase 2 of issue #60) — it MUST be
-  // colDecrypt()'d before JSON.parse, or parsing the ciphertext throws and the
-  // limit silently falls back to 1, serialising every company's runs (the
-  // concurrency bug). colDecrypt() passes legacy plaintext through unchanged.
-  const tfRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
-  let fwConfig = tfRow ? (() => { try { return JSON.parse(colDecrypt(tfRow.config)); } catch (_) { return {}; } })() : {};
-  // Handle double-nested config (legacy: { config: { concurrentSessionLimit: N } })
-  if (fwConfig.config && typeof fwConfig.config === 'object' && !Array.isArray(fwConfig.config)) {
-    fwConfig = fwConfig.config;
-  }
-  const concurrentLimit = fwConfig.concurrentSessionLimit || 1;
-
-  // ── Parallel mode: one run per scenario ──────────────────────────────────
-  //
-  // v1.11.5 fix: since v1.11.0 (Phase 2 of issue #60) the datafile on disk
-  // is AES-256-GCM encrypted (OSCAR1 envelope). Reading it directly with
-  // fs.readFileSync + JSON.parse returns the ciphertext and chokes on the
-  // magic header ("Unexpected token 'O', \"OSCAR1...\""). Use the
-  // decryptFromFile helper which handles both new (encrypted) and legacy
-  // plaintext files transparently via the OSCAR1 magic-header check.
-  let datafile;
-  try {
-    const { decryptFromFile } = require('../../utils/at-rest');
-    datafile = JSON.parse(decryptFromFile(company.datafile_path).toString('utf8'));
-  } catch (err) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Could not parse data file: ' + err.message });
-  }
+  // Endpoint suspended, endpoint, credentials or data file missing, data file
+  // unreadable: the same answers as always, now in helpers/runLaunch.js.
+  const ready = launchReadiness(req.user.id, targetCompanyId);
+  if (ready.refusal) return res.status(ready.refusal[0]).json(ready.refusal[1]);
+  const { credentials: user, datafile, concurrentLimit } = ready;
 
   return queueBatch(req, res, { company, targetCompanyId, user, datafile, concurrentLimit });
 });

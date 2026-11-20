@@ -1147,10 +1147,12 @@ function refusedSuspendedEndpoint(companyId) {
 function refusedRunScope(runRow, companyId, userId) {
   try {
     if (runRow.company_id !== companyId) return 'Run refused: the run does not belong to the company it was queued for.';
-    const user = get('SELECT id, company_id, role FROM users WHERE id = ?', [userId]);
+    const user = get('SELECT id, company_id, role, status FROM users WHERE id = ?', [userId]);
     if (!user) return 'Run refused: the user who started the run no longer exists.';
     const member = { id: user.id, companyId: user.company_id, role: normalizeRole(user.role) };
     if (member.role === 'administrator') return 'Run refused: an administrator does not run tests on a company.';
+    // A Company API account suspended after it queued runs (#1342) starts none of them.
+    if (member.role === 'api_client' && user.status !== 'active') return 'Run refused: the Company API account that asked for the run is suspended.';
     if (!canUseCompany(member, companyId)) return 'Run refused: the user who started the run may no longer use this company.';
     return null;
   } catch {
