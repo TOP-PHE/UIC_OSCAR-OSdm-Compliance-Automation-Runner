@@ -30,7 +30,10 @@
 
 const { get, run } = require('../../db/db');
 
-const MEMBER_ROLES = new Set(['tester', 'company_user', 'test_manager']);
+// A Company API account (#1342, role api_client) is a member as a tester is:
+// its own company, and the providers it is listed for in provider_access. It
+// reaches no page (sessionUser() refuses it); only the API reads it.
+const MEMBER_ROLES = new Set(['tester', 'company_user', 'test_manager', 'api_client']);
 
 /**
  * May this member act in this company? `user` is { id, companyId, role } as

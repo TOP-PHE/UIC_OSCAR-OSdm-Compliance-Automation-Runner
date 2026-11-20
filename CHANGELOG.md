@@ -576,6 +576,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.556] — 2026-11-20
+
+API for test automation, part 1 (#1342): Company API accounts. Not released on its own: listed in `compatibility.json` (2026.595) without moving `current_release`, so no release tag is made. The parts that let an account sign in to the API (OAuth with `private_key_jwt`) and launch tests follow; the programme is released as a whole by its last part, with the news entry and the guide.
+
+### Why
+A company that develops its OSDM system with its own test automation asks OSCAR for tests through an API. The maintainer decided (#1342, D1) that the API acts as a dedicated user, never as a Test Manager: a person may not have the same rights, and their leaving would stop the company's CI.
+
+### Added
+- **A Company API account** is a user of the company with the role `api_client`, plus a row of `api_account` (migration 57: name, who made it, when, suspended when and by whom). Its OSDM credentials per provider, its provider access, its runs and the audit log work as they do for a person. It has rights of its own:
+  - **It never signs in to OSCAR's pages.** `sessionUser()` refuses its role whatever a token says, so none of the page routes that only refuse administrators and certifiers ever sees it. Its password is made up and known to nobody, its e-mail is made up under `.invalid` (RFC 6761: never delivered), sign-in answers "Invalid credentials" and no reset link is ever made for it.
+  - **It may use** its company and the providers it is given (`provider_access`, as a tester); `canUseCompany()` counts it as a member.
+  - **Its runs**: it reads only those it launched; the company's testers read them, as they read a Test Manager's (`testerReads()`, `runScopeSql()`).
+- **`/v1/company/api-accounts`**, Test Managers only, the company's (the distributor of a provider the request names): list, make (`name`, `providers`; at most 20 a company, names unique without case), rename and set its providers, suspend, resume, delete (its runs go with it, as a person's), and its OSDM credentials per company or provider it is given (`GET` / `PATCH /:id/credentials`, `POST /:id/credentials/test`), with the checks of a tester's own. A provider taken away, a suspension or a deletion stops any run pod kept for it.
+- **The page *API Accounts*** (Test Managers' menu, `api-accounts.html`): make an account, tick its providers, rename, suspend, resume, delete. *Set its OSDM credentials* opens **API Config** for the account (`profile.html?api_account=<id>`): the sections are the places the account may use, a notice names it, and only its credentials are read and saved (the endpoint and dedicated headers stay read-only there).
+
+### Changed
+- **The company's user routes leave Company API accounts out**: `GET /v1/company/users` does not list them, and its change, reset, approval and deletion answer 404 for one. The providers page's tester list leaves them out.
+- **The administrator lists a Company API account and changes nothing of it** (`/v1/admin/users/:id`: 409 for any change, reset, link or deletion). A company's deletion still removes it.
+- **`PATCH /v1/me/credentials`** checks and stores through `api/helpers/credentialsInput.js`, now shared with the account's credentials. Same answers and same stored values.
+
 ## [server-1.11.555] — 2026-11-19
 
 Release 2026.594 (`current_release`). **Server Config: an empty number field is the default, never 0** (#1338).

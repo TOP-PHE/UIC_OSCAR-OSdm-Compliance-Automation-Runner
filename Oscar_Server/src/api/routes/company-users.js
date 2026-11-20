@@ -132,7 +132,8 @@ router.get('/', (req, res) => {
   const q = (req.query.q || '').toString().trim().toLowerCase();
   const status = (req.query.status || '').toString().trim();
   const params = [companyId];
-  let where = 'u.company_id = ?';
+  // A Company API account (#1342) is managed on its own page, never here.
+  let where = "u.company_id = ? AND u.role != 'api_client'";
   if (q) {
     where += ' AND lower(u.email) LIKE ?';
     params.push(`%${q}%`);
@@ -217,7 +218,7 @@ router.patch('/:id',
 
     // Look up the target user IN THIS COMPANY only — refuses to touch
     // foreign-company rows even if the caller knows their UUID.
-    const target = get('SELECT * FROM users WHERE id = ? AND company_id = ?', [userId, companyId]);
+    const target = get("SELECT * FROM users WHERE id = ? AND company_id = ? AND role != 'api_client'", [userId, companyId]);
     if (!target) {
       return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found in this company.' });
     }
@@ -297,7 +298,7 @@ router.post('/:id/approve', (req, res) => {
   const companyId = req.user.companyId;
   const userId = req.params.id;
 
-  const target = get('SELECT id, email, status FROM users WHERE id = ? AND company_id = ?', [userId, companyId]);
+  const target = get("SELECT id, email, status FROM users WHERE id = ? AND company_id = ? AND role != 'api_client'", [userId, companyId]);
   if (!target) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found in this company.' });
   }
@@ -323,7 +324,7 @@ router.post('/:id/approve', (req, res) => {
 // new one (decision 3) and never sets it.
 router.post('/:id/send-reset', (req, res) => {
   const companyId = req.user.companyId;
-  const target = get('SELECT id, email FROM users WHERE id = ? AND company_id = ?', [req.params.id, companyId]);
+  const target = get("SELECT id, email FROM users WHERE id = ? AND company_id = ? AND role != 'api_client'", [req.params.id, companyId]);
   if (!target) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found in this company.' });
   }
@@ -341,7 +342,7 @@ router.delete('/:id', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'You cannot delete your own account.' });
   }
 
-  const target = get('SELECT id, email, role, company_id FROM users WHERE id = ? AND company_id = ?', [userId, companyId]);
+  const target = get("SELECT id, email, role, company_id FROM users WHERE id = ? AND company_id = ? AND role != 'api_client'", [userId, companyId]);
   if (!target) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found in this company.' });
   }

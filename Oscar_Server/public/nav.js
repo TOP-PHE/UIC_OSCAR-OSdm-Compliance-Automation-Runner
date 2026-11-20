@@ -309,6 +309,8 @@
         items.push({ href: '/ai-analysis.html', label: 'AI Analysis', page: 'ai-analysis' });
         // #503: read-only API keys of the company or provider chosen in "Working on".
         items.push({ href: '/api-keys.html', label: 'API Keys', page: 'api-keys' });
+        // #1342: the Company API accounts the company's own test automation acts as.
+        items.push({ href: '/api-accounts.html', label: 'API Accounts', page: 'api-accounts' });
       }
     }
 

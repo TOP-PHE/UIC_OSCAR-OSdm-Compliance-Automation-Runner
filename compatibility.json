@@ -4,6 +4,17 @@
   "current_release": "2026.594",
   "releases": [
     {
+      "release": "2026.595",
+      "date": "2026-11-20",
+      "server": "1.11.556",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.556: API for test automation, part 1 (#1342): Company API accounts. A Company API account is the user a company's own test automation acts as (role api_client): it never signs in to the pages (no session, no password anyone knows, a made-up .invalid e-mail, no reset link), has its own OSDM credentials per company or provider it is given, reads only the runs it launched, and the company's testers read its runs. Test Managers manage them on the new API Accounts page and /v1/company/api-accounts (make, rename, providers, suspend, resume, delete, credentials and their test, on API Config opened for the account); the company's user routes and the administrator change nothing of one. Migration 57. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.594",
       "date": "2026-11-19",
       "server": "1.11.555",

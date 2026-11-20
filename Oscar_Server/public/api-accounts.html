@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!--
+Copyright [2026] [International Union of Railways (UIC)]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR — API Accounts</title>
+<link rel="stylesheet" href="/css/oscar-banner.css">
+<link rel="stylesheet" href="/css/oscar-page.css">
+<style>
+.container{max-width:1100px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;color:#78909c;text-transform:uppercase;letter-spacing:.4px;padding:8px 6px;border-bottom:2px solid #eceff1}
+td{padding:9px 6px;border-bottom:1px solid #f1f3f4;vertical-align:top}
+td.actions{white-space:nowrap}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-danger{background:#c62828;color:#fff}
+.btn-danger:hover{background:#8e0000}
+.muted{font-size:12px;color:#90a4ae;overflow-wrap:anywhere}
+.empty{padding:18px;text-align:center;color:#90a4ae;font-size:13px}
+.state{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase}
+.box{display:inline-block;margin:2px 10px 2px 0;font-size:13px;white-space:nowrap}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <script src="/js/banner.js"></script>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'api-accounts');</script>
+</header>
+
+<div class="container">
+  <h2>🤖 Company API Accounts <span class="muted" id="accounts-target"></span></h2>
+  <div id="msg" class="msg"></div>
+
+  <div class="card">
+    <h3>What a Company API account is</h3>
+    <p class="muted" style="font-size:13px;color:#546e7a;line-height:1.6">
+      A Company API account is the user your company's own test automation acts as when it asks
+      OSCAR for tests through the API: a CI pipeline, a test tool. It has its own rights and its own
+      OSDM credentials, and it never acts as a person. It never signs in to these pages and has no
+      password. It tests your company and the providers you give it, and its runs are read by your
+      company's Test Managers and testers. Suspend it to stop it at once; deleting it deletes its runs.
+    </p>
+  </div>
+
+  <div class="card" id="create-card">
+    <h3>Make an account</h3>
+    <div class="row">
+      <div class="field">
+        <label for="account-name">Name</label>
+        <input type="text" id="account-name" maxlength="60" placeholder="e.g. Nightly CI">
+      </div>
+    </div>
+    <div class="field">
+      <span class="muted">Providers it may use, besides your company</span>
+      <div id="new-providers"></div>
+    </div>
+    <button class="btn btn-primary" data-action="create">➕ Make the account</button>
+  </div>
+
+  <div class="card">
+    <h3>Accounts</h3>
+    <div id="accounts-list"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<script src="/js/api-accounts.js"></script>
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+</body>
+</html>

@@ -174,6 +174,9 @@ function isNewCompany(companyId) {
 
 /** A link to choose a new password, sent to the account's own address only. */
 function sendPasswordReset(user) {
+  // A Company API account (#1342) has no password: no link is made for it.
+  const stored = get('SELECT role FROM users WHERE id = ?', [user.id]);
+  if (stored?.role === 'api_client') return;
   const token = crypto.randomUUID();
   run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
   run('INSERT INTO password_reset_tokens (id, user_id, token, expires_at, requested_ip) VALUES (?, ?, ?, ?, NULL)',

@@ -31,6 +31,7 @@ const PATH_MODULES = [
   require('./openapi/runs-and-reports'),
   require('./openapi/company-data'),
   require('./openapi/company-findings'),
+  require('./openapi/company-api-accounts'),
 ];
 
 const errorSchema = {

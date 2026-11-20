@@ -1281,6 +1281,23 @@ const MIGRATIONS = [
       // or the old one again, on a database of any size.
       checkIndexes.swapAtStart(db);
   }},
+  { version: 57, name: 'api-accounts', up: () => {
+      // #1342 (D1) - a Company API account: a user of the role api_client,
+      // which never signs in to the pages, plus its name and state here. Its
+      // company is the distributor; the providers it may use are rows of
+      // provider_access, as a tester's. A suspended account is users.status
+      // 'suspended', with the time and the Test Manager here.
+      db.exec(`CREATE TABLE IF NOT EXISTS api_account (
+        user_id       TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        name          TEXT NOT NULL,
+        created_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        suspended_at  TEXT,
+        suspended_by  TEXT REFERENCES users(id) ON DELETE SET NULL
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_api_account_company ON api_account(company_id, created_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
