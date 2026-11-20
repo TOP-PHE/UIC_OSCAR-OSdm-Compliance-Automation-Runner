@@ -12,8 +12,9 @@
  * API account may ask, and what each run and the whole request read as.
  *
  * A test request is one call of POST /v1/api/test-requests: one batch per
- * provider it names, of the scenarios it names (`scenarios`) or that a
- * selection keeps (`selection`, the Run page's object, utils/runFilters.js).
+ * provider it names, of the scenarios it names (`scenarios`), that a
+ * selection keeps (`selection`, the Run page's object, utils/runFilters.js)
+ * or that a named suite holds (`suite`, utils/testSuites.js, PR 4).
  *
  * Pure: no database, no clock.
  */
@@ -49,14 +50,19 @@ function requestOf(body) {
       || providers.some(p => typeof p !== 'string' || !UUID.test(p))) {
     return { error: `providers must be a list of 1 to ${MAX_PROVIDERS} company or provider ids.` };
   }
-  const has = ['scenarios', 'selection'].filter(k => b[k] !== undefined);
-  if (has.length !== 1) return { error: 'Send exactly one of scenarios (a list of codes) and selection (as the Run page makes it).' };
+  const has = ['scenarios', 'selection', 'suite'].filter(k => b[k] !== undefined);
+  if (has.length !== 1) return { error: 'Send exactly one of scenarios (a list of codes), selection (as the Run page makes it) and suite (the name of a suite).' };
   const out = { providers: [...new Set(providers)], reference: null };
   if (b.reference !== undefined && b.reference !== null) {
     if (typeof b.reference !== 'string' || b.reference.length > MAX_REFERENCE || !printable(b.reference)) {
       return { error: `reference must be a text of at most ${MAX_REFERENCE} characters.` };
     }
     out.reference = b.reference;
+  }
+  if (b.suite !== undefined) {
+    if (typeof b.suite !== 'string' || b.suite.trim() === '' || b.suite.length > 60) return { error: 'suite must be the name of a suite of your company.' };
+    out.suite = b.suite.trim();
+    return out;
   }
   if (b.scenarios !== undefined) {
     const codes = b.scenarios;
@@ -85,6 +91,7 @@ function hashOf(request) {
     providers: [...request.providers].sort(byText),
     scenarios: request.scenarios ? [...request.scenarios].sort(byText) : null,
     selection: request.selection || null,
+    suite: request.suite ? request.suite.toLowerCase() : null,
     reference: request.reference,
   });
   return crypto.createHash('sha256').update(canonical).digest('hex');

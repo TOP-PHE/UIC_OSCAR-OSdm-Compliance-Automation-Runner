@@ -944,6 +944,7 @@ app.use('/v1/me/credentials',  require('./api/routes/me-credentials'));
 app.use('/v1/company/users',   require('./api/routes/company-users'));
 app.use('/v1/company/providers', require('./api/routes/company-providers'));
 app.use('/v1/company/api-accounts', require('./api/routes/company-api-accounts'));   // Company API accounts (#1342)
+app.use('/v1/company/test-suites', require('./api/routes/company-test-suites'));     // named suites (#1342)
 app.use('/v1/company',         require('./api/routes/company'));
 app.use('/v1/company',         require('./api/routes/company-test-framework'));
 app.use('/v1/company',         require('./api/routes/company-test-resources'));

@@ -116,6 +116,22 @@ label.opt.none{color:#b0bec5}
     <div id="sel-summary" class="sel-summary"></div>
     <button class="btn btn-run" id="run-btn" data-action="start-run" disabled>&#9654; Start Conformance Test Run</button>
   </div>
+
+  <!-- #1342: named suites, asked by name by the company's test automation. -->
+  <div class="card" id="suites-card" style="display:none">
+    <h3>Named suites</h3>
+    <p style="color:#78909c;font-size:12px;margin-bottom:14px">
+      A suite is a selection saved under a name. Your company's test automation asks it by name through
+      the API (POST /v1/api/test-requests with "suite"), and its filters are applied on each provider at each launch.
+    </p>
+    <div id="suite-save" style="display:none;gap:8px;align-items:center;margin-bottom:12px">
+      <label for="suite-name" style="font-size:13px">Name</label>
+      <input type="text" id="suite-name" maxlength="60" placeholder="e.g. nightly">
+      <button type="button" class="btn" data-suite-action="save">Save the selection above as a suite</button>
+    </div>
+    <div id="suite-msg" class="msg"></div>
+    <div id="suites-list"></div>
+  </div>
 </div>
 
 <script>
@@ -484,6 +500,7 @@ loadProfile();
   </div>
   &copy; UIC - International union of railways. 2026. All rights reserved.
 </footer>
+<script src="/js/test-suites.js"></script>
 </body>
 </html>
 

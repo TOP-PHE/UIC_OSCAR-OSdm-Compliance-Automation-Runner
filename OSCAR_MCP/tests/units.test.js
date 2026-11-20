@@ -44,7 +44,7 @@ test('OSCAR_API_KEY: an OSCAR key or nothing, and the refusal never quotes it', 
 });
 
 test('one tool per read route, all read-only, every path under /v1/api', () => {
-  assert.deepEqual(TOOLS.map(t => t.name), ['oscar_key', 'oscar_list_runs', 'oscar_get_run', 'oscar_get_run_checks', 'oscar_get_batch', 'oscar_get_test_request', 'oscar_get_queue']);
+  assert.deepEqual(TOOLS.map(t => t.name), ['oscar_key', 'oscar_list_runs', 'oscar_get_run', 'oscar_get_run_checks', 'oscar_get_batch', 'oscar_get_test_request', 'oscar_list_suites', 'oscar_get_queue']);
   for (const t of listed()) {
     assert.equal(t.annotations.readOnlyHint, true);
     assert.equal(t.annotations.destructiveHint, false);
@@ -86,7 +86,7 @@ test('initialize agrees on a version, lists the tools, and answers nothing to a 
   assert.equal(later.result.protocolVersion, PROTOCOL_VERSIONS[0]);
   assert.equal(await handle({ jsonrpc: '2.0', method: 'notifications/initialized' }, none), null);
   assert.deepEqual((await handle({ jsonrpc: '2.0', id: 3, method: 'ping' }, none)).result, {});
-  assert.equal((await handle({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, none)).result.tools.length, 7);
+  assert.equal((await handle({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, none)).result.tools.length, 8);
   assert.equal((await handle({ jsonrpc: '2.0', id: 5, method: 'resources/list' }, none)).error.code, -32601);
   assert.equal((await handle({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'oscar_delete_run' } }, none)).error.code, -32602);
   assert.equal((await handle({ id: 7, method: 'ping' }, none)).error.code, -32600);

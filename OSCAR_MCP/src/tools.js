@@ -102,6 +102,13 @@ const TOOLS = Object.freeze([
     path: (a) => `/v1/api/test-requests/${encodeURIComponent(a.test_request_id)}${a.wait === undefined ? '' : '?wait=' + a.wait}`,
   },
   {
+    name: 'oscar_list_suites',
+    title: 'OSCAR named suites',
+    description: `The named suites of the company a Company API account may ask by name (#1342): each a selection of the Run page, a list of scenario codes, or both. ${DATA_NOTE}`,
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    path: () => '/v1/api/suites',
+  },
+  {
     name: 'oscar_get_queue',
     title: 'OSCAR queue',
     description: "The runs of the key's company or provider that are waiting or running, in order, with their place in the queue.",

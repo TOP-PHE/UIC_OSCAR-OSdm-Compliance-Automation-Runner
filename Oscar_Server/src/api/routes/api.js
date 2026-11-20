@@ -315,6 +315,19 @@ const TestRequests = require('./api-test-requests');
 router.post('/test-requests', write, TestRequests.launchLimiter, TestRequests.launchHandler);
 router.get('/test-requests/:id', read, TestRequests.readHandler);
 
+// The named suites a Company API account may ask by name (#1342 PR 4).
+router.get('/suites', read, (req, res) => {
+  if (!req.apiAccount) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'The API has no such route.' });
+  const rows = all('SELECT name, selection, codes, created_at, updated_at FROM test_suite WHERE company_id = ? ORDER BY lower(name)', [req.apiAccount.companyId]);
+  return res.json({ suites: rows.map(r => ({
+    name: r.name,
+    selection: r.selection ? JSON.parse(r.selection) : null,
+    codes: r.codes ? JSON.parse(r.codes) : null,
+    created_at: r.created_at,
+    updated_at: r.updated_at || null,
+  })) });
+});
+
 router.use((req, res) => {
   res.status(404).json({ status: 404, title: 'Not Found', detail: 'The API has no such route.' });
 });
