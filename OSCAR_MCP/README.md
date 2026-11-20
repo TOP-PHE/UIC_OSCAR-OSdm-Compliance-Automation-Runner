@@ -5,10 +5,13 @@ Lets an AI assistant (Claude Desktop, Claude Code, or any client of the
 results: runs, their checks, batches and the queue of **one** company or
 provider.
 
-It is a thin layer over OSCAR's read-only API (`/v1/api`, issue #503). It holds
-one **API key** and has no more rights than that key: it cannot start, change
-or delete anything, it cannot read request or response bodies or logs, and it
-only sees the runs of the company or provider the key was made for.
+It is a thin layer over OSCAR's API (`/v1/api`, issues #503 and #1342). It holds
+either one **read-only API key**, or the private key of a **Company API
+account** (`#1342`), and has no more rights than they give, read only: it
+cannot start, change or delete anything (it asks an account's token with the
+scope `runs:read` only), and it cannot read request or response bodies or
+logs. With a key it sees the runs of the company or provider the key was made
+for; with an account, the runs and test requests that account launched.
 
 Node 22 or later. Nothing to install: it has no dependency.
 
@@ -18,14 +21,25 @@ In OSCAR, as a Test Manager: menu **API Keys**, choose the company or provider
 in **Working on**, give the key a name ("Claude Desktop", for instance) and a
 lifetime, and copy the key shown (it is shown once). See the user guide, § 2.3.
 
+Or, for a **Company API account** (#1342): menu **API Accounts**, card
+*Signing in to the API*, give the account a public key and keep its private key
+(see *OSCAR - Test Automation API Guide*, § 3).
+
 ## 2. Tell your assistant about it
 
-The server is started by the assistant, with two environment variables:
+The server is started by the assistant, with these environment variables:
 
 | Variable | Value |
 |---|---|
 | `OSCAR_URL` | the OSCAR address, `https://<oscar host>` (`http://` is accepted for `localhost` only) |
-| `OSCAR_API_KEY` | the key, `oscar_…` |
+| `OSCAR_API_KEY` | a read-only key, `oscar_…` |
+| or `OSCAR_CLIENT_ID` | a Company API account's client id |
+| and `OSCAR_PRIVATE_KEY` | its private key, PEM (line breaks may be written `\n`); EC P-256 or RSA 2048+ |
+
+Set the key, or the account's two variables, never both. With an account, the
+server signs a one-minute assertion with the private key (`node:crypto`, no
+dependency), asks OSCAR's token endpoint for a 15-minute token holding
+`runs:read`, and keeps it until a minute before it expires.
 
 **Claude Desktop** (`claude_desktop_config.json`, Settings → Developer → Edit
 Config):
@@ -60,13 +74,17 @@ failed in the latest one?"*
 | `oscar_get_run` | `GET /v1/api/runs/{id}` | one run and its check counts |
 | `oscar_get_run_checks` | `GET /v1/api/runs/{id}/assertions` | its checks by step (`result`: `failed` or `passed`) |
 | `oscar_get_batch` | `GET /v1/api/batches/{batchId}` | the runs of a batch, counted by status |
+| `oscar_get_test_request` | `GET /v1/api/test-requests/{id}` | a Company API account's test request: state, verdict, each run's verdict (`wait` up to 60 s) |
+| `oscar_get_test_request_results` | `GET /v1/api/test-requests/{id}/results` | where each run failed and warned (`format`: `json` or `junit`) |
+| `oscar_list_suites` | `GET /v1/api/suites` | the company's named suites |
 | `oscar_get_queue` | `GET /v1/api/queue` | the runs waiting or running |
 
 ## 4. Safety
 
 - **The key stays in the environment variable.** The server sends it to the
   configured OSCAR only, in the `Authorization` header, and never writes it in
-  an answer, an error or a log line. Keep the assistant's configuration file
+  an answer, an error or a log line. An account's private key never leaves
+  this process: only the signed assertion goes to OSCAR's token endpoint. Keep the assistant's configuration file
   private, as you would a password.
 - **GET to `/v1/api` only, and only to `OSCAR_URL`.** A redirect is not
   followed (it would carry the key elsewhere). Arguments are checked before

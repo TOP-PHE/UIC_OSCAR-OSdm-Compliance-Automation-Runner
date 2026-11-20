@@ -1,6 +1,6 @@
 {
   "name": "oscar-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A read-only MCP server for OSCAR: an assistant reads a company's run results through OSCAR's API, with an API key and no more rights than the key.",
   "private": true,
   "license": "Apache-2.0",

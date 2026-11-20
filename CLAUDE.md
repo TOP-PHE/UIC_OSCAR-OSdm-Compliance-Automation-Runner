@@ -1314,6 +1314,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   runner stores everything before the final status; a new writer of a
   finished run's checks or log lines must forget it). The status route reads
   the detail of passing runs only, to tell `passed_with_deviation`.
+  **PR 6 (1.11.561, release 2026.600 of the whole):** `OSCAR_MCP` 0.2.0
+  signs in as an account (`src/auth.js`: JWS by `crypto.sign`, ES256 with
+  `dsaEncoding: 'ieee-p1363'`, PS256 with salt length 32, which
+  jsonwebtoken verifies; `mcp-account.test.js` proves both against the real
+  endpoint), scope `runs:read` only. Guide *OSCAR - Test Automation API
+  Guide*. **Each part's server version was listed without moving
+  `current_release`; this one moved it.**
 - **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
   The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
   read "100 scenarios". `whole_batches=1` adds the rest of each batch on the

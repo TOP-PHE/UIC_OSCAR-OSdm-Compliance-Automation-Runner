@@ -8,16 +8,22 @@
 'use strict';
 
 /**
- * config.js — where the MCP server finds OSCAR, and with which key (#503 PR 3).
+ * config.js — where the MCP server finds OSCAR, and as whom (#503 PR 3, #1342).
  *
- * Two environment variables, nothing else:
- *   OSCAR_URL      the OSCAR address, https://… (http:// only for this machine)
- *   OSCAR_API_KEY  a read-only API key made on OSCAR's API Keys page
+ *   OSCAR_URL          the OSCAR address, https://… (http:// only for this machine)
+ * and either
+ *   OSCAR_API_KEY      a read-only API key made on OSCAR's API Keys page
+ * or a Company API account (#1342), which signs in with private_key_jwt:
+ *   OSCAR_CLIENT_ID    the account's client id (API Accounts page)
+ *   OSCAR_PRIVATE_KEY  its private key, PEM (line breaks may be written \n)
  *
- * The key is never written anywhere by this program: not in an answer, not in
+ * No secret is ever written anywhere by this program: not in an answer, not in
  * an error, not in a log line. A message about a refused configuration names
  * the variable, never its value.
  */
+
+const crypto = require('node:crypto');
+const { algOf } = require('./auth');
 
 const KEY_PATTERN = /^oscar_[0-9a-f]{8}_[A-Za-z0-9_-]{43}$/;
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -47,13 +53,35 @@ function keyOf(value) {
   return { key };
 }
 
-/** { origin, key } from an environment, or { errors: [...] }. */
-function configFrom(env) {
-  const origin = originOf(env.OSCAR_URL);
-  const key = keyOf(env.OSCAR_API_KEY);
-  const errors = [origin.error, key.error].filter(Boolean);
-  if (errors.length) return { errors };
-  return { origin: origin.origin, key: key.key };
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** A Company API account from OSCAR_CLIENT_ID and OSCAR_PRIVATE_KEY: { clientId, privateKey } or { error }. */
+function accountOf(clientId, pem) {
+  if (typeof clientId !== 'string' || !UUID.test(clientId.trim())) return { error: 'OSCAR_CLIENT_ID is not a client id (the account\'s id on OSCAR\'s API Accounts page).' };
+  if (typeof pem !== 'string' || pem.trim() === '') return { error: 'OSCAR_PRIVATE_KEY is not set.' };
+  let privateKey;
+  try {
+    privateKey = crypto.createPrivateKey({ key: pem.includes('\\n') ? pem.split('\\n').join('\n') : pem, format: 'pem' });
+  } catch {
+    return { error: 'OSCAR_PRIVATE_KEY is not a PEM private key.' };
+  }
+  if (!algOf(privateKey)) return { error: 'OSCAR_PRIVATE_KEY must be EC P-256 or RSA of 2048 bits or more.' };
+  return { clientId: clientId.trim(), privateKey };
 }
 
-module.exports = { configFrom, originOf, keyOf, KEY_PATTERN };
+/** { origin, key } or { origin, clientId, privateKey } from an environment, or { errors: [...] }. */
+function configFrom(env) {
+  const origin = originOf(env.OSCAR_URL);
+  const asAccount = env.OSCAR_CLIENT_ID !== undefined || env.OSCAR_PRIVATE_KEY !== undefined;
+  if (asAccount && env.OSCAR_API_KEY !== undefined) {
+    return { errors: [origin.error, 'Set OSCAR_API_KEY, or OSCAR_CLIENT_ID and OSCAR_PRIVATE_KEY, not both.'].filter(Boolean) };
+  }
+  const who = asAccount ? accountOf(env.OSCAR_CLIENT_ID, env.OSCAR_PRIVATE_KEY) : keyOf(env.OSCAR_API_KEY);
+  const errors = [origin.error, who.error].filter(Boolean);
+  if (errors.length) return { errors };
+  return asAccount
+    ? { origin: origin.origin, clientId: who.clientId, privateKey: who.privateKey }
+    : { origin: origin.origin, key: who.key };
+}
+
+module.exports = { configFrom, originOf, keyOf, accountOf, KEY_PATTERN };

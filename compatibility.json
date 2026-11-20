@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.594",
+  "current_release": "2026.600",
   "releases": [
+    {
+      "release": "2026.600",
+      "date": "2026-11-20",
+      "server": "1.11.561",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.561: API for test automation, part 6 (#1342): the OSCAR MCP server (0.2.0) reads as a Company API account (OSCAR_CLIENT_ID and OSCAR_PRIVATE_KEY: it signs a one-minute ES256 or PS256 assertion with node:crypto and asks a runs:read token, kept until a minute before it expires), with three more tools (oscar_get_test_request, oscar_get_test_request_results, oscar_list_suites); the guide OSCAR - Test Automation API Guide (setting up an account, keys, tokens in Node.js and Python, test requests, verdicts, results, JUnit XML, a CI step); the Tester User Guide points to it; a news entry.",
+        "Releases the API for test automation (#1342) as a whole: 2026.595 (1.11.556, Company API accounts), 2026.596 (1.11.557, private_key_jwt sign-in), 2026.597 (1.11.558, test requests and verdicts), 2026.598 (1.11.559, named suites), 2026.599 (1.11.560, results and JUnit XML) and this one. Migrations 57 to 60. Nothing changes for a company that makes no Company API account."
+      ]
+    },
     {
       "release": "2026.599",
       "date": "2026-11-20",
