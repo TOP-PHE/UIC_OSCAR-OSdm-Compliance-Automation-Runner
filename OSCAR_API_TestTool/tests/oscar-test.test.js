@@ -51,9 +51,10 @@ async function standIn({ publicKey, finishAfter = 1, never = false }) {
         const [h, p, s] = String(form.get('client_assertion')).split('.');
         const header = JSON.parse(Buffer.from(h, 'base64url'));
         const claims = JSON.parse(Buffer.from(p, 'base64url'));
-        const ok = header.alg === 'ES256' && crypto.verify('sha256', Buffer.from(`${h}.${p}`), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(s, 'base64url'))
-          && claims.iss === CLIENT && claims.sub === CLIENT && claims.aud === `${origin}/v1/api/oauth/token` && claims.exp - claims.iat <= 300;
-        if (!ok) return send(401, { error: 'invalid_client', error_description: 'not accepted' });
+        // The signature is always checked, whatever the assertion says of itself.
+        const signed = crypto.verify('sha256', Buffer.from(`${h}.${p}`), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(s || '', 'base64url'));
+        const named = claims.iss === CLIENT && claims.sub === CLIENT && claims.aud === `${origin}/v1/api/oauth/token` && claims.exp - claims.iat <= 300;
+        if (!signed || header.alg !== 'ES256' || !named) return send(401, { error: 'invalid_client', error_description: 'not accepted' });
         seen.tokens += 1;
         seen.scopes.push(form.get('scope'));
         return send(200, { access_token: `tok-${seen.tokens}`, token_type: 'Bearer', expires_in: 900, scope: form.get('scope') });
