@@ -109,9 +109,11 @@ function idempotencyKeyOf(value) {
 /**
  * What one run reads as: { state, verdict, reason }.
  *   state:   queued | running | finished
- *   verdict: null until finished; passed | failed | not_a_result | cancelled
+ *   verdict: null until finished; passed | passed_with_deviation | failed |
+ *            not_a_result | cancelled. passed_with_deviation: no check failed
+ *            and the run applied a known deviation (a finding baselined, #398).
  */
-function verdictOf(run, failedChecks, totalChecks) {
+function verdictOf(run, failedChecks, totalChecks, deviations = 0) {
   if (run.status === 'QUEUED') return { state: 'queued', verdict: null, reason: null };
   if (run.status === 'RUNNING') return { state: 'running', verdict: null, reason: null };
   if (run.status === 'CANCELLED') return { state: 'finished', verdict: 'cancelled', reason: null };
@@ -120,16 +122,19 @@ function verdictOf(run, failedChecks, totalChecks) {
   if (run.status === 'FAILED' || totalChecks === 0) {
     return { state: 'finished', verdict: 'not_a_result', reason: run.error_message || 'NO_CHECKS' };
   }
+  if (deviations > 0) return { state: 'finished', verdict: 'passed_with_deviation', reason: null };
   return { state: 'finished', verdict: 'passed', reason: null };
 }
 
 /**
  * The request as a whole: { state, verdict, counts }. Finished when every run
  * is; then failed when any run failed, incomplete when any gave no result or
- * was cancelled, else passed. A pipeline is green on passed only.
+ * was cancelled, else passed (a known deviation is accepted: it counts as
+ * passed_with_deviation, and the request still passes). A pipeline is green
+ * on passed only.
  */
 function summaryOf(verdicts) {
-  const counts = { queued: 0, running: 0, passed: 0, failed: 0, not_a_result: 0, cancelled: 0 };
+  const counts = { queued: 0, running: 0, passed: 0, passed_with_deviation: 0, failed: 0, not_a_result: 0, cancelled: 0 };
   for (const v of verdicts) counts[v.verdict || v.state] += 1;
   let state = 'finished';
   if (counts.running > 0) state = 'running';

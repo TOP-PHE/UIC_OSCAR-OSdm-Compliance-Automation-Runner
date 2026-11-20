@@ -1305,6 +1305,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `runSelection`, so it is loaded **after** the page's inline script),
   `GET /v1/api/suites` (+ MCP `oscar_list_suites`), and `suite` in a test
   request (resolved by name in the account's company before planning).
+  **PR 5 (1.11.560): results.** `GET /v1/api/test-requests/:id/results`
+  (`?format=junit`, `utils/junitReport.js`): per run `failures` (problem
+  code from an error answer's body, the code only), `warnings`
+  (`isWarningLine()` lines of `run_events`) and `deviations`
+  (`knownDeviationOf()`, never also a warning), from
+  `api/helpers/runDetail.js`, which keeps a **finished** run's detail (the
+  runner stores everything before the final status; a new writer of a
+  finished run's checks or log lines must forget it). The status route reads
+  the detail of passing runs only, to tell `passed_with_deviation`.
 - **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
   The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
   read "100 scenarios". `whole_batches=1` adds the rest of each batch on the

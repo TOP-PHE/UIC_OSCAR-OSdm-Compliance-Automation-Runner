@@ -19,6 +19,8 @@
  *   GET  /v1/api/test-requests/:id    — its state and verdicts (runs:read)
  *     ?wait=<seconds>  (at most 60: answers as soon as it is finished; five
  *     waits at a time an account, a cheap count while waiting)
+ *   GET  /v1/api/test-requests/:id/results — where each run failed and warned
+ *     ?format=json | junit  (PR 5: JUnit XML for a CI tool)
  *
  * Only a Company API account launches; a read-only key gets 403. Everything
  * is checked for every provider before anything is queued: a provider the
@@ -42,6 +44,8 @@ const RF = require('../../utils/runFilters');
 const TR = require('../../utils/testRequests');
 const S = require('../../utils/testSuites');
 const Tokens = require('../../utils/apiAccessTokens');
+const { detailOf } = require('../helpers/runDetail');
+const { junitOf } = require('../../utils/junitReport');
 
 // Per account: a CI pipeline asks a few times an hour.
 const launchLimiter = rateLimit({
@@ -56,15 +60,20 @@ const problem = (res, status, title, detail, extra = {}) => res.status(status).j
 const COUNTS_SQL = `SELECT COUNT(*) AS total, SUM(CASE WHEN passed = 0 THEN 1 ELSE 0 END) AS failed
   FROM run_assertions WHERE run_id = ?`;
 
-// One run as a test request shows it.
-function runAnswer(r, base) {
+// One run as a test request shows it; with `withDetail`, where it failed and
+// warned (runDetail.js). A passing run's detail is read anyway, once and kept,
+// to tell a pass with a known deviation.
+function runAnswer(r, base, withDetail = false) {
   const counts = get(COUNTS_SQL, [r.id]) || {};
   const total = Number(counts.total) || 0;
   const failed = Number(counts.failed) || 0;
+  const plain = TR.verdictOf(r, failed, total);
+  const detail = withDetail || plain.verdict === 'passed' ? detailOf(r) : null;
   return {
     id: r.id,
     scenario_code: r.scenario_code,
-    ...TR.verdictOf(r, failed, total),
+    ...TR.verdictOf(r, failed, total, detail ? detail.deviations.length : 0),
+    ...(withDetail ? detail : {}),
     checks: { total, passed: total - failed, failed },
     queued_at: r.queued_at || null,
     started_at: r.started_at || null,
@@ -74,7 +83,7 @@ function runAnswer(r, base) {
 }
 
 // The test request as stored, with each provider's runs as they are now.
-function requestAnswer(row, base) {
+function requestAnswer(row, base, withDetail = false) {
   const batches = JSON.parse(row.batches || '[]');
   const asked = JSON.parse(row.request);
   const everyRun = [];
@@ -83,7 +92,7 @@ function requestAnswer(row, base) {
     const runs = b.batch_id
       ? all(`SELECT id, status, error_message, scenario_code, queued_at, started_at, completed_at FROM runs
               WHERE batch_id = ? AND company_id = ? AND user_id = ? ORDER BY +queued_at ASC, id ASC`,
-      [b.batch_id, b.company_id, row.user_id]).map(r => runAnswer(r, base))
+      [b.batch_id, b.company_id, row.user_id]).map(r => runAnswer(r, base, withDetail))
       : [];
     everyRun.push(...runs);
     return { id: b.company_id, name: company?.name || null, batch_id: b.batch_id, not_found: b.not_found || [], ...TR.summaryOf(runs), runs };
@@ -267,4 +276,17 @@ async function readHandler(req, res) {
   return res.json(requestAnswer(row, Tokens.oscarBase(req)));
 }
 
-module.exports = { launchLimiter, launchHandler, readHandler };
+// GET /v1/api/test-requests/:id/results (?format=junit): where each run failed
+// and warned, as JSON, or as JUnit XML for a CI tool. Results only (D4).
+function resultsHandler(req, res) {
+  if (!req.apiAccount) return res.status(404).json(NOT_FOUND);
+  const format = req.query.format === undefined ? 'json' : req.query.format;
+  if (format !== 'json' && format !== 'junit') return problem(res, 400, 'Bad Request', 'format must be json or junit.');
+  const row = requestRow(String(req.params.id), req.apiAccount.id);
+  if (!row?.batches) return res.status(404).json(NOT_FOUND);
+  const answer = requestAnswer(row, Tokens.oscarBase(req), true);
+  if (format === 'junit') return res.type('application/xml').send(junitOf(answer));
+  return res.json(answer);
+}
+
+module.exports = { launchLimiter, launchHandler, readHandler, resultsHandler };

@@ -4,6 +4,17 @@
   "current_release": "2026.594",
   "releases": [
     {
+      "release": "2026.599",
+      "date": "2026-11-20",
+      "server": "1.11.560",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.560: API for test automation, part 5 (#1342): where each run failed and warned (results only, D4). GET /v1/api/test-requests/:id/results: per run its failed checks (step, check, message, expected, actual, HTTP status, OSDM problem code), its [WARNING] log lines and the known deviations it applied, 50 of each, one line of 500 characters each; never a body or another log line. ?format=junit gives JUnit XML (a suite per provider, a case per run; failure, error for no result, skipped; warnings and deviations in system-out; verdict and run_url as properties). A run that passed applying a known deviation reads passed_with_deviation, and the request still passes. A finished run's detail is read once and kept (5,000 runs). MCP tool oscar_get_test_request_results. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.598",
       "date": "2026-11-20",
       "server": "1.11.559",

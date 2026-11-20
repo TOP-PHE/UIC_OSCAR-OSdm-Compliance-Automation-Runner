@@ -31,7 +31,7 @@ const MCP = path.resolve(__dirname, '../../../OSCAR_MCP/server.js');
 
 const SAMPLE_ARGS = {
   oscar_key: {}, oscar_list_runs: {}, oscar_get_run: { run_id: 'R' }, oscar_get_run_checks: { run_id: 'R' },
-  oscar_get_batch: { batch_id: 'B' }, oscar_get_queue: {}, oscar_get_test_request: { test_request_id: 'R' }, oscar_list_suites: {},
+  oscar_get_batch: { batch_id: 'B' }, oscar_get_queue: {}, oscar_get_test_request: { test_request_id: 'R' }, oscar_list_suites: {}, oscar_get_test_request_results: { test_request_id: 'R' },
 };
 
 test('every tool is one GET route of /v1/api in the OpenAPI description, and every such route has its tool', () => {

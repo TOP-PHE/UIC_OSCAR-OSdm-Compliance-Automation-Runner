@@ -576,6 +576,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.560] — 2026-11-20
+
+API for test automation, part 5 (#1342): where each run failed and warned. Not released on its own: listed in `compatibility.json` (2026.599) without moving `current_release`.
+
+### Why
+The maintainer decided (#1342, D4) that the API gives the results only: whether each test is OK or not, where it failed and where it warned, with the failure and warning messages. Logs and message content stay in OSCAR's pages.
+
+### Added
+- **`GET /v1/api/test-requests/:id/results`** (scope `runs:read`, the account's own only): the test request's answer with, for each run:
+  - `failures`: each failed check, with its step, check text, failure message, expected and actual values, HTTP status, and for an error answer the OSDM problem code. Only the code is read out of the answer's body.
+  - `warnings`: each `[WARNING]` line of its log (`isWarningLine()`, as the AI analysis reads them), with its step. No other log line.
+  - `deviations`: each known deviation it applied (a finding baselined in the run, #398): step, status, note.
+  - 50 failures and 50 warnings at most, `truncated` when more were left out; each text one line of at most 500 characters.
+- **`?format=junit`**: the same as JUnit XML (`utils/junitReport.js`). One `<testsuite>` per provider, one `<testcase>` per run: `<failure>` with the failed checks, `<error>` for a run without result, `<skipped>` for a cancelled or unfinished one. Warnings and deviations go in `<system-out>` (JUnit has no warning element), and the verdict and `run_url` are properties. Every text is escaped, and characters XML 1.0 does not allow are dropped.
+- **Verdict `passed_with_deviation`**: no check failed and the run applied a known deviation. It is accepted: the request still passes, and `counts.passed_with_deviation` says how many.
+- **`api/helpers/runDetail.js`** reads a run's detail. A finished run's detail never changes, so it is kept (5,000 runs, least recently used first); a client polling a test request decrypts each run's log once.
+- **MCP tool `oscar_get_test_request_results`** (`format` json or junit).
+
 ## [server-1.11.559] — 2026-11-20
 
 API for test automation, part 4 (#1342): named suites. Not released on its own: listed in `compatibility.json` (2026.598) without moving `current_release`.

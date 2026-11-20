@@ -80,6 +80,9 @@ describe('verdicts', () => {
     expect(TR.verdictOf(run('FAILED', 'NO_CHECKS'), 0, 0).reason).toBe('NO_CHECKS');
     expect(TR.verdictOf(run('FAILED', 'TOKEN_AUTH_ERROR'), 0, 0)).toMatchObject({ verdict: 'not_a_result', reason: 'TOKEN_AUTH_ERROR' });
     expect(TR.verdictOf(run('COMPLETED'), 0, 0)).toMatchObject({ verdict: 'not_a_result', reason: 'NO_CHECKS' });
+    // #1342 PR 5: a pass that applied a known deviation; a failure stays a failure.
+    expect(TR.verdictOf(run('COMPLETED'), 0, 5, 1).verdict).toBe('passed_with_deviation');
+    expect(TR.verdictOf(run('FAILED'), 1, 5, 1).verdict).toBe('failed');
   });
 
   test('the whole request: running until every run is finished; then failed, incomplete or passed', () => {
@@ -87,7 +90,10 @@ describe('verdicts', () => {
     expect(TR.summaryOf([v('finished', 'passed'), v('running')])).toMatchObject({ state: 'running', verdict: null });
     expect(TR.summaryOf([v('finished', 'passed'), v('queued')])).toMatchObject({ state: 'queued', verdict: null });
     expect(TR.summaryOf([v('finished', 'passed'), v('finished', 'failed'), v('finished', 'not_a_result')]))
-      .toEqual({ state: 'finished', verdict: 'failed', counts: { queued: 0, running: 0, passed: 1, failed: 1, not_a_result: 1, cancelled: 0 } });
+      .toEqual({ state: 'finished', verdict: 'failed', counts: { queued: 0, running: 0, passed: 1, passed_with_deviation: 0, failed: 1, not_a_result: 1, cancelled: 0 } });
+    // A known deviation is accepted: the request still passes, and says how many.
+    expect(TR.summaryOf([v('finished', 'passed'), v('finished', 'passed_with_deviation')]))
+      .toMatchObject({ verdict: 'passed', counts: { passed: 1, passed_with_deviation: 1 } });
     expect(TR.summaryOf([v('finished', 'passed'), v('finished', 'cancelled')]).verdict).toBe('incomplete');
     expect(TR.summaryOf([v('finished', 'passed')]).verdict).toBe('passed');
     expect(TR.summaryOf([]).verdict).toBe('incomplete');
