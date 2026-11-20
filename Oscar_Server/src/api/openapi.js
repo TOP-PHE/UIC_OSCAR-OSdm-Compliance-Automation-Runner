@@ -98,6 +98,8 @@ module.exports = {
     securitySchemes: {
       bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       apiKeyAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'oscar_<prefix>_<secret>', description: 'A read-only API key (#503), on the /v1/api routes only.' },
+      apiAccountAuth: { type: 'oauth2', description: 'A Company API account (#1342): OAuth 2.0 client credentials, the client authenticated by private_key_jwt (RFC 7523). The access token is sent as Authorization: Bearer, on the /v1/api routes only.',
+        flows: { clientCredentials: { tokenUrl: '/v1/api/oauth/token', scopes: { 'runs:read': 'Read the runs the account launched', 'runs:write': 'Launch runs' } } } },
     },
     schemas: { Error: errorSchema, User: userSchema, Run: runSchema, RunSelection: {
         type: 'object',
@@ -512,12 +514,12 @@ module.exports = {
         responses: { 200: { description: 'The key, revoked' }, 403: { description: 'Test Managers only' }, 404: { description: 'Not a key of this company or provider' } } },
     },
     '/v1/api/key': {
-      get: { tags: ['API'], summary: 'The API key making the request: name, company, scopes, expiry (#503)', security: [{ apiKeyAuth: [] }],
+      get: { tags: ['API'], summary: 'The API key making the request: name, company, scopes, expiry (#503)', security: [{ apiKeyAuth: [] }, { apiAccountAuth: ['runs:read'] }],
         description: 'Authorization: Bearer <key> only (never a cookie or a URL parameter). Any refusal is the same 401. Every other route outside /v1/api refuses a key.',
         responses: { 200: { description: '{ name, hint, company: { id, name }, scopes, created_at, expires_at }' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 429: { description: 'Too many requests' } } },
     },
     '/v1/api/runs': {
-      get: { tags: ['API'], summary: 'The runs of the key\'s company or provider, newest first (#503)', security: [{ apiKeyAuth: [] }],
+      get: { tags: ['API'], summary: 'The runs of the key\'s company or provider, newest first (#503)', security: [{ apiKeyAuth: [] }, { apiAccountAuth: ['runs:read'] }],
         description: 'Only the runs of the company or provider the key was made for (not its providers), never a deleted one. Each run: { id, status, scenario_code, batch_id, queued_at, started_at, completed_at, exit_code, checks: { total, passed, failed } }. No body, log, URL, endpoint or person is answered.',
         parameters: [
           { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
@@ -529,12 +531,12 @@ module.exports = {
         responses: { 200: { description: '{ total, limit, offset, runs: [run] }' }, 400: { description: 'A parameter that is not one of the values above' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 429: { description: 'Too many requests' } } },
     },
     '/v1/api/runs/{id}': {
-      get: { tags: ['API'], summary: 'One run and its check counts (#503)', security: [{ apiKeyAuth: [] }],
+      get: { tags: ['API'], summary: 'One run and its check counts (#503)', security: [{ apiKeyAuth: [] }, { apiAccountAuth: ['runs:read'] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'The run, as in the list' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 404: { description: 'No such run, or not one of the key\'s company' } } },
     },
     '/v1/api/runs/{id}/assertions': {
-      get: { tags: ['API'], summary: 'The checks of a run: suites, requests, checks (#503)', security: [{ apiKeyAuth: [] }],
+      get: { tags: ['API'], summary: 'The checks of a run: suites, requests, checks (#503)', security: [{ apiKeyAuth: [] }, { apiAccountAuth: ['runs:read'] }],
         description: '{ run, suites: [{ scenario, name, duration_ms, checks, requests: [{ name, method, http_status, result, capability, duration_ms, checks, assertions: [{ name, type, passed, category, domain, offer_part, severity, error, expected, actual }] }] }] }. No request or response body, header or URL.',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
@@ -543,12 +545,12 @@ module.exports = {
         responses: { 200: { description: 'The checks' }, 400: { description: 'result is not passed or failed' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 404: { description: 'No such run, or not one of the key\'s company' } } },
     },
     '/v1/api/batches/{batchId}': {
-      get: { tags: ['API'], summary: 'The runs of one batch, with counts by status (#503)', security: [{ apiKeyAuth: [] }],
+      get: { tags: ['API'], summary: 'The runs of one batch, with counts by status (#503)', security: [{ apiKeyAuth: [] }, { apiAccountAuth: ['runs:read'] }],
         parameters: [{ name: 'batchId', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: '{ batch_id, total, queued, running, completed, failed, cancelled, runs: [run] }' }, 401: { description: 'Missing, invalid, expired or revoked key' }, 404: { description: 'No such batch in the key\'s company' } } },
     },
     '/v1/api/queue': {
-      get: { tags: ['API'], summary: 'The queued and running runs of the key\'s company or provider (#503)', security: [{ apiKeyAuth: [] }],
+      get: { tags: ['API'], summary: 'The queued and running runs of the key\'s company or provider (#503)', security: [{ apiKeyAuth: [] }, { apiAccountAuth: ['runs:read'] }],
         responses: { 200: { description: '{ running, queued, runs: [{ id, status, scenario_code, batch_id, position, queued_at, started_at }] }' }, 401: { description: 'Missing, invalid, expired or revoked key' } } },
     },
     '/v1/company/reference': {

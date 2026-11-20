@@ -1262,7 +1262,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   as `profile.html?api_account=<uuid>` (`API_ACCOUNT_ID`,
   `credentialsUrl()`) edits only that account's credentials. **A new route
   that reads users by company decides whether an API account belongs in its
-  answer.**
+  answer.** **PR 2 (1.11.557): signing in.** `api_account_key` (migration
+  58; PEM public keys, ES256 P-256 or PS256 RSA 2048+, two active,
+  `fingerprint` = SHA-256 of the SPKI, base64url) and `api_assertion_jti`.
+  `POST /v1/api/oauth/token` (`api-oauth.js`, mounted **before**
+  `/v1/api`, whose router asks a key or token on every route): form only,
+  `utils/clientAssertion.js` `verifyAssertion()` (alg from the allow-list
+  only, so HS256-with-the-public-key and `none` fail), `aud` = token URL or
+  `oscarBase()` (`APP_URL`; production never reads the Host header), jti
+  once. The token (`utils/apiAccessTokens.js`) is HS256 with a key derived
+  from `JWT_SECRET` ("oscar-api-access-token/v1"), so it never verifies as a
+  session nor a session as it. `/v1/api` uses `requireApiCaller`
+  (`middleware/apiCaller.js`: an `oscar_` key goes to `requireApiKey`) and
+  `needScope('runs:read')`; `callerScope()` in `api.js` reads an
+  account's own runs. Suspension sets `sessions_valid_after`: tokens issued
+  before it stay dead after a resume. **Every refusal on `/v1/api` keeps the
+  key's text** ("Missing, invalid, expired or revoked API key."), pinned by
+  `api-keys.test.js`.
 - **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
   The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
   read "100 scenarios". `whole_batches=1` adds the rest of each batch on the

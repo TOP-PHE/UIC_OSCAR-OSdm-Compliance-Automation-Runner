@@ -67,4 +67,27 @@ module.exports = {
       parameters: ACCOUNT,
       responses: { 200: { description: 'The test\'s outcome' }, ...TM_ONLY, ...NO_ACCOUNT, 409: { description: 'The account is not given this provider' }, 429: { description: 'Too many tests' } } },
   },
+  '/v1/company/api-accounts/{id}/keys': {
+    get: { tags: ['Company'], summary: "A Company API account's public keys and how it asks a token (#1342)", security: bearer,
+      description: `${WHO} { client_id, token_url, active_keys, max_active_keys, algorithms, keys: [{ id, alg, fingerprint, created_by, created_at, last_used_at, revoked_at, revoked_by, state }] }. A key is public: OSCAR never holds the private key.`,
+      parameters: ACCOUNT,
+      responses: { 200: { description: 'The keys' }, ...TM_ONLY, ...NO_ACCOUNT } },
+    post: { tags: ['Company'], summary: 'Give a Company API account a public key (#1342)', security: bearer,
+      description: `${WHO} Body: { public_key }: a PEM public key, EC P-256 (ES256) or RSA of 2048 bits or more (PS256). A private key is refused. Two active keys at most, for a rotation. Answer 201, the key.`,
+      parameters: ACCOUNT, requestBody: jsonBody('{ public_key }'),
+      responses: { 201: { description: 'The key' }, 400: { description: 'Not a public key of a kind accepted, or a private key' }, ...TM_ONLY, ...NO_ACCOUNT, 409: { description: 'The key is already there, or two keys are active' } } },
+  },
+  '/v1/company/api-accounts/{id}/keys/{keyId}': {
+    delete: { tags: ['Company'], summary: "Revoke a Company API account's public key (#1342)", security: bearer,
+      description: `${WHO} Effective at once for new tokens; a token already given lives its 15 minutes. Revoking a revoked key changes nothing.`,
+      parameters: [...ACCOUNT, pathParam('keyId', 'The key')],
+      responses: { 200: { description: 'The key, revoked' }, ...TM_ONLY, 404: { description: 'No such account or key here' } } },
+  },
+  '/v1/api/oauth/token': {
+    post: { tags: ['API'], summary: 'An access token for a Company API account: client credentials with private_key_jwt (#1342)', security: [],
+      description: `application/x-www-form-urlencoded (RFC 6749 §4.4, RFC 7523): grant_type=client_credentials, client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer, client_assertion=<JWT>, scope (optional, "runs:read runs:write" by default), client_id (optional, the iss of the assertion). The assertion is signed ES256 or PS256 with the account's private key: iss = sub = the account's client_id, aud = this token endpoint (or OSCAR's address), exp at most 5 minutes after iat, a jti used once. Answer { access_token, token_type: "Bearer", expires_in: 900, scope }, never cached. Errors are RFC 6749 §5.2: { error, error_description }. 30 requests a minute per address.`,
+      requestBody: { required: true, content: { 'application/x-www-form-urlencoded': { schema: { type: 'object', required: ['grant_type', 'client_assertion_type', 'client_assertion'],
+        properties: { grant_type: { type: 'string', enum: ['client_credentials'] }, client_assertion_type: { type: 'string' }, client_assertion: { type: 'string' }, scope: { type: 'string' }, client_id: { type: 'string' } } } } } },
+      responses: { 200: { description: 'The access token' }, 400: { description: 'invalid_request, unsupported_grant_type or invalid_scope' }, 401: { description: 'invalid_client: the account, its key or the assertion was not accepted' }, 429: { description: 'slow_down' }, 503: { description: 'APP_URL is not set in production' } } },
+  },
 };

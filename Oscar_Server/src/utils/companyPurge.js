@@ -40,7 +40,7 @@ const OWNED = [
   'run_requests', 'run_assertions', 'run_suites', 'run_share', 'run_batch', 'security_event',
   'report_comparisons', 'report_templates', 'test_frameworks', 'test_resources', 'places_cache',
   'run_selections', 'tester_credentials', 'provider_access', 'finding_suggestion', 'finding',
-  'ai_access_request', 'ai_config', 'ai_analysis', 'ai_setup', 'provider_checklist', 'api_key', 'api_account',
+  'ai_access_request', 'ai_config', 'ai_analysis', 'ai_setup', 'provider_checklist', 'api_key', 'api_account_key', 'api_account',
   'checklist_import', 'coverage_report', 'access_request', 'runs', 'users',
 ];
 // Kept: the audit trail. The company row itself goes last.

@@ -4,6 +4,17 @@
   "current_release": "2026.594",
   "releases": [
     {
+      "release": "2026.596",
+      "date": "2026-11-20",
+      "server": "1.11.557",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.557: API for test automation, part 2 (#1342): a Company API account signs in to the API with OAuth 2.0 client credentials and private_key_jwt (RFC 7523, decision D2). A Test Manager gives the account public keys (EC P-256 or RSA 2048+, PEM, two active at most; a private key is refused) on the API Accounts page. POST /v1/api/oauth/token (form) takes an assertion signed by the private key (iss = sub = the account, aud = the token endpoint or APP_URL, at most 5 minutes, a jti used once) and gives a 15-minute bearer token (scopes runs:read, runs:write), never cached; any refusal of the client is invalid_client. On /v1/api the token reads the runs the account launched; every route needs runs:read; a suspension ends every token issued before it; the token opens no page. Migration 58. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.595",
       "date": "2026-11-20",
       "server": "1.11.556",

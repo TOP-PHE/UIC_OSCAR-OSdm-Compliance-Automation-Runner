@@ -966,7 +966,8 @@ app.use('/v1/reports',         require('./api/routes/reports'));
 app.use('/v1/certifier',       require('./api/routes/certifier-coverage-reports'));   // reports shared with certifiers (#972)
 app.use('/v1/admin/simulator', require('./api/routes/admin-simulator'));   // the OSDM simulator's accounts (#930)
 app.use('/v1/admin',           require('./api/routes/admin'));
-app.use('/v1/api',             require('./api/routes/api'));   // read-only, by API key (#503)
+app.use('/v1/api/oauth',       require('./api/routes/api-oauth'));   // Company API accounts' token endpoint (#1342)
+app.use('/v1/api',             require('./api/routes/api'));   // by API key (#503) or a Company API account's token (#1342)
 
 // ── OpenAPI / Swagger UI ──────────────────────────────────────────────────────
 // Interactive API explorer at /v1/docs, raw spec at /v1/openapi.json.

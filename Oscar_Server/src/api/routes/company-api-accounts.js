@@ -20,6 +20,9 @@
  *   GET    /v1/company/api-accounts/:id/credentials    — its OSDM credentials (shown as "set?")
  *   PATCH  /v1/company/api-accounts/:id/credentials    — save them
  *   POST   /v1/company/api-accounts/:id/credentials/test — test what is saved
+ *   GET    /v1/company/api-accounts/:id/keys          — its public keys (private_key_jwt, #1342 D2)
+ *   POST   /v1/company/api-accounts/:id/keys          — add one: { public_key } (PEM), two active at most
+ *   DELETE /v1/company/api-accounts/:id/keys/:keyId   — revoke one
  *
  * Test Managers only. An account belongs to the distributor (the request's
  * company, or the distributor of the provider it names); the providers it may
@@ -49,6 +52,8 @@ const { testCredentials } = require('../../services/credentialTest');
 const { deleteUserAccount } = require('../../utils/userDeletion');
 const keptPods = require('../../worker/keptPods');
 const A = require('../../utils/apiAccounts');
+const CA = require('../../utils/clientAssertion');
+const Tokens = require('../../utils/apiAccessTokens');
 
 const router = express.Router();
 
@@ -107,7 +112,15 @@ function credentialsSet(c) {
   return !!c.access_token_enc;
 }
 
-function accountView(row, distributor) {
+// What a client needs to ask a token: its id and the token endpoint (null
+// when APP_URL is not set in production: the endpoint then answers 503).
+function signInOf(req, accountId) {
+  const base = Tokens.oscarBase(req);
+  const active = get('SELECT COUNT(*) AS n FROM api_account_key WHERE user_id = ? AND revoked_at IS NULL', [accountId]).n;
+  return { client_id: accountId, token_url: base ? base + Tokens.TOKEN_PATH : null, active_keys: active };
+}
+
+function accountView(row, distributor, req) {
   const providers = providersOf(row.id, distributor.id);
   const places = [{ id: distributor.id, name: distributor.name }, ...providers];
   return {
@@ -121,6 +134,7 @@ function accountView(row, distributor) {
     created_at: row.created_at,
     suspended_at: row.suspended_at || null,
     suspended_by: row.suspended_by_email || null,
+    ...(req ? signInOf(req, row.id) : {}),
   };
 }
 
@@ -160,7 +174,7 @@ router.get('/', (req, res) => {
   return res.json({
     company: { id: distributor.id, name: distributor.name },
     max_accounts: A.MAX_PER_COMPANY,
-    accounts: rows.map(r => accountView(accountRow(r.id, distributor.id), distributor)),
+    accounts: rows.map(r => accountView(accountRow(r.id, distributor.id), distributor, req)),
   });
 });
 
@@ -193,13 +207,13 @@ router.post('/', async (req, res) => {
     }
   });
   auditLog(req.user.id, distributor.id, req.user.email, `api_account_created:${id}`);
-  return res.status(201).json(accountView(accountRow(id, distributor.id), distributor));
+  return res.status(201).json(accountView(accountRow(id, distributor.id), distributor, req));
 });
 
 router.get('/:id', (req, res) => {
   const found = loaded(req, res);
   if (!found) return;
-  return res.json(accountView(found.row, found.distributor));
+  return res.json(accountView(found.row, found.distributor, req));
 });
 
 router.patch('/:id', (req, res) => {
@@ -237,7 +251,7 @@ router.patch('/:id', (req, res) => {
   for (const p of removed) keptPods.revokeUser(row.id, p);
   auditLog(req.user.id, distributor.id, req.user.email,
     `api_account_updated:${row.id}${name === null ? '' : ':name'}${providers ? ':providers' : ''}`);
-  return res.json(accountView(accountRow(row.id, distributor.id), distributor));
+  return res.json(accountView(accountRow(row.id, distributor.id), distributor, req));
 });
 
 router.post('/:id/suspend', (req, res) => {
@@ -252,7 +266,7 @@ router.post('/:id/suspend', (req, res) => {
     for (const place of placesOf(row.id, distributor.id)) keptPods.revokeUser(row.id, place);
     auditLog(req.user.id, distributor.id, req.user.email, `api_account_suspended:${row.id}`);
   }
-  return res.json(accountView(accountRow(row.id, distributor.id), distributor));
+  return res.json(accountView(accountRow(row.id, distributor.id), distributor, req));
 });
 
 router.post('/:id/resume', (req, res) => {
@@ -266,7 +280,7 @@ router.post('/:id/resume', (req, res) => {
     });
     auditLog(req.user.id, distributor.id, req.user.email, `api_account_resumed:${row.id}`);
   }
-  return res.json(accountView(accountRow(row.id, distributor.id), distributor));
+  return res.json(accountView(accountRow(row.id, distributor.id), distributor, req));
 });
 
 router.delete('/:id', (req, res) => {
@@ -316,6 +330,59 @@ router.post('/:id/credentials/test', testLimiter, async (req, res) => {
   const result = await testCredentials(place.row.id, place.companyId);
   auditLog(req.user.id, place.companyId, req.user.email, `api_account_credentials_tested:${place.row.id}:${result.outcome}`);
   return res.json(result);
+});
+
+// ── Its public keys: how it signs in to the API (private_key_jwt, #1342 D2) ──
+
+const keyView = k => ({
+  id: k.id, alg: k.alg, fingerprint: k.fingerprint,
+  created_by: k.created_by_email || null, created_at: k.created_at,
+  last_used_at: k.last_used_at || null, revoked_at: k.revoked_at || null, revoked_by: k.revoked_by_email || null,
+  state: k.revoked_at ? 'revoked' : 'active',
+});
+const KEY_FIELDS = `k.id, k.alg, k.fingerprint, k.created_at, k.last_used_at, k.revoked_at,
+  cb.email AS created_by_email, rb.email AS revoked_by_email`;
+const keysOf = (accountId) => all(`SELECT ${KEY_FIELDS} FROM api_account_key k
+  LEFT JOIN users cb ON cb.id = k.created_by LEFT JOIN users rb ON rb.id = k.revoked_by
+  WHERE k.user_id = ? ORDER BY k.created_at DESC, k.id`, [accountId]).map(keyView);
+
+router.get('/:id/keys', (req, res) => {
+  const found = loaded(req, res);
+  if (!found) return;
+  return res.json({ ...signInOf(req, found.row.id), max_active_keys: CA.MAX_KEYS, algorithms: CA.ALGORITHMS, keys: keysOf(found.row.id) });
+});
+
+router.post('/:id/keys', (req, res) => {
+  const found = loaded(req, res);
+  if (!found) return;
+  const { distributor, row } = found;
+  const key = CA.publicKeyOf(req.body?.public_key);
+  if (key.error) return bad(res, key.error);
+  const active = all('SELECT fingerprint FROM api_account_key WHERE user_id = ? AND revoked_at IS NULL', [row.id]);
+  if (active.some(k => k.fingerprint === key.fingerprint)) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: "This key is already one of the account's." });
+  }
+  if (active.length >= CA.MAX_KEYS) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: `An account has at most ${CA.MAX_KEYS} active keys: revoke the old one first.` });
+  }
+  const id = crypto.randomUUID();
+  run(`INSERT INTO api_account_key (id, user_id, company_id, alg, public_key, fingerprint, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`, [id, row.id, distributor.id, key.alg, key.pem, key.fingerprint, req.user.id]);
+  auditLog(req.user.id, distributor.id, req.user.email, `api_account_key_added:${row.id}:${key.fingerprint}`);
+  return res.status(201).json(keysOf(row.id).find(k => k.id === id));
+});
+
+router.delete('/:id/keys/:keyId', (req, res) => {
+  const found = loaded(req, res);
+  if (!found) return;
+  const { distributor, row } = found;
+  const key = get('SELECT id, fingerprint, revoked_at FROM api_account_key WHERE id = ? AND user_id = ?', [String(req.params.keyId), row.id]);
+  if (!key) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No such key for this account.' });
+  if (!key.revoked_at) {
+    run("UPDATE api_account_key SET revoked_at = datetime('now'), revoked_by = ? WHERE id = ? AND revoked_at IS NULL", [req.user.id, key.id]);
+    auditLog(req.user.id, distributor.id, req.user.email, `api_account_key_revoked:${row.id}:${key.fingerprint}`);
+  }
+  return res.json(keysOf(row.id).find(k => k.id === key.id));
 });
 
 module.exports = router;

@@ -15,8 +15,13 @@
  * credentials are saved on the API Config page, opened for that account
  * (profile.html?api_account=<id>).
  *
- * accountRowHtml(), providerBoxesHtml(), credentialsHtml() and whenText() are
- * pure top-level functions, lifted by the page test; the rest is wiring.
+ * Each account signs in to the API with private_key_jwt (#1342, D2): the page
+ * shows its client id and the token endpoint, and takes its public keys (two
+ * active at most) and revokes them. OSCAR never sees the private key.
+ *
+ * accountRowHtml(), providerBoxesHtml(), credentialsHtml(), keysSectionHtml()
+ * and whenText() are pure top-level functions, lifted by the page test; the
+ * rest is wiring.
  */
 
 const ACCOUNT_STATE_STYLE = {
@@ -76,6 +81,33 @@ function accountRowHtml(a, providers) {
     + '</td></tr>';
 }
 
+// How one account signs in: its client id, the token endpoint, its keys, a box for a new one.
+function keysSectionHtml(a, k) {
+  const id = esc(a.id);
+  const rows = (k.keys || []).map(key => '<tr>'
+    + '<td>' + esc(key.alg) + '</td>'
+    + '<td><code>' + esc(key.fingerprint) + '</code></td>'
+    + '<td>' + esc(key.state === 'active' ? 'active' : 'revoked') + '</td>'
+    + '<td>' + esc(key.created_by || '—') + '<div class="muted">' + esc(whenText(key.created_at)) + '</div></td>'
+    + '<td>' + esc(whenText(key.last_used_at)) + '</td>'
+    + '<td>' + (key.state === 'active'
+      ? '<button class="btn btn-danger btn-sm" data-action="revoke-key" data-id="' + id + '" data-key="' + esc(key.id) + '">Revoke</button>'
+      : '') + '</td></tr>').join('');
+  const full = (k.active_keys || 0) >= (k.max_active_keys || 2);
+  return '<section class="keys"><h4>' + esc(a.name) + '</h4>'
+    + '<div class="muted">client_id <code>' + esc(k.client_id || a.id) + '</code> · token endpoint <code>'
+    + esc(k.token_url || 'APP_URL is not set on the server') + '</code></div>'
+    + (rows
+      ? '<table><thead><tr><th>Algorithm</th><th>Fingerprint (kid)</th><th>State</th><th>Added by</th><th>Last used</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+      : '<div class="empty">No key yet: the account cannot sign in.</div>')
+    + (full
+      ? '<p class="muted">Two keys are active: revoke the old one before adding another.</p>'
+      : '<label class="muted" for="key-' + id + '">Public key (PEM)</label>'
+        + '<textarea id="key-' + id + '" data-key-for="' + id + '" rows="4" placeholder="-----BEGIN PUBLIC KEY-----"></textarea>'
+        + '<button class="btn btn-primary btn-sm" data-action="add-key" data-id="' + id + '">Add this public key</button>')
+    + '</section>';
+}
+
 (function () {
   if (typeof document === 'undefined') return;
   const list = document.getElementById('accounts-list');
@@ -112,6 +144,35 @@ function accountRowHtml(a, providers) {
       ? '<table><thead><tr><th>Account</th><th>State</th><th>Providers it may use</th><th>OSDM credentials</th><th></th></tr></thead><tbody>'
         + accounts.map(a => accountRowHtml(a, providers)).join('') + '</tbody></table>'
       : '<div class="empty">No Company API account yet.</div>';
+    await loadKeys();
+  }
+
+  async function loadKeys() {
+    const box = document.getElementById('keys-list');
+    if (!accounts.length) { box.innerHTML = '<div class="empty">Make an account first.</div>'; return; }
+    const answers = await Promise.all(accounts.map(a => fetch(accountUrl(a.id) + '/keys')
+      .then(r => (r.ok ? r.json() : null)).catch(() => null)));
+    box.innerHTML = accounts.map((a, i) => (answers[i]
+      ? keysSectionHtml(a, answers[i])
+      : '<section class="keys"><h4>' + esc(a.name) + '</h4><div class="empty">Its keys could not be loaded.</div></section>')).join('');
+  }
+
+  async function addKey(id) {
+    const field = document.getElementById('key-' + id);
+    const pem = (field?.value || '').trim();
+    if (!pem) { showMsg('Paste the public key first ("-----BEGIN PUBLIC KEY-----").', false); return; }
+    const res = await fetch(accountUrl(id) + '/keys', json('POST', { public_key: pem }));
+    if (!res.ok) { showMsg(await readError(res, 'The key was not added.'), false); return; }
+    showMsg('Key added: the account can sign in with the matching private key.', true);
+    await loadKeys();
+  }
+
+  async function revokeKey(id, keyId) {
+    if (!confirm('Revoke this key? No new token is given with it; a token already given lives its 15 minutes.')) return;
+    const res = await fetch(accountUrl(id) + '/keys/' + encodeURIComponent(keyId), { method: 'DELETE' });
+    if (!res.ok) { showMsg(await readError(res, 'The key was not revoked.'), false); return; }
+    showMsg('Key revoked.', true);
+    await loadKeys();
   }
 
   async function create() {
@@ -167,6 +228,8 @@ function accountRowHtml(a, providers) {
     if (action === 'create') create().catch(reportError);
     else if (action === 'rename') rename(el.dataset.id).catch(reportError);
     else if (['suspend', 'resume', 'delete'].includes(action)) act(el.dataset.id, action).catch(reportError);
+    else if (action === 'add-key') addKey(el.dataset.id).catch(reportError);
+    else if (action === 'revoke-key') revokeKey(el.dataset.id, el.dataset.key).catch(reportError);
   });
   document.addEventListener('change', (e) => {
     const box = e.target.closest('input[data-action="toggle-provider"]');
@@ -177,6 +240,7 @@ function accountRowHtml(a, providers) {
     load().catch(reportError);
   } else {
     document.getElementById('create-card').style.display = 'none';
+    document.getElementById('keys-card').style.display = 'none';
     list.innerHTML = '<div class="empty">Company API accounts are managed by your company\'s Test Managers.</div>';
   }
 })();

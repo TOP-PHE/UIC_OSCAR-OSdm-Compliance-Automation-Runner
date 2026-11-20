@@ -1298,6 +1298,33 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_api_account_company ON api_account(company_id, created_at)');
   }},
+  { version: 58, name: 'api-account-keys', up: () => {
+      // #1342 (D2) - a Company API account signs in with private_key_jwt: the
+      // public keys its company gave (two at once at most, for a rotation),
+      // never a private key or a secret. And the assertion ids already used,
+      // kept until the assertion expires, so none is accepted twice.
+      db.exec(`CREATE TABLE IF NOT EXISTS api_account_key (
+        id            TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        alg           TEXT NOT NULL,
+        public_key    TEXT NOT NULL,
+        fingerprint   TEXT NOT NULL,
+        created_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        last_used_at  TEXT,
+        revoked_at    TEXT,
+        revoked_by    TEXT REFERENCES users(id) ON DELETE SET NULL
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_api_account_key_user ON api_account_key(user_id, created_at)');
+      db.exec(`CREATE TABLE IF NOT EXISTS api_assertion_jti (
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        jti         TEXT NOT NULL,
+        expires_at  INTEGER NOT NULL,
+        PRIMARY KEY (user_id, jti)
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_api_assertion_jti_expiry ON api_assertion_jti(expires_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
